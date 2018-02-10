@@ -1,0 +1,23 @@
+[package]
+name = "sabre-cli"
+version = "0.1.0"
+authors = ["Cargill Incorporated"]
+build = "build.rs"
+
+[[bin]]
+name = "sabre"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2"
+futures = "0.1"
+hyper = "0.11"
+protobuf = "1.4"
+rust-crypto = "0.2"
+sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
+tokio-core = "0.1"
+users = "0.6"
+yaml-rust = "0.4"
+
+[build-dependencies]
+protoc-rust = "1.4"
