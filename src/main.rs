@@ -26,6 +26,7 @@ extern crate yaml_rust;
 mod error;
 mod execute;
 mod key;
+mod namespace;
 mod protos;
 mod submit;
 mod transaction;
@@ -60,6 +61,18 @@ fn run() -> Result<(), error::CliError> {
             (@arg inputs: --inputs +takes_value "Input addresses used by the contract")
             (@arg outputs: --outputs +takes_value "Output addresses used by the contract")
         )
+        (@subcommand ns =>
+            (about: "create, update, or delete a Sabre namespace")
+            (@group action =>
+                (@arg create: -c --create "Create the namespace")
+                (@arg update: -u --update "Update the namespace")
+                (@arg delete: -d --delete "Delete the namespace")
+            )
+            (@arg namespace: +required "A global state address prefix (namespace)")
+            (@arg key: -k --key +takes_value "Signing key name")
+            (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
+            (@arg owner: -O --owner +takes_value +multiple "Owner of this namespace")
+        )
     ).get_matches();
 
     if let Some(upload_matches) = matches.subcommand_matches("upload") {
@@ -87,6 +100,26 @@ fn run() -> Result<(), error::CliError> {
         }?;
 
         execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
+    }
+
+    if let Some(ns_matches) = matches.subcommand_matches("ns") {
+        let namespace = ns_matches.value_of("namespace").unwrap();
+        let key_name = ns_matches.value_of("key");
+        let url = ns_matches.value_of("url").unwrap_or("http://localhost:8008/");
+        let owners = ns_matches.values_of("owner").map(|values| values.map(|v| v.into()).collect());
+
+        if matches.is_present("update") {
+            let o = owners.ok_or(error::CliError::UserError("update action requires one or more --owner arguments".into()))?;
+            namespace::do_ns_update(key_name, &url, &namespace, o)?;
+        } else if matches.is_present("delete") {
+            if matches.is_present("owner") {
+                return Err(error::CliError::UserError("arguments --delete and --owner conflict".into()));
+            }
+            namespace::do_ns_delete(key_name, &url, &namespace)?;
+        } else {
+            let o = owners.ok_or(error::CliError::UserError("create action requires one or more --owner arguments".into()))?;
+            namespace::do_ns_create(key_name, &url, &namespace, o)?;
+        }
     }
 
     Ok(())
