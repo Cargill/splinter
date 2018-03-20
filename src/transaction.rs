@@ -109,7 +109,7 @@ fn compute_contract_address(name: &str, version: &str) -> String {
     sha.input(s.as_bytes());
     sha.result(hash);
 
-    String::from(CONTRACT_REGISTRY_PREFIX) + &bytes_to_hex_str(hash)[..64]
+    String::from(CONTRACT_PREFIX) + &bytes_to_hex_str(hash)[..64]
 }
 
 /// Returns a Transaction for the given Payload and Signer
