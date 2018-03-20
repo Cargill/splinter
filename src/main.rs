@@ -107,11 +107,10 @@ fn run() -> Result<(), error::CliError> {
         let key_name = ns_matches.value_of("key");
         let url = ns_matches.value_of("url").unwrap_or("http://localhost:8008/");
         let owners = ns_matches.values_of("owner").map(|values| values.map(|v| v.into()).collect());
-
-        if matches.is_present("update") {
+        if ns_matches.is_present("update") {
             let o = owners.ok_or(error::CliError::UserError("update action requires one or more --owner arguments".into()))?;
             namespace::do_ns_update(key_name, &url, &namespace, o)?;
-        } else if matches.is_present("delete") {
+        } else if ns_matches.is_present("delete") {
             if matches.is_present("owner") {
                 return Err(error::CliError::UserError("arguments --delete and --owner conflict".into()));
             }
