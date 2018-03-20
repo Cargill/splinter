@@ -19,6 +19,7 @@ use std::time::Instant;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
+use crypto::sha2::Sha256;
 
 use protobuf;
 use protobuf::Message;
@@ -48,6 +49,8 @@ const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
 
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &'static str = "00ec02";
+
+const SETTING_PREFIX: &'static str = "000000";
 
 /// Creates a nonce appropriate for a TransactionHeader
 fn create_nonce() -> String {
@@ -110,6 +113,29 @@ fn compute_contract_address(name: &str, version: &str) -> String {
     sha.result(hash);
 
     String::from(CONTRACT_PREFIX) + &bytes_to_hex_str(hash)[..64]
+}
+
+/// Returns a state address for a the setting sawtooth.swa.administrators
+fn compute_setting_admin_address() -> String {
+    SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16) + &hash_256("swa", 16)
+        + &hash_256("administrators", 16) + &hash_256("", 16)
+}
+
+/// Returns a Sha256 hash of the given length
+///
+/// # Arguments
+///
+/// * `to_hash` - string to hash
+/// * `num` - the length of the string returned
+fn hash_256(to_hash: &str, num: usize) -> String {
+    let mut sha = Sha256::new();
+    sha.input_str(to_hash);
+    let temp = sha.result_str().to_string();
+    let hash = match temp.get(..num) {
+        Some(x) => x,
+        None => "",
+    };
+    hash.to_string()
 }
 
 /// Returns a Transaction for the given Payload and Signer
@@ -194,17 +220,20 @@ pub fn create_transaction(payload: &payload::SabrePayload,
         },
         Action::CREATE_NAMESPACE_REGISTRY => {
             let namespace = payload.get_create_namespace_registry().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)];
+            let addresses = vec![compute_namespace_registry_address(namespace),
+                                 compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::DELETE_NAMESPACE_REGISTRY => {
             let namespace = payload.get_delete_namespace_registry().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)];
+            let addresses = vec![compute_namespace_registry_address(namespace),
+                                 compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
             let namespace = payload.get_update_namespace_registry_owners().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)];
+            let addresses = vec![compute_namespace_registry_address(namespace),
+                                 compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
