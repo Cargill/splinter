@@ -21,6 +21,8 @@ use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::CreateNamespaceRegistryAction;
 use protos::payload::UpdateNamespaceRegistryOwnersAction;
 use protos::payload::DeleteNamespaceRegistryAction;
+use protos::payload::CreateNamespaceRegistryPermissionAction;
+use protos::payload::DeleteNamespaceRegistryPermissionAction;
 use transaction::{create_transaction, create_batch, create_batch_list_from_one};
 use submit::submit_batch_list;
 
@@ -85,6 +87,62 @@ pub fn do_ns_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Resul
     let mut payload = SabrePayload::new();
     payload.action = SabrePayload_Action::DELETE_NAMESPACE_REGISTRY;
     payload.set_delete_namespace_registry(action);
+
+    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let batch = create_batch(txn, &signer, &public_key)?;
+    let batch_list = create_batch_list_from_one(batch);
+
+    submit_batch_list(url, &batch_list)?;
+
+    Ok(())
+}
+
+pub fn do_perm_create(
+        key_name: Option<&str>,
+        url: &str,
+        namespace: &str,
+        contract: &str,
+        read: bool,
+        write: bool
+    ) -> Result<(), CliError> {
+
+    let private_key = key::load_signing_key(key_name)?;
+    let context = signing::create_context("secp256k1")?;
+    let public_key = context.get_public_key(&private_key)?.as_hex();
+    let factory = signing::CryptoFactory::new(&*context);
+    let signer = factory.new_signer(&private_key);
+
+    let mut action = CreateNamespaceRegistryPermissionAction::new();
+    action.set_namespace(namespace.into());
+    action.set_contract_name(contract.into());
+    action.set_read(read);
+    action.set_write(write);
+
+    let mut payload = SabrePayload::new();
+    payload.action = SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION;
+    payload.set_create_namespace_registry_permission(action);
+
+    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let batch = create_batch(txn, &signer, &public_key)?;
+    let batch_list = create_batch_list_from_one(batch);
+
+    submit_batch_list(url, &batch_list)?;
+
+    Ok(())
+}
+pub fn do_perm_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<(), CliError> {
+    let private_key = key::load_signing_key(key_name)?;
+    let context = signing::create_context("secp256k1")?;
+    let public_key = context.get_public_key(&private_key)?.as_hex();
+    let factory = signing::CryptoFactory::new(&*context);
+    let signer = factory.new_signer(&private_key);
+
+    let mut action = DeleteNamespaceRegistryPermissionAction::new();
+    action.set_namespace(namespace.into());
+
+    let mut payload = SabrePayload::new();
+    payload.action = SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION;
+    payload.set_delete_namespace_registry_permission(action);
 
     let txn = create_transaction(&payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;

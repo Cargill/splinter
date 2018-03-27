@@ -73,6 +73,16 @@ fn run() -> Result<(), error::CliError> {
             (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
             (@arg owner: -O --owner +takes_value +multiple "Owner of this namespace")
         )
+        (@subcommand perm =>
+            (about: "set or delete a Sabre namespace permission")
+            (@arg namespace: +required "A global state address prefix (namespace)")
+            (@arg contract: +required "Name of the contract")
+            (@arg key: -k --key +takes_value "Signing key name")
+            (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
+            (@arg delete: -d --delete "Remove all permissions")
+            (@arg read: -r --read conflicts_with[delete] "Set read permission")
+            (@arg write: -w --write conflicts_with[delete] "Set write permission")
+        )
     ).get_matches();
 
     if let Some(upload_matches) = matches.subcommand_matches("upload") {
@@ -118,6 +128,26 @@ fn run() -> Result<(), error::CliError> {
         } else {
             let o = owners.ok_or(error::CliError::UserError("create action requires one or more --owner arguments".into()))?;
             namespace::do_ns_create(key_name, &url, &namespace, o)?;
+        }
+    }
+
+    if let Some(perm_matches) = matches.subcommand_matches("perm") {
+        let namespace = perm_matches.value_of("namespace").unwrap();
+        let contract = perm_matches.value_of("contract").unwrap();
+        let key_name = perm_matches.value_of("key");
+        let url = perm_matches.value_of("url").unwrap_or("http://localhost:8008/");
+
+        if perm_matches.is_present("delete") {
+            namespace::do_perm_delete(key_name, &url, &namespace)?;
+        } else {
+            let read = perm_matches.is_present("read");
+            let write = perm_matches.is_present("write");
+
+            if !(read || write) {
+                return Err(error::CliError::UserError("no permissions provided".into()));
+            }
+
+            namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?;
         }
     }
 
