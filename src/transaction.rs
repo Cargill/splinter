@@ -261,12 +261,14 @@ pub fn create_transaction(payload: &payload::SabrePayload,
         },
         Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
             let namespace = payload.get_create_namespace_registry_permission().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)];
+            let addresses = vec![compute_namespace_registry_address(namespace),
+                                 compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
             let namespace = payload.get_delete_namespace_registry_permission().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)];
+            let addresses = vec![compute_namespace_registry_address(namespace),
+                                 compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
     };
