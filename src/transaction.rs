@@ -193,13 +193,36 @@ pub fn create_transaction(payload: &payload::SabrePayload,
             let name = payload.get_execute_contract().get_name();
             let version = payload.get_execute_contract().get_version();
 
-            let input_addresses = vec![
+            let mut input_addresses = vec![
                 compute_contract_registry_address(name),
-                compute_contract_address(name, version)];
+                compute_contract_address(name, version),
+                ];
+            for input in payload.get_execute_contract().get_inputs() {
+                let namespace = match input.get(..6) {
+                    Some(namespace) => namespace,
+                    None =>  return Err(CliError::UserError(
+                        format!("Input must be atleast 6 characters long: {} ", input)))
+                };
 
-            let output_addresses = vec![
+                input_addresses.push(compute_namespace_registry_address(namespace));
+            }
+            input_addresses.append(&mut payload.get_execute_contract().get_inputs().to_vec());
+
+            let mut output_addresses = vec![
                 compute_contract_registry_address(name),
-                compute_contract_address(name, version)];
+                compute_contract_address(name, version),
+                ];
+
+            for output in payload.get_execute_contract().get_outputs() {
+                let namespace = match output.get(..6) {
+                    Some(namespace) => namespace,
+                    None =>  return Err(CliError::UserError(
+                        format!("Output must be atleast 6 characters long: {} ", output)))
+                };
+
+                output_addresses.push(compute_namespace_registry_address(namespace));
+            }
+            output_addresses.append(&mut payload.get_execute_contract().get_outputs().to_vec());
 
             (input_addresses, output_addresses)
         },
