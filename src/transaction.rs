@@ -72,14 +72,24 @@ fn bytes_to_hex_str(b: &[u8]) -> String {
 /// # Arguments
 ///
 /// * `namespace` - the address prefix for this namespace
-fn compute_namespace_registry_address(namespace: &str) -> String {
+fn compute_namespace_registry_address(namespace: &str) -> Result<String, CliError> {
+    let prefix = match namespace.get(..6) {
+        Some(x) => x,
+        None => {
+            return Err(CliError::UserError(format!(
+                "Namespace must be at least 6 characters long: {}",
+                namespace
+            )))
+        }
+    };
+
     let hash: &mut [u8] = & mut [0; 64];
 
     let mut sha = Sha512::new();
-    sha.input(namespace.as_bytes());
+    sha.input(prefix.as_bytes());
     sha.result(hash);
 
-    String::from(NAMESPACE_REGISTRY_PREFIX) + &bytes_to_hex_str(hash)[..64]
+    Ok(String::from(NAMESPACE_REGISTRY_PREFIX) + &bytes_to_hex_str(hash)[..64])
 }
 
 /// Returns a state address for a given contract registry
@@ -200,11 +210,15 @@ pub fn create_transaction(payload: &payload::SabrePayload,
             for input in payload.get_execute_contract().get_inputs() {
                 let namespace = match input.get(..6) {
                     Some(namespace) => namespace,
-                    None =>  return Err(CliError::UserError(
-                        format!("Input must be atleast 6 characters long: {} ", input)))
+                    None => {
+                        return Err(CliError::UserError(format!(
+                            "Input must be at least 6 characters long: {}",
+                            input
+                        )))
+                    }
                 };
 
-                input_addresses.push(compute_namespace_registry_address(namespace));
+                input_addresses.push(compute_namespace_registry_address(namespace)?);
             }
             input_addresses.append(&mut payload.get_execute_contract().get_inputs().to_vec());
 
@@ -216,11 +230,15 @@ pub fn create_transaction(payload: &payload::SabrePayload,
             for output in payload.get_execute_contract().get_outputs() {
                 let namespace = match output.get(..6) {
                     Some(namespace) => namespace,
-                    None =>  return Err(CliError::UserError(
-                        format!("Output must be atleast 6 characters long: {} ", output)))
+                    None => {
+                        return Err(CliError::UserError(format!(
+                            "Output must be at least 6 characters long: {}",
+                            output
+                        )))
+                    }
                 };
 
-                output_addresses.push(compute_namespace_registry_address(namespace));
+                output_addresses.push(compute_namespace_registry_address(namespace)?);
             }
             output_addresses.append(&mut payload.get_execute_contract().get_outputs().to_vec());
 
@@ -243,31 +261,31 @@ pub fn create_transaction(payload: &payload::SabrePayload,
         },
         Action::CREATE_NAMESPACE_REGISTRY => {
             let namespace = payload.get_create_namespace_registry().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace),
+            let addresses = vec![compute_namespace_registry_address(namespace)?,
                                  compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::DELETE_NAMESPACE_REGISTRY => {
             let namespace = payload.get_delete_namespace_registry().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace),
+            let addresses = vec![compute_namespace_registry_address(namespace)?,
                                  compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
             let namespace = payload.get_update_namespace_registry_owners().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace),
+            let addresses = vec![compute_namespace_registry_address(namespace)?,
                                  compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
             let namespace = payload.get_create_namespace_registry_permission().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace),
+            let addresses = vec![compute_namespace_registry_address(namespace)?,
                                  compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
         Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
             let namespace = payload.get_delete_namespace_registry_permission().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace),
+            let addresses = vec![compute_namespace_registry_address(namespace)?,
                                  compute_setting_admin_address()];
             (addresses.clone(), addresses)
         },
