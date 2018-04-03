@@ -99,8 +99,8 @@ fn run() -> Result<(), error::CliError> {
         let key_name = exec_matches.value_of("key");
         let url = exec_matches.value_of("url").unwrap_or("http://localhost:8008/");
 
-        let inputs = exec_matches.value_of("inputs").unwrap_or("*").split(":").map(|i| i.into()).collect();
-        let outputs = exec_matches.value_of("outputs").unwrap_or("*").split(":").map(|o| o.into()).collect();
+        let inputs = exec_matches.value_of("inputs").unwrap_or("").split(":").map(|i| i.into()).collect();
+        let outputs = exec_matches.value_of("outputs").unwrap_or("").split(":").map(|o| o.into()).collect();
 
         let (name, version) = match contract.split(":").collect::<Vec<_>>() {
             ref v if (v.len() == 1 || v.len() == 2) && v[0].len() == 0 => Err(error::CliError::UserError("contract name must be specified".into())),
