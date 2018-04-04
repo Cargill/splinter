@@ -26,7 +26,7 @@ use error::CliError;
 use key;
 use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::CreateContractAction;
-use transaction::{create_transaction, create_batch, create_batch_list_from_one};
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 use submit::submit_batch_list;
 
 pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<(), CliError> {
@@ -52,7 +52,8 @@ pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<()
         &definition.version,
         definition.inputs,
         definition.outputs,
-        contract);
+        contract,
+    );
 
     let txn = create_transaction(&payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
@@ -64,12 +65,12 @@ pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<()
 }
 
 fn create_upload_payload(
-        name: &str,
-        version: &str,
-        inputs: Vec<String>,
-        outputs: Vec<String>,
-        contract: Vec<u8>) -> SabrePayload {
-
+    name: &str,
+    version: &str,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
+    contract: Vec<u8>,
+) -> SabrePayload {
     let mut create_contract = CreateContractAction::new();
     create_contract.set_name(String::from(name));
     create_contract.set_version(String::from(version));
@@ -84,14 +85,22 @@ fn create_upload_payload(
 }
 
 fn load_contract_file(path: &Path) -> Result<Vec<u8>, CliError> {
-    let file = File::open(path).map_err(|e| CliError::UserError(format!(
-        "Could not load contract \"{}\": {}",
-        path.display(), e)))?;
+    let file = File::open(path).map_err(|e| {
+        CliError::UserError(format!(
+            "Could not load contract \"{}\": {}",
+            path.display(),
+            e
+        ))
+    })?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
-    buf_reader.read_to_end(&mut contents).map_err(|e| CliError::UserError(format!(
-        "IoError while reading contract \"{}\": {}",
-        path.display(), e)))?;
+    buf_reader.read_to_end(&mut contents).map_err(|e| {
+        CliError::UserError(format!(
+            "IoError while reading contract \"{}\": {}",
+            path.display(),
+            e
+        ))
+    })?;
 
     Ok(contents)
 }
@@ -106,58 +115,76 @@ struct ContractDefinition {
 
 impl ContractDefinition {
     fn load(filename: &str) -> Result<ContractDefinition, CliError> {
-        let file = File::open(filename).map_err(|e| CliError::UserError(format!(
-            "Could not load contract definition file \"{}\": {}",
-            filename, e)))?;
+        let file = File::open(filename).map_err(|e| {
+            CliError::UserError(format!(
+                "Could not load contract definition file \"{}\": {}",
+                filename, e
+            ))
+        })?;
         let mut buf_reader = BufReader::new(file);
         let mut contents = String::new();
-        buf_reader.read_to_string(&mut contents).map_err(|e| CliError::UserError(format!(
-            "IoError while reading contract definition file \"{}\": {}",
-            filename, e)))?;
+        buf_reader.read_to_string(&mut contents).map_err(|e| {
+            CliError::UserError(format!(
+                "IoError while reading contract definition file \"{}\": {}",
+                filename, e
+            ))
+        })?;
 
         let docs = YamlLoader::load_from_str(&contents).unwrap();
         if docs.is_empty() {
             return Err(CliError::UserError(format!(
                 "Malformed contract definition file \"{}\": no content",
-                filename)));
+                filename
+            )));
         }
         let doc = &docs[0];
 
         let name = doc["name"].as_str().ok_or(CliError::UserError(format!(
             "Malformed contract definition file \"{}\": missing string field \"name\"",
-            filename)))?;
+            filename
+        )))?;
 
         let version = doc["version"].as_str().ok_or(CliError::UserError(format!(
             "Malformed contract definition file \"{}\": missing string field \"version\"",
-            filename)))?;
+            filename
+        )))?;
 
         let wasm = doc["wasm"].as_str().ok_or(CliError::UserError(format!(
             "Malformed contract definition file \"{}\": missing string field \"wasm\"",
-            filename)))?;
+            filename
+        )))?;
 
         let inputs = doc["inputs"]
-            .as_vec().ok_or(CliError::UserError(format!(
+            .as_vec()
+            .ok_or(CliError::UserError(format!(
                 "Malformed contract definition file \"{}\": missing array \"inputs\"",
-                filename)))?
-            .into_iter().map(|y| {
+                filename
+            )))?
+            .into_iter()
+            .map(|y| {
                 y.as_str()
                  .ok_or(CliError::UserError(format!(
                      "Malformed contract definition file: \"{}\": inputs array contains non-string values",
                      filename)))
                  .map(|s| String::from(s))
-            }).collect::<Result<Vec<_>, CliError>>()?;
+            })
+            .collect::<Result<Vec<_>, CliError>>()?;
 
         let outputs = doc["outputs"]
-            .as_vec().ok_or(CliError::UserError(format!(
+            .as_vec()
+            .ok_or(CliError::UserError(format!(
                 "Malformed contract definition file \"{}\": missing array \"outputs\"",
-                filename)))?
-            .into_iter().map(|y| {
+                filename
+            )))?
+            .into_iter()
+            .map(|y| {
                 y.as_str()
                  .ok_or(CliError::UserError(format!(
                      "Malformed contract definition file: \"{}\": outputs array contains non-string values",
                      filename)))
                  .map(|s| String::from(s))
-            }).collect::<Result<Vec<_>, CliError>>()?;
+            })
+            .collect::<Result<Vec<_>, CliError>>()?;
 
         Ok(ContractDefinition {
             name: String::from(name),

@@ -23,10 +23,15 @@ use protos::payload::UpdateNamespaceRegistryOwnersAction;
 use protos::payload::DeleteNamespaceRegistryAction;
 use protos::payload::CreateNamespaceRegistryPermissionAction;
 use protos::payload::DeleteNamespaceRegistryPermissionAction;
-use transaction::{create_transaction, create_batch, create_batch_list_from_one};
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 use submit::submit_batch_list;
 
-pub fn do_ns_create(key_name: Option<&str>, url: &str, namespace: &str, owners: Vec<String>) -> Result<(), CliError> {
+pub fn do_ns_create(
+    key_name: Option<&str>,
+    url: &str,
+    namespace: &str,
+    owners: Vec<String>,
+) -> Result<(), CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -50,7 +55,12 @@ pub fn do_ns_create(key_name: Option<&str>, url: &str, namespace: &str, owners: 
     Ok(())
 }
 
-pub fn do_ns_update(key_name: Option<&str>, url: &str, namespace: &str, owners: Vec<String>) -> Result<(), CliError> {
+pub fn do_ns_update(
+    key_name: Option<&str>,
+    url: &str,
+    namespace: &str,
+    owners: Vec<String>,
+) -> Result<(), CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -98,14 +108,13 @@ pub fn do_ns_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Resul
 }
 
 pub fn do_perm_create(
-        key_name: Option<&str>,
-        url: &str,
-        namespace: &str,
-        contract: &str,
-        read: bool,
-        write: bool
-    ) -> Result<(), CliError> {
-
+    key_name: Option<&str>,
+    url: &str,
+    namespace: &str,
+    contract: &str,
+    read: bool,
+    write: bool,
+) -> Result<(), CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();

@@ -64,7 +64,10 @@ fn create_nonce() -> String {
 ///
 /// * `b` - input bytes
 fn bytes_to_hex_str(b: &[u8]) -> String {
-    b.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("")
+    b.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 /// Returns a state address for a given namespace registry
@@ -83,7 +86,7 @@ fn compute_namespace_registry_address(namespace: &str) -> Result<String, CliErro
         }
     };
 
-    let hash: &mut [u8] = & mut [0; 64];
+    let hash: &mut [u8] = &mut [0; 64];
 
     let mut sha = Sha512::new();
     sha.input(prefix.as_bytes());
@@ -98,7 +101,7 @@ fn compute_namespace_registry_address(namespace: &str) -> Result<String, CliErro
 ///
 /// * `name` - the name of the contract registry
 fn compute_contract_registry_address(name: &str) -> String {
-    let hash: &mut [u8] = & mut [0; 64];
+    let hash: &mut [u8] = &mut [0; 64];
 
     let mut sha = Sha512::new();
     sha.input(name.as_bytes());
@@ -114,7 +117,7 @@ fn compute_contract_registry_address(name: &str) -> String {
 /// * `name` - the name of the contract
 /// * `version` - the version of the contract
 fn compute_contract_address(name: &str, version: &str) -> String {
-    let hash: &mut [u8] = & mut [0; 64];
+    let hash: &mut [u8] = &mut [0; 64];
 
     let s = String::from(name) + "," + version;
 
@@ -163,9 +166,11 @@ fn hash_256(to_hash: &str, num: usize) -> String {
 /// returned.
 ///
 /// If a signing error occurs, a `CliError::SigningError` is returned.
-pub fn create_transaction(payload: &payload::SabrePayload,
-                          signer: &Signer,
-                          public_key: &String) -> Result<Transaction, CliError> {
+pub fn create_transaction(
+    payload: &payload::SabrePayload,
+    signer: &Signer,
+    public_key: &String,
+) -> Result<Transaction, CliError> {
     let mut txn = Transaction::new();
     let mut txn_header = TransactionHeader::new();
 
@@ -176,29 +181,29 @@ pub fn create_transaction(payload: &payload::SabrePayload,
     txn_header.set_batcher_public_key(public_key.clone());
 
     let (input_addresses, output_addresses) = match payload.get_action() {
-        Action::ACTION_UNSET => {
-            panic!("payload action was ACTION_UNSET")
-        },
+        Action::ACTION_UNSET => panic!("payload action was ACTION_UNSET"),
         Action::CREATE_CONTRACT => {
             let name = payload.get_create_contract().get_name();
             let version = payload.get_create_contract().get_version();
 
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_contract_address(name, version)];
+                compute_contract_address(name, version),
+            ];
 
             (addresses.clone(), addresses)
-        },
+        }
         Action::DELETE_CONTRACT => {
             let name = payload.get_delete_contract().get_name();
             let version = payload.get_delete_contract().get_version();
 
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_contract_address(name, version)];
+                compute_contract_address(name, version),
+            ];
 
             (addresses.clone(), addresses)
-        },
+        }
         Action::EXECUTE_CONTRACT => {
             let name = payload.get_execute_contract().get_name();
             let version = payload.get_execute_contract().get_version();
@@ -206,7 +211,7 @@ pub fn create_transaction(payload: &payload::SabrePayload,
             let mut input_addresses = vec![
                 compute_contract_registry_address(name),
                 compute_contract_address(name, version),
-                ];
+            ];
             for input in payload.get_execute_contract().get_inputs() {
                 let namespace = match input.get(..6) {
                     Some(namespace) => namespace,
@@ -225,7 +230,7 @@ pub fn create_transaction(payload: &payload::SabrePayload,
             let mut output_addresses = vec![
                 compute_contract_registry_address(name),
                 compute_contract_address(name, version),
-                ];
+            ];
 
             for output in payload.get_execute_contract().get_outputs() {
                 let namespace = match output.get(..6) {
@@ -243,52 +248,68 @@ pub fn create_transaction(payload: &payload::SabrePayload,
             output_addresses.append(&mut payload.get_execute_contract().get_outputs().to_vec());
 
             (input_addresses, output_addresses)
-        },
+        }
         Action::CREATE_CONTRACT_REGISTRY => {
             let name = payload.get_create_contract_registry().get_name();
             let addresses = vec![compute_contract_registry_address(name)];
             (addresses.clone(), addresses)
-        },
+        }
         Action::DELETE_CONTRACT_REGISTRY => {
             let name = payload.get_delete_contract_registry().get_name();
             let addresses = vec![compute_contract_registry_address(name)];
             (addresses.clone(), addresses)
-        },
+        }
         Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
             let name = payload.get_update_contract_registry_owners().get_name();
             let addresses = vec![compute_contract_registry_address(name)];
             (addresses.clone(), addresses)
-        },
+        }
         Action::CREATE_NAMESPACE_REGISTRY => {
             let namespace = payload.get_create_namespace_registry().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)?,
-                                 compute_setting_admin_address()];
+            let addresses = vec![
+                compute_namespace_registry_address(namespace)?,
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
-        },
+        }
         Action::DELETE_NAMESPACE_REGISTRY => {
             let namespace = payload.get_delete_namespace_registry().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)?,
-                                 compute_setting_admin_address()];
+            let addresses = vec![
+                compute_namespace_registry_address(namespace)?,
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
-        },
+        }
         Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
-            let namespace = payload.get_update_namespace_registry_owners().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)?,
-                                 compute_setting_admin_address()];
+            let namespace = payload
+                .get_update_namespace_registry_owners()
+                .get_namespace();
+            let addresses = vec![
+                compute_namespace_registry_address(namespace)?,
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
-        },
+        }
         Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
-            let namespace = payload.get_create_namespace_registry_permission().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)?,
-                                 compute_setting_admin_address()];
+            let namespace = payload
+                .get_create_namespace_registry_permission()
+                .get_namespace();
+            let addresses = vec![
+                compute_namespace_registry_address(namespace)?,
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
-        },
+        }
         Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
-            let namespace = payload.get_delete_namespace_registry_permission().get_namespace();
-            let addresses = vec![compute_namespace_registry_address(namespace)?,
-                                 compute_setting_admin_address()];
+            let namespace = payload
+                .get_delete_namespace_registry_permission()
+                .get_namespace();
+            let addresses = vec![
+                compute_namespace_registry_address(namespace)?,
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
-        },
+        }
     };
 
     txn_header.set_inputs(protobuf::RepeatedField::from_vec(input_addresses));
@@ -297,7 +318,7 @@ pub fn create_transaction(payload: &payload::SabrePayload,
     let payload_bytes = payload.write_to_bytes()?;
     let mut sha = Sha512::new();
     sha.input(&payload_bytes);
-    let hash: &mut [u8] = & mut [0; 64];
+    let hash: &mut [u8] = &mut [0; 64];
     sha.result(hash);
     txn_header.set_payload_sha512(bytes_to_hex_str(hash));
     txn.set_payload(payload_bytes);
@@ -326,15 +347,19 @@ pub fn create_transaction(payload: &payload::SabrePayload,
 /// returned.
 ///
 /// If a signing error occurs, a `CliError::SigningError` is returned.
-pub fn create_batch(txn: Transaction, signer: &Signer, public_key: &String) -> Result<Batch, CliError> {
+pub fn create_batch(
+    txn: Transaction,
+    signer: &Signer,
+    public_key: &String,
+) -> Result<Batch, CliError> {
     let mut batch = Batch::new();
     let mut batch_header = BatchHeader::new();
 
-    batch_header.set_transaction_ids(
-        protobuf::RepeatedField::from_vec(vec![txn.header_signature.clone()]));
+    batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![
+        txn.header_signature.clone(),
+    ]));
     batch_header.set_signer_public_key(public_key.clone());
-    batch.set_transactions(
-        protobuf::RepeatedField::from_vec(vec![txn]));
+    batch.set_transactions(protobuf::RepeatedField::from_vec(vec![txn]));
 
     let batch_header_bytes = batch_header.write_to_bytes()?;
     batch.set_header(batch_header_bytes.clone());
@@ -352,7 +377,6 @@ pub fn create_batch(txn: Transaction, signer: &Signer, public_key: &String) -> R
 /// * `batch` - a Batch
 pub fn create_batch_list_from_one(batch: Batch) -> BatchList {
     let mut batch_list = BatchList::new();
-    batch_list.set_batches(
-        protobuf::RepeatedField::from_vec(vec![batch]));
+    batch_list.set_batches(protobuf::RepeatedField::from_vec(vec![batch]));
     return batch_list;
 }

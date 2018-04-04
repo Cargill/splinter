@@ -50,22 +50,28 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
     let username: String = name.map(|s| String::from(s))
         .ok_or_else(|| env::var("USER"))
         .or_else(|_| get_current_username().ok_or(0))
-        .map_err(|_| CliError::UserError(String::from(
-            "Could not load signing key: unable to determine username")))?;
+        .map_err(|_| {
+            CliError::UserError(String::from(
+                "Could not load signing key: unable to determine username",
+            ))
+        })?;
 
     let private_key_filename = env::home_dir()
         .ok_or(CliError::UserError(String::from(
-            "Could not load signing key: unable to determine home directory")))
+            "Could not load signing key: unable to determine home directory",
+        )))
         .and_then(|mut p| {
-                p.push(".sawtooth");
-                p.push("keys");
-                p.push(format!("{}.priv", &username));
-                Ok(p)
-            })?;
+            p.push(".sawtooth");
+            p.push("keys");
+            p.push(format!("{}.priv", &username));
+            Ok(p)
+        })?;
 
     if !private_key_filename.as_path().exists() {
-        return Err(CliError::UserError(
-            format!("No such key file: {}", private_key_filename.display())));
+        return Err(CliError::UserError(format!(
+            "No such key file: {}",
+            private_key_filename.display()
+        )));
     }
 
     let mut f = File::open(&private_key_filename)?;
@@ -75,8 +81,12 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
 
     let key_str = match contents.lines().next() {
         Some(k) => k,
-        None => return Err(CliError::UserError(
-            format!("Empty key file: {}", private_key_filename.display())))
+        None => {
+            return Err(CliError::UserError(format!(
+                "Empty key file: {}",
+                private_key_filename.display()
+            )))
+        }
     };
 
     Ok(Secp256k1PrivateKey::from_hex(&key_str)?)

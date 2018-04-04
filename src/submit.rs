@@ -18,7 +18,7 @@ use hyper;
 use hyper::Method;
 use hyper::client::{Client, Request};
 use std::str;
-use hyper::header::{ContentType, ContentLength};
+use hyper::header::{ContentLength, ContentType};
 use futures::{future, Future};
 use futures::Stream;
 use tokio_core;
@@ -32,16 +32,18 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliErr
     let post_url = String::from(url) + "/batches";
     let hyper_uri = match post_url.parse::<hyper::Uri>() {
         Ok(uri) => uri,
-        Err(e) => return Err(CliError::UserError(format!("Invalid URL: {}: {}", e, url)))
+        Err(e) => return Err(CliError::UserError(format!("Invalid URL: {}: {}", e, url))),
     };
 
     match hyper_uri.scheme() {
         Some(scheme) => {
             if scheme != "http" {
-                return Err(CliError::UserError(
-                    format!("Unsupported scheme ({}) in URL: {}", scheme, url)));
+                return Err(CliError::UserError(format!(
+                    "Unsupported scheme ({}) in URL: {}",
+                    scheme, url
+                )));
             }
-        },
+        }
         None => {
             return Err(CliError::UserError(format!("No scheme in URL: {}", url)));
         }
@@ -49,8 +51,7 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliErr
 
     let mut core = tokio_core::reactor::Core::new()?;
     let handle = core.handle();
-    let client = Client::configure()
-        .build(&handle);
+    let client = Client::configure().build(&handle);
 
     let bytes = batch_list.write_to_bytes()?;
 
@@ -60,13 +61,15 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliErr
     req.set_body(bytes);
 
     let work = client.request(req).and_then(|res| {
-        res.body().fold(Vec::new(), |mut v, chunk| {
-            v.extend(&chunk[..]);
-            future::ok::<_, hyper::Error>(v)
-        }).and_then(move |chunks| {
-            let body = String::from_utf8(chunks).unwrap();
-            future::ok(body)
-        })
+        res.body()
+            .fold(Vec::new(), |mut v, chunk| {
+                v.extend(&chunk[..]);
+                future::ok::<_, hyper::Error>(v)
+            })
+            .and_then(move |chunks| {
+                let body = String::from_utf8(chunks).unwrap();
+                future::ok(body)
+            })
     });
 
     let body = core.run(work)?;

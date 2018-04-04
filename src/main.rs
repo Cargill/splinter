@@ -88,7 +88,9 @@ fn run() -> Result<(), error::CliError> {
     if let Some(upload_matches) = matches.subcommand_matches("upload") {
         let filename = upload_matches.value_of("filename").unwrap();
         let key_name = upload_matches.value_of("key");
-        let url = upload_matches.value_of("url").unwrap_or("http://localhost:8008/");
+        let url = upload_matches
+            .value_of("url")
+            .unwrap_or("http://localhost:8008/");
 
         upload::do_upload(&filename, key_name, &url)?;
     }
@@ -97,16 +99,32 @@ fn run() -> Result<(), error::CliError> {
         let contract = exec_matches.value_of("contract").unwrap();
         let payload = exec_matches.value_of("payload").unwrap();
         let key_name = exec_matches.value_of("key");
-        let url = exec_matches.value_of("url").unwrap_or("http://localhost:8008/");
+        let url = exec_matches
+            .value_of("url")
+            .unwrap_or("http://localhost:8008/");
 
-        let inputs = exec_matches.value_of("inputs").unwrap_or("").split(":").map(|i| i.into()).collect();
-        let outputs = exec_matches.value_of("outputs").unwrap_or("").split(":").map(|o| o.into()).collect();
+        let inputs = exec_matches
+            .value_of("inputs")
+            .unwrap_or("")
+            .split(":")
+            .map(|i| i.into())
+            .collect();
+        let outputs = exec_matches
+            .value_of("outputs")
+            .unwrap_or("")
+            .split(":")
+            .map(|o| o.into())
+            .collect();
 
         let (name, version) = match contract.split(":").collect::<Vec<_>>() {
-            ref v if (v.len() == 1 || v.len() == 2) && v[0].len() == 0 => Err(error::CliError::UserError("contract name must be specified".into())),
+            ref v if (v.len() == 1 || v.len() == 2) && v[0].len() == 0 => Err(
+                error::CliError::UserError("contract name must be specified".into()),
+            ),
             ref v if v.len() == 1 || v.len() == 2 && v[1].len() == 0 => Ok((v[0], "latest".into())),
             ref v if v.len() == 2 => Ok((v[0], v[1])),
-            _ => Err(error::CliError::UserError("malformed contract argument, may contain at most one ':'".into()))
+            _ => Err(error::CliError::UserError(
+                "malformed contract argument, may contain at most one ':'".into(),
+            )),
         }?;
 
         execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
@@ -115,18 +133,28 @@ fn run() -> Result<(), error::CliError> {
     if let Some(ns_matches) = matches.subcommand_matches("ns") {
         let namespace = ns_matches.value_of("namespace").unwrap();
         let key_name = ns_matches.value_of("key");
-        let url = ns_matches.value_of("url").unwrap_or("http://localhost:8008/");
-        let owners = ns_matches.values_of("owner").map(|values| values.map(|v| v.into()).collect());
+        let url = ns_matches
+            .value_of("url")
+            .unwrap_or("http://localhost:8008/");
+        let owners = ns_matches
+            .values_of("owner")
+            .map(|values| values.map(|v| v.into()).collect());
         if ns_matches.is_present("update") {
-            let o = owners.ok_or(error::CliError::UserError("update action requires one or more --owner arguments".into()))?;
+            let o = owners.ok_or(error::CliError::UserError(
+                "update action requires one or more --owner arguments".into(),
+            ))?;
             namespace::do_ns_update(key_name, &url, &namespace, o)?;
         } else if ns_matches.is_present("delete") {
             if matches.is_present("owner") {
-                return Err(error::CliError::UserError("arguments --delete and --owner conflict".into()));
+                return Err(error::CliError::UserError(
+                    "arguments --delete and --owner conflict".into(),
+                ));
             }
             namespace::do_ns_delete(key_name, &url, &namespace)?;
         } else {
-            let o = owners.ok_or(error::CliError::UserError("create action requires one or more --owner arguments".into()))?;
+            let o = owners.ok_or(error::CliError::UserError(
+                "create action requires one or more --owner arguments".into(),
+            ))?;
             namespace::do_ns_create(key_name, &url, &namespace, o)?;
         }
     }
@@ -135,7 +163,9 @@ fn run() -> Result<(), error::CliError> {
         let namespace = perm_matches.value_of("namespace").unwrap();
         let contract = perm_matches.value_of("contract").unwrap();
         let key_name = perm_matches.value_of("key");
-        let url = perm_matches.value_of("url").unwrap_or("http://localhost:8008/");
+        let url = perm_matches
+            .value_of("url")
+            .unwrap_or("http://localhost:8008/");
 
         if perm_matches.is_present("delete") {
             namespace::do_perm_delete(key_name, &url, &namespace)?;

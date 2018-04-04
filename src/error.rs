@@ -56,16 +56,11 @@ impl StdError for CliError {
 impl std::fmt::Display for CliError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            CliError::UserError(ref s) =>
-                write!(f, "Error: {}", s),
-            CliError::IoError(ref err) =>
-                write!(f, "IoError: {}", err),
-            CliError::SigningError(ref err) =>
-                write!(f, "SigningError: {}", err.description()),
-            CliError::ProtobufError(ref err) =>
-                write!(f, "ProtobufError: {}", err.description()),
-            CliError::HyperError(ref err) =>
-                write!(f, "HyperError: {}", err.description()),
+            CliError::UserError(ref s) => write!(f, "Error: {}", s),
+            CliError::IoError(ref err) => write!(f, "IoError: {}", err),
+            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err.description()),
+            CliError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err.description()),
+            CliError::HyperError(ref err) => write!(f, "HyperError: {}", err.description()),
         }
     }
 }

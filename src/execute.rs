@@ -23,14 +23,18 @@ use error::CliError;
 use key;
 use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::ExecuteContractAction;
-use transaction::{create_transaction, create_batch, create_batch_list_from_one};
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 use submit::submit_batch_list;
 
-pub fn do_exec(name: &str, version: &str, payload_file: &str,
-               inputs: Vec<String>, outputs: Vec<String>,
-               key_name: Option<&str>, url: &str) ->
-Result<(), CliError> {
-
+pub fn do_exec(
+    name: &str,
+    version: &str,
+    payload_file: &str,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
+    key_name: Option<&str>,
+    url: &str,
+) -> Result<(), CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -39,12 +43,7 @@ Result<(), CliError> {
 
     let contract_payload = load_contract_payload_file(payload_file)?;
 
-    let txn_payload = create_exec_txn_payload(
-        name,
-        version,
-        inputs,
-        outputs,
-        contract_payload);
+    let txn_payload = create_exec_txn_payload(name, version, inputs, outputs, contract_payload);
 
     let txn = create_transaction(&txn_payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
@@ -56,12 +55,12 @@ Result<(), CliError> {
 }
 
 fn create_exec_txn_payload(
-        name: &str,
-        version: &str,
-        inputs: Vec<String>,
-        outputs: Vec<String>,
-        contract_payload: Vec<u8>) -> SabrePayload {
-
+    name: &str,
+    version: &str,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
+    contract_payload: Vec<u8>,
+) -> SabrePayload {
     let mut exec_contract = ExecuteContractAction::new();
     exec_contract.set_name(name.into());
     exec_contract.set_version(version.into());
@@ -76,14 +75,20 @@ fn create_exec_txn_payload(
 }
 
 fn load_contract_payload_file(payload_file: &str) -> Result<Vec<u8>, CliError> {
-    let file = File::open(payload_file).map_err(|e| CliError::UserError(format!(
-        "Could not load payload \"{}\": {}",
-        payload_file, e)))?;
+    let file = File::open(payload_file).map_err(|e| {
+        CliError::UserError(format!(
+            "Could not load payload \"{}\": {}",
+            payload_file, e
+        ))
+    })?;
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
-    buf_reader.read_to_end(&mut contents).map_err(|e| CliError::UserError(format!(
-        "IoError while reading payload \"{}\": {}",
-        payload_file, e)))?;
+    buf_reader.read_to_end(&mut contents).map_err(|e| {
+        CliError::UserError(format!(
+            "IoError while reading payload \"{}\": {}",
+            payload_file, e
+        ))
+    })?;
 
     Ok(contents)
 }
