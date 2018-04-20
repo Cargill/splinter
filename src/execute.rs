@@ -34,7 +34,7 @@ pub fn do_exec(
     outputs: Vec<String>,
     key_name: Option<&str>,
     url: &str,
-) -> Result<(), CliError> {
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -49,9 +49,7 @@ pub fn do_exec(
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }
 
 fn create_exec_txn_payload(

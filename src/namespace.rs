@@ -31,7 +31,7 @@ pub fn do_ns_create(
     url: &str,
     namespace: &str,
     owners: Vec<String>,
-) -> Result<(), CliError> {
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -50,9 +50,7 @@ pub fn do_ns_create(
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }
 
 pub fn do_ns_update(
@@ -60,7 +58,7 @@ pub fn do_ns_update(
     url: &str,
     namespace: &str,
     owners: Vec<String>,
-) -> Result<(), CliError> {
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -79,12 +77,10 @@ pub fn do_ns_update(
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }
 
-pub fn do_ns_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<(), CliError> {
+pub fn do_ns_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -102,9 +98,7 @@ pub fn do_ns_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Resul
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }
 
 pub fn do_perm_create(
@@ -114,7 +108,7 @@ pub fn do_perm_create(
     contract: &str,
     read: bool,
     write: bool,
-) -> Result<(), CliError> {
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -135,11 +129,9 @@ pub fn do_perm_create(
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }
-pub fn do_perm_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<(), CliError> {
+pub fn do_perm_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -157,7 +149,5 @@ pub fn do_perm_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Res
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }

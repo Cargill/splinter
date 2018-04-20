@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate clap;
+#[macro_use] extern crate clap;
+#[macro_use] extern crate serde_derive;
 extern crate crypto;
 extern crate futures;
 extern crate hyper;
@@ -22,6 +22,8 @@ extern crate sawtooth_sdk;
 extern crate tokio_core;
 extern crate users;
 extern crate yaml_rust;
+extern crate serde_json;
+extern crate serde;
 
 mod error;
 mod execute;
@@ -31,6 +33,8 @@ mod protos;
 mod submit;
 mod transaction;
 mod upload;
+
+use std::time::Instant;
 
 const APP_NAME: &'static str = env!("CARGO_PKG_NAME");
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -51,6 +55,7 @@ fn run() -> Result<(), error::CliError> {
             (@arg filename: -f --filename +required +takes_value "Path to Sabre contract definition (*.yaml)")
             (@arg key: -k --key +takes_value "Signing key name")
             (@arg url: --url +takes_value "URL to the Sawtooth REST API")
+            (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
         (@subcommand exec =>
             (about: "execute a Sabre contract")
@@ -60,6 +65,7 @@ fn run() -> Result<(), error::CliError> {
             (@arg url: --url +takes_value "URL to the Sawtooth REST API")
             (@arg inputs: --inputs +takes_value "Input addresses used by the contract")
             (@arg outputs: --outputs +takes_value "Output addresses used by the contract")
+            (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
         (@subcommand ns =>
             (about: "create, update, or delete a Sabre namespace")
@@ -72,6 +78,7 @@ fn run() -> Result<(), error::CliError> {
             (@arg key: -k --key +takes_value "Signing key name")
             (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
             (@arg owner: -O --owner +takes_value +multiple "Owner of this namespace")
+            (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
         (@subcommand perm =>
             (about: "set or delete a Sabre namespace permission")
@@ -82,26 +89,33 @@ fn run() -> Result<(), error::CliError> {
             (@arg delete: -d --delete "Remove all permissions")
             (@arg read: -r --read conflicts_with[delete] "Set read permission")
             (@arg write: -w --write conflicts_with[delete] "Set write permission")
+            (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
     ).get_matches();
 
-    if let Some(upload_matches) = matches.subcommand_matches("upload") {
+    let (batch_link, mut wait) = if let Some(upload_matches) = matches.subcommand_matches("upload") {
         let filename = upload_matches.value_of("filename").unwrap();
         let key_name = upload_matches.value_of("key");
         let url = upload_matches
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
 
-        upload::do_upload(&filename, key_name, &url)?;
-    }
+        let wait = value_t!(upload_matches, "wait", u64)
+            .expect("Failed to parse wait value");
 
-    if let Some(exec_matches) = matches.subcommand_matches("exec") {
+        let batch_link = upload::do_upload(&filename, key_name, &url)?;
+
+        (batch_link, wait)
+    } else if let Some(exec_matches) = matches.subcommand_matches("exec") {
         let contract = exec_matches.value_of("contract").unwrap();
         let payload = exec_matches.value_of("payload").unwrap();
         let key_name = exec_matches.value_of("key");
         let url = exec_matches
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
+
+        let wait = value_t!(exec_matches, "wait", u64)
+            .expect("Failed to parse wait value");
 
         let inputs = exec_matches
             .value_of("inputs")
@@ -127,48 +141,57 @@ fn run() -> Result<(), error::CliError> {
             )),
         }?;
 
-        execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
-    }
+        let batch_link = execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
 
-    if let Some(ns_matches) = matches.subcommand_matches("ns") {
+        (batch_link, wait)
+    } else if let Some(ns_matches) = matches.subcommand_matches("ns") {
         let namespace = ns_matches.value_of("namespace").unwrap();
+
         let key_name = ns_matches.value_of("key");
+
         let url = ns_matches
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
+
+        let wait = value_t!(ns_matches, "wait", u64)
+            .expect("Failed to parse wait value");
+
         let owners = ns_matches
             .values_of("owner")
             .map(|values| values.map(|v| v.into()).collect());
-        if ns_matches.is_present("update") {
+
+        let batch_link = if ns_matches.is_present("update") {
             let o = owners.ok_or(error::CliError::UserError(
                 "update action requires one or more --owner arguments".into(),
             ))?;
-            namespace::do_ns_update(key_name, &url, &namespace, o)?;
+            namespace::do_ns_update(key_name, &url, &namespace, o)?
         } else if ns_matches.is_present("delete") {
             if matches.is_present("owner") {
                 return Err(error::CliError::UserError(
                     "arguments --delete and --owner conflict".into(),
                 ));
             }
-            namespace::do_ns_delete(key_name, &url, &namespace)?;
+            namespace::do_ns_delete(key_name, &url, &namespace)?
         } else {
             let o = owners.ok_or(error::CliError::UserError(
                 "create action requires one or more --owner arguments".into(),
             ))?;
-            namespace::do_ns_create(key_name, &url, &namespace, o)?;
-        }
-    }
+            namespace::do_ns_create(key_name, &url, &namespace, o)?
+        };
 
-    if let Some(perm_matches) = matches.subcommand_matches("perm") {
+        (batch_link, wait)
+    } else if let Some(perm_matches) = matches.subcommand_matches("perm") {
         let namespace = perm_matches.value_of("namespace").unwrap();
         let contract = perm_matches.value_of("contract").unwrap();
         let key_name = perm_matches.value_of("key");
         let url = perm_matches
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
+        let wait = value_t!(perm_matches, "wait", u64)
+            .expect("Failed to parse wait value");
 
-        if perm_matches.is_present("delete") {
-            namespace::do_perm_delete(key_name, &url, &namespace)?;
+        let batch_link = if perm_matches.is_present("delete") {
+            namespace::do_perm_delete(key_name, &url, &namespace)?
         } else {
             let read = perm_matches.is_present("read");
             let write = perm_matches.is_present("write");
@@ -177,8 +200,20 @@ fn run() -> Result<(), error::CliError> {
                 return Err(error::CliError::UserError("no permissions provided".into()));
             }
 
-            namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?;
+            namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?
+        };
+
+        (batch_link, wait)
+    } else {
+        return Err(error::CliError::UserError("Subcommand required".into()));
+    };
+
+    while wait > 0 {
+        let time = Instant::now();
+        if submit::wait_for_batch(&batch_link, wait)? {
+            break;
         }
+        wait -= time.elapsed().as_secs()
     }
 
     Ok(())

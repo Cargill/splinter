@@ -14,7 +14,9 @@
 
 //! Contains functions which assist with batch submission to a REST API
 
+use serde_json;
 use hyper;
+use hyper::StatusCode;
 use hyper::Method;
 use hyper::client::{Client, Request};
 use std::str;
@@ -28,7 +30,7 @@ use sawtooth_sdk::messages::batch::BatchList;
 use error::CliError;
 use protobuf::Message;
 
-pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliError> {
+pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, CliError> {
     let post_url = String::from(url) + "/batches";
     let hyper_uri = match post_url.parse::<hyper::Uri>() {
         Ok(uri) => uri,
@@ -61,19 +63,82 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliErr
     req.set_body(bytes);
 
     let work = client.request(req).and_then(|res| {
-        res.body()
-            .fold(Vec::new(), |mut v, chunk| {
-                v.extend(&chunk[..]);
-                future::ok::<_, hyper::Error>(v)
+        res.body().concat2().and_then(move |chunks| {
+            future::ok(serde_json::from_slice::<Link>(&chunks).unwrap())
+        })
+    });
+
+    let batch_link = core.run(work)?;
+    println!("Response Body:\n{:?}", batch_link);
+
+    Ok(batch_link.link)
+}
+
+pub fn wait_for_batch(url: &str, wait: u64) -> Result<bool, CliError> {
+    let url_with_wait_query  = format!("{}&wait={}", url, wait);
+
+    // Validate url
+
+    let hyper_uri = match url_with_wait_query.parse::<hyper::Uri>() {
+        Ok(uri) => uri,
+        Err(e) => return Err(CliError::UserError(format!("Invalid URL: {}: {}", e, url))),
+    };
+
+    match hyper_uri.scheme() {
+        Some(scheme) => {
+            if scheme != "http" {
+                return Err(CliError::UserError(format!(
+                    "Unsupported scheme ({}) in URL: {}",
+                    scheme, url
+                )));
+            }
+        }
+        None => {
+            return Err(CliError::UserError(format!("No scheme in URL: {}", url)));
+        }
+    }
+
+    let mut core = tokio_core::reactor::Core::new()?;
+    let handle = core.handle();
+    let client = Client::configure().build(&handle);
+
+    let work = client.get(hyper_uri).and_then(|res| {
+        if res.status() == StatusCode::ServiceUnavailable {
+            panic!("Service Unavailable");
+        } else {
+            res.body().concat2().and_then(move |chunks| {
+                future::ok(serde_json::from_slice::<StatusResponse>(&chunks).unwrap())
             })
-            .and_then(move |chunks| {
-                let body = String::from_utf8(chunks).unwrap();
-                future::ok(body)
-            })
+        }
     });
 
     let body = core.run(work)?;
-    println!("Response Body:\n{}", body);
+    println!("Response Body:\n{:?}", body);
 
-    Ok(())
+    Ok(body.data.iter().all(|x| x.status == "COMMITTED") ||
+        body.data.iter().any(|x| x.status == "INVALID"))
+}
+
+#[derive(Deserialize, Debug)]
+struct Link {
+    link: String
+}
+
+#[derive(Deserialize, Debug)]
+struct Data {
+    id: String,
+    status: String,
+    invalid_transactions: Vec<InvalidTransaction>
+}
+
+#[derive(Deserialize, Debug)]
+struct InvalidTransaction {
+    id: String,
+    message: String
+}
+
+#[derive(Deserialize, Debug)]
+struct StatusResponse {
+    data: Vec<Data>,
+    link: String
 }

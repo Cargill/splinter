@@ -29,7 +29,7 @@ use protos::payload::CreateContractAction;
 use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 use submit::submit_batch_list;
 
-pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<(), CliError> {
+pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -59,9 +59,7 @@ pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<()
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
-    submit_batch_list(url, &batch_list)?;
-
-    Ok(())
+    submit_batch_list(url, &batch_list)
 }
 
 fn create_upload_payload(
