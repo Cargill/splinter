@@ -19,7 +19,7 @@ use hyper;
 use hyper::StatusCode;
 use hyper::Method;
 use hyper::client::{Client, Request};
-use std::str;
+use std::{str, fmt};
 use hyper::header::{ContentLength, ContentType};
 use futures::{future, Future};
 use futures::Stream;
@@ -113,7 +113,7 @@ pub fn wait_for_batch(url: &str, wait: u64) -> Result<bool, CliError> {
     });
 
     let body = core.run(work)?;
-    println!("Response Body:\n{:?}", body);
+    println!("Response Body:\n{}", body);
 
     Ok(body.data.iter().all(|x| x.status == "COMMITTED") ||
         body.data.iter().any(|x| x.status == "INVALID"))
@@ -141,4 +141,39 @@ struct InvalidTransaction {
 struct StatusResponse {
     data: Vec<Data>,
     link: String
+}
+
+impl fmt::Display for Link {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{\"link\": {}}}", self.link)
+    }
+}
+
+impl fmt::Display for Data {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut invalid_txn_string_vec = Vec::new();
+        for txn in &self.invalid_transactions{
+           invalid_txn_string_vec.push(txn.to_string());
+        }
+        write!(f, "{{\"id\": \"{}\", \"status\": \"{}\", \"invalid_transactions\": [{}]}}",
+            self.id, self.status, invalid_txn_string_vec.join(","))
+    }
+}
+
+impl fmt::Display for InvalidTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{\"id\": \"{}\", \"message\": \"{}\"}}", self.id, self.message )
+    }
+}
+
+impl fmt::Display for StatusResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut data_string_vec = Vec::new();
+        for data in &self.data {
+            data_string_vec.push(data.to_string());
+        }
+
+        write!(f, "StatusResponse {{\"data\":[{}], \"link\": \"{}\"}}",
+            data_string_vec.join(","), self.link )
+    }
 }
