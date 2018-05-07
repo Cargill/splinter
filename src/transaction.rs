@@ -251,17 +251,23 @@ pub fn create_transaction(
         }
         Action::CREATE_CONTRACT_REGISTRY => {
             let name = payload.get_create_contract_registry().get_name();
-            let addresses = vec![compute_contract_registry_address(name)];
+            let addresses = vec![
+                compute_contract_registry_address(name),
+                compute_setting_admin_address()];
             (addresses.clone(), addresses)
         }
         Action::DELETE_CONTRACT_REGISTRY => {
             let name = payload.get_delete_contract_registry().get_name();
-            let addresses = vec![compute_contract_registry_address(name)];
+            let addresses = vec![
+                compute_contract_registry_address(name),
+                compute_setting_admin_address()];
             (addresses.clone(), addresses)
         }
         Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
             let name = payload.get_update_contract_registry_owners().get_name();
-            let addresses = vec![compute_contract_registry_address(name)];
+            let addresses = vec![
+                compute_contract_registry_address(name),
+                compute_setting_admin_address()];
             (addresses.clone(), addresses)
         }
         Action::CREATE_NAMESPACE_REGISTRY => {

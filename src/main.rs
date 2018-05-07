@@ -25,6 +25,7 @@ extern crate yaml_rust;
 extern crate serde_json;
 extern crate serde;
 
+mod contract_registry;
 mod error;
 mod execute;
 mod key;
@@ -89,6 +90,19 @@ fn run() -> Result<(), error::CliError> {
             (@arg delete: -d --delete "Remove all permissions")
             (@arg read: -r --read conflicts_with[delete] "Set read permission")
             (@arg write: -w --write conflicts_with[delete] "Set write permission")
+            (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
+        )
+        (@subcommand cr =>
+            (about: "create, update, or delete a Sabre contract registry")
+            (@group action =>
+                (@arg create: -c --create "Create the contract registry")
+                (@arg update: -u --update "Update the contract registry")
+                (@arg delete: -d --delete "Delete the contract registry")
+            )
+            (@arg name: +required "Name of the contracts in the registry")
+            (@arg key: -k --key +takes_value "Signing key name")
+            (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
+            (@arg owner: -O --owner +takes_value +multiple "Owner of this contract registry")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
     ).get_matches();
@@ -233,6 +247,43 @@ fn run() -> Result<(), error::CliError> {
             }
 
             namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?
+        };
+
+        (batch_link, wait)
+
+    } else if let Some(cr_matches) = matches.subcommand_matches("cr") {
+        let name = cr_matches.value_of("name").unwrap();
+
+        let key_name = cr_matches.value_of("key");
+
+        let url = cr_matches
+            .value_of("url")
+            .unwrap_or("http://localhost:8008/");
+
+        let wait = value_t!(cr_matches, "wait", u64)
+            .unwrap_or(0);
+
+        let owners = cr_matches
+            .values_of("owner")
+            .map(|values| values.map(|v| v.into()).collect());
+
+        let batch_link = if cr_matches.is_present("update") {
+            let o = owners.ok_or(error::CliError::UserError(
+                "update action requires one or more --owner arguments".into(),
+            ))?;
+            contract_registry::do_cr_update(key_name, &url, &name, o)?
+        } else if cr_matches.is_present("delete") {
+            if matches.is_present("owner") {
+                return Err(error::CliError::UserError(
+                    "arguments --delete and --owner conflict".into(),
+                ));
+            }
+            contract_registry::do_cr_delete(key_name, &url, &name)?
+        } else {
+            let o = owners.ok_or(error::CliError::UserError(
+                "create action requires one or more --owner arguments".into(),
+            ))?;
+            contract_registry::do_cr_create(key_name, &url, &name, o)?
         };
 
         (batch_link, wait)
