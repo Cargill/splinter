@@ -100,8 +100,17 @@ fn run() -> Result<(), error::CliError> {
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
 
-        let wait = value_t!(upload_matches, "wait", u64)
-            .expect("Failed to parse wait value");
+        let wait = match value_t!(upload_matches, "wait", u64) {
+            Ok(wait) => wait,
+            Err(err) => {
+                match err.kind{
+                    clap::ErrorKind::ArgumentNotFound => 0,
+                    _ => return Err(error::CliError::UserError(
+                        "Wait must be an integer".into()),
+                    )
+                }
+            }
+        };
 
         let batch_link = upload::do_upload(&filename, key_name, &url)?;
 
@@ -114,8 +123,17 @@ fn run() -> Result<(), error::CliError> {
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
 
-        let wait = value_t!(exec_matches, "wait", u64)
-            .expect("Failed to parse wait value");
+        let wait = match value_t!(exec_matches, "wait", u64) {
+            Ok(wait) => wait,
+            Err(err) => {
+                match err.kind{
+                    clap::ErrorKind::ArgumentNotFound => 0,
+                    _ => return Err(error::CliError::UserError(
+                        "Wait must be an integer".into()),
+                    )
+                }
+            }
+        };
 
         let inputs = exec_matches
             .value_of("inputs")
@@ -153,8 +171,17 @@ fn run() -> Result<(), error::CliError> {
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
 
-        let wait = value_t!(ns_matches, "wait", u64)
-            .expect("Failed to parse wait value");
+        let wait = match value_t!(ns_matches, "wait", u64) {
+            Ok(wait) => wait,
+            Err(err) => {
+                match err.kind{
+                    clap::ErrorKind::ArgumentNotFound => 0,
+                    _ => return Err(error::CliError::UserError(
+                        "Wait must be an integer".into()),
+                    )
+                }
+            }
+        };
 
         let owners = ns_matches
             .values_of("owner")
@@ -187,8 +214,18 @@ fn run() -> Result<(), error::CliError> {
         let url = perm_matches
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
-        let wait = value_t!(perm_matches, "wait", u64)
-            .expect("Failed to parse wait value");
+
+        let wait = match value_t!(perm_matches, "wait", u64) {
+            Ok(wait) => wait,
+            Err(err) => {
+                match err.kind{
+                    clap::ErrorKind::ArgumentNotFound => 0,
+                    _ => return Err(error::CliError::UserError(
+                        "Wait must be an integer".into()),
+                    )
+                }
+            }
+        };
 
         let batch_link = if perm_matches.is_present("delete") {
             namespace::do_perm_delete(key_name, &url, &namespace)?
