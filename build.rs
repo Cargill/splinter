@@ -13,6 +13,7 @@
 // limitations under the License.
 
 extern crate protoc_rust;
+use protoc_rust::Customize;
 
 use std::fs;
 use std::fs::File;
@@ -24,6 +25,9 @@ fn main() {
         out_dir: "src/protos",
         input: &["../protos/payload.proto"],
         includes: &["../protos"],
+        customize: Customize {
+            ..Default::default()
+        }
     }).expect("protoc");
 
     let mut file = File::create("src/protos/mod.rs").unwrap();
