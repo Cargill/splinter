@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Contains functions which assist with the creation of Identity Batches and
+//! Contains functions which assist with the creation of Sabre Batches and
 //! Transactions
 
 use std::time::Instant;
