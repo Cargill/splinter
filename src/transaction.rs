@@ -50,6 +50,13 @@ const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &'static str = "00ec02";
 
+/// The smart permission prefix for global state (00ec03)
+const SMART_PERMISSION_PREFIX: &'static str = "00ec03";
+
+const PIKE_AGENT_PREFIX: &'static str = "cad11d00";
+
+const PIKE_ORG_PREFIX: &'static str = "cad11d01";
+
 const SETTING_PREFIX: &'static str = "000000";
 
 /// Creates a nonce appropriate for a TransactionHeader
@@ -132,6 +139,54 @@ fn compute_contract_address(name: &str, version: &str) -> String {
 fn compute_setting_admin_address() -> String {
     SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16) + &hash_256("swa", 16)
         + &hash_256("administrators", 16) + &hash_256("", 16)
+}
+
+/// Returns a state address for a given agent name
+///
+/// # Arguments
+///
+/// * `name` - the agent's name
+fn compute_agent_address(name: &str) -> String {
+    let hash: &mut [u8] = &mut [0; 64];
+
+    let mut sha = Sha512::new();
+    sha.input(name.as_bytes());
+    sha.result(hash);
+
+    String::from(PIKE_AGENT_PREFIX) + &bytes_to_hex_str(hash)[..62]
+}
+
+/// Returns a state address for a given organization id
+///
+/// # Arguments
+///
+/// * `id` - the organization's id
+fn compute_org_address(id: &str) -> String {
+    let hash: &mut [u8] = &mut [0; 64];
+
+    let mut sha = Sha512::new();
+    sha.input(id.as_bytes());
+    sha.result(hash);
+
+    String::from(PIKE_ORG_PREFIX) + &bytes_to_hex_str(hash)[..62]
+}
+
+/// Returns a state address for a given smart permission
+///
+/// # Arguments
+///
+/// * `org_id` - the organization's id
+/// * `name` - smart permission name
+fn compute_smart_permission_address(org_id: &str, name: &str) -> String {
+    let mut sha_org_id = Sha512::new();
+    sha_org_id.input(org_id.as_bytes());
+
+    let mut sha_name = Sha512::new();
+    sha_name.input(name.as_bytes());
+
+    String::from(SMART_PERMISSION_PREFIX)
+        + &sha_org_id.result_str()[..6].to_string()
+        + &sha_name.result_str()[..58].to_string()
 }
 
 /// Returns a Sha256 hash of the given length
@@ -314,6 +369,39 @@ pub fn create_transaction(
                 compute_namespace_registry_address(namespace)?,
                 compute_setting_admin_address(),
             ];
+            (addresses.clone(), addresses)
+        }
+        Action::CREATE_SMART_PERMISSION => {
+            let org_id = payload.get_create_smart_permission().get_org_id();
+            let name = payload.get_create_smart_permission().get_name();
+            let addresses = vec![
+                compute_smart_permission_address(org_id, name),
+                compute_org_address(org_id),
+                compute_agent_address(public_key),
+            ];
+
+            (addresses.clone(), addresses)
+        }
+        Action::UPDATE_SMART_PERMISSION => {
+            let org_id = payload.get_update_smart_permission().get_org_id();
+            let name = payload.get_update_smart_permission().get_name();
+            let addresses = vec![
+                compute_smart_permission_address(org_id, name),
+                compute_org_address(org_id),
+                compute_agent_address(public_key),
+            ];
+
+            (addresses.clone(), addresses)
+        }
+        Action::DELETE_SMART_PERMISSION => {
+            let org_id = payload.get_delete_smart_permission().get_org_id();
+            let name = payload.get_delete_smart_permission().get_name();
+            let addresses = vec![
+                compute_smart_permission_address(org_id, name),
+                compute_org_address(org_id),
+                compute_agent_address(public_key),
+            ];
+
             (addresses.clone(), addresses)
         }
     };

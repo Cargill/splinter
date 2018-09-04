@@ -30,6 +30,7 @@ mod error;
 mod execute;
 mod key;
 mod namespace;
+mod smart_permission;
 mod protos;
 mod submit;
 mod transaction;
@@ -104,6 +105,31 @@ fn run() -> Result<(), error::CliError> {
             (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
             (@arg owner: -O --owner +takes_value +multiple "Owner of this contract registry")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
+        )
+        (@subcommand sp => 
+          (about: "Create, update or delete smart permissions")
+          (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
+          (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
+          (@subcommand create =>
+                (@arg org_id: +required "Organization ID ")
+                (@arg name: +required "Name of the Smart Permission")
+                (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
+                (@arg key: -k --key +takes_value "Signing key name")
+                (@arg output: --output -o +takes_value "File name to write payload to.")
+            )
+            (@subcommand update =>
+                (@arg org_id: +required "Organization IDs")
+                (@arg name: +required "Name of the Smart Permission")
+                (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
+                (@arg key: -k --key +takes_value "Signing key name")
+                (@arg output: --output -o +takes_value "File name to write payload to.")
+            )
+            (@subcommand delete =>
+                (@arg org_id: +required "Organization IDs")
+                (@arg name: +required "Name of the Smart Permission")
+                (@arg key: -k --key +takes_value "Signing key name")
+                (@arg output: --output -o +takes_value "File name to write payload to.")
+            )
         )
         (@subcommand sp => 
           (about: "Create, update or delete smart permissions")
@@ -314,7 +340,6 @@ fn run() -> Result<(), error::CliError> {
             ))?;
             contract_registry::do_cr_create(key_name, &url, &name, o)?
         };
-
         (batch_link, wait)
     } else if let Some(sp_matches) = matches.subcommand_matches("sp") {
         let url = sp_matches
