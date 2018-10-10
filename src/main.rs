@@ -65,7 +65,7 @@ fn run() -> Result<(), error::CliError> {
             (@arg key: -k --key +takes_value "Signing key name")
             (@arg url: --url +takes_value "URL to the Sawtooth REST API")
             (@arg inputs: --inputs +takes_value +multiple "Input addresses used by the contract")
-            (@arg outputs: --outputs +takes_value +multiple"Output addresses used by the contract")
+            (@arg outputs: --outputs +takes_value +multiple "Output addresses used by the contract")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
         (@subcommand ns =>
@@ -151,12 +151,16 @@ fn run() -> Result<(), error::CliError> {
 
         let inputs = exec_matches
             .values_of("inputs")
-            .map(|values| values.map(|v| v.into()).collect()).unwrap();
+            .map(|values| values.map(|v| v.into()).collect())
+            .ok_or(error::CliError::UserError(
+                "exec action requires one or more --inputs arguments".into(),
+            ))?;
 
         let outputs = exec_matches
             .values_of("outputs")
-            .map(|values| values.map(|v| v.into()).collect()).unwrap();
-
+            .map(|values| values.map(|v| v.into()).collect()).ok_or(error::CliError::UserError(
+                "exec action requires one or more --outputs arguments".into(),
+            ))?;
         let (name, version) = match contract.split(":").collect::<Vec<_>>() {
             ref v if (v.len() == 1 || v.len() == 2) && v[0].len() == 0 => Err(
                 error::CliError::UserError("contract name must be specified".into()),
