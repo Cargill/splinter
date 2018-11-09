@@ -18,13 +18,17 @@
 
 FROM ubuntu:xenial as sabre-cli-builder
 
+ENV VERSION=AUTO_STRICT
+
 RUN apt-get update \
  && apt-get install -y \
  curl \
  gcc \
+ git \
  libssl-dev \
  libzmq3-dev \
  pkg-config \
+ python3 \
  unzip
 
 # For Building Protobufs
@@ -40,6 +44,7 @@ COPY . /project
 
 WORKDIR /project/cli
 
+RUN sed -i -e s/version.*$/version\ =\ \"$(../bin/get_version)\"/ Cargo.toml
 RUN /root/.cargo/bin/cargo deb
 
 # -------------=== sabre cli docker build ===-------------
