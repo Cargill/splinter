@@ -1,0 +1,128 @@
+// Copyright 2019 Cargill Incorporated
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+
+// The enumerated types of authorization messages.
+enum AuthorizationMessageType {
+    UNSET_AUTHORIZATION_MESSAGE_TYPE = 0;
+
+    // Begin a Connection.
+    CONNECT = 1;
+
+    // Authorize a peer.
+    AUTHORIZE = 2;    
+
+    // Authorization failure.
+    AUTHORIZATION_FAILURE = 3;
+
+    // Trust.
+    TRUST_REQUEST = 10;
+    TRUST_RESPONSE = 11;
+
+    // Challenge.
+    CHALLENGE_REQUEST = 20;
+    CHALLENGE_RESPONSE = 21;
+
+}
+
+// The authorization message envelope.
+message AuthorizationMessage {
+    // The type of message.
+    AuthorizationMessageType message_type = 1;
+
+    // the payload.
+    bytes payload = 2;
+}
+
+// A connection message.
+//
+// This message provides information from the incoming connection.
+message ConnectMessage {
+    string endpoint = 1;
+}
+
+// A message indicating an error in authorization.
+//
+// This includes failed authorizations, or invalid messages during the authorization
+// handshake conversation.
+message AuthorizationError {
+    enum AuthorizationErrorType {
+        UNSET_AUTHORIZATION_FAILURE_TYPE = 0;
+
+        AUTHORIZATION_REJECTED = 1;
+    }
+
+    // The type of error.
+    AuthorizationErrorType error_type = 1;
+
+    // The error details.
+    string error_message = 2;
+}
+
+// A trust request.
+//
+// A trust request is sent in response to a Connect Message, if the node is using trust
+// authentication as its means of allowing a node to connect.
+message TrustRequest {
+    // An id to use to correlate the response.
+    string correlation_id = 1;
+}
+
+// A trust response.
+//
+// The trust response is returned by the connecting node to provide its public key as its identity.
+message TrustResponse {
+    // The correlation id from the original trust request.
+    string correlation_id = 1;
+
+    // The connecting node's public key.
+    bytes public_key = 2;
+}
+
+// A challenge request.
+//
+// A challenge request is sent in response to a Connect Message, if the node is using challenge
+// authentication as its means of allowing a node to connect.
+message ChallengeRequest {
+    // An id to use to correlate the response.
+    string correlation_id = 1;
+
+    // A byte payload to be signed by the connecting node.
+    bytes payload = 2;
+}
+
+// A challenge response.
+//
+// The challenge response is returned by the connecting node to provide its public key and a
+// signature generated using the connecting nodes private key.  This signature will be verified
+// against the original payload.
+message ChallengeResponse {
+    // The correlation id from the original trust request.
+    string correlation_id = 1;
+
+    // The connecting node's public key.
+    bytes public_key = 2;
+
+    // The signature of the challenge request payload, using the connecting node's private key.
+    bytes signature = 3;
+}
+
+// A successful authorization message.
+//
+// This message is returned after either a TrustResponse or a ChallengeResponse has been returned
+// by the connecting node.
+message AuthorizedMessage {
+}
