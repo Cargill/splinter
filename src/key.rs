@@ -15,8 +15,8 @@
 //! Contains functions which assist with signing key management
 
 use std::env;
-use std::io::prelude::*;
 use std::fs::File;
+use std::io::prelude::*;
 
 use users::get_current_username;
 
@@ -47,7 +47,8 @@ use error::CliError;
 /// If a HOME or USER environment variable is required but cannot be
 /// retrieved from the environment, a CliError::VarError is returned.
 pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
-    let username: String = name.map(|s| String::from(s))
+    let username: String = name
+        .map(|s| String::from(s))
         .ok_or_else(|| env::var("USER"))
         .or_else(|_| get_current_username().ok_or(0))
         .map_err(|_| {
@@ -85,7 +86,7 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
             return Err(CliError::UserError(format!(
                 "Empty key file: {}",
                 private_key_filename.display()
-            )))
+            )));
         }
     };
 

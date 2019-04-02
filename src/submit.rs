@@ -14,15 +14,15 @@
 
 //! Contains functions which assist with batch submission to a REST API
 
-use serde_json;
-use hyper;
-use hyper::StatusCode;
-use hyper::Method;
-use hyper::client::{Client, Request};
-use std::{str, fmt};
-use hyper::header::{ContentLength, ContentType};
-use futures::{future, Future};
 use futures::Stream;
+use futures::{future, Future};
+use hyper;
+use hyper::client::{Client, Request};
+use hyper::header::{ContentLength, ContentType};
+use hyper::Method;
+use hyper::StatusCode;
+use serde_json;
+use std::{fmt, str};
 use tokio_core;
 
 use sawtooth_sdk::messages::batch::BatchList;
@@ -63,9 +63,9 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, Cl
     req.set_body(bytes);
 
     let work = client.request(req).and_then(|res| {
-        res.body().concat2().and_then(move |chunks| {
-            future::ok(serde_json::from_slice::<Link>(&chunks).unwrap())
-        })
+        res.body()
+            .concat2()
+            .and_then(move |chunks| future::ok(serde_json::from_slice::<Link>(&chunks).unwrap()))
     });
 
     let batch_link = core.run(work)?;
@@ -75,7 +75,7 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, Cl
 }
 
 pub fn wait_for_batch(url: &str, wait: u64) -> Result<bool, CliError> {
-    let url_with_wait_query  = format!("{}&wait={}", url, wait);
+    let url_with_wait_query = format!("{}&wait={}", url, wait);
 
     // Validate url
 
@@ -115,32 +115,32 @@ pub fn wait_for_batch(url: &str, wait: u64) -> Result<bool, CliError> {
     let body = core.run(work)?;
     println!("Response Body:\n{}", body);
 
-    Ok(body.data.iter().all(|x| x.status == "COMMITTED") ||
-        body.data.iter().any(|x| x.status == "INVALID"))
+    Ok(body.data.iter().all(|x| x.status == "COMMITTED")
+        || body.data.iter().any(|x| x.status == "INVALID"))
 }
 
 #[derive(Deserialize, Debug)]
 struct Link {
-    link: String
+    link: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct Data {
     id: String,
     status: String,
-    invalid_transactions: Vec<InvalidTransaction>
+    invalid_transactions: Vec<InvalidTransaction>,
 }
 
 #[derive(Deserialize, Debug)]
 struct InvalidTransaction {
     id: String,
-    message: String
+    message: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct StatusResponse {
     data: Vec<Data>,
-    link: String
+    link: String,
 }
 
 impl fmt::Display for Link {
@@ -152,17 +152,26 @@ impl fmt::Display for Link {
 impl fmt::Display for Data {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut invalid_txn_string_vec = Vec::new();
-        for txn in &self.invalid_transactions{
-           invalid_txn_string_vec.push(txn.to_string());
+        for txn in &self.invalid_transactions {
+            invalid_txn_string_vec.push(txn.to_string());
         }
-        write!(f, "{{\"id\": \"{}\", \"status\": \"{}\", \"invalid_transactions\": [{}]}}",
-            self.id, self.status, invalid_txn_string_vec.join(","))
+        write!(
+            f,
+            "{{\"id\": \"{}\", \"status\": \"{}\", \"invalid_transactions\": [{}]}}",
+            self.id,
+            self.status,
+            invalid_txn_string_vec.join(",")
+        )
     }
 }
 
 impl fmt::Display for InvalidTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{\"id\": \"{}\", \"message\": \"{}\"}}", self.id, self.message )
+        write!(
+            f,
+            "{{\"id\": \"{}\", \"message\": \"{}\"}}",
+            self.id, self.message
+        )
     }
 }
 
@@ -173,7 +182,11 @@ impl fmt::Display for StatusResponse {
             data_string_vec.push(data.to_string());
         }
 
-        write!(f, "StatusResponse {{\"data\":[{}], \"link\": \"{}\"}}",
-            data_string_vec.join(","), self.link )
+        write!(
+            f,
+            "StatusResponse {{\"data\":[{}], \"link\": \"{}\"}}",
+            data_string_vec.join(","),
+            self.link
+        )
     }
 }

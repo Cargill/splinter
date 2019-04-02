@@ -18,8 +18,8 @@
 use std::time::Instant;
 
 use crypto::digest::Digest;
-use crypto::sha2::Sha512;
 use crypto::sha2::Sha256;
+use crypto::sha2::Sha512;
 
 use protobuf;
 use protobuf::Message;
@@ -89,7 +89,7 @@ fn compute_namespace_registry_address(namespace: &str) -> Result<String, CliErro
             return Err(CliError::UserError(format!(
                 "Namespace must be at least 6 characters long: {}",
                 namespace
-            )))
+            )));
         }
     };
 
@@ -137,8 +137,11 @@ fn compute_contract_address(name: &str, version: &str) -> String {
 
 /// Returns a state address for a the setting sawtooth.swa.administrators
 fn compute_setting_admin_address() -> String {
-    SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16) + &hash_256("swa", 16)
-        + &hash_256("administrators", 16) + &hash_256("", 16)
+    SETTING_PREFIX.to_string()
+        + &hash_256("sawtooth", 16)
+        + &hash_256("swa", 16)
+        + &hash_256("administrators", 16)
+        + &hash_256("", 16)
 }
 
 /// Returns a state address for a given agent name
@@ -274,7 +277,7 @@ pub fn create_transaction(
                         return Err(CliError::UserError(format!(
                             "Input must be at least 6 characters long: {}",
                             input
-                        )))
+                        )));
                     }
                 };
 
@@ -294,7 +297,7 @@ pub fn create_transaction(
                         return Err(CliError::UserError(format!(
                             "Output must be at least 6 characters long: {}",
                             output
-                        )))
+                        )));
                     }
                 };
 
@@ -308,21 +311,24 @@ pub fn create_transaction(
             let name = payload.get_create_contract_registry().get_name();
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_setting_admin_address()];
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
         }
         Action::DELETE_CONTRACT_REGISTRY => {
             let name = payload.get_delete_contract_registry().get_name();
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_setting_admin_address()];
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
         }
         Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
             let name = payload.get_update_contract_registry_owners().get_name();
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_setting_admin_address()];
+                compute_setting_admin_address(),
+            ];
             (addresses.clone(), addresses)
         }
         Action::CREATE_NAMESPACE_REGISTRY => {
@@ -449,9 +455,9 @@ pub fn create_batch(
     let mut batch = Batch::new();
     let mut batch_header = BatchHeader::new();
 
-    batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![
-        txn.header_signature.clone(),
-    ]));
+    batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![txn
+        .header_signature
+        .clone()]));
     batch_header.set_signer_public_key(public_key.clone());
     batch.set_transactions(protobuf::RepeatedField::from_vec(vec![txn]));
 

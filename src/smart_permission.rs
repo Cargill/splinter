@@ -22,18 +22,14 @@ use std::path::PathBuf;
 
 use error::CliError;
 use key;
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
-use submit::submit_batch_list;
 use protos::payload::{
-    SabrePayload,
-    SabrePayload_Action,
-    CreateSmartPermissionAction,
+    CreateSmartPermissionAction, DeleteSmartPermissionAction, SabrePayload, SabrePayload_Action,
     UpdateSmartPermissionAction,
-    DeleteSmartPermissionAction
 };
+use submit::submit_batch_list;
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 use protobuf::Message;
-
 
 pub fn do_create(
     url: &str,
@@ -41,8 +37,8 @@ pub fn do_create(
     name: &str,
     filename: &str,
     key: Option<&str>,
-    output: Option<&str>) -> Result<String, CliError> {
-
+    output: Option<&str>,
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -66,7 +62,9 @@ pub fn do_create(
     if let Some(o) = output {
         let mut buffer = File::create(o)?;
         let payload_bytes = payload.write_to_bytes()?;
-        buffer.write_all(&payload_bytes).map_err(|err| CliError::IoError(err))?;
+        buffer
+            .write_all(&payload_bytes)
+            .map_err(|err| CliError::IoError(err))?;
     }
 
     let txn = create_transaction(&payload, &signer, &public_key)?;
@@ -82,8 +80,8 @@ pub fn do_update(
     name: &str,
     filename: &str,
     key: Option<&str>,
-    output: Option<&str>) -> Result<String, CliError> {
-
+    output: Option<&str>,
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -107,7 +105,9 @@ pub fn do_update(
     if let Some(o) = output {
         let mut buffer = File::create(o)?;
         let payload_bytes = payload.write_to_bytes()?;
-        buffer.write_all(&payload_bytes).map_err(|err| CliError::IoError(err))?;
+        buffer
+            .write_all(&payload_bytes)
+            .map_err(|err| CliError::IoError(err))?;
     }
 
     let txn = create_transaction(&payload, &signer, &public_key)?;
@@ -122,8 +122,8 @@ pub fn do_delete(
     org_id: &str,
     name: &str,
     key: Option<&str>,
-    output: Option<&str>) -> Result<String, CliError> {
-
+    output: Option<&str>,
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -141,7 +141,9 @@ pub fn do_delete(
     if let Some(o) = output {
         let mut buffer = File::create(o)?;
         let payload_bytes = payload.write_to_bytes()?;
-        buffer.write_all(&payload_bytes).map_err(|err| CliError::IoError(err))?;
+        buffer
+            .write_all(&payload_bytes)
+            .map_err(|err| CliError::IoError(err))?;
     }
 
     let txn = create_transaction(&payload, &signer, &public_key)?;

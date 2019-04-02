@@ -17,14 +17,14 @@ use sawtooth_sdk::signing;
 
 use error::CliError;
 use key;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::CreateNamespaceRegistryAction;
-use protos::payload::UpdateNamespaceRegistryOwnersAction;
-use protos::payload::DeleteNamespaceRegistryAction;
 use protos::payload::CreateNamespaceRegistryPermissionAction;
+use protos::payload::DeleteNamespaceRegistryAction;
 use protos::payload::DeleteNamespaceRegistryPermissionAction;
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use protos::payload::UpdateNamespaceRegistryOwnersAction;
+use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 pub fn do_ns_create(
     key_name: Option<&str>,
@@ -80,7 +80,11 @@ pub fn do_ns_update(
     submit_batch_list(url, &batch_list)
 }
 
-pub fn do_ns_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<String, CliError> {
+pub fn do_ns_delete(
+    key_name: Option<&str>,
+    url: &str,
+    namespace: &str,
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -131,7 +135,11 @@ pub fn do_perm_create(
 
     submit_batch_list(url, &batch_list)
 }
-pub fn do_perm_delete(key_name: Option<&str>, url: &str, namespace: &str) -> Result<String, CliError> {
+pub fn do_perm_delete(
+    key_name: Option<&str>,
+    url: &str,
+    namespace: &str,
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();

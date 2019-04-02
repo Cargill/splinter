@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use] extern crate clap;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate clap;
+#[macro_use]
+extern crate serde_derive;
 extern crate crypto;
 extern crate futures;
 extern crate hyper;
 extern crate protobuf;
 extern crate sawtooth_sdk;
+extern crate serde;
+extern crate serde_json;
 extern crate tokio_core;
 extern crate users;
 extern crate yaml_rust;
-extern crate serde_json;
-extern crate serde;
 
 mod contract_registry;
 mod error;
 mod execute;
 mod key;
 mod namespace;
-mod smart_permission;
 mod protos;
+mod smart_permission;
 mod submit;
 mod transaction;
 mod upload;
@@ -106,7 +108,7 @@ fn run() -> Result<(), error::CliError> {
             (@arg owner: -O --owner +takes_value +multiple "Owner of this contract registry")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
         )
-        (@subcommand sp => 
+        (@subcommand sp =>
           (about: "Create, update or delete smart permissions")
           (@arg url: -U --url +takes_value "URL to the Sawtooth REST API")
           (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
@@ -133,7 +135,8 @@ fn run() -> Result<(), error::CliError> {
         )
     ).get_matches();
 
-    let (batch_link, mut wait) = if let Some(upload_matches) = matches.subcommand_matches("upload") {
+    let (batch_link, mut wait) = if let Some(upload_matches) = matches.subcommand_matches("upload")
+    {
         let filename = upload_matches.value_of("filename").unwrap();
         let key_name = upload_matches.value_of("key");
         let url = upload_matches
@@ -142,14 +145,10 @@ fn run() -> Result<(), error::CliError> {
 
         let wait = match value_t!(upload_matches, "wait", u64) {
             Ok(wait) => wait,
-            Err(err) => {
-                match err.kind{
-                    clap::ErrorKind::ArgumentNotFound => 0,
-                    _ => return Err(error::CliError::UserError(
-                        "Wait must be an integer".into()),
-                    )
-                }
-            }
+            Err(err) => match err.kind {
+                clap::ErrorKind::ArgumentNotFound => 0,
+                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+            },
         };
 
         let batch_link = upload::do_upload(&filename, key_name, &url)?;
@@ -165,14 +164,10 @@ fn run() -> Result<(), error::CliError> {
 
         let wait = match value_t!(exec_matches, "wait", u64) {
             Ok(wait) => wait,
-            Err(err) => {
-                match err.kind{
-                    clap::ErrorKind::ArgumentNotFound => 0,
-                    _ => return Err(error::CliError::UserError(
-                        "Wait must be an integer".into()),
-                    )
-                }
-            }
+            Err(err) => match err.kind {
+                clap::ErrorKind::ArgumentNotFound => 0,
+                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+            },
         };
 
         let inputs = exec_matches
@@ -184,7 +179,8 @@ fn run() -> Result<(), error::CliError> {
 
         let outputs = exec_matches
             .values_of("outputs")
-            .map(|values| values.map(|v| v.into()).collect()).ok_or(error::CliError::UserError(
+            .map(|values| values.map(|v| v.into()).collect())
+            .ok_or(error::CliError::UserError(
                 "exec action requires one or more --outputs arguments".into(),
             ))?;
         let (name, version) = match contract.split(":").collect::<Vec<_>>() {
@@ -198,7 +194,8 @@ fn run() -> Result<(), error::CliError> {
             )),
         }?;
 
-        let batch_link = execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
+        let batch_link =
+            execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
 
         (batch_link, wait)
     } else if let Some(ns_matches) = matches.subcommand_matches("ns") {
@@ -212,14 +209,10 @@ fn run() -> Result<(), error::CliError> {
 
         let wait = match value_t!(ns_matches, "wait", u64) {
             Ok(wait) => wait,
-            Err(err) => {
-                match err.kind{
-                    clap::ErrorKind::ArgumentNotFound => 0,
-                    _ => return Err(error::CliError::UserError(
-                        "Wait must be an integer".into()),
-                    )
-                }
-            }
+            Err(err) => match err.kind {
+                clap::ErrorKind::ArgumentNotFound => 0,
+                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+            },
         };
 
         let owners = ns_matches
@@ -256,14 +249,10 @@ fn run() -> Result<(), error::CliError> {
 
         let wait = match value_t!(perm_matches, "wait", u64) {
             Ok(wait) => wait,
-            Err(err) => {
-                match err.kind{
-                    clap::ErrorKind::ArgumentNotFound => 0,
-                    _ => return Err(error::CliError::UserError(
-                        "Wait must be an integer".into()),
-                    )
-                }
-            }
+            Err(err) => match err.kind {
+                clap::ErrorKind::ArgumentNotFound => 0,
+                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+            },
         };
 
         let batch_link = if perm_matches.is_present("delete") {
@@ -280,7 +269,6 @@ fn run() -> Result<(), error::CliError> {
         };
 
         (batch_link, wait)
-
     } else if let Some(cr_matches) = matches.subcommand_matches("cr") {
         let name = cr_matches.value_of("name").unwrap();
 
@@ -290,8 +278,7 @@ fn run() -> Result<(), error::CliError> {
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
 
-        let wait = value_t!(cr_matches, "wait", u64)
-            .unwrap_or(0);
+        let wait = value_t!(cr_matches, "wait", u64).unwrap_or(0);
 
         let owners = cr_matches
             .values_of("owner")
@@ -323,14 +310,10 @@ fn run() -> Result<(), error::CliError> {
 
         let wait = match value_t!(sp_matches, "wait", u64) {
             Ok(wait) => wait,
-            Err(err) => {
-                match err.kind{
-                    clap::ErrorKind::ArgumentNotFound => 0,
-                    _ => return Err(error::CliError::UserError(
-                        "Wait must be an integer".into()),
-                    )
-                }
-            }
+            Err(err) => match err.kind {
+                clap::ErrorKind::ArgumentNotFound => 0,
+                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+            },
         };
 
         let batch_link = match sp_matches.subcommand() {
@@ -340,7 +323,7 @@ fn run() -> Result<(), error::CliError> {
                 m.value_of("name").unwrap(),
                 m.value_of("filename").unwrap(),
                 m.value_of("key"),
-                m.value_of("output")
+                m.value_of("output"),
             )?,
             ("update", Some(m)) => smart_permission::do_update(
                 url,
@@ -348,16 +331,20 @@ fn run() -> Result<(), error::CliError> {
                 m.value_of("name").unwrap(),
                 m.value_of("filename").unwrap(),
                 m.value_of("key"),
-                m.value_of("output")
+                m.value_of("output"),
             )?,
             ("delete", Some(m)) => smart_permission::do_delete(
                 url,
                 m.value_of("org_id").unwrap(),
                 m.value_of("name").unwrap(),
                 m.value_of("key"),
-                m.value_of("output")
+                m.value_of("output"),
             )?,
-            _ => return Err(error::CliError::UserError("Unrecognized smart permission subcommand".into()))
+            _ => {
+                return Err(error::CliError::UserError(
+                    "Unrecognized smart permission subcommand".into(),
+                ));
+            }
         };
 
         (batch_link, wait)

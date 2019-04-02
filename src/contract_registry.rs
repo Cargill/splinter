@@ -17,12 +17,12 @@ use sawtooth_sdk::signing;
 
 use error::CliError;
 use key;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::CreateContractRegistryAction;
-use protos::payload::UpdateContractRegistryOwnersAction;
 use protos::payload::DeleteContractRegistryAction;
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use protos::payload::UpdateContractRegistryOwnersAction;
+use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 pub fn do_cr_create(
     key_name: Option<&str>,

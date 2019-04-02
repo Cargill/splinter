@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use std::fs::File;
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -24,10 +24,10 @@ use yaml_rust::YamlLoader;
 
 use error::CliError;
 use key;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::CreateContractAction;
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;

@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use std::fs::File;
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
 
 use protobuf;
 use sawtooth_sdk::signing;
 
 use error::CliError;
 use key;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use protos::payload::ExecuteContractAction;
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 pub fn do_exec(
     name: &str,
