@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf;
 use sawtooth_sdk::signing;
 use std::fs::File;
 use std::io::prelude::*;
