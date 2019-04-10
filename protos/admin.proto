@@ -1,0 +1,150 @@
+// Copyright 2019 Cargill Incorporated
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+// The administrator message envelope.
+message AdminMessage {
+    // The message type for the payload
+    AdminMessageType message_type = 1;
+
+    // Either a message defined below or another message envelope
+    bytes payload = 2;
+}
+
+// The enumerated types of administrator messages.
+enum AdminMessageType {
+    UNSET_ADMIN_MESSAGE_TYPE = 0;
+
+    CIRCUIT_CREATE_REQUEST = 1;
+    CIRCUIT_CREATE_RESPONSE = 2;
+    CIRCUIT_CREATE_FORWARD = 3;
+}
+
+message SplinterNode {
+    // unique id of a splinter node
+    string node_id = 1;
+
+    // The endpoint the splinter node is available on
+    string endpoint = 2;
+}
+
+// This message will be submitted to a splinter node by an administrator that
+// wishes to add a new Circuit to the network
+message CircuitCreateRequest {
+    enum AuthorizationType {
+        UNSET_AUTHORIZATION_TYPE = 0;
+        // Connections are trusted, and no authorization is done
+        TRUST_AUTHORIZATION = 1;
+    }
+
+    enum PersistenceType {
+        // The circuit does not have a preference for if the connection is
+        // persisted
+        ANY_PERSISTENCE = 0;
+    }
+
+    enum DurabilityType {
+        // The message will be dropped if the connection is not available
+        NO_DURABILITY = 0;
+    }
+
+    enum RouteType {
+        // The circuit can use any route to deliver the message
+        ANY_ROUTE = 0;
+    }
+
+    // The unique circuit name
+    string circuit_name = 1;
+
+    // The list of services (service ids) that are allowed to connect to the
+    // circuit
+    repeated string roster = 2;
+
+    // The SplinterNodes that are a part of the circuit
+    repeated SplinterNode members = 3;
+
+    // Circuit specific authorization type
+    AuthorizationType authorization_type = 4;
+
+    // Whether the circuit connections need to be persisted
+    PersistenceType persistence = 5;
+
+    // Routes a message is allowed to take from one service to another
+    RouteType routes = 6;
+}
+
+// If the Circuit was added to the network, this response will return with a
+// status of OK. Otherwise, an error will tell the administrator why it was
+// not successful
+message CircuitCreateResponse {
+    enum Status {
+        UNSET_STATUS = 0;
+        OK = 1;
+        ERROR_CIRCUIT_ALREADY_EXISTS = 2;
+        ERROR_QUEUE_FULL = 5;
+    }
+    // the unique circuit name
+    string circuit_name = 1;
+
+    Status status = 2;
+
+    // a message explaining the error encountered
+    string error_message = 3;
+}
+
+// If the Circuit was successfully added to a splinter node, the node will
+// send this message to the other nodes that are also a part of this circuit
+message CircuitForwardRequest {
+    enum AuthorizationType {
+        UNSET_AUTHORIZATION_TYPE = 0;
+        // Connections are trusted, and no authorization is done
+        TRUST_AUTHORIZATION = 1;
+    }
+
+    enum PersistenceType {
+        // The circuit does not have a preference for if the connection is
+        // persisted
+        ANY_PERSISTENCE = 0;
+    }
+
+    enum DurabilityType {
+        // The message will be dropped if the connection is not available
+        NO_DURABILITY = 0;
+    }
+
+    enum RouteType {
+        // The circuit can use any route to deliver the message
+        ANY_ROUTE = 0;
+    }
+
+    // The unique circuit name
+    string circuit_name = 1;
+
+    // The list of services (service_id) that are allowed to connect to the
+    // circuit
+    repeated string roster = 2;
+
+    // The SplinterNodes that are a part of the circuit
+    repeated SplinterNode members = 3;
+
+    // Circuit specific authorization type
+    AuthorizationType authorization_type = 4;
+
+    // Whether the circuit connections need to be persisted
+    PersistenceType persistence = 5;
+
+    // Routes a message is allowed to take from one service to another
+    RouteType routes = 6;
+}

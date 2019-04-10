@@ -30,7 +30,8 @@ enum NetworkMessageType {
 
     // Message types that indicate that the payload is another message envelope
     CIRCUIT = 100;
-    AUTHORIZATION = 101 ;
+    AUTHORIZATION = 101;
+    ADMIN = 102;
 }
 
 // This message is used for debugging
