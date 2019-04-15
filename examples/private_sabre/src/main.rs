@@ -14,12 +14,18 @@
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate log;
+
+mod error;
+
+use crate::error::ServiceError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn main() {
-    let _matches = clap_app!(myapp =>
+fn main() -> Result<(), ServiceError> {
+    let matches = clap_app!(myapp =>
         (name: APP_NAME)
         (version: VERSION)
         (author: "Contributors to Splinter")
@@ -27,4 +33,15 @@ fn main() {
         (@arg verbose: -v +multiple "Log verbosely")
     )
     .get_matches();
+
+    let log_level = match matches.occurrences_of("verbose") {
+        0 => log::Level::Warn,
+        1 => log::Level::Info,
+        _ => log::Level::Debug,
+    };
+    simple_logger::init_with_level(log_level)?;
+
+    info!("Started Private Sabre Service");
+
+    Ok(())
 }
