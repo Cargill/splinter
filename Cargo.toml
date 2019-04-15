@@ -10,4 +10,5 @@ members = [
 ]
 exclude = [
     "examples/private_xo",
+    "examples/private_sabre",
 ]

@@ -23,5 +23,8 @@
 /examples/private_counter/cli/target
 /examples/private_counter/cli/Cargo.lock
 
+/examples/private_sabre/target
+/examples/private_sabre/Cargo.lock
+
 /target
 /Cargo.lock
