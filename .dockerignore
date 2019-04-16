@@ -22,5 +22,8 @@
 /examples/private_xo/target
 /examples/private_xo/Cargo.lock
 
+/examples/private_sabre/target
+/examples/private_sabre/Cargo.lock
+
 /target
 /Cargo.lock
