@@ -17,6 +17,7 @@ extern crate clap;
 #[macro_use]
 extern crate log;
 
+mod config;
 mod error;
 
 use crate::error::ServiceError;
