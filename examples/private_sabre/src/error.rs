@@ -18,12 +18,14 @@ use std::fmt;
 #[derive(Debug)]
 pub enum ServiceError {
     LoggingInitializationError(Box<dyn Error>),
+    ConfigurationError(Box<dyn Error>),
 }
 
 impl Error for ServiceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            ServiceError::LoggingInitializationError(err) => Some(&**err)
+            ServiceError::LoggingInitializationError(err) => Some(&**err),
+            ServiceError::ConfigurationError(err) => Some(&**err),
         }
     }
 }
@@ -34,7 +36,47 @@ impl fmt::Display for ServiceError {
             ServiceError::LoggingInitializationError(err) => {
                 write!(f, "Unable to initialize logging: {}", err)
             }
+            ServiceError::ConfigurationError(err) => write!(f, "Configuration Error: {}", err),
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ConfigurationError {
+    MissingValue(String),
+    EmptyValue(String),
+    InvalidValue {
+        config_field_name: String,
+        value: String,
+    },
+}
+
+impl Error for ConfigurationError {}
+
+impl fmt::Display for ConfigurationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ConfigurationError::MissingValue(config_field_name) => {
+                write!(f, "Missing configuration for {}", config_field_name)
+            }
+            ConfigurationError::EmptyValue(config_field_name) => {
+                write!(f, "{} must not be empty", config_field_name)
+            }
+            ConfigurationError::InvalidValue {
+                config_field_name,
+                value,
+            } => write!(
+                f,
+                "\"{}\" is not a valid value for {}",
+                value, config_field_name
+            ),
+        }
+    }
+}
+
+impl From<ConfigurationError> for ServiceError {
+    fn from(err: ConfigurationError) -> Self {
+        ServiceError::ConfigurationError(Box::new(err))
     }
 }
 
