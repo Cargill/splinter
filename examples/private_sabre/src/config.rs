@@ -70,6 +70,12 @@ impl ConfigBuilder {
     }
 
     pub fn build(mut self) -> Result<Config, ConfigurationError> {
+        let (bind_host, bind_port) = self
+            .bind
+            .take()
+            .ok_or_else(|| ConfigurationError::MissingValue("bind".into()))
+            .and_then(|bind_string| split_endpoint("bind", bind_string))?;
+
         Ok(Config {
             service_id: self
                 .service_id
@@ -90,10 +96,8 @@ impl ConfigBuilder {
                         Ok(verifiers)
                     }
                 })?,
-            bind: self
-                .bind
-                .take()
-                .ok_or_else(|| ConfigurationError::MissingValue("bind".into()))?,
+            bind_host,
+            bind_port,
             connect: self
                 .connect
                 .take()
@@ -101,6 +105,39 @@ impl ConfigBuilder {
             transport: self.transport.build()?,
         })
     }
+}
+
+fn split_endpoint<S: AsRef<str>>(
+    field_name: &str,
+    s: S,
+) -> Result<(String, u16), ConfigurationError> {
+    let s = s.as_ref();
+    if s.is_empty() {
+        return Err(ConfigurationError::EmptyValue(field_name.into()));
+    }
+
+    let mut parts = s.split(":");
+
+    let address = parts.next().unwrap();
+
+    let port = if let Some(port_str) = parts.next() {
+        match port_str.parse::<u16>() {
+            Ok(port) if port > 0 => port,
+            _ => {
+                return Err(ConfigurationError::InvalidValue {
+                    config_field_name: field_name.into(),
+                    message: "port must be an integer in the range 0 < port < 65535".into(),
+                })
+            }
+        }
+    } else {
+        return Err(ConfigurationError::InvalidValue {
+            config_field_name: field_name.into(),
+            message: "must specify a port".into(),
+        });
+    };
+
+    Ok((address.to_string(), port))
 }
 
 #[derive(Debug)]
@@ -188,7 +225,8 @@ pub struct Config {
     service_id: String,
     circuit: String,
     verifiers: Vec<String>,
-    bind: String,
+    bind_host: String,
+    bind_port: u16,
     connect: String,
     transport: TransportConfig,
 }
@@ -206,8 +244,12 @@ impl Config {
         &self.verifiers
     }
 
-    pub fn bind(&self) -> &str {
-        &self.bind
+    pub fn bind_host(&self) -> &str {
+        &self.bind_host
+    }
+
+    pub fn bind_port(&self) -> u16 {
+        self.bind_port
     }
 
     pub fn connect(&self) -> &str {
@@ -263,7 +305,8 @@ mod test {
         assert_eq!("my_circuit", config.circuit());
         assert_eq!(&["v1".to_owned()], config.verifiers());
         assert_eq!("localhost:8043", config.connect());
-        assert_eq!("localhost:8000", config.bind());
+        assert_eq!("localhost", config.bind_host());
+        assert_eq!(8000, config.bind_port());
 
         assert_eq!(&TransportConfig::Raw, config.transport_config());
     }
@@ -314,7 +357,8 @@ mod test {
         assert_eq!("my_circuit", config.circuit());
         assert_eq!(&["v1".to_owned(), "v2".to_owned()], config.verifiers());
         assert_eq!("splinterd:8053", config.connect());
-        assert_eq!("eth0:8080", config.bind());
+        assert_eq!("eth0", config.bind_host());
+        assert_eq!(8080, config.bind_port());
 
         assert_eq!(&TransportConfig::Raw, config.transport_config());
     }
@@ -375,7 +419,8 @@ mod test {
         assert_eq!("my_circuit", config.circuit());
         assert_eq!(&["v1".to_owned()], config.verifiers());
         assert_eq!("localhost:8043", config.connect());
-        assert_eq!("localhost:8000", config.bind());
+        assert_eq!("localhost", config.bind_host());
+        assert_eq!(8000, config.bind_port());
 
         assert_eq!(
             &TransportConfig::TLS {

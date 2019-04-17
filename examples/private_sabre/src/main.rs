@@ -71,7 +71,11 @@ fn run() -> Result<(), ServiceError> {
         service_config.circuit(),
         service_config.service_id()
     );
-    info!("Binding on {}", service_config.bind());
+    info!(
+        "Binding on {}:{}",
+        service_config.bind_host(),
+        service_config.bind_port()
+    );
     info!(
         "Connecting to network via {} over {}",
         service_config.connect(),
