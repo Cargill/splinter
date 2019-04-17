@@ -47,7 +47,7 @@ pub enum ConfigurationError {
     EmptyValue(String),
     InvalidValue {
         config_field_name: String,
-        value: String,
+        message: String,
     },
 }
 
@@ -64,12 +64,8 @@ impl fmt::Display for ConfigurationError {
             }
             ConfigurationError::InvalidValue {
                 config_field_name,
-                value,
-            } => write!(
-                f,
-                "\"{}\" is not a valid value for {}",
-                value, config_field_name
-            ),
+                message,
+            } => write!(f, "Invalid value for {}: {}", config_field_name, message,),
         }
     }
 }

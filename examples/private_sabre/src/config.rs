@@ -166,7 +166,7 @@ impl TransportConfigBuilder {
             }),
             Some(s) => Err(ConfigurationError::InvalidValue {
                 config_field_name: "transport".into(),
-                value: s,
+                message: s,
             }),
             None => Err(ConfigurationError::MissingValue("transport".into())),
         }
