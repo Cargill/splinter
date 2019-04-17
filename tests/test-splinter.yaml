@@ -29,5 +29,7 @@ services:
             cargo test && \
             echo \"Running private_xo tests...\" && \
             (cd examples/private_xo && cargo +nightly test)
+            echo \"Running private_sabre tests...\" && \
+            (cd examples/private_sabre && cargo +nightly test)
         "
     stop_signal: SIGKILL
