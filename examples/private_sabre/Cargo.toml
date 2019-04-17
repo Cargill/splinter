@@ -21,4 +21,5 @@ edition = "2018"
 [dependencies]
 clap = "2.32"
 log = "0.4"
+rocket = "0.4"
 simple_logger = "1.0"

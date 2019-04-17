@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![feature(proc_macro_hygiene, decl_macro)]
+
 #[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate rocket;
 
 mod config;
 mod error;
+mod routes;
+
+use rocket::config::{Config, Environment};
 
 use crate::error::ServiceError;
 
@@ -93,6 +100,16 @@ fn run() -> Result<(), ServiceError> {
             .collect::<Vec<_>>()
             .join(", ")
     );
+
+    rocket::custom(
+        Config::build(Environment::Production)
+            .address(service_config.bind_host())
+            .port(service_config.bind_port())
+            .finalize()
+            .map_err(|err| ServiceError::ConfigurationError(Box::new(err)))?,
+    )
+    .mount("/", routes![routes::index])
+    .launch();
 
     Ok(())
 }
