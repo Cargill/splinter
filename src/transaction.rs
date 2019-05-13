@@ -38,8 +38,8 @@ use protos::payload::SabrePayload_Action as Action;
 /// The Sawtooth Sabre transaction family name (sabre)
 const SABRE_FAMILY_NAME: &'static str = "sabre";
 
-/// The Sawtooth Sabre transaction family version (0.0)
-const SABRE_FAMILY_VERSION: &'static str = "0.0";
+/// The Sawtooth Sabre transaction family version (0.2)
+const SABRE_FAMILY_VERSION: &'static str = "0.2";
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
