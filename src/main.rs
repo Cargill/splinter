@@ -34,7 +34,6 @@ mod error;
 mod execute;
 mod key;
 mod namespace;
-mod protos;
 mod smart_permission;
 mod submit;
 mod transaction;
