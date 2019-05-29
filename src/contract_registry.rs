@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf;
+use sabre_sdk::protocol::payload::{
+    Action, CreateContractRegistryActionBuilder, DeleteContractRegistryActionBuilder,
+    SabrePayloadBuilder, UpdateContractRegistryOwnersActionBuilder,
+};
 use sawtooth_sdk::signing;
+use submit::submit_batch_list;
 
 use error::CliError;
 use key;
-use protos::payload::CreateContractRegistryAction;
-use protos::payload::DeleteContractRegistryAction;
-use protos::payload::UpdateContractRegistryOwnersAction;
-use protos::payload::{SabrePayload, SabrePayload_Action};
-use submit::submit_batch_list;
 use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 pub fn do_cr_create(
@@ -36,15 +35,16 @@ pub fn do_cr_create(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = CreateContractRegistryAction::new();
-    action.set_name(name.into());
-    action.set_owners(protobuf::RepeatedField::from_vec(owners));
+    let action = CreateContractRegistryActionBuilder::new()
+        .with_name(name.into())
+        .with_owners(owners)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::CREATE_CONTRACT_REGISTRY;
-    payload.set_create_contract_registry(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::CreateContractRegistry(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -63,15 +63,16 @@ pub fn do_cr_update(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = UpdateContractRegistryOwnersAction::new();
-    action.set_name(name.into());
-    action.set_owners(protobuf::RepeatedField::from_vec(owners));
+    let action = UpdateContractRegistryOwnersActionBuilder::new()
+        .with_name(name.into())
+        .with_owners(owners)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS;
-    payload.set_update_contract_registry_owners(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::UpdateContractRegistryOwners(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -85,14 +86,15 @@ pub fn do_cr_delete(key_name: Option<&str>, url: &str, name: &str) -> Result<Str
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = DeleteContractRegistryAction::new();
-    action.set_name(name.into());
+    let action = DeleteContractRegistryActionBuilder::new()
+        .with_name(name.into())
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::DELETE_CONTRACT_REGISTRY;
-    payload.set_delete_contract_registry(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::DeleteContractRegistry(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 

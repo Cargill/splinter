@@ -18,14 +18,14 @@ use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 
-use protobuf;
+use sabre_sdk::protocol::payload::{
+    Action, CreateContractActionBuilder, SabrePayload, SabrePayloadBuilder,
+};
 use sawtooth_sdk::signing;
 use yaml_rust::YamlLoader;
 
 use error::CliError;
 use key;
-use protos::payload::CreateContractAction;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
 use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
@@ -53,9 +53,9 @@ pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<St
         definition.inputs,
         definition.outputs,
         contract,
-    );
+    )?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -68,18 +68,20 @@ fn create_upload_payload(
     inputs: Vec<String>,
     outputs: Vec<String>,
     contract: Vec<u8>,
-) -> SabrePayload {
-    let mut create_contract = CreateContractAction::new();
-    create_contract.set_name(String::from(name));
-    create_contract.set_version(String::from(version));
-    create_contract.set_inputs(protobuf::RepeatedField::from_vec(inputs));
-    create_contract.set_outputs(protobuf::RepeatedField::from_vec(outputs));
-    create_contract.set_contract(contract);
+) -> Result<SabrePayload, CliError> {
+    let create_contract = CreateContractActionBuilder::new()
+        .with_name(String::from(name))
+        .with_version(String::from(version))
+        .with_inputs(inputs)
+        .with_outputs(outputs)
+        .with_contract(contract)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::CREATE_CONTRACT;
-    payload.set_create_contract(create_contract);
-    payload
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::CreateContract(create_contract))
+        .build()?;
+
+    Ok(payload)
 }
 
 fn load_contract_file(path: &Path) -> Result<Vec<u8>, CliError> {

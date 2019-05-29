@@ -20,10 +20,10 @@ use std::time::Instant;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use crypto::sha2::Sha512;
-
 use protobuf;
 use protobuf::Message;
-
+use sabre_sdk::protocol::payload::{Action, SabrePayload};
+use sabre_sdk::protos::IntoBytes;
 use sawtooth_sdk::messages::batch::Batch;
 use sawtooth_sdk::messages::batch::BatchHeader;
 use sawtooth_sdk::messages::batch::BatchList;
@@ -32,8 +32,6 @@ use sawtooth_sdk::messages::transaction::TransactionHeader;
 use sawtooth_sdk::signing::Signer;
 
 use error::CliError;
-use protos::payload;
-use protos::payload::SabrePayload_Action as Action;
 
 /// The Sawtooth Sabre transaction family name (sabre)
 const SABRE_FAMILY_NAME: &'static str = "sabre";
@@ -225,7 +223,7 @@ fn hash_256(to_hash: &str, num: usize) -> String {
 ///
 /// If a signing error occurs, a `CliError::SigningError` is returned.
 pub fn create_transaction(
-    payload: &payload::SabrePayload,
+    payload: SabrePayload,
     signer: &Signer,
     public_key: &String,
 ) -> Result<Transaction, CliError> {
@@ -238,11 +236,10 @@ pub fn create_transaction(
     txn_header.set_signer_public_key(public_key.clone());
     txn_header.set_batcher_public_key(public_key.clone());
 
-    let (input_addresses, output_addresses) = match payload.get_action() {
-        Action::ACTION_UNSET => panic!("payload action was ACTION_UNSET"),
-        Action::CREATE_CONTRACT => {
-            let name = payload.get_create_contract().get_name();
-            let version = payload.get_create_contract().get_version();
+    let (input_addresses, output_addresses) = match payload.action() {
+        Action::CreateContract(create_contract) => {
+            let name = create_contract.name();
+            let version = create_contract.version();
 
             let addresses = vec![
                 compute_contract_registry_address(name),
@@ -251,9 +248,9 @@ pub fn create_transaction(
 
             (addresses.clone(), addresses)
         }
-        Action::DELETE_CONTRACT => {
-            let name = payload.get_delete_contract().get_name();
-            let version = payload.get_delete_contract().get_version();
+        Action::DeleteContract(delete_contract) => {
+            let name = delete_contract.name();
+            let version = delete_contract.version();
 
             let addresses = vec![
                 compute_contract_registry_address(name),
@@ -262,15 +259,15 @@ pub fn create_transaction(
 
             (addresses.clone(), addresses)
         }
-        Action::EXECUTE_CONTRACT => {
-            let name = payload.get_execute_contract().get_name();
-            let version = payload.get_execute_contract().get_version();
+        Action::ExecuteContract(execute_contract) => {
+            let name = execute_contract.name();
+            let version = execute_contract.version();
 
             let mut input_addresses = vec![
                 compute_contract_registry_address(name),
                 compute_contract_address(name, version),
             ];
-            for input in payload.get_execute_contract().get_inputs() {
+            for input in execute_contract.inputs() {
                 let namespace = match input.get(..6) {
                     Some(namespace) => namespace,
                     None => {
@@ -283,14 +280,14 @@ pub fn create_transaction(
 
                 input_addresses.push(compute_namespace_registry_address(namespace)?);
             }
-            input_addresses.append(&mut payload.get_execute_contract().get_inputs().to_vec());
+            input_addresses.append(&mut execute_contract.inputs().to_vec());
 
             let mut output_addresses = vec![
                 compute_contract_registry_address(name),
                 compute_contract_address(name, version),
             ];
 
-            for output in payload.get_execute_contract().get_outputs() {
+            for output in execute_contract.outputs() {
                 let namespace = match output.get(..6) {
                     Some(namespace) => namespace,
                     None => {
@@ -303,83 +300,77 @@ pub fn create_transaction(
 
                 output_addresses.push(compute_namespace_registry_address(namespace)?);
             }
-            output_addresses.append(&mut payload.get_execute_contract().get_outputs().to_vec());
+            output_addresses.append(&mut execute_contract.outputs().to_vec());
 
             (input_addresses, output_addresses)
         }
-        Action::CREATE_CONTRACT_REGISTRY => {
-            let name = payload.get_create_contract_registry().get_name();
+        Action::CreateContractRegistry(create_contract_registry) => {
+            let name = create_contract_registry.name();
             let addresses = vec![
                 compute_contract_registry_address(name),
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::DELETE_CONTRACT_REGISTRY => {
-            let name = payload.get_delete_contract_registry().get_name();
+        Action::DeleteContractRegistry(delete_contract_registry) => {
+            let name = delete_contract_registry.name();
             let addresses = vec![
                 compute_contract_registry_address(name),
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
-            let name = payload.get_update_contract_registry_owners().get_name();
+        Action::UpdateContractRegistryOwners(update_contract_registry_owners) => {
+            let name = update_contract_registry_owners.name();
             let addresses = vec![
                 compute_contract_registry_address(name),
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::CREATE_NAMESPACE_REGISTRY => {
-            let namespace = payload.get_create_namespace_registry().get_namespace();
+        Action::CreateNamespaceRegistry(create_namespace_registry) => {
+            let namespace = create_namespace_registry.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::DELETE_NAMESPACE_REGISTRY => {
-            let namespace = payload.get_delete_namespace_registry().get_namespace();
+        Action::DeleteNamespaceRegistry(delete_namespace_registry) => {
+            let namespace = delete_namespace_registry.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
-            let namespace = payload
-                .get_update_namespace_registry_owners()
-                .get_namespace();
+        Action::UpdateNamespaceRegistryOwners(update_namespace_registry_owners) => {
+            let namespace = update_namespace_registry_owners.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
-            let namespace = payload
-                .get_create_namespace_registry_permission()
-                .get_namespace();
+        Action::CreateNamespaceRegistryPermission(create_namespace_registry_permission) => {
+            let namespace = create_namespace_registry_permission.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
-            let namespace = payload
-                .get_delete_namespace_registry_permission()
-                .get_namespace();
+        Action::DeleteNamespaceRegistryPermission(delete_namespace_registry_permission) => {
+            let namespace = delete_namespace_registry_permission.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
                 compute_setting_admin_address(),
             ];
             (addresses.clone(), addresses)
         }
-        Action::CREATE_SMART_PERMISSION => {
-            let org_id = payload.get_create_smart_permission().get_org_id();
-            let name = payload.get_create_smart_permission().get_name();
+        Action::CreateSmartPermission(create_smart_permission) => {
+            let org_id = create_smart_permission.org_id();
+            let name = create_smart_permission.name();
             let addresses = vec![
                 compute_smart_permission_address(org_id, name),
                 compute_org_address(org_id),
@@ -388,9 +379,9 @@ pub fn create_transaction(
 
             (addresses.clone(), addresses)
         }
-        Action::UPDATE_SMART_PERMISSION => {
-            let org_id = payload.get_update_smart_permission().get_org_id();
-            let name = payload.get_update_smart_permission().get_name();
+        Action::UpdateSmartPermission(update_smart_permission) => {
+            let org_id = update_smart_permission.org_id();
+            let name = update_smart_permission.name();
             let addresses = vec![
                 compute_smart_permission_address(org_id, name),
                 compute_org_address(org_id),
@@ -399,9 +390,9 @@ pub fn create_transaction(
 
             (addresses.clone(), addresses)
         }
-        Action::DELETE_SMART_PERMISSION => {
-            let org_id = payload.get_delete_smart_permission().get_org_id();
-            let name = payload.get_delete_smart_permission().get_name();
+        Action::DeleteSmartPermission(delete_smart_permission) => {
+            let org_id = delete_smart_permission.org_id();
+            let name = delete_smart_permission.name();
             let addresses = vec![
                 compute_smart_permission_address(org_id, name),
                 compute_org_address(org_id),
@@ -415,7 +406,7 @@ pub fn create_transaction(
     txn_header.set_inputs(protobuf::RepeatedField::from_vec(input_addresses));
     txn_header.set_outputs(protobuf::RepeatedField::from_vec(output_addresses));
 
-    let payload_bytes = payload.write_to_bytes()?;
+    let payload_bytes = payload.into_bytes()?;
     let mut sha = Sha512::new();
     sha.input(&payload_bytes);
     let hash: &mut [u8] = &mut [0; 64];

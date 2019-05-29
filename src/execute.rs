@@ -16,13 +16,13 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
-use protobuf;
+use sabre_sdk::protocol::payload::{
+    Action, ExecuteContractActionBuilder, SabrePayload, SabrePayloadBuilder,
+};
 use sawtooth_sdk::signing;
 
 use error::CliError;
 use key;
-use protos::payload::ExecuteContractAction;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
 use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
@@ -43,9 +43,9 @@ pub fn do_exec(
 
     let contract_payload = load_contract_payload_file(payload_file)?;
 
-    let txn_payload = create_exec_txn_payload(name, version, inputs, outputs, contract_payload);
+    let txn_payload = create_exec_txn_payload(name, version, inputs, outputs, contract_payload)?;
 
-    let txn = create_transaction(&txn_payload, &signer, &public_key)?;
+    let txn = create_transaction(txn_payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -58,18 +58,20 @@ fn create_exec_txn_payload(
     inputs: Vec<String>,
     outputs: Vec<String>,
     contract_payload: Vec<u8>,
-) -> SabrePayload {
-    let mut exec_contract = ExecuteContractAction::new();
-    exec_contract.set_name(name.into());
-    exec_contract.set_version(version.into());
-    exec_contract.set_inputs(protobuf::RepeatedField::from_vec(inputs));
-    exec_contract.set_outputs(protobuf::RepeatedField::from_vec(outputs));
-    exec_contract.set_payload(contract_payload);
+) -> Result<SabrePayload, CliError> {
+    let exec_contract = ExecuteContractActionBuilder::new()
+        .with_name(name.into())
+        .with_version(version.into())
+        .with_inputs(inputs)
+        .with_outputs(outputs)
+        .with_payload(contract_payload)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::EXECUTE_CONTRACT;
-    payload.set_execute_contract(exec_contract);
-    payload
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::ExecuteContract(exec_contract))
+        .build()?;
+
+    Ok(payload)
 }
 
 fn load_contract_payload_file(payload_file: &str) -> Result<Vec<u8>, CliError> {

@@ -11,24 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-use sawtooth_sdk::signing;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 
+use sabre_sdk::protocol::payload::{
+    Action, CreateSmartPermissionActionBuilder, DeleteSmartPermissionActionBuilder,
+    SabrePayloadBuilder, UpdateSmartPermissionActionBuilder,
+};
+use sawtooth_sdk::signing;
+
 use error::CliError;
 use key;
-use protos::payload::{
-    CreateSmartPermissionAction, DeleteSmartPermissionAction, SabrePayload, SabrePayload_Action,
-    UpdateSmartPermissionAction,
-};
 use submit::submit_batch_list;
 use transaction::{create_batch, create_batch_list_from_one, create_transaction};
-
-use protobuf::Message;
 
 pub fn do_create(
     url: &str,
@@ -36,7 +34,6 @@ pub fn do_create(
     name: &str,
     filename: &str,
     key: Option<&str>,
-    output: Option<&str>,
 ) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key)?;
     let context = signing::create_context("secp256k1")?;
@@ -49,24 +46,17 @@ pub fn do_create(
 
     let function = load_smart_permission_file(smart_permission_path_buf.as_path())?;
 
-    let mut action = CreateSmartPermissionAction::new();
-    action.set_name(name.to_string());
-    action.set_org_id(org_id.to_string());
-    action.set_function(function);
+    let action = CreateSmartPermissionActionBuilder::new()
+        .with_name(name.to_string())
+        .with_org_id(org_id.to_string())
+        .with_function(function)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::CREATE_SMART_PERMISSION;
-    payload.set_create_smart_permission(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::CreateSmartPermission(action))
+        .build()?;
 
-    if let Some(o) = output {
-        let mut buffer = File::create(o)?;
-        let payload_bytes = payload.write_to_bytes()?;
-        buffer
-            .write_all(&payload_bytes)
-            .map_err(|err| CliError::IoError(err))?;
-    }
-
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -79,7 +69,6 @@ pub fn do_update(
     name: &str,
     filename: &str,
     key: Option<&str>,
-    output: Option<&str>,
 ) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key)?;
     let context = signing::create_context("secp256k1")?;
@@ -92,24 +81,17 @@ pub fn do_update(
 
     let function = load_smart_permission_file(smart_permission_path_buf.as_path())?;
 
-    let mut action = UpdateSmartPermissionAction::new();
-    action.set_name(name.to_string());
-    action.set_org_id(org_id.to_string());
-    action.set_function(function);
+    let action = UpdateSmartPermissionActionBuilder::new()
+        .with_name(name.to_string())
+        .with_org_id(org_id.to_string())
+        .with_function(function)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::UPDATE_SMART_PERMISSION;
-    payload.set_update_smart_permission(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::UpdateSmartPermission(action))
+        .build()?;
 
-    if let Some(o) = output {
-        let mut buffer = File::create(o)?;
-        let payload_bytes = payload.write_to_bytes()?;
-        buffer
-            .write_all(&payload_bytes)
-            .map_err(|err| CliError::IoError(err))?;
-    }
-
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -121,7 +103,6 @@ pub fn do_delete(
     org_id: &str,
     name: &str,
     key: Option<&str>,
-    output: Option<&str>,
 ) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key)?;
     let context = signing::create_context("secp256k1")?;
@@ -129,23 +110,16 @@ pub fn do_delete(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = DeleteSmartPermissionAction::new();
-    action.set_name(name.to_string());
-    action.set_org_id(org_id.to_string());
+    let action = DeleteSmartPermissionActionBuilder::new()
+        .with_name(name.to_string())
+        .with_org_id(org_id.to_string())
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::UPDATE_SMART_PERMISSION;
-    payload.set_delete_smart_permission(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::DeleteSmartPermission(action))
+        .build()?;
 
-    if let Some(o) = output {
-        let mut buffer = File::create(o)?;
-        let payload_bytes = payload.write_to_bytes()?;
-        buffer
-            .write_all(&payload_bytes)
-            .map_err(|err| CliError::IoError(err))?;
-    }
-
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 

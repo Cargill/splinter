@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf;
+use sabre_sdk::protocol::payload::{
+    Action, CreateNamespaceRegistryActionBuilder, CreateNamespaceRegistryPermissionActionBuilder,
+    DeleteNamespaceRegistryActionBuilder, DeleteNamespaceRegistryPermissionActionBuilder,
+    SabrePayloadBuilder, UpdateNamespaceRegistryOwnersActionBuilder,
+};
 use sawtooth_sdk::signing;
 
 use error::CliError;
 use key;
-use protos::payload::CreateNamespaceRegistryAction;
-use protos::payload::CreateNamespaceRegistryPermissionAction;
-use protos::payload::DeleteNamespaceRegistryAction;
-use protos::payload::DeleteNamespaceRegistryPermissionAction;
-use protos::payload::UpdateNamespaceRegistryOwnersAction;
-use protos::payload::{SabrePayload, SabrePayload_Action};
 use submit::submit_batch_list;
 use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
@@ -38,15 +36,16 @@ pub fn do_ns_create(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = CreateNamespaceRegistryAction::new();
-    action.set_namespace(namespace.into());
-    action.set_owners(protobuf::RepeatedField::from_vec(owners));
+    let action = CreateNamespaceRegistryActionBuilder::new()
+        .with_namespace(namespace.into())
+        .with_owners(owners)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::CREATE_NAMESPACE_REGISTRY;
-    payload.set_create_namespace_registry(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::CreateNamespaceRegistry(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -65,15 +64,16 @@ pub fn do_ns_update(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = UpdateNamespaceRegistryOwnersAction::new();
-    action.set_namespace(namespace.into());
-    action.set_owners(protobuf::RepeatedField::from_vec(owners));
+    let action = UpdateNamespaceRegistryOwnersActionBuilder::new()
+        .with_namespace(namespace.into())
+        .with_owners(owners)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS;
-    payload.set_update_namespace_registry_owners(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::UpdateNamespaceRegistryOwners(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -91,14 +91,15 @@ pub fn do_ns_delete(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = DeleteNamespaceRegistryAction::new();
-    action.set_namespace(namespace.into());
+    let action = DeleteNamespaceRegistryActionBuilder::new()
+        .with_namespace(namespace.into())
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::DELETE_NAMESPACE_REGISTRY;
-    payload.set_delete_namespace_registry(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::DeleteNamespaceRegistry(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -119,17 +120,18 @@ pub fn do_perm_create(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = CreateNamespaceRegistryPermissionAction::new();
-    action.set_namespace(namespace.into());
-    action.set_contract_name(contract.into());
-    action.set_read(read);
-    action.set_write(write);
+    let action = CreateNamespaceRegistryPermissionActionBuilder::new()
+        .with_namespace(namespace.into())
+        .with_contract_name(contract.into())
+        .with_read(read)
+        .with_write(write)
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION;
-    payload.set_create_namespace_registry_permission(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::CreateNamespaceRegistryPermission(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
@@ -146,14 +148,15 @@ pub fn do_perm_delete(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let mut action = DeleteNamespaceRegistryPermissionAction::new();
-    action.set_namespace(namespace.into());
+    let action = DeleteNamespaceRegistryPermissionActionBuilder::new()
+        .with_namespace(namespace.into())
+        .build()?;
 
-    let mut payload = SabrePayload::new();
-    payload.action = SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION;
-    payload.set_delete_namespace_registry_permission(action);
+    let payload = SabrePayloadBuilder::new()
+        .with_action(Action::DeleteNamespaceRegistryPermission(action))
+        .build()?;
 
-    let txn = create_transaction(&payload, &signer, &public_key)?;
+    let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
