@@ -17,6 +17,7 @@ extern crate clap;
 #[macro_use]
 extern crate serde_derive;
 extern crate crypto;
+extern crate dirs;
 extern crate futures;
 extern crate hyper;
 extern crate protobuf;

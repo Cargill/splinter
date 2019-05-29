@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
+dirs = "2.0.0"
 futures = "0.1"
 hyper = "0.11"
 protobuf = "2"
