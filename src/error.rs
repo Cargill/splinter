@@ -18,6 +18,16 @@ use std::error::Error as StdError;
 
 use hyper;
 use protobuf;
+use sabre_sdk::protocol::payload::{
+    CreateContractActionBuildError, CreateContractRegistryActionBuildError,
+    CreateNamespaceRegistryActionBuildError, CreateNamespaceRegistryPermissionActionBuildError,
+    CreateSmartPermissionActionBuildError, DeleteContractRegistryActionBuildError,
+    DeleteNamespaceRegistryActionBuildError, DeleteNamespaceRegistryPermissionActionBuildError,
+    DeleteSmartPermissionActionBuildError, ExecuteContractActionBuildError, SabrePayloadBuildError,
+    UpdateContractRegistryOwnersActionBuildError, UpdateNamespaceRegistryOwnersActionBuildError,
+    UpdateSmartPermissionActionBuildError,
+};
+use sabre_sdk::protos::ProtoConversionError;
 use sawtooth_sdk::signing;
 
 #[derive(Debug)]
@@ -29,6 +39,8 @@ pub enum CliError {
     SigningError(signing::Error),
     ProtobufError(protobuf::ProtobufError),
     HyperError(hyper::Error),
+    ProtocolBuildError(Box<dyn StdError>),
+    ProtoConversionError(ProtoConversionError),
 }
 
 impl StdError for CliError {
@@ -39,6 +51,8 @@ impl StdError for CliError {
             CliError::SigningError(ref err) => err.description(),
             CliError::ProtobufError(ref err) => err.description(),
             CliError::HyperError(ref err) => err.description(),
+            CliError::ProtocolBuildError(ref err) => err.description(),
+            CliError::ProtoConversionError(ref err) => err.description(),
         }
     }
 
@@ -49,6 +63,8 @@ impl StdError for CliError {
             CliError::SigningError(ref err) => Some(err.borrow()),
             CliError::ProtobufError(ref err) => Some(err.borrow()),
             CliError::HyperError(ref err) => Some(err.borrow()),
+            CliError::ProtocolBuildError(ref err) => Some(err.borrow()),
+            CliError::ProtoConversionError(ref err) => Some(err.borrow()),
         }
     }
 }
@@ -61,6 +77,8 @@ impl std::fmt::Display for CliError {
             CliError::SigningError(ref err) => write!(f, "SigningError: {}", err.description()),
             CliError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err.description()),
             CliError::HyperError(ref err) => write!(f, "HyperError: {}", err.description()),
+            CliError::ProtocolBuildError(ref err) => write!(f, "Protocol Error: {}", err),
+            CliError::ProtoConversionError(ref err) => write!(f, "Proto Conversion Error: {}", err),
         }
     }
 }
@@ -88,3 +106,39 @@ impl From<hyper::Error> for CliError {
         CliError::HyperError(e)
     }
 }
+
+impl From<ProtoConversionError> for CliError {
+    fn from(e: ProtoConversionError) -> Self {
+        CliError::ProtoConversionError(e)
+    }
+}
+
+// used to convert BuildErrors from the sabre sdk protocols into a CliError.
+macro_rules! impl_builder_errors {
+    ($($x:ty),*) => {
+        $(
+            impl From<$x> for CliError {
+                fn from(e: $x) -> Self {
+                    CliError::ProtocolBuildError(Box::new(e))
+                }
+            }
+        )*
+    };
+}
+
+impl_builder_errors!(
+    CreateContractRegistryActionBuildError,
+    UpdateContractRegistryOwnersActionBuildError,
+    DeleteContractRegistryActionBuildError,
+    SabrePayloadBuildError,
+    CreateNamespaceRegistryActionBuildError,
+    UpdateNamespaceRegistryOwnersActionBuildError,
+    CreateNamespaceRegistryPermissionActionBuildError,
+    DeleteNamespaceRegistryActionBuildError,
+    ExecuteContractActionBuildError,
+    DeleteNamespaceRegistryPermissionActionBuildError,
+    CreateSmartPermissionActionBuildError,
+    UpdateSmartPermissionActionBuildError,
+    DeleteSmartPermissionActionBuildError,
+    CreateContractActionBuildError
+);
