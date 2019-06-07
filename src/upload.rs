@@ -24,10 +24,10 @@ use sabre_sdk::protocol::payload::{
 use sawtooth_sdk::signing;
 use yaml_rust::YamlLoader;
 
-use error::CliError;
-use key;
-use submit::submit_batch_list;
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use crate::error::CliError;
+use crate::key;
+use crate::submit::submit_batch_list;
+use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
 pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;

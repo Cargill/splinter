@@ -31,7 +31,7 @@ use sawtooth_sdk::messages::transaction::Transaction;
 use sawtooth_sdk::messages::transaction::TransactionHeader;
 use sawtooth_sdk::signing::Signer;
 
-use error::CliError;
+use crate::error::CliError;
 
 /// The Sawtooth Sabre transaction family name (sabre)
 const SABRE_FAMILY_NAME: &'static str = "sabre";

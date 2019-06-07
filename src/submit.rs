@@ -21,14 +21,14 @@ use hyper::client::{Client, Request};
 use hyper::header::{ContentLength, ContentType};
 use hyper::Method;
 use hyper::StatusCode;
+use protobuf::Message;
 use serde_json;
 use std::{fmt, str};
 use tokio_core;
 
 use sawtooth_sdk::messages::batch::BatchList;
 
-use error::CliError;
-use protobuf::Message;
+use crate::error::CliError;
 
 pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, CliError> {
     let post_url = String::from(url) + "/batches";

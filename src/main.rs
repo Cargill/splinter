@@ -16,18 +16,6 @@
 extern crate clap;
 #[macro_use]
 extern crate serde_derive;
-extern crate crypto;
-extern crate dirs;
-extern crate futures;
-extern crate hyper;
-extern crate protobuf;
-extern crate sabre_sdk;
-extern crate sawtooth_sdk;
-extern crate serde;
-extern crate serde_json;
-extern crate tokio_core;
-extern crate users;
-extern crate yaml_rust;
 
 mod contract_registry;
 mod error;
