@@ -56,7 +56,7 @@ impl StdError for CliError {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             CliError::UserError(ref _s) => None,
             CliError::IoError(ref err) => Some(err.borrow()),
