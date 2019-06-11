@@ -29,8 +29,8 @@ mod upload;
 
 use std::time::Instant;
 
-const APP_NAME: &'static str = env!("CARGO_PKG_NAME");
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn run() -> Result<(), error::CliError> {
     // Below, unwrap() is used on required arguments, since they will always

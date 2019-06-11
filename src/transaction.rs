@@ -34,28 +34,28 @@ use sawtooth_sdk::signing::Signer;
 use crate::error::CliError;
 
 /// The Sawtooth Sabre transaction family name (sabre)
-const SABRE_FAMILY_NAME: &'static str = "sabre";
+const SABRE_FAMILY_NAME: &str = "sabre";
 
 /// The Sawtooth Sabre transaction family version (0.3)
-const SABRE_FAMILY_VERSION: &'static str = "0.3";
+const SABRE_FAMILY_VERSION: &str = "0.3";
 
 /// The namespace registry prefix for global state (00ec00)
-const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
+const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
 
 /// The contract registry prefix for global state (00ec01)
-const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
+const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 
 /// The contract prefix for global state (00ec02)
-const CONTRACT_PREFIX: &'static str = "00ec02";
+const CONTRACT_PREFIX: &str = "00ec02";
 
 /// The smart permission prefix for global state (00ec03)
-const SMART_PERMISSION_PREFIX: &'static str = "00ec03";
+const SMART_PERMISSION_PREFIX: &str = "00ec03";
 
-const PIKE_AGENT_PREFIX: &'static str = "cad11d00";
+const PIKE_AGENT_PREFIX: &str = "cad11d00";
 
-const PIKE_ORG_PREFIX: &'static str = "cad11d01";
+const PIKE_ORG_PREFIX: &str = "cad11d01";
 
-const SETTING_PREFIX: &'static str = "000000";
+const SETTING_PREFIX: &str = "000000";
 
 /// Creates a nonce appropriate for a TransactionHeader
 fn create_nonce() -> String {
