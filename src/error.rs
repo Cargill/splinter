@@ -44,27 +44,15 @@ pub enum CliError {
 }
 
 impl StdError for CliError {
-    fn description(&self) -> &str {
-        match *self {
-            CliError::UserError(ref s) => &s,
-            CliError::IoError(ref err) => err.description(),
-            CliError::SigningError(ref err) => err.description(),
-            CliError::ProtobufError(ref err) => err.description(),
-            CliError::HyperError(ref err) => err.description(),
-            CliError::ProtocolBuildError(ref err) => err.description(),
-            CliError::ProtoConversionError(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn StdError> {
-        match *self {
-            CliError::UserError(ref _s) => None,
-            CliError::IoError(ref err) => Some(err.borrow()),
-            CliError::SigningError(ref err) => Some(err.borrow()),
-            CliError::ProtobufError(ref err) => Some(err.borrow()),
-            CliError::HyperError(ref err) => Some(err.borrow()),
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            CliError::UserError(_) => None,
+            CliError::IoError(err) => Some(err),
+            CliError::SigningError(err) => Some(err),
+            CliError::ProtobufError(err) => Some(err),
+            CliError::HyperError(err) => Some(err),
             CliError::ProtocolBuildError(ref err) => Some(err.borrow()),
-            CliError::ProtoConversionError(ref err) => Some(err.borrow()),
+            CliError::ProtoConversionError(err) => Some(err),
         }
     }
 }
