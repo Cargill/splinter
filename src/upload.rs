@@ -160,7 +160,7 @@ impl ContractDefinition {
                 "Malformed contract definition file \"{}\": missing array \"inputs\"",
                 filename
             )))?
-            .into_iter()
+            .iter()
             .map(|y| {
                 y.as_str()
                  .ok_or_else(|| CliError::UserError(format!(
@@ -176,7 +176,7 @@ impl ContractDefinition {
                 "Malformed contract definition file \"{}\": missing array \"outputs\"",
                 filename
             )))?
-            .into_iter()
+            .iter()
             .map(|y| {
                 y.as_str()
                  .ok_or_else(|| CliError::UserError(format!(
