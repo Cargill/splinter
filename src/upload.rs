@@ -189,8 +189,8 @@ impl ContractDefinition {
         Ok(ContractDefinition {
             name: String::from(name),
             version: String::from(version),
-            inputs: inputs,
-            outputs: outputs,
+            inputs,
+            outputs,
             wasm: String::from(wasm),
         })
     }
