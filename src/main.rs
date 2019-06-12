@@ -123,214 +123,17 @@ fn run() -> Result<(), error::CliError> {
 
     let (batch_link, mut wait) = if let Some(upload_matches) = matches.subcommand_matches("upload")
     {
-        let filename = upload_matches.value_of("filename").unwrap();
-        let key_name = upload_matches.value_of("key");
-        let url = upload_matches
-            .value_of("url")
-            .unwrap_or("http://localhost:8008/");
-
-        let wait = match value_t!(upload_matches, "wait", u64) {
-            Ok(wait) => wait,
-            Err(err) => match err.kind {
-                clap::ErrorKind::ArgumentNotFound => 0,
-                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
-            },
-        };
-
-        let batch_link = upload::do_upload(&filename, key_name, &url)?;
-
-        (batch_link, wait)
+        upload(upload_matches)?
     } else if let Some(exec_matches) = matches.subcommand_matches("exec") {
-        let contract = exec_matches.value_of("contract").unwrap();
-        let payload = exec_matches.value_of("payload").unwrap();
-        let key_name = exec_matches.value_of("key");
-        let url = exec_matches
-            .value_of("url")
-            .unwrap_or("http://localhost:8008/");
-
-        let wait = match value_t!(exec_matches, "wait", u64) {
-            Ok(wait) => wait,
-            Err(err) => match err.kind {
-                clap::ErrorKind::ArgumentNotFound => 0,
-                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
-            },
-        };
-
-        let inputs = exec_matches
-            .values_of("inputs")
-            .map(|values| values.map(|v| v.into()).collect())
-            .ok_or_else(|| error::CliError::UserError(
-                "exec action requires one or more --inputs arguments".into(),
-            ))?;
-
-        let outputs = exec_matches
-            .values_of("outputs")
-            .map(|values| values.map(|v| v.into()).collect())
-            .ok_or_else(|| error::CliError::UserError(
-                "exec action requires one or more --outputs arguments".into(),
-            ))?;
-        let (name, version) = match contract.split(':').collect::<Vec<_>>() {
-            ref v if (v.len() == 1 || v.len() == 2) && v[0].is_empty() => Err(
-                error::CliError::UserError("contract name must be specified".into()),
-            ),
-            ref v if v.len() == 1 || v.len() == 2 && v[1].is_empty() => Ok((v[0], "latest")),
-            ref v if v.len() == 2 => Ok((v[0], v[1])),
-            _ => Err(error::CliError::UserError(
-                "malformed contract argument, may contain at most one ':'".into(),
-            )),
-        }?;
-
-        let batch_link =
-            execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
-
-        (batch_link, wait)
+        execute(exec_matches)?
     } else if let Some(ns_matches) = matches.subcommand_matches("ns") {
-        let namespace = ns_matches.value_of("namespace").unwrap();
-
-        let key_name = ns_matches.value_of("key");
-
-        let url = ns_matches
-            .value_of("url")
-            .unwrap_or("http://localhost:8008/");
-
-        let wait = match value_t!(ns_matches, "wait", u64) {
-            Ok(wait) => wait,
-            Err(err) => match err.kind {
-                clap::ErrorKind::ArgumentNotFound => 0,
-                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
-            },
-        };
-
-        let owners = ns_matches
-            .values_of("owner")
-            .map(|values| values.map(|v| v.into()).collect());
-
-        let batch_link = if ns_matches.is_present("update") {
-            let o = owners.ok_or_else( || error::CliError::UserError(
-                "update action requires one or more --owner arguments".into(),
-            ))?;
-            namespace::do_ns_update(key_name, &url, &namespace, o)?
-        } else if ns_matches.is_present("delete") {
-            if matches.is_present("owner") {
-                return Err(error::CliError::UserError(
-                    "arguments --delete and --owner conflict".into(),
-                ));
-            }
-            namespace::do_ns_delete(key_name, &url, &namespace)?
-        } else {
-            let o = owners.ok_or_else(|| error::CliError::UserError(
-                "create action requires one or more --owner arguments".into(),
-            ))?;
-            namespace::do_ns_create(key_name, &url, &namespace, o)?
-        };
-
-        (batch_link, wait)
+        namespace_registry(ns_matches)?
     } else if let Some(perm_matches) = matches.subcommand_matches("perm") {
-        let namespace = perm_matches.value_of("namespace").unwrap();
-        let contract = perm_matches.value_of("contract").unwrap();
-        let key_name = perm_matches.value_of("key");
-        let url = perm_matches
-            .value_of("url")
-            .unwrap_or("http://localhost:8008/");
-
-        let wait = match value_t!(perm_matches, "wait", u64) {
-            Ok(wait) => wait,
-            Err(err) => match err.kind {
-                clap::ErrorKind::ArgumentNotFound => 0,
-                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
-            },
-        };
-
-        let batch_link = if perm_matches.is_present("delete") {
-            namespace::do_perm_delete(key_name, &url, &namespace)?
-        } else {
-            let read = perm_matches.is_present("read");
-            let write = perm_matches.is_present("write");
-
-            if !(read || write) {
-                return Err(error::CliError::UserError("no permissions provided".into()));
-            }
-
-            namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?
-        };
-
-        (batch_link, wait)
+        namespace_permission(perm_matches)?
     } else if let Some(cr_matches) = matches.subcommand_matches("cr") {
-        let name = cr_matches.value_of("name").unwrap();
-
-        let key_name = cr_matches.value_of("key");
-
-        let url = cr_matches
-            .value_of("url")
-            .unwrap_or("http://localhost:8008/");
-
-        let wait = value_t!(cr_matches, "wait", u64).unwrap_or(0);
-
-        let owners = cr_matches
-            .values_of("owner")
-            .map(|values| values.map(|v| v.into()).collect());
-
-        let batch_link = if cr_matches.is_present("update") {
-            let o = owners.ok_or_else(|| error::CliError::UserError(
-                "update action requires one or more --owner arguments".into(),
-            ))?;
-            contract_registry::do_cr_update(key_name, &url, &name, o)?
-        } else if cr_matches.is_present("delete") {
-            if matches.is_present("owner") {
-                return Err(error::CliError::UserError(
-                    "arguments --delete and --owner conflict".into(),
-                ));
-            }
-            contract_registry::do_cr_delete(key_name, &url, &name)?
-        } else {
-            let o = owners.ok_or_else(|| error::CliError::UserError(
-                "create action requires one or more --owner arguments".into(),
-            ))?;
-            contract_registry::do_cr_create(key_name, &url, &name, o)?
-        };
-        (batch_link, wait)
+        contract_registry(cr_matches)?
     } else if let Some(sp_matches) = matches.subcommand_matches("sp") {
-        let url = sp_matches
-            .value_of("url")
-            .unwrap_or("http://localhost:8008/");
-
-        let wait = match value_t!(sp_matches, "wait", u64) {
-            Ok(wait) => wait,
-            Err(err) => match err.kind {
-                clap::ErrorKind::ArgumentNotFound => 0,
-                _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
-            },
-        };
-
-        let batch_link = match sp_matches.subcommand() {
-            ("create", Some(m)) => smart_permission::do_create(
-                url,
-                m.value_of("org_id").unwrap(),
-                m.value_of("name").unwrap(),
-                m.value_of("filename").unwrap(),
-                m.value_of("key"),
-            )?,
-            ("update", Some(m)) => smart_permission::do_update(
-                url,
-                m.value_of("org_id").unwrap(),
-                m.value_of("name").unwrap(),
-                m.value_of("filename").unwrap(),
-                m.value_of("key"),
-            )?,
-            ("delete", Some(m)) => smart_permission::do_delete(
-                url,
-                m.value_of("org_id").unwrap(),
-                m.value_of("name").unwrap(),
-                m.value_of("key"),
-            )?,
-            _ => {
-                return Err(error::CliError::UserError(
-                    "Unrecognized smart permission subcommand".into(),
-                ));
-            }
-        };
-
-        (batch_link, wait)
+        smart_permission(sp_matches)?
     } else {
         return Err(error::CliError::UserError("Subcommand required".into()));
     };
@@ -344,6 +147,235 @@ fn run() -> Result<(), error::CliError> {
     }
 
     Ok(())
+}
+
+fn upload(upload_matches: &clap::ArgMatches) -> Result<(String, u64), error::CliError> {
+    let filename = upload_matches.value_of("filename").unwrap();
+    let key_name = upload_matches.value_of("key");
+    let url = upload_matches
+        .value_of("url")
+        .unwrap_or("http://localhost:8008/");
+
+    let wait = match value_t!(upload_matches, "wait", u64) {
+        Ok(wait) => wait,
+        Err(err) => match err.kind {
+            clap::ErrorKind::ArgumentNotFound => 0,
+            _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+        },
+    };
+
+    let batch_link = upload::do_upload(&filename, key_name, &url)?;
+    Ok((batch_link, wait))
+}
+
+fn execute(exec_matches: &clap::ArgMatches) -> Result<(String, u64), error::CliError> {
+    let contract = exec_matches.value_of("contract").unwrap();
+    let payload = exec_matches.value_of("payload").unwrap();
+    let key_name = exec_matches.value_of("key");
+    let url = exec_matches
+        .value_of("url")
+        .unwrap_or("http://localhost:8008/");
+
+    let wait = match value_t!(exec_matches, "wait", u64) {
+        Ok(wait) => wait,
+        Err(err) => match err.kind {
+            clap::ErrorKind::ArgumentNotFound => 0,
+            _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+        },
+    };
+
+    let inputs = exec_matches
+        .values_of("inputs")
+        .map(|values| values.map(|v| v.into()).collect())
+        .ok_or_else(|| {
+            error::CliError::UserError("exec action requires one or more --inputs arguments".into())
+        })?;
+
+    let outputs = exec_matches
+        .values_of("outputs")
+        .map(|values| values.map(|v| v.into()).collect())
+        .ok_or_else(|| {
+            error::CliError::UserError(
+                "exec action requires one or more --outputs arguments".into(),
+            )
+        })?;
+    let (name, version) = match contract.split(':').collect::<Vec<_>>() {
+        ref v if (v.len() == 1 || v.len() == 2) && v[0].is_empty() => Err(
+            error::CliError::UserError("contract name must be specified".into()),
+        ),
+        ref v if v.len() == 1 || v.len() == 2 && v[1].is_empty() => Ok((v[0], "latest")),
+        ref v if v.len() == 2 => Ok((v[0], v[1])),
+        _ => Err(error::CliError::UserError(
+            "malformed contract argument, may contain at most one ':'".into(),
+        )),
+    }?;
+
+    let batch_link = execute::do_exec(&name, &version, &payload, inputs, outputs, key_name, &url)?;
+
+    Ok((batch_link, wait))
+}
+
+fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), error::CliError> {
+    let namespace = ns_matches.value_of("namespace").unwrap();
+
+    let key_name = ns_matches.value_of("key");
+
+    let url = ns_matches
+        .value_of("url")
+        .unwrap_or("http://localhost:8008/");
+
+    let wait = match value_t!(ns_matches, "wait", u64) {
+        Ok(wait) => wait,
+        Err(err) => match err.kind {
+            clap::ErrorKind::ArgumentNotFound => 0,
+            _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+        },
+    };
+
+    let owners = ns_matches
+        .values_of("owner")
+        .map(|values| values.map(|v| v.into()).collect());
+
+    let batch_link = if ns_matches.is_present("update") {
+        let o = owners.ok_or_else(|| {
+            error::CliError::UserError(
+                "update action requires one or more --owner arguments".into(),
+            )
+        })?;
+        namespace::do_ns_update(key_name, &url, &namespace, o)?
+    } else if ns_matches.is_present("delete") {
+        if ns_matches.is_present("owner") {
+            return Err(error::CliError::UserError(
+                "arguments --delete and --owner conflict".into(),
+            ));
+        }
+        namespace::do_ns_delete(key_name, &url, &namespace)?
+    } else {
+        let o = owners.ok_or_else(|| {
+            error::CliError::UserError(
+                "create action requires one or more --owner arguments".into(),
+            )
+        })?;
+        namespace::do_ns_create(key_name, &url, &namespace, o)?
+    };
+
+    Ok((batch_link, wait))
+}
+
+fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64), error::CliError> {
+    let namespace = perm_matches.value_of("namespace").unwrap();
+    let contract = perm_matches.value_of("contract").unwrap();
+    let key_name = perm_matches.value_of("key");
+    let url = perm_matches
+        .value_of("url")
+        .unwrap_or("http://localhost:8008/");
+
+    let wait = match value_t!(perm_matches, "wait", u64) {
+        Ok(wait) => wait,
+        Err(err) => match err.kind {
+            clap::ErrorKind::ArgumentNotFound => 0,
+            _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+        },
+    };
+
+    let batch_link = if perm_matches.is_present("delete") {
+        namespace::do_perm_delete(key_name, &url, &namespace)?
+    } else {
+        let read = perm_matches.is_present("read");
+        let write = perm_matches.is_present("write");
+
+        if !(read || write) {
+            return Err(error::CliError::UserError("no permissions provided".into()));
+        }
+
+        namespace::do_perm_create(key_name, &url, &namespace, &contract, read, write)?
+    };
+
+    Ok((batch_link, wait))
+}
+
+fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), error::CliError> {
+    let name = cr_matches.value_of("name").unwrap();
+
+    let key_name = cr_matches.value_of("key");
+
+    let url = cr_matches
+        .value_of("url")
+        .unwrap_or("http://localhost:8008/");
+
+    let wait = value_t!(cr_matches, "wait", u64).unwrap_or(0);
+
+    let owners = cr_matches
+        .values_of("owner")
+        .map(|values| values.map(|v| v.into()).collect());
+
+    let batch_link = if cr_matches.is_present("update") {
+        let o = owners.ok_or_else(|| {
+            error::CliError::UserError(
+                "update action requires one or more --owner arguments".into(),
+            )
+        })?;
+        contract_registry::do_cr_update(key_name, &url, &name, o)?
+    } else if cr_matches.is_present("delete") {
+        if cr_matches.is_present("owner") {
+            return Err(error::CliError::UserError(
+                "arguments --delete and --owner conflict".into(),
+            ));
+        }
+        contract_registry::do_cr_delete(key_name, &url, &name)?
+    } else {
+        let o = owners.ok_or_else(|| {
+            error::CliError::UserError(
+                "create action requires one or more --owner arguments".into(),
+            )
+        })?;
+        contract_registry::do_cr_create(key_name, &url, &name, o)?
+    };
+    Ok((batch_link, wait))
+}
+
+fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), error::CliError> {
+    let url = sp_matches
+        .value_of("url")
+        .unwrap_or("http://localhost:8008/");
+
+    let wait = match value_t!(sp_matches, "wait", u64) {
+        Ok(wait) => wait,
+        Err(err) => match err.kind {
+            clap::ErrorKind::ArgumentNotFound => 0,
+            _ => return Err(error::CliError::UserError("Wait must be an integer".into())),
+        },
+    };
+
+    let batch_link = match sp_matches.subcommand() {
+        ("create", Some(m)) => smart_permission::do_create(
+            url,
+            m.value_of("org_id").unwrap(),
+            m.value_of("name").unwrap(),
+            m.value_of("filename").unwrap(),
+            m.value_of("key"),
+        )?,
+        ("update", Some(m)) => smart_permission::do_update(
+            url,
+            m.value_of("org_id").unwrap(),
+            m.value_of("name").unwrap(),
+            m.value_of("filename").unwrap(),
+            m.value_of("key"),
+        )?,
+        ("delete", Some(m)) => smart_permission::do_delete(
+            url,
+            m.value_of("org_id").unwrap(),
+            m.value_of("name").unwrap(),
+            m.value_of("key"),
+        )?,
+        _ => {
+            return Err(error::CliError::UserError(
+                "Unrecognized smart permission subcommand".into(),
+            ));
+        }
+    };
+
+    Ok((batch_link, wait))
 }
 
 fn main() {
