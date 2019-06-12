@@ -159,14 +159,14 @@ fn run() -> Result<(), error::CliError> {
         let inputs = exec_matches
             .values_of("inputs")
             .map(|values| values.map(|v| v.into()).collect())
-            .ok_or(error::CliError::UserError(
+            .ok_or_else(|| error::CliError::UserError(
                 "exec action requires one or more --inputs arguments".into(),
             ))?;
 
         let outputs = exec_matches
             .values_of("outputs")
             .map(|values| values.map(|v| v.into()).collect())
-            .ok_or(error::CliError::UserError(
+            .ok_or_else(|| error::CliError::UserError(
                 "exec action requires one or more --outputs arguments".into(),
             ))?;
         let (name, version) = match contract.split(":").collect::<Vec<_>>() {
@@ -206,7 +206,7 @@ fn run() -> Result<(), error::CliError> {
             .map(|values| values.map(|v| v.into()).collect());
 
         let batch_link = if ns_matches.is_present("update") {
-            let o = owners.ok_or(error::CliError::UserError(
+            let o = owners.ok_or_else( || error::CliError::UserError(
                 "update action requires one or more --owner arguments".into(),
             ))?;
             namespace::do_ns_update(key_name, &url, &namespace, o)?
@@ -218,7 +218,7 @@ fn run() -> Result<(), error::CliError> {
             }
             namespace::do_ns_delete(key_name, &url, &namespace)?
         } else {
-            let o = owners.ok_or(error::CliError::UserError(
+            let o = owners.ok_or_else(|| error::CliError::UserError(
                 "create action requires one or more --owner arguments".into(),
             ))?;
             namespace::do_ns_create(key_name, &url, &namespace, o)?
@@ -271,7 +271,7 @@ fn run() -> Result<(), error::CliError> {
             .map(|values| values.map(|v| v.into()).collect());
 
         let batch_link = if cr_matches.is_present("update") {
-            let o = owners.ok_or(error::CliError::UserError(
+            let o = owners.ok_or_else(|| error::CliError::UserError(
                 "update action requires one or more --owner arguments".into(),
             ))?;
             contract_registry::do_cr_update(key_name, &url, &name, o)?
@@ -283,7 +283,7 @@ fn run() -> Result<(), error::CliError> {
             }
             contract_registry::do_cr_delete(key_name, &url, &name)?
         } else {
-            let o = owners.ok_or(error::CliError::UserError(
+            let o = owners.ok_or_else(|| error::CliError::UserError(
                 "create action requires one or more --owner arguments".into(),
             ))?;
             contract_registry::do_cr_create(key_name, &url, &name, o)?
