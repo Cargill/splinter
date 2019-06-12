@@ -166,7 +166,7 @@ impl ContractDefinition {
                  .ok_or_else(|| CliError::UserError(format!(
                      "Malformed contract definition file: \"{}\": inputs array contains non-string values",
                      filename)))
-                 .map(|s| String::from(s))
+                 .map(String::from)
             })
             .collect::<Result<Vec<_>, CliError>>()?;
 
@@ -182,7 +182,7 @@ impl ContractDefinition {
                  .ok_or_else(|| CliError::UserError(format!(
                      "Malformed contract definition file: \"{}\": outputs array contains non-string values",
                      filename)))
-                 .map(|s| String::from(s))
+                 .map(String::from)
             })
             .collect::<Result<Vec<_>, CliError>>()?;
 
