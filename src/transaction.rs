@@ -469,5 +469,5 @@ pub fn create_batch(
 pub fn create_batch_list_from_one(batch: Batch) -> BatchList {
     let mut batch_list = BatchList::new();
     batch_list.set_batches(protobuf::RepeatedField::from_vec(vec![batch]));
-    return batch_list;
+    batch_list
 }
