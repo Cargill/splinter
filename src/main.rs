@@ -169,7 +169,7 @@ fn run() -> Result<(), error::CliError> {
             .ok_or_else(|| error::CliError::UserError(
                 "exec action requires one or more --outputs arguments".into(),
             ))?;
-        let (name, version) = match contract.split(":").collect::<Vec<_>>() {
+        let (name, version) = match contract.split(':').collect::<Vec<_>>() {
             ref v if (v.len() == 1 || v.len() == 2) && v[0].is_empty() => Err(
                 error::CliError::UserError("contract name must be specified".into()),
             ),
