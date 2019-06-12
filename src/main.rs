@@ -170,10 +170,10 @@ fn run() -> Result<(), error::CliError> {
                 "exec action requires one or more --outputs arguments".into(),
             ))?;
         let (name, version) = match contract.split(":").collect::<Vec<_>>() {
-            ref v if (v.len() == 1 || v.len() == 2) && v[0].len() == 0 => Err(
+            ref v if (v.len() == 1 || v.len() == 2) && v[0].is_empty() => Err(
                 error::CliError::UserError("contract name must be specified".into()),
             ),
-            ref v if v.len() == 1 || v.len() == 2 && v[1].len() == 0 => Ok((v[0], "latest")),
+            ref v if v.len() == 1 || v.len() == 2 && v[1].is_empty() => Ok((v[0], "latest")),
             ref v if v.len() == 2 => Ok((v[0], v[1])),
             _ => Err(error::CliError::UserError(
                 "malformed contract argument, may contain at most one ':'".into(),
