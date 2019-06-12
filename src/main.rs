@@ -173,7 +173,7 @@ fn run() -> Result<(), error::CliError> {
             ref v if (v.len() == 1 || v.len() == 2) && v[0].len() == 0 => Err(
                 error::CliError::UserError("contract name must be specified".into()),
             ),
-            ref v if v.len() == 1 || v.len() == 2 && v[1].len() == 0 => Ok((v[0], "latest".into())),
+            ref v if v.len() == 1 || v.len() == 2 && v[1].len() == 0 => Ok((v[0], "latest")),
             ref v if v.len() == 2 => Ok((v[0], v[1])),
             _ => Err(error::CliError::UserError(
                 "malformed contract argument, may contain at most one ':'".into(),
