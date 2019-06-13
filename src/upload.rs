@@ -139,20 +139,26 @@ impl ContractDefinition {
         }
         let doc = &docs[0];
 
-        let name = doc["name"].as_str().ok_or_else(|| CliError::UserError(format!(
-            "Malformed contract definition file \"{}\": missing string field \"name\"",
-            filename
-        )))?;
+        let name = doc["name"].as_str().ok_or_else(|| {
+            CliError::UserError(format!(
+                "Malformed contract definition file \"{}\": missing string field \"name\"",
+                filename
+            ))
+        })?;
 
-        let version = doc["version"].as_str().ok_or_else(|| CliError::UserError(format!(
-            "Malformed contract definition file \"{}\": missing string field \"version\"",
-            filename
-        )))?;
+        let version = doc["version"].as_str().ok_or_else(|| {
+            CliError::UserError(format!(
+                "Malformed contract definition file \"{}\": missing string field \"version\"",
+                filename
+            ))
+        })?;
 
-        let wasm = doc["wasm"].as_str().ok_or_else(|| CliError::UserError(format!(
-            "Malformed contract definition file \"{}\": missing string field \"wasm\"",
-            filename
-        )))?;
+        let wasm = doc["wasm"].as_str().ok_or_else(|| {
+            CliError::UserError(format!(
+                "Malformed contract definition file \"{}\": missing string field \"wasm\"",
+                filename
+            ))
+        })?;
 
         let inputs = doc["inputs"]
             .as_vec()
