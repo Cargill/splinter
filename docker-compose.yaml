@@ -24,13 +24,16 @@ services:
     ports:
       - 8080:8080
     volumes:
-      - ./splinterd/sample_configs:/configs
+      - ./splinterd:/splinterd
+      - ./libsplinter:/libsplinter
+      - ./protos:/protos
     build:
       context: .
       dockerfile: splinterd/Dockerfile
     entrypoint: |
       bash -c "
-        ./splinterd --generate-certs -c ./configs/splinterd-node-0-docker.toml -vv
+        cargo build &&
+        splinterd --generate-certs -c /splinterd/sample_configs/splinterd-node-0-docker.toml -vv
       "
 
   openapi-client:
