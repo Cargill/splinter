@@ -44,33 +44,27 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.5.1/proto
 
 ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin
 
+# Copy dependencies
 COPY ./protos /protos
 COPY ./libsplinter /libsplinter
 
+# Cache dependencies
 RUN USER=root cargo new --bin splinterd
 WORKDIR /splinterd
 
 COPY ./splinterd/Cargo.toml ./Cargo.toml
-RUN cargo build --release
+RUN cargo build
 
 RUN rm src/*.rs
+RUN rm ./target/debug/splinterd* ./target/debug/deps/splinterd*
+
+# Build splinterd
 COPY ./splinterd/src ./src
 COPY ./splinterd/api ./api
-
-RUN rm ./target/release/splinterd* ./target/release/deps/splinterd*
-RUN cargo build --release
-
-# create the standalone image
-FROM ubuntu:bionic
-
-RUN apt-get update \
- && apt-get install -y libssl1.1 libzmq5 \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
-
-COPY --from=BUILDER /splinterd/target/release/splinterd /
+RUN cargo build
 
 EXPOSE 8043
 EXPOSE 8945
 EXPOSE 8080
-CMD ["splinterd"]
+
+ENV PATH=$PATH:/splinterd/target/debug/
