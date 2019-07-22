@@ -31,7 +31,7 @@ pub struct FileInternal {
 
 impl YamlNodeRegistry {
     pub fn new(file_path: &str) -> Result<YamlNodeRegistry, YamlNodeRegistryError> {
-        let file = OpenOptions::new().read(true).write(true).open(file_path)?;
+        let file = open_or_create(file_path)?;
 
         let nodes = serde_yaml::from_reader(&file)?;
 
@@ -259,6 +259,19 @@ impl NodeRegistry for YamlNodeRegistry {
     fn clone_box(&self) -> Box<NodeRegistry> {
         Box::new(Clone::clone(self))
     }
+}
+
+fn open_or_create(file_path: &str) -> Result<File, YamlNodeRegistryError> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(file_path)?;
+    if file.metadata()?.len() == 0 {
+        serde_yaml::to_writer(file, &Vec::<Node>::new())?;
+        file = OpenOptions::new().read(true).write(true).open(file_path)?;
+    }
+    Ok(file)
 }
 
 #[cfg(test)]
