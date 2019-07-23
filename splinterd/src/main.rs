@@ -194,7 +194,8 @@ fn main() {
     let registry_file = matches
         .value_of("registry_file")
         .map(String::from)
-        .or_else(|| config.registry_file());
+        .or_else(|| config.registry_file())
+        .unwrap_or_else(|| "./sample_nodes.yaml".to_string());
 
     let mut daemon_builder = SplinterDaemonBuilder::new()
         .with_storage_location(storage_location)
@@ -206,10 +207,8 @@ fn main() {
         .with_rest_api_endpoint(rest_api_endpoint)
         .with_registry_backend(registry_backend.clone());
 
-    if &registry_backend == "FILE" && registry_file.is_none() {
-        panic!("Must provide path for registry file if registry_backend type = 'FILE'.")
-    } else if &registry_backend == "FILE" {
-        daemon_builder = daemon_builder.with_registry_file(registry_file.unwrap());
+    if &registry_backend == "FILE" {
+        daemon_builder = daemon_builder.with_registry_file(registry_file);
     }
 
     let mut node = match daemon_builder.build() {

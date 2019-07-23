@@ -3,6 +3,7 @@
 
 /splinterd/target
 /splinterd/Cargo.lock
+/splinterd/sample_nodes.yaml
 
 /messaging/src/protos
 /messaging/target
