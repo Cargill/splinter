@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #[macro_use]
+extern crate actix_web;
+#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
@@ -20,11 +22,13 @@ extern crate serde_derive;
 mod certs;
 mod config;
 mod daemon;
+mod node_registry;
+mod registry_config;
 mod rest_api;
 
 use crate::certs::{make_ca_cert, make_ca_signed_cert, write_file, CertError};
 use crate::config::{Config, ConfigError};
-use crate::daemon::SplinterDaemon;
+use crate::daemon::SplinterDaemonBuilder;
 use clap::{clap_app, crate_version};
 use libsplinter::transport::raw::RawTransport;
 use libsplinter::transport::tls::{TlsInitError, TlsTransport};
@@ -41,9 +45,9 @@ const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 
 fn main() {
-    let matches = clap_app!(splinter =>
+    let matches = clap_app!(splinterd =>
         (version: crate_version!())
-        (about: "Splinter Node")
+        (about: "Splinter Daemon")
         (@arg config: -c --config +takes_value)
         (@arg node_id: --("node-id") +takes_value
           "unique id for the node ")
@@ -73,6 +77,10 @@ fn main() {
           "if set, the certs will be generated and insecure will be false, only use for development")
         (@arg bind: --("bind") +takes_value
             "connection endpoint for REST API")
+        (@arg registry_backend: --("registry-backend") +takes_value
+            "backend type for the node registry. Default is FILE.")
+        (@arg registry_file: --("registry-file") +takes_value
+            "file path to the node registry file if registry-backend is FILE.")
         (@arg verbose: -v --verbose +multiple
          "increase output verbosity"))
     .get_matches();
@@ -176,15 +184,34 @@ fn main() {
         .or_else(|| Some("127.0.0.1:8080".to_string()))
         .expect("Must provide a url for REST API endpoint");
 
-    let mut node = match SplinterDaemon::new(
-        storage_location,
-        transport,
-        network_endpoint,
-        service_endpoint,
-        initial_peers,
-        node_id,
-        rest_api_endpoint,
-    ) {
+    let registry_backend = matches
+        .value_of("registry_backend")
+        .map(String::from)
+        .or_else(|| config.registry_backend())
+        .or_else(|| Some("FILE".to_string()))
+        .expect("Must provide a type for registry backend");
+
+    let registry_file = matches
+        .value_of("registry_file")
+        .map(String::from)
+        .or_else(|| config.registry_file());
+
+    let mut daemon_builder = SplinterDaemonBuilder::new()
+        .with_storage_location(storage_location)
+        .with_network_endpoint(network_endpoint)
+        .with_service_endpoint(service_endpoint)
+        .with_initial_peers(initial_peers)
+        .with_node_id(node_id)
+        .with_rest_api_endpoint(rest_api_endpoint)
+        .with_registry_backend(registry_backend.clone());
+
+    if &registry_backend == "FILE" && registry_file.is_none() {
+        panic!("Must provide path for registry file if registry_backend type = 'FILE'.")
+    } else if &registry_backend == "FILE" {
+        daemon_builder = daemon_builder.with_registry_file(registry_file.unwrap());
+    }
+
+    let mut node = match daemon_builder.build() {
         Ok(node) => node,
         Err(err) => {
             error!("An error occurred while creating daemon {:?}", err);
@@ -192,7 +219,7 @@ fn main() {
         }
     };
 
-    if let Err(err) = node.start() {
+    if let Err(err) = node.start(transport) {
         error!("Failed to start daemon {:?}", err);
         std::process::exit(1);
     }

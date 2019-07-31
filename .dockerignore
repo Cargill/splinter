@@ -22,5 +22,11 @@
 /examples/private_xo/target
 /examples/private_xo/Cargo.lock
 
+/examples/gameroom/database/target
+/examples/gameroom/database/Cargo.lock
+
+/examples/gameroom/daemon/target
+/examples/gameroom/daemon/Cargo.lock
+
 /target
 /Cargo.lock

@@ -15,9 +15,11 @@
 pub mod error;
 pub mod routes;
 
+use crate::node_registry::yaml::YamlNodeRegistry;
+use crate::registry_config::RegistryConfig;
 use actix_web::{middleware, web, App, HttpServer};
 use error::RestApiServerError;
-use routes::get_status;
+use libsplinter::node_registry::NodeRegistry;
 use std::sync::mpsc;
 use std::thread;
 
@@ -33,6 +35,7 @@ impl RestApiShutdownHandle {
 
 pub fn run(
     bind_url: &str,
+    registry_config: &RegistryConfig,
 ) -> Result<
     (
         RestApiShutdownHandle,
@@ -42,14 +45,23 @@ pub fn run(
 > {
     let bind_url = bind_url.to_owned();
     let (tx, rx) = mpsc::channel();
+    let node_registry = create_node_registry(&registry_config)?;
+
     let join_handle = thread::Builder::new()
         .name("SplinterDRestApi".into())
         .spawn(move || {
             let sys = actix::System::new("SplinterD-Rest-API");
-            let addr = HttpServer::new(|| {
+            let addr = HttpServer::new(move || {
                 App::new()
+                    .data(node_registry.clone())
                     .wrap(middleware::Logger::default())
-                    .service(web::resource("/status").to(get_status))
+                    .service(routes::get_status)
+                    .service(routes::get_openapi)
+                    .service(
+                        web::resource("/node/{identity}")
+                            .route(web::get().to_async(routes::fetch_node)),
+                    )
+                    .service(web::resource("/node").route(web::get().to_async(routes::list_nodes)))
             })
             .bind(bind_url)?
             .disable_signals()
@@ -79,4 +91,22 @@ pub fn run(
     });
 
     Ok((RestApiShutdownHandle { do_shutdown }, join_handle))
+}
+
+fn create_node_registry(
+    registry_config: &RegistryConfig,
+) -> Result<Box<dyn NodeRegistry>, RestApiServerError> {
+    match &registry_config.registry_backend() as &str {
+        "FILE" => Ok(Box::new(
+            YamlNodeRegistry::new(&registry_config.registry_file()).map_err(|err| {
+                RestApiServerError::StartUpError(format!(
+                    "Failed to initialize YamlNodeRegistry: {}",
+                    err
+                ))
+            })?,
+        )),
+        _ => Err(RestApiServerError::StartUpError(
+            "NodeRegistry type is not supported".to_string(),
+        )),
+    }
 }

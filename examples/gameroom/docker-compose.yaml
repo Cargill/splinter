@@ -1,0 +1,80 @@
+# Copyright 2019 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: '3'
+
+volumes:
+  cargo-registry:
+
+services:
+  gameroom-app-acme:
+    build:
+      context: ./gameroom-app
+      args:
+        VUE_APP_BRAND: "acme"
+    image: gameroom-app-acme
+    container_name: gameroom-app-acme
+    expose:
+      - 80
+    ports:
+      - '8080:80'
+
+  gameroom-app-bubba:
+    build:
+      context: ./gameroom-app
+      args:
+        VUE_APP_BRAND: "bubba"
+    image: gameroom-app-bubba
+    container_name: gameroom-app-bubba
+    expose:
+      - 80
+    ports:
+      - '8081:80'
+
+  postgres:
+    image: postgres:alpine
+    restart: always
+    expose:
+      - 5432
+    ports:
+        - "5432:5432"
+    environment:
+      POSTGRES_USER: gameroom
+      POSTGRES_PASSWORD: gameroom_example
+      POSTGRES_DB: gameroom
+    volumes:
+      - "./database/tables:/docker-entrypoint-initdb.d"
+
+  gameroomd:
+      image: gameroomd
+      build:
+        context: .
+        dockerfile: ./daemon/Dockerfile
+      volumes:
+        - cargo-registry:/root/.cargo/registry
+      expose:
+        - 8000
+      ports:
+        - "8000:8000"
+      command: |
+        bash -c "
+          # we need to wait for the db to have started.
+          until PGPASSWORD=gameroom_example psql -h postgres -U gameroom -c '\q'; do
+              >&2 echo \"Database is unavailable - sleeping\"
+              sleep 1
+          done
+
+          target/debug/gameroomd -vv --database-url postgres://gameroom:gameroom_example@postgres:5432/gameroom \
+            -b gameroomd:8000
+        "

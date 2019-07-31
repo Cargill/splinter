@@ -23,5 +23,11 @@
 /examples/private_counter/cli/target
 /examples/private_counter/cli/Cargo.lock
 
+/examples/gameroom/database/target
+/examples/gameroom/database/Cargo.lock
+
+/examples/gameroom/daemon/target
+/examples/gameroom/daemon/Cargo.lock
+
 /target
 /Cargo.lock

@@ -16,11 +16,14 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
+use crate::registry_config::{RegistryConfig, RegistryConfigBuilder, RegistryConfigError};
+use crate::rest_api::{self, error::RestApiServerError};
+use crossbeam_channel;
 use libsplinter::circuit::directory::CircuitDirectory;
 use libsplinter::circuit::handlers::{
-    CircuitDirectMessageHandler, CircuitErrorHandler, CircuitMessageHandler,
-    ServiceConnectForwardHandler, ServiceConnectRequestHandler, ServiceDisconnectForwardHandler,
-    ServiceDisconnectRequestHandler,
+    AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
+    CircuitMessageHandler, ServiceConnectForwardHandler, ServiceConnectRequestHandler,
+    ServiceDisconnectForwardHandler, ServiceDisconnectRequestHandler,
 };
 use libsplinter::circuit::SplinterState;
 use libsplinter::mesh::Mesh;
@@ -30,6 +33,7 @@ use libsplinter::network::auth::handlers::{
 use libsplinter::network::auth::AuthorizationManager;
 use libsplinter::network::dispatch::{DispatchLoop, DispatchMessage, Dispatcher};
 use libsplinter::network::handlers::NetworkEchoHandler;
+use libsplinter::network::peer::PeerConnector;
 use libsplinter::network::sender::{NetworkMessageSender, SendRequest};
 use libsplinter::network::{
     ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError,
@@ -42,16 +46,12 @@ use libsplinter::protos::network::{NetworkMessage, NetworkMessageType};
 use libsplinter::rwlock_read_unwrap;
 use libsplinter::storage::get_storage;
 use libsplinter::transport::{AcceptError, ConnectError, Incoming, ListenError, Transport};
-
-use crate::rest_api::{self, error::RestApiServerError};
-use crossbeam_channel;
 use protobuf::Message;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
 
 pub struct SplinterDaemon {
-    transport: Box<dyn Transport + Send>,
     storage_location: String,
     service_endpoint: String,
     network_endpoint: String,
@@ -59,40 +59,18 @@ pub struct SplinterDaemon {
     network: Network,
     node_id: String,
     rest_api_endpoint: String,
+    registry_config: RegistryConfig,
 }
 
 impl SplinterDaemon {
-    pub fn new(
-        storage_location: String,
-        transport: Box<dyn Transport + Send>,
-        network_endpoint: String,
-        service_endpoint: String,
-        initial_peers: Vec<String>,
-        node_id: String,
-        rest_api_endpoint: String,
-    ) -> Result<SplinterDaemon, CreateError> {
-        let mesh = Mesh::new(512, 128);
-        let network = Network::new(mesh.clone());
-
-        Ok(SplinterDaemon {
-            transport,
-            storage_location,
-            service_endpoint,
-            network_endpoint,
-            initial_peers,
-            network,
-            node_id,
-            rest_api_endpoint,
-        })
-    }
-
-    pub fn start(&mut self) -> Result<(), StartError> {
+    pub fn start(&mut self, transport: Box<dyn Transport>) -> Result<(), StartError> {
+        let mut transport = transport;
         // Setup up ctrlc handling
         let running = Arc::new(AtomicBool::new(true));
         let r = running.clone();
 
         let (rest_api_shutdown_handle, rest_api_join_handle) =
-            rest_api::run(&self.rest_api_endpoint)?;
+            rest_api::run(&self.rest_api_endpoint, &self.registry_config)?;
 
         ctrlc::set_handler(move || {
             info!("Recieved Shutdown");
@@ -168,7 +146,7 @@ impl SplinterDaemon {
         let network_dispatcher_thread = thread::spawn(move || network_dispatch_loop.run());
 
         // setup a thread to listen on the network port and add incoming connection to the network
-        let mut network_listener = self.transport.listen(&self.network_endpoint)?;
+        let mut network_listener = transport.listen(&self.network_endpoint)?;
         let network_clone = self.network.clone();
 
         // this thread will just be dropped on shutdown
@@ -190,7 +168,7 @@ impl SplinterDaemon {
         });
 
         // setup a thread to listen on the service port and add incoming connection to the network
-        let mut service_listener = self.transport.listen(&self.service_endpoint)?;
+        let mut service_listener = transport.listen(&self.service_endpoint)?;
         let service_clone = self.network.clone();
 
         // this thread will just be dropped on shutdown
@@ -214,18 +192,13 @@ impl SplinterDaemon {
             Ok(())
         });
 
+        let peer_connector = PeerConnector::new(self.network.clone(), transport);
+
         // For provided initial peers, try to connect to them
         for peer in self.initial_peers.iter() {
-            let connection_result = self.transport.connect(&peer);
-            match connection_result {
-                Ok(connection) => {
-                    debug!("Successfully connected to {}", connection.remote_endpoint());
-                    self.network.add_connection(connection)?;
-                }
-                Err(err) => {
-                    error!("Connect Error: {:?}", err);
-                }
-            };
+            if let Err(err) = peer_connector.connect_unidentified_peer(&peer) {
+                error!("Connect Error: {}", err);
+            }
         }
 
         // For each node in the circuit_directory, try to connect and add them to the network
@@ -240,23 +213,12 @@ impl SplinterDaemon {
                     }
                 };
                 if node_endpoint != self.network_endpoint {
-                    let connection_result = self.transport.connect(&node_endpoint);
-                    let connection = match connection_result {
-                        Ok(connection) => connection,
-                        Err(err) => {
-                            debug!("Unable to connect to node: {} Error: {:?}", node_id, err);
-                            continue;
-                        }
-                    };
-                    debug!(
-                        "Successfully connected to node {}: {}",
-                        node_id,
-                        connection.remote_endpoint()
-                    );
-                    self.network.add_peer(node_id.to_string(), connection)?;
+                    if let Err(err) = peer_connector.connect_peer(node_id, &node_endpoint) {
+                        debug!("Unable to connect to node: {} Error: {:?}", node_id, err);
+                    }
                 }
             } else {
-                debug!("Unable to connect to node: {}", node_id);
+                debug!("node {} has no known endpoints", node_id);
             }
         }
 
@@ -305,6 +267,115 @@ impl SplinterDaemon {
         let _ = rest_api_join_handle.join();
 
         Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct SplinterDaemonBuilder {
+    storage_location: Option<String>,
+    service_endpoint: Option<String>,
+    network_endpoint: Option<String>,
+    initial_peers: Option<Vec<String>>,
+    node_id: Option<String>,
+    rest_api_endpoint: Option<String>,
+    registry_backend: Option<String>,
+    registry_file: Option<String>,
+}
+
+impl SplinterDaemonBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_storage_location(mut self, value: String) -> Self {
+        self.storage_location = Some(value);
+        self
+    }
+
+    pub fn with_service_endpoint(mut self, value: String) -> Self {
+        self.service_endpoint = Some(value);
+        self
+    }
+
+    pub fn with_network_endpoint(mut self, value: String) -> Self {
+        self.network_endpoint = Some(value);
+        self
+    }
+
+    pub fn with_initial_peers(mut self, value: Vec<String>) -> Self {
+        self.initial_peers = Some(value);
+        self
+    }
+
+    pub fn with_node_id(mut self, value: String) -> Self {
+        self.node_id = Some(value);
+        self
+    }
+
+    pub fn with_rest_api_endpoint(mut self, value: String) -> Self {
+        self.rest_api_endpoint = Some(value);
+        self
+    }
+
+    pub fn with_registry_backend(mut self, value: String) -> Self {
+        self.registry_backend = Some(value);
+        self
+    }
+
+    pub fn with_registry_file(mut self, value: String) -> Self {
+        self.registry_file = Some(value);
+        self
+    }
+
+    pub fn build(self) -> Result<SplinterDaemon, CreateError> {
+        let mesh = Mesh::new(512, 128);
+        let network = Network::new(mesh.clone());
+
+        let storage_location = self.storage_location.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: storage_location".to_string())
+        })?;
+
+        let service_endpoint = self.service_endpoint.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: service_location".to_string())
+        })?;
+
+        let network_endpoint = self.network_endpoint.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: network_endpoint".to_string())
+        })?;
+
+        let initial_peers = self.initial_peers.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: initial_peers".to_string())
+        })?;
+
+        let node_id = self.node_id.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: node_id".to_string())
+        })?;
+
+        let rest_api_endpoint = self.rest_api_endpoint.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: rest_api_endpoint".to_string())
+        })?;
+
+        let mut registry_config_builder = RegistryConfigBuilder::default();
+        if let Some(value) = self.registry_backend {
+            registry_config_builder = registry_config_builder.with_registry_backend(value);
+        }
+
+        if let Some(value) = self.registry_file {
+            registry_config_builder = registry_config_builder.with_registry_file(value);
+        }
+
+        let registry_config = registry_config_builder.build()?;
+
+        Ok(SplinterDaemon {
+            storage_location,
+            service_endpoint,
+            network_endpoint,
+            initial_peers,
+            network,
+            node_id,
+            rest_api_endpoint,
+            registry_config,
+        })
     }
 }
 
@@ -385,10 +456,18 @@ fn set_up_circuit_dispatcher(
         Box::new(direct_message_handler),
     );
 
-    let circuit_error_handler = CircuitErrorHandler::new(node_id.to_string(), state);
+    let circuit_error_handler = CircuitErrorHandler::new(node_id.to_string(), state.clone());
     dispatcher.set_handler(
         CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
         Box::new(circuit_error_handler),
+    );
+
+    // Circuit Admin handlers
+    let admin_direct_message_handler =
+        AdminDirectMessageHandler::new(node_id.to_string(), state.clone());
+    dispatcher.set_handler(
+        CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+        Box::new(admin_direct_message_handler),
     );
 
     dispatcher
@@ -410,7 +489,16 @@ fn create_connect_request() -> Result<Vec<u8>, protobuf::ProtobufError> {
 }
 
 #[derive(Debug)]
-pub enum CreateError {}
+pub enum CreateError {
+    MissingRequiredField(String),
+    NodeRegistryError(String),
+}
+
+impl From<RegistryConfigError> for CreateError {
+    fn from(err: RegistryConfigError) -> Self {
+        CreateError::NodeRegistryError(format!("Error configuring Node Registry: {}", err))
+    }
+}
 
 #[derive(Debug)]
 pub enum StartError {

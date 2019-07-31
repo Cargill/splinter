@@ -12,25 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{HttpRequest, HttpResponse};
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Status {
-    version: String,
-}
-
-pub fn get_status(_req: HttpRequest) -> HttpResponse {
-    let status = Status {
-        version: get_version(),
-    };
-    HttpResponse::Ok().json(status)
-}
-
-fn get_version() -> String {
-    format!(
-        "{}.{}.{}",
-        env!("CARGO_PKG_VERSION_MAJOR"),
-        env!("CARGO_PKG_VERSION_MINOR"),
-        env!("CARGO_PKG_VERSION_PATCH")
-    )
+module.exports = {
+  plugins: {
+    autoprefixer: {}
+  }
 }
