@@ -44,7 +44,7 @@ use crate::service::{
 
 use self::consensus::AdminConsensusManager;
 use self::error::{AdminError, Sha256Error};
-use self::messages::{from_payload, AdminServiceEvent, CircuitProposalVote, CreateCircuit};
+use self::messages::{from_payload, AdminServiceEvent, Circuit, CircuitProposalVote};
 use self::shared::AdminServiceShared;
 
 pub struct AdminService {
@@ -310,7 +310,7 @@ fn create_circuit(
     shared: Arc<Mutex<AdminServiceShared>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
     Box::new(
-        from_payload::<CreateCircuit>(payload).and_then(move |create_circuit| {
+        from_payload::<Circuit>(payload).and_then(move |create_circuit| {
             let mut circuit_create_request = match create_circuit.into_proto() {
                 Ok(request) => request,
                 Err(_) => return Ok(HttpResponse::BadRequest().finish()),

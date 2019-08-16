@@ -21,7 +21,7 @@ use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::protos::admin::{self, CircuitCreateRequest};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct CreateCircuit {
+pub struct Circuit {
     pub circuit_id: String,
     pub roster: Vec<SplinterService>,
     pub members: Vec<SplinterNode>,
@@ -46,7 +46,7 @@ pub fn from_payload<T: DeserializeOwned>(
         .into_future()
 }
 
-impl CreateCircuit {
+impl Circuit {
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, MarshallingError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
@@ -211,7 +211,7 @@ pub struct CircuitProposal {
     pub proposal_type: ProposalType,
     pub circuit_id: String,
     pub circuit_hash: String,
-    pub circuit: CreateCircuit,
+    pub circuit: Circuit,
     pub votes: Vec<VoteRecord>,
     pub requester: String,
 }
@@ -241,7 +241,7 @@ impl CircuitProposal {
             proposal_type,
             circuit_id: proto.take_circuit_id(),
             circuit_hash: proto.take_circuit_hash(),
-            circuit: CreateCircuit::from_proto(proto.take_circuit_proposal())?,
+            circuit: Circuit::from_proto(proto.take_circuit_proposal())?,
             votes,
             requester: proto.take_requester(),
         })
