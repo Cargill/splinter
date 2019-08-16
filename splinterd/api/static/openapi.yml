@@ -296,6 +296,21 @@ components:
     CreateCircuit:
       additionalProperties: false
       properties:
+        requester:
+          description: The public key of the user proposing the circuit
+          type: string
+          example: 395acb89a89835ffd4ecaf92baeb83b74eea6e5ade10a5c570debfd12a772baa87
+        signature:
+          description: The signature derived from signing the circuit created by this request
+          type: array
+          items:
+            type: integer
+        circuit:
+          $ref: '#/components/schemas/Circuit'
+
+    Circuit:
+      additionalProperties: false
+      properties:
         circuit_id:
           description: Name of circuit
           type: string
@@ -304,7 +319,7 @@ components:
           description: Authentication type
           type: string
           enum:
-            - TRUST_AUTHORIZATION
+            - Trust
         members:
           description: Array of nodes allowed to participate on the circuit
           type: array
@@ -318,14 +333,14 @@ components:
         persistence:
           type: string
           enum:
-            - ANY_PERSISTENCE
+            - Any
         circuit_management_type:
           type: string
           example: gameroom
         routes:
           type: string
           enum:
-            - ANY_ROUTE
+            - Any
         application_metadata:
           description: serialized bytes of metadata
           type: array 
@@ -356,45 +371,6 @@ components:
           type: array
           items:
             type: string
-
-    Circuit:
-      additionalProperties: false
-      properties:
-        status:
-          description: Circuit status
-          type: string
-          enum:
-            - CREATED
-            - PENDING
-            - DESTROYED
-            - CREATION_ERROR
-        name:
-          description: Name of circuit
-          type: string
-          example: alpha
-        auth:
-          description: Authentication type
-          type: string
-          example: trust
-        members:
-          description: Array of nodes allowed to participate on the circuit
-          type: array
-          items:
-            $ref: '#/components/schemas/SplinterNode'
-        roster:
-          description: Array of services that will communicate over circuit
-          type: array
-          items:
-            type: string
-        persistence:
-          type: string
-          example: any
-        durability:
-          type: string
-          example: none
-        routes:
-          type: string
-          example: request_direct
 
     ApplicationRegistration:
       additionalProperties: false
