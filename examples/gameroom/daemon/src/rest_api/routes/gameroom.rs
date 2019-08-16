@@ -15,7 +15,8 @@
 use actix_web::{client::Client, http::StatusCode, web, Error, HttpResponse};
 use futures::Future;
 use libsplinter::admin::messages::{
-    AuthorizationType, CreateCircuit, PersistenceType, RouteType, SplinterNode, SplinterService,
+    AuthorizationType, Circuit, CreateCircuit, PersistenceType, RouteType, SplinterNode,
+    SplinterService,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,7 +46,7 @@ pub fn propose_gameroom(
 
     let members = &create_gameroom.member;
 
-    let create_request = CreateCircuit {
+    let circuit = Circuit {
         circuit_id: create_gameroom.alias.to_string(),
         roster: members
             .iter()
@@ -67,6 +68,12 @@ pub fn propose_gameroom(
         routes: RouteType::Any,
         circuit_management_type: "Gameroom".to_string(),
         application_metadata: vec![],
+    };
+
+    let create_request = CreateCircuit {
+        requester: "".into(),
+        signature: Vec::new(),
+        circuit,
     };
 
     client

@@ -335,7 +335,7 @@ mod test {
     use gameroom_database::models::{CircuitMember, CircuitService, ProposalVoteRecord};
 
     use libsplinter::admin::messages::{
-        AuthorizationType, Ballot, CircuitProposalVote, CreateCircuit, PersistenceType,
+        AuthorizationType, Ballot, Circuit, CircuitProposalVote, CreateCircuit, PersistenceType,
         ProposalType, RouteType, Vote,
     };
 
@@ -650,7 +650,7 @@ mod test {
     }
 
     fn get_create_circuit_msg(circuit_id: &str) -> CreateCircuit {
-        CreateCircuit {
+        let circuit = Circuit {
             circuit_id: circuit_id.to_string(),
             roster: vec![SplinterService {
                 service_id: "scabbard_123".to_string(),
@@ -666,6 +666,12 @@ mod test {
             routes: RouteType::Any,
             circuit_management_type: "gameroom".to_string(),
             application_metadata: vec![],
+        };
+
+        CreateCircuit {
+            requester: "".into(),
+            signature: Vec::new(),
+            circuit,
         }
     }
 
@@ -675,7 +681,7 @@ mod test {
             circuit_id: circuit_id.to_string(),
             circuit_hash: "8e066d41911817a42ab098eda35a2a2b11e93c753bc5ecc3ffb3e99ed99ada0d"
                 .to_string(),
-            circuit: get_create_circuit_msg(circuit_id),
+            circuit: get_create_circuit_msg(circuit_id).circuit,
             votes: vec![],
             requester: "acme_corp".to_string(),
         }
