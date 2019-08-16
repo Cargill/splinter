@@ -18,11 +18,11 @@
 use std::time::Instant;
 
 use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 use crypto::sha2::Sha512;
 use protobuf;
 use protobuf::Message;
 use sabre_sdk::protocol::payload::{Action, SabrePayload};
+use sabre_sdk::protocol::ADMINISTRATORS_SETTING_ADDRESS;
 use sabre_sdk::protos::IntoBytes;
 use sawtooth_sdk::messages::batch::Batch;
 use sawtooth_sdk::messages::batch::BatchHeader;
@@ -54,8 +54,6 @@ const SMART_PERMISSION_PREFIX: &str = "00ec03";
 const PIKE_AGENT_PREFIX: &str = "cad11d00";
 
 const PIKE_ORG_PREFIX: &str = "cad11d01";
-
-const SETTING_PREFIX: &str = "000000";
 
 /// Creates a nonce appropriate for a TransactionHeader
 fn create_nonce() -> String {
@@ -133,15 +131,6 @@ fn compute_contract_address(name: &str, version: &str) -> String {
     String::from(CONTRACT_PREFIX) + &bytes_to_hex_str(hash)[..64]
 }
 
-/// Returns a state address for a the setting sawtooth.swa.administrators
-fn compute_setting_admin_address() -> String {
-    SETTING_PREFIX.to_string()
-        + &hash_256("sawtooth", 16)
-        + &hash_256("swa", 16)
-        + &hash_256("administrators", 16)
-        + &hash_256("", 16)
-}
-
 /// Returns a state address for a given agent name
 ///
 /// # Arguments
@@ -188,23 +177,6 @@ fn compute_smart_permission_address(org_id: &str, name: &str) -> String {
     String::from(SMART_PERMISSION_PREFIX)
         + &sha_org_id.result_str()[..6].to_string()
         + &sha_name.result_str()[..58].to_string()
-}
-
-/// Returns a Sha256 hash of the given length
-///
-/// # Arguments
-///
-/// * `to_hash` - string to hash
-/// * `num` - the length of the string returned
-fn hash_256(to_hash: &str, num: usize) -> String {
-    let mut sha = Sha256::new();
-    sha.input_str(to_hash);
-    let temp = sha.result_str().to_string();
-    let hash = match temp.get(..num) {
-        Some(x) => x,
-        None => "",
-    };
-    hash.to_string()
 }
 
 /// Returns a Transaction for the given Payload and Signer
@@ -308,7 +280,7 @@ pub fn create_transaction(
             let name = create_contract_registry.name();
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -316,7 +288,7 @@ pub fn create_transaction(
             let name = delete_contract_registry.name();
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -324,7 +296,7 @@ pub fn create_transaction(
             let name = update_contract_registry_owners.name();
             let addresses = vec![
                 compute_contract_registry_address(name),
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -332,7 +304,7 @@ pub fn create_transaction(
             let namespace = create_namespace_registry.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -340,7 +312,7 @@ pub fn create_transaction(
             let namespace = delete_namespace_registry.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -348,7 +320,7 @@ pub fn create_transaction(
             let namespace = update_namespace_registry_owners.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -356,7 +328,7 @@ pub fn create_transaction(
             let namespace = create_namespace_registry_permission.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
@@ -364,7 +336,7 @@ pub fn create_transaction(
             let namespace = delete_namespace_registry_permission.namespace();
             let addresses = vec![
                 compute_namespace_registry_address(namespace)?,
-                compute_setting_admin_address(),
+                ADMINISTRATORS_SETTING_ADDRESS.into(),
             ];
             (addresses.clone(), addresses)
         }
