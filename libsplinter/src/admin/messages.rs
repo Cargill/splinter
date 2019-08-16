@@ -21,6 +21,28 @@ use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::protos::admin::{self, CircuitCreateRequest};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct CreateCircuit {
+    pub circuit: Circuit,
+    pub requester: String,
+    pub signature: Vec<u8>,
+}
+
+impl CreateCircuit {
+    pub fn into_circuit_management_payload(
+        self,
+    ) -> Result<admin::CircuitManagementPayload, MarshallingError> {
+        let mut payload = admin::CircuitManagementPayload::new();
+
+        payload.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
+        payload.set_signature(self.signature);
+        payload.set_requester(self.requester);
+        payload.set_circuit_create_request(self.circuit.into_proto()?);
+
+        Ok(payload)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Circuit {
     pub circuit_id: String,
     pub roster: Vec<SplinterService>,
