@@ -150,16 +150,22 @@ message CircuitManagementPayload {
 
     Action action = 1;
 
-    CircuitProposalVote circuit_proposal_vote = 2;
-    CircuitCreateRequest circuit_create_request = 3;
-    CircuitUpdateRosterRequest  circuit_update_roster_request = 4;
-    CircuitUpdateAddNodeRequest circuit_update_add_node = 5;
-    CircuitUpdateRemoveNodeRequest circuit_update_remove_node = 6;
+    // Public key of agent submitting the payload 
+    string requester = 2;
+
+    // The signature derived from signing the circuit created by this request
+    bytes signature = 3;
+
+    CircuitProposalVote circuit_proposal_vote = 4;
+    CircuitCreateRequest circuit_create_request = 5;
+    CircuitUpdateRosterRequest  circuit_update_roster_request = 6;
+    CircuitUpdateAddNodeRequest circuit_update_add_node = 7;
+    CircuitUpdateRemoveNodeRequest circuit_update_remove_node = 8;
     CircuitUpdateApplicationMetadataRequest
-        circuit_update_application_metadata_request = 7;
-    CircuitJoinRequest circuit_join_request = 8;
-    CircuitDestroyRequest circuit_destroy_request = 9;
-    CircuitAbandon circuit_abandon = 10;
+        circuit_update_application_metadata_request = 9;
+    CircuitJoinRequest circuit_join_request = 10;
+    CircuitDestroyRequest circuit_destroy_request = 11;
+    CircuitAbandon circuit_abandon = 12;
 }
 
 message CircuitProposalVote {
