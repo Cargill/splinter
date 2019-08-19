@@ -311,14 +311,18 @@ fn create_circuit(
 ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>> {
     Box::new(
         from_payload::<CreateCircuit>(payload).and_then(move |create_circuit| {
-            let mut circuit_create_request = match create_circuit.circuit.into_proto() {
+            let mut circuit_create_request = match create_circuit.into_circuit_management_payload()
+            {
                 Ok(request) => request,
                 Err(_) => return Ok(HttpResponse::BadRequest().finish()),
             };
-            let circuit = circuit_create_request.take_circuit();
-            let circuit_id = circuit.circuit_id.clone();
+            let circuit_id = circuit_create_request
+                .take_circuit_create_request()
+                .take_circuit()
+                .take_circuit_id()
+                .clone();
             let mut shared = shared.lock().expect("the admin state lock was poisoned");
-            if let Err(err) = shared.propose_circuit(circuit) {
+            if let Err(err) = shared.propose_circuit(circuit_create_request) {
                 error!("Unable to submit circuit {} proposal: {}", circuit_id, err);
                 Ok(HttpResponse::BadRequest().finish())
             } else {
@@ -443,11 +447,21 @@ mod tests {
             splinter_service("service-b", "sabre"),
         ]));
 
+        let mut request = admin::CircuitCreateRequest::new();
+        request.set_circuit(proposed_circuit.clone());
+
+        let mut payload = admin::CircuitManagementPayload::new();
+
+        payload.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
+        payload.set_signature(Vec::new());
+        payload.set_requester("".into());
+        payload.set_circuit_create_request(request.clone());
+
         admin_service
             .admin_service_shared
             .lock()
             .unwrap()
-            .propose_circuit(proposed_circuit.clone())
+            .propose_circuit(payload.clone())
             .expect("The proposal was not handled correctly");
 
         // wait up to 1 second for the proposed circuit message

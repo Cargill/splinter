@@ -24,8 +24,8 @@ use crate::network::{
 };
 use crate::orchestrator::ServiceOrchestrator;
 use crate::protos::admin::{
-    Circuit, CircuitCreateRequest, CircuitManagementPayload, CircuitManagementPayload_Action,
-    CircuitProposal, CircuitProposal_ProposalType,
+    CircuitManagementPayload, CircuitManagementPayload_Action, CircuitProposal,
+    CircuitProposal_ProposalType,
 };
 use crate::service::error::ServiceError;
 use crate::service::ServiceNetworkSender;
@@ -213,14 +213,25 @@ impl AdminServiceShared {
     ///
     /// This operation will propose a new circuit to all the member nodes of the circuit.  If there
     /// is no peer connection, a connection to the peer will also be established.
-    pub fn propose_circuit(&mut self, proposed_circuit: Circuit) -> Result<(), ServiceError> {
+    pub fn propose_circuit(
+        &mut self,
+        proposed_circuit: CircuitManagementPayload,
+    ) -> Result<(), ServiceError> {
         debug!(
-            "received circuit proposal for {}",
-            proposed_circuit.get_circuit_id()
+            "recieved circuit proposal for {}",
+            proposed_circuit
+                .get_circuit_create_request()
+                .get_circuit()
+                .get_circuit_id()
         );
 
         let mut unauthorized_peers = vec![];
-        for node in proposed_circuit.get_members() {
+
+        for node in proposed_circuit
+            .get_circuit_create_request()
+            .get_circuit()
+            .get_members()
+        {
             if self.node_id() != node.get_node_id() {
                 if self.auth_inquisitor.is_authorized(node.get_node_id()) {
                     continue;
@@ -235,23 +246,19 @@ impl AdminServiceShared {
             }
         }
 
-        let mut create_request = CircuitCreateRequest::new();
-        create_request.set_circuit(proposed_circuit);
-
-        let mut envelope = CircuitManagementPayload::new();
-        envelope.set_action(CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-        envelope.set_circuit_create_request(create_request);
-
         if unauthorized_peers.is_empty() {
-            self.pending_circuit_payloads.push_back(envelope);
+            self.pending_circuit_payloads
+                .push_back(proposed_circuit.clone());
         } else {
             debug!(
                 "Members {:?} added; awaiting network authorization before proceeding",
                 &unauthorized_peers
             );
 
-            self.unpeered_payloads.push((unauthorized_peers, envelope));
+            self.unpeered_payloads
+                .push((unauthorized_peers, proposed_circuit.clone()));
         }
+
         Ok(())
     }
 
@@ -359,7 +366,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
         );
 
-        let mut circuit = Circuit::new();
+        let mut circuit = admin::Circuit::new();
         circuit.set_circuit_id("test_propose_circuit".into());
         circuit.set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
         circuit.set_persistence(admin::Circuit_PersistenceType::ANY_PERSISTENCE);
@@ -375,8 +382,17 @@ mod tests {
             splinter_service("service-b", "sabre"),
         ]));
 
+        let mut request = admin::CircuitCreateRequest::new();
+        request.set_circuit(circuit);
+
+        let mut payload = admin::CircuitManagementPayload::new();
+        payload.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
+        payload.set_signature(Vec::new());
+        payload.set_requester("".into());
+        payload.set_circuit_create_request(request);
+
         shared
-            .propose_circuit(circuit)
+            .propose_circuit(payload)
             .expect("Proposal not accepted");
 
         // None of the proposed members are peered
@@ -411,7 +427,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
         );
 
-        let mut circuit = Circuit::new();
+        let mut circuit = admin::Circuit::new();
         circuit.set_circuit_id("test_propose_circuit".into());
         circuit.set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
         circuit.set_persistence(admin::Circuit_PersistenceType::ANY_PERSISTENCE);
@@ -427,8 +443,17 @@ mod tests {
             splinter_service("service-b", "sabre"),
         ]));
 
+        let mut request = admin::CircuitCreateRequest::new();
+        request.set_circuit(circuit);
+
+        let mut payload = admin::CircuitManagementPayload::new();
+        payload.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
+        payload.set_signature(Vec::new());
+        payload.set_requester("".into());
+        payload.set_circuit_create_request(request);
+
         shared
-            .propose_circuit(circuit)
+            .propose_circuit(payload)
             .expect("Proposal not accepted");
 
         // None of the proposed members are peered
