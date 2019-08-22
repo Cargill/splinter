@@ -18,8 +18,7 @@ use protobuf::Message;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
-use std::thread;
-use std::thread::JoinHandle;
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crate::channel;
@@ -50,19 +49,38 @@ struct SharedState {
     pub join_handles: Vec<JoinHandle<Result<(), ServiceProcessorError>>>,
 }
 
+/// Helper macro for generating ServiceProcessorError::ProcessError
+macro_rules! process_err {
+    ($err:ident, $ctx_msg:expr) => {
+        ServiceProcessorError::ProcessError($ctx_msg.into(), Box::new($err))
+    };
+    ($err:ident, $ctx_msg:tt, $($fmt_arg:tt)*) => {
+        ServiceProcessorError::ProcessError(format!($ctx_msg, $($fmt_arg)*), Box::new($err))
+    }
+}
+
+/// Helper macro for generating map_err functions that convert errors into
+/// ServiceProcessorError::ProcessError values.
+macro_rules! to_process_err {
+    ($($arg:tt)*) => {
+        |err| process_err!(err, $($arg)*)
+    }
+}
+
 /// The ServiceProcessor handles the networking for services. This includes talking to the
 /// splinter node, connecting for authorization, registering the services, and routing
 /// direct messages to the correct service.
 pub struct ServiceProcessor {
     shared_state: Arc<RwLock<SharedState>>,
+    services: Vec<Box<dyn Service>>,
     mesh: Mesh,
     circuit: String,
     node_mesh_id: usize,
     network_sender: Sender<Vec<u8>>,
     network_receiver: Receiver<Vec<u8>>,
     running: Arc<AtomicBool>,
-    inbound_router: InboundRouter<ServiceMessage>,
-    inbound_receiver: Receiver<Result<ServiceMessage, channel::RecvError>>,
+    inbound_router: InboundRouter<CircuitMessageType>,
+    inbound_receiver: Receiver<Result<(CircuitMessageType, Vec<u8>), channel::RecvError>>,
     channel_capacity: usize,
 }
 
@@ -78,7 +96,7 @@ impl ServiceProcessor {
         let mesh = Mesh::new(incoming_capacity, outgoing_capacity);
         let node_mesh_id = mesh
             .add(connection)
-            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+            .map_err(|err| process_err!(err, "unable to add connection to mesh"))?;
         let (network_sender, network_receiver) = crossbeam_channel::bounded(channel_capacity);
         let (inbound_sender, inbound_receiver) = crossbeam_channel::bounded(channel_capacity);
         Ok(ServiceProcessor {
@@ -86,6 +104,7 @@ impl ServiceProcessor {
                 services: HashMap::new(),
                 join_handles: vec![],
             })),
+            services: vec![],
             mesh,
             circuit,
             node_mesh_id,
@@ -101,92 +120,20 @@ impl ServiceProcessor {
     /// add_service takes a Service and sets up the thread that the service will run in.
     /// The service will be started, including registration and then messages are routed to the
     /// the services using a channel.
-    pub fn add_service(
-        &mut self,
-        mut service: Box<dyn Service>,
-    ) -> Result<(), ServiceProcessorError> {
-        let mut shared_state = rwlock_write_unwrap!(self.shared_state);
-        let service_id = service.service_id().to_string();
-
-        let (send, recv) = crossbeam_channel::bounded(self.channel_capacity);
-        let network_sender = self.network_sender.clone();
-        let circuit = self.circuit.clone();
-        let inbound_router = self.inbound_router.clone();
-        let join_handle = thread::Builder::new()
-            .name(format!("Service {}", service_id))
-            .spawn(move || {
-                info!("Starting Service: {}", service.service_id());
-                let registry = StandardServiceNetworkRegistry::new(
-                    circuit.to_string(),
-                    network_sender.clone(),
-                    inbound_router.clone(),
-                );
-                service
-                    .start(&registry)
-                    .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
-
-                loop {
-                    let service_message: ServiceMessage = match recv.recv() {
-                        Ok(ProcessorMessage::ServiceMessage(message)) => Ok(message),
-                        Ok(ProcessorMessage::Shutdown) => {
-                            info!("Shutting down {}", service.service_id());
-                            service.stop(&registry).map_err(|err| {
-                                ServiceProcessorError::ProcessError(Box::new(err))
-                            })?;
-                            service.destroy().map_err(|err| {
-                                ServiceProcessorError::ProcessError(Box::new(err))
-                            })?;
-                            break;
-                        }
-                        Err(err) => Err(ServiceProcessorError::ProcessError(Box::new(err))),
-                    }?;
-
-                    match service_message {
-                        ServiceMessage::AdminDirectMessage(mut admin_direct_message) => {
-                            let msg_context = ServiceMessageContext {
-                                sender: admin_direct_message.take_sender(),
-                                circuit: admin_direct_message.take_circuit(),
-                                correlation_id: admin_direct_message.take_correlation_id(),
-                            };
-
-                            service
-                                .handle_message(admin_direct_message.get_payload(), &msg_context)
-                                .map_err(|err| {
-                                    ServiceProcessorError::ProcessError(Box::new(err))
-                                })?;
-                        }
-                        ServiceMessage::CircuitDirectMessage(mut direct_message) => {
-                            let msg_context = ServiceMessageContext {
-                                sender: direct_message.take_sender(),
-                                circuit: direct_message.take_circuit(),
-                                correlation_id: direct_message.take_correlation_id(),
-                            };
-
-                            service
-                                .handle_message(direct_message.get_payload(), &msg_context)
-                                .map_err(|err| {
-                                    ServiceProcessorError::ProcessError(Box::new(err))
-                                })?;
-                        }
-                        other_msg => warn!(
-                            "{} received unexpected message type: {:?}",
-                            service.service_id(),
-                            other_msg
-                        ),
-                    }
-                }
-                Ok(())
-            })?;
-        shared_state.join_handles.push(join_handle);
-
-        if shared_state.services.get(&service_id).is_none() {
-            shared_state.services.insert(service_id.to_string(), send);
-            Ok(())
-        } else {
+    pub fn add_service(&mut self, service: Box<dyn Service>) -> Result<(), ServiceProcessorError> {
+        if self
+            .services
+            .iter()
+            .any(|s| s.service_id() == service.service_id())
+        {
             Err(ServiceProcessorError::AddServiceError(format!(
                 "{} already exists",
-                service_id
+                service.service_id()
             )))
+        } else {
+            self.services.push(service);
+
+            Ok(())
         }
     }
 
@@ -194,14 +141,47 @@ impl ServiceProcessor {
     /// node and route it to a running service.
     ///
     /// Returns a ShutdownHandle and join_handles so the service can be properly shutdown.
-    pub fn start(self) -> Result<ShutdownHandle, ServiceProcessorError> {
+    pub fn start(
+        self,
+    ) -> Result<
+        (
+            ShutdownHandle,
+            JoinHandles<Result<(), ServiceProcessorError>>,
+        ),
+        ServiceProcessorError,
+    > {
         // Starts the authorization process with the splinter node
         // If running over inproc connection, this is the only authroization message required
         let connect_request = create_connect_request()
-            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;;
+            .map_err(|err| process_err!(err, "unable to create connect request"))?;;
         self.mesh
             .send(Envelope::new(self.node_mesh_id, connect_request))
-            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+            .map_err(|err| process_err!(err, "unable to send connect request"))?;
+
+        for service in self.services.into_iter() {
+            let mut shared_state = rwlock_write_unwrap!(self.shared_state);
+            let service_id = service.service_id().to_string();
+
+            let (send, recv) = crossbeam_channel::bounded(self.channel_capacity);
+            let network_sender = self.network_sender.clone();
+            let circuit = self.circuit.clone();
+            let inbound_router = self.inbound_router.clone();
+            let join_handle = thread::Builder::new()
+                .name(format!("Service {}", service_id))
+                .spawn(move || {
+                    let service_id = service.service_id().to_string();
+                    if let Err(err) =
+                        run_service_loop(circuit, service, network_sender, recv, inbound_router)
+                    {
+                        error!("Terminating service {} due to error: {}", service_id, err);
+                        Err(err)
+                    } else {
+                        Ok(())
+                    }
+                })?;
+            shared_state.join_handles.push(join_handle);
+            shared_state.services.insert(service_id.to_string(), send);
+        }
 
         let incoming_mesh = self.mesh.clone();
         let shared_state = self.shared_state.clone();
@@ -224,82 +204,85 @@ impl ServiceProcessor {
                         };
 
                         let msg: NetworkMessage = protobuf::parse_from_bytes(&message_bytes)
-                            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+                            .map_err(to_process_err!("unable parse network message"))?;
 
                         // if a service is waiting on a reply the inbound router will
                         // route back the reponse to the service based on the correlation id in
                         // the message, otherwise it will be sent to the inbound thread
                         match msg.get_message_type() {
                             NetworkMessageType::CIRCUIT => {
-                                let circuit_msg: CircuitMessage =
-                                    protobuf::parse_from_bytes(&msg.get_payload()).map_err(
-                                        |err| ServiceProcessorError::ProcessError(Box::new(err)),
-                                    )?;
+                                let mut circuit_msg: CircuitMessage = protobuf::parse_from_bytes(
+                                    &msg.get_payload(),
+                                )
+                                .map_err(to_process_err!("unable to parse circuit message"))?;
 
                                 match circuit_msg.get_message_type() {
                                     CircuitMessageType::ADMIN_DIRECT_MESSAGE => {
                                         let admin_direct_message: AdminDirectMessage =
-                                            protobuf::parse_from_bytes(&circuit_msg.get_payload())
-                                                .map_err(|err| {
-                                                    ServiceProcessorError::ProcessError(Box::new(
-                                                        err,
-                                                    ))
-                                                })?;
+                                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                                                .map_err(to_process_err!(
+                                                "unable to parse admin direct message"
+                                            ))?;
                                         inbound_router
-                                            .route(Ok(ServiceMessage::AdminDirectMessage(
-                                                admin_direct_message,
-                                            )))
-                                            .map_err(|err| {
-                                                ServiceProcessorError::ProcessError(Box::new(err))
-                                            })?;
+                                            .route(
+                                                admin_direct_message.get_correlation_id(),
+                                                Ok((
+                                                    CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                                                    circuit_msg.take_payload(),
+                                                )),
+                                            )
+                                            .map_err(to_process_err!("unable to route message"))?;
                                     }
                                     CircuitMessageType::CIRCUIT_DIRECT_MESSAGE => {
                                         let direct_message: CircuitDirectMessage =
-                                            protobuf::parse_from_bytes(&circuit_msg.get_payload())
-                                                .map_err(|err| {
-                                                    ServiceProcessorError::ProcessError(Box::new(
-                                                        err,
-                                                    ))
-                                                })?;
+                                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                                                .map_err(to_process_err!(
+                                                "unable to parse circuit direct message"
+                                            ))?;
                                         inbound_router
-                                            .route(Ok(ServiceMessage::CircuitDirectMessage(
-                                                direct_message,
-                                            )))
-                                            .map_err(|err| {
-                                                ServiceProcessorError::ProcessError(Box::new(err))
-                                            })?;
+                                            .route(
+                                                direct_message.get_correlation_id(),
+                                                Ok((
+                                                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                                                    circuit_msg.take_payload(),
+                                                )),
+                                            )
+                                            .map_err(to_process_err!("unable to route message"))?;
                                     }
                                     CircuitMessageType::SERVICE_CONNECT_RESPONSE => {
                                         let response: ServiceConnectResponse =
-                                            protobuf::parse_from_bytes(&circuit_msg.get_payload())
-                                                .map_err(|err| {
-                                                    ServiceProcessorError::ProcessError(Box::new(
-                                                        err,
-                                                    ))
-                                                })?;
+                                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                                                .map_err(to_process_err!(
+                                                "unable to parse service connect response"
+                                            ))?;
                                         inbound_router
-                                            .route(Ok(ServiceMessage::ServiceConnectResponse(
-                                                response,
-                                            )))
-                                            .map_err(|err| {
-                                                ServiceProcessorError::ProcessError(Box::new(err))
-                                            })?;
+                                            .route(
+                                                response.get_correlation_id(),
+                                                Ok((
+                                                    CircuitMessageType::SERVICE_CONNECT_RESPONSE,
+                                                    circuit_msg.take_payload(),
+                                                )),
+                                            )
+                                            .map_err(to_process_err!("unable to route message"))?;
                                     }
                                     CircuitMessageType::SERVICE_DISCONNECT_RESPONSE => {
                                         let response: ServiceDisconnectResponse =
-                                            protobuf::parse_from_bytes(&circuit_msg.get_payload())
+                                            protobuf::parse_from_bytes(circuit_msg.get_payload())
                                                 .map_err(|err| {
-                                                    ServiceProcessorError::ProcessError(Box::new(
-                                                        err,
-                                                    ))
-                                                })?;
-                                        inbound_router
-                                            .route(Ok(ServiceMessage::ServiceDisconnectResponse(
-                                                response,
-                                            )))
-                                            .map_err(|err| {
-                                                ServiceProcessorError::ProcessError(Box::new(err))
+                                                process_err!(
+                                                    err,
+                                                    "unable to parse service disconnect response"
+                                                )
                                             })?;
+                                        inbound_router
+                                            .route(
+                                                response.get_correlation_id(),
+                                                Ok((
+                                                    CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
+                                                    circuit_msg.take_payload(),
+                                                )),
+                                            )
+                                            .map_err(to_process_err!("unable to route message"))?;
                                     }
                                     msg_type => {
                                         warn!("Received unimplemented message: {:?}", msg_type)
@@ -313,7 +296,7 @@ impl ServiceProcessor {
                     Ok(())
                 })?;
 
-        let inbound_receiver = self.inbound_receiver.clone();
+        let inbound_receiver = self.inbound_receiver;
         let inbound_running = self.running.clone();
         // Thread that handles messages that do not have a matching correlation id
         let inbound_join_handle: JoinHandle<Result<(), ServiceProcessorError>> =
@@ -322,30 +305,51 @@ impl ServiceProcessor {
                 .spawn(move || {
                     let timeout = Duration::from_secs(TIMEOUT_SEC);
                     while inbound_running.load(Ordering::SeqCst) {
-                        let service_message = inbound_receiver
-                            .recv_timeout(timeout)
-                            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?
-                            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+                        let service_message = match inbound_receiver.recv_timeout(timeout) {
+                            Ok(msg) => msg,
+                            Err(crossbeam_channel::RecvTimeoutError::Timeout) => continue,
+                            Err(err) => {
+                                debug!("inbound sender dropped; ending inbound message thread");
+                                return Err(process_err!(err, "inbound sender dropped"));
+                            }
+                        }
+                        .map_err(to_process_err!("received service message error"))?;
+
                         match service_message {
-                            ServiceMessage::AdminDirectMessage(msg) => {
-                                handle_admin_direct_msg(msg, &shared_state).map_err(|err| {
-                                    ServiceProcessorError::ProcessError(Box::new(err))
-                                })?;
+                            (CircuitMessageType::ADMIN_DIRECT_MESSAGE, msg) => {
+                                let admin_direct_message: AdminDirectMessage =
+                                    protobuf::parse_from_bytes(&msg).map_err(to_process_err!(
+                                        "unable to parse inbound admin direct message"
+                                    ))?;
+
+                                handle_admin_direct_msg(admin_direct_message, &shared_state)
+                                    .map_err(to_process_err!(
+                                        "unable to handle inbound admin direct message"
+                                    ))?;
                             }
-                            ServiceMessage::CircuitDirectMessage(msg) => {
-                                handle_circuit_direct_msg(msg, &shared_state).map_err(|err| {
-                                    ServiceProcessorError::ProcessError(Box::new(err))
-                                })?;
+                            (CircuitMessageType::CIRCUIT_DIRECT_MESSAGE, msg) => {
+                                let circuit_direct_message: CircuitDirectMessage =
+                                    protobuf::parse_from_bytes(&msg).map_err(to_process_err!(
+                                        "unable to parse inbound circuit direct message"
+                                    ))?;
+
+                                handle_circuit_direct_msg(circuit_direct_message, &shared_state)
+                                    .map_err(to_process_err!(
+                                        "unable to handle inbound circuit direct message"
+                                    ))?;
                             }
-                            _ => warn!("Received message that does not have a correlation id"),
+                            (msg_type, _) => warn!(
+                                "Received message ({:?}) that does not have a correlation id",
+                                msg_type
+                            ),
                         }
                     }
                     Ok(())
                 })?;
 
-        let outgoing_mesh = self.mesh.clone();
+        let outgoing_mesh = self.mesh;
         let outgoing_running = self.running.clone();
-        let outgoing_receiver = self.network_receiver.clone();
+        let outgoing_receiver = self.network_receiver;
         let node_mesh_id = self.node_mesh_id;
 
         // Thread that handles outgoing messages that need to be sent to the splinter node
@@ -359,7 +363,7 @@ impl ServiceProcessor {
                             Ok(msg) => msg,
                             Err(crossbeam_channel::RecvTimeoutError::Timeout) => continue,
                             Err(err) => {
-                                error!("{}", err);
+                                error!("channel dropped while handling outgoing messages: {}", err);
                                 break;
                             }
                         };
@@ -367,7 +371,7 @@ impl ServiceProcessor {
                         // Send message to splinter node
                         outgoing_mesh
                             .send(Envelope::new(node_mesh_id, message_bytes))
-                            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+                            .map_err(to_process_err!("unable to send outbound message"))?;
                     }
                     Ok(())
                 })?;
@@ -402,47 +406,105 @@ impl ServiceProcessor {
             Ok(())
         });
 
-        Ok(ShutdownHandle {
-            do_shutdown,
-            incoming_join_handle,
-            outgoing_join_handle,
-            inbound_join_handle,
-        })
+        Ok((
+            ShutdownHandle { do_shutdown },
+            JoinHandles::new(vec![
+                incoming_join_handle,
+                outgoing_join_handle,
+                inbound_join_handle,
+            ]),
+        ))
     }
 }
 
 pub struct ShutdownHandle {
-    do_shutdown: Box<dyn Fn() -> Result<(), ServiceProcessorError>>,
-    incoming_join_handle: JoinHandle<Result<(), ServiceProcessorError>>,
-    outgoing_join_handle: JoinHandle<Result<(), ServiceProcessorError>>,
-    inbound_join_handle: JoinHandle<Result<(), ServiceProcessorError>>,
+    do_shutdown: Box<dyn Fn() -> Result<(), ServiceProcessorError> + Send>,
+}
+
+pub struct JoinHandles<T> {
+    join_handles: Vec<JoinHandle<T>>,
+}
+
+impl<T> JoinHandles<T> {
+    fn new(join_handles: Vec<JoinHandle<T>>) -> Self {
+        Self { join_handles }
+    }
+
+    pub fn join_all(self) -> thread::Result<Vec<T>> {
+        let mut res = Vec::with_capacity(self.join_handles.len());
+
+        for jh in self.join_handles.into_iter() {
+            res.push(jh.join()?);
+        }
+
+        Ok(res)
+    }
 }
 
 impl ShutdownHandle {
     pub fn shutdown(self) -> Result<(), ServiceProcessorError> {
         (*self.do_shutdown)()?;
 
-        self.incoming_join_handle.join().map_err(|err| {
-            ServiceProcessorError::ShutdownError(format!(
-                "unable to shutdown incoming thread: {:?}",
-                err
-            ))
-        })??;
-        self.outgoing_join_handle.join().map_err(|err| {
-            ServiceProcessorError::ShutdownError(format!(
-                "unable to shutdown outgoing thread: {:?}",
-                err
-            ))
-        })??;
-        self.inbound_join_handle.join().map_err(|err| {
-            ServiceProcessorError::ShutdownError(format!(
-                "unable to shutdown inbound thread: {:?}",
-                err
-            ))
-        })??;
-
         Ok(())
     }
+}
+
+fn run_service_loop(
+    circuit: String,
+    mut service: Box<dyn Service>,
+    network_sender: Sender<Vec<u8>>,
+    service_recv: Receiver<ProcessorMessage>,
+    inbound_router: InboundRouter<CircuitMessageType>,
+) -> Result<(), ServiceProcessorError> {
+    info!("Starting Service: {}", service.service_id());
+    let registry = StandardServiceNetworkRegistry::new(circuit, network_sender, inbound_router);
+    service.start(&registry).map_err(to_process_err!(
+        "unable to start service {}",
+        service.service_id()
+    ))?;
+
+    loop {
+        let service_message: ServiceMessage = match service_recv.recv() {
+            Ok(ProcessorMessage::ServiceMessage(message)) => Ok(message),
+            Ok(ProcessorMessage::Shutdown) => {
+                info!("Shutting down {}", service.service_id());
+                service
+                    .stop(&registry)
+                    .map_err(to_process_err!("unable to stop service"))?;
+                service
+                    .destroy()
+                    .map_err(to_process_err!("unable to destroy service"))?;
+                break;
+            }
+            Err(err) => Err(process_err!(err, "unable to receive service messages")),
+        }?;
+
+        match service_message {
+            ServiceMessage::AdminDirectMessage(mut admin_direct_message) => {
+                let msg_context = ServiceMessageContext {
+                    sender: admin_direct_message.take_sender(),
+                    circuit: admin_direct_message.take_circuit(),
+                    correlation_id: admin_direct_message.take_correlation_id(),
+                };
+
+                service
+                    .handle_message(admin_direct_message.get_payload(), &msg_context)
+                    .map_err(to_process_err!("unable to handle admin direct message"))?;
+            }
+            ServiceMessage::CircuitDirectMessage(mut direct_message) => {
+                let msg_context = ServiceMessageContext {
+                    sender: direct_message.take_sender(),
+                    circuit: direct_message.take_circuit(),
+                    correlation_id: direct_message.take_correlation_id(),
+                };
+
+                service
+                    .handle_message(direct_message.get_payload(), &msg_context)
+                    .map_err(to_process_err!("unable to handle circuit direct message"))?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn handle_circuit_direct_msg(
@@ -456,7 +518,9 @@ fn handle_circuit_direct_msg(
             .send(ProcessorMessage::ServiceMessage(
                 ServiceMessage::CircuitDirectMessage(direct_message),
             ))
-            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+            .map_err(to_process_err!(
+                "unable to send service (circuit direct) message"
+            ))?;
     } else {
         warn!(
             "Service with id {} does not exist, ignoring message",
@@ -480,7 +544,9 @@ fn handle_admin_direct_msg(
             .send(ProcessorMessage::ServiceMessage(
                 ServiceMessage::AdminDirectMessage(admin_direct_message),
             ))
-            .map_err(|err| ServiceProcessorError::ProcessError(Box::new(err)))?;
+            .map_err(to_process_err!(
+                "unable to send service (admin direct) message"
+            ))?;
     } else {
         warn!(
             "Service with id {} does not exist, ignoring message",
@@ -718,8 +784,7 @@ pub mod tests {
     // Service that can be used for testing a standard service's functionality
     struct MockService {
         service_id: String,
-        family_name: String,
-        family_versions: Vec<String>,
+        service_type: String,
         network_sender: Option<Box<dyn ServiceNetworkSender>>,
     }
 
@@ -727,8 +792,7 @@ pub mod tests {
         pub fn new() -> Self {
             MockService {
                 service_id: "mock_service".to_string(),
-                family_name: "mock".to_string(),
-                family_versions: vec!["0.1".to_string()],
+                service_type: "mock".to_string(),
                 network_sender: None,
             }
         }
@@ -741,13 +805,8 @@ pub mod tests {
         }
 
         /// This service's message family
-        fn family_name(&self) -> &str {
-            &self.family_name
-        }
-
-        /// This service's supported message versions
-        fn family_versions(&self) -> &[String] {
-            &self.family_versions
+        fn service_type(&self) -> &str {
+            &self.service_type
         }
 
         /// Starts the service
@@ -755,21 +814,17 @@ pub mod tests {
             &mut self,
             service_registry: &dyn ServiceNetworkRegistry,
         ) -> Result<(), ServiceStartError> {
-            let network_sender = service_registry
-                .connect(self.service_id())
-                .map_err(|err| ServiceStartError(Box::new(err)))?;
+            let network_sender = service_registry.connect(self.service_id())?;
             self.network_sender = Some(network_sender);
             Ok(())
         }
 
         /// Stops the service
         fn stop(
-            &self,
+            &mut self,
             service_registry: &dyn ServiceNetworkRegistry,
         ) -> Result<(), ServiceStopError> {
-            service_registry
-                .disconnect(self.service_id())
-                .map_err(|err| ServiceStopError(Box::new(err)))?;
+            service_registry.disconnect(self.service_id())?;
             Ok(())
         }
 
@@ -812,8 +867,7 @@ pub mod tests {
     // Service that can be used for testing a Admin service's functionality
     struct MockAdminService {
         service_id: String,
-        family_name: String,
-        family_versions: Vec<String>,
+        service_type: String,
         network_sender: Option<Box<dyn ServiceNetworkSender>>,
     }
 
@@ -821,19 +875,9 @@ pub mod tests {
         pub fn new() -> Self {
             MockAdminService {
                 service_id: "mock_service".to_string(),
-                family_name: "mock".to_string(),
-                family_versions: vec!["0.1".to_string()],
+                service_type: "mock".to_string(),
                 network_sender: None,
             }
-        }
-
-        fn create_admin_msg(&self, payload: Vec<u8>) -> Vec<u8> {
-            let mut direct_response = AdminDirectMessage::new();
-            direct_response.set_recipient("service_a".to_string());
-            direct_response.set_sender(self.service_id().to_string());
-            direct_response.set_circuit("admin".to_string());
-            direct_response.set_payload(payload);
-            direct_response.write_to_bytes().unwrap()
         }
     }
 
@@ -844,13 +888,8 @@ pub mod tests {
         }
 
         /// This service's message family
-        fn family_name(&self) -> &str {
-            &self.family_name
-        }
-
-        /// This service's supported message versions
-        fn family_versions(&self) -> &[String] {
-            &self.family_versions
+        fn service_type(&self) -> &str {
+            &self.service_type
         }
 
         /// Starts the service
@@ -858,21 +897,17 @@ pub mod tests {
             &mut self,
             service_registry: &dyn ServiceNetworkRegistry,
         ) -> Result<(), ServiceStartError> {
-            let network_sender = service_registry
-                .connect(self.service_id())
-                .map_err(|err| ServiceStartError(Box::new(err)))?;
+            let network_sender = service_registry.connect(self.service_id())?;
             self.network_sender = Some(network_sender);
             Ok(())
         }
 
         /// Stops the service
         fn stop(
-            &self,
+            &mut self,
             service_registry: &dyn ServiceNetworkRegistry,
         ) -> Result<(), ServiceStopError> {
-            service_registry
-                .disconnect(self.service_id())
-                .map_err(|err| ServiceStopError(Box::new(err)))?;
+            service_registry.disconnect(self.service_id())?;
             Ok(())
         }
 
@@ -892,16 +927,14 @@ pub mod tests {
         ) -> Result<(), ServiceError> {
             if message_bytes == b"send" {
                 if let Some(network_sender) = &self.network_sender {
-                    let payload = self.create_admin_msg(b"send_response".to_vec());
                     network_sender
-                        .send(&message_context.sender, &payload)
+                        .send(&message_context.sender, b"send_response")
                         .unwrap();;
                 }
             } else if message_bytes == b"send_and_await" {
                 if let Some(network_sender) = &self.network_sender {
-                    let payload = self.create_admin_msg(b"waiting for response".to_vec());
                     let response = network_sender
-                        .send_and_await(&message_context.sender, &payload)
+                        .send_and_await(&message_context.sender, b"waiting for response")
                         .unwrap();
                     assert_eq!(response, b"respond to waiting");
                 }

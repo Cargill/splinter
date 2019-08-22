@@ -16,6 +16,8 @@
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate serde_json;
 
 #[macro_export]
 macro_rules! rwlock_read_unwrap {
@@ -47,6 +49,7 @@ macro_rules! mutex_lock_unwrap {
     };
 }
 
+pub mod admin;
 pub mod channel;
 pub mod circuit;
 pub mod collections;
@@ -55,7 +58,12 @@ pub mod mesh;
 pub mod network;
 pub mod node_registry;
 pub mod protos;
+pub mod rest_api;
 pub mod service;
 pub mod signing;
 pub mod storage;
 pub mod transport;
+
+pub use actix_http;
+pub use actix_web;
+pub use futures;

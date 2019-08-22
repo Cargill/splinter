@@ -1,0 +1,8 @@
+- identity: '123asdf'
+  metadata:
+    organization: 'bubba_bakery'
+    endpoint: 'tls://splinterd-node-bubba:8044'
+- identity: '2456qwerty'
+  metadata:
+    organization: 'ACME Corp'
+    endpoint: 'tls://splinterd-node-acme:8044'

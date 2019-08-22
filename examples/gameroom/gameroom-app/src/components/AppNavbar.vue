@@ -19,27 +19,22 @@ limitations under the License.
     <router-link class="navbar-brand" to="/">
       <img src="~brandAssets/logo_wide.png" height="60px">
     </router-link>
-    <ul>
-      <li v-if="isLoggedIn" class="nav-item">
-        <router-link to="/gamerooms">
-          Gamerooms
+    <ul v-if="isLoggedIn">
+      <li>
+        <router-link to='/'>
+          <span v-on:click="logout">Log out</span>
         </router-link>
       </li>
     </ul>
-    <ul>
-      <li v-if="!isLoggedIn" class="nav-item">
+    <ul v-else>
+      <li>
         <router-link to="/login">
           Log In
         </router-link>
       </li>
-      <li v-if="!isLoggedIn" class="nav-item">
+      <li>
         <router-link to="/register">
           Register
-        </router-link>
-      </li>
-      <li v-if="isLoggedIn" class="nav-item">
-        <router-link to='/'>
-          <span v-on:click="logout">Log out</span>
         </router-link>
       </li>
     </ul>
@@ -48,46 +43,20 @@ limitations under the License.
 
 <script lang='ts'>
 import { Vue, Component } from 'vue-property-decorator';
-import user from '@/store/modules/user';
 
 @Component
 export default class AppNavbar extends Vue {
+
   get isLoggedIn() {
-    return user.isLoggedIn;
+    return this.$store.getters['user/isLoggedIn'];
   }
 
   logout() {
-    user.clearUser();
+    this.$store.commit('user/clearUser');
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.navbar {
-  background-color: $color-base;
-  border-bottom: 1px solid $color-border;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap-reverse;
-  ul {
-    padding-left: 0;
-    display: flex;
-    list-style-type: none;
-    li {
-      padding-left: 1em;
-      padding-right: 1em;
-    }
-  }
-}
-.navbar-brand {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: .5em;
-  .brand-text {
-    font-size: 2em;
-  }
-}
-
+  @import '@/scss/components/_app-navbar.scss';
 </style>

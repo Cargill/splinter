@@ -15,12 +15,12 @@
 openapi: '3.0.0'
 
 info:
-  version: 0.1.0
+  version: 0.2.1
   title: SplinterD API
   description: REST API for SplinterD
 
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:9000/api
 
 paths:
   /status:
@@ -41,10 +41,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /circuit:
+  /admin/circuit:
     get:
       tags:
-        - circuits
+        - Admin Service
       description: Retrieve a list of all circuits
       responses:
         200:
@@ -64,7 +64,7 @@ paths:
 
     post:
       tags:
-        - circuits
+        - Admin Service
       description: Create a new circuit
       requestBody:
           required: true
@@ -73,12 +73,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/CreateCircuit'
       responses:
-        200:
+        202:
           description: Creation request was accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Circuit'
         400:
           description: Circuit creation request was malformed
           content:
@@ -92,10 +88,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /circuit/{name}:
+  /admin/circuit/{name}:
     get:
       tags:
-        - circuits
+        - Admin Service
       description: Get circuit with {name}
       parameters:
         - name: name
@@ -125,10 +121,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /register/{type}:
-    put:
+  /admin/vote:
+    post:
       tags:
-        - Authorization Handler
+        - Admin Service
+      description: Send vote to admin service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircuitProposalVote'
+      responses:
+        202:
+          description: The vote was accepted
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /ws/admin/register/{type}:
+    get:
+      tags:
+        - Admin Service
       description: Register the handler for a circuit management type
       parameters:
         - name: type
@@ -145,6 +169,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApplicationRegistration'
+        400:
+          description: The circuit management type was invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
         500:
           description: Internal server error
           content:
@@ -152,21 +183,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
                 
-  /ws/proposals/subscribe:
-    post:
-      tags:
-        - proposals
-      description: WebSocket endpoint for subscribing to circuit proposal events
-      responses:
-        200:
-          description: subscription successful
-        500:
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /node:
+  /nodes:
     get:
       tags:
           - Node Registry
@@ -216,8 +233,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-                    
-  /node/{identity}:
+
+  /nodes/{identity}:
       get:
         tags:
           - Node Registry
@@ -265,42 +282,57 @@ components:
         version:
           description: Rest API version
           type: string
-          example: "0.1.0"
+          example: "0.2.1"
+        node_id:
+          description: Node id
+          type: string
+          example: node-009 
+        endpoint:
+          description: The node's service endpoint
+          example: tcp://foo.bar.biz
       required:
         - version
 
     CreateCircuit:
       additionalProperties: false
       properties:
-        name:
+        circuit_id:
           description: Name of circuit
           type: string
           example: alpha
-        auth:
+        authorization_type:
           description: Authentication type
           type: string
-          example: trust
+          enum:
+            - TRUST_AUTHORIZATION
         members:
           description: Array of nodes allowed to participate on the circuit
           type: array
           items:
-            $ref: '#/components/schemas/Node'
+            $ref: '#/components/schemas/SplinterNode'
         roster:
           description: Array of services that will communicate over a circuit
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/SplinterService'
         persistence:
           type: string
-          example: any
-        durability:
+          enum:
+            - ANY_PERSISTENCE
+        circuit_management_type:
           type: string
-          example: none
+          example: gameroom
         routes:
           type: string
-          example: request_direct
+          enum:
+            - ANY_ROUTE
+        application_metadata:
+          description: serialized bytes of metadata
+          type: array 
+          items:
+            type: integer
 
-    Node:
+    SplinterNode:
       additionalProperties: false
       properties:
         node_id:
@@ -311,6 +343,19 @@ components:
           description: Url for node
           type: string
           example: tcp://localhost:4040
+    SplinterService:
+      additionalProperties: false
+      properties:
+        service_id:
+          type: string
+          example: service-123
+        service_type:
+          type: string
+          example: gameroom
+        allowed_nodes:
+          type: array
+          items:
+            type: string
 
     Circuit:
       additionalProperties: false
@@ -335,7 +380,7 @@ components:
           description: Array of nodes allowed to participate on the circuit
           type: array
           items:
-            $ref: '#/components/schemas/Node'
+            $ref: '#/components/schemas/SplinterNode'
         roster:
           description: Array of services that will communicate over circuit
           type: array
@@ -378,6 +423,35 @@ components:
         identity: node-123123-asdf
         company: Cargill
         status: Up
+
+    Ballot:
+      type: object
+      properties:
+        circuit_id:
+          type: string
+          example: circuit-000
+        circuit_hash:
+          type: string
+          example: d2b1abbd57e8cd2bfcf3f4259b9785a723e19b4bb4d5cc0206e860890c403dc4
+        vote:
+          type: string
+          enum:
+            - Accept
+            - Reject
+
+    CircuitProposalVote:
+      type: object
+      properties:
+        ballot:
+          $ref: '#/components/schemas/Ballot'
+        ballot_signature:
+          type: array
+          items:
+            type: integer
+        signer_public_key:
+          type: array
+          items:
+            type: integer
 
     
     Paging:

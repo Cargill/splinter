@@ -15,10 +15,9 @@ use crossbeam_channel::Sender;
 use protobuf::Message;
 use uuid::Uuid;
 
-use crate::network::reply::{Envelope, HasCorrelationId, InboundRouter};
+use crate::network::reply::InboundRouter;
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitMessage, CircuitMessageType,
-    ServiceConnectResponse, ServiceDisconnectResponse,
 };
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::error::ServiceSendError;
@@ -28,30 +27,6 @@ use crate::service::{ServiceMessageContext, ServiceNetworkSender};
 pub enum ServiceMessage {
     AdminDirectMessage(AdminDirectMessage),
     CircuitDirectMessage(CircuitDirectMessage),
-    ServiceConnectResponse(ServiceConnectResponse),
-    ServiceDisconnectResponse(ServiceDisconnectResponse),
-}
-
-impl Envelope for ServiceMessage {
-    fn payload(&self) -> &[u8] {
-        match self {
-            ServiceMessage::AdminDirectMessage(message) => message.get_payload(),
-            ServiceMessage::CircuitDirectMessage(message) => message.get_payload(),
-            ServiceMessage::ServiceConnectResponse(_) => &[],
-            ServiceMessage::ServiceDisconnectResponse(_) => &[],
-        }
-    }
-}
-
-impl HasCorrelationId for ServiceMessage {
-    fn correlation_id(&self) -> &str {
-        match self {
-            ServiceMessage::AdminDirectMessage(message) => message.get_correlation_id(),
-            ServiceMessage::CircuitDirectMessage(message) => message.get_correlation_id(),
-            ServiceMessage::ServiceConnectResponse(message) => message.get_correlation_id(),
-            ServiceMessage::ServiceDisconnectResponse(message) => message.get_correlation_id(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,17 +38,18 @@ pub enum ProcessorMessage {
 /// An implementation of a ServiceNetworkSender that should be used for AdminDirectMessage.
 /// AdminDirectMessage needs special handling since this message can be sent over the admin circuit
 /// or over any other circuit that exists.
+#[derive(Clone)]
 pub struct AdminServiceNetworkSender {
     outgoing_sender: Sender<Vec<u8>>,
     message_sender: String,
-    inbound_router: InboundRouter<ServiceMessage>,
+    inbound_router: InboundRouter<CircuitMessageType>,
 }
 
 impl AdminServiceNetworkSender {
     pub fn new(
         outgoing_sender: Sender<Vec<u8>>,
         message_sender: String,
-        inbound_router: InboundRouter<ServiceMessage>,
+        inbound_router: InboundRouter<CircuitMessageType>,
     ) -> Self {
         AdminServiceNetworkSender {
             outgoing_sender,
@@ -86,8 +62,18 @@ impl AdminServiceNetworkSender {
 impl ServiceNetworkSender for AdminServiceNetworkSender {
     /// the service will create the admin direct message themselves so it can set which circuit
     /// this message should be sent over.
-    fn send(&self, _recipient: &str, message: &[u8]) -> Result<(), ServiceSendError> {
-        let msg = create_message(message.to_vec(), CircuitMessageType::ADMIN_DIRECT_MESSAGE)
+    fn send(&self, recipient: &str, message: &[u8]) -> Result<(), ServiceSendError> {
+        let mut admin_direct_message = AdminDirectMessage::new();
+        admin_direct_message.set_circuit("admin".into());
+        admin_direct_message.set_sender(self.message_sender.to_string());
+        admin_direct_message.set_recipient(recipient.into());
+        admin_direct_message.set_payload(message.to_vec());
+
+        let bytes = admin_direct_message
+            .write_to_bytes()
+            .map_err(|err| ServiceSendError(Box::new(err)))?;
+
+        let msg = create_message(bytes, CircuitMessageType::ADMIN_DIRECT_MESSAGE)
             .map_err(|err| ServiceSendError(Box::new(err)))?;
 
         self.outgoing_sender
@@ -99,14 +85,12 @@ impl ServiceNetworkSender for AdminServiceNetworkSender {
     /// Send the message bytes to the given recipient (another admin service)
     /// and await the reply. This function blocks until the reply is
     /// returned.
-    fn send_and_await(
-        &self,
-        _recipient: &str,
-        message: &[u8],
-    ) -> Result<Vec<u8>, ServiceSendError> {
-        let mut admin_direct_message: AdminDirectMessage =
-            protobuf::parse_from_bytes(&message).map_err(|err| ServiceSendError(Box::new(err)))?;
-
+    fn send_and_await(&self, recipient: &str, message: &[u8]) -> Result<Vec<u8>, ServiceSendError> {
+        let mut admin_direct_message = AdminDirectMessage::new();
+        admin_direct_message.set_circuit("admin".into());
+        admin_direct_message.set_sender(self.message_sender.to_string());
+        admin_direct_message.set_recipient(recipient.into());
+        admin_direct_message.set_payload(message.to_vec());
         let correlation_id = Uuid::new_v4().to_string();
         admin_direct_message.set_correlation_id(correlation_id.to_string());
 
@@ -117,20 +101,17 @@ impl ServiceNetworkSender for AdminServiceNetworkSender {
         let message = create_message(bytes, CircuitMessageType::ADMIN_DIRECT_MESSAGE)
             .map_err(|err| ServiceSendError(Box::new(err)))?;
 
-        let future = self.inbound_router.expect_reply(correlation_id);
+        let mut future = self.inbound_router.expect_reply(correlation_id);
 
         self.outgoing_sender
             .send(message)
             .map_err(|err| ServiceSendError(Box::new(err)))?;
 
         // block until the response is received
-        match future.recv() {
-            Ok(msg) => match msg {
-                Ok(msg) => Ok(msg.payload().to_vec()),
-                Err(err) => Err(ServiceSendError(Box::new(err))),
-            },
-            Err(err) => Err(ServiceSendError(Box::new(err))),
-        }
+        future
+            .get::<AdminDirectMessage>()
+            .map(|mut res| res.take_payload())
+            .map_err(|err| ServiceSendError(Box::new(err)))
     }
 
     /// Send the message bytes back to the origin specified in the given
@@ -159,15 +140,20 @@ impl ServiceNetworkSender for AdminServiceNetworkSender {
             .map_err(|err| ServiceSendError(Box::new(err)))?;
         Ok(())
     }
+
+    fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
+        Box::new(self.clone())
+    }
 }
 
 /// This implementation of ServiceNetworkSender can be used by any service that does not require
 /// any special handling.
+#[derive(Clone)]
 pub struct StandardServiceNetworkSender {
     outgoing_sender: Sender<Vec<u8>>,
     circuit: String,
     message_sender: String,
-    inbound_router: InboundRouter<ServiceMessage>,
+    inbound_router: InboundRouter<CircuitMessageType>,
 }
 
 impl StandardServiceNetworkSender {
@@ -175,7 +161,7 @@ impl StandardServiceNetworkSender {
         outgoing_sender: Sender<Vec<u8>>,
         circuit: String,
         message_sender: String,
-        inbound_router: InboundRouter<ServiceMessage>,
+        inbound_router: InboundRouter<CircuitMessageType>,
     ) -> Self {
         StandardServiceNetworkSender {
             outgoing_sender,
@@ -228,20 +214,17 @@ impl ServiceNetworkSender for StandardServiceNetworkSender {
         let message = create_message(bytes, CircuitMessageType::CIRCUIT_DIRECT_MESSAGE)
             .map_err(|err| ServiceSendError(Box::new(err)))?;
 
-        let future = self.inbound_router.expect_reply(correlation_id);
+        let mut future = self.inbound_router.expect_reply(correlation_id);
 
         self.outgoing_sender
             .send(message)
             .map_err(|err| ServiceSendError(Box::new(err)))?;
 
         // block until the response is received
-        match future.recv() {
-            Ok(msg) => match msg {
-                Ok(msg) => Ok(msg.payload().to_vec()),
-                Err(err) => Err(ServiceSendError(Box::new(err))),
-            },
-            Err(err) => Err(ServiceSendError(Box::new(err))),
-        }
+        future
+            .get::<CircuitDirectMessage>()
+            .map(|mut res| res.take_payload())
+            .map_err(|err| ServiceSendError(Box::new(err)))
     }
 
     /// Send the message bytes back to the origin specified in the given
@@ -269,6 +252,10 @@ impl ServiceNetworkSender for StandardServiceNetworkSender {
             .send(message)
             .map_err(|err| ServiceSendError(Box::new(err)))?;
         Ok(())
+    }
+
+    fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
+        Box::new(self.clone())
     }
 }
 
@@ -304,7 +291,7 @@ pub mod tests {
     fn test_standard_send() {
         let (outgoing_sender, outgoing_receiver) = crossbeam_channel::bounded(3);
         let (internal_sender, _) = crossbeam_channel::bounded(3);
-        let inbound_router: InboundRouter<ServiceMessage> =
+        let inbound_router: InboundRouter<CircuitMessageType> =
             InboundRouter::new(Box::new(internal_sender));
         let network_sender = StandardServiceNetworkSender::new(
             outgoing_sender,
@@ -343,7 +330,7 @@ pub mod tests {
     fn test_standard_send_and_await_send() {
         let (outgoing_sender, outgoing_receiver) = crossbeam_channel::bounded(3);
         let (internal_sender, _) = crossbeam_channel::bounded(3);
-        let mut inbound_router: InboundRouter<ServiceMessage> =
+        let mut inbound_router: InboundRouter<CircuitMessageType> =
             InboundRouter::new(Box::new(internal_sender));
         let network_sender = StandardServiceNetworkSender::new(
             outgoing_sender,
@@ -390,7 +377,15 @@ pub mod tests {
         direct_response.set_correlation_id(correlation_id);
         direct_response.set_payload(b"test_response".to_vec());
         inbound_router
-            .route(Ok(ServiceMessage::CircuitDirectMessage(direct_response)))
+            .route(
+                direct_response.get_correlation_id(),
+                Ok((
+                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                    direct_response
+                        .write_to_bytes()
+                        .expect("Failed to write bytes"),
+                )),
+            )
             .unwrap();
 
         // block until the network sender test is finished
@@ -403,7 +398,7 @@ pub mod tests {
     fn test_standard_reply() {
         let (outgoing_sender, outgoing_receiver) = crossbeam_channel::bounded(3);
         let (internal_sender, _) = crossbeam_channel::bounded(3);
-        let inbound_router: InboundRouter<ServiceMessage> =
+        let inbound_router: InboundRouter<CircuitMessageType> =
             InboundRouter::new(Box::new(internal_sender));
         let network_sender = StandardServiceNetworkSender::new(
             outgoing_sender,
@@ -447,25 +442,18 @@ pub mod tests {
     fn test_admin_send() {
         let (outgoing_sender, outgoing_receiver) = crossbeam_channel::bounded(3);
         let (internal_sender, _) = crossbeam_channel::bounded(3);
-        let inbound_router: InboundRouter<ServiceMessage> =
+        let inbound_router: InboundRouter<CircuitMessageType> =
             InboundRouter::new(Box::new(internal_sender));
         let network_sender = AdminServiceNetworkSender::new(
             outgoing_sender,
-            "service_a".to_string(),
+            "service_b".to_string(),
             inbound_router,
         );
 
         thread::Builder::new()
             .name("test_admin_send".to_string())
             .spawn(move || {
-                let mut admin_direct_message = AdminDirectMessage::new();
-                admin_direct_message.set_recipient("service_a".to_string());
-                admin_direct_message.set_sender("service_b".to_string());
-                admin_direct_message.set_circuit("other_circuit".to_string());
-                admin_direct_message.set_payload(b"test_admin".to_vec());
-                let msg_bytes = admin_direct_message.write_to_bytes().unwrap();
-
-                network_sender.send("service_b", &msg_bytes).unwrap();
+                network_sender.send("service_a", b"test_admin").unwrap();
             })
             .unwrap();;
 
@@ -482,7 +470,7 @@ pub mod tests {
 
         assert_eq!(direct_message.get_recipient(), "service_a");
         assert_eq!(direct_message.get_sender(), "service_b");
-        assert_eq!(direct_message.get_circuit(), "other_circuit".to_string());
+        assert_eq!(direct_message.get_circuit(), "admin");
         assert_eq!(direct_message.get_payload(), b"test_admin");
     }
 
@@ -492,26 +480,19 @@ pub mod tests {
     fn test_admin_send_and_await_send() {
         let (outgoing_sender, outgoing_receiver) = crossbeam_channel::bounded(3);
         let (internal_sender, _) = crossbeam_channel::bounded(3);
-        let mut inbound_router: InboundRouter<ServiceMessage> =
+        let mut inbound_router: InboundRouter<CircuitMessageType> =
             InboundRouter::new(Box::new(internal_sender));
         let network_sender = AdminServiceNetworkSender::new(
             outgoing_sender,
-            "service_a".to_string(),
+            "service_b".to_string(),
             inbound_router.clone(),
         );
 
         thread::Builder::new()
             .name("test_admin_send_and_await_send".to_string())
             .spawn(move || {
-                let mut admin_direct_message = AdminDirectMessage::new();
-                admin_direct_message.set_recipient("service_a".to_string());
-                admin_direct_message.set_sender("service_b".to_string());
-                admin_direct_message.set_circuit("other_circuit".to_string());
-                admin_direct_message.set_payload(b"test_admin".to_vec());
-                let msg_bytes = admin_direct_message.write_to_bytes().unwrap();
-
                 let response = network_sender
-                    .send_and_await("service_b", &msg_bytes)
+                    .send_and_await("service_a", b"test_admin")
                     .unwrap();
                 assert_eq!(&response, b"test_response");
 
@@ -533,7 +514,7 @@ pub mod tests {
 
         assert_eq!(direct_message.get_recipient(), "service_a");
         assert_eq!(direct_message.get_sender(), "service_b");
-        assert_eq!(direct_message.get_circuit(), "other_circuit".to_string());
+        assert_eq!(direct_message.get_circuit(), "admin");
         assert_eq!(direct_message.get_payload(), b"test_admin");
 
         let correlation_id = direct_message.take_correlation_id();
@@ -545,7 +526,15 @@ pub mod tests {
         direct_response.set_correlation_id(correlation_id);
         direct_response.set_payload(b"test_response".to_vec());
         inbound_router
-            .route(Ok(ServiceMessage::AdminDirectMessage(direct_response)))
+            .route(
+                direct_response.get_correlation_id(),
+                Ok((
+                    CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                    direct_response
+                        .write_to_bytes()
+                        .expect("Failed to write bytes"),
+                )),
+            )
             .unwrap();
 
         // block until the network sender test is finished
@@ -558,7 +547,7 @@ pub mod tests {
     fn test_admin_reply() {
         let (outgoing_sender, outgoing_receiver) = crossbeam_channel::bounded(3);
         let (internal_sender, _) = crossbeam_channel::bounded(3);
-        let inbound_router: InboundRouter<ServiceMessage> =
+        let inbound_router: InboundRouter<CircuitMessageType> =
             InboundRouter::new(Box::new(internal_sender));
         let network_sender = AdminServiceNetworkSender::new(
             outgoing_sender,

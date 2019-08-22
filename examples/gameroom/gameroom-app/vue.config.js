@@ -20,13 +20,20 @@ module.exports = {
     loaderOptions: {
       sass: {
         data: `
-          @import "@/scss/_variables.scss";
-          @import "@/scss/_mixins.scss";
-          @import "@/scss/multiselect.scss";
-          @import "~brandVariables/variables.scss";
+          @import "@/scss/main.scss";
         `
       }
     }
+  },
+  devServer: {
+    proxy: {
+      '^/api': {
+        target: 'http://localhost:8000',
+        pathRewrite: {'^/api': ''},
+        ws: true,
+        changeOrigin: true
+      },
+    },
   },
   transpileDependencies: ['vuex-module-decorators'],
   configureWebpack: {

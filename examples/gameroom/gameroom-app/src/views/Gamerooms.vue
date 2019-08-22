@@ -15,103 +15,96 @@ limitations under the License.
 -->
 
 <template>
-  <div class="gamerooms-container">
+  <div>
     <modal v-if="displayModal" @close="closeNewGameroomModal">
       <h3 slot="title">New Gameroom</h3>
       <div slot="body">
-        <div class=form-wrapper>
-          <form class="new-gameroom-form" @submit.prevent="createGameroom">
-            <label class="form-label">
-              Alias
-              <input class="form-input" type="text" v-model="newGameroom.alias" />
-            </label>
-            <label class="form-label">
-              <div class="multiselect-label">Member</div>
-              <multiselect
-                v-model="newGameroom.member"
-                track-by="identity"
-                label="metadata"
-                placeholder=""
-                deselect-label=""
-                open-direction="bottom"
-                :close-on-select="true"
-                :clear-on-select="false"
-                :custom-label="getMemberLabel"
-                :options="nodes"
-                :allow-empty="false"
-              >
-                <template slot="singleLabel" slot-scope="{ option }">
-                  <strong>{{ option.metadata.organization }}</strong>
-                </template>
-              </multiselect>
-            </label>
-            <div class="button-container">
-              <button class="form-button outline-button" @click.prevent="closeNewGameroomModal">
-                Cancel
-              </button>
-              <button class="form-button" type="submit" :disabled="!canSubmitNewGameroom">
-                Submit
-              </button>
-            </div>
-          </form>
-        </div>
+        <form class="modal-form" @submit.prevent="createGameroom">
+          <label class="form-label">
+            Alias
+            <input class="form-input" type="text" v-model="newGameroom.alias" />
+          </label>
+          <label class="form-label">
+            <div class="multiselect-label">Member</div>
+            <multiselect
+              v-model="newGameroom.member"
+              track-by="identity"
+              label="metadata"
+              placeholder=""
+              deselect-label=""
+              open-direction="bottom"
+              :close-on-select="true"
+              :clear-on-select="false"
+              :custom-label="getMemberLabel"
+              :options="nodeList"
+              :allow-empty="false"
+            >
+              <template slot="singleLabel" slot-scope="{ option }">
+                <strong>{{ option.metadata.organization }}</strong>
+              </template>
+            </multiselect>
+          </label>
+          <div class="flex-container button-container">
+            <button class="btn-action form-button btn-outline" @click.prevent="closeNewGameroomModal">
+              Cancel
+            </button>
+            <button class="btn-action form-button" type="submit" :disabled="!canSubmitNewGameroom">
+              Submit
+            </button>
+          </div>
+        </form>
       </div>
     </modal>
-    <div class="new-gameroom-button-container">
-      <button class="icon-button" @click="showNewGameroomModal">
-        <div class="button-content">
-        <i class="material-icons" style="font-size:1.5em;">add</i>
-        <span class="button-text">
-          New gameroom
-        </span>
-        </div>
-      </button>
-    </div>
+    <tabs v-on:show-new-gameroom-modal="showNewGameroomModal()" />
   </div>
 </template>
 
 <script lang="ts">
 import { Vue, Component } from 'vue-property-decorator';
 import Modal from '@/components/Modal.vue';
+import Tabs from '@/components/Tabs.vue';
 import Multiselect from 'vue-multiselect';
 import gamerooms from '@/store/modules/gamerooms';
 import nodes from '@/store/modules/nodes';
 import { Node } from '@/store/models';
 
-interface MemberMetadata {
-  organization: string;
-  endpoint: string;
+interface NewGameroom {
+  alias: string;
+  member: Node | null;
 }
 
 @Component({
-  components: { Modal, Multiselect },
+  components: { Modal, Multiselect, Tabs },
 })
 export default class Gamerooms extends Vue {
   displayModal = false;
 
-  newGameroom = {
+  newGameroom: NewGameroom = {
     alias: '',
-    member: '',
+    member: null,
   };
 
   mounted() {
-    nodes.listNodesMock();
+    nodes.listNodes();
   }
 
-  get nodes() {
+  get nodeList() {
     return nodes.nodeList;
   }
 
   get canSubmitNewGameroom() {
     if (this.newGameroom.alias !== '' &&
-        this.newGameroom.member !== '') {
+        this.newGameroom.member !== null) {
       return true;
     }
     return false;
   }
 
   createGameroom() {
-    gamerooms.proposeGameroom(this.newGameroom);
+    gamerooms.proposeGameroom({
+      alias: this.newGameroom.alias,
+      member: [this.newGameroom.member as Node],
+    });
   }
 
   getMemberLabel(node: Node) {
@@ -125,53 +118,7 @@ export default class Gamerooms extends Vue {
   closeNewGameroomModal() {
     this.displayModal = false;
     this.newGameroom.alias = '';
-    this.newGameroom.member = '';
+    this.newGameroom.member = null;
   }
 }
-
-
 </script>
-
-<style lang="scss" scoped>
-.form-wrapper {
-  .new-gameroom-form {
-    display: flex;
-    flex-direction: column;
-
-    .form-label {
-      .multiselect-label {
-        margin-bottom: .25em;
-      }
-
-      .form-input {
-        min-height: 3em;
-        width: 100%;
-        margin: .25em 0 1em;
-        padding: .5em;
-        font-size: 1em;
-        border: 1px solid $color-border;
-        outline: none;
-        @include rounded-border;
-      }
-
-      .form-input:focus {
-        border: 1px solid $color-primary-light;
-      }
-    }
-
-    .button-container {
-      margin-top: 1em;
-      margin-left: auto;
-    }
-  }
-}
-
-.gamerooms-container {
-  margin: 1em;
-  display: flex;
-
-  .new-gameroom-button-container {
-    margin-left: auto;
-  }
-}
-</style>

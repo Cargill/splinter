@@ -14,7 +14,7 @@
 
 [package]
 name = "splinterd"
-version = "0.1.0"
+version = "0.2.1"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 
@@ -23,18 +23,15 @@ libsplinter = { path = "../libsplinter" }
 clap = "2.32"
 crossbeam-channel = "0.3"
 ctrlc = "3.0"
-simple_logger = "0.4.0"
-log = "0.3.0"
+simple_logger = "1.0"
+log = "0.4"
 bytes = "0.4"
 serde_derive = "1.0.80"
 serde = "1.0.80"
 serde_yaml = "0.8"
 serde_json = "1.0"
-url = "1.7"
+percent-encoding = "2.0"
 toml = "0.4.8"
 protobuf = "2"
 openssl = "0.10"
 tempdir = "0.3"
-actix = "0.8"
-actix-web = "1.0"
-futures = "0.1"

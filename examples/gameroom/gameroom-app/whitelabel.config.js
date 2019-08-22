@@ -15,12 +15,12 @@
 const whitelabelConfig = {
   'bubba': {
     'brand': 'Bubba Bakery',
-    'scssVariables': './src/scss/bubba',
+    'scssVariables': './src/scss/modules/themes/bubba',
     'assets': './src/assets/bubba',
   },
   'acme': {
     'brand': 'Acme Corporation',
-    'scssVariables': './src/scss/acme',
+    'scssVariables': './src/scss/modules/themes/acme',
     'assets': './src/assets/acme',
   },
 }

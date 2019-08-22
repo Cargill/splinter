@@ -1,6 +1,6 @@
 {
   "name": "gameroom-app",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": true,
   "author": "Cargill Incorporated",
   "license": "Apache-2.0",
@@ -17,6 +17,7 @@
     "@types/sjcl": "^1.0.28",
     "axios": "^0.19.0",
     "core-js": "^2.6.5",
+    "moment": "^2.24.0",
     "sawtooth-sdk": "^1.0.5",
     "sjcl": "^1.0.8",
     "vue": "^2.6.10",
@@ -24,7 +25,8 @@
     "vue-multiselect": "^2.1.6",
     "vue-property-decorator": "^8.1.0",
     "vue-router": "^3.0.3",
-    "vuex": "^3.0.1"
+    "vuex": "^3.0.1",
+    "vuex-persist": "^2.0.1"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.9.0",

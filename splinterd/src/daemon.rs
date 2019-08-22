@@ -16,9 +16,11 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
-use crate::registry_config::{RegistryConfig, RegistryConfigBuilder, RegistryConfigError};
-use crate::rest_api::{self, error::RestApiServerError};
 use crossbeam_channel;
+use protobuf::Message;
+
+use crate::node_registry::yaml::YamlNodeRegistry;
+use libsplinter::admin::AdminService;
 use libsplinter::circuit::directory::CircuitDirectory;
 use libsplinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -38,18 +40,29 @@ use libsplinter::network::sender::{NetworkMessageSender, SendRequest};
 use libsplinter::network::{
     ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError,
 };
+use libsplinter::node_registry::NodeRegistry;
 use libsplinter::protos::authorization::{
     AuthorizationMessage, AuthorizationMessageType, ConnectRequest, ConnectRequest_HandshakeMode,
 };
 use libsplinter::protos::circuit::CircuitMessageType;
 use libsplinter::protos::network::{NetworkMessage, NetworkMessageType};
+use libsplinter::rest_api::{
+    Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
+};
 use libsplinter::rwlock_read_unwrap;
+use libsplinter::service::{self, Service, ServiceProcessor};
 use libsplinter::storage::get_storage;
-use libsplinter::transport::{AcceptError, ConnectError, Incoming, ListenError, Transport};
-use protobuf::Message;
+use libsplinter::transport::{
+    inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Incoming,
+    ListenError, Transport,
+};
+
+use crate::registry_config::{RegistryConfig, RegistryConfigBuilder, RegistryConfigError};
+use crate::routes;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
+const ADMIN_SERVICE_ADDRESS: &str = "inproc://admin-service";
 
 pub struct SplinterDaemon {
     storage_location: String,
@@ -63,14 +76,51 @@ pub struct SplinterDaemon {
 }
 
 impl SplinterDaemon {
-    pub fn start(&mut self, transport: Box<dyn Transport>) -> Result<(), StartError> {
-        let mut transport = transport;
+    pub fn start(&mut self, transport: Box<dyn Transport + Send>) -> Result<(), StartError> {
+        let inproc_tranport = InprocTransport::default();
+        let mut transport = MultiTransport::new(vec![transport, Box::new(inproc_tranport.clone())]);
+
         // Setup up ctrlc handling
         let running = Arc::new(AtomicBool::new(true));
         let r = running.clone();
 
-        let (rest_api_shutdown_handle, rest_api_join_handle) =
-            rest_api::run(&self.rest_api_endpoint, &self.registry_config)?;
+        let registry = create_node_registry(&self.registry_config)?;
+
+        let node_registry_manager =
+            routes::NodeRegistryManager::new(self.node_id.clone(), registry);
+
+        // set up the listeners on the transport
+        let mut network_listener = transport.listen(&self.network_endpoint)?;
+        debug!(
+            "Listening for peer connections on {}",
+            network_listener.endpoint()
+        );
+        let mut service_listener = transport.listen(&self.service_endpoint)?;
+        debug!(
+            "Listening for service connections on {}",
+            service_listener.endpoint()
+        );
+        let mut admin_service_listener = transport.listen(ADMIN_SERVICE_ADDRESS)?;
+
+        let peer_connector = PeerConnector::new(self.network.clone(), Box::new(transport));
+        let admin_service = AdminService::new(&self.node_id, peer_connector.clone());
+
+        let node_id = self.node_id.clone();
+        let service_endpoint = self.service_endpoint.clone();
+        let (rest_api_shutdown_handle, rest_api_join_handle) = RestApiBuilder::new()
+            .with_bind(&self.rest_api_endpoint)
+            .add_resource(Resource::new(
+                Method::Get,
+                "/openapi.yml",
+                routes::get_openapi,
+            ))
+            .add_resource(Resource::new(Method::Get, "/status", move |_, _| {
+                routes::get_status(node_id.clone(), service_endpoint.clone())
+            }))
+            .add_resources(node_registry_manager.resources())
+            .add_resources(admin_service.resources())
+            .build()?
+            .run()?;
 
         ctrlc::set_handler(move || {
             info!("Recieved Shutdown");
@@ -146,7 +196,6 @@ impl SplinterDaemon {
         let network_dispatcher_thread = thread::spawn(move || network_dispatch_loop.run());
 
         // setup a thread to listen on the network port and add incoming connection to the network
-        let mut network_listener = transport.listen(&self.network_endpoint)?;
         let network_clone = self.network.clone();
 
         // this thread will just be dropped on shutdown
@@ -168,11 +217,25 @@ impl SplinterDaemon {
         });
 
         // setup a thread to listen on the service port and add incoming connection to the network
-        let mut service_listener = transport.listen(&self.service_endpoint)?;
         let service_clone = self.network.clone();
 
         // this thread will just be dropped on shutdown
+        let admin_service_peer_id = admin_service.service_id().to_string();
         let _ = thread::spawn(move || {
+            // accept the admin service's connection
+            match admin_service_listener.incoming().next() {
+                Some(Ok(connection)) => {
+                    service_clone.add_peer(admin_service_peer_id, connection)?;
+                }
+                Some(Err(err)) => {
+                    return Err(StartError::TransportError(format!(
+                        "Accept Error: {:?}",
+                        err
+                    )));
+                }
+                None => {}
+            }
+
             for connection_result in service_listener.incoming() {
                 let connection = match connection_result {
                     Ok(connection) => connection,
@@ -191,8 +254,6 @@ impl SplinterDaemon {
             }
             Ok(())
         });
-
-        let peer_connector = PeerConnector::new(self.network.clone(), transport);
 
         // For provided initial peers, try to connect to them
         for peer in self.initial_peers.iter() {
@@ -229,6 +290,10 @@ impl SplinterDaemon {
         }
 
         let timeout = Duration::from_secs(TIMEOUT_SEC);
+
+        let service_processor_join_handle =
+            Self::start_admin_service(inproc_tranport, admin_service, Arc::clone(&running))?;
+
         // start the recv loop
         while running.load(Ordering::SeqCst) {
             match self.network.recv_timeout(timeout) {
@@ -265,8 +330,67 @@ impl SplinterDaemon {
         let _ = auth_dispatcher_thread.join();
         let _ = network_dispatcher_thread.join();
         let _ = rest_api_join_handle.join();
+        let _ = service_processor_join_handle.join_all();
 
         Ok(())
+    }
+
+    fn start_admin_service(
+        transport: InprocTransport,
+        admin_service: AdminService,
+        running: Arc<AtomicBool>,
+    ) -> Result<service::JoinHandles<Result<(), service::error::ServiceProcessorError>>, StartError>
+    {
+        let start_admin: std::thread::JoinHandle<
+            Result<
+                service::JoinHandles<Result<(), service::error::ServiceProcessorError>>,
+                StartError,
+            >,
+        > = thread::spawn(move || {
+            let mut transport = transport;
+
+            // use a match statement here, to inform
+            let connection = transport.connect(ADMIN_SERVICE_ADDRESS).map_err(|err| {
+                StartError::AdminServiceError(format!(
+                    "unable to initiate admin service connection: {:?}",
+                    err
+                ))
+            })?;
+            let mut admin_service_processor =
+                ServiceProcessor::new(connection, "admin".into(), 1, 1, 128, running).map_err(
+                    |err| {
+                        StartError::AdminServiceError(format!(
+                            "unable to create admin service processor: {}",
+                            err
+                        ))
+                    },
+                )?;
+
+            admin_service_processor
+                .add_service(Box::new(admin_service))
+                .map_err(|err| {
+                    StartError::AdminServiceError(format!(
+                        "unable to add admin service to processor: {}",
+                        err
+                    ))
+                })?;
+
+            admin_service_processor
+                .start()
+                .map(|(_, join_handles)| join_handles)
+                .map_err(|err| {
+                    StartError::AdminServiceError(format!(
+                        "unable to start service processor: {}",
+                        err
+                    ))
+                })
+        });
+
+        start_admin.join().map_err(|_| {
+            StartError::AdminServiceError(
+                "unable to start admin service, due to thread join error".into(),
+            )
+        })?
     }
 }
 
@@ -488,6 +612,24 @@ fn create_connect_request() -> Result<Vec<u8>, protobuf::ProtobufError> {
     network_msg.write_to_bytes()
 }
 
+fn create_node_registry(
+    registry_config: &RegistryConfig,
+) -> Result<Box<dyn NodeRegistry>, RestApiServerError> {
+    match &registry_config.registry_backend() as &str {
+        "FILE" => Ok(Box::new(
+            YamlNodeRegistry::new(&registry_config.registry_file()).map_err(|err| {
+                RestApiServerError::StartUpError(format!(
+                    "Failed to initialize YamlNodeRegistry: {}",
+                    err
+                ))
+            })?,
+        )),
+        _ => Err(RestApiServerError::StartUpError(
+            "NodeRegistry type is not supported".to_string(),
+        )),
+    }
+}
+
 #[derive(Debug)]
 pub enum CreateError {
     MissingRequiredField(String),
@@ -507,6 +649,7 @@ pub enum StartError {
     StorageError(String),
     ProtocolError(String),
     RestApiError(String),
+    AdminServiceError(String),
 }
 
 impl From<RestApiServerError> for StartError {

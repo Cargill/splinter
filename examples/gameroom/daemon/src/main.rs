@@ -16,7 +16,10 @@
 extern crate clap;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate serde_derive;
 
+mod authorization_handler;
 mod config;
 mod error;
 mod rest_api;
@@ -39,6 +42,7 @@ fn run() -> Result<(), GameroomDaemonError> {
         (@arg verbose: -v +multiple "Log verbosely")
         (@arg database_url: --("database-url") +takes_value "Database connection for Gameroom rest API")
         (@arg bind: -b --bind +takes_value "connection endpoint for Gameroom rest API")
+        (@arg splinterd_url: --("splinterd-url") +takes_value "connection endpoint to SplinterD rest API")
     )
     .get_matches();
 
@@ -55,7 +59,32 @@ fn run() -> Result<(), GameroomDaemonError> {
     let connection_pool: ConnectionPool =
         gameroom_database::create_connection_pool(config.database_url())?;
 
-    rest_api::run(config.rest_api_endpoint(), connection_pool.clone())?;
+    let (app_auth_handler_shutdown_handle, app_auth_handler_join_handle) =
+        authorization_handler::run(config.splinterd_url(), connection_pool.clone())?;
+
+    let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api::run(
+        config.rest_api_endpoint(),
+        config.splinterd_url(),
+        connection_pool.clone(),
+    )?;
+
+    ctrlc::set_handler(move || {
+        info!("Recieved Shutdown");
+
+        if let Err(err) = rest_api_shutdown_handle.shutdown() {
+            error!("Unable to cleanly shutdown REST API server: {}", err);
+        }
+        if let Err(err) = app_auth_handler_shutdown_handle.shutdown() {
+            error!(
+                "Unable to cleanly shutdown application authorization handler: {}",
+                err
+            );
+        }
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    app_auth_handler_join_handle.join();
+    let _ = rest_api_join_handle.join();
 
     Ok(())
 }

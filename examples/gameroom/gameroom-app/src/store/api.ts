@@ -14,12 +14,14 @@
 
 import axios from 'axios';
 import {
+  GameroomProposal,
   User,
   UserCredentials,
   UserAuthResponse,
-  GameroomProposal,
+  NewGameroomProposal,
   Node,
 } from './models';
+import router from '@/router';
 
 export const gameroomAPI = axios.create({
   baseURL: '/api',
@@ -31,6 +33,7 @@ export async function userCreate(
 ): Promise<UserAuthResponse|undefined> {
   try {
     const response = await gameroomAPI.post('/users', user);
+    router.push('/');
     return response.data as UserAuthResponse;
   } catch (e) {
     alert(e);
@@ -42,6 +45,7 @@ export async function userAuthenticate(
 ): Promise<UserAuthResponse|undefined> {
   try {
     const response = await gameroomAPI.post('/users/authenticate', userCredentials);
+    router.push('/');
     return response.data as UserAuthResponse;
   } catch (e) {
     alert(e);
@@ -50,7 +54,7 @@ export async function userAuthenticate(
 
 // Gamerooms
 export async function gameroomPropose(
-  gameroomProposal: GameroomProposal,
+  gameroomProposal: NewGameroomProposal,
 ): Promise<number|undefined> {
   try {
     const response = await gameroomAPI.post('/gamerooms/propose', gameroomProposal);
@@ -64,7 +68,19 @@ export async function gameroomPropose(
 export async function listNodes(): Promise<Node[]> {
   try {
     const response = await gameroomAPI.get('/nodes');
-    return response.data as Node[];
+    return response.data.data as Node[];
+  } catch (e) {
+    alert(e);
+  }
+  return [];
+}
+
+
+// Proposals
+export async function listProposals(): Promise<GameroomProposal[]> {
+  try {
+    const response = await gameroomAPI.get('/proposals');
+    return response.data.data as GameroomProposal[];
   } catch (e) {
     alert(e);
   }
