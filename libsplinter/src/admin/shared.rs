@@ -524,9 +524,8 @@ fn verify_signature(payload: &CircuitManagementPayload) -> Result<bool, ServiceE
 
     ursa_signature_verifier
         .verify(&payload.get_header(), &signature, &public_key)
-        .map_err(AdminShared::from)
-        .map_err(Box::new)
-        .map_err(ServiceError::UnableToHandleMessage)
+        .map_err(AdminSharedError::SignerError)
+        .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
 }
 
 #[cfg(not(feature = "ursa-compat"))]
