@@ -29,7 +29,12 @@ use crate::key;
 use crate::submit::submit_batch_list;
 use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
-pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<String, CliError> {
+pub fn do_upload(
+    filename: &str,
+    key_name: Option<&str>,
+    url: &str,
+    wasm_name: Option<&str>,
+) -> Result<String, CliError> {
     let private_key = key::load_signing_key(key_name)?;
     let context = signing::create_context("secp256k1")?;
     let public_key = context.get_public_key(&private_key)?.as_hex();
@@ -41,9 +46,18 @@ pub fn do_upload(filename: &str, key_name: Option<&str>, url: &str) -> Result<St
     // Load the contract file relative to the directory containing the
     // definition YAML
     let mut contract_path_buf = PathBuf::new();
-    contract_path_buf.push(filename);
-    contract_path_buf.pop();
-    contract_path_buf.push(definition.wasm);
+    if let Some(path) = wasm_name {
+        contract_path_buf.push(path);
+    } else if let Some(wasm) = definition.wasm {
+        contract_path_buf.push(filename);
+        contract_path_buf.pop();
+        contract_path_buf.push(wasm);
+    } else {
+        return Err(CliError::UserError(format!(
+            "Malformed contract definition file \"{}\": missing string field \"wasm\" and/or missing --wasm flag",
+            filename
+        )));
+    }
 
     let contract = load_contract_file(contract_path_buf.as_path())?;
 
@@ -110,7 +124,7 @@ struct ContractDefinition {
     version: String,
     inputs: Vec<String>,
     outputs: Vec<String>,
-    wasm: String,
+    wasm: Option<String>,
 }
 
 impl ContractDefinition {
@@ -153,12 +167,7 @@ impl ContractDefinition {
             ))
         })?;
 
-        let wasm = doc["wasm"].as_str().ok_or_else(|| {
-            CliError::UserError(format!(
-                "Malformed contract definition file \"{}\": missing string field \"wasm\"",
-                filename
-            ))
-        })?;
+        let wasm = doc["wasm"].as_str().map(ToString::to_string);
 
         let inputs = doc["inputs"]
             .as_vec()
@@ -197,7 +206,7 @@ impl ContractDefinition {
             version: String::from(version),
             inputs,
             outputs,
-            wasm: String::from(wasm),
+            wasm,
         })
     }
 }

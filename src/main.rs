@@ -49,6 +49,7 @@ fn run() -> Result<(), error::CliError> {
             (@arg key: -k --key +takes_value "Signing key name")
             (@arg url: --url +takes_value "URL to the Sawtooth REST API")
             (@arg wait: --wait +takes_value "A time in seconds to wait for batches to be committed")
+            (@arg wasm: -w --wasm +takes_value "Path to compiled smart contract (*.wasm)")
         )
         (@subcommand exec =>
             (about: "execute a Sabre contract")
@@ -155,6 +156,7 @@ fn upload(upload_matches: &clap::ArgMatches) -> Result<(String, u64), error::Cli
     let url = upload_matches
         .value_of("url")
         .unwrap_or("http://localhost:8008/");
+    let wasm_name = upload_matches.value_of("wasm");
 
     let wait = match value_t!(upload_matches, "wait", u64) {
         Ok(wait) => wait,
@@ -164,7 +166,7 @@ fn upload(upload_matches: &clap::ArgMatches) -> Result<(String, u64), error::Cli
         },
     };
 
-    let batch_link = upload::do_upload(&filename, key_name, &url)?;
+    let batch_link = upload::do_upload(&filename, key_name, &url, wasm_name)?;
     Ok((batch_link, wait))
 }
 
