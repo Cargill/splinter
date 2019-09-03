@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
 
 #[cfg(feature = "ursa-compat")]
-use ursa::signatures::ed25519::EcdsaSecp256k1Sha256;
+use ursa::signatures::secp256k1::EcdsaSecp256k1Sha256;
 #[cfg(feature = "ursa-compat")]
 use ursa::signatures::SignatureScheme;
 
