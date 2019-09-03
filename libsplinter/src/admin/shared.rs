@@ -516,7 +516,8 @@ fn verify_signature(payload: &CircuitManagementPayload) -> Result<bool, ServiceE
     let scheme = EcdsaSecp256k1Sha256::new();
     let ursa_signature_verifier = UrsaSecp256k1SignatureVerifier::new(&scheme);
 
-    let header = protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.header())?;
+    let header =
+        protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.get_header())?;
 
     let signature = payload.get_signature();
     let public_key = header.get_requester();
