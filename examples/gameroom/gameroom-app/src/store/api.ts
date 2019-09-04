@@ -22,6 +22,7 @@ import {
   UserAuthResponse,
   NewGameroomProposal,
   Node,
+  Ballot,
 } from './models';
 
 export const gameroomAPI = axios.create({
@@ -102,6 +103,11 @@ export async function listProposals(): Promise<GameroomProposal[]> {
   return response.data.data as GameroomProposal[];
 }
 
+export async function proposalVote(ballot: Ballot, proposalID: string,
+): Promise<Uint8Array> {
+  const response = await gameroomAPI.post(`/proposals/${proposalID}/vote`, ballot);
+  return response.data.data.payload_bytes as Uint8Array;
+}
 
 // Notifications
 export async function listNotifications(): Promise<GameroomNotification[]> {
