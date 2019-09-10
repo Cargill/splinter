@@ -45,3 +45,44 @@ jobs:
       script:
         - docker-compose -f tests/test-splinter.yaml up --abort-on-container-exit unit-test-splinter
         - docker-compose -f examples/gameroom/tests/docker-compose.yaml up --abort-on-container-exit
+
+    - stage: Cron build
+      if: type = cron
+      script:
+      - docker-compose -f docker-compose-installed build
+      - docker-compose -f docker/compose/copy-debs.yaml up
+      - cd build/ && sudo tar --exclude=*.tgz -czvf ./archive.tgz . && cd -
+      before_deploy:
+      - git config --local user.name "cron"
+      - git config --local user.email "cron"
+      - export TRAVIS_TAG="dev_build"
+      - git tag $TRAVIS_TAG
+      deploy:
+        - provider: releases
+          name: Splinter daily build
+          body: "$(TZ=America/Chicago date +'%H:%M %a %b %d, %Y') $TRAVIS_COMMIT"
+          prerelease: true
+          overwrite: true
+          api_key: $API_SECRET
+          file_glob: true
+          file:
+          - "./build/archive.tgz"
+          skip_cleanup: true
+          draft: true
+
+    - stage: Archive release artifacts
+      if: tag IS present
+      script:
+      - docker-compose -f docker-compose-installed build
+      - docker-compose -f docker/compose/copy-debs.yaml up
+      - cd build/ && sudo tar --exclude=*.tgz -czvf ./archive.tgz . && cd -
+      deploy:
+        - provider: releases
+          name: Splinter release build
+          api_key: $API_SECRET
+          file_glob: true
+          file:
+          - "./build/archive.tgz"
+          skip_cleanup: true
+          on:
+            tags: true
