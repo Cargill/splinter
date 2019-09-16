@@ -17,299 +17,383 @@
 
 mod error;
 pub use error::AppAuthHandlerError;
+mod sabre;
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    mpsc, Arc,
-};
-use std::thread;
+use std::fmt::Write;
 use std::time::SystemTime;
 
-use awc::ws::{CloseCode, CloseReason, Codec, Frame, Message};
 use diesel::connection::Connection;
-use futures::{
-    future::{self, Either},
-    sink::Sink,
-    stream::Stream,
-    Future,
-};
-use hyper::{header, Body, Client, Request, StatusCode};
-use tokio::{codec::Decoder, runtime::Runtime};
-use uuid::Uuid;
-
 use gameroom_database::{
     helpers,
-    models::{CircuitProposal, NewCircuitMember, NewCircuitService, NewProposalVoteRecord},
+    models::{
+        Gameroom, GameroomProposal, NewGameroomMember, NewGameroomProposal, NewGameroomService,
+        NewProposalVoteRecord,
+    },
     ConnectionPool,
 };
-use libsplinter::admin::messages::{
-    AdminServiceEvent, CircuitProposal as MsgCircuitProposal, SplinterNode, SplinterService,
+use libsplinter::{
+    admin::messages::{
+        AdminServiceEvent, CircuitProposal, CreateCircuit, SplinterNode, SplinterService,
+    },
+    events::{Igniter, WebSocketClient, WebSocketError, WsResponse},
 };
 
-pub struct AppAuthHandlerShutdownHandle {
-    do_shutdown: Box<dyn Fn() -> Result<(), AppAuthHandlerError> + Send>,
-}
+use crate::application_metadata::ApplicationMetadata;
 
-impl AppAuthHandlerShutdownHandle {
-    pub fn shutdown(&self) -> Result<(), AppAuthHandlerError> {
-        (*self.do_shutdown)()
-    }
-}
-
-pub struct ThreadJoinHandle(Vec<thread::JoinHandle<Result<(), AppAuthHandlerError>>>);
-
-impl ThreadJoinHandle {
-    pub fn join(self) {
-        self.0.into_iter().for_each(|join_handle| {
-            let _ = join_handle.join();
-        });
-    }
-}
+use self::sabre::setup_xo;
 
 pub fn run(
-    splinterd_url: &str,
+    splinterd_url: String,
+    node_id: String,
     db_conn: ConnectionPool,
-) -> Result<(AppAuthHandlerShutdownHandle, ThreadJoinHandle), AppAuthHandlerError> {
-    let splinterd_url = splinterd_url.to_owned();
-    let client = Client::new();
-    let shutdown_signaler = Arc::new(AtomicBool::new(true));
-    let running = shutdown_signaler.clone();
-    let (tx, rx) = mpsc::channel();
-    let (tx_join, rx_join) = mpsc::channel();
-    let join_handle = thread::Builder::new()
-        .name("GameroomDAppAuthHandler".into())
-        .spawn(move || {
-            let req = Request::builder()
-                .uri(format!("{}/ws/admin/register/gameroom", splinterd_url))
-                .header(header::UPGRADE, "websocket")
-                .header(header::CONNECTION, "Upgrade")
-                .header(header::SEC_WEBSOCKET_VERSION, "13")
-                .header(header::SEC_WEBSOCKET_KEY, "13")
-                .body(Body::empty())
-                .map_err(|err| AppAuthHandlerError::RequestError(format!("{}", err)))?;
+    private_key: String,
+    igniter: Igniter,
+) -> Result<(), AppAuthHandlerError> {
+    let on_message_igniter = igniter.clone();
+    let on_error_igniter = igniter.clone();
 
-            let mut runtime = Runtime::new()?;
+    let mut ws = WebSocketClient::new(
+        &format!("{}/ws/admin/register/gameroom", splinterd_url),
+        move |event| {
+            if let Err(err) = process_admin_event(
+                event,
+                &db_conn,
+                &node_id,
+                &private_key,
+                &splinterd_url,
+                on_message_igniter.clone(),
+            ) {
+                error!("Failed to process admin event: {}", err);
+            }
+            WsResponse::Empty
+        },
+    );
 
-            runtime.block_on(
-                client
-                    .request(req)
-                    .and_then(|res| {
-                        if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-                            error!("The server didn't upgrade: {}", res.status());
-                        }
-                        res.into_body().on_upgrade()
-                    })
-                    .map_err(|e| {
-                        error!("The client returned an error: {}", e);
-                        AppAuthHandlerError::ClientError(format!("{}", e))
-                    })
-                    .and_then(move |upgraded| {
-                        let codec = Codec::new().client_mode();
-                        let framed = codec.framed(upgraded);
-                        let (sink, stream) = framed.split();
-
-                        // Listen to shutdown signal
-                        let join_handle = thread::spawn(move || {
-                            let msg = rx.recv().map_err(|err| {
-                                AppAuthHandlerError::ShutdownError(format!(
-                                    "Unable to receive websocket close message {}",
-                                    err
-                                ))
-                            })?;
-
-                            info!("Sending closing handshake to server");
-                            sink.send(msg).wait().map_err(|e| {
-                                AppAuthHandlerError::ShutdownError(format!(
-                                    "Unable to send close message to server {}",
-                                    e
-                                ))
-                            })?;
-                            Ok(())
-                        });
-
-                        if let Err(err) = tx_join.send(join_handle) {
-                            return Either::A(future::err(AppAuthHandlerError::StartUpError(
-                                format!("Unable to send send join handler addr {}", err),
-                            )));
-                        };
-
-                        // Read stream until shutdown signal is received
-                        Either::B(
-                            stream
-                                .take_while(move |message| {
-                                    match message {
-                                        Frame::Text(msg) => {
-                                            if let Some(bytes) = msg {
-                                                if let Err(err) =
-                                                    process_text_message(&bytes[..], &db_conn)
-                                                {
-                                                    error!(
-                                                    "An error occurred while processing a message:
-                                                    {}",
-                                                    err
-                                                );
-                                                }
-                                            } else {
-                                                error!("Received empty message");
-                                            }
-                                        }
-                                        Frame::Ping(msg) => info!("Received Ping {}", msg),
-                                        Frame::Close(msg) => {
-                                            info!("Received close message {:?}", msg);
-                                            return future::ok(false);
-                                        }
-                                        _ => error!("Received unknown message: {:?}", message),
-                                    };
-
-                                    future::ok(running.load(Ordering::SeqCst))
-                                })
-                                // Transform stream into a future
-                                .for_each(|_| future::ok(()))
-                                .map_err(|e| {
-                                    error!("The client returned an error: {}", e);
-                                    AppAuthHandlerError::ClientError(format!("{}", e))
-                                }),
-                        )
-                    }),
-            )
-        })?;
-
-    let join_handle_adrr = rx_join.recv().map_err(|err| {
-        AppAuthHandlerError::StartUpError(format!("Unable to receive join handle addr: {}", err))
-    })?;
-    let do_shutdown = Box::new(move || {
-        debug!("Shutting down application authentication handler");
-        shutdown_signaler.store(false, Ordering::SeqCst);
-
-        // Send shutdown message to listening thread
-        tx.send(Message::Close(Some(CloseReason {
-            code: CloseCode::Normal,
-            description: Some("The client received shutdown signal".to_string()),
-        })))
-        .map_err(|err| {
-            AppAuthHandlerError::ShutdownError(format!(
-                "Unable to send websocket close message {}",
-                err
-            ))
-        })?;
-
-        Ok(())
+    ws.on_error(move |err, ws| {
+        error!("An error occured while listening for admin events {}", err);
+        if let WebSocketError::ParserError { .. } = err {
+            debug!("Protocol error, closing connection");
+            Ok(())
+        } else {
+            debug!("Attempting to restart connection");
+            on_error_igniter.clone().start_ws(&ws)
+        }
     });
 
-    Ok((
-        AppAuthHandlerShutdownHandle { do_shutdown },
-        ThreadJoinHandle(vec![join_handle_adrr, join_handle]),
-    ))
+    igniter.start_ws(&ws).map_err(AppAuthHandlerError::from)
 }
 
-fn process_text_message(msg: &[u8], pool: &ConnectionPool) -> Result<(), AppAuthHandlerError> {
-    let admin_event: AdminServiceEvent = serde_json::from_slice(msg)?;
+fn process_admin_event(
+    admin_event: AdminServiceEvent,
+    pool: &ConnectionPool,
+    node_id: &str,
+    private_key: &str,
+    url: &str,
+    igniter: Igniter,
+) -> Result<(), AppAuthHandlerError> {
     match admin_event {
         AdminServiceEvent::ProposalSubmitted(msg_proposal) => {
             let time = SystemTime::now();
-            let proposal_id = Uuid::new_v4().to_string();
-            let proposal = parse_proposal(&msg_proposal, &proposal_id, time);
-            let services = parse_splinter_services(&proposal_id, &msg_proposal.circuit.roster);
-            let nodes = parse_splinter_nodes(&proposal_id, &msg_proposal.circuit.members);
+
+            // convert requester public key to hex
+            let requester = to_hex(&msg_proposal.requester);
+            let proposal = parse_proposal(&msg_proposal, time, requester);
+
+            let gameroom = parse_gameroom(&msg_proposal.circuit, time)?;
+
+            let services = parse_splinter_services(
+                &msg_proposal.circuit_id,
+                &msg_proposal.circuit.roster,
+                time,
+            );
+
+            let nodes = parse_splinter_nodes(
+                &msg_proposal.circuit_id,
+                &msg_proposal.circuit.members,
+                time,
+            );
+
             let conn = &*pool.get()?;
 
             // insert proposal information in database tables in a single transaction
             conn.transaction::<_, _, _>(|| {
-                helpers::insert_circuit_proposal(conn, proposal)?;
-                helpers::insert_circuit_service(conn, &services)?;
-                helpers::insert_circuit_member(conn, &nodes)?;
+                let notification = helpers::create_new_notification(
+                    "gameroom_proposal",
+                    &proposal.requester,
+                    &proposal.requester_node_id,
+                    &proposal.circuit_id,
+                );
+                helpers::insert_gameroom_notification(conn, &[notification])?;
+
+                helpers::insert_gameroom(conn, gameroom)?;
+                helpers::insert_gameroom_proposal(conn, proposal)?;
+                helpers::insert_gameroom_services(conn, &services)?;
+                helpers::insert_gameroom_members(conn, &nodes)?;
 
                 debug!("Inserted new proposal into database");
                 Ok(())
             })
         }
-        AdminServiceEvent::ProposalVote(msg_vote) => {
-            let proposal =
-                get_pending_proposal_with_circuit_id(&pool, &&msg_vote.ballot.circuit_id)?;
+        AdminServiceEvent::ProposalVote((msg_proposal, signer_public_key)) => {
+            let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
+            let vote = msg_proposal
+                .votes
+                .iter()
+                .find(|vote| vote.public_key == signer_public_key)
+                .ok_or_else(|| {
+                    AppAuthHandlerError::InvalidMessageError("Missing vote from signer".to_string())
+                })?;
             let time = SystemTime::now();
             let vote = NewProposalVoteRecord {
-                proposal_id: proposal.id.to_string(),
-                voter_public_key: String::from_utf8(msg_vote.signer_public_key)?,
-                vote: format!("{:?}", msg_vote.ballot.vote),
+                proposal_id: proposal.id,
+                voter_public_key: to_hex(&signer_public_key),
+                voter_node_id: vote.voter_node_id.to_string(),
+                vote: "Accept".to_string(),
                 created_time: time,
             };
             let conn = &*pool.get()?;
 
             // insert vote and update proposal in a single database transaction
             conn.transaction::<_, _, _>(|| {
-                helpers::update_circuit_proposal_status(conn, &proposal.id, &time, "Pending")?;
+                let notification = helpers::create_new_notification(
+                    "proposal_vote_record",
+                    &vote.voter_public_key,
+                    &vote.voter_node_id,
+                    &msg_proposal.circuit_id,
+                );
+                helpers::insert_gameroom_notification(conn, &[notification])?;
+                helpers::update_gameroom_proposal_status(conn, proposal.id, &time, "Pending")?;
                 helpers::insert_proposal_vote_record(conn, &[vote])?;
 
                 debug!("Inserted new vote into database");
                 Ok(())
             })
         }
-        AdminServiceEvent::ProposalAccepted(msg_proposal) => {
+        AdminServiceEvent::ProposalAccepted((msg_proposal, signer_public_key)) => {
             let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
             let time = SystemTime::now();
+            let vote = msg_proposal
+                .votes
+                .iter()
+                .find(|vote| vote.public_key == signer_public_key)
+                .ok_or_else(|| {
+                    AppAuthHandlerError::InvalidMessageError("Missing vote from signer".to_string())
+                })?;
+
+            let vote = NewProposalVoteRecord {
+                proposal_id: proposal.id,
+                voter_public_key: to_hex(&signer_public_key),
+                voter_node_id: vote.voter_node_id.to_string(),
+                vote: "Accept".to_string(),
+                created_time: time,
+            };
             let conn = &*pool.get()?;
-            helpers::update_circuit_proposal_status(conn, &proposal.id, &time, "Accepted")?;
-            debug!("Updated proposal to status 'Accepted'");
-            Ok(())
+
+            // insert vote and update proposal in a single database transaction
+            conn.transaction::<_, _, _>(|| {
+                let notification = helpers::create_new_notification(
+                    "proposal_accepted",
+                    &vote.voter_public_key,
+                    &vote.voter_node_id,
+                    &msg_proposal.circuit_id,
+                );
+                helpers::insert_gameroom_notification(conn, &[notification])?;
+                helpers::update_gameroom_proposal_status(conn, proposal.id, &time, "Accepted")?;
+                helpers::update_gameroom_status(conn, &msg_proposal.circuit_id, &time, "Accepted")?;
+                helpers::update_gameroom_member_status(
+                    conn,
+                    &msg_proposal.circuit_id,
+                    &time,
+                    "Pending",
+                    "Accepted",
+                )?;
+                helpers::update_gameroom_service_status(
+                    conn,
+                    &msg_proposal.circuit_id,
+                    &time,
+                    "Pending",
+                    "Accepted",
+                )?;
+
+                helpers::insert_proposal_vote_record(conn, &[vote])?;
+
+                debug!("Updated proposal to status 'Accepted'");
+                Ok(())
+            })
         }
-        AdminServiceEvent::ProposalRejected(msg_proposal) => {
+        AdminServiceEvent::ProposalRejected((msg_proposal, signer_public_key)) => {
             let proposal = get_pending_proposal_with_circuit_id(&pool, &msg_proposal.circuit_id)?;
             let time = SystemTime::now();
+            let vote = msg_proposal
+                .votes
+                .iter()
+                .find(|vote| vote.public_key == signer_public_key)
+                .ok_or_else(|| {
+                    AppAuthHandlerError::InvalidMessageError("Missing vote from signer".to_string())
+                })?;
+
+            let vote = NewProposalVoteRecord {
+                proposal_id: proposal.id,
+                voter_public_key: to_hex(&signer_public_key),
+                voter_node_id: vote.voter_node_id.to_string(),
+                vote: "Reject".to_string(),
+                created_time: time,
+            };
             let conn = &*pool.get()?;
-            helpers::update_circuit_proposal_status(conn, &proposal.id, &time, "Rejected")?;
-            debug!("Updated proposal to status 'Rejected'");
-            Ok(())
+
+            // insert vote and update proposal in a single database transaction
+            conn.transaction::<_, _, _>(|| {
+                let notification = helpers::create_new_notification(
+                    "proposal_rejected",
+                    &vote.voter_public_key,
+                    &vote.voter_node_id,
+                    &msg_proposal.circuit_id,
+                );
+                helpers::insert_gameroom_notification(conn, &[notification])?;
+                helpers::update_gameroom_proposal_status(conn, proposal.id, &time, "Rejected")?;
+                helpers::update_gameroom_status(conn, &msg_proposal.circuit_id, &time, "Rejected")?;
+                helpers::update_gameroom_member_status(
+                    conn,
+                    &msg_proposal.circuit_id,
+                    &time,
+                    "Pending",
+                    "Rejected",
+                )?;
+                helpers::update_gameroom_service_status(
+                    conn,
+                    &msg_proposal.circuit_id,
+                    &time,
+                    "Pending",
+                    "Rejected",
+                )?;
+                helpers::insert_proposal_vote_record(conn, &[vote])?;
+                debug!("Updated proposal to status 'Rejected'");
+                Ok(())
+            })
+        }
+        AdminServiceEvent::CircuitReady(msg_proposal) => {
+            // Now that the circuit is created, submit the Sabre transactions to run xo
+            let service_id = match msg_proposal.circuit.roster.iter().find_map(|service| {
+                if service.allowed_nodes.contains(&node_id.to_string()) {
+                    Some(service.service_id.clone())
+                } else {
+                    None
+                }
+            }) {
+                Some(id) => id,
+                None => {
+                    debug!(
+                        "New gameroom does not have any services for this node: {}",
+                        node_id
+                    );
+                    return Ok(());
+                }
+            };
+            let scabbard_admin_keys = match serde_json::from_slice::<ApplicationMetadata>(
+                msg_proposal.circuit.application_metadata.as_slice(),
+            ) {
+                Ok(metadata) => metadata.scabbard_admin_keys().to_vec(),
+                Err(err) => {
+                    return Err(AppAuthHandlerError::InvalidMessageError(format!(
+                        "unable to parse application metadata: {}",
+                        err
+                    )))
+                }
+            };
+            igniter
+                .send(setup_xo(
+                    private_key,
+                    scabbard_admin_keys,
+                    url,
+                    &msg_proposal.circuit_id,
+                    &service_id,
+                )?)
+                .map_err(AppAuthHandlerError::from)
         }
     }
 }
 
 fn parse_proposal(
-    proposal: &MsgCircuitProposal,
-    id: &str,
+    proposal: &CircuitProposal,
     timestamp: SystemTime,
-) -> CircuitProposal {
-    CircuitProposal {
-        id: id.to_string(),
+    requester_public_key: String,
+) -> NewGameroomProposal {
+    NewGameroomProposal {
         proposal_type: format!("{:?}", proposal.proposal_type),
         circuit_id: proposal.circuit_id.clone(),
-        circuit_hash: proposal.circuit_hash.clone(),
-        requester: proposal.requester.clone(),
-        authorization_type: format!("{:?}", proposal.circuit.authorization_type),
-        persistence: format!("{:?}", proposal.circuit.persistence),
-        routes: format!("{:?}", proposal.circuit.routes),
-        circuit_management_type: proposal.circuit.circuit_management_type.clone(),
-        application_metadata: proposal.circuit.application_metadata.clone(),
+        circuit_hash: proposal.circuit_hash.to_string(),
+        requester: requester_public_key,
+        requester_node_id: proposal.requester_node_id.to_string(),
         status: "Pending".to_string(),
         created_time: timestamp,
         updated_time: timestamp,
     }
 }
 
+fn parse_gameroom(
+    circuit: &CreateCircuit,
+    timestamp: SystemTime,
+) -> Result<Gameroom, AppAuthHandlerError> {
+    let application_metadata = ApplicationMetadata::from_bytes(&circuit.application_metadata)?;
+
+    Ok(Gameroom {
+        circuit_id: circuit.circuit_id.clone(),
+        authorization_type: format!("{:?}", circuit.authorization_type),
+        persistence: format!("{:?}", circuit.persistence),
+        durability: format!("{:?}", circuit.durability),
+        routes: format!("{:?}", circuit.routes),
+        circuit_management_type: circuit.circuit_management_type.clone(),
+        alias: application_metadata.alias().to_string(),
+        status: "Pending".to_string(),
+        created_time: timestamp,
+        updated_time: timestamp,
+    })
+}
+
 fn parse_splinter_services(
-    proposal_id: &str,
+    circuit_id: &str,
     splinter_services: &[SplinterService],
-) -> Vec<NewCircuitService> {
+    timestamp: SystemTime,
+) -> Vec<NewGameroomService> {
     splinter_services
         .iter()
-        .map(|service| NewCircuitService {
-            proposal_id: proposal_id.to_string(),
+        .map(|service| NewGameroomService {
+            circuit_id: circuit_id.to_string(),
             service_id: service.service_id.to_string(),
             service_type: service.service_type.to_string(),
             allowed_nodes: service.allowed_nodes.clone(),
+            arguments: service
+                .arguments
+                .clone()
+                .iter()
+                .map(|(key, value)| {
+                    json!({
+                        "key": key,
+                        "value": value
+                    })
+                })
+                .collect(),
+            status: "Pending".to_string(),
+            created_time: timestamp,
+            updated_time: timestamp,
         })
         .collect()
 }
 
 fn parse_splinter_nodes(
-    proposal_id: &str,
+    circuit_id: &str,
     splinter_nodes: &[SplinterNode],
-) -> Vec<NewCircuitMember> {
+    timestamp: SystemTime,
+) -> Vec<NewGameroomMember> {
     splinter_nodes
         .iter()
-        .map(|node| NewCircuitMember {
-            proposal_id: proposal_id.to_string(),
+        .map(|node| NewGameroomMember {
+            circuit_id: circuit_id.to_string(),
             node_id: node.node_id.to_string(),
             endpoint: node.endpoint.to_string(),
+            status: "Pending".to_string(),
+            created_time: timestamp,
+            updated_time: timestamp,
         })
         .collect()
 }
@@ -317,8 +401,8 @@ fn parse_splinter_nodes(
 fn get_pending_proposal_with_circuit_id(
     pool: &ConnectionPool,
     circuit_id: &str,
-) -> Result<CircuitProposal, AppAuthHandlerError> {
-    helpers::fetch_circuit_proposal_with_status(&*pool.get()?, &circuit_id, "Pending")?.ok_or_else(
+) -> Result<GameroomProposal, AppAuthHandlerError> {
+    helpers::fetch_gameroom_proposal_with_status(&*pool.get()?, &circuit_id, "Pending")?.ok_or_else(
         || {
             AppAuthHandlerError::DatabaseError(format!(
                 "Could not find open proposal for circuit: {}",
@@ -328,103 +412,150 @@ fn get_pending_proposal_with_circuit_id(
     )
 }
 
+pub fn to_hex(bytes: &[u8]) -> String {
+    let mut buf = String::new();
+    for b in bytes {
+        write!(&mut buf, "{:02x}", b).expect("Unable to write to string");
+    }
+
+    buf
+}
+
 #[cfg(all(feature = "test-authorization-handler", test))]
 mod test {
     use super::*;
+    use libsplinter::events::Reactor;
+
+    use std::collections::HashMap;
+
     use diesel::{dsl::insert_into, prelude::*, RunQueryDsl};
-    use gameroom_database::models::{CircuitMember, CircuitService, ProposalVoteRecord};
+    use gameroom_database::models::{
+        GameroomMember, GameroomNotification, GameroomService, NewGameroomNotification,
+        ProposalVoteRecord,
+    };
 
     use libsplinter::admin::messages::{
-        AuthorizationType, Ballot, CircuitProposalVote, CreateCircuit, PersistenceType,
-        ProposalType, RouteType, Vote,
+        AuthorizationType, CreateCircuit, DurabilityType, PersistenceType, ProposalType, RouteType,
+        Vote, VoteRecord,
     };
 
     static DATABASE_URL: &str = "postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test";
 
     #[test]
-    /// Tests if when receiving an admin message to CreateProposal the circuit_proposal
+    /// Tests if when receiving an admin message to CreateProposal the gameroom_proposal
     /// table is updated as expected
     fn test_process_proposal_submitted_message_update_proposal_table() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
-        let message = get_submit_proposal_msg("my_circuit");
-        let serialized = serde_json::to_vec(&message).expect("Failed to serialize message");
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
 
-        process_text_message(&serialized, &pool).expect("Error processing message");
+        let message = get_submit_proposal_msg("my_circuit");
+        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
 
         assert_eq!(proposals.len(), 1);
 
         let proposal = &proposals[0];
-        let expected_proposal = get_circuit_proposal("", "my_circuit", SystemTime::now());
+        let expected_proposal = get_gameroom_proposal("my_circuit", SystemTime::now());
 
         assert_eq!(proposal.proposal_type, expected_proposal.proposal_type);
         assert_eq!(proposal.circuit_id, expected_proposal.circuit_id);
         assert_eq!(proposal.circuit_hash, expected_proposal.circuit_hash);
         assert_eq!(proposal.requester, expected_proposal.requester);
-        assert_eq!(
-            proposal.authorization_type,
-            expected_proposal.authorization_type
-        );
-        assert_eq!(proposal.persistence, expected_proposal.persistence);
-        assert_eq!(proposal.routes, expected_proposal.routes);
-        assert_eq!(
-            proposal.circuit_management_type,
-            expected_proposal.circuit_management_type
-        );
-        assert_eq!(
-            proposal.application_metadata,
-            expected_proposal.application_metadata
-        );
         assert_eq!(proposal.status, expected_proposal.status);
     }
 
     #[test]
-    /// Tests if when receiving an admin message to CreateProposal the proposal_circuit_member
+    /// Tests if when receiving an admin message to CreateProposal the gameroom
     /// table is updated as expected
-    fn test_process_proposal_submitted_message_update_member_table() {
+    fn test_process_proposal_submitted_message_update_gameroom_table() {
+        let reactor = Reactor::new();
+
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
+
         let message = get_submit_proposal_msg("my_circuit");
-        let serialized = serde_json::to_vec(&message).expect("Failed to serialize message");
+        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
 
-        process_text_message(&serialized, &pool).expect("Error processing message");
+        let gamerooms = query_gameroom_table(&pool);
 
-        let members = query_circuit_members_table(&pool);
+        assert_eq!(gamerooms.len(), 1);
+
+        let gameroom = &gamerooms[0];
+        let expected_gameroom = get_gameroom("my_circuit", SystemTime::now());
+
+        assert_eq!(gameroom.circuit_id, expected_gameroom.circuit_id);
+        assert_eq!(
+            gameroom.authorization_type,
+            expected_gameroom.authorization_type
+        );
+        assert_eq!(gameroom.persistence, expected_gameroom.persistence);
+        assert_eq!(gameroom.routes, expected_gameroom.routes);
+        assert_eq!(gameroom.durability, expected_gameroom.durability);
+        assert_eq!(
+            gameroom.circuit_management_type,
+            expected_gameroom.circuit_management_type
+        );
+        assert_eq!(gameroom.alias, expected_gameroom.alias);
+        assert_eq!(gameroom.status, expected_gameroom.status);
+    }
+
+    #[test]
+    /// Tests if when receiving an admin message to CreateProposal the gameroom_member
+    /// table is updated as expected
+    fn test_process_proposal_submitted_message_update_member_table() {
+        let reactor = Reactor::new();
+        let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
+            .expect("Failed to get database connection pool");
+
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
+
+        let message = get_submit_proposal_msg("my_circuit");
+        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
+
+        let members = query_gameroom_members_table(&pool);
 
         assert_eq!(members.len(), 1);
 
         let node = &members[0];
-        let expected_node = get_new_circuit_member("");
+        let expected_node = get_new_gameroom_member("my_circuit", SystemTime::now());
 
         assert_eq!(node.node_id, expected_node.node_id);
         assert_eq!(node.endpoint, expected_node.endpoint);
     }
 
     #[test]
-    /// Tests if when receiving an admin message to CreateProposal the proposal_circuit_service
+    /// Tests if when receiving an admin message to CreateProposal the gameroom_service
     /// table is updated as expected
     fn test_process_proposal_submitted_message_update_service_table() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
+
         let message = get_submit_proposal_msg("my_circuit");
-        let serialized = serde_json::to_vec(&message).expect("Failed to serialize message");
+        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
 
-        process_text_message(&serialized, &pool).expect("Error processing message");
-
-        let services = query_circuit_service_table(&pool);
+        let services = query_gameroom_service_table(&pool);
 
         assert_eq!(services.len(), 1);
 
         let service = &services[0];
-        let expected_service = get_new_circuit_service("");
+        let expected_service = get_new_gameroom_service("my_circuit", SystemTime::now());
 
         assert_eq!(service.service_id, expected_service.service_id);
         assert_eq!(service.service_type, expected_service.service_type);
@@ -432,28 +563,73 @@ mod test {
     }
 
     #[test]
-    /// Tests if when receiving an admin message ProposalAccepted the circuit_proposal
+    /// Tests if when receiving an admin message to CreateProposal the gameroom_notification
     /// table is updated as expected
-    fn test_process_proposal_accepted_message_ok() {
+    fn test_process_proposal_submitted_message_update_notification_table() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
+
+        let message = get_submit_proposal_msg("my_circuit");
+        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
+
+        let notifications = query_gameroom_notification_table(&pool);
+
+        assert_eq!(notifications.len(), 1);
+
+        let notification = &notifications[0];
+        let expected_notification =
+            get_new_gameroom_notification_proposal("my_circuit", SystemTime::now());
+
+        assert_eq!(
+            notification.notification_type,
+            expected_notification.notification_type
+        );
+        assert_eq!(notification.requester, expected_notification.requester);
+        assert_eq!(notification.target, expected_notification.target);
+        assert_eq!(notification.read, expected_notification.read);
+    }
+
+    #[test]
+    /// Tests if when receiving an admin message ProposalAccepted the gameroom_proposal
+    /// table is updated as expected
+    fn test_process_proposal_accepted_message_ok() {
+        let reactor = Reactor::new();
+        let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
+            .expect("Failed to get database connection pool");
+
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
 
         let created_time = SystemTime::now();
+
+        // insert gameroom into database
+        insert_gameroom_table(&pool, get_gameroom("my_circuit", created_time.clone()));
 
         // insert pending proposal into database
         insert_proposals_table(
             &pool,
-            get_circuit_proposal("my_proposal", "my_circuit", created_time.clone()),
+            get_gameroom_proposal("my_circuit", created_time.clone()),
+        );
+
+        insert_member_table(
+            &pool,
+            get_new_gameroom_member("my_circuit", created_time.clone()),
+        );
+        insert_service_table(
+            &pool,
+            get_new_gameroom_service("my_circuit", created_time.clone()),
         );
 
         let accept_message = get_accept_proposal_msg("my_circuit");
-        let accept_serialized =
-            serde_json::to_vec(&accept_message).expect("Failed to serialize message");
 
         // accept proposal
-        process_text_message(&accept_serialized, &pool).expect("Error processing message");
+        process_admin_event(accept_message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
 
@@ -465,23 +641,45 @@ mod test {
         assert!(proposal.updated_time > created_time);
         // Check status was changed to accepted
         assert_eq!(proposal.status, "Accepted");
+
+        let members = query_gameroom_members_table(&pool);
+
+        assert_eq!(members.len(), 1);
+
+        let member = &members[0];
+
+        // Check member updated_time changed
+        assert!(member.updated_time > created_time);
+        // Check status was changed to accepted
+        assert_eq!(member.status, "Accepted");
+
+        let services = query_gameroom_service_table(&pool);
+
+        assert_eq!(services.len(), 1);
+
+        let service = &services[0];
+
+        // Check service updated_time changed
+        assert!(service.updated_time > created_time);
+        // Check status was changed to accepted
+        assert_eq!(service.status, "Accepted");
     }
 
     #[test]
     /// Tests if when receiving an admin message ProposalAccepted an error is returned
     /// if a pending proposal for that circuit is not found
     fn test_process_proposal_accepted_message_err() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
 
         let accept_message = get_accept_proposal_msg("my_circuit");
-        let accept_serialized =
-            serde_json::to_vec(&accept_message).expect("Failed to serialize message");
 
         // accept proposal
-        match process_text_message(&accept_serialized, &pool) {
+        match process_admin_event(accept_message, &pool, "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
             Err(AppAuthHandlerError::DatabaseError(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: my_circuit"));
@@ -491,28 +689,41 @@ mod test {
     }
 
     #[test]
-    /// Tests if when receiving an admin message ProposalRejected the circuit_proposal
-    /// table is updated as expected
+    /// Tests if when receiving an admin message ProposalRejected the gameroom_proposal and
+    /// gameroom tables are updated as expected
     fn test_process_proposal_rejected_message_ok() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
 
         let created_time = SystemTime::now();
+
+        // insert gameroom into database
+        insert_gameroom_table(&pool, get_gameroom("my_circuit", created_time.clone()));
 
         // insert pending proposal into database
         insert_proposals_table(
             &pool,
-            get_circuit_proposal("my_proposal", "my_circuit", created_time.clone()),
+            get_gameroom_proposal("my_circuit", created_time.clone()),
+        );
+
+        insert_member_table(
+            &pool,
+            get_new_gameroom_member("my_circuit", created_time.clone()),
+        );
+        insert_service_table(
+            &pool,
+            get_new_gameroom_service("my_circuit", created_time.clone()),
         );
 
         let rejected_message = get_reject_proposal_msg("my_circuit");
-        let rejected_serialized =
-            serde_json::to_vec(&rejected_message).expect("Failed to serialize message");
 
         // reject proposal
-        process_text_message(&rejected_serialized, &pool).expect("Error processing message");
+        process_admin_event(rejected_message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
 
@@ -524,23 +735,56 @@ mod test {
         assert!(proposal.updated_time > created_time);
         // Check status was changed to rejected
         assert_eq!(proposal.status, "Rejected");
+
+        let gamerooms = query_gameroom_table(&pool);
+
+        assert_eq!(gamerooms.len(), 1);
+
+        let gameroom = &gamerooms[0];
+
+        // Check gameroom updated_time changed
+        assert!(gameroom.updated_time > created_time);
+        // Check status was changed to rejected
+        assert_eq!(gameroom.status, "Rejected");
+
+        let members = query_gameroom_members_table(&pool);
+
+        assert_eq!(members.len(), 1);
+
+        let member = &members[0];
+
+        // Check member updated_time changed
+        assert!(member.updated_time > created_time);
+        // Check status was changed to rejected
+        assert_eq!(member.status, "Rejected");
+
+        let services = query_gameroom_service_table(&pool);
+
+        assert_eq!(services.len(), 1);
+
+        let service = &services[0];
+
+        // Check service updated_time changed
+        assert!(service.updated_time > created_time);
+        // Check status was changed to rejected
+        assert_eq!(service.status, "Rejected");
     }
 
     #[test]
     /// Tests if when receiving an admin message ProposalRejected an error is returned
     /// if a pending proposal for that circuit is not found
     fn test_process_proposal_rejected_message_err() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
 
         let rejected_message = get_reject_proposal_msg("my_circuit");
-        let rejected_serialized =
-            serde_json::to_vec(&rejected_message).expect("Failed to serialize message");
 
         // reject proposal
-        match process_text_message(&rejected_serialized, &pool) {
+        match process_admin_event(rejected_message, &pool, "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
             Err(AppAuthHandlerError::DatabaseError(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: my_circuit"));
@@ -550,28 +794,32 @@ mod test {
     }
 
     #[test]
-    /// Tests if when receiving an admin message ProposalVote the circuit_proposal and circuit_vote
-    /// tables are updated as expected
+    /// Tests if when receiving an admin message ProposalVote the gameroom_proposal and
+    /// proposal_vote_record tables are updated as expected
     fn test_process_proposal_vote_message_ok() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
 
         let created_time = SystemTime::now();
+
+        // insert gameroom into database
+        insert_gameroom_table(&pool, get_gameroom("my_circuit", created_time.clone()));
 
         // insert pending proposal into database
         insert_proposals_table(
             &pool,
-            get_circuit_proposal("my_proposal", "my_circuit", created_time.clone()),
+            get_gameroom_proposal("my_circuit", created_time.clone()),
         );
 
         let vote_message = get_vote_proposal_msg("my_circuit");
-        let vote_serialized =
-            serde_json::to_vec(&vote_message).expect("Failed to serialize message");
 
         // vote proposal
-        process_text_message(&vote_serialized, &pool).expect("Error processing message");
+        process_admin_event(vote_message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
 
@@ -586,27 +834,77 @@ mod test {
         assert_eq!(votes.len(), 1);
 
         let vote = &votes[0];
-        let expected_vote = get_new_vote_record("", SystemTime::now());
+        let expected_vote = get_new_vote_record(proposal.id, SystemTime::now());
         assert_eq!(vote.voter_public_key, expected_vote.voter_public_key);
         assert_eq!(vote.vote, expected_vote.vote);
         assert_eq!(vote.created_time, proposal.updated_time);
     }
 
     #[test]
-    /// Tests if when receiving an admin message ProposalVote an error is returned
-    /// if a pending proposal for that circuit is not found
-    fn test_process_proposal_vote_message_err() {
+    /// Tests if when receiving an admin message to ProposalVote the gameroom_notification
+    /// table is updated as expected
+    fn test_process_proposal_vote_message_update_notification_table() {
+        let reactor = Reactor::new();
         let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
             .expect("Failed to get database connection pool");
 
-        clear_circuit_proposals_table(&pool);
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
+
+        let created_time = SystemTime::now();
+
+        // insert gameroom into database
+        insert_gameroom_table(&pool, get_gameroom("my_circuit", created_time.clone()));
+
+        // insert pending proposal into database
+        insert_proposals_table(
+            &pool,
+            get_gameroom_proposal("my_circuit", created_time.clone()),
+        );
 
         let vote_message = get_vote_proposal_msg("my_circuit");
-        let vote_serialized =
-            serde_json::to_vec(&vote_message).expect("Failed to serialize message");
 
         // vote proposal
-        match process_text_message(&vote_serialized, &pool) {
+        process_admin_event(vote_message, &pool, "", "", "", reactor.igniter())
+            .expect("Error processing message");
+
+        let notifications = query_gameroom_notification_table(&pool);
+
+        assert_eq!(notifications.len(), 1);
+
+        let votes = query_votes_table(&pool);
+        assert_eq!(votes.len(), 1);
+
+        let vote = &votes[0];
+
+        let notification = &notifications[0];
+        let expected_notification =
+            get_new_gameroom_notification_vote("my_circuit", SystemTime::now());
+
+        assert_eq!(
+            notification.notification_type,
+            expected_notification.notification_type
+        );
+        assert_eq!(notification.requester, expected_notification.requester);
+        assert_eq!(notification.target, expected_notification.target);
+        assert_eq!(notification.read, expected_notification.read);
+    }
+
+    #[test]
+    /// Tests if when receiving an admin message ProposalVote an error is returned
+    /// if a pending proposal for that circuit is not found
+    fn test_process_proposal_vote_message_err() {
+        let reactor = Reactor::new();
+        let pool: ConnectionPool = gameroom_database::create_connection_pool(DATABASE_URL)
+            .expect("Failed to get database connection pool");
+
+        clear_gameroom_table(&pool);
+        clear_gameroom_notification_table(&pool);
+
+        let vote_message = get_vote_proposal_msg("my_circuit");
+
+        // vote proposal
+        match process_admin_event(vote_message, &pool, "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
             Err(AppAuthHandlerError::DatabaseError(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: my_circuit"));
@@ -616,46 +914,67 @@ mod test {
     }
 
     #[test]
-    /// Tests if the admin message CreateProposal to a database CircuitProposal is successful
+    /// Tests if the admin message CreateProposal to a database GameroomProposal is successful
     fn test_parse_proposal() {
         let time = SystemTime::now();
-        let proposal = parse_proposal(&get_msg_proposal("my_circuit"), "my_proposal", time.clone());
+        let proposal = parse_proposal(
+            &get_msg_proposal("my_circuit"),
+            time.clone(),
+            to_hex(&public_key()),
+        );
 
-        assert_eq!(
-            proposal,
-            get_circuit_proposal("my_proposal", "my_circuit", time.clone())
-        )
+        assert_eq!(proposal, get_gameroom_proposal("my_circuit", time.clone()));
     }
 
     #[test]
-    /// Tests if the admin message SplinterService to a database NewCircuitService is successful
-    fn test_parse_circuit_service() {
+    /// Tests if the admin message CreateCircuit to a database Gameroom is successful
+    fn test_parse_gameroom() {
+        let time = SystemTime::now();
+        let gameroom = parse_gameroom(&get_create_circuit_msg("my_circuit"), time)
+            .expect("Failed to parse gameroom");
+
+        assert_eq!(gameroom, get_gameroom("my_circuit", time.clone()))
+    }
+
+    #[test]
+    /// Tests if the admin message SplinterService to a database NewGameroomService is successful
+    fn test_parse_gameroom_service() {
+        let time = SystemTime::now();
         let services = parse_splinter_services(
-            "my_proposal",
+            "my_circuit",
             &get_msg_proposal("my_circuit").circuit.roster,
+            time,
         );
 
-        assert_eq!(services, vec![get_new_circuit_service("my_proposal")])
+        assert_eq!(services, vec![get_new_gameroom_service("my_circuit", time)]);
     }
 
     #[test]
-    /// Tests if the admin message SplinterNode to a database NewCircuitMember is successful
-    fn test_parse_circuit_member() {
+    /// Tests if the admin message SplinterNode to a database NewGameroomMember is successful
+    fn test_parse_gameroom_member() {
+        let time = SystemTime::now();
         let members = parse_splinter_nodes(
-            "my_proposal",
+            "my_circuit",
             &get_msg_proposal("my_circuit").circuit.members,
+            time,
         );
 
-        assert_eq!(members, vec![get_new_circuit_member("my_proposal")])
+        assert_eq!(members, vec![get_new_gameroom_member("my_circuit", time)]);
     }
 
     fn get_create_circuit_msg(circuit_id: &str) -> CreateCircuit {
+        let mut arguments = HashMap::new();
+        arguments.insert("test_key".to_string(), "test_value".to_string());
+        let application_metadata = ApplicationMetadata::new("test_gameroom", vec![].as_slice())
+            .to_bytes()
+            .expect("Failed to serialize application_metadata");
         CreateCircuit {
             circuit_id: circuit_id.to_string(),
             roster: vec![SplinterService {
                 service_id: "scabbard_123".to_string(),
                 service_type: "scabbard".to_string(),
                 allowed_nodes: vec!["acme_corp".to_string()],
+                arguments: arguments,
             }],
             members: vec![SplinterNode {
                 node_id: "Node-123".to_string(),
@@ -663,103 +982,152 @@ mod test {
             }],
             authorization_type: AuthorizationType::Trust,
             persistence: PersistenceType::Any,
+            durability: DurabilityType::NoDurabilty,
             routes: RouteType::Any,
             circuit_management_type: "gameroom".to_string(),
-            application_metadata: vec![],
+            application_metadata,
         }
     }
 
-    fn get_msg_proposal(circuit_id: &str) -> MsgCircuitProposal {
-        MsgCircuitProposal {
+    fn get_msg_proposal(circuit_id: &str) -> CircuitProposal {
+        CircuitProposal {
             proposal_type: ProposalType::Create,
             circuit_id: circuit_id.to_string(),
             circuit_hash: "8e066d41911817a42ab098eda35a2a2b11e93c753bc5ecc3ffb3e99ed99ada0d"
                 .to_string(),
             circuit: get_create_circuit_msg(circuit_id),
             votes: vec![],
-            requester: "acme_corp".to_string(),
+            requester: public_key(),
+            requester_node_id: "acme_corp".to_string(),
         }
     }
 
-    fn get_ballot(circuit_id: &str) -> Ballot {
-        Ballot {
+    fn get_msg_proposal_with_vote(circuit_id: &str) -> CircuitProposal {
+        let vote = VoteRecord {
+            public_key: public_key(),
+            vote: Vote::Accept,
+            voter_node_id: "acme_corp".to_string(),
+        };
+
+        CircuitProposal {
+            proposal_type: ProposalType::Create,
             circuit_id: circuit_id.to_string(),
             circuit_hash: "8e066d41911817a42ab098eda35a2a2b11e93c753bc5ecc3ffb3e99ed99ada0d"
                 .to_string(),
-            vote: Vote::Accept,
-        }
-    }
-
-    fn get_msg_circuit_proposal_vote(circuit_id: &str) -> CircuitProposalVote {
-        CircuitProposalVote {
-            ballot: get_ballot(circuit_id),
-            ballot_signature: vec![65, 65, 65, 65, 66, 51, 78],
-            signer_public_key: vec![73, 119, 65, 65, 65, 81],
+            circuit: get_create_circuit_msg(circuit_id),
+            votes: vec![vote],
+            requester: public_key(),
+            requester_node_id: "acme_corp".to_string(),
         }
     }
 
     fn get_reject_proposal_msg(circuit_id: &str) -> AdminServiceEvent {
-        AdminServiceEvent::ProposalRejected(get_msg_proposal(circuit_id))
+        AdminServiceEvent::ProposalRejected((get_msg_proposal_with_vote(circuit_id), public_key()))
     }
 
     fn get_accept_proposal_msg(circuit_id: &str) -> AdminServiceEvent {
-        AdminServiceEvent::ProposalAccepted(get_msg_proposal(circuit_id))
+        AdminServiceEvent::ProposalAccepted((get_msg_proposal_with_vote(circuit_id), public_key()))
     }
 
     fn get_vote_proposal_msg(circuit_id: &str) -> AdminServiceEvent {
-        AdminServiceEvent::ProposalVote(get_msg_circuit_proposal_vote(circuit_id))
+        AdminServiceEvent::ProposalVote((get_msg_proposal_with_vote(circuit_id), public_key()))
     }
 
     fn get_submit_proposal_msg(circuit_id: &str) -> AdminServiceEvent {
         AdminServiceEvent::ProposalSubmitted(get_msg_proposal(circuit_id))
     }
 
-    fn get_circuit_proposal(
-        proposal_id: &str,
-        circuit_id: &str,
-        timestamp: SystemTime,
-    ) -> CircuitProposal {
-        CircuitProposal {
-            id: proposal_id.to_string(),
+    fn get_gameroom_proposal(circuit_id: &str, timestamp: SystemTime) -> NewGameroomProposal {
+        NewGameroomProposal {
             proposal_type: "Create".to_string(),
             circuit_id: circuit_id.to_string(),
             circuit_hash: "8e066d41911817a42ab098eda35a2a2b11e93c753bc5ecc3ffb3e99ed99ada0d"
                 .to_string(),
-            requester: "acme_corp".to_string(),
-            authorization_type: "Trust".to_string(),
-            persistence: "Any".to_string(),
-            routes: "Any".to_string(),
-            circuit_management_type: "gameroom".to_string(),
-            application_metadata: vec![],
+            requester: to_hex(&public_key()),
+            requester_node_id: "acme_corp".to_string(),
             status: "Pending".to_string(),
             created_time: timestamp,
             updated_time: timestamp,
         }
     }
 
-    fn get_new_vote_record(proposal_id: &str, timestamp: SystemTime) -> NewProposalVoteRecord {
+    fn get_gameroom(circuit_id: &str, timestamp: SystemTime) -> Gameroom {
+        Gameroom {
+            circuit_id: circuit_id.to_string(),
+            authorization_type: "Trust".to_string(),
+            persistence: "Any".to_string(),
+            durability: "NoDurabilty".to_string(),
+            routes: "Any".to_string(),
+            circuit_management_type: "gameroom".to_string(),
+            alias: "test_gameroom".to_string(),
+            status: "Pending".to_string(),
+            created_time: timestamp,
+            updated_time: timestamp,
+        }
+    }
+
+    fn get_new_vote_record(proposal_id: i64, timestamp: SystemTime) -> NewProposalVoteRecord {
         NewProposalVoteRecord {
-            proposal_id: proposal_id.to_string(),
-            voter_public_key: "IwAAAQ".to_string(),
+            proposal_id,
+            voter_public_key: to_hex(&public_key()),
+            voter_node_id: "acme_corp".to_string(),
             vote: "Accept".to_string(),
             created_time: timestamp,
         }
     }
 
-    fn get_new_circuit_service(proposal_id: &str) -> NewCircuitService {
-        NewCircuitService {
-            proposal_id: proposal_id.to_string(),
+    fn get_new_gameroom_service(circuit_id: &str, timestamp: SystemTime) -> NewGameroomService {
+        NewGameroomService {
+            circuit_id: circuit_id.to_string(),
             service_id: "scabbard_123".to_string(),
             service_type: "scabbard".to_string(),
             allowed_nodes: vec!["acme_corp".to_string()],
+            arguments: vec![json!({
+                "key": "test_key",
+                "value": "test_value"
+            })],
+            status: "Pending".to_string(),
+            created_time: timestamp,
+            updated_time: timestamp,
         }
     }
 
-    fn get_new_circuit_member(proposal_id: &str) -> NewCircuitMember {
-        NewCircuitMember {
-            proposal_id: proposal_id.to_string(),
+    fn get_new_gameroom_member(circuit_id: &str, timestamp: SystemTime) -> NewGameroomMember {
+        NewGameroomMember {
+            circuit_id: circuit_id.to_string(),
             node_id: "Node-123".to_string(),
             endpoint: "127.0.0.1:8282".to_string(),
+            status: "Pending".to_string(),
+            created_time: timestamp,
+            updated_time: timestamp,
+        }
+    }
+
+    fn get_new_gameroom_notification_proposal(
+        circuit_id: &str,
+        timestamp: SystemTime,
+    ) -> NewGameroomNotification {
+        NewGameroomNotification {
+            notification_type: "gameroom_proposal".to_string(),
+            requester: to_hex(&public_key()),
+            requester_node_id: "acme_corp".to_string(),
+            target: circuit_id.to_string(),
+            created_time: timestamp,
+            read: false,
+        }
+    }
+
+    fn get_new_gameroom_notification_vote(
+        circuit_id: &str,
+        timestamp: SystemTime,
+    ) -> NewGameroomNotification {
+        NewGameroomNotification {
+            notification_type: "proposal_vote_record".to_string(),
+            requester: to_hex(&public_key()),
+            requester_node_id: "acme_corp".to_string(),
+            target: circuit_id.to_string(),
+            created_time: timestamp,
+            read: false,
         }
     }
 
@@ -773,54 +1141,119 @@ mod test {
             .expect("Error fetching vote records")
     }
 
-    fn query_circuit_members_table(pool: &ConnectionPool) -> Vec<CircuitMember> {
-        use gameroom_database::schema::proposal_circuit_member;
+    fn query_gameroom_members_table(pool: &ConnectionPool) -> Vec<GameroomMember> {
+        use gameroom_database::schema::gameroom_member;
 
         let conn = &*pool.get().expect("Error getting db connection");
-        proposal_circuit_member::table
-            .select(proposal_circuit_member::all_columns)
-            .load::<CircuitMember>(conn)
+        gameroom_member::table
+            .select(gameroom_member::all_columns)
+            .load::<GameroomMember>(conn)
             .expect("Error fetching circuit members")
     }
 
-    fn query_circuit_service_table(pool: &ConnectionPool) -> Vec<CircuitService> {
-        use gameroom_database::schema::proposal_circuit_service;
+    fn query_gameroom_service_table(pool: &ConnectionPool) -> Vec<GameroomService> {
+        use gameroom_database::schema::gameroom_service;
 
         let conn = &*pool.get().expect("Error getting db connection");
-        proposal_circuit_service::table
-            .select(proposal_circuit_service::all_columns)
-            .load::<CircuitService>(conn)
+        gameroom_service::table
+            .select(gameroom_service::all_columns)
+            .load::<GameroomService>(conn)
             .expect("Error fetching circuit members")
     }
 
-    fn query_proposals_table(pool: &ConnectionPool) -> Vec<CircuitProposal> {
-        use gameroom_database::schema::circuit_proposal;
+    fn query_proposals_table(pool: &ConnectionPool) -> Vec<GameroomProposal> {
+        use gameroom_database::schema::gameroom_proposal;
 
         let conn = &*pool.get().expect("Error getting db connection");
-        circuit_proposal::table
-            .select(circuit_proposal::all_columns)
-            .load::<CircuitProposal>(conn)
+        gameroom_proposal::table
+            .select(gameroom_proposal::all_columns)
+            .load::<GameroomProposal>(conn)
             .expect("Error fetching proposals")
     }
 
-    fn insert_proposals_table(pool: &ConnectionPool, proposal: CircuitProposal) {
-        use gameroom_database::schema::circuit_proposal;
+    fn query_gameroom_table(pool: &ConnectionPool) -> Vec<Gameroom> {
+        use gameroom_database::schema::gameroom;
 
         let conn = &*pool.get().expect("Error getting db connection");
-        insert_into(circuit_proposal::table)
+        gameroom::table
+            .select(gameroom::all_columns)
+            .load::<Gameroom>(conn)
+            .expect("Error fetching proposals")
+    }
+
+    fn query_gameroom_notification_table(pool: &ConnectionPool) -> Vec<GameroomNotification> {
+        use gameroom_database::schema::gameroom_notification;
+
+        let conn = &*pool.get().expect("Error getting db connection");
+        gameroom_notification::table
+            .select(gameroom_notification::all_columns)
+            .load::<GameroomNotification>(conn)
+            .expect("Error fetching proposals")
+    }
+
+    fn insert_proposals_table(pool: &ConnectionPool, proposal: NewGameroomProposal) {
+        use gameroom_database::schema::gameroom_proposal;
+
+        let conn = &*pool.get().expect("Error getting db connection");
+        insert_into(gameroom_proposal::table)
             .values(&vec![proposal])
             .execute(conn)
             .map(|_| ())
             .expect("Failed to insert proposal in table")
     }
 
-    fn clear_circuit_proposals_table(pool: &ConnectionPool) {
-        use gameroom_database::schema::circuit_proposal::dsl::*;
+    fn insert_gameroom_table(pool: &ConnectionPool, gameroom: Gameroom) {
+        use gameroom_database::schema::gameroom;
 
         let conn = &*pool.get().expect("Error getting db connection");
-        diesel::delete(circuit_proposal)
+        insert_into(gameroom::table)
+            .values(&vec![gameroom])
             .execute(conn)
-            .expect("Error cleaning proposals table");
+            .map(|_| ())
+            .expect("Failed to insert proposal in table")
     }
 
+    fn insert_member_table(pool: &ConnectionPool, member: NewGameroomMember) {
+        use gameroom_database::schema::gameroom_member;
+
+        let conn = &*pool.get().expect("Error getting db connection");
+        insert_into(gameroom_member::table)
+            .values(&vec![member])
+            .execute(conn)
+            .map(|_| ())
+            .expect("Failed to insert proposal in table")
+    }
+
+    fn insert_service_table(pool: &ConnectionPool, service: NewGameroomService) {
+        use gameroom_database::schema::gameroom_service;
+
+        let conn = &*pool.get().expect("Error getting db connection");
+        insert_into(gameroom_service::table)
+            .values(&vec![service])
+            .execute(conn)
+            .map(|_| ())
+            .expect("Failed to insert proposal in table")
+    }
+
+    fn clear_gameroom_table(pool: &ConnectionPool) {
+        use gameroom_database::schema::gameroom::dsl::*;
+
+        let conn = &*pool.get().expect("Error getting db connection");
+        diesel::delete(gameroom)
+            .execute(conn)
+            .expect("Error cleaning gameroom table");
+    }
+
+    fn clear_gameroom_notification_table(pool: &ConnectionPool) {
+        use gameroom_database::schema::gameroom_notification::dsl::*;
+
+        let conn = &*pool.get().expect("Error getting db connection");
+        diesel::delete(gameroom_notification)
+            .execute(conn)
+            .expect("Error cleaning gameroom_notification table");
+    }
+
+    fn public_key() -> Vec<u8> {
+        vec![73, 119, 65, 65, 65, 81]
+    }
 }

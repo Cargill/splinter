@@ -45,13 +45,17 @@ impl SendRequest {
 // The NetworkMessageSender recv messages that should be sent over the network. The Sender side of
 // the channel will be passed to handlers.
 pub struct NetworkMessageSender {
-    rc: Box<Receiver<SendRequest>>,
+    rc: Box<dyn Receiver<SendRequest>>,
     network: Network,
     running: Arc<AtomicBool>,
 }
 
 impl NetworkMessageSender {
-    pub fn new(rc: Box<Receiver<SendRequest>>, network: Network, running: Arc<AtomicBool>) -> Self {
+    pub fn new(
+        rc: Box<dyn Receiver<SendRequest>>,
+        network: Network,
+        running: Arc<AtomicBool>,
+    ) -> Self {
         NetworkMessageSender {
             rc,
             network,
@@ -225,5 +229,4 @@ mod tests {
         let (send, recv) = mpsc::channel();
         test_network_message_sender_rapid_fire(Box::new(send), Box::new(recv));
     }
-
 }

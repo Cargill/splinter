@@ -72,7 +72,7 @@ impl ScabbardConsensusManager {
         let thread_handle = Builder::new()
             .name(format!("consensus-{}", service_id))
             .spawn(move || {
-                let mut two_phase_engine = TwoPhaseEngine::new();
+                let mut two_phase_engine = TwoPhaseEngine::default();
                 two_phase_engine
                     .run(
                         consensus_msg_rx,
@@ -383,7 +383,7 @@ mod tests {
             VecDeque::new(),
             Some(Box::new(service_sender.clone())),
             peer_services.clone(),
-            ScabbardState::new(Path::new("/tmp/network_sender.lmdb"), 1024 * 1024)
+            ScabbardState::new(Path::new("/tmp/network_sender.lmdb"), 1024 * 1024, vec![])
                 .expect("failed to create state"),
         )));
         let consensus_sender = ScabbardConsensusNetworkSender::new("0".into(), shared);

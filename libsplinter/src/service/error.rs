@@ -179,6 +179,7 @@ impl From<ServiceDisconnectionError> for ServiceStopError {
 pub enum ServiceDestroyError {
     NotStopped,
     Internal(Box<dyn Error + Send>),
+    PoisonedLock(String),
 }
 
 impl Error for ServiceDestroyError {
@@ -186,6 +187,7 @@ impl Error for ServiceDestroyError {
         match self {
             ServiceDestroyError::NotStopped => None,
             ServiceDestroyError::Internal(err) => Some(&**err),
+            ServiceDestroyError::PoisonedLock(_) => None,
         }
     }
 }
@@ -195,12 +197,15 @@ impl std::fmt::Display for ServiceDestroyError {
         match self {
             ServiceDestroyError::NotStopped => write!(f, "service not stopped"),
             ServiceDestroyError::Internal(err) => write!(f, "unable to destroy service: {}", err),
+            ServiceDestroyError::PoisonedLock(msg) => write!(f, "a lock was poisoned: {}", msg),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum ServiceError {
+    /// Returned if an error is detected when creating a service
+    UnableToCreate(Box<dyn Error + Send>),
     /// Returned if an error is detected when parsing a message
     InvalidMessageFormat(Box<dyn Error + Send>),
     /// Returned if an error is detected during the handling of a message
@@ -218,6 +223,7 @@ pub enum ServiceError {
 impl Error for ServiceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            ServiceError::UnableToCreate(err) => Some(&**err),
             ServiceError::InvalidMessageFormat(err) => Some(&**err),
             ServiceError::UnableToHandleMessage(err) => Some(&**err),
             ServiceError::UnableToSendMessage(err) => Some(err),
@@ -230,6 +236,9 @@ impl Error for ServiceError {
 impl std::fmt::Display for ServiceError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            ServiceError::UnableToCreate(ref err) => {
+                write!(f, "service was unable to be created: {}", err)
+            }
             ServiceError::InvalidMessageFormat(ref err) => {
                 write!(f, "message is in an invalid format: {}", err)
             }
@@ -254,6 +263,34 @@ impl From<ProtobufError> for ServiceError {
 impl From<ServiceSendError> for ServiceError {
     fn from(err: ServiceSendError) -> Self {
         ServiceError::UnableToSendMessage(Box::new(err))
+    }
+}
+
+#[derive(Debug)]
+pub enum FactoryCreateError {
+    CreationFailed(Box<dyn Error + Send>),
+    InvalidArguments(String),
+}
+
+impl Error for FactoryCreateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            FactoryCreateError::CreationFailed(err) => Some(&**err),
+            FactoryCreateError::InvalidArguments(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for FactoryCreateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FactoryCreateError::CreationFailed(err) => {
+                write!(f, "failed to create service: {}", err)
+            }
+            FactoryCreateError::InvalidArguments(err) => {
+                write!(f, "invalid arguments specified: {}", err)
+            }
+        }
     }
 }
 

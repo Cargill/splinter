@@ -28,18 +28,14 @@ limitations under the License.
           v-bind:is-active="currentTab == 2"
           class="btn-tab"
           text="Invites"
-          icon="message"/>
+          icon="share"/>
     </div>
     <div class="tab-container">
       <div class="tab-title">
         <h2 v-if="currentTab == 1">Gamerooms</h2>
         <h2 v-if="currentTab == 2">Invites</h2>
         <button class="btn-action" @click="$emit('show-new-gameroom-modal')">
-          <div class="button-content">
-            <span class="button-text">
-              New Gameroom
-            </span>
-          </div>
+            <div class="btn-text">New Gameroom</div>
         </button>
       </div>
       <div class="tab">

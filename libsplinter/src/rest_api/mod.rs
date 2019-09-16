@@ -52,15 +52,21 @@
 //! ```
 
 mod errors;
+mod events;
 
-use actix_http::Error as ActixError;
-use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer};
-use futures::Future;
+use actix_web::{
+    error::ErrorBadRequest, middleware, web, App, Error as ActixError, HttpRequest, HttpResponse,
+    HttpServer,
+};
+use futures::{future::FutureResult, stream::Stream, Future, IntoFuture};
+use protobuf::{self, Message};
 use std::boxed::Box;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-pub use errors::RestApiServerError;
+pub use errors::{ResponseError, RestApiServerError};
+
+pub use events::EventDealer;
 
 /// A `RestResourceProvider` provides a list of resources that are consumed by `RestApi`.
 pub trait RestResourceProvider {
@@ -68,7 +74,7 @@ pub trait RestResourceProvider {
 }
 
 type HandlerFunction = Box<
-    dyn Fn(HttpRequest, web::Payload) -> Box<Future<Item = HttpResponse, Error = ActixError>>
+    dyn Fn(HttpRequest, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
         + Send
         + Sync
         + 'static,
@@ -83,6 +89,44 @@ pub struct RestApiShutdownHandle {
 impl RestApiShutdownHandle {
     pub fn shutdown(&self) -> Result<(), RestApiServerError> {
         (*self.do_shutdown)()
+    }
+}
+
+pub struct Request(HttpRequest, web::Payload);
+
+impl From<(HttpRequest, web::Payload)> for Request {
+    fn from((http_request, payload): (HttpRequest, web::Payload)) -> Self {
+        Self(http_request, payload)
+    }
+}
+
+impl Into<(HttpRequest, web::Payload)> for Request {
+    fn into(self) -> (HttpRequest, web::Payload) {
+        (self.0, self.1)
+    }
+}
+
+pub struct Response(HttpResponse);
+
+impl From<HttpResponse> for Response {
+    fn from(res: HttpResponse) -> Self {
+        Self(res)
+    }
+}
+
+impl IntoFuture for Response {
+    type Item = HttpResponse;
+    type Error = ActixError;
+    type Future = FutureResult<HttpResponse, ActixError>;
+
+    fn into_future(self) -> Self::Future {
+        self.0.into_future()
+    }
+}
+
+impl std::fmt::Debug for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 
@@ -124,7 +168,10 @@ pub struct Resource {
 impl Resource {
     pub fn new<F>(method: Method, route: &str, handle: F) -> Self
     where
-        F: Fn(HttpRequest, web::Payload) -> Box<Future<Item = HttpResponse, Error = ActixError>>
+        F: Fn(
+                HttpRequest,
+                web::Payload,
+            ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
             + 'static
@@ -208,7 +255,9 @@ impl RestApi {
 
         let do_shutdown = Box::new(move || {
             debug!("Shutting down Rest API");
-            addr.stop(true);
+            if let Err(err) = addr.stop(true).wait() {
+                error!("An error occured while shutting down rest API: {:?}", err);
+            }
             debug!("Graceful signal sent to Rest API");
 
             Ok(())
@@ -265,6 +314,22 @@ impl RestApiBuilder {
     }
 }
 
+pub fn into_protobuf<M: Message>(
+    payload: web::Payload,
+) -> impl Future<Item = M, Error = ActixError> {
+    payload
+        .from_err::<ActixError>()
+        .fold(web::BytesMut::new(), move |mut body, chunk| {
+            body.extend_from_slice(&chunk);
+            Ok::<_, ActixError>(body)
+        })
+        .and_then(|body| match protobuf::parse_from_bytes::<M>(&body) {
+            Ok(proto) => Ok(proto),
+            Err(err) => Err(ErrorBadRequest(json!({ "message": format!("{}", err) }))),
+        })
+        .into_future()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -273,7 +338,7 @@ mod test {
 
     #[test]
     fn test_create_handle() {
-        let handler = Resource::new(Method::Get, "/test", |_: HttpRequest, _: web::Payload| {
+        let _handler = Resource::new(Method::Get, "/test", |_: HttpRequest, _: web::Payload| {
             Box::new(Response::Ok().finish().into_future())
         });
     }

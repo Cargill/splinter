@@ -13,18 +13,23 @@
 # limitations under the License.
 
 [package]
-name = "splinterd"
-version = "0.2.1"
+name = "splinter-daemon"
+version = "0.3.2"
 authors = ["Cargill Incorporated"]
 edition = "2018"
+license = "Apache-2.0"
+
+[[bin]]
+name = "splinterd"
+path = "src/main.rs"
 
 [dependencies]
-libsplinter = { path = "../libsplinter" }
+libsplinter = { path = "../libsplinter", features = ["sawtooth-signing-compat"] }
 clap = "2.32"
 crossbeam-channel = "0.3"
 ctrlc = "3.0"
-simple_logger = "1.0"
 log = "0.4"
+flexi_logger = "0.14"
 bytes = "0.4"
 serde_derive = "1.0.80"
 serde = "1.0.80"
@@ -35,3 +40,18 @@ toml = "0.4.8"
 protobuf = "2"
 openssl = "0.10"
 tempdir = "0.3"
+
+[package.metadata.deb]
+maintainer = "The Splinter Team"
+depends = "$auto"
+assets = [
+    ["packaging/nodes.yaml.example", "/etc/splinter/nodes.yaml.example", "644"],
+    ["packaging/splinterd.toml.example", "/etc/splinter/splinterd.toml.example", "644"],
+    ["packaging/systemd/splinterd", "/etc/default/splinterd", "644"],
+    ["packaging/systemd/splinterd.service", "/lib/systemd/system/splinterd.service", "644"],
+    ["target/release/splinterd", "/usr/bin/splinterd", "755"]
+]
+maintainer-scripts = "packaging/ubuntu"
+extended-description = """\
+Splinter is a blockchain-inspired networking platform for distributed \
+communications between organizations."""

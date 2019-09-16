@@ -15,18 +15,19 @@ limitations under the License.
 -->
 
 <template>
-  <div>
-    <h3 class="tbl-placeholder">No gamerooms available</h3>
-  </div>
+  <div class="home-container"><h2>Home</h2></div>
 </template>
 
 <script lang="ts">
 import { Vue, Component } from 'vue-property-decorator';
 
 @Component
-export default class GameroomTable extends Vue {}
+export default class DashboardHome extends Vue {}
 </script>
 
 <style lang="scss" scoped>
-@import '@/scss/components/_custom-table.scss';
+  .home-container {
+    display: flex;
+    padding: 2rem 4rem;
+  }
 </style>

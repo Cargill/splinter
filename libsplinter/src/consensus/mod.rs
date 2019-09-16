@@ -78,6 +78,18 @@ macro_rules! id_type {
 id_type!(PeerId);
 id_type!(ProposalId);
 
+impl Ord for PeerId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_ref().cmp(other.as_ref())
+    }
+}
+
+impl PartialOrd for PeerId {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_ref().partial_cmp(other.as_ref())
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Proposal {
     pub id: ProposalId,
@@ -263,8 +275,8 @@ pub trait ConsensusEngine: Send {
         &mut self,
         consensus_messages: Receiver<ConsensusMessage>,
         proposal_updates: Receiver<ProposalUpdate>,
-        network_sender: Box<ConsensusNetworkSender>,
-        proposal_manager: Box<ProposalManager>,
+        network_sender: Box<dyn ConsensusNetworkSender>,
+        proposal_manager: Box<dyn ProposalManager>,
         startup_state: StartupState,
     ) -> Result<(), ConsensusEngineError>;
 }
@@ -383,6 +395,10 @@ pub mod tests {
 
                 self.update_sender
                     .send(ProposalUpdate::ProposalCreated(Some(proposal)))
+                    .expect("failed to send proposal");
+            } else {
+                self.update_sender
+                    .send(ProposalUpdate::ProposalCreated(None))
                     .expect("failed to send proposal");
             }
 

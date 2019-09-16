@@ -15,9 +15,9 @@
 openapi: '3.0.0'
 
 info:
-  version: 0.2.1
-  title: GameroomD API
-  description: REST API for GameroomD
+  version: 0.3.2
+  title: Gameroomd API
+  description: REST API for Gameroomd
 
 servers:
   - url: http://localhost:8000
@@ -103,8 +103,10 @@ paths:
                 schema:
                   $ref: '#/components/schemas/Error'
 
-  /api/users:
+  /users:
       post:
+        tags:
+          - Users
         description: Create new Gameroom User entry in database
         requestBody:
           content:
@@ -143,7 +145,10 @@ paths:
             content:
               application/json:
                 schema:
-                  $ref: '#/components/schemas/AuthResponseData'
+                  type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AuthResponseData'
           400:
             description: Invalid request was made
             content:
@@ -152,11 +157,15 @@ paths:
                   $ref: '#/components/schemas/Error'
           500:
             description: Internal server error occurred
-          503:
-            description: Server unavailable
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
 
-  /api/users/authenticate:
+  /users/authenticate:
       post:
+        tags:
+          - Users
         description: Authenticate a Gameroom User
         requestBody:
           content:
@@ -183,43 +192,71 @@ paths:
             content:
               application/json:
                 schema:
-                  $ref: '#/components/schemas/AuthResponseData'
+                  type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AuthResponseData'
           401:
             description: Unauthorized request
+            content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
           500:
             description: Internal server error occurred
-          503:
-            description: Server unavailable
+            content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
+
 
 
   /gamerooms/propose:
       post:
-        description: Propose a new Gameroom
+        tags:
+          - Gamerooms
+        description: Propose a new gameroom
         requestBody:
           content:
             application/json:
               schema:
                 properties:
                   alias:
-                    description: Name of new Gameroom
+                    description: Name of new gameroom
+                    example: my_gameroom
                   member:
-                    description: Proposed members of the Gameroom
+                    $ref: '#/components/schemas/Member'
                 required:
                   - alias
                   - member
-                example:
-                  alias: My_Gameroom
-                  member:
-                    $ref: '#/components/schemas/Member'
 
         responses:
-          202:
-            description: Create Gameroom proposal has been accepted
+          200:
+            description: A serialized circuit management payload
+            content:
+              application/octet-stream:
+                schema:
+                  type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/BinaryData'
+          400:
+            description: Gameroom proposal request is invalid
+            content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
           500:
             description: Internal server error occurred
+            content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
 
   /proposals:
     get:
+      tags:
+          - Proposals
       description: List Circuit Proposals
       parameters:
       - name: offset
@@ -252,11 +289,15 @@ paths:
                     $ref: '#/components/schemas/Paging'
         500:
           description: Internal server error occurred
-        503:
-          description: Server unavailable
+          content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
 
   /proposals/{proposal_id}:
     get:
+      tags:
+          - Proposals
       description: Fetch a circuit proposal by the proposal id
       parameters:
         - name: proposal_id
@@ -286,15 +327,348 @@ paths:
         503:
           description: Server unavailable
 
+  /proposals/{proposal_id}/vote:
+      post:
+        tags:
+          - Proposals
+        description: Vote on a proposal
+        parameters:
+          - name: proposal_id
+            in: path
+            description: identity of the proposal to vote on
+            required: true
+            schema:
+              type: string
+        requestBody:
+          content:
+            application/json:
+              schema:
+                 $ref: '#/components/schemas/Vote'
+
+        responses:
+          200:
+            description: A serialized circuit management payload
+            content:
+              application/octet-stream:
+                schema:
+                  type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/BinaryData'
+          500:
+            description: Internal server error occurred
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+
+  /submit:
+      post:
+        tags:
+          - Splinter
+        description: Submit signed serialized payload to Splinter daemon
+        requestBody:
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+        responses:
+          202:
+            description:  The payload was accepted
+            content:
+              application/json:
+                schema:
+                  properties:
+                    data:
+                      type: string
+                      example: "The payload was submitted successfully"
+          400:
+            description: Request was malformed
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+          500:
+            description: Internal server error
+
+
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      description: List Gameroom notifications
+      parameters:
+      - name: offset
+        in: query
+        description: paging offset
+        required: false
+        schema:
+          type: integer
+          default: 0
+      - name: limit
+        in: query
+        description: maximum number of items to return (max 100)
+        required: false
+        schema:
+          type: integer
+          default: 100
+      responses:
+        200:
+          description: list of Gameroom notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiNotification'
+                  paging:
+                    $ref: '#/components/schemas/Paging'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: Server unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/{notification_id}:
+    get:
+      tags:
+        - Notifications
+      description: Fetch Gameroom notification by notification id
+      parameters:
+      - name: notification_id
+        in: path
+        description: identity of the notification to fetch
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: Gameroom Notification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiNotification'
+        404:
+          description: The notification with {notification_id} was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: Server unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/{notification_id}/read:
+    patch:
+      tags:
+        - Notifications
+      description: Indicate the Gameroom notification has been viewed by a client's user
+      parameters:
+      - name: notification_id
+        in: path
+        description: identity of the notification to update
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: Gameroom Notification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiNotification'
+        404:
+          description: The notification with {notification_id} was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: Server unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gamerooms:
+    get:
+      tags:
+        - Gamerooms
+      description: List Gamerooms created from accepted gameroom proposals
+      parameters:
+        - name: status
+          in: query
+          description: status of gamerooms to list
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          description: paging offset
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          description: maximum number of items to return (max 100)
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        200:
+          description: list of Gamerooms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiGameroom'
+                  paging:
+                    $ref: '#/components/schemas/Paging'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: Server unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /gamerooms/{circuit_id}:
+    get:
+      tags:
+        - Gamerooms
+      description: Fetch a Gameroom by the circuit id
+      parameters:
+        - name: circuit_id
+          in: path
+          description: identity of the Gameroom circuit to fetch
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Gameroom
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiGameroom'
+        404:
+          description: The Gameroom with {circuit_id} was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: Server unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /ws/subscribe:
+    get:
+      tags:
+        - Gameroom Websocket
+      description: Connect to the gameroomd websocket to receive messages
+      responses:
+        200:
+          description: Registration request was successfully submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  namespace:
+                    type: string
+                    example: notifications
+                  action:
+                    type: string
+                    example: listNotifications
+        400:
+          description: The request to connect to the websocket was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: Server unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
 components:
   schemas:
     Error:
       additionalProperties: false
       properties:
+        code:
+          description: The HTTP error code
+          type: string
+          example: 404
         message:
           description: A message describing the error that occurred
           type: string
-          example: DatabaseError({description})
+          example: Resource not found
       required:
         - message
 
@@ -303,6 +677,10 @@ components:
       type: object
       properties:
         proposal_id:
+          type: string
+        circuit_id:
+          type: string
+        circuit_hash:
           type: string
         members:
           type: array
@@ -326,12 +704,40 @@ components:
         endpoint:
           type: string
 
+    ApiGameroom:
+      type: object
+      properties:
+        circuit_id:
+          type: string
+          example: gameroom::acme-node-000::bubba-node-000::11bf5b37-e0b8-42e0-8dcf-dc8c4aefc000
+        authorization_type:
+          type: string
+          example: Trust
+        persistence:
+          type: string
+          example: Any
+        routes:
+          type: string
+          example: Any
+        circuit_management_type:
+          type: string
+          example: Gameroom
+        alias:
+          description: alias of the gameroom
+          type: string
+          example: Acme-Bubba-Gameroom
+        status:
+          description: status of the gameroom
+          type: string
+          example: 'ACCEPTED'
 
     Member:
       type: object
+      description: Member of the gameroom
       properties:
         identity:
           type: string
+          example: acme-node-000
         metadata:
           $ref: '#/components/schemas/MemberMetadata'
 
@@ -341,7 +747,11 @@ components:
       properties:
         organization:
           type: string
+          example: Acme Corporation
         endpoint:
+          type: string
+          example: tls://127.0.0.1:8080
+        public_key:
           type: string
 
 
@@ -354,7 +764,6 @@ components:
           type: string
         encrypted_private_key:
           type: string
-
 
     Node:
       type: object
@@ -395,3 +804,47 @@ components:
         prev: /nodes?offset=0&limit=10
         next: /nodes?offset=20&limit=10
         last: /nodes?offset=40&limit=10
+
+    Vote:
+      type: object
+      properties:
+        circuit_id:
+          type: string
+          example: circuit-000
+        circuit_hash:
+          type: string
+          example: d2b1abbd57e8cd2bfcf3f4259b9785a723e19b4bb4d5cc0206e860890c403dc4
+        vote:
+          type: string
+          enum:
+            - Accept
+            - Reject
+
+    ApiNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        notification_type:
+          type: string
+        org:
+          type: string
+        requester:
+          description: public key of user who that submitted the request
+          type: string
+        target:
+          type: string
+        timestamp:
+          description: time in seconds since the unix epoch the notification was created
+          type: integer
+        read:
+          description: states whether the notification has been returned to the client
+          type: boolean
+          default: false
+
+    BinaryData:
+      type: object
+      properties:
+        payload_bytes:
+          type: string
+          format: binary

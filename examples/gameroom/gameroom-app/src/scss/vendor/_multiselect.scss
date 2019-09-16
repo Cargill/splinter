@@ -17,13 +17,14 @@ $vue-multiselect-padding-y: 0.5em !default;
 $vue-multiselect-min-height: 3em !default;
 $vue-multiselect-border-radius: 5px !default;
 $vue-multiselect-border-color: $color-border !default;
+$vue-multiselect-border-color-focused: $color-primary-light !default;
 $vue-multiselect-border-width: 1px !default;
 $vue-multiselect-disabled-opacity: 0.2 !default;
 $vue-multiselect-placeholder-color: $color-text-form !default;
 $vue-multiselect-bg: $color-white !default;
 $vue-multiselect-color: $color-text-form !default;
 $vue-multiselect-disabled-bg: $color-disabled !default;
-$vue-multiselect-disabled-color: $color-disabled-text !default;
+$vue-multiselect-disabled-color: $color-text-disabled !default;
 
 $vue-multiselect-option-selected-color: $color-white !default;
 $vue-multiselect-option-selected-bg: $color-primary !default;
@@ -32,7 +33,7 @@ $vue-multiselect-option-highlight-bg: #f3f3f3 !default;
 $vue-multiselect-option-selected-highlight-color: $color-white !default;
 $vue-multiselect-option-selected-highlight-bg: $color-primary !default;
 
-$vue-multiselect-tag-color: $color-base !default;
+$vue-multiselect-tag-color: $color-primary !default;
 $vue-multiselect-tag-bg: $color-white !default;
 $vue-multiselect-tag-font-size: 0.5rem !default;
 $vue-multiselect-tag-font-weight: normal !default;
@@ -117,7 +118,6 @@ fieldset[disabled] .multiselect {
 .multiselect__input,
 .multiselect__single {
   position: relative;
-  display: inline-block;
   min-height: $vue-multiselect-min-height / 2;
   line-height: $vue-multiselect-min-height / 2;
   border: none;
@@ -129,6 +129,10 @@ fieldset[disabled] .multiselect {
   box-sizing: border-box;
   margin-bottom: $vue-multiselect-padding-y;
   vertical-align: top;
+
+  &:focus {
+    border: none;
+  }
 }
 
 .multiselect__input::placeholder {
@@ -157,6 +161,10 @@ fieldset[disabled] .multiselect {
   background: $vue-multiselect-bg;
   font-family: inherit;
   font-size: inherit;
+
+  &:focus-within {
+    border: $vue-multiselect-border-width solid $vue-multiselect-border-color-focused;
+  }
 }
 
 .multiselect__tag {
@@ -269,7 +277,7 @@ fieldset[disabled] .multiselect {
   width: 100%;
   max-height: 240px;
   overflow: auto;
-  border: $vue-multiselect-border-width solid $vue-multiselect-border-color;
+  border: $vue-multiselect-border-width solid $vue-multiselect-border-color-focused;
   border-top: none;
   border-bottom-left-radius: $vue-multiselect-border-radius;
   border-bottom-right-radius: $vue-multiselect-border-radius;

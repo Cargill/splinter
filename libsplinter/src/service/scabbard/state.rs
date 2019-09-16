@@ -14,7 +14,9 @@
 
 use std::path::Path;
 
+use protobuf::Message;
 use sawtooth_sabre::handler::SabreTransactionHandler;
+use sawtooth_sabre::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};
 use transact::context::manager::sync::ContextManager;
 use transact::database::{
     lmdb::{LmdbContext, LmdbDatabase},
@@ -29,6 +31,9 @@ use transact::state::{
     StateChange, Write,
 };
 
+use crate::protos::scabbard::{Setting, Setting_Entry};
+use crate::rest_api::{EventDealer, Request, Response, ResponseError};
+
 use super::error::ScabbardStateError;
 
 const EXECUTION_TIMEOUT: u64 = 300; // five minutes
@@ -39,22 +44,57 @@ pub struct ScabbardState {
     executor: Executor,
     current_state_root: String,
     pending_changes: Option<Vec<StateChange>>,
+    event_dealer: EventDealer<Vec<StateChangeEvent>>,
 }
 
 impl ScabbardState {
-    pub fn new(db_path: &Path, db_size: usize) -> Result<Self, ScabbardStateError> {
+    pub fn new(
+        db_path: &Path,
+        db_size: usize,
+        admin_keys: Vec<String>,
+    ) -> Result<Self, ScabbardStateError> {
+        // Initialize the database
         let db = Box::new(LmdbDatabase::new(
             LmdbContext::new(db_path, INDEXES.len(), Some(db_size))?,
             &INDEXES,
         )?);
+
+        // Set initial state (admin keys)
+        let mut admin_keys_entry = Setting_Entry::new();
+        admin_keys_entry.set_key(ADMINISTRATORS_SETTING_KEY.into());
+        admin_keys_entry.set_value(admin_keys.join(","));
+        let mut admin_keys_setting = Setting::new();
+        admin_keys_setting.set_entries(vec![admin_keys_entry].into());
+        let admin_keys_setting_bytes = admin_keys_setting.write_to_bytes().map_err(|err| {
+            ScabbardStateError(format!(
+                "failed to write admin keys setting to bytes: {}",
+                err
+            ))
+        })?;
+        let admin_keys_state_change = StateChange::Set {
+            key: ADMINISTRATORS_SETTING_ADDRESS.into(),
+            value: admin_keys_setting_bytes,
+        };
+
+        let initial_state_root = MerkleRadixTree::new(db.clone_box(), None)?.get_merkle_root();
+        let current_state_root = MerkleState::new(db.clone()).commit(
+            &initial_state_root,
+            vec![admin_keys_state_change].as_slice(),
+        )?;
+
+        // Initialize transact
         let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
-        let executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
+        let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
             vec![Box::new(SawtoothToTransactHandlerAdapter::new(
                 SabreTransactionHandler::new(),
             ))],
             context_manager.clone(),
         )?)]);
-        let current_state_root = MerkleRadixTree::new(db.clone_box(), None)?.get_merkle_root();
+        executor
+            .start()
+            .map_err(|err| ScabbardStateError(format!("failed to start executor: {}", err)))?;
+
+        let event_dealer = EventDealer::new();
 
         Ok(ScabbardState {
             db,
@@ -62,6 +102,7 @@ impl ScabbardState {
             executor,
             current_state_root,
             pending_changes: None,
+            event_dealer,
         })
     }
 
@@ -130,6 +171,12 @@ impl ScabbardState {
                     self.current_state_root,
                 );
 
+                let events = state_changes
+                    .into_iter()
+                    .map(StateChangeEvent::from_state_change)
+                    .collect();
+
+                self.event_dealer.dispatch(events);
                 Ok(())
             }
             None => Err(ScabbardStateError("no pending changes to commit".into())),
@@ -144,6 +191,10 @@ impl ScabbardState {
 
         Ok(())
     }
+
+    pub fn subscribe_to_state(&mut self, request: Request) -> Result<Response, ResponseError> {
+        self.event_dealer.subscribe(request)
+    }
 }
 
 fn into_writable_state_change(
@@ -155,6 +206,22 @@ fn into_writable_state_change(
         }
         transact::protocol::receipt::StateChange::Delete { key } => {
             transact::state::StateChange::Delete { key }
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(tag = "eventType", content = "message")]
+enum StateChangeEvent {
+    Set { key: String, value: Vec<u8> },
+    Delete { key: String },
+}
+
+impl StateChangeEvent {
+    fn from_state_change(state_change: StateChange) -> Self {
+        match state_change {
+            StateChange::Set { key, value } => StateChangeEvent::Set { key, value },
+            StateChange::Delete { key } => StateChangeEvent::Delete { key },
         }
     }
 }

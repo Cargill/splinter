@@ -41,18 +41,33 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/proto
     && unzip -o protoc-3.7.1-linux-x86_64.zip -d /usr/local \
     && rm protoc-3.7.1-linux-x86_64.zip
 
-RUN mkdir /build
+# Fetch the XO smart contract
+RUN curl -OLsS https://build.sawtooth.me/job/Sawtooth-Hyperledger/job/sawtooth-sdk-rust/job/master/lastSuccessfulBuild/artifact/build/scar/*zip*/scar.zip \
+    && unzip -oj scar.zip \
+    && tar -xvf xo_*.scar \
+    && rm scar.zip xo_*.scar
 
 # Copy dependencies
 COPY examples/gameroom/database /build/examples/gameroom/database
 COPY protos /build/protos
-COPY libsplinter /build/libsplinter
 
-# Create empty cargo project
+# Create empty cargo project for libsplinter
+WORKDIR /build
+RUN USER=root cargo new --lib libsplinter
+
+# Copy over Cargo.toml and build.rs
+COPY libsplinter/build.rs /build/libsplinter/build.rs
+COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
+
+# Do a release build to cache dependencies
+WORKDIR /build/libsplinter
+RUN cargo build --release
+
+# Create empty cargo project for gameroomd
 WORKDIR /build/examples/gameroom
 RUN USER=root cargo new --bin daemon
 
-# Copy over Cargo.toml file
+# Copy over gameroomd Cargo.toml file
 COPY examples/gameroom/daemon/Cargo.toml /build/examples/gameroom/daemon/Cargo.toml
 
 # Do a release build to cache dependencies
@@ -62,11 +77,13 @@ RUN cargo build --release
 # Remove the auto-generated .rs files and the built files
 WORKDIR /build
 RUN rm */src/*.rs
-RUN rm examples/gameroom/daemon/target/release/gameroom* examples/gameroom/daemon/target/release/deps/gameroom*
+RUN rm examples/gameroom/daemon/target/release/gameroom* \
+    examples/gameroom/daemon/target/release/deps/gameroom* \
+    examples/gameroom/daemon/target/release/deps/*libsplinter*
 
 # Copy over source files
 COPY examples/gameroom/daemon/src /build/examples/gameroom/daemon/src
-COPY libsplinter/src /build/libsplinter/src
+COPY libsplinter/ /build/libsplinter/
 COPY protos/ /build/protos
 
 # Build the project
@@ -86,3 +103,4 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=BUILDER /build/examples/gameroom/daemon/target/release/gameroomd /usr/bin/gameroomd
+COPY --from=BUILDER /xo-tp-rust.wasm /var/lib/gameroomd/xo-tp-rust.wasm

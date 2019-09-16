@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use protobuf::{self, RepeatedField};
 use serde::de::DeserializeOwned;
 use serde_json;
 
 use crate::actix_web::{error::ErrorBadRequest, web, Error as ActixError};
+#[cfg(feature = "events")]
+use crate::events::{ParseBytes, ParseError};
 use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::protos::admin::{self, CircuitCreateRequest};
+
+use super::error::MarshallingError;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct CreateCircuit {
@@ -27,6 +33,7 @@ pub struct CreateCircuit {
     pub members: Vec<SplinterNode>,
     pub authorization_type: AuthorizationType,
     pub persistence: PersistenceType,
+    pub durability: DurabilityType,
     pub routes: RouteType,
     pub circuit_management_type: String,
     pub application_metadata: Vec<u8>,
@@ -66,6 +73,15 @@ impl CreateCircuit {
             }
         };
 
+        let durability = match proto.get_durability() {
+            admin::Circuit_DurabilityType::NO_DURABILITY => DurabilityType::NoDurabilty,
+            admin::Circuit_DurabilityType::UNSET_DURABILITY_TYPE => {
+                return Err(MarshallingError::UnsetField(
+                    "Unset durability type".to_string(),
+                ));
+            }
+        };
+
         let routes = match proto.get_routes() {
             admin::Circuit_RouteType::ANY_ROUTE => RouteType::Any,
             admin::Circuit_RouteType::UNSET_ROUTE_TYPE => {
@@ -87,6 +103,7 @@ impl CreateCircuit {
                 .collect::<Result<Vec<SplinterNode>, MarshallingError>>()?,
             authorization_type,
             persistence,
+            durability,
             routes,
             circuit_management_type: proto.take_circuit_management_type(),
             application_metadata: proto.take_application_metadata(),
@@ -125,6 +142,11 @@ impl CreateCircuit {
                 circuit.set_persistence(admin::Circuit_PersistenceType::ANY_PERSISTENCE);
             }
         };
+        match self.durability {
+            DurabilityType::NoDurabilty => {
+                circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
+            }
+        };
 
         match self.routes {
             RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
@@ -145,6 +167,11 @@ pub enum AuthorizationType {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum PersistenceType {
     Any,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum DurabilityType {
+    NoDurabilty,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -181,6 +208,7 @@ pub struct SplinterService {
     pub service_id: String,
     pub service_type: String,
     pub allowed_nodes: Vec<String>,
+    pub arguments: HashMap<String, String>,
 }
 
 impl SplinterService {
@@ -189,6 +217,17 @@ impl SplinterService {
         proto.set_service_id(self.service_id);
         proto.set_service_type(self.service_type);
         proto.set_allowed_nodes(RepeatedField::from_vec(self.allowed_nodes));
+        proto.set_arguments(RepeatedField::from_vec(
+            self.arguments
+                .into_iter()
+                .map(|(k, v)| {
+                    let mut argument = admin::SplinterService_Argument::new();
+                    argument.set_key(k);
+                    argument.set_value(v);
+                    argument
+                })
+                .collect(),
+        ));
 
         proto
     }
@@ -202,6 +241,11 @@ impl SplinterService {
                 .into_iter()
                 .map(String::from)
                 .collect(),
+            arguments: proto
+                .take_arguments()
+                .into_iter()
+                .map(|mut argument| (argument.take_key(), argument.take_value()))
+                .collect(),
         })
     }
 }
@@ -213,7 +257,8 @@ pub struct CircuitProposal {
     pub circuit_hash: String,
     pub circuit: CreateCircuit,
     pub votes: Vec<VoteRecord>,
-    pub requester: String,
+    pub requester: Vec<u8>,
+    pub requester_node_id: String,
 }
 
 impl CircuitProposal {
@@ -244,6 +289,7 @@ impl CircuitProposal {
             circuit: CreateCircuit::from_proto(proto.take_circuit_proposal())?,
             votes,
             requester: proto.take_requester(),
+            requester_node_id: proto.take_requester_node_id(),
         })
     }
 }
@@ -258,48 +304,46 @@ pub enum ProposalType {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct VoteRecord {
-    pub public_key: String,
-    pub vote: Vote,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct CircuitProposalVote {
-    pub ballot: Ballot,
-    pub ballot_signature: Vec<u8>,
-    pub signer_public_key: Vec<u8>,
-}
-
-impl CircuitProposalVote {
-    fn from_proto(mut proto: admin::CircuitProposalVote) -> Result<Self, MarshallingError> {
-        Ok(CircuitProposalVote {
-            ballot: Ballot::from_proto(proto.take_ballot())?,
-            ballot_signature: proto.take_ballot_signature(),
-            signer_public_key: proto.take_signer_public_key(),
-        })
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Ballot {
     pub circuit_id: String,
     pub circuit_hash: String,
     pub vote: Vote,
 }
 
-impl Ballot {
-    fn from_proto(mut proto: admin::CircuitProposalVote_Ballot) -> Result<Self, MarshallingError> {
+impl CircuitProposalVote {
+    pub fn from_proto(mut proto: admin::CircuitProposalVote) -> Result<Self, MarshallingError> {
         let vote = match proto.get_vote() {
             admin::CircuitProposalVote_Vote::ACCEPT => Vote::Accept,
             admin::CircuitProposalVote_Vote::REJECT => Vote::Reject,
+            admin::CircuitProposalVote_Vote::UNSET_VOTE => {
+                return Err(MarshallingError::UnsetField("Unset vote".to_string()));
+            }
         };
 
-        Ok(Ballot {
+        Ok(CircuitProposalVote {
             circuit_id: proto.take_circuit_id(),
             circuit_hash: proto.take_circuit_hash(),
             vote,
         })
     }
+
+    pub fn into_proto(self) -> admin::CircuitProposalVote {
+        let mut vote = admin::CircuitProposalVote::new();
+        vote.set_circuit_id(self.circuit_id);
+        vote.set_circuit_hash(self.circuit_hash);
+        match self.vote {
+            Vote::Accept => vote.set_vote(admin::CircuitProposalVote_Vote::ACCEPT),
+            Vote::Reject => vote.set_vote(admin::CircuitProposalVote_Vote::REJECT),
+        }
+        vote
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct VoteRecord {
+    pub public_key: Vec<u8>,
+    pub vote: Vote,
+    pub voter_node_id: String,
 }
 
 impl VoteRecord {
@@ -307,11 +351,15 @@ impl VoteRecord {
         let vote = match proto.get_vote() {
             admin::CircuitProposalVote_Vote::ACCEPT => Vote::Accept,
             admin::CircuitProposalVote_Vote::REJECT => Vote::Reject,
+            admin::CircuitProposalVote_Vote::UNSET_VOTE => {
+                return Err(MarshallingError::UnsetField("Unset vote".to_string()));
+            }
         };
 
         Ok(Self {
             public_key: proto.take_public_key(),
             vote,
+            voter_node_id: proto.take_voter_node_id(),
         })
     }
 }
@@ -326,28 +374,17 @@ pub enum Vote {
 #[serde(tag = "eventType", content = "message")]
 pub enum AdminServiceEvent {
     ProposalSubmitted(CircuitProposal),
-    ProposalVote(CircuitProposalVote),
-    ProposalAccepted(CircuitProposal),
-    ProposalRejected(CircuitProposal),
+    ProposalVote((CircuitProposal, Vec<u8>)),
+    ProposalAccepted((CircuitProposal, Vec<u8>)),
+    ProposalRejected((CircuitProposal, Vec<u8>)),
+    CircuitReady(CircuitProposal),
 }
 
-#[derive(Debug)]
-pub enum MarshallingError {
-    UnsetField(String),
-}
-
-impl std::error::Error for MarshallingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            MarshallingError::UnsetField(_) => None,
-        }
-    }
-}
-
-impl std::fmt::Display for MarshallingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            MarshallingError::UnsetField(_) => write!(f, "Invalid enumerated type"),
-        }
+#[cfg(feature = "events")]
+impl ParseBytes<AdminServiceEvent> for AdminServiceEvent {
+    fn from_bytes(bytes: &[u8]) -> Result<AdminServiceEvent, ParseError> {
+        serde_json::from_slice(bytes)
+            .map_err(Box::new)
+            .map_err(|err| ParseError::MalformedMessage(err))
     }
 }

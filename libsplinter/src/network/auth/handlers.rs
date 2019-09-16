@@ -15,7 +15,9 @@
 use protobuf::Message;
 
 use crate::channel::Sender;
-use crate::network::auth::{AuthorizationAction, AuthorizationManager, AuthorizationState};
+use crate::network::auth::{
+    AuthorizationAction, AuthorizationInquisitor, AuthorizationManager, AuthorizationState,
+};
 use crate::network::dispatch::{
     DispatchError, DispatchMessage, Dispatcher, FromMessageBytes, Handler, MessageContext,
 };
@@ -83,7 +85,7 @@ pub fn create_authorization_dispatcher(
 /// This Handler accepts authorization network messages, unwraps the envelope, and forwards the
 /// message contents to an authorization dispatcher.
 pub struct AuthorizationMessageHandler {
-    sender: Box<Sender<DispatchMessage<AuthorizationMessageType>>>,
+    sender: Box<dyn Sender<DispatchMessage<AuthorizationMessageType>>>,
 }
 
 impl AuthorizationMessageHandler {
@@ -91,7 +93,7 @@ impl AuthorizationMessageHandler {
     ///
     /// This constructs an AuthorizationMessageHandler with a sender that will dispatch messages
     /// to a authorization dispatcher.
-    pub fn new(sender: Box<Sender<DispatchMessage<AuthorizationMessageType>>>) -> Self {
+    pub fn new(sender: Box<dyn Sender<DispatchMessage<AuthorizationMessageType>>>) -> Self {
         AuthorizationMessageHandler { sender }
     }
 }
@@ -120,7 +122,7 @@ impl Handler<NetworkMessageType, AuthorizationMessage> for AuthorizationMessageH
 /// NetworkMessageType.
 pub struct NetworkAuthGuardHandler<M: FromMessageBytes> {
     auth_manager: AuthorizationManager,
-    handler: Box<Handler<NetworkMessageType, M>>,
+    handler: Box<dyn Handler<NetworkMessageType, M>>,
 }
 
 impl<M: FromMessageBytes> NetworkAuthGuardHandler<M> {
@@ -129,7 +131,7 @@ impl<M: FromMessageBytes> NetworkAuthGuardHandler<M> {
     /// Handlers must be typed to the NetworkMessageType, but may be any message content type.
     pub fn new(
         auth_manager: AuthorizationManager,
-        handler: Box<Handler<NetworkMessageType, M>>,
+        handler: Box<dyn Handler<NetworkMessageType, M>>,
     ) -> Self {
         NetworkAuthGuardHandler {
             auth_manager,
@@ -219,7 +221,17 @@ impl Handler<AuthorizationMessageType, ConnectRequest> for ConnectRequestHandler
                     )?,
                 ))?;
             }
-            Ok(AuthorizationState::Internal) => (),
+            Ok(AuthorizationState::Internal) => {
+                debug!(
+                    "Sending Authorized message to internal peer {}",
+                    context.source_peer_id()
+                );
+                let auth_msg = AuthorizedMessage::new();
+                sender.send(SendRequest::new(
+                    context.source_peer_id().to_string(),
+                    wrap_in_network_auth_envelopes(AuthorizationMessageType::AUTHORIZE, auth_msg)?,
+                ))?;
+            }
             Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
         }
 

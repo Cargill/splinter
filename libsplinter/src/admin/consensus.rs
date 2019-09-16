@@ -64,7 +64,7 @@ impl AdminConsensusManager {
         let thread_handle = Builder::new()
             .name(format!("consensus-{}", service_id))
             .spawn(move || {
-                let mut two_phase_engine = TwoPhaseEngine::new();
+                let mut two_phase_engine = TwoPhaseEngine::default();
                 two_phase_engine
                     .run(
                         consensus_msg_rx,
@@ -162,7 +162,7 @@ impl ProposalManager for AdminProposalManager {
 
             // Cheating a bit here by not setting the ID properly (isn't a hash of previous_id,
             // proposal_height, and summary), but none of this really matters with 2-phase
-            // consensus. The ID is the hash of the circuit managment playlaod. This example will
+            // consensus. The ID is the hash of the circuit management playload. This example will
             // not work with forking consensus, because it does not track previously accepted
             // proposals.
             let mut proposal = Proposal::default();
@@ -176,19 +176,15 @@ impl ProposalManager for AdminProposalManager {
             let mut verifiers = vec![];
             let members = circuit_proposal.get_circuit_proposal().get_members();
             for member in members {
-                verifiers.push(
-                    format!("admin::{}", member.get_node_id())
-                        .as_bytes()
-                        .to_vec(),
-                );
+                verifiers.push(admin_service_id(member.get_node_id()).as_bytes().to_vec());
             }
             required_verifiers.set_verifiers(RepeatedField::from_vec(verifiers));
             let required_verifiers_bytes = required_verifiers
                 .write_to_bytes()
                 .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
-            proposal.consensus_data = required_verifiers_bytes;
+            proposal.consensus_data = required_verifiers_bytes.clone();
 
-            shared.add_pending_consesus_proposal(
+            shared.add_pending_consensus_proposal(
                 proposal.id.clone(),
                 (proposal.clone(), circuit_payload.clone()),
             );
@@ -197,6 +193,7 @@ impl ProposalManager for AdminProposalManager {
             let mut proposed_circuit = ProposedCircuit::new();
             proposed_circuit.set_circuit_payload(circuit_payload);
             proposed_circuit.set_expected_hash(expected_hash.as_bytes().into());
+            proposed_circuit.set_required_verifiers(required_verifiers_bytes);
             let mut msg = AdminMessage::new();
             msg.set_message_type(AdminMessage_Type::PROPOSED_CIRCUIT);
             msg.set_proposed_circuit(proposed_circuit);
@@ -221,39 +218,32 @@ impl ProposalManager for AdminProposalManager {
     }
 
     fn check_proposal(&self, id: &ProposalId) -> Result<(), ProposalManagerError> {
-        let shared = &self
+        let mut shared = self
             .shared
             .lock()
             .map_err(|_| ServiceError::PoisonedLock("the admin state lock was poisoned".into()))?;
 
-        match shared.pending_consesus_proposals(id) {
-            Some((proposal, circuit_payload)) if &proposal.id == id => {
-                let (hash, _) = self
-                    .shared
-                    .lock()
-                    .map_err(|_| {
-                        ServiceError::PoisonedLock("the admin state lock was poisoned".into())
-                    })?
-                    .propose_change(circuit_payload.clone())
-                    .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
+        let (proposal, circuit_payload) = shared
+            .pending_consensus_proposals(id)
+            .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?
+            .clone();
 
-                // check if hash is the expected hash stored in summary
-                if hash.as_bytes().to_vec() != proposal.summary {
-                    warn!(
-                        "Hash mismatch: expected {:?} but was {}",
-                        proposal.summary, hash
-                    );
+        let (hash, _) = shared
+            .propose_change(circuit_payload.clone())
+            .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
 
-                    self.proposal_update_sender
-                        .send(ProposalUpdate::ProposalInvalid(id.clone()))?;
-                } else {
-                    Err(ProposalManagerError::UnknownProposal(id.clone()))?;
-                }
-            }
-            _ => {
-                warn!("checked proposal that isn't pending: {}", id);
-                Err(ProposalManagerError::UnknownProposal(id.clone()))?;
-            }
+        // check if hash is the expected hash stored in summary
+        if hash.as_bytes().to_vec() != proposal.summary {
+            warn!(
+                "Hash mismatch: expected {:?} but was {}",
+                proposal.summary, hash
+            );
+
+            self.proposal_update_sender
+                .send(ProposalUpdate::ProposalInvalid(id.clone()))?;
+        } else {
+            self.proposal_update_sender
+                .send(ProposalUpdate::ProposalValid(id.clone()))?;
         }
 
         Ok(())
@@ -264,15 +254,15 @@ impl ProposalManager for AdminProposalManager {
         id: &ProposalId,
         _consensus_data: Option<Vec<u8>>,
     ) -> Result<(), ProposalManagerError> {
-        let shared = &mut self
+        let mut shared = self
             .shared
             .lock()
             .map_err(|_| ServiceError::PoisonedLock("the admin state lock was poisoned".into()))?;
 
-        match shared.pending_consesus_proposals(id) {
+        match shared.pending_consensus_proposals(id) {
             Some((proposal, _)) if &proposal.id == id => match shared.commit() {
                 Ok(_) => {
-                    shared.remove_pending_consesus_proposals(id);
+                    shared.remove_pending_consensus_proposals(id);
                     info!("Committed proposal {}", id);
                 }
                 Err(err) => {
@@ -295,23 +285,20 @@ impl ProposalManager for AdminProposalManager {
     }
 
     fn reject_proposal(&self, id: &ProposalId) -> Result<(), ProposalManagerError> {
-        let shared = &mut self
+        let mut shared = self
             .shared
             .lock()
             .map_err(|_| ServiceError::PoisonedLock("the admin state lock was poisoned".into()))?;
 
-        match shared.pending_consesus_proposals(id) {
-            Some((proposal, _)) if &proposal.id == id => match shared.rollback() {
-                Ok(_) => {
-                    shared.remove_pending_consesus_proposals(id);
-                    info!("Rolled back proposal {}", id);
-                }
-                Err(err) => {
-                    error!("Failed to roll back proposal: {}", err);
-                }
-            },
-            _ => warn!("Rejected proposal that was not pending: {}", id),
-        }
+        shared
+            .remove_pending_consensus_proposals(id)
+            .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?;
+
+        shared
+            .rollback()
+            .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
+
+        info!("Rolled back proposal {}", id);
 
         Ok(())
     }
@@ -373,16 +360,14 @@ impl ConsensusNetworkSender for AdminConsensusNetworkSender {
             .clone()
             .ok_or(ConsensusSendError::NotReady)?;
 
-        // Since there are not a fixed set of peers to send messages too, use the set of members
-        // in the curret pending change
-        if let Some(pending_changes) = &shared.pending_changes() {
-            for member in pending_changes.get_circuit_proposal().get_members() {
-                {
+        // Since there are not a fixed set of peers to send messages too, use the set of verifiers
+        // in the current_consensus_verifiers which comes from the pending_changes
+        for verifier in shared.current_consensus_verifiers() {
+            {
+                // don't send a message back to this service
+                if verifier != &admin_service_id(shared.node_id()) {
                     network_sender
-                        .send(
-                            &admin_service_id(member.get_node_id()),
-                            msg.write_to_bytes()?.as_slice(),
-                        )
+                        .send(verifier, msg.write_to_bytes()?.as_slice())
                         .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?;
                 }
             }

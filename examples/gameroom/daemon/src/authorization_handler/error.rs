@@ -18,27 +18,43 @@
 use std::error::Error;
 use std::fmt;
 
+use futures::future;
+use libsplinter::events;
+use sabre_sdk::protocol::payload::{
+    CreateContractActionBuildError, CreateContractRegistryActionBuildError,
+    CreateNamespaceRegistryActionBuildError, CreateNamespaceRegistryPermissionActionBuildError,
+    SabrePayloadBuildError,
+};
+use sabre_sdk::protos::ProtoConversionError as SabreProtoConversionError;
+use sawtooth_sdk::signing::Error as SigningError;
+
+use crate::application_metadata::ApplicationMetadataError;
+
 #[derive(Debug)]
 pub enum AppAuthHandlerError {
-    RequestError(String),
     IOError(std::io::Error),
-    DeserializationError(Box<dyn Error + Send>),
+    InvalidMessageError(String),
     DatabaseError(String),
-    ShutdownError(String),
-    StartUpError(String),
-    ClientError(String),
+    ReactorError(events::ReactorError),
+    WebSocketError(events::WebSocketError),
+    SabreError(String),
+    SawtoothError(String),
+    SigningError(String),
+    BatchSubmitError(String),
 }
 
 impl Error for AppAuthHandlerError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            AppAuthHandlerError::RequestError(_) => None,
             AppAuthHandlerError::IOError(err) => Some(err),
-            AppAuthHandlerError::DeserializationError(err) => Some(&**err),
+            AppAuthHandlerError::InvalidMessageError(_) => None,
             AppAuthHandlerError::DatabaseError(_) => None,
-            AppAuthHandlerError::ShutdownError(_) => None,
-            AppAuthHandlerError::StartUpError(_) => None,
-            AppAuthHandlerError::ClientError(_) => None,
+            AppAuthHandlerError::ReactorError(err) => Some(err),
+            AppAuthHandlerError::SabreError(_) => None,
+            AppAuthHandlerError::SawtoothError(_) => None,
+            AppAuthHandlerError::SigningError(_) => None,
+            AppAuthHandlerError::BatchSubmitError(_) => None,
+            AppAuthHandlerError::WebSocketError(err) => Some(err),
         }
     }
 }
@@ -46,23 +62,33 @@ impl Error for AppAuthHandlerError {
 impl fmt::Display for AppAuthHandlerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AppAuthHandlerError::RequestError(msg) => write!(f, "Failed to build request, {}", msg),
             AppAuthHandlerError::IOError(msg) => write!(f, "An I/O error occurred: {}", msg),
-            AppAuthHandlerError::DeserializationError(msg) => {
-                write!(f, "Failed to deserialize message: {}", msg)
+            AppAuthHandlerError::InvalidMessageError(msg) => {
+                write!(f, "The client received an invalid message: {}", msg)
             }
             AppAuthHandlerError::DatabaseError(msg) => {
                 write!(f, "The database returned an error: {}", msg)
             }
-            AppAuthHandlerError::ShutdownError(msg) => {
-                write!(f, "An error occurred while shutting down: {}", msg)
+            AppAuthHandlerError::ReactorError(msg) => write!(f, "Reactor Error: {}", msg),
+            AppAuthHandlerError::SabreError(msg) => write!(
+                f,
+                "An error occurred while building a Sabre payload: {}",
+                msg
+            ),
+            AppAuthHandlerError::SawtoothError(msg) => write!(
+                f,
+                "An error occurred while building a transaction or batch: {}",
+                msg
+            ),
+            AppAuthHandlerError::SigningError(msg) => {
+                write!(f, "A signing error occurred: {}", msg)
             }
-            AppAuthHandlerError::StartUpError(msg) => {
-                write!(f, "An error occurred while starting up: {}", msg)
-            }
-            AppAuthHandlerError::ClientError(msg) => {
-                write!(f, "The client returned an error: {}", msg)
-            }
+            AppAuthHandlerError::BatchSubmitError(msg) => write!(
+                f,
+                "An error occurred while submitting a batch to the scabbard service: {}",
+                msg
+            ),
+            AppAuthHandlerError::WebSocketError(msg) => write!(f, "WebsocketError {}", msg),
         }
     }
 }
@@ -75,13 +101,19 @@ impl From<std::io::Error> for AppAuthHandlerError {
 
 impl From<serde_json::error::Error> for AppAuthHandlerError {
     fn from(err: serde_json::error::Error) -> AppAuthHandlerError {
-        AppAuthHandlerError::DeserializationError(Box::new(err))
+        AppAuthHandlerError::InvalidMessageError(format!("{}", err))
     }
 }
 
 impl From<std::string::FromUtf8Error> for AppAuthHandlerError {
     fn from(err: std::string::FromUtf8Error) -> AppAuthHandlerError {
-        AppAuthHandlerError::DeserializationError(Box::new(err))
+        AppAuthHandlerError::InvalidMessageError(format!("{}", err))
+    }
+}
+
+impl From<ApplicationMetadataError> for AppAuthHandlerError {
+    fn from(err: ApplicationMetadataError) -> AppAuthHandlerError {
+        AppAuthHandlerError::InvalidMessageError(format!("{}", err))
     }
 }
 
@@ -93,6 +125,51 @@ impl From<gameroom_database::DatabaseError> for AppAuthHandlerError {
 
 impl From<diesel::result::Error> for AppAuthHandlerError {
     fn from(err: diesel::result::Error) -> Self {
-        AppAuthHandlerError::DatabaseError(format!("Error perfoming query: {}", err))
+        AppAuthHandlerError::DatabaseError(format!("Error performing query: {}", err))
+    }
+}
+
+impl From<events::ReactorError> for AppAuthHandlerError {
+    fn from(err: events::ReactorError) -> Self {
+        AppAuthHandlerError::ReactorError(err)
+    }
+}
+
+impl From<events::WebSocketError> for AppAuthHandlerError {
+    fn from(err: events::WebSocketError) -> Self {
+        AppAuthHandlerError::WebSocketError(err)
+    }
+}
+
+macro_rules! impl_from_sabre_errors {
+    ($($x:ty),*) => {
+        $(
+            impl From<$x> for AppAuthHandlerError {
+                fn from(e: $x) -> Self {
+                    AppAuthHandlerError::SabreError(e.to_string())
+                }
+            }
+        )*
+    };
+}
+
+impl_from_sabre_errors!(
+    CreateContractActionBuildError,
+    CreateContractRegistryActionBuildError,
+    CreateNamespaceRegistryActionBuildError,
+    CreateNamespaceRegistryPermissionActionBuildError,
+    SabreProtoConversionError,
+    SabrePayloadBuildError
+);
+
+impl From<SigningError> for AppAuthHandlerError {
+    fn from(err: SigningError) -> Self {
+        AppAuthHandlerError::SigningError(err.to_string())
+    }
+}
+
+impl<T> Into<future::FutureResult<T, AppAuthHandlerError>> for AppAuthHandlerError {
+    fn into(self) -> future::FutureResult<T, AppAuthHandlerError> {
+        future::err(self)
     }
 }

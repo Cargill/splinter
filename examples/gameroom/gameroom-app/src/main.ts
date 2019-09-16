@@ -16,6 +16,7 @@ import Vue from 'vue';
 import App from '@/App.vue';
 import router from '@/router';
 import store from '@/store';
+import VueNativeSock from 'vue-native-websocket';
 
 Vue.config.productionTip = false;
 
@@ -24,3 +25,18 @@ new Vue({
   store,
   render: (h) => h(App),
 }).$mount('#app');
+
+Vue.use(VueNativeSock, `ws://${window.location.host}/ws/subscribe`, {
+  store,
+  format: 'json',
+  reconnection: true,
+  reconnectionAttempts: 30,
+  reconnectionDelay: 10,
+});
+
+// When the page loads, the element with this directive gains focus.
+Vue.directive('focus', {
+  inserted: (el) => {
+    el.focus();
+  },
+});

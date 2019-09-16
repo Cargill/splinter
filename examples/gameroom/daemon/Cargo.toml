@@ -14,15 +14,16 @@
 
 [package]
 name = "gameroom-daemon"
-version = "0.2.1"
+version = "0.3.2"
 authors = ["Cargill Incorporated"]
 edition = "2018"
+license = "Apache-2.0"
 
 [dependencies]
 actix = { version = "0.8", default-features = false }
 actix-web = { version = "1.0", default-features = false, features = ["flate2-zlib"] }
+actix-web-actors = "1.0"
 flate2 = "1.0.10"
-awc = "0.2"
 bcrypt = "0.5"
 clap = "2"
 ctrlc = "3.0"
@@ -31,15 +32,19 @@ hyper = "0.12"
 tokio = "0.1"
 gameroom-database = { path = "../database" }
 log = "0.4"
-log4rs = "0.8"
-simple_logger = "1.0"
-libsplinter = { path = "../../../libsplinter" }
+flexi_logger = "0.14"
+libsplinter = { path = "../../../libsplinter", features = ["events"]}
 futures = "0.1"
+rust-crypto = "0.2"
+sabre-sdk = "0.4"
+sawtooth-sdk = "0.3"
 serde_json = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 percent-encoding = "2.0"
 uuid = { version = "0.7", features = ["v4"]}
+protobuf = "2"
+openssl = "0.10"
 
 [features]
 test-node-endpoint = []
@@ -48,3 +53,17 @@ test-authorization-handler = []
 [[bin]]
 name = "gameroomd"
 path = "src/main.rs"
+
+[package.metadata.deb]
+maintainer = "The Splinter Team"
+depends = "$auto"
+assets = [
+    ["packaging/systemd/gameroomd.service", "/lib/systemd/system/gameroomd.service", "644"],
+    ["packaging/systemd/gameroomd", "/etc/default/gameroomd", "644"],
+    ["target/release/gameroomd", "/usr/bin/gameroomd", "755"]
+]
+maintainer-scripts = "packaging/ubuntu"
+extended-description = """\
+Gameroom is a demo Splinter application that allows you to set up dynamic \
+multi-party circuits (called "gamerooms") and play tic tac toe with \
+shared state"""

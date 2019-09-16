@@ -24,9 +24,15 @@ message SplinterNode {
 }
 
 message SplinterService {
+    message Argument {
+        string key = 1;
+        string value = 2;
+    }
+
     string service_id = 1;
     string service_type = 2;
     repeated string allowed_nodes = 3;
+    repeated Argument arguments = 4;
 }
 
 message Circuit {
@@ -74,15 +80,18 @@ message Circuit {
     // Whether the circuit connections need to be persisted
     PersistenceType persistence = 5;
 
+    // Whether the connection must be durable
+    DurabilityType durability = 6;
+
     // Routes a message is allowed to take from one service to another
-    RouteType routes = 6;
+    RouteType routes = 7;
 
     // The circuit management type indicates the application authorization
-    // handler that will handle this cicuit's change proposals.
-    string circuit_management_type  = 7;
+    // handler that will handle this circuit's change proposals.
+    string circuit_management_type  = 8;
 
     // Opaque bytes that can be used by applications
-    bytes application_metadata = 8;
+    bytes application_metadata = 9;
 }
 
 // Contains the vote counts for a given proposal.
@@ -99,10 +108,13 @@ message CircuitProposal {
     // An individual vote record
     message VoteRecord {
         // The public key of the voter
-        string public_key = 1;
+        bytes public_key = 1;
 
         // The voter's actual vote
         CircuitProposalVote.Vote vote = 2;
+
+        // the node the vote came from
+        string voter_node_id = 3;
     }
 
     // What is being changed
@@ -121,9 +133,12 @@ message CircuitProposal {
     // List of votes
     repeated VoteRecord votes = 5;
 
-    // The node that the request originated from
-    // a vote does not need to come from this node
-    string requester = 6;
+    // The public key that the request originated from a vote does not need to
+    // come from the node this public key is associated with
+    bytes requester = 6;
+
+    // the node the requester created the proposal for
+    string requester_node_id = 7;
 }
 
 // Contains all the circuit proposals up for a vote.
@@ -148,40 +163,50 @@ message CircuitManagementPayload {
          CIRCUIT_ABANDON = 9;
     }
 
-    Action action = 1;
+    message Header {
+         Action action = 1;
 
-    CircuitProposalVote circuit_proposal_vote = 2;
-    CircuitCreateRequest circuit_create_request = 3;
-    CircuitUpdateRosterRequest  circuit_update_roster_request = 4;
-    CircuitUpdateAddNodeRequest circuit_update_add_node = 5;
-    CircuitUpdateRemoveNodeRequest circuit_update_remove_node = 6;
+         // Public key of agent submitting the payload
+         bytes requester = 2;
+
+         // A hash of the circuit management payload action in bytes
+         bytes payload_sha512 = 3;
+
+         // the node the requester is submitting the payload for
+         string requester_node_id = 4;
+    }
+
+    // Serialized header
+    bytes header = 1;
+
+    // The signature derived from signing the header included in this request
+    bytes signature = 2;
+
+    CircuitProposalVote circuit_proposal_vote = 3;
+    CircuitCreateRequest circuit_create_request = 4;
+    CircuitUpdateRosterRequest  circuit_update_roster_request = 5;
+    CircuitUpdateAddNodeRequest circuit_update_add_node = 6;
+    CircuitUpdateRemoveNodeRequest circuit_update_remove_node = 7;
     CircuitUpdateApplicationMetadataRequest
-        circuit_update_application_metadata_request = 7;
-    CircuitJoinRequest circuit_join_request = 8;
-    CircuitDestroyRequest circuit_destroy_request = 9;
-    CircuitAbandon circuit_abandon = 10;
+        circuit_update_application_metadata_request = 8;
+    CircuitJoinRequest circuit_join_request = 9;
+    CircuitDestroyRequest circuit_destroy_request = 10;
+    CircuitAbandon circuit_abandon = 11;
 }
 
 message CircuitProposalVote {
     enum Vote {
-        ACCEPT = 0;
-        REJECT = 1;
+        UNSET_VOTE = 0;
+        ACCEPT = 1;
+        REJECT = 2;
     }
 
-    message Ballot {
-        // The id of the circuit being updated
-        string circuit_id = 1;
-
-        // The sha256 hash of the final state of the new circuit definition in
-        // bytes
-        string circuit_hash = 2;
-
-        Vote vote = 3;
-    }
-
-    Ballot ballot = 1;
-    bytes ballot_signature = 2;
-    bytes signer_public_key = 3;
+    // The id of the circuit being updated
+    string circuit_id = 1;
+    // The sha256 hash of the final state of the new circuit definition in
+    // bytes
+    string circuit_hash = 2;
+    Vote vote = 3;
 }
 
 // This message will be submitted to a splinter node by an administrator that
@@ -252,12 +277,14 @@ message AdminMessage {
         UNSET = 0;
         CONSENSUS_MESSAGE = 1;
         PROPOSED_CIRCUIT = 2;
+        MEMBER_READY = 3;
     }
 
     Type message_type = 1;
 
     bytes consensus_message = 2;
     ProposedCircuit proposed_circuit = 3;
+    MemberReady member_ready = 4;
 }
 
 message ProposedCircuit {
@@ -267,4 +294,11 @@ message ProposedCircuit {
     // the hash of the expected circuit proposal that is generated by the
     // included request
     bytes expected_hash = 2;
+
+    bytes required_verifiers = 3;
+}
+
+message MemberReady {
+    string circuit_id = 1;
+    string member_node_id = 2;
 }

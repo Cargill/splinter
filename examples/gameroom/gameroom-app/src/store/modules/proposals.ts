@@ -14,9 +14,14 @@
 
 import { VuexModule, Module, getModule, Action, Mutation } from 'vuex-module-decorators';
 import store from '@/store';
-import { GameroomProposal } from '@/store/models';
-import { listProposals } from '@/store/api';
-import nodes from './nodes';
+import { GameroomProposal, Ballot } from '@/store/models';
+import { listProposals, proposalVote, submitPayload } from '@/store/api';
+import { signPayload } from '@/utils/crypto';
+
+interface Vote {
+  proposalID: string;
+  ballot: Ballot;
+}
 
 @Module({
   namespaced: true,
@@ -30,34 +35,24 @@ class ProposalsModule extends VuexModule {
   @Mutation
   setProposals(proposals: GameroomProposal[]) { this.proposals = proposals;  }
 
-  @Action({ commit: 'setProposals' })
-  async listProposals() {
-    const proposals = await listProposals();
-    return proposals;
+  @Action({ rawError: true })
+  async vote(vote: Vote) {
+    const user = this.context.rootGetters['user/getUser'];
+    try {
+      const payload = await proposalVote(vote.ballot, vote.proposalID);
+      const signedPayload = signPayload(payload, user.privateKey);
+      this.context.dispatch('votes/vote', vote.proposalID, {root: true});
+      const response = await submitPayload(signedPayload);
+      return response;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   }
 
   @Action({ commit: 'setProposals' })
-  listProposalsMock() {
-    const proposals = [
-      {
-        name: 'acme_corp:bubba_bakery',
-        members: [
-          'bubba_bakery', 'acme_corp',
-        ],
-        requester: 'acme_corp',
-        created_time: 1564772396,
-        updated_time: 0,
-      },
-      {
-        name: 'asdforg:bubba_bakery',
-        members: [
-          'asdforg', 'acme_corp',
-        ],
-        requester: 'asdforg',
-        created_time: 1564772439,
-        updated_time: 0,
-      },
-    ];
+  async listProposals() {
+    const proposals = await listProposals();
     return proposals;
   }
 

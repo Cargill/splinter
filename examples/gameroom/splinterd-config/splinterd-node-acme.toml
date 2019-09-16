@@ -13,7 +13,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
-node_id = "2456qwerty"
+node_id = "acme-node-000"
 
 # Endpoint used for service to daemon communication.
 service_endpoint = "127.0.0.1:8043"
@@ -27,13 +27,16 @@ peers = []
 
 # The type of storage that should be used to store circuit state. Option are
 # currently "yaml" or "memory"
-storage = "memory"
+storage = "yaml"
 
 # Which transport type this splinterd node supports. Options are "raw" or "tls"
 transport = "tls"
 
 # Rest api address.
-bind = "0.0.0.0:8085"
+bind = "localhost:8085"
+
+# Node Registry type
+registry_backend = "FILE"
 
 # Node Registry file
 registry_file = "/node_registry/nodes.yaml"

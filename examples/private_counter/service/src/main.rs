@@ -153,7 +153,7 @@ fn main() -> Result<(), ServiceError> {
         let state = state.lock().expect("State lock poisoned");
 
         StartupState {
-            id: state.peer_id.as_bytes().into(),
+            id: state.service_id.as_bytes().into(),
             peer_ids: state
                 .verifiers
                 .iter()
@@ -166,7 +166,7 @@ fn main() -> Result<(), ServiceError> {
     let consensus_thread = Builder::new()
         .name("TwoPhaseConsensus".into())
         .spawn(move || {
-            let mut two_phase_engine = TwoPhaseEngine::new();
+            let mut two_phase_engine = TwoPhaseEngine::default();
             two_phase_engine
                 .run(
                     consensus_msg_rx,

@@ -19,6 +19,12 @@ export interface ApiError {
 
 export interface User {
   email: string;
+  publicKey: string;
+  privateKey: string;
+}
+
+export interface UserRegistration {
+  email: string;
   hashedPassword: string;
   publicKey: string;
   encryptedPrivateKey: string;
@@ -48,10 +54,56 @@ export interface NewGameroomProposal {
   member: [Node];
 }
 
+export interface Member {
+  node_id: string;
+  organization: string;
+  endpoint: string;
+}
+
 export interface GameroomProposal {
-  name: string;
-  members: string[];
+  proposal_id: string;
+  circuit_id: string;
+  circuit_hash: string;
+  members: Member[];
   requester: string;
   created_time: number;
   updated_time: number;
+  requester_org: string;
+  status: string;
+}
+
+export interface GameroomNotification {
+  id: number;
+  notification_type: string;
+  org: string;
+  requester: string;
+  target: string;
+  timestamp: number;
+  read: boolean;
+}
+
+export interface Section {
+  name: string;
+  icon: string;
+  active: boolean;
+  link: string;
+  dropdown: boolean;
+  action: boolean;
+  actionIcon: string;
+}
+
+export interface Ballot {
+  circuit_id: string;
+  circuit_hash: string;
+  vote: string;
+}
+
+export interface Gameroom {
+  circuit_id: string;
+  authorization_type: string;
+  persistence: string;
+  routes: string;
+  circuit_management_type: string;
+  alias: string;
+  status: string;
 }

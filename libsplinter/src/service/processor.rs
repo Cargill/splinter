@@ -151,12 +151,19 @@ impl ServiceProcessor {
         ServiceProcessorError,
     > {
         // Starts the authorization process with the splinter node
-        // If running over inproc connection, this is the only authroization message required
+        // If running over inproc connection, this is the only authorization message required
         let connect_request = create_connect_request()
             .map_err(|err| process_err!(err, "unable to create connect request"))?;;
         self.mesh
             .send(Envelope::new(self.node_mesh_id, connect_request))
             .map_err(|err| process_err!(err, "unable to send connect request"))?;
+
+        // Wait for the auth response.  Currently, this is on an inproc transport, so this will be
+        // an "ok" response
+        let _authed_response = self
+            .mesh
+            .recv()
+            .map_err(|err| process_err!(err, "Unable to receive auth response"))?;
 
         for service in self.services.into_iter() {
             let mut shared_state = rwlock_write_unwrap!(self.shared_state);
@@ -576,10 +583,14 @@ fn create_connect_request() -> Result<Vec<u8>, protobuf::ProtobufError> {
 pub mod tests {
     use super::*;
 
+    use std::any::Any;
     use std::thread;
 
     use crate::network::Network;
-    use crate::protos::circuit::{ServiceConnectRequest, ServiceConnectResponse_Status};
+    use crate::protos::{
+        authorization::AuthorizedMessage,
+        circuit::{ServiceConnectRequest, ServiceConnectResponse_Status},
+    };
     use crate::service::error::{
         ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
     };
@@ -630,6 +641,11 @@ pub mod tests {
             auth_response.get_message_type(),
             AuthorizationMessageType::CONNECT_REQUEST
         );
+
+        // Send authorized response
+        network
+            .send("service_processor", &authorized_response())
+            .expect("Unable to send authorized response");
 
         // Receive service connect request and respond with ServiceConnectionResposne with status
         // OK
@@ -720,11 +736,16 @@ pub mod tests {
             .unwrap();;
 
         // Receive connect request from service
-        let auth_response = get_auth_msg(network.recv().unwrap().payload().to_vec());
+        let auth_request = get_auth_msg(network.recv().unwrap().payload().to_vec());
         assert_eq!(
-            auth_response.get_message_type(),
+            auth_request.get_message_type(),
             AuthorizationMessageType::CONNECT_REQUEST
         );
+
+        // Send authorized response
+        network
+            .send("service_processor", &authorized_response())
+            .expect("Unable to send authorized response");
 
         // Receive service connect request and respond with ServiceConnectionResposne with status
         // OK
@@ -844,7 +865,7 @@ pub mod tests {
                 if let Some(network_sender) = &self.network_sender {
                     network_sender
                         .send(&message_context.sender, b"send_response")
-                        .unwrap();;
+                        .unwrap();
                 }
             } else if message_bytes == b"send_and_await" {
                 if let Some(network_sender) = &self.network_sender {
@@ -857,10 +878,14 @@ pub mod tests {
                 if let Some(network_sender) = &self.network_sender {
                     network_sender
                         .reply(&message_context, b"reply response")
-                        .unwrap();;
+                        .unwrap();
                 }
             }
             Ok(())
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
         }
     }
 
@@ -929,7 +954,7 @@ pub mod tests {
                 if let Some(network_sender) = &self.network_sender {
                     network_sender
                         .send(&message_context.sender, b"send_response")
-                        .unwrap();;
+                        .unwrap();
                 }
             } else if message_bytes == b"send_and_await" {
                 if let Some(network_sender) = &self.network_sender {
@@ -946,6 +971,10 @@ pub mod tests {
                 }
             }
             Ok(())
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
         }
     }
 
@@ -1056,5 +1085,25 @@ pub mod tests {
         let direct_message: AdminDirectMessage =
             protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
         direct_message
+    }
+
+    fn authorized_response() -> Vec<u8> {
+        let msg_type = AuthorizationMessageType::AUTHORIZE;
+        let auth_msg = AuthorizedMessage::new();
+        let mut auth_msg_env = AuthorizationMessage::new();
+        auth_msg_env.set_message_type(msg_type);
+        auth_msg_env.set_payload(auth_msg.write_to_bytes().expect("unable to write to bytes"));
+
+        let mut network_msg = NetworkMessage::new();
+        network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
+        network_msg.set_payload(
+            auth_msg_env
+                .write_to_bytes()
+                .expect("unable to write to bytes"),
+        );
+
+        network_msg
+            .write_to_bytes()
+            .expect("unable to write to bytes")
     }
 }

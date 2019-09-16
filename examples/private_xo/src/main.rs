@@ -96,7 +96,7 @@ fn main() -> Result<(), CliError> {
     let consensus_network_sender =
         PrivateXoNetworkSender::new(service_config.clone(), send.clone());
     let startup_state = StartupState {
-        id: service_config.peer_id().as_bytes().into(),
+        id: service_config.service_id().as_bytes().into(),
         peer_ids: service_config
             .verifiers()
             .iter()
@@ -108,7 +108,7 @@ fn main() -> Result<(), CliError> {
     let _ = Builder::new()
         .name("TwoPhaseConsensus".into())
         .spawn(move || {
-            let mut two_phase_engine = TwoPhaseEngine::new();
+            let mut two_phase_engine = TwoPhaseEngine::default();
             two_phase_engine
                 .run(
                     consensus_msg_rx,

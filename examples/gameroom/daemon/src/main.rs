@@ -18,16 +18,21 @@ extern crate clap;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate serde_json;
 
+mod application_metadata;
 mod authorization_handler;
 mod config;
 mod error;
 mod rest_api;
 
+use flexi_logger::{LogSpecBuilder, Logger};
 use gameroom_database::ConnectionPool;
-use simple_logger;
+use libsplinter::events::Reactor;
+use sawtooth_sdk::signing::create_context;
 
-use crate::config::GameroomConfigBuilder;
+use crate::config::{get_node, GameroomConfigBuilder};
 use crate::error::GameroomDaemonError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -46,11 +51,19 @@ fn run() -> Result<(), GameroomDaemonError> {
     )
     .get_matches();
 
-    match matches.occurrences_of("verbose") {
-        0 => simple_logger::init_with_level(log::Level::Warn),
-        1 => simple_logger::init_with_level(log::Level::Info),
-        _ => simple_logger::init_with_level(log::Level::Debug),
-    }?;
+    let log_level = match matches.occurrences_of("verbose") {
+        0 => log::LevelFilter::Warn,
+        1 => log::LevelFilter::Info,
+        2 => log::LevelFilter::Debug,
+        _ => log::LevelFilter::Trace,
+    };
+
+    let mut log_spec_builder = LogSpecBuilder::new();
+    log_spec_builder.default(log_level);
+    log_spec_builder.module("hyper", log::LevelFilter::Warn);
+    log_spec_builder.module("tokio", log::LevelFilter::Warn);
+
+    Logger::with(log_spec_builder.build()).start()?;
 
     let config = GameroomConfigBuilder::default()
         .with_cli_args(&matches)
@@ -59,13 +72,30 @@ fn run() -> Result<(), GameroomDaemonError> {
     let connection_pool: ConnectionPool =
         gameroom_database::create_connection_pool(config.database_url())?;
 
-    let (app_auth_handler_shutdown_handle, app_auth_handler_join_handle) =
-        authorization_handler::run(config.splinterd_url(), connection_pool.clone())?;
+    // Generate a public/private key pair
+    let context = create_context("secp256k1")?;
+    let private_key = context.new_random_private_key()?;
+    let public_key = context.get_public_key(&*private_key)?;
+
+    // Get splinterd node information
+    let node = get_node(config.splinterd_url())?;
+
+    let reactor = Reactor::new();
+
+    authorization_handler::run(
+        config.splinterd_url().into(),
+        node.identity.clone(),
+        connection_pool.clone(),
+        private_key.as_hex(),
+        reactor.igniter(),
+    )?;
 
     let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api::run(
         config.rest_api_endpoint(),
         config.splinterd_url(),
+        node,
         connection_pool.clone(),
+        public_key.as_hex(),
     )?;
 
     ctrlc::set_handler(move || {
@@ -74,17 +104,17 @@ fn run() -> Result<(), GameroomDaemonError> {
         if let Err(err) = rest_api_shutdown_handle.shutdown() {
             error!("Unable to cleanly shutdown REST API server: {}", err);
         }
-        if let Err(err) = app_auth_handler_shutdown_handle.shutdown() {
-            error!(
-                "Unable to cleanly shutdown application authorization handler: {}",
-                err
-            );
-        }
     })
     .expect("Error setting Ctrl-C handler");
 
-    app_auth_handler_join_handle.join();
     let _ = rest_api_join_handle.join();
+
+    if let Err(err) = reactor.shutdown() {
+        error!(
+            "Unable to cleanly shutdown application authorization handler reactor: {}",
+            err
+        );
+    }
 
     Ok(())
 }

@@ -15,13 +15,11 @@
 
 use std::fmt;
 use std::fs::File;
-use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 
 use atomicwrites::{AllowOverwrite, AtomicFile};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_yaml::{from_str, to_string};
 
 use super::{Storage, StorageReadGuard, StorageWriteGuard};
 
@@ -72,13 +70,7 @@ impl<'a, T: Serialize + DeserializeOwned> Drop for YamlStorageWriteGuard<'a, T> 
     fn drop(&mut self) {
         self.storage
             .file
-            .write(|f| {
-                f.write_all(
-                    to_string(&self.storage.data)
-                        .expect("Couldn't convert value to string!")
-                        .as_bytes(),
-                )
-            })
+            .write(|f| serde_yaml::to_writer(f, &self.storage.data))
             .expect("File write failed while dropping YamlStorageWriteGuard!");
     }
 }
@@ -126,20 +118,13 @@ impl<T: Serialize + DeserializeOwned> YamlStorage<T> {
 
         // Read the file first, to see if there's any existing data
         let data = match File::open(file.path()) {
-            Ok(mut f) => {
-                let mut contents = String::new();
-
-                f.read_to_string(&mut contents)
-                    .map_err(|err| format!("Couldn't read file: {}", err))?;
-
-                from_str(&contents).map_err(|err| format!("Couldn't read file: {}", err))?
+            Ok(f) => {
+                serde_yaml::from_reader(f).map_err(|err| format!("Couldn't read file: {}", err))?
             }
             Err(_) => {
                 let data = default();
-                let data_string =
-                    to_string(&data).map_err(|err| format!("File write failed: {}", err))?;
 
-                file.write(|f| f.write_all(data_string.as_bytes()))
+                file.write(|f| serde_yaml::to_writer(f, &data))
                     .map_err(|err| format!("File write failed: {}", err))?;
 
                 data
@@ -160,17 +145,18 @@ impl<T: fmt::Display + Serialize + DeserializeOwned> fmt::Display for YamlStorag
 impl<T: Serialize + DeserializeOwned> Storage for YamlStorage<T> {
     type S = T;
 
-    fn read<'a>(&'a self) -> Box<StorageReadGuard<'a, T, Target = T> + 'a> {
+    fn read<'a>(&'a self) -> Box<dyn StorageReadGuard<'a, T, Target = T> + 'a> {
         Box::new(YamlStorageReadGuard::new(self))
     }
 
-    fn write<'a>(&'a mut self) -> Box<StorageWriteGuard<'a, T, Target = T> + 'a> {
+    fn write<'a>(&'a mut self) -> Box<dyn StorageWriteGuard<'a, T, Target = T> + 'a> {
         Box::new(YamlStorageWriteGuard::new(self))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
     use std::path::PathBuf;
 
     use tempdir::TempDir;
@@ -192,12 +178,23 @@ mod tests {
             auth: trust
             members:
               - "123"
-            services:
-              - abc
-              - def
+            roster:
+              - service_id: abc
+                service_type: test_service
+                allowed_nodes:
+                  - "*"
+                arguments:
+                  test_arg: test_value
+              - service_id: def
+                service_type: test_service
+                allowed_nodes:
+                  - "*"
+                arguments:
+                  test_arg: test_value
             persistence: any
             durability: none
             routes: require_direct
+            circuit_management_type: state_test_app
     */
     fn set_up_mock_state_file(mut temp_dir: PathBuf) -> String {
         // Create mock state
@@ -205,15 +202,18 @@ mod tests {
         let node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:8000".into()]);
         state.add_node("123".into(), node);
 
-        let circuit = Circuit::new(
-            "alpha".into(),
-            "trust".into(),
-            vec!["123".into()],
-            vec!["abc".into(), "def".into()],
-            "any".into(),
-            "none".into(),
-            "require_direct".into(),
-        );
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth("trust".into())
+            .with_members(vec!["123".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence("any".into())
+            .with_durability("none".into())
+            .with_routes("require_direct".into())
+            .with_circuit_management_type("state_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
+
         state.add_circuit("alpha".into(), circuit);
 
         let state_string = serde_yaml::to_string(&state).unwrap();
@@ -348,7 +348,7 @@ mod tests {
                 .unwrap()
                 .roster()
                 .to_vec(),
-            vec!["abc".to_string(), "def".to_string()]
+            vec!["abc".into(), "def".into()]
         );
 
         assert_eq!(
@@ -360,6 +360,16 @@ mod tests {
                 .members()
                 .to_vec(),
             vec!["123".to_string()],
+        );
+
+        assert_eq!(
+            storage
+                .data
+                .circuits()
+                .get("alpha")
+                .unwrap()
+                .circuit_management_type(),
+            "state_test_app"
         );
     }
 
@@ -451,7 +461,7 @@ mod tests {
                 .unwrap()
                 .roster()
                 .to_vec(),
-            vec!["abc".to_string(), "def".to_string()]
+            vec!["abc".into(), "def".into()]
         );
 
         assert_eq!(
@@ -479,15 +489,18 @@ mod tests {
         {
             // load state file into yaml storage
             let mut storage = YamlStorage::new(path.clone(), CircuitDirectory::new).unwrap();
-            let circuit = Circuit::new(
-                "beta".into(),
-                "trust".into(),
-                vec!["456".into(), "789".into()],
-                vec!["qwe".into(), "rty".into(), "uio".into()],
-                "any".into(),
-                "none".into(),
-                "require_direct".into(),
-            );
+            let circuit = Circuit::builder()
+                .with_id("alpha".into())
+                .with_auth("trust".into())
+                .with_members(vec!["456".into(), "789".into()])
+                .with_roster(vec!["qwe".into(), "rty".into(), "uio".into()])
+                .with_persistence("any".into())
+                .with_durability("none".into())
+                .with_routes("require_direct".into())
+                .with_circuit_management_type("state_write_test_app".into())
+                .build()
+                .expect("Should have built a correct circuit");
+
             storage.write().add_circuit("beta".into(), circuit);
 
             //drop storage
@@ -509,7 +522,7 @@ mod tests {
                 .unwrap()
                 .roster()
                 .to_vec(),
-            vec!["abc".to_string(), "def".to_string()]
+            vec!["abc".into(), "def".into()]
         );
 
         assert_eq!(
@@ -531,7 +544,7 @@ mod tests {
                 .unwrap()
                 .roster()
                 .to_vec(),
-            vec!["qwe".to_string(), "rty".to_string(), "uio".to_string()]
+            vec!["qwe".into(), "rty".into(), "uio".into()]
         );
 
         assert_eq!(
@@ -543,6 +556,16 @@ mod tests {
                 .members()
                 .to_vec(),
             vec!["456".to_string(), "789".to_string()],
+        );
+
+        assert_eq!(
+            storage
+                .data
+                .circuits()
+                .get("beta")
+                .unwrap()
+                .circuit_management_type(),
+            "state_write_test_app"
         );
     }
 
@@ -584,5 +607,4 @@ mod tests {
             vec!["tcp://127.0.0.1:8000".to_string()]
         );
     }
-
 }

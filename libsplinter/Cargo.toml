@@ -15,10 +15,12 @@
 [features]
 zmq-transport = ["zmq"]
 ursa-compat = ["ursa"]
+sawtooth-signing-compat = ["sawtooth-sdk"]
+events = ["hyper", "tokio", "awc"]
 
 [package]
 name = "libsplinter"
-version = "0.2.1"
+version = "0.3.2"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 
@@ -37,6 +39,7 @@ url = "1.7.1"
 openssl = "0.10"
 mio = "0.6"
 sawtooth-sabre = "0.4"
+sawtooth-sdk = { version = "0.3", optional = true }
 serde = "1.0"
 serde_yaml = "0.8"
 serde_derive = "1.0"
@@ -48,6 +51,9 @@ uuid = { version = "0.7", features = ["v4"]}
 protobuf = "2"
 zmq = { version = "0.9", optional = true }
 ursa = { version = "0.1", optional = true }
+hyper = { version = "0.12", optional = true }
+tokio = { version = "0.1.22", optional = true }
+awc = { version = "0.2", optional = true }
 
 [dev-dependencies]
 tempdir = "0.3"

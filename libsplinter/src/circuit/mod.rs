@@ -19,6 +19,8 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 
 use crate::circuit::directory::CircuitDirectory;
 use crate::circuit::service::{Service, ServiceId, SplinterNode};
@@ -34,27 +36,18 @@ pub struct Circuit {
     persistence: String,
     durability: String,
     routes: String,
+
+    #[serde(default = "Circuit::default_management_type")]
+    circuit_management_type: String,
 }
 
 impl Circuit {
-    pub fn new(
-        id: String,
-        auth: String,
-        members: Vec<String>,
-        roster: Vec<String>,
-        persistence: String,
-        durability: String,
-        routes: String,
-    ) -> Self {
-        Circuit {
-            id,
-            auth,
-            members,
-            roster: Roster::Standard(roster),
-            persistence,
-            durability,
-            routes,
-        }
+    pub fn builder() -> CircuitBuilder {
+        CircuitBuilder::default()
+    }
+
+    fn default_management_type() -> String {
+        "default".into()
     }
 
     pub fn new_admin() -> Self {
@@ -66,6 +59,7 @@ impl Circuit {
             persistence: "".into(),
             durability: "".into(),
             routes: "".into(),
+            circuit_management_type: "".into(),
         }
     }
 
@@ -96,6 +90,116 @@ impl Circuit {
     pub fn routes(&self) -> &str {
         &self.routes
     }
+
+    pub fn circuit_management_type(&self) -> &str {
+        &self.circuit_management_type
+    }
+}
+
+#[derive(Default)]
+pub struct CircuitBuilder {
+    id: Option<String>,
+    auth: Option<String>,
+    members: Vec<String>,
+    roster: Vec<ServiceDefinition>,
+    persistence: Option<String>,
+    durability: Option<String>,
+    routes: Option<String>,
+
+    circuit_management_type: Option<String>,
+}
+
+impl CircuitBuilder {
+    pub fn with_id(mut self, id: String) -> Self {
+        self.id = Some(id);
+
+        self
+    }
+
+    pub fn with_members<I: IntoIterator<Item = String>>(mut self, members: I) -> Self {
+        self.members.extend(members.into_iter());
+
+        self
+    }
+
+    pub fn with_roster<I: IntoIterator<Item = ServiceDefinition>>(mut self, roster: I) -> Self {
+        self.roster.extend(roster.into_iter());
+
+        self
+    }
+
+    pub fn with_auth(mut self, auth: String) -> Self {
+        self.auth = Some(auth);
+
+        self
+    }
+
+    pub fn with_persistence(mut self, persistence: String) -> Self {
+        self.persistence = Some(persistence);
+
+        self
+    }
+
+    pub fn with_durability(mut self, durability: String) -> Self {
+        self.durability = Some(durability);
+
+        self
+    }
+
+    pub fn with_routes(mut self, id: String) -> Self {
+        self.routes = Some(id);
+
+        self
+    }
+
+    pub fn with_circuit_management_type(mut self, circuit_management_type: String) -> Self {
+        self.circuit_management_type = Some(circuit_management_type);
+
+        self
+    }
+
+    pub fn build(self) -> Result<Circuit, CircuitBuildError> {
+        if self.members.is_empty() {
+            return Err(CircuitBuildError(
+                "Circuit requires at least one member".into(),
+            ));
+        }
+
+        Ok(Circuit {
+            id: self
+                .id
+                .ok_or_else(|| CircuitBuildError("Circuit requires an id".into()))?,
+            auth: self.auth.ok_or_else(|| {
+                CircuitBuildError("Circuit requires an auth configuration".into())
+            })?,
+
+            members: self.members,
+            roster: Roster::Standard(self.roster),
+            persistence: self.persistence.ok_or_else(|| {
+                CircuitBuildError("Circuit requires a persistence setting".into())
+            })?,
+            routes: self
+                .routes
+                .ok_or_else(|| CircuitBuildError("Circuit requires a routes setting".into()))?,
+            durability: self
+                .durability
+                .ok_or_else(|| CircuitBuildError("Circuit requires a durability setting".into()))?,
+            circuit_management_type: self
+                .circuit_management_type
+                .unwrap_or_else(Circuit::default_management_type),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct CircuitBuildError(pub String);
+
+impl std::error::Error for CircuitBuildError {}
+
+impl Display for CircuitBuildError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "unable to build circuit: {}", self.0)
+    }
 }
 
 pub struct Members<'c> {
@@ -125,23 +229,96 @@ impl<'c> IntoIterator for Members<'c> {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct ServiceDefinition {
+    service_id: String,
+    service_type: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default = "Vec::new")]
+    allowed_nodes: Vec<String>,
+
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default = "BTreeMap::new")]
+    arguments: BTreeMap<String, String>,
+}
+
+impl ServiceDefinition {
+    pub fn builder(service_id: String, service_type: String) -> ServiceDefinitionBuilder {
+        ServiceDefinitionBuilder {
+            service_id,
+            service_type,
+            allowed_nodes: vec![],
+            arguments: BTreeMap::new(),
+        }
+    }
+
+    pub fn service_id(&self) -> &str {
+        &self.service_id
+    }
+
+    pub fn service_type(&self) -> &str {
+        &self.service_type
+    }
+
+    pub fn allowed_nodes(&self) -> &[String] {
+        &self.allowed_nodes
+    }
+
+    pub fn arguments(&self) -> &BTreeMap<String, String> {
+        &self.arguments
+    }
+}
+
+pub struct ServiceDefinitionBuilder {
+    service_id: String,
+    service_type: String,
+    allowed_nodes: Vec<String>,
+    arguments: BTreeMap<String, String>,
+}
+
+impl ServiceDefinitionBuilder {
+    pub fn with_allowed_nodes<I: IntoIterator<Item = String>>(mut self, node_ids: I) -> Self {
+        self.allowed_nodes.extend(node_ids.into_iter());
+
+        self
+    }
+
+    pub fn with_arguments<I: IntoIterator<Item = (String, String)>>(
+        mut self,
+        arguments: I,
+    ) -> Self {
+        self.arguments.extend(arguments.into_iter());
+
+        self
+    }
+
+    pub fn build(self) -> ServiceDefinition {
+        ServiceDefinition {
+            service_id: self.service_id,
+            service_type: self.service_type,
+            allowed_nodes: self.allowed_nodes,
+            arguments: self.arguments,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Roster {
-    Standard(Vec<String>),
+    Standard(Vec<ServiceDefinition>),
     Admin,
 }
 
 impl Roster {
     pub fn contains(&self, service_name: &str) -> bool {
         match self {
-            Roster::Standard(roster) => {
-                roster.iter().any(|roster_name| roster_name == service_name)
-            }
+            Roster::Standard(roster) => roster
+                .iter()
+                .any(|service_def| service_def.service_id == service_name),
             Roster::Admin => service_name.starts_with("admin::"),
         }
     }
 
-    pub fn to_vec(&self) -> Vec<String> {
+    pub fn to_vec(&self) -> Vec<ServiceDefinition> {
         match self {
             Roster::Standard(roster) => roster.to_vec(),
             Roster::Admin => Vec::with_capacity(0),
@@ -157,12 +334,12 @@ impl Roster {
 }
 
 pub enum RosterIter<'r> {
-    Standard(std::slice::Iter<'r, String>),
+    Standard(std::slice::Iter<'r, ServiceDefinition>),
     Admin,
 }
 
 impl<'r> Iterator for RosterIter<'r> {
-    type Item = &'r String;
+    type Item = &'r ServiceDefinition;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -173,7 +350,7 @@ impl<'r> Iterator for RosterIter<'r> {
 }
 
 impl<'r> IntoIterator for &'r Roster {
-    type Item = &'r String;
+    type Item = &'r ServiceDefinition;
     type IntoIter = RosterIter<'r>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -206,9 +383,7 @@ impl SplinterState {
     fn write_circuit_directory(&self) -> Result<(), WriteError> {
         // Replace stored state with the current splinter state
         let mut storage = get_storage(self.storage_location(), || self.circuit_directory.clone())
-            .map_err(|err| {
-            WriteError::GetStorageError(format!("Unable to get storage: {}", err))
-        })?;
+            .map_err(|err| WriteError::GetStorageError(err.to_string()))?;
 
         // when this is dropped the new state will be written to storage
         **storage.write() = self.circuit_directory.clone();
@@ -268,11 +443,25 @@ impl SplinterState {
     pub fn circuit(&self, circuit_name: &str) -> Option<&Circuit> {
         self.circuit_directory.circuit(circuit_name)
     }
+
+    pub fn has_circuit(&self, circuit_name: &str) -> bool {
+        self.circuit_directory.has_circuit(circuit_name)
+    }
 }
 
 #[derive(Debug)]
 pub enum WriteError {
     GetStorageError(String),
+}
+
+impl Error for WriteError {}
+
+impl std::fmt::Display for WriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WriteError::GetStorageError(msg) => write!(f, "Unable to get storage: {}", msg),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -290,6 +479,15 @@ mod tests {
         path
     }
 
+    impl Into<ServiceDefinition> for &str {
+        fn into(self) -> ServiceDefinition {
+            ServiceDefinition::builder(self.to_string(), "test_type".into())
+                .with_allowed_nodes(vec!["*".into()])
+                .with_arguments(vec![("test-key".into(), "test-value".into())])
+                .build()
+        }
+    }
+
     #[test]
     fn test_circuit_write_file() {
         // create temp directoy
@@ -305,20 +503,24 @@ mod tests {
         // Check that SplinterState does not have any circuits
         assert!(state.circuits().len() == 0);
 
-        let circuit = Circuit::new(
-            "alpha".into(),
-            "trust".into(),
-            vec!["123".into()],
-            vec!["abc".into(), "def".into()],
-            "any".into(),
-            "none".into(),
-            "require_direct".into(),
-        );
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth("trust".into())
+            .with_members(vec!["123".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence("any".into())
+            .with_durability("none".into())
+            .with_routes("require_direct".into())
+            .with_circuit_management_type("test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
+
         // add circuit to splinter state
         state.add_circuit("alpha".into(), circuit).unwrap();
 
         // reload storage and check that the circuit was written
         let storage = get_storage(&path, CircuitDirectory::new).unwrap();
+
         assert_eq!(storage.read().circuits().len(), 1);
         assert!(storage.read().circuits().contains_key("alpha"));
 
@@ -330,7 +532,7 @@ mod tests {
                 .unwrap()
                 .roster()
                 .to_vec(),
-            vec!["abc".to_string(), "def".to_string()]
+            vec!["abc".into(), "def".into()]
         );
 
         assert_eq!(

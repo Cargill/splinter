@@ -16,7 +16,7 @@ pub mod dispatch;
 mod dispatch_proto;
 pub mod handlers;
 pub mod peer;
-pub mod reply;
+pub(crate) mod reply;
 pub mod sender;
 
 use uuid::Uuid;
@@ -152,7 +152,6 @@ impl PeerMap {
 
 #[derive(Clone)]
 pub struct Network {
-    // Peer Id to Connection Id
     peers: Arc<RwLock<PeerMap>>,
     mesh: Mesh,
 }
@@ -402,5 +401,4 @@ pub mod tests {
         assert_eq!("123", message.peer_id());
         assert_eq!(b"hello_world", message.payload());
     }
-
 }

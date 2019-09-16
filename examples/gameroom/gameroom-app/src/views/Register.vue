@@ -16,18 +16,34 @@ limitations under the License.
 
 <template>
   <div class="auth-container">
+    <toast toast-type="error" :active="error" v-on:toast-action="clearError">
+      {{ error }}
+    </toast>
     <div class="auth-wrapper">
       <form class="auth-form" @submit.prevent="register">
-        <label class= "form-label">
-          Email
+        <label class="form-label">
+          <div>Email</div>
           <input
             class="form-input"
             type="email"
             v-model="email"
+            v-focus
           />
         </label>
         <label class="form-label">
-          Password
+          <div>Private Key</div>
+            <div class="form-input-icon-wrapper">
+              <input
+                class="input"
+                type="text"
+                v-model="privateKey"/>
+              <button class="form-button" type="button" @click.prevent="generatePrivateKey">
+                <i class="icon material-icons-round">autorenew</i>
+              </button>
+            </div>
+        </label>
+        <label class="form-label">
+          <div>Password</div>
           <input
             class="form-input"
             type="password"
@@ -35,23 +51,25 @@ limitations under the License.
           />
         </label>
         <label class="form-label">
-          Confirm Password
+          <div>Confirm Password</div>
           <input
             class="form-input"
             type="password"
             v-model="confirmPassword"
           />
         </label>
-        <button class="btn-action form-button" type="submit" :disabled="!canSubmit">
-          <div v-if="submitting"> Registering... </div>
-          <div v-else> Register </div>
-        </button>
-        <span class="form-link">
-          Already have an account?
-          <router-link to="/login">
-            Click here to log in.
-          </router-link>
-        </span>
+        <div class="submit-container">
+          <button class="btn-action large" type="submit" :disabled="!canSubmit">
+            <div v-if="submitting" class="spinner" />
+            <div v-else> Register </div>
+          </button>
+          <div class="form-link">
+            Already have an account?
+            <router-link to="/login">
+              Click here to log in.
+            </router-link>
+          </div>
+        </div>
       </form>
     </div>
   </div>
@@ -59,18 +77,24 @@ limitations under the License.
 
 <script lang="ts">
 import { Vue, Component } from 'vue-property-decorator';
+import Toast from '../components/Toast.vue';
 import * as crypto from '@/utils/crypto';
 
-@Component
+@Component({
+  components: { Toast },
+})
 export default class Register extends Vue {
   email = '';
+  privateKey = '';
   password = '';
   confirmPassword = '';
   submitting = false;
+  error = '';
 
   get canSubmit() {
     if (!this.submitting &&
         this.email !== '' &&
+        this.privateKey !== '' &&
         this.password !== '' &&
         this.confirmPassword !== '') {
       return true;
@@ -78,19 +102,31 @@ export default class Register extends Vue {
     return false;
   }
 
+  clearError() {
+    this.error = '';
+  }
+
+  generatePrivateKey() {
+    const privKey = crypto.createPrivateKey();
+    this.privateKey = privKey;
+  }
+
   async register() {
     if (this.password !== this.confirmPassword) {
-      alert('Passwords do not match');
+      this.error = 'Passwords do not match.';
       return;
     }
-    const keys = crypto.createKeyPair(this.password);
     this.submitting = true;
-    await this.$store.dispatch('user/register', {
-      email: this.email,
-      hashedPassword: crypto.hashSHA256(this.email, this.password),
-      publicKey: keys.publicKey,
-      encryptedPrivateKey: keys.encryptedPrivateKey,
-    });
+    try {
+      await this.$store.dispatch('user/register', {
+        email: this.email,
+        privateKey: this.privateKey,
+        password: this.password,
+      });
+      this.$router.push({ name: 'dashboard' });
+    } catch (e) {
+      this.error = e.message;
+    }
     this.submitting = false;
   }
 }
