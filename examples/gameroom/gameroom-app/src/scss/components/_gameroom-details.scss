@@ -57,6 +57,9 @@
     color: $color-text-disabled;
   }
 
+  .invalidInput {
+    color: #ff6659;
+  }
     /* games list styling */
   .data-container {
     @include overlay(1);

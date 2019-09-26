@@ -24,6 +24,7 @@ limitations under the License.
             Game name
             <input class="form-input" type="text" v-model="newGameName" />
           </label>
+          <span class='invalidInput'>{{ invalidGameNameMessage }}</span>
           <div class="flex-container button-container">
             <button class="btn-action outline small"
                     type="reset"
@@ -120,6 +121,7 @@ import Modal from '@/components/Modal.vue';
       newGameName = '';
       displayModal = false;
       submitting = false;
+      invalidGameNameMessage = '';
 
       mounted() {
         gamerooms.listGamerooms().then(() => {
@@ -162,9 +164,24 @@ import Modal from '@/components/Modal.vue';
        }
      }
 
+     get gameNameIsValid() {
+       if (this.newGameName !== '') {
+         if (this.newGameName.indexOf('%') !== -1) {
+           this.invalidGameNameMessage = 'Invalid character \`%\`.';
+           return false;
+         } else {
+           this.invalidGameNameMessage = '';
+           return true;
+         }
+       } else {
+         this.invalidGameNameMessage = '';
+         return false;
+       }
+     }
+
      get canSubmitNewGame() {
-       if (!this.submitting &&
-           this.newGameName !== '') {
+       if (!this.submitting && this.gameNameIsValid) {
+
          return true;
        }
        return false;
