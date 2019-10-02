@@ -305,6 +305,11 @@ components:
         endpoint:
           description: The node's service endpoint
           example: tcp://foo.bar.biz
+        connected_peers:
+          description: A list of peers currently connected to a node
+          type: array
+          items:
+            type: string
       required:
         - version
 

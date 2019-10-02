@@ -51,7 +51,7 @@ impl NetworkMessage {
     }
 }
 
-struct PeerMap {
+pub struct PeerMap {
     peers: BiHashMap<String, usize>,
     redirects: HashMap<String, String>,
     endpoints: BiHashMap<String, String>,
@@ -74,6 +74,13 @@ impl PeerMap {
         self.peers
             .keys()
             .map(std::string::ToString::to_string)
+            .collect()
+    }
+
+    pub fn peer_endpoints(&self) -> Vec<String> {
+        self.peer_ids()
+            .iter()
+            .filter_map(|id| self.get_peer_endpoint(id))
             .collect()
     }
 
@@ -162,6 +169,10 @@ impl Network {
             peers: Arc::new(RwLock::new(PeerMap::new())),
             mesh,
         }
+    }
+
+    pub fn peers(&self) -> Arc<RwLock<PeerMap>> {
+        self.peers.clone()
     }
 
     pub fn peer_ids(&self) -> Vec<String> {

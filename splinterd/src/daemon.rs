@@ -320,6 +320,7 @@ impl SplinterDaemon {
 
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
+        let peer_map = self.network.peers();
         let (rest_api_shutdown_handle, rest_api_join_handle) = RestApiBuilder::new()
             .with_bind(&self.rest_api_endpoint)
             .add_resource(Resource::new(
@@ -328,7 +329,7 @@ impl SplinterDaemon {
                 routes::get_openapi,
             ))
             .add_resource(Resource::new(Method::Get, "/status", move |_, _| {
-                routes::get_status(node_id.clone(), service_endpoint.clone())
+                routes::get_status(node_id.clone(), service_endpoint.clone(), peer_map.clone())
             }))
             .add_resources(node_registry_manager.resources())
             .add_resources(key_registry_manager.resources())

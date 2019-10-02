@@ -12,24 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::{Arc, RwLock};
+
 use libsplinter::actix_web::{web, Error, HttpRequest, HttpResponse};
 use libsplinter::futures::{Future, IntoFuture};
+use libsplinter::network::PeerMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Status {
     node_id: String,
     endpoint: String,
     version: String,
+    connected_peers: Vec<String>,
 }
 
 pub fn get_status(
     node_id: String,
     endpoint: String,
+    peer_map: Arc<RwLock<PeerMap>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let connected_peers = if let Ok(inner) = peer_map.read() {
+        inner.peer_endpoints()
+    } else {
+        return Box::new(HttpResponse::InternalServerError().finish().into_future());
+    };
     let status = Status {
         node_id,
         endpoint,
         version: get_version(),
+        connected_peers,
     };
 
     Box::new(HttpResponse::Ok().json(status).into_future())
