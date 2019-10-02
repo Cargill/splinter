@@ -19,7 +19,7 @@ mod action;
 mod error;
 
 use crate::error::CliError;
-use action::{admin, Action, SubcommandActions};
+use action::{admin, health, Action, SubcommandActions};
 
 use clap::clap_app;
 use log::LogLevel;
@@ -62,6 +62,13 @@ fn run() -> Result<(), CliError> {
                 (@arg quiet: -q --quiet "do not display output")
             )
         )
+        (@subcommand health =>
+            (about: "Splinter commands for inspecting network integrety and health")
+            (@subcommand status =>
+                (about: "Check status of node")
+                (@arg url: -u +takes_value "Url of node")
+            )
+        )
     )
     .get_matches();
 
@@ -79,6 +86,10 @@ fn run() -> Result<(), CliError> {
             SubcommandActions::new()
                 .with_command("keygen", admin::KeyGenAction)
                 .with_command("keyregistry", admin::KeyRegistryGenerationAction),
+        )
+        .with_command(
+            "health",
+            SubcommandActions::new().with_command("status", health::StatusAction),
         )
         .run(Some(&matches))
 }
