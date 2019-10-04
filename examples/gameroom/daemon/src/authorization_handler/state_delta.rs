@@ -113,9 +113,19 @@ impl XoStateDeltaProcessor {
                             },
                         )?;
 
+                        let requester = match game_state[2].as_str() {
+                            "P1-NEXT" | "P2-WIN" => &game_state[4],
+                            _ => &game_state[3],
+                        };
+
+                        let notification_type = match game_state[2].as_str() {
+                            "TIE" | "P1-WIN" | "P2-WIN" => format!("game_over:{}", game_state[0]),
+                            _ => format!("game_updated:{}", game_state[0]),
+                        };
+
                         let notification = helpers::create_new_notification(
-                            &format!("game_updated:{}", game_state[0]),
-                            &self.requester,
+                            &notification_type,
+                            &requester,
                             &self.node_id,
                             &self.circuit_id,
                         );
