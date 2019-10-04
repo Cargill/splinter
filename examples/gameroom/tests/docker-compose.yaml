@@ -34,7 +34,7 @@ services:
         "
 
   splinterd-node:
-    image: splinterd-node
+    image: spliterd-node
     expose:
       - 8080
       - 8043
