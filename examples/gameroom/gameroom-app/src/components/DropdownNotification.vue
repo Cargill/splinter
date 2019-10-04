@@ -101,7 +101,11 @@ export default class DropdownNotification extends Vue {
 
   markAsRead() {
     this.$store.dispatch('notifications/markRead', this.notification.id);
-    this.$router.push(this.link);
+    this.$router.push(this.link).catch((err) => {
+      if (err.name !== 'NavigationDuplicated') {
+        console.error(err);
+      }
+    });
     this.$emit('click');
   }
 }
