@@ -51,13 +51,43 @@ export default class DropdownNotification extends Vue {
   notification!: GameroomNotification;
 
   get link(): any {
-    const regex = RegExp('^new_game_created');
-    const notification: string =
-        regex.test(this.notification.notification_type) ? 'new_game_created' : this.notification.notification_type;
+    let notification: string = this.notification.notification_type;
+    if (this.notification.notification_type.includes('new_game_created')) {
+      notification = 'new_game_created';
+    }
+    if (this.notification.notification_type.includes('game_updated')) {
+      notification = 'game_updated';
+    }
+    if (this.notification.notification_type.includes('game_over')) {
+      notification = 'game_over';
+    }
     switch (notification) {
       case('gameroom_proposal'): return {name: 'invitations'};
       case('circuit_active'): return {name: 'gamerooms', params: {id: `${this.notification.target}`}};
-      case('new_game_created'): return {name: 'games', params: {id: `${this.notification.target}`, gameNameHash: `${hashGameName(this.getGameName(this.notification.notification_type))}`}};
+      case('new_game_created'):
+        return {
+          name: 'games',
+          params: {
+            id: `${this.notification.target}`,
+            gameNameHash: `${hashGameName(this.getGameName(this.notification.notification_type))}`,
+          },
+        };
+      case('game_updated'):
+        return {
+          name: 'games',
+          params: {
+            id: `${this.notification.target}`,
+            gameNameHash: `${hashGameName(this.getGameName(this.notification.notification_type))}`,
+          },
+        };
+      case('game_over'):
+        return {
+          name: 'games',
+          params: {
+            id: `${this.notification.target}`,
+            gameNameHash: `${hashGameName(this.getGameName(this.notification.notification_type))}`,
+          },
+        };
       default: return '';
     }
   }
@@ -69,10 +99,17 @@ export default class DropdownNotification extends Vue {
   }
 
   formatText(notification: GameroomNotification) {
-    const regex = RegExp('new_game_created:');
-    if (regex.test(notification.notification_type)) {
+    if (RegExp('new_game_created:').test(notification.notification_type)) {
       const gameName = this.getGameName(notification.notification_type);
       return  `A new game is available in gameroom ${this.getName()}: ${gameName}`;
+    }
+    if (RegExp('game_updated:').test(notification.notification_type)) {
+      const gameName = this.getGameName(notification.notification_type);
+      return  `It's your turn: ${gameName}`;
+    }
+    if (RegExp('game_over:').test(notification.notification_type)) {
+      const gameName = this.getGameName(notification.notification_type);
+      return  `Game over: ${gameName}`;
     }
     switch (notification.notification_type) {
       case('gameroom_proposal'): {
@@ -86,13 +123,7 @@ export default class DropdownNotification extends Vue {
   }
 
   getGameName(notificationType: string): string {
-    const regex = RegExp('new_game_created:');
-    if (regex.test(notificationType)) {
-      const gameName = notificationType.split('new_game_created:')[1];
-      return  gameName;
-    } else {
-      return '';
-    }
+    return notificationType.split(':')[1];
   }
 
   fromNow(timestamp: number): string {
