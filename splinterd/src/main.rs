@@ -110,7 +110,7 @@ fn main() {
         (@arg insecure:  --("insecure")
           "if set tls should accept all peer certificates")
         (@arg generate_certs:  --("generate-certs")
-          "if set, the certs will be generated and insecure will be false, only use for development")
+          "if set, the certs will be generated and run in insecure mode, only use for development")
         (@arg common_name: --("common-name") +takes_value
           "the common name that should be used in the generated cert, defaults to localhost")
         (@arg bind: --("bind") +takes_value
