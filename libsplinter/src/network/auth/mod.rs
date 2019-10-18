@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::network::Network;
+use crate::network::{ConnectionError, Network};
 
 /// The states of a connection during authorization.
 #[derive(PartialEq, Debug, Clone)]
@@ -68,6 +68,8 @@ enum AuthorizationActionError {
     AlreadyConnecting,
     InvalidMessageOrder(AuthorizationState, AuthorizationAction),
     ConnectionLost,
+    AlreadyAuthorized(String),
+    NetworkError(ConnectionError),
 }
 
 impl fmt::Display for AuthorizationActionError {
@@ -81,6 +83,12 @@ impl fmt::Display for AuthorizationActionError {
             }
             AuthorizationActionError::ConnectionLost => {
                 f.write_str("Connection lost while authorizing peer")
+            }
+            AuthorizationActionError::AlreadyAuthorized(peer_id) => {
+                write!(f, "Already authorized with {}", peer_id)
+            }
+            AuthorizationActionError::NetworkError(err) => {
+                write!(f, "Received error from the network {}", err)
             }
         }
     }
@@ -180,6 +188,18 @@ impl AuthorizationManager {
             AuthorizationState::Connecting => match action {
                 AuthorizationAction::Connecting => Err(AuthorizationActionError::AlreadyConnecting),
                 AuthorizationAction::TrustIdentifying(new_peer_id) => {
+                    // check if new node_id already exists
+                    if shared
+                        .states
+                        .get(&new_peer_id)
+                        .unwrap_or(&AuthorizationState::Unknown)
+                        == &AuthorizationState::Authorized
+                    {
+                        self.network
+                            .remove_connection(peer_id)
+                            .map_err(AuthorizationActionError::NetworkError)?;
+                        return Err(AuthorizationActionError::AlreadyAuthorized(new_peer_id));
+                    }
                     // Verify pub key allowed
                     shared.states.remove(peer_id);
                     self.network
