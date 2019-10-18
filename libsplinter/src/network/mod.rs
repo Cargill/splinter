@@ -191,7 +191,10 @@ impl Network {
 
     pub fn remove_connection(&self, peer_id: &str) -> Result<(), ConnectionError> {
         if let Some(mesh_id) = rwlock_write_unwrap!(self.peers).remove(peer_id) {
-            self.mesh.remove(mesh_id)?;
+            let mut connection = self.mesh.remove(mesh_id)?;
+            connection.disconnect().map_err(|_| {
+                ConnectionError::RemoveError(format!("unable to disconnect from {}", peer_id))
+            })?;
         }
 
         Ok(())
@@ -381,6 +384,9 @@ pub mod tests {
 
             // send hello world
             assert_ok(network_two.send(&peer_id, b"hello_world"));
+
+            // keep open until connection is removed
+            network_two.recv()
         });
 
         // accept connection
@@ -400,5 +406,8 @@ pub mod tests {
         let message = assert_ok(network_one.recv());
         assert_eq!("123", message.peer_id());
         assert_eq!(b"hello_world", message.payload());
+
+        //remove connections
+        network_one.remove_connection("123").unwrap();
     }
 }
