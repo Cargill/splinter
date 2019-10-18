@@ -302,7 +302,7 @@ impl From<MeshSendError> for SendError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ConnectionError {
     AddError(String),
     RemoveError(String),
