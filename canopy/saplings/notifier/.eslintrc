@@ -1,0 +1,19 @@
+{
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js"]
+      }
+    }
+  },
+  "env": {
+    "es6": true,
+    "jest": true,
+    "browser": true
+  },
+  "rules": {
+    "import/no-default-export": 2,
+    "import/prefer-default-export": 0
+  },
+  "extends": ["airbnb", "plugin:prettier/recommended"]
+}
