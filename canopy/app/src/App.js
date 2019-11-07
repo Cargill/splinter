@@ -15,7 +15,11 @@
  */
 
 import React, { useRef, useLayoutEffect, useState } from 'react';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faBell } from '@fortawesome/free-solid-svg-icons';
+
 import { loadAllSaplings } from './loadSaplings';
+
 import 'App.scss';
 
 const canopyState = {
@@ -50,6 +54,8 @@ window.$CANOPY = {
     canopyState.configSaplings[namespace] = bootStrapFunction;
   }
 };
+
+library.add(faBell);
 
 function App() {
   const saplingNode = useRef(null);
