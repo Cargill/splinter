@@ -14,27 +14,16 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { createStore } from 'redux';
-import { Provider } from 'react-redux';
+/*
+ * action types
+ */
 
-import App from 'App';
-import rootReducer from 'reducers';
+export const READ_NOTIFICATION = 'READ_NOTIFICATION';
 
-import './index.css';
+/*
+ * action creators
+ */
 
-const store = createStore(
-  rootReducer,
-
-  // This enables the use of redux devtools in the browser
-  // eslint-disable-next-line no-underscore-dangle
-  window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__()
-);
-
-ReactDOM.render(
-  <Provider store={store}>
-    <App />
-  </Provider>,
-  document.getElementById('root')
-);
+export const readNotification = id => {
+  return { type: READ_NOTIFICATION, id };
+};

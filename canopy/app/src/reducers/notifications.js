@@ -14,27 +14,31 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { createStore } from 'redux';
-import { Provider } from 'react-redux';
+import { READ_NOTIFICATION } from 'actions';
 
-import App from 'App';
-import rootReducer from 'reducers';
+const mockNotifications = [
+  {
+    id: 1,
+    text: 'You have a new friend request!',
+    isRead: false
+  },
+  {
+    id: 2,
+    text: 'You just lost the game.',
+    isRead: false
+  }
+];
 
-import './index.css';
-
-const store = createStore(
-  rootReducer,
-
-  // This enables the use of redux devtools in the browser
-  // eslint-disable-next-line no-underscore-dangle
-  window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__()
-);
-
-ReactDOM.render(
-  <Provider store={store}>
-    <App />
-  </Provider>,
-  document.getElementById('root')
-);
+export default (state = mockNotifications, action) => {
+  switch (action.type) {
+    case READ_NOTIFICATION:
+      return state.map(notification => {
+        if (action.id === notification.id) {
+          return { ...notification, isRead: true };
+        }
+        return notification;
+      });
+    default:
+      return state;
+  }
+};
