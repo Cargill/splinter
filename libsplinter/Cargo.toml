@@ -13,6 +13,20 @@
 # limitations under the License.
 
 [features]
+default = []
+
+stable = [
+    "admin-service",
+    "sawtooth-signing-compat",
+    "scabbard-service",
+]
+
+experimental = [
+    "events",
+    "ursa-compat",
+    "zmq-transport",
+]
+
 admin-service = []
 scabbard-service = []
 zmq-transport = ["zmq"]
