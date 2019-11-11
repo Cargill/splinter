@@ -39,6 +39,7 @@ pub mod error;
 mod factory;
 mod processor;
 mod registry;
+#[cfg(feature = "scabbard-service")]
 pub mod scabbard;
 mod sender;
 
