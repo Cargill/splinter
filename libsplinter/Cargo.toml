@@ -13,6 +13,7 @@
 # limitations under the License.
 
 [features]
+admin-service = []
 zmq-transport = ["zmq"]
 ursa-compat = ["ursa"]
 sawtooth-signing-compat = ["sawtooth-sdk"]

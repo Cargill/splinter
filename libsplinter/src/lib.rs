@@ -49,6 +49,7 @@ macro_rules! mutex_lock_unwrap {
     };
 }
 
+#[cfg(feature = "admin-service")]
 pub mod admin;
 pub mod channel;
 pub mod circuit;

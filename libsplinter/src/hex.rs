@@ -15,7 +15,9 @@
 use std::error::Error;
 use std::fmt::{self, Write};
 
+#[cfg(feature = "admin-service")]
 use serde::de;
+#[cfg(feature = "admin-service")]
 use serde::{Deserializer, Serializer};
 
 pub fn to_hex(bytes: &[u8]) -> String {
@@ -48,6 +50,7 @@ pub fn parse_hex(hex: &str) -> Result<Vec<u8>, HexError> {
     Ok(res)
 }
 
+#[cfg(feature = "admin-service")]
 pub fn as_hex<S>(data: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -55,6 +58,7 @@ where
     serializer.serialize_str(&to_hex(data))
 }
 
+#[cfg(feature = "admin-service")]
 pub fn deserialize_hex<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
 where
     D: Deserializer<'de>,
