@@ -17,7 +17,9 @@
 import React, { useRef, useLayoutEffect, useState } from 'react';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { faBell } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
+import NotificationList from 'components/notifications/NotificationList';
 import { loadAllSaplings } from './loadSaplings';
 
 import 'App.scss';
@@ -60,6 +62,8 @@ library.add(faBell);
 function App() {
   const saplingNode = useRef(null);
   const [userSaplings, setUserSaplings] = useState([]);
+  const [notificationListIsOpen, setNotificationListIsOpen] = useState(false);
+
   useLayoutEffect(() => {
     (async function invokeSaplings() {
       const {
@@ -81,8 +85,14 @@ function App() {
   }, []);
 
   return (
-    <>
-      <nav>
+    <div className="app">
+      <nav className="side-nav">
+        <button
+          type="button"
+          onClick={() => setNotificationListIsOpen(!notificationListIsOpen)}
+        >
+          <FontAwesomeIcon icon="bell" />
+        </button>
         {userSaplings.map(({ displayName, namespace }) => {
           return (
             <a href={`/${namespace}`} key={namespace}>
@@ -91,8 +101,12 @@ function App() {
           );
         })}
       </nav>
-      <div ref={saplingNode} />
-    </>
+      <NotificationList
+        className="notification-list"
+        isOpen={notificationListIsOpen}
+      />
+      <div className="view" ref={saplingNode} />
+    </div>
   );
 }
 
