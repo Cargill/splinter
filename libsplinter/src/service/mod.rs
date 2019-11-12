@@ -146,6 +146,14 @@ pub trait Service: Send {
         message_context: &ServiceMessageContext,
     ) -> Result<(), ServiceError>;
 
+    // Handle responses from peering manager
+    fn handle_peering_manager_response(
+        &self,
+        _: PeeringManagerResponse,
+    ) -> Result<(), ServiceError> {
+        Ok(())
+    }
+
     /// Cast the service as `&dyn Any`.
     ///
     /// This allows for downcasting the `Service` to a specific implementation.
