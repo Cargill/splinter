@@ -49,6 +49,7 @@ use std::fs;
 #[cfg(not(feature = "config-toml"))]
 use std::fs::File;
 use std::io;
+use std::path::Path;
 use std::thread;
 
 const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
@@ -134,6 +135,8 @@ fn main() {
           "if set tls should accept all peer certificates")
         (@arg generate_certs:  --("generate-certs")
           "if set, the certs will be generated and insecure will be false, only use for development")
+        (@arg cert_location:  --("cert-location") +takes_value
+          "if generating certs, save the generated certs to this location.")
         (@arg common_name: --("common-name") +takes_value
           "the common name that should be used in the generated cert, defaults to localhost")
         (@arg bind: --("bind") +takes_value
@@ -331,9 +334,16 @@ fn get_transport(
                 // Generate Certificate Authority keys and certificate
                 let (ca_key, ca_cert) = make_ca_cert()?;
 
-                // Create temp directory to store ca.cert
                 let temp_dir = TempDir::new("tls-transport")?;
-                let temp_dir_path = temp_dir.path();
+                let dir_path = {
+                    match matches.value_of("cert_location") {
+                        Some(cert_location) => Path::new(cert_location),
+                        None => {
+                            // Create temp directory to store generated_certs
+                            temp_dir.path()
+                        }
+                    }
+                };
 
                 // Generate client and server keys and certificates
                 let (client_key, client_cert) =
@@ -342,25 +352,25 @@ fn get_transport(
                     make_ca_signed_cert(&ca_cert, &ca_key, &common_name)?;
 
                 let client_cert = write_file(
-                    temp_dir_path.to_path_buf(),
+                    dir_path.to_path_buf(),
                     "client.cert",
                     &client_cert.to_pem()?,
                 )?;
 
                 let client_key_file = write_file(
-                    temp_dir_path.to_path_buf(),
+                    dir_path.to_path_buf(),
                     "client.key",
                     &client_key.private_key_to_pem_pkcs8()?,
                 )?;
 
                 let server_cert = write_file(
-                    temp_dir_path.to_path_buf(),
+                    dir_path.to_path_buf(),
                     "server.cert",
                     &server_cert.to_pem()?,
                 )?;
 
                 let server_key_file = write_file(
-                    temp_dir_path.to_path_buf(),
+                    dir_path.to_path_buf(),
                     "server.key",
                     &server_key.private_key_to_pem_pkcs8()?,
                 )?;
