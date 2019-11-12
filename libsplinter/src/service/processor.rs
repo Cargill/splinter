@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, TryRecvError};
 use protobuf::Message;
 
 use std::collections::HashMap;
@@ -23,6 +23,7 @@ use std::time::Duration;
 
 use crate::channel;
 use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError};
+use crate::network::peer::PeerConnector;
 use crate::network::reply::InboundRouter;
 use crate::protos::authorization::{
     AuthorizationMessage, AuthorizationMessageType, ConnectRequest, ConnectRequest_HandshakeMode,
@@ -34,7 +35,9 @@ use crate::protos::circuit::{
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::error::ServiceProcessorError;
 use crate::service::registry::StandardServiceNetworkRegistry;
-use crate::service::sender::{ProcessorMessage, ServiceMessage};
+use crate::service::sender::{
+    PeeringManagerRequest, PeeringManagerResponse, ProcessorMessage, ServiceMessage,
+};
 use crate::service::{Service, ServiceMessageContext};
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
@@ -474,6 +477,130 @@ impl ShutdownHandle {
         (*self.do_shutdown)()
     }
 }
+
+pub struct PeeringManager {
+    peer_connector: PeerConnector,
+    services: HashMap<String, Sender<ProcessorMessage>>,
+    message_sender: Sender<PeeringManagerRequest>,
+    message_recv: Option<Receiver<PeeringManagerRequest>>,
+    thread_handle: Option<thread::JoinHandle<()>>,
+}
+
+impl PeeringManager {
+    pub fn new(peer_connector: PeerConnector) -> Self {
+        let (message_sender, message_recv) = crossbeam_channel::bounded(10);
+        PeeringManager {
+            peer_connector,
+            services: HashMap::new(),
+            message_sender,
+            message_recv: Some(message_recv),
+            thread_handle: None,
+        }
+    }
+
+    fn add_services(&mut self, services: &HashMap<String, Sender<ProcessorMessage>>) {
+        for (service_id, sender) in services {
+            self.services.insert(service_id.clone(), sender.clone());
+        }
+    }
+    pub fn start(&mut self) {
+        let message_recv = if self.message_recv.is_some() {
+            self.message_recv.take().unwrap()
+        } else {
+            return;
+        };
+
+        let services = self.services.clone();
+        let peer_connector = self.peer_connector.clone();
+
+        let thread_handle = thread::spawn(move || loop {
+            match message_recv.try_recv() {
+                Ok(PeeringManagerRequest::Connect {
+                    requester_service_id,
+                    peer_id,
+                    endpoint,
+                }) => {
+                    let router_send_result =
+                        if let Some(ref sender) = services.get(&requester_service_id) {
+                            match peer_connector.connect_peer(&peer_id, &endpoint) {
+                                Ok(_) => sender.send(ProcessorMessage::from(
+                                    PeeringManagerResponse::Connected { peer_id },
+                                )),
+                                Err(err) => sender.send(ProcessorMessage::from(
+                                    PeeringManagerResponse::Error {
+                                        message: format!("{:?}", err),
+                                    },
+                                )),
+                            }
+                        } else {
+                            warn!("Peer manager has not been registered with a process manager");
+                            Ok(())
+                        };
+
+                    if let Err(err) = router_send_result {
+                        error!("Failed to connect to service processor, {:?}", err);
+                    }
+                }
+                Ok(PeeringManagerRequest::Shutdown) => break,
+                Err(TryRecvError::Disconnected) => {
+                    warn!("No senders connected to peering manager");
+                    break;
+                }
+                Err(TryRecvError::Empty) => continue,
+            }
+        });
+
+        self.thread_handle = Some(thread_handle);
+    }
+
+    pub fn sender(&self) -> PmSender {
+        PmSender {
+            sender: self.message_sender.clone(),
+        }
+    }
+
+    pub fn shutdown(self) -> Result<(), PmError> {
+        let thread_handle = if let Some(th) = self.thread_handle {
+            th
+        } else {
+            return Ok(());
+        };
+
+        if let Err(err) = self.message_sender.send(PeeringManagerRequest::Shutdown) {
+            error!(
+                "Broken channel could not deliever shudown messasge: {:?}",
+                err
+            );
+        }
+
+        thread_handle
+            .join()
+            .map_err(|err| PmError(format!("{:?}", err)))
+    }
+}
+
+pub struct PmSender {
+    sender: Sender<PeeringManagerRequest>,
+}
+
+impl PmSender {
+    pub fn connect_to_peer(
+        &self,
+        requester_service_id: String,
+        peer_id: String,
+        endpoint: String,
+    ) -> Result<(), PmError> {
+        self.sender
+            .send(PeeringManagerRequest::Connect {
+                endpoint,
+                requester_service_id,
+                peer_id,
+            })
+            .map_err(|_| PmError("Failed to send Connect request".into()))
+    }
+}
+
+pub struct PmError(String);
 
 fn run_service_loop(
     circuit: String,
