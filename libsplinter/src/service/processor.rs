@@ -140,6 +140,11 @@ impl ServiceProcessor {
         }
     }
 
+    pub fn register_peering_manager(&self, pm: &mut PeeringManager) {
+        let services = rwlock_read_unwrap!(self.shared_state).services.clone();
+        pm.add_services(&services);
+    }
+
     /// Once the service processor is started it will handle incoming messages from the splinter
     /// node and route it to a running service.
     ///
