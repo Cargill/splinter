@@ -528,6 +528,11 @@ fn run_service_loop(
                     .handle_message(direct_message.get_payload(), &msg_context)
                     .map_err(to_process_err!("unable to handle circuit direct message"))?;
             }
+            ServiceMessage::PeeringManagerResponse(response) => {
+                service
+                    .handle_peering_manager_response(response)
+                    .map_err(to_process_err!("unable to handle peering manager message"))?;
+            }
         }
     }
     Ok(())

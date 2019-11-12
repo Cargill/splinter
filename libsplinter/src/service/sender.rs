@@ -26,13 +26,36 @@ use crate::service::{ServiceMessageContext, ServiceNetworkSender};
 #[derive(Debug, Clone)]
 pub enum ServiceMessage {
     AdminDirectMessage(AdminDirectMessage),
+    PeeringManagerResponse(PeeringManagerResponse),
     CircuitDirectMessage(CircuitDirectMessage),
+}
+
+#[derive(Debug)]
+pub enum PeeringManagerRequest {
+    Shutdown,
+    Connect {
+        requester_service_id: String,
+        endpoint: String,
+        peer_id: String,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum PeeringManagerResponse {
+    Connected { peer_id: String },
+    Error { message: String },
 }
 
 #[derive(Debug, Clone)]
 pub enum ProcessorMessage {
     ServiceMessage(ServiceMessage),
     Shutdown,
+}
+
+impl From<PeeringManagerResponse> for ProcessorMessage {
+    fn from(message: PeeringManagerResponse) -> Self {
+        ProcessorMessage::ServiceMessage(ServiceMessage::PeeringManagerResponse(message))
+    }
 }
 
 /// An implementation of a ServiceNetworkSender that should be used for AdminDirectMessage.

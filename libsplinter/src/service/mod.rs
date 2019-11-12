@@ -49,6 +49,7 @@ pub use processor::JoinHandles;
 pub use processor::ServiceProcessor;
 pub use processor::ShutdownHandle;
 pub use registry::StandardServiceNetworkRegistry;
+use sender::PeeringManagerResponse;
 
 pub use error::{
     FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
