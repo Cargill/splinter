@@ -14,20 +14,8 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
-pub(crate) mod helpers;
-pub(crate) mod models;
-pub(crate) mod schema;
+mod notifications;
 
-embed_migrations!("./src/biome/notifications/database/migrations");
-
-use diesel::pg::PgConnection;
-
-pub use crate::database::error::DatabaseError;
-
-pub fn run_migrations(conn: &PgConnection) -> Result<(), DatabaseError> {
-    embedded_migrations::run(conn).map_err(|err| DatabaseError::ConnectionError(Box::new(err)))?;
-
-    info!("Successfully applied migrations");
-
-    Ok(())
-}
+pub use notifications::{
+    insert_notification, insert_notification_property, insert_user_notification,
+};
