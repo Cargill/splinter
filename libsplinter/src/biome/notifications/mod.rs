@@ -15,3 +15,18 @@
  * -----------------------------------------------------------------------------
  */
 pub mod database;
+mod error;
+pub mod notification_manager;
+
+pub use error::NotificationManagerError;
+
+pub trait NotificationManager<T> {
+    /// Adds a notification to the underlying storage
+    ///
+    /// # Arguments
+    ///
+    ///  * `notification` - The notification to be added
+    ///
+    ///
+    fn add_notification(&self, notification: T) -> Result<(), NotificationManagerError>;
+}
