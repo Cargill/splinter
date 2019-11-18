@@ -19,9 +19,9 @@ use std::time::SystemTime;
 
 use super::schema::{notification_properties, notifications, user_notifications};
 
-#[derive(Insertable, Queryable)]
+#[derive(Debug, Serialize, Deserialize, Insertable, Queryable)]
 #[table_name = "notifications"]
-pub struct Notification {
+pub struct NotificationModel {
     pub id: String,
     pub payload_title: String,
     pub payload_body: String,
@@ -29,18 +29,17 @@ pub struct Notification {
     pub recipients: Vec<String>,
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Debug, Serialize, Deserialize, Insertable, Queryable)]
 #[table_name = "user_notifications"]
-pub struct UserNotification {
+pub struct UserNotificationModel {
     pub notification_id: String,
     pub user_id: String,
     pub unread: bool,
 }
 
-#[derive(Insertable, Queryable)]
+#[derive(Debug, Serialize, Deserialize, Insertable, Queryable)]
 #[table_name = "notification_properties"]
-pub struct NotificationProperty {
-    pub id: i64,
+pub struct NotificationPropertyModel {
     pub notification_id: String,
     pub property: String,
     pub property_value: String,
