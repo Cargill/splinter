@@ -15,6 +15,8 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
 
 import { useUserState, UserProvider } from 'UserStore';
 import SideNav from 'components/navigation/SideNav';
@@ -23,6 +25,8 @@ import { loadAllSaplings } from './loadSaplings';
 import 'App.scss';
 
 window.$CANOPY = {};
+
+library.add(faUserCircle);
 
 function App() {
   const saplingDomNode = useRef(null);
