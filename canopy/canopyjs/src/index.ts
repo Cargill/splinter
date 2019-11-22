@@ -18,6 +18,7 @@ export {
   SabreTransactionBuilder
 } from './transactions/transaction';
 export { BatchBuilder } from './transactions/batch';
+export { submitBatch } from './transactions/submitter';
 interface User {
   userId: string;
   displayName?: string;
