@@ -6,7 +6,9 @@
   "license": "Apache-2.0",
   "main": "dist/index.js",
   "dependencies": {
-    "protobufjs": "^6.8.8"
+    "@types/secp256k1": "^3.5.0",
+    "protobufjs": "^6.8.8",
+    "secp256k1": "^3.7.1"
   },
   "scripts": {
     "test": "jest",
