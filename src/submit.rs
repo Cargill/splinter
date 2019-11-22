@@ -74,7 +74,7 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, Cl
     Ok(batch_link.link)
 }
 
-pub fn wait_for_batch(url: &str, wait: u64) -> Result<bool, CliError> {
+pub fn wait_for_batch(url: &str, wait: u64) -> Result<StatusResponse, CliError> {
     let url_with_wait_query = format!("{}&wait={}", url, wait);
 
     // Validate url
@@ -113,10 +113,8 @@ pub fn wait_for_batch(url: &str, wait: u64) -> Result<bool, CliError> {
     });
 
     let body = core.run(work)?;
-    println!("Response Body:\n{}", body);
 
-    Ok(body.data.iter().all(|x| x.status == "COMMITTED")
-        || body.data.iter().any(|x| x.status == "INVALID"))
+    Ok(body)
 }
 
 #[derive(Deserialize, Debug)]
@@ -125,22 +123,29 @@ struct Link {
 }
 
 #[derive(Deserialize, Debug)]
-struct Data {
+pub struct BatchStatus {
     id: String,
     status: String,
     invalid_transactions: Vec<InvalidTransaction>,
 }
 
 #[derive(Deserialize, Debug)]
-struct InvalidTransaction {
+pub struct InvalidTransaction {
     id: String,
     message: String,
 }
 
 #[derive(Deserialize, Debug)]
-struct StatusResponse {
-    data: Vec<Data>,
+pub struct StatusResponse {
+    data: Vec<BatchStatus>,
     link: String,
+}
+
+impl StatusResponse {
+    pub fn is_finished(&self) -> bool {
+        self.data.iter().all(|x| x.status == "COMMITTED")
+            || self.data.iter().any(|x| x.status == "INVALID")
+    }
 }
 
 impl fmt::Display for Link {
@@ -149,7 +154,7 @@ impl fmt::Display for Link {
     }
 }
 
-impl fmt::Display for Data {
+impl fmt::Display for BatchStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut invalid_txn_string_vec = Vec::new();
         for txn in &self.invalid_transactions {

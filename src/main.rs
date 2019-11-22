@@ -139,12 +139,19 @@ fn run() -> Result<(), error::CliError> {
         return Err(error::CliError::UserError("Subcommand required".into()));
     };
 
-    while wait > 0 {
-        let time = Instant::now();
-        if submit::wait_for_batch(&batch_link, wait)? {
-            break;
-        }
-        wait -= time.elapsed().as_secs()
+    if wait > 0 {
+        let response_body = loop {
+            let time = Instant::now();
+            let status_response = submit::wait_for_batch(&batch_link, wait)?;
+
+            wait = wait.saturating_sub(time.elapsed().as_secs());
+
+            if wait == 0 || status_response.is_finished() {
+                break status_response;
+            }
+        };
+
+        println!("Response Body:\n{}", response_body);
     }
 
     Ok(())
