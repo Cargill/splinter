@@ -21,3 +21,5 @@ COPY package*.json ./
 RUN yarn install
 
 COPY . .
+
+RUN yarn generate-proto-files

@@ -5,12 +5,15 @@
   "author": "Cargill Incorporated",
   "license": "Apache-2.0",
   "main": "dist/index.js",
-  "dependencies": {},
+  "dependencies": {
+    "protobufjs": "^6.8.8"
+  },
   "scripts": {
     "test": "jest",
     "build": "tsc -p ./tsconfig.json --strict --outDir dist",
     "format": "prettier --write \"**/*.+(ts|*rc|json|js)\"",
-    "lint": "eslint src/*"
+    "lint": "eslint src/**/**/**/*",
+    "generate-proto-files": "node scripts/compile_protobuf.js ./protos"
   },
   "devDependencies": {
     "@types/jest": "^24.0.19",

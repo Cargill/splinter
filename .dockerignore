@@ -54,6 +54,7 @@
 /canopy/**/coverage
 /canopy/**/build
 /canopy**/dist
+/canopy/**/node_modules
 
 /target
 /Cargo.lock
