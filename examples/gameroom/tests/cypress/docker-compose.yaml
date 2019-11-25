@@ -16,6 +16,7 @@ version: '3'
 
 volumes:
   cargo-registry:
+  splinter-shared:
 
 services:
 
@@ -80,6 +81,26 @@ services:
           -b gameroomd-acme:8000 --splinterd-url http://splinterd-node:8085
       "
 
+  generate-shared:
+      image: splinter-cli
+      build:
+        context: ../../../..
+        dockerfile: cli/Dockerfile-installed-${DISTRO}
+        args:
+          - REPO_VERSION=${REPO_VERSION}
+      volumes:
+        - splinter-shared:/splinter_shared
+      command: |
+        bash -c "
+          if [ ! -f /splinter_shared/private/server.key ]
+          then
+            splinter cert generate \
+              -d  /splinter_shared/ \
+              --force
+          fi
+          tail -f /dev/null
+        "
+
   splinterd-node:
     image: splinterd-node
     expose:
@@ -91,6 +112,7 @@ services:
       - 8090:8085
     volumes:
       - ../:/project/tests
+      - splinter-shared:/splinter_shared
     build:
       context: ../../../..
       dockerfile: splinterd/Dockerfile-installed-${DISTRO}
@@ -98,7 +120,15 @@ services:
         - REPO_VERSION=${REPO_VERSION}
     entrypoint: |
       bash -c "
-        splinterd --generate-certs -c ./project/tests/splinterd-node-0-docker.toml -vv
+        # We need to wait for the generated certificates and keys to be
+        # available
+        while [ ! -f /splinter_shared/private/server.key ]; do \
+          echo 'waiting for certs and keys'; \
+          sleep 1; \
+        done && \
+        # Copy the generated keys and certificates to its expected location
+        cp -a /splinter_shared/. /etc/splinter/certs && \
+        splinterd --insecure -c ./project/tests/splinterd-node-0-docker.toml -vv
       "
 
   db-cypress-test:
