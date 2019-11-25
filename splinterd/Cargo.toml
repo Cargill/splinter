@@ -43,7 +43,7 @@ tempdir = "0.3"
 toml = "0.4.8"
 
 [features]
-default = ["generate-certs"]
+default = []
 
 experimental = [
     "config-builder",
