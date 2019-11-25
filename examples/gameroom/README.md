@@ -31,12 +31,12 @@ and [Docker Compose](https://docs.docker.com/compose).
      docker-compose -f examples/gameroom/docker-compose.yaml up
      ```
 1. To extract private keys to use in the web application, run bash using the
-   `generate-key-registry` image and read the private key.  For example, to get
+   `generate-shared` image and read the private key.  For example, to get
    Alice's private key:
 
     ```
-    $ docker-compose -f examples/gameroom/docker-compose.yaml run generate-key-registry bash
-    root@<container-id>:/# cat /key_registry/alice.priv; echo ""
+    $ docker-compose -f examples/gameroom/docker-compose.yaml run generate-shared bash
+    root@<container-id>:/# cat /gameroom_shared/key_registry/alice.priv; echo ""
     <the private key value>
     root@<container-id>:/#
     ```
@@ -54,4 +54,3 @@ and [Docker Compose](https://docs.docker.com/compose).
      ```
      docker-compose -f examples/gameroom/docker-compose.yaml down
      ```
-

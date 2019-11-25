@@ -16,13 +16,13 @@ version: '3'
 
 volumes:
   cargo-registry:
-  key-registry:
+  gameroom-shared:
   acme-var:
   bubba-var:
 
 services:
 
-    generate-key-registry:
+    generate-shared:
         image: splinter-cli
         build:
           context: ../..
@@ -30,15 +30,30 @@ services:
           args:
             - REPO_VERSION=${REPO_VERSION}
         volumes:
-          - key-registry:/key_registry
+          - gameroom-shared:/gameroom_shared
           - ./key_registry:/input
         command: |
           bash -c "
-            if [ ! -f /key_registry/keys.yaml ]
+            if [ ! -f /gameroom_shared/key_registry/keys.yaml ]
             then
+              mkdir -p /gameroom_shared/key_registry &&
               splinter admin keyregistry \
                 -i /input/key_registry_spec.yaml \
-                -d /key_registry \
+                -d /gameroom_shared/key_registry \
+                --force
+            fi
+            if [ ! -f /gameroom_shared/acme/private/server.key ]
+            then
+              mkdir -p /gameroom_shared/acme &&
+              splinter cert generate \
+                -d  /gameroom_shared/acme \
+                --force
+            fi
+            if [ ! -f /gameroom_shared/bubba/private/server.key ]
+            then
+              mkdir -p /gameroom_shared/bubba &&
+              splinter cert generate \
+                -d  /gameroom_shared/bubba \
                 --force
             fi
           "
@@ -128,23 +143,32 @@ services:
       ports:
         - 8088:8085
       volumes:
-        - key-registry:/key_registry_shared
+        - gameroom-shared:/gameroom_shared
         - acme-var:/var/lib/splinter
         - ./splinterd-config:/configs
         - ./node_registry:/node_registry
       entrypoint: |
         bash -c "
           # We need to wait for the generated key registry to be available
-          while [ ! -f /key_registry_shared/keys.yaml ]; do \
+          while [ ! -f /gameroom_shared/key_registry/keys.yaml ]; do \
             echo 'waiting for key registry'; \
             sleep 1; \
           done && \
+          # We need to wait for the generated certificates and keys to be
+          # available
+          while [ ! -f /gameroom_shared/acme/private/server.key ]; do \
+            echo 'waiting for certs and keys'; \
+            sleep 1; \
+          done && \
           # Copy the generated key registry to its expected location
-          cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
-          splinterd --generate-certs -c ./configs/splinterd-node-acme.toml -vv \
+          cp -a /gameroom_shared/key_registry/keys.yaml /var/lib/splinter && \
+          # Copy the generated keys and certificates to its expected location
+          cp -a /gameroom_shared/acme/. /etc/splinter/certs && \
+          splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
-              --bind 0.0.0.0:8085
+              --bind 0.0.0.0:8085 \
+              --insecure
         "
 
     db-bubba:
@@ -233,21 +257,30 @@ services:
       ports:
         - 8089:8085
       volumes:
-        - key-registry:/key_registry_shared
+        - gameroom-shared:/gameroom_shared
         - ./splinterd-config:/configs
         - ./node_registry:/node_registry
         - bubba-var:/var/lib/splinter
       entrypoint: |
         bash -c "
           # We need to wait for the generated key registry to be available
-          while [ ! -f /key_registry_shared/keys.yaml ]; do \
+          while [ ! -f /gameroom_shared/key_registry/keys.yaml ]; do \
             echo 'waiting for key registry'; \
             sleep 1; \
           done && \
+          # We need to wait for the generated certificates and keys to be
+          # available
+          while [ ! -f /gameroom_shared/bubba/private/server.key ]; do \
+            echo 'waiting for certs and keys'; \
+            sleep 1; \
+          done && \
           # Copy the generated key registry to its expected location
-          cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
-          splinterd --generate-certs -c ./configs/splinterd-node-bubba.toml -vv \
+          cp -a /gameroom_shared/key_registry/keys.yaml /var/lib/splinter && \
+          # Copy the generated keys and certificates to its expected location
+          cp -a /gameroom_shared/bubba/. /etc/splinter/certs && \
+          splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
-              --bind 0.0.0.0:8085
+              --bind 0.0.0.0:8085 \
+              --insecure
         "
