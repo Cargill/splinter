@@ -14,7 +14,29 @@
 
 version: "2.2"
 
+volumes:
+  splinter-shared:
+
 services:
+  generate-shared:
+      image: splinter-cli
+      build:
+        context: .
+        dockerfile: cli/Dockerfile-installed-${DISTRO}
+        args:
+          - REPO_VERSION=${REPO_VERSION}
+      volumes:
+        - splinter-shared:/splinter_shared
+      command: |
+        bash -c "
+          if [ ! -f /splinter_shared/private/server.key ]
+          then
+            splinter cert generate \
+              -d  /splinter_shared/ \
+              --force
+          fi
+        "
+
   splinterd-node-0:
     image: splinterd-node
     expose:
@@ -26,6 +48,7 @@ services:
     volumes:
       - ./splinterd/sample_configs:/configs
       - ./splinterd/sample_node_registries:/node_registries
+      - splinter-shared:/splinter_shared
     build:
       context: .
       dockerfile: splinterd/Dockerfile-installed-${DISTRO}
@@ -33,10 +56,18 @@ services:
         - REPO_VERSION=${REPO_VERSION}
     entrypoint: |
       bash -c "
+        # We need to wait for the generated certificates and keys to be
+        # available
+        while [ ! -f /splinter_shared/private/server.key ]; do \
+          echo 'waiting for certs and keys'; \
+          sleep 1; \
+        done && \
+        # Copy the generated keys and certificates to its expected location
+        cp -a /splinter_shared/. /etc/splinter/certs && \
         splinterd \
-            --generate-certs \
             -c ./configs/splinterd-node-0-docker.toml \
             --registry-file ./node_registries/nodes.yaml \
+            --insecure \
             -vv
       "
 
