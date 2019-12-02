@@ -11,6 +11,7 @@
     "secp256k1": "^3.7.1"
   },
   "scripts": {
+    "postinstall": "yarn generate-proto-files",
     "test": "jest",
     "build": "tsc -p ./tsconfig.json --strict --outDir dist",
     "format": "prettier --write \"**/*.+(ts|*rc|json|js)\"",

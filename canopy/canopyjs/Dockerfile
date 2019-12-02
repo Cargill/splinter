@@ -16,10 +16,6 @@ FROM node:lts-alpine
 
 WORKDIR /canopyjs
 
-COPY package*.json ./
-
-RUN yarn install
-
 COPY . .
 
-RUN yarn generate-proto-files
+RUN yarn install
