@@ -231,6 +231,20 @@ impl NotificationHandler {
     }
 }
 
+impl Iterator for NotificationHandler {
+    type Item = CmNotification;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.recv.recv() {
+            Ok(notification) => Some(notification),
+            Err(_) => {
+                error!("connection manager no longer running");
+                None
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 struct ConnectionMetadata {
     id: usize,
@@ -678,5 +692,36 @@ pub mod tests {
                 error_message: None,
             }
         );
+    }
+
+    #[test]
+    fn test_nofication_handler_iterator() {
+        let (send, recv) = sync_channel(2);
+
+        let nh = NotificationHandler { recv };
+
+        let join_handle = thread::spawn(move || {
+            for _ in 0..5 {
+                send.send(CmNotification::HeartbeatSent {
+                    endpoint: "tcp://localhost:3030".to_string(),
+                })
+                .unwrap();
+            }
+        });
+
+        let mut notifications_sent = 0;
+        for n in nh {
+            assert_eq!(
+                n,
+                CmNotification::HeartbeatSent {
+                    endpoint: "tcp://localhost:3030".to_string()
+                }
+            );
+            notifications_sent += 1;
+        }
+
+        assert_eq!(notifications_sent, 5);
+
+        join_handle.join().unwrap();
     }
 }
