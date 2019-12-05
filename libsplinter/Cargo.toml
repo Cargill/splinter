@@ -72,9 +72,10 @@ experimental = [
     "biome-notifications",
     "database",
     "connection-manager",
+    "matrix"
 ]
 
-connection-manager = []
+connection-manager = ["matrix"]
 zmq-transport = ["zmq"]
 ursa-compat = ["ursa"]
 sawtooth-signing-compat = ["sawtooth-sdk"]
@@ -83,6 +84,7 @@ biome = ["database", "jsonwebtoken", "rand"]
 biome-credentials = ["biome", "database", "bcrypt"]
 biome-notifications = ["biome", "database"]
 database = ["diesel", "diesel_migrations"]
+matrix = []
 
 [package.metadata.docs.rs]
 features = [
