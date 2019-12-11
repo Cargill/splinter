@@ -158,6 +158,10 @@ impl Connector {
         })
     }
 
+    pub fn list_connections(&self) -> Result<CmResponse, ConnectionManagerError> {
+        self.send_payload(CmPayload::ListConnections)
+    }
+
     pub fn subscribe(&self) -> Result<Notifier, ConnectionManagerError> {
         let (send, recv) = sync_channel(CHANNEL_CAPACITY);
         match self.sender.send(CmMessage::Subscribe(send)) {
@@ -356,6 +360,13 @@ fn handle_request<T: MatrixLifeCycle, U: MatrixSender>(
                 status: CmResponseStatus::Error,
                 error_message: Some(format!("{:?}", err)),
             },
+        },
+        CmPayload::ListConnections => CmResponse::ListConnections {
+            endpoints: state
+                .connection_metadata()
+                .iter()
+                .map(|(key, _)| key.to_string())
+                .collect(),
         },
     };
 
