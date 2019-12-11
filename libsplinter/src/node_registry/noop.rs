@@ -53,6 +53,13 @@ impl NodeRegistryWriter for NoOpNodeRegistry {
     fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
         Err(NodeRegistryError::NotFoundError(identity.to_string()))
     }
+
+    fn replace_all(&self, _nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+        Err(NodeRegistryError::UnableToAddNode(
+            "operation not supported".into(),
+            None,
+        ))
+    }
 }
 
 impl RwNodeRegistry for NoOpNodeRegistry {

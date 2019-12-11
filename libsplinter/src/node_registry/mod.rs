@@ -169,6 +169,13 @@ pub trait NodeRegistryWriter: Send + Sync {
     ///  * `identity` - The Splinter identity of the node.
     ///
     fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError>;
+
+    /// Replaces all nodes in the registry with the given list of nodes.
+    ///
+    /// # Arguments
+    ///
+    ///  * `nodes` - The list of nodes that will comprise the registry.
+    fn replace_all(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError>;
 }
 
 /// Provides a marker trait for a clonable, readable and writable Node Registry.
@@ -223,5 +230,9 @@ where
 
     fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
         (**self).delete_node(identity)
+    }
+
+    fn replace_all(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+        (**self).replace_all(nodes)
     }
 }

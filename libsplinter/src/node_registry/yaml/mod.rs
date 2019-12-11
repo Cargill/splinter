@@ -158,6 +158,16 @@ impl NodeRegistryWriter for YamlNodeRegistry {
         self.write_nodes(&nodes)
             .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))
     }
+
+    fn replace_all(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+        for (idx, node) in nodes.iter().enumerate() {
+            check_node_required_fields_are_not_empty(node)?;
+            check_if_node_is_duplicate(node, &nodes[idx + 1..])?;
+        }
+
+        self.write_nodes(&nodes)
+            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))
+    }
 }
 
 impl RwNodeRegistry for YamlNodeRegistry {
@@ -709,6 +719,34 @@ mod test {
                 Err(NodeRegistryError::NotFoundError(_)) => (),
                 Err(err) => panic!("Should have gotten NotFoundError but got {}", err),
             }
+        })
+    }
+
+    ///
+    /// Verifies that replace_all replaces the entire registry.
+    ///
+    #[test]
+    fn test_replace_all() {
+        run_test(|test_yaml_file_path| {
+            write_to_file(&vec![get_node_1()], test_yaml_file_path);
+
+            let registry = YamlNodeRegistry::new(test_yaml_file_path)
+                .expect("Failed to create YamlNodeRegistry");
+
+            let new_nodes = vec![get_node_2(), get_node_3()];
+
+            registry
+                .replace_all(new_nodes.clone())
+                .expect("Failed to replace registry");
+
+            let nodes = registry
+                .list_nodes(&[])
+                .expect("Failed to retrieve nodes")
+                .collect::<Vec<_>>();
+
+            assert_eq!(nodes.len(), 2);
+
+            assert_eq!(nodes, new_nodes);
         })
     }
 
