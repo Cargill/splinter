@@ -25,5 +25,6 @@ members = [
     "examples/gameroom/database",
     "examples/gameroom/daemon",
     "examples/cm-repl/daemon",
+    "examples/cm-repl/cli",
     "services/health"
 ]
