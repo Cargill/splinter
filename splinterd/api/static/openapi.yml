@@ -298,6 +298,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    put:
+      tags:
+        - Node Registry
+      description: Replace the entire Node Registry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/RegisteredNode'
+      responses:
+        200:
+          description: The registry was successfully replaced
+        400:
+          description: The request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        403:
+          description: A node was invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
     get:
       tags:
         - Node Registry

@@ -57,12 +57,16 @@ where
     N: NodeRegistryReader + NodeRegistryWriter + Clone + 'static,
 {
     let registry1 = registry.clone();
+    let registry2 = registry.clone();
     Resource::build("/nodes")
         .add_method(Method::Get, move |r, _| {
             list_nodes(r, web::Data::new(registry.clone()))
         })
         .add_method(Method::Post, move |_, p| {
             add_node(p, web::Data::new(registry1.clone()))
+        })
+        .add_method(Method::Put, move |_, p| {
+            replace_registry(p, web::Data::new(registry2.clone()))
         })
 }
 
@@ -379,6 +383,54 @@ where
     )
 }
 
+fn replace_registry<NW>(
+    payload: web::Payload,
+    registry: web::Data<NW>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
+where
+    NW: NodeRegistryWriter + 'static,
+{
+    Box::new(
+        payload
+            .from_err::<Error>()
+            .fold(web::BytesMut::new(), move |mut body, chunk| {
+                body.extend_from_slice(&chunk);
+                Ok::<_, Error>(body)
+            })
+            .into_future()
+            .and_then(
+                move |body| match serde_json::from_slice::<Vec<Node>>(&body) {
+                    Ok(nodes) => {
+                        Box::new(web::block(move || registry.replace_all(nodes)).then(|res| {
+                            Ok(match res {
+                                Ok(_) => HttpResponse::Ok().finish(),
+                                Err(err) => match err {
+                                    BlockingError::Error(err) => match err {
+                                        NodeRegistryError::InvalidNode(err) => {
+                                            HttpResponse::Forbidden()
+                                                .json(format!("a node was invalid: {}", err))
+                                        }
+                                        _ => HttpResponse::InternalServerError()
+                                            .json(format!("{}", err)),
+                                    },
+                                    _ => {
+                                        HttpResponse::InternalServerError().json(format!("{}", err))
+                                    }
+                                },
+                            })
+                        }))
+                            as Box<dyn Future<Item = HttpResponse, Error = Error>>
+                    }
+                    Err(err) => Box::new(
+                        HttpResponse::BadRequest()
+                            .json(format!("invalid node: {}", err))
+                            .into_future(),
+                    ),
+                },
+            ),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -683,6 +735,57 @@ mod tests {
             let resp = test::call_service(&mut app, req);
 
             assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        })
+    }
+
+    #[test]
+    /// Test the PUT /nodes route for overwriting the entire registry.
+    fn test_replace_registry() {
+        run_test(|test_yaml_file_path| {
+            let original_node = get_node_1();
+
+            write_to_file(&test_yaml_file_path, &[original_node.clone()]);
+
+            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+
+            let mut app = test::init_service(
+                App::new().data(node_registry.clone()).service(
+                    web::resource("/nodes")
+                        .route(web::put().to_async(replace_registry::<YamlNodeRegistry>))
+                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
+                ),
+            );
+
+            // Verify an empty request gets a BAD_REQUEST response
+            let req = test::TestRequest::put()
+                .uri("/nodes")
+                .header(header::CONTENT_TYPE, "application/json")
+                .to_request();
+
+            let resp = test::call_service(&mut app, req);
+
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+            // Verify a valid list of nodes gets an OK response and updates the registry
+            let new_node = get_node_2();
+
+            let req = test::TestRequest::put()
+                .uri("/nodes")
+                .header(header::CONTENT_TYPE, "application/json")
+                .set_json(&vec![new_node.clone()])
+                .to_request();
+
+            let resp = test::call_service(&mut app, req);
+
+            assert_eq!(resp.status(), StatusCode::OK);
+
+            let req = test::TestRequest::get().uri("/nodes").to_request();
+
+            let resp = test::call_service(&mut app, req);
+
+            assert_eq!(resp.status(), StatusCode::OK);
+            let nodes: ListNodesResponse = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
+            assert_eq!(nodes.data, vec![new_node]);
         })
     }
 
