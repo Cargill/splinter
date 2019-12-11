@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[workspace]
+[package]
+name = "cmc"
+version = "0.1.0"
+authors = ["Cargill Incorporated"]
+edition = "2018"
 
-members = [
-    "cli",
-    "client",
-    "libsplinter",
-    "splinterd",
-    "examples/cm-repl/cli",
-    "examples/cm-repl/daemon",
-    "examples/private_counter/cli",
-    "examples/private_counter/service",
-    "examples/private_xo",
-    "examples/gameroom/cli",
-    "examples/gameroom/database",
-    "examples/gameroom/daemon",
-    "services/health",
-    "services/scabbard",
-]
+[dependencies]
+clap = "2"
+flexi_logger = "0.14"
+log = "0.4"
+reqwest = "0.9"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
