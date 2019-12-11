@@ -13,7 +13,7 @@
 // limitations under the License.
 
 mod error;
-mod messages;
+pub mod messages;
 mod pacemaker;
 
 use std;
