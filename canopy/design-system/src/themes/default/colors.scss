@@ -69,10 +69,12 @@ $text-white: rgb(255, 255, 255) !default;
 $color-success: rgb(0, 211, 74) !default;
 $color-danger: rgb(219, 3, 0) !default;
 $color-warning: rgb(255, 225, 0) !default;
+$color-disabled: rgba(63, 63, 65, 0.4) !default;
 $status-colors: (
   'success': $color-success,
   'danger': $color-danger,
-  'warning': $color-warning
+  'warning': $color-warning,
+  'disabled': $color-disabled
 );
 
 @each $name, $color in $status-colors {

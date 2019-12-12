@@ -1,0 +1,182 @@
+/**
+ * Copyright 2019 Cargill Incorporated
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+button {
+  display: inline-flex;
+  padding: $padding-s;
+  height: fit-content;
+  width: fit-content;
+  border: none;
+  border-radius: 4px;
+  color: $text-white;
+  background-image: linear-gradient(
+    to right,
+    $color-secondary 0%,
+    $color-secondary-light 50%,
+    $color-secondary 100%
+  );
+  background-size: 200%;
+  background-position-x: 0;
+  transition: background $transitionDuration-m;
+  cursor: pointer;
+  font-family: $fontFamily-secondary;
+
+  &.canopy {
+    background-image: linear-gradient(
+      to right,
+      $color-canopy 0%,
+      $color-canopy-light 50%,
+      $color-canopy 100%
+    );
+  }
+
+  &.secondary {
+    background-image: linear-gradient(
+      to right,
+      $color-tertiary 0%,
+      $color-tertiary-light 50%,
+      $color-tertiary 100%
+    );
+  }
+
+  &.flat {
+    background-image: none;
+    background: transparent;
+    color: $text-light;
+
+    &:hover {
+      color: $text-primary;
+    }
+  }
+
+  &.fab {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    color: $text-white;
+  }
+
+  &:hover {
+    background-position-x: 100%;
+  }
+
+  &:disabled {
+    background-color: $color-disabled;
+    color: $text-light;
+    cursor: default;
+  }
+
+  &.compact {
+    padding: calc(#{$padding-s} / 2);
+  }
+
+  &.danger,
+  &.warning,
+  &:disabled {
+    background-image: none;
+    background-size: 100%;
+  }
+
+  &.danger {
+    background-color: $color-danger;
+  }
+
+  &.warning {
+    background-color: $color-warning;
+    color: $text-light;
+  }
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  position: relative;
+  padding: $padding-s;
+
+  button {
+    &.submit {
+      margin-left: auto;
+    }
+  }
+}
+
+.canopy-input {
+  display: flex;
+  flex-direction: column-reverse;
+  padding: $padding-s 0;
+  flex: 1 0 100%;
+  font-family: $fontFamily-primary;
+
+  label {
+    margin-bottom: 0.25rem;
+    position: relative;
+    top: 1.4rem;
+    transition: top $transitionDuration-m;
+    z-index: 0;
+    color: $text-lighter;
+  }
+
+  input {
+    z-index: 1;
+    &[type='text'],
+    &[type='password'],
+    &[type='number'] {
+      &:focus + label {
+        top: 0;
+        color: $text-light;
+      }
+
+      &:not(:placeholder-shown) + label {
+        top: 0;
+      }
+
+      &:focus ~ .toggle-password {
+        color: $text-light;
+      }
+    }
+  }
+
+  .toggle-password {
+    z-index: 2;
+    position: relative;
+    top: 2.6rem;
+    left: calc(100% - 2rem);
+    color: $text-lighter;
+  }
+}
+
+input {
+  &[type='text'],
+  &[type='password'],
+  &[type='number'] {
+    border: none;
+    box-shadow: 0px 1px 0px 0px $text-light;
+    height: 1.2rem;
+    background: transparent;
+    transition: box-shadow $transitionDuration-m;
+    font-size: 1rem;
+
+    &:focus {
+      box-shadow: 0px 2px 0px 0px $text-primary;
+    }
+
+    &:hover {
+      cursor: text;
+    }
+  }
+}

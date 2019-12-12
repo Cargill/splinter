@@ -1,0 +1,106 @@
+/**
+ * Copyright 2019 Cargill Incorporated
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+@import 'canopy-design-system/src/themes/default';
+
+#root {
+    height: 100%;
+}
+
+#profile {
+    position: relative;
+    background-image: linear-gradient(to right, $color-canopy-dark 0%, $color-canopy 80%);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    .user-info {
+        position: relative;
+        display: flex;
+        padding: $padding-m;
+        justify-content: center;
+        align-items: flex-end;
+
+        .display-name {
+            margin: 3rem 0 2rem;
+            color: $text-white;
+        }
+
+        .action-list {
+            .actions.open {
+                background: $background-white;
+            }
+        }
+    }
+
+    .action-list {
+        position: absolute;
+        top: 1rem;
+        right: 0.25rem;
+    }
+
+    .user-keys {
+        background: $background-white;
+        border-radius: 2rem 2rem 0 0;
+        flex: 0 1 100%;
+        padding: $padding-m;
+
+        .key-list {
+            display: grid;
+            grid-auto-columns: 20rem;
+            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+            grid-template-rows: auto;
+            grid-column-gap: 1rem;
+            grid-row-gap: 3rem;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .add-key {
+            position: fixed;
+            bottom: 3rem;
+            right: 3rem;
+
+            .icon {
+                width: 2rem;
+                height: 2rem;
+            }
+        }
+    }
+}
+
+.info-field {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: 1fr;
+    grid-template-areas: 'info actions';
+    width: fit-content;
+
+    .label {
+        width: fit-content;
+        color: $text-light;
+    }
+
+    .value {
+        width: fit-content;
+        margin: 0;
+    }
+
+    .field-action {
+        margin: 0 2rem;
+        align-self: center;
+        justify-self: flex-start;
+    }
+}

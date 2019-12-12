@@ -54,7 +54,10 @@ const tabs = [
       },
       {
         name: 'Buttons',
-        route: '/design/buttons'
+        route: '/design/buttons',
+        component: lazy(() =>
+          import('!babel-loader!mdx-loader!./views/Buttons.mdx')
+        )
       },
       {
         name: 'Typography',
@@ -80,6 +83,20 @@ const tabs = [
         route: '/components/tabbox',
         component: lazy(() =>
           import('!babel-loader!mdx-loader!./views/TabBox.mdx')
+        )
+      },
+      {
+        name: 'Forms',
+        route: '/components/forms',
+        component: lazy(()=>
+          import('!babel-loader!mdx-loader!./views/Forms.mdx')
+        )
+      },
+      {
+        name: 'Modals',
+        route: '/components/modals',
+        component: lazy(()=>
+          import('!babel-loader!mdx-loader!./views/Modals.mdx')
         )
       }
     ]

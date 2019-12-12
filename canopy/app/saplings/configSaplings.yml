@@ -3,3 +3,9 @@
     - 0.0.0.0:8675/loginRegisterSapling.js
   styleFiles: []
   workerFiles: []
+- namespace: profile
+  runtimeFiles:
+    - 0.0.0.0:8675/profile/static/js/profile.js
+  styleFiles:
+    - 0.0.0.0:8675/profile/static/css/profile.css
+  workerFiles: []

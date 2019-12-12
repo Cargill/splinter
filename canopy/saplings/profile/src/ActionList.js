@@ -13,8 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import React, { useState } from 'react';
+import './ActionList.scss';
 
-@import './../components/progress/Progress.scss';
-@import './../components/tabBox/TabBox.scss';
-@import './../components/form/form.scss';
-@import './../components/modal/modal.scss';
+export function ActionList({ children }) {
+  const [open, setOpen] = useState(0);
+  return (
+    <div className="action-list">
+      <button className="flat action-button" onClick={() => setOpen(!open)}>
+        Actions
+        <div className="hamburger">
+          <div className="top"></div>
+          <div className="middle"></div>
+          <div className="bottom"></div>
+        </div>
+      </button>
+      <div className={`actions${open ? ' open' : ''}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
