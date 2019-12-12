@@ -365,20 +365,13 @@ fn send_heartbeats(
     state: &mut ConnectionState,
     subscribers: &mut HashMap<String, SyncSender<Vec<CmNotification>>>,
 ) {
-    let heartbeat_message = match create_heartbeat() {
-        Ok(h) => h,
-        Err(err) => {
-            error!("Failed to create heartbeat message: {:?}", err);
-            return;
-        }
-    };
     let mut notifications = Vec::new();
 
     for (endpoint, metadata) in state.connection_metadata() {
         info!("Sending heartbeat to {}", endpoint);
         if let Err(err) = state
             .mesh()
-            .send(Envelope::new(metadata.id, heartbeat_message.clone()))
+            .send(Envelope::new(metadata.id, create_heartbeat()))
         {
             error!(
                 "failed to send heartbeat: {:?} attempting reconnection",
@@ -411,17 +404,14 @@ fn send_heartbeats(
     notify_subscribers(subscribers, notifications);
 }
 
-fn create_heartbeat() -> Result<Vec<u8>, ConnectionManagerError> {
-    let heartbeat = NetworkHeartbeat::new().write_to_bytes().map_err(|_| {
-        ConnectionManagerError::HeartbeatError("cannot create NetworkHeartbeat message".to_string())
-    })?;
+fn create_heartbeat() -> Vec<u8> {
+    let heartbeat = NetworkHeartbeat::new().write_to_bytes().unwrap();
+
     let mut heartbeat_message = NetworkMessage::new();
     heartbeat_message.set_message_type(NetworkMessageType::NETWORK_HEARTBEAT);
     heartbeat_message.set_payload(heartbeat);
-    let heartbeat_bytes = heartbeat_message.write_to_bytes().map_err(|_| {
-        ConnectionManagerError::HeartbeatError("cannot create NetworkMessage".to_string())
-    })?;
-    Ok(heartbeat_bytes)
+
+    heartbeat_message.write_to_bytes().unwrap()
 }
 
 #[cfg(test)]
