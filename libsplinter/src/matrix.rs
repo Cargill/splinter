@@ -18,7 +18,7 @@ use std::fmt;
 use crate::transport::Connection;
 
 /// MatrixLifeCycle trait abstracts out adding and removing connections to a
-/// connection handler without requiring knowledge about sending or receiving messges. 
+/// connection handler without requiring knowledge about sending or receiving messges.
 pub trait MatrixLifeCycle: Clone + Send {
     fn add(&self, connection: Box<dyn Connection>) -> Result<usize, MatrixAddError>;
     fn remove(&self, id: usize) -> Result<Box<dyn Connection>, MatrixRemoveError>;
