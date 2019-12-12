@@ -150,10 +150,10 @@ impl Connector {
         })
     }
 
-    pub fn subscribe(&self) -> Result<NotificationHandler, ConnectionManagerError> {
+    pub fn subscribe(&self) -> Result<Notifier, ConnectionManagerError> {
         let (send, recv) = sync_channel(CHANNEL_CAPACITY);
         match self.sender.send(CmMessage::Subscribe(send)) {
-            Ok(()) => Ok(NotificationHandler { recv }),
+            Ok(()) => Ok(Notifier { recv }),
             Err(_) => Err(ConnectionManagerError::SendMessageError(
                 "The connection manager is no longer running".into(),
             )),
@@ -195,11 +195,11 @@ impl ShutdownHandle {
     }
 }
 
-pub struct NotificationHandler {
+pub struct Notifier {
     recv: Receiver<CmNotification>,
 }
 
-impl NotificationHandler {
+impl Notifier {
     pub fn try_next(&self) -> Result<Option<CmNotification>, ConnectionManagerError> {
         match self.recv.try_recv() {
             Ok(notifications) => Ok(Some(notifications)),
@@ -211,7 +211,7 @@ impl NotificationHandler {
     }
 }
 
-impl Iterator for NotificationHandler {
+impl Iterator for Notifier {
     type Item = CmNotification;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -661,7 +661,7 @@ pub mod tests {
     fn test_nofication_handler_iterator() {
         let (send, recv) = sync_channel(2);
 
-        let nh = NotificationHandler { recv };
+        let nh = Notifier { recv };
 
         let join_handle = thread::spawn(move || {
             for _ in 0..5 {
