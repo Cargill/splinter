@@ -30,7 +30,7 @@ use log::Record;
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg(feature = "health")]
+#[cfg(any(feature = "health", feature = "nodes"))]
 const DEFAULT_SPLINTER_NODE_URL: &str = "http://localhost:8085";
 
 // log format for cli that will only show the log message
@@ -138,6 +138,96 @@ fn run() -> Result<(), CliError> {
         )
     }
 
+    #[cfg(feature = "nodes")]
+    {
+        use action::nodes;
+        use clap::{Arg, SubCommand};
+
+        app = app.subcommand(
+            SubCommand::with_name("nodes")
+                .about("Interact with a node registry")
+                .arg(
+                    Arg::with_name(nodes::URL_ARG)
+                        .long("url")
+                        .short("U")
+                        .global(true)
+                        .takes_value(true)
+                        .default_value(DEFAULT_SPLINTER_NODE_URL)
+                        .help("Splinter node's endpoint"),
+                )
+                .subcommand(
+                    SubCommand::with_name("list")
+                        .about("List all nodes in the registry")
+                        .alias("ls")
+                        .arg(
+                            Arg::with_name(nodes::FORMAT_ARG)
+                                .long("format")
+                                .takes_value(true)
+                                .default_value(nodes::YAML)
+                                .possible_values(nodes::SUPPORTED_FORMATS)
+                                .help("Format nodes will be displayed in"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("show")
+                        .about("Show a single node from the registry")
+                        .arg(
+                            Arg::with_name("identity")
+                                .takes_value(true)
+                                .required(true)
+                                .help("Identity of the node to show"),
+                        )
+                        .arg(
+                            Arg::with_name(nodes::FORMAT_ARG)
+                                .long("format")
+                                .takes_value(true)
+                                .default_value(nodes::YAML)
+                                .possible_values(nodes::SUPPORTED_FORMATS)
+                                .help("Format nodes will be displayed in"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("add")
+                        .about("Add nodes to the registry, read from a JSON or YAML file")
+                        .arg(
+                            Arg::with_name(nodes::FILE_ARG)
+                                .takes_value(true)
+                                .required(true)
+                                .help("Path to JSON or YAML file with node definition(s)"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("update")
+                        .about(
+                            "Update one or more nodes in the registry with definitions from a \
+                            JSON or YAML file",
+                        )
+                        .arg(Arg::with_name(nodes::REPLACE_ALL_ARG).long("replace-all").help(
+                            "If specified, the entire node registry will be cleared and replaced \
+                            by the nodes in the file",
+                        ))
+                        .arg(
+                            Arg::with_name(nodes::FILE_ARG)
+                                .takes_value(true)
+                                .required(true)
+                                .help("Path to JSON or YAML file with node definition(s)"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("remove")
+                        .about("Remove one or more nodes from the registry")
+                        .alias("rm")
+                        .arg(
+                            Arg::with_name(nodes::IDENTITIES_ARG)
+                                .takes_value(true)
+                                .multiple(true)
+                                .required(true)
+                                .help("Identities of the nodes to remove"),
+                        ),
+                ),
+        );
+    }
+
     let matches = app.get_matches();
 
     // set default to info
@@ -184,6 +274,21 @@ fn run() -> Result<(), CliError> {
             SubcommandActions::new().with_command("migrate", database::MigrateAction),
         )
     }
+
+    #[cfg(feature = "nodes")]
+    {
+        use action::nodes;
+        subcommands = subcommands.with_command(
+            "nodes",
+            SubcommandActions::new()
+                .with_command("list", nodes::ListAction)
+                .with_command("show", nodes::ShowAction)
+                .with_command("add", nodes::AddAction)
+                .with_command("update", nodes::UpdateAction)
+                .with_command("remove", nodes::RemoveAction),
+        );
+    }
+
     subcommands.run(Some(&matches), &mut logger_handle)
 }
 

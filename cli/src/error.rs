@@ -18,6 +18,8 @@ use std::fmt;
 pub enum CliError {
     RequiresArgs,
     InvalidSubcommand,
+    #[cfg(feature = "nodes")]
+    MissingArg(String),
     ActionError(String),
     EnvironmentError(String),
     #[cfg(feature = "database")]
@@ -31,6 +33,8 @@ impl fmt::Display for CliError {
         match self {
             CliError::RequiresArgs => write!(f, "action requires arguments"),
             CliError::InvalidSubcommand => write!(f, "received invalid subcommand"),
+            #[cfg(feature = "nodes")]
+            CliError::MissingArg(arg) => write!(f, "missing required argument: {}", arg),
             CliError::ActionError(msg) => write!(f, "action encountered an error: {}", msg),
             CliError::EnvironmentError(msg) => {
                 write!(f, "action encountered an environment error: {}", msg)
