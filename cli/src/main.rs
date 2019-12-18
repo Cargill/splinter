@@ -30,6 +30,9 @@ use log::Record;
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg(feature = "health")]
+const DEFAULT_SPLINTER_NODE_URL: &str = "http://localhost:8085";
+
 // log format for cli that will only show the log message
 pub fn log_format(
     w: &mut dyn std::io::Write,
@@ -108,6 +111,7 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("url")
                                 .short("U")
                                 .takes_value(true)
+                                .default_value(DEFAULT_SPLINTER_NODE_URL)
                                 .help("URL of node"),
                         ),
                 ),

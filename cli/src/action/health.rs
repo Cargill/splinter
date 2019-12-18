@@ -28,11 +28,9 @@ impl Action for StatusAction {
         arg_matches: Option<&ArgMatches<'a>>,
         _logger_handle: &mut ReconfigurationHandle,
     ) -> Result<(), CliError> {
-        let url = if let Some(args) = arg_matches {
-            args.value_of("url").unwrap_or("http://localhost:8085")
-        } else {
-            "http://localhost:8085"
-        };
+        let url = arg_matches
+            .and_then(|args| args.value_of("url"))
+            .expect("should have default URL arg");
 
         let status: Value = reqwest::get(&format!("{}/health/status", url))
             .and_then(|mut res| res.json())
