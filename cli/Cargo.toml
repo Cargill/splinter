@@ -23,9 +23,11 @@ experimental = [
     "database-migrate-biome-credentials",
     "database-migrate-biome-notifications",
     "database-migrate-biome-users",
+    "nodes",
 ]
 
 health = ["reqwest", "serde_json"]
+nodes = ["reqwest", "serde_json"]
 
 database = ["splinter/database", "diesel"]
 database-migrate-biome-users = ["splinter/biome", "database"]

@@ -18,6 +18,8 @@ pub mod certs;
 pub mod database;
 #[cfg(feature = "health")]
 pub mod health;
+#[cfg(feature = "nodes")]
+pub mod nodes;
 
 use std::collections::HashMap;
 use std::ffi::CString;
