@@ -75,6 +75,7 @@ stable = [
 experimental = [
     "biome",
     "biome-credentials",
+    "biome-key-management",
     "biome-notifications",
     "connection-manager",
     "connection-manager-notification-iter-try-next",
@@ -84,6 +85,7 @@ experimental = [
 
 biome = ["database", "jsonwebtoken", "rand"]
 biome-credentials = ["biome", "database", "bcrypt"]
+biome-key-management = ["biome", "database"]
 biome-notifications = ["biome", "database"]
 connection-manager = []
 connection-manager-notification-iter-try-next = ["connection-manager"]
@@ -102,6 +104,7 @@ ursa-compat = ["ursa"]
 features = [
     "biome",
     "biome-credentials",
+    "biome-key-management",
     "biome-notifications",
     "connection-manager",
     "connection-manager-notification-iter-try-next",
