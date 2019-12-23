@@ -821,42 +821,36 @@ impl AdminServiceShared {
             ));
         }
 
-        let key_info = self
-            .key_registry
-            .get_key(signer_public_key)
-            .map_err(|err| AdminSharedError::ValidationFailed(err.to_string()))?
-            .ok_or_else(|| {
-                AdminSharedError::ValidationFailed(format!(
-                    "{} is not registered for a node",
-                    to_hex(signer_public_key)
-                ))
-            })?;
+        if requester_node_id == self.node_id {
+            let _key_info = self
+                .key_registry
+                .get_key(signer_public_key)
+                .map_err(|err| AdminSharedError::ValidationFailed(err.to_string()))?
+                .ok_or_else(|| {
+                    AdminSharedError::ValidationFailed(format!(
+                        "{} is not registered for a node",
+                        to_hex(signer_public_key)
+                    ))
+                })?;
 
-        if key_info.associated_node_id() != requester_node_id {
-            return Err(AdminSharedError::ValidationFailed(format!(
-                "{} is not registered for the node in header",
-                to_hex(signer_public_key)
-            )));
-        };
-
-        let permitted = self
-            .key_permission_manager
-            .is_permitted(signer_public_key, PROPOSER_ROLE)
-            .map_err(|err| AdminSharedError::InternalError {
-                context: format!(
-                    "Unable to check permissions for {}: {}",
+            let permitted = self
+                .key_permission_manager
+                .is_permitted(signer_public_key, PROPOSER_ROLE)
+                .map_err(|err| AdminSharedError::InternalError {
+                    context: format!(
+                        "Unable to check permissions for {}: {}",
+                        to_hex(signer_public_key),
+                        err
+                    ),
+                    source: None,
+                })?;
+            if !permitted {
+                return Err(AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to propose circuits on behalf of node {}",
                     to_hex(signer_public_key),
-                    err
-                ),
-                source: None,
-            })?;
-
-        if !permitted {
-            return Err(AdminSharedError::ValidationFailed(format!(
-                "{} is not permitted to propose circuits on behalf of node {}",
-                to_hex(signer_public_key),
-                key_info.associated_node_id()
-            )));
+                    self.node_id
+                )));
+            }
         }
 
         if self.has_proposal(circuit.get_circuit_id()) {
@@ -1021,31 +1015,11 @@ impl AdminServiceShared {
         proposal_vote: &CircuitProposalVote,
         signer_public_key: &[u8],
         circuit_proposal: &CircuitProposal,
-        node_id: &str,
+        voting_node_id: &str,
     ) -> Result<(), AdminSharedError> {
         let circuit_hash = proposal_vote.get_circuit_hash();
 
-        let key_info = self
-            .key_registry
-            .get_key(signer_public_key)
-            .map_err(|err| AdminSharedError::ValidationFailed(err.to_string()))?
-            .ok_or_else(|| {
-                AdminSharedError::ValidationFailed(format!(
-                    "{} is not registered for a node",
-                    to_hex(signer_public_key)
-                ))
-            })?;
-
-        let signer_node = key_info.associated_node_id().to_string();
-
-        if signer_node != node_id {
-            return Err(AdminSharedError::ValidationFailed(format!(
-                "Payload requester node id does not match the node the key is registered to: {}",
-                to_hex(circuit_proposal.get_requester())
-            )));
-        }
-
-        if circuit_proposal.get_requester_node_id() == signer_node {
+        if circuit_proposal.get_requester_node_id() == voting_node_id {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received vote from requester node: {}",
                 to_hex(circuit_proposal.get_requester())
@@ -1058,31 +1032,44 @@ impl AdminServiceShared {
             .map(|vote| vote.get_voter_node_id().to_string())
             .collect();
 
-        if voted_nodes.iter().any(|node| *node == signer_node) {
+        if voted_nodes.iter().any(|node| *node == voting_node_id) {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received duplicate vote from {} for {}",
-                signer_node, proposal_vote.circuit_id
+                voting_node_id, proposal_vote.circuit_id
             )));
         }
 
-        let permitted = self
-            .key_permission_manager
-            .is_permitted(signer_public_key, VOTER_ROLE)
-            .map_err(|err| AdminSharedError::InternalError {
-                context: format!(
-                    "Unable to check permissions for {}: {}",
-                    to_hex(signer_public_key),
-                    err
-                ),
-                source: None,
-            })?;
+        if voting_node_id == self.node_id {
+            let _key_info = self
+                .key_registry
+                .get_key(signer_public_key)
+                .map_err(|err| AdminSharedError::ValidationFailed(err.to_string()))?
+                .ok_or_else(|| {
+                    AdminSharedError::ValidationFailed(format!(
+                        "{} is not registered for a node",
+                        to_hex(signer_public_key)
+                    ))
+                })?;
 
-        if !permitted {
-            return Err(AdminSharedError::ValidationFailed(format!(
-                "{} is not permitted to vote on behalf of node {}",
-                to_hex(signer_public_key),
-                signer_node
-            )));
+            let permitted = self
+                .key_permission_manager
+                .is_permitted(signer_public_key, VOTER_ROLE)
+                .map_err(|err| AdminSharedError::InternalError {
+                    context: format!(
+                        "Unable to check permissions for {}: {}",
+                        to_hex(signer_public_key),
+                        err
+                    ),
+                    source: None,
+                })?;
+
+            if !permitted {
+                return Err(AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to vote on behalf of node {}",
+                    to_hex(signer_public_key),
+                    self.node_id
+                )));
+            }
         }
 
         // validate hash of circuit
@@ -1469,6 +1456,7 @@ mod tests {
     use crate::circuit::directory::CircuitDirectory;
     use crate::keys::{
         insecure::AllowAllKeyPermissionManager, storage::StorageKeyRegistry, KeyInfo,
+        KeyPermissionError,
     };
     use crate::mesh::Mesh;
     use crate::network::{
@@ -2321,7 +2309,7 @@ mod tests {
     }
 
     #[test]
-    // test that if the signer of the vote is not registered to a node the vote is invalid
+    // test that if the signer of the vote is not registered to this node the vote is invalid
     fn test_validate_proposal_vote_node_not_registered() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
@@ -2354,15 +2342,16 @@ mod tests {
     }
 
     #[test]
-    // test if the voter is registered to the original requester node the vote is invalid
-    fn test_validate_proposal_vote_requester() {
+    // test that the vote is marked invalid if the signer is not permitted to vote on behalf of the
+    // node.
+    fn test_validate_proposal_vote_requester_permitted() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
         // set up key registry
         let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(b"test_signer_a".to_vec(), "node_b".to_string()).build();
+        let key_info = KeyInfo::builder(b"test_signer_a".to_vec(), "node_a".to_string()).build();
         key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
@@ -2373,7 +2362,7 @@ mod tests {
             state,
             Box::new(HashVerifier),
             Box::new(key_registry),
-            Box::new(AllowAllKeyPermissionManager),
+            Box::new(DenyAllKeyPermissionManager),
             "memory",
         )
         .unwrap();
@@ -2383,7 +2372,7 @@ mod tests {
         if let Ok(_) =
             admin_shared.validate_circuit_vote(&vote, b"test_signer_a", &proposal, "node_a")
         {
-            panic!("Should have been invalid because signer registered for the requester node");
+            panic!("Should have been invalid because signer is not permitted on the node");
         }
     }
 
@@ -2779,6 +2768,18 @@ mod tests {
         service.set_service_id(service_id.into());
         service.set_service_type(service_type.into());
         service
+    }
+
+    struct DenyAllKeyPermissionManager;
+
+    impl KeyPermissionManager for DenyAllKeyPermissionManager {
+        fn is_permitted(
+            &self,
+            _public_key: &[u8],
+            _role: &str,
+        ) -> Result<bool, KeyPermissionError> {
+            Ok(false)
+        }
     }
 
     struct MockAuthInquisitor;
