@@ -839,15 +839,25 @@ impl AdminServiceShared {
             )));
         };
 
-        self.key_permission_manager
+        let permitted = self
+            .key_permission_manager
             .is_permitted(signer_public_key, PROPOSER_ROLE)
-            .map_err(|_| {
-                AdminSharedError::ValidationFailed(format!(
-                    "{} is not permitted to vote for node {}",
+            .map_err(|err| AdminSharedError::InternalError {
+                context: format!(
+                    "Unable to check permissions for {}: {}",
                     to_hex(signer_public_key),
-                    key_info.associated_node_id()
-                ))
+                    err
+                ),
+                source: None,
             })?;
+
+        if !permitted {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "{} is not permitted to propose circuits on behalf of node {}",
+                to_hex(signer_public_key),
+                key_info.associated_node_id()
+            )));
+        }
 
         if self.has_proposal(circuit.get_circuit_id()) {
             return Err(AdminSharedError::ValidationFailed(format!(
@@ -1055,15 +1065,25 @@ impl AdminServiceShared {
             )));
         }
 
-        self.key_permission_manager
+        let permitted = self
+            .key_permission_manager
             .is_permitted(signer_public_key, VOTER_ROLE)
-            .map_err(|_| {
-                AdminSharedError::ValidationFailed(format!(
-                    "{} is not permitted to vote for node {}",
+            .map_err(|err| AdminSharedError::InternalError {
+                context: format!(
+                    "Unable to check permissions for {}: {}",
                     to_hex(signer_public_key),
-                    signer_node
-                ))
+                    err
+                ),
+                source: None,
             })?;
+
+        if !permitted {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "{} is not permitted to vote on behalf of node {}",
+                to_hex(signer_public_key),
+                signer_node
+            )));
+        }
 
         // validate hash of circuit
         if circuit_proposal.get_circuit_hash() != circuit_hash {
