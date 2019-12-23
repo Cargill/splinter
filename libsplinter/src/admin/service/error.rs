@@ -124,12 +124,20 @@ pub enum AdminSharedError {
     /// An error occurred while trying to add an admin service event subscriber to the service.
     UnableToAddSubscriber(String),
 
-    /// An error occured while attempting to verify a payload's signature
+    /// An error occurred while attempting to verify a payload's signature
     SignerError(signing::error::Error),
 
     // Returned if a circuit cannot be added to splinter state
     CommitError(String),
     UpdateProposalsError(OpenProposalError),
+
+    /// An error occurred while performing an internal operation. These may be caused by various
+    /// implementations of provided traits throwing their own errors that do not imply a specific
+    /// control-flow scenario.
+    InternalError {
+        context: String,
+        source: Option<Box<dyn Error + Send>>,
+    },
 }
 
 impl Error for AdminSharedError {
@@ -148,6 +156,13 @@ impl Error for AdminSharedError {
             AdminSharedError::CommitError(_) => None,
             AdminSharedError::UpdateProposalsError(err) => Some(err),
             AdminSharedError::UnableToAddSubscriber(_) => None,
+            AdminSharedError::InternalError { source, .. } => {
+                if let Some(ref err) = source {
+                    Some(&**err)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -188,6 +203,13 @@ impl fmt::Display for AdminSharedError {
             }
             AdminSharedError::UnableToAddSubscriber(msg) => {
                 write!(f, "unable to add admin service event subscriber: {}", msg)
+            }
+            AdminSharedError::InternalError { context, source } => {
+                if let Some(ref err) = source {
+                    write!(f, "{}: {}", context, err)
+                } else {
+                    f.write_str(&context)
+                }
             }
         }
     }
