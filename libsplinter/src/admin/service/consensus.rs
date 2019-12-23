@@ -32,7 +32,7 @@ use crate::protos::admin::{AdminMessage, AdminMessage_Type, ProposedCircuit};
 use crate::protos::two_phase::RequiredVerifiers;
 use crate::service::ServiceError;
 
-use super::error::AdminConsensusManagerError;
+use super::error::{AdminConsensusManagerError, AdminSharedError};
 use super::shared::AdminServiceShared;
 use super::{admin_service_id, sha256};
 
@@ -227,9 +227,16 @@ impl ProposalManager for AdminProposalManager {
             .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?
             .clone();
 
-        let (hash, _) = shared
-            .propose_change(circuit_payload)
-            .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
+        let hash = match shared.propose_change(circuit_payload) {
+            Ok((hash, _)) => hash,
+            Err(AdminSharedError::ValidationFailed(msg)) => {
+                warn!("Validation failed for proposal {}: {}", id, msg);
+                self.proposal_update_sender
+                    .send(ProposalUpdate::ProposalInvalid(id.clone()))?;
+                return Ok(());
+            }
+            Err(err) => return Err(ProposalManagerError::Internal(Box::new(err))),
+        };
 
         // check if hash is the expected hash stored in summary
         if hash.as_bytes().to_vec() != proposal.summary {
