@@ -404,14 +404,15 @@ impl AdminServiceShared {
         &mut self,
         mut circuit_payload: CircuitManagementPayload,
     ) -> Result<(String, CircuitProposal), AdminSharedError> {
-        let header = protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(
-            circuit_payload.get_header(),
-        )
-        .map_err(MarshallingError::from)?;
+        let header = protobuf::parse_from_bytes(circuit_payload.get_header())
+            .map_err(MarshallingError::from)?;
         self.validate_circuit_management_payload(&circuit_payload, &header)?;
-        self.verify_signature(&circuit_payload).map_err(|_| {
-            AdminSharedError::ValidationFailed(String::from("Unable to verify signature"))
-        })?;
+
+        self.verify_signature(&header, &circuit_payload)
+            .map_err(|_| {
+                AdminSharedError::ValidationFailed(String::from("Unable to verify signature"))
+            })?;
+
         match header.get_action() {
             CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST => {
                 let mut create_request = circuit_payload.take_circuit_create_request();
@@ -520,6 +521,7 @@ impl AdminServiceShared {
     /// is no peer connection, a connection to the peer will also be established.
     pub fn propose_circuit(
         &mut self,
+        header: &CircuitManagementPayload_Header,
         payload: CircuitManagementPayload,
     ) -> Result<(), ServiceError> {
         debug!(
@@ -529,6 +531,42 @@ impl AdminServiceShared {
                 .get_circuit()
                 .get_circuit_id()
         );
+        let public_key = header.get_requester();
+        let _key_info = self
+            .key_registry
+            .get_key(public_key)
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
+            .ok_or_else(|| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::InternalError {
+                    context: format!(
+                        "{} is not registered as an admin for this node",
+                        to_hex(public_key),
+                    ),
+                    source: None,
+                }))
+            })?;
+        let permitted = self
+            .key_permission_manager
+            .is_permitted(public_key, PROPOSER_ROLE)
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::InternalError {
+                    context: format!(
+                        "Unable to check permissions for {}: {}",
+                        to_hex(public_key),
+                        err
+                    ),
+                    source: None,
+                }))
+            })?;
+        if !permitted {
+            return Err(ServiceError::UnableToHandleMessage(Box::new(
+                AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to propose circuits on behalf of node {}",
+                    to_hex(public_key),
+                    self.node_id
+                )),
+            )));
+        }
 
         let mut unauthorized_peers = vec![];
         for node in payload
@@ -563,11 +601,52 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    pub fn propose_vote(&mut self, payload: CircuitManagementPayload) -> Result<(), ServiceError> {
+    pub fn propose_vote(
+        &mut self,
+        header: &CircuitManagementPayload_Header,
+        payload: CircuitManagementPayload,
+    ) -> Result<(), ServiceError> {
         debug!(
             "received circuit vote for {}",
             payload.get_circuit_proposal_vote().get_circuit_id()
         );
+
+        let public_key = header.get_requester();
+        let _key_info = self
+            .key_registry
+            .get_key(public_key)
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
+            .ok_or_else(|| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::InternalError {
+                    context: format!(
+                        "{} is not registered as an admin for this node",
+                        to_hex(public_key),
+                    ),
+                    source: None,
+                }))
+            })?;
+        let permitted = self
+            .key_permission_manager
+            .is_permitted(public_key, VOTER_ROLE)
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::InternalError {
+                    context: format!(
+                        "Unable to check permissions for {}: {}",
+                        to_hex(public_key),
+                        err
+                    ),
+                    source: None,
+                }))
+            })?;
+        if !permitted {
+            return Err(ServiceError::UnableToHandleMessage(Box::new(
+                AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to vote on behalf of node {}",
+                    to_hex(public_key),
+                    self.node_id
+                )),
+            )));
+        }
 
         self.pending_circuit_payloads.push_back(payload);
         Ok(())
@@ -576,17 +655,20 @@ impl AdminServiceShared {
     pub fn submit(&mut self, payload: CircuitManagementPayload) -> Result<(), ServiceError> {
         debug!("Payload submitted: {:?}", payload);
 
-        let header =
-            protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.get_header())?;
+        let header = protobuf::parse_from_bytes(payload.get_header())?;
+
         self.validate_circuit_management_payload(&payload, &header)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
-        self.verify_signature(&payload)?;
+
+        self.verify_signature(&header, &payload)?;
 
         match header.get_action() {
             CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST => {
-                self.propose_circuit(payload)
+                self.propose_circuit(&header, payload)
             }
-            CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE => self.propose_vote(payload),
+            CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE => {
+                self.propose_vote(&header, payload)
+            }
             CircuitManagementPayload_Action::ACTION_UNSET => {
                 Err(ServiceError::UnableToHandleMessage(Box::new(
                     AdminSharedError::ValidationFailed(String::from("No action specified")),
@@ -1434,10 +1516,11 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    fn verify_signature(&self, payload: &CircuitManagementPayload) -> Result<bool, ServiceError> {
-        let header =
-            protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.get_header())?;
-
+    fn verify_signature(
+        &self,
+        header: &CircuitManagementPayload_Header,
+        payload: &CircuitManagementPayload,
+    ) -> Result<bool, ServiceError> {
         let signature = payload.get_signature();
         let public_key = header.get_requester();
 
@@ -1496,7 +1579,11 @@ mod tests {
             .expect("failed to create orchestrator");
         let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
         let state = setup_splinter_state();
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
+
+        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
+        let key_info = KeyInfo::builder(b"test_signer_a".to_vec(), "node_a".to_string()).build();
+        key_registry.save_key(key_info).unwrap();
+
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             orchestrator,
@@ -1532,6 +1619,7 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
+        header.set_requester(b"test_signer_a".to_vec());
 
         let mut payload = admin::CircuitManagementPayload::new();
 
@@ -1540,7 +1628,7 @@ mod tests {
         payload.set_circuit_create_request(request);
 
         shared
-            .propose_circuit(payload)
+            .propose_circuit(&header, payload)
             .expect("Proposal not accepted");
 
         // None of the proposed members are peered
@@ -1572,7 +1660,11 @@ mod tests {
             .expect("failed to create orchestrator");
         let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
         let state = setup_splinter_state();
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
+
+        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
+        let key_info = KeyInfo::builder(b"test_signer_a".to_vec(), "node_a".to_string()).build();
+        key_registry.save_key(key_info).unwrap();
+
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             orchestrator,
@@ -1607,6 +1699,7 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
+        header.set_requester(b"test_signer_a".to_vec());
 
         let mut payload = admin::CircuitManagementPayload::new();
 
@@ -1615,7 +1708,7 @@ mod tests {
         payload.set_circuit_create_request(request);
 
         shared
-            .propose_circuit(payload)
+            .propose_circuit(&header, payload)
             .expect("Proposal not accepted");
 
         // None of the proposed members are peered

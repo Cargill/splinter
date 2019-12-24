@@ -515,7 +515,7 @@ mod tests {
             .admin_service_shared
             .lock()
             .unwrap()
-            .propose_circuit(payload)
+            .propose_circuit(&header, payload)
             .expect("The proposal was not handled correctly");
 
         // wait up to 1 second for the proposed circuit message
