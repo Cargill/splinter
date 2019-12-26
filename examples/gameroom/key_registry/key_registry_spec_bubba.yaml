@@ -13,11 +13,6 @@
 # limitations under the License.
 
 ---
-alice:
-  node_id: acme-node-000
-  metadata:
-    gameroom/first-name: alice
-    gameroom/organization: Acme
 bob:
   node_id: bubba-node-000
   metadata:

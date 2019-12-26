@@ -16,33 +16,10 @@ version: '3'
 
 volumes:
   cargo-registry:
-  key-registry:
   acme-var:
   bubba-var:
 
 services:
-
-    generate-key-registry:
-        image: splinter-cli
-        build:
-          context: ../..
-          dockerfile: ./cli/Dockerfile-installed-${DISTRO}
-          args:
-            - CARGO_ARGS=${CARGO_ARGS}
-            - REPO_VERSION=${REPO_VERSION}
-        volumes:
-          - key-registry:/key_registry
-          - ./key_registry:/input
-        command: |
-          bash -c "
-            if [ ! -f /key_registry/keys.yaml ]
-            then
-              splinter admin keyregistry \
-                -i /input/key_registry_spec.yaml \
-                -d /key_registry \
-                --force
-            fi
-          "
 
     db-acme:
       image: gameroom-database
@@ -131,19 +108,19 @@ services:
       ports:
         - 8088:8085
       volumes:
-        - key-registry:/key_registry_shared
+        - ./key_registry:/input
         - acme-var:/var/lib/splinter
         - ./splinterd-config:/configs
         - ./node_registry:/node_registry
       entrypoint: |
         bash -c "
-          # We need to wait for the generated key registry to be available
-          while [ ! -f /key_registry_shared/keys.yaml ]; do \
-            echo 'waiting for key registry'; \
-            sleep 1; \
-          done && \
-          # Copy the generated key registry to its expected location
-          cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
+          if [ ! -f /var/lib/splinter/keys.yaml ]
+          then
+            splinter admin keyregistry \
+              -i /input/key_registry_spec_acme.yaml \
+              --force
+          fi
+
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --service-endpoint 0.0.0.0:8043 \
@@ -240,19 +217,19 @@ services:
       ports:
         - 8089:8085
       volumes:
-        - key-registry:/key_registry_shared
+        - ./key_registry:/input
         - ./splinterd-config:/configs
         - ./node_registry:/node_registry
         - bubba-var:/var/lib/splinter
       entrypoint: |
         bash -c "
-          # We need to wait for the generated key registry to be available
-          while [ ! -f /key_registry_shared/keys.yaml ]; do \
-            echo 'waiting for key registry'; \
-            sleep 1; \
-          done && \
-          # Copy the generated key registry to its expected location
-          cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
+          if [ ! -f /var/lib/splinter/keys.yaml ]
+          then
+            splinter admin keyregistry \
+              -i /input/key_registry_spec_bubba.yaml \
+              --force
+          fi
+
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --service-endpoint 0.0.0.0:8043 \
