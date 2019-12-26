@@ -30,12 +30,18 @@ const actions = {
   vote({ commit }: any, id: number) {
     commit('setVote', id);
   },
+  clearVote({ commit}: any, id: number) {
+      commit('clearVote', id)
+  }
 };
 
 const mutations = {
   setVote(state: VoteState, id: number) {
     state.votes[id] = true;
   },
+  clearVote(state: VoteState, id: number) {
+    delete state.votes[id];
+  }
 };
 
 export default {

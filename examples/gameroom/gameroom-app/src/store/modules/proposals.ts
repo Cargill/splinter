@@ -45,6 +45,7 @@ const actions = {
       const response = await submitPayload(signedPayload);
       return response;
     } catch (err) {
+      await dispatch('votes/clearVote', vote.proposalID, {root: true});
       console.error(err);
       throw err;
     }
