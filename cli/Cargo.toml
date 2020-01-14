@@ -54,7 +54,7 @@ license = "Apache-2.0"
 
 [[bin]]
 name = "splinter"
-path = "src/main.rs"
+path = "src/splinter/main.rs"
 
 [dependencies]
 clap = "2"

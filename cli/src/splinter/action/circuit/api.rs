@@ -33,7 +33,7 @@ impl<'a> SplinterRestClient<'a> {
     pub fn fetch_node_id(&self) -> Result<String, CliError> {
         Client::new()
             .get(&format!("{}/status", self.url))
-            .send()
+            .submit()
             .and_then(|res| res.json())
             .map(|server_status: ServerStatus| server_status.node_id)
             .map_err(|err| CliError::ActionError(format!("Unable to fetch node id: {}", err)))
@@ -45,7 +45,7 @@ impl<'a> SplinterRestClient<'a> {
             .post(&format!("{}/admin/submit", self.url))
             .header(header::CONTENT_TYPE, "octet-stream")
             .body(payload)
-            .send()
+            .submit()
             .map_err(|err| {
                 CliError::ActionError(format!("Unable to submit admin payload: {}", err))
             })
