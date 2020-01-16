@@ -69,6 +69,10 @@ impl ConfigBuilder {
         self
     }
 
+    // In testing for the ConfigBuilder module behind the config-builder feature, this method is
+    // not used in order to produce a None option in the resulting ConfigBuilder object. This
+    // method is required to compile and test the ConfigToml module behind the config-toml feature.
+    #[cfg(feature = "config-toml")]
     pub fn with_cert_dir(mut self, cert_dir: String) -> Self {
         self.cert_dir = Some(cert_dir);
         self
@@ -119,6 +123,10 @@ impl ConfigBuilder {
         self
     }
 
+    // In testing for the ConfigBuilder module behind the config-builder feature, this method is
+    // not used in order to produce a None option in the resulting ConfigBuilder object. This
+    // method is required to compile and test the ConfigToml module behind the config-toml feature.
+    #[cfg(feature = "config-toml")]
     pub fn with_bind(mut self, bind: String) -> Self {
         self.bind = Some(bind);
         self
@@ -130,16 +138,28 @@ impl ConfigBuilder {
         self
     }
 
+    // In testing for the ConfigBuilder module behind the config-builder feature, this method is
+    // not used in order to produce a None option in the resulting ConfigBuilder object. This
+    // method is required to compile and test the ConfigToml module behind the config-toml feature.
+    #[cfg(feature = "config-toml")]
     pub fn with_registry_backend(mut self, registry_backend: String) -> Self {
         self.registry_backend = Some(registry_backend);
         self
     }
 
+    // In testing for the ConfigBuilder module behind the config-builder feature, this method is
+    // not used in order to produce a None option in the resulting ConfigBuilder object. This
+    // method is required to compile and test the ConfigToml module behind the config-toml feature.
+    #[cfg(feature = "config-toml")]
     pub fn with_registry_file(mut self, registry_file: String) -> Self {
         self.registry_file = Some(registry_file);
         self
     }
 
+    // In testing for the ConfigBuilder module behind the config-builder feature, this method is
+    // not used in order to produce a None option in the resulting ConfigBuilder object. This
+    // method is required to compile and test the ConfigToml module behind the config-toml feature.
+    #[cfg(feature = "config-toml")]
     pub fn with_heartbeat_interval(mut self, heartbeat_interval: u64) -> Self {
         self.heartbeat_interval = Some(heartbeat_interval);
         self
