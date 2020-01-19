@@ -37,7 +37,7 @@ services:
           bash -c "
             if [ ! -f /key_registry/keys.yaml ]
             then
-              splinter admin keyregistry \
+              splinter-cli admin keyregistry \
                 -i /input/key_registry_spec.yaml \
                 -d /key_registry \
                 --force
@@ -144,7 +144,7 @@ services:
           done && \
           # Copy the generated key registry to its expected location
           cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
-          splinter cert generate --skip && \
+          splinter-cli cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
@@ -253,7 +253,7 @@ services:
           done && \
           # Copy the generated key registry to its expected location
           cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
-          splinter cert generate --skip && \
+          splinter-cli cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
