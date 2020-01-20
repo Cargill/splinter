@@ -134,7 +134,7 @@ impl UserCredentialsBuilder {
 
 /// Defines methods for CRUD operations and fetching a user’s
 /// credentials without defining a storage strategy
-pub trait CredentialsStore<T> {
+pub trait CredentialsStore<T>: Send {
     /// Adds a credential to the underlying storage
     ///
     /// # Arguments
