@@ -607,6 +607,8 @@ fn start_health_service(
 
 #[cfg(feature = "biome")]
 fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartError> {
+    use splinter::biome::user;
+
     info!("Adding biome routes");
     let connection_pool: ConnectionPool =
         database::create_connection_pool(db_url).map_err(|err| {
@@ -616,8 +618,11 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
             ))
         })?;
     let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
-    biome_rest_provider_builder =
-        biome_rest_provider_builder.with_user_store(connection_pool.clone());
+
+    let user_store = user::store::from_connection_pool(connection_pool.clone()).map_err(|err| {
+        StartError::RestApiError(format!("Unable to instantiate user store: {}", err))
+    })?;
+    biome_rest_provider_builder = biome_rest_provider_builder.with_user_store(user_store);
     #[cfg(feature = "biome-credentials")]
     {
         biome_rest_provider_builder =

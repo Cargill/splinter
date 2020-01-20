@@ -16,12 +16,13 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::actix_web::HttpResponse;
+use crate::biome::clone::CloneVat;
 use crate::futures::{Future, IntoFuture};
 use crate::rest_api::{into_bytes, ErrorResponse, Method, Resource};
 
 use super::super::rest_api::BiomeRestConfig;
 use super::super::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
-use super::super::user::store::{diesel::SplinterUserStore, SplinterUser, UserStore};
+use super::super::user::store::{SplinterUser, UserStore};
 use super::{
     credentials_store::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
     UserCredentialsBuilder,
@@ -41,13 +42,14 @@ struct UsernamePassword {
 ///   }
 pub fn make_register_route(
     credentials_store: Arc<SplinterCredentialsStore>,
-    user_store: Arc<SplinterUserStore>,
+    user_store: Box<dyn UserStore<SplinterUser>>,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {
+    let user_store = CloneVat::new(user_store);
     Resource::build("/biome/register").add_method(Method::Post, move |_, payload| {
         let credentials_store = credentials_store.clone();
-        let user_store = user_store.clone();
         let rest_config = rest_config.clone();
+        let user_store = user_store.get_clone();
         Box::new(into_bytes(payload).and_then(move |bytes| {
             let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
                 Ok(val) => val,

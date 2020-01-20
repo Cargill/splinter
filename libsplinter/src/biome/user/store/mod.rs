@@ -103,3 +103,11 @@ impl<T> Clone for Box<dyn UserStore<T>> {
         self.clone_boxed()
     }
 }
+
+#[cfg(feature = "diesel")]
+/// Returns a UserStore implementation for SplinterUsers on the given ConnectionPool.
+pub fn from_connection_pool(
+    connection_pool: crate::database::ConnectionPool,
+) -> Result<Box<dyn UserStore<SplinterUser>>, UserStoreError> {
+    Ok(Box::new(diesel::SplinterUserStore::new(connection_pool)))
+}
