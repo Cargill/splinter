@@ -195,6 +195,16 @@ impl<T> Clone for Box<dyn CredentialsStore<T>> {
     }
 }
 
+/// Construct a new CredentialsStore for UserCredentials over a connection pool
+#[cfg(feature = "diesel")]
+pub fn new_store_from_connection_pool(
+    connection_pool: crate::database::ConnectionPool,
+) -> Result<Box<dyn CredentialsStore<UserCredentials>>, CredentialsStoreError> {
+    Ok(Box::new(credentials_store::SplinterCredentialsStore::new(
+        connection_pool,
+    )))
+}
+
 impl From<UserCredentialsModel> for UserCredentials {
     fn from(user_credentials: UserCredentialsModel) -> Self {
         Self {

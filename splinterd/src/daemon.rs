@@ -625,8 +625,14 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
     biome_rest_provider_builder = biome_rest_provider_builder.with_user_store(user_store);
     #[cfg(feature = "biome-credentials")]
     {
+        use splinter::biome::credentials;
+
+        let credentials_store = credentials::new_store_from_connection_pool(connection_pool)
+            .map_err(|err| {
+                StartError::RestApiError(format!("Unable to instantiate credential store: {}", err))
+            })?;
         biome_rest_provider_builder =
-            biome_rest_provider_builder.with_credentials_store(connection_pool);
+            biome_rest_provider_builder.with_credentials_store(credentials_store);
     }
     let biome_rest_provider = biome_rest_provider_builder.build().map_err(|err| {
         StartError::RestApiError(format!("Unable to build Biome REST routes: {}", err))

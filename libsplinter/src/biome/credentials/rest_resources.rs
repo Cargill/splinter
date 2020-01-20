@@ -23,10 +23,7 @@ use crate::rest_api::{into_bytes, ErrorResponse, Method, Resource};
 use super::super::rest_api::BiomeRestConfig;
 use super::super::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 use super::super::user::store::{SplinterUser, UserStore};
-use super::{
-    credentials_store::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
-    UserCredentialsBuilder,
-};
+use super::{CredentialsStore, CredentialsStoreError, UserCredentials, UserCredentialsBuilder};
 
 #[derive(Deserialize)]
 struct UsernamePassword {
@@ -41,13 +38,14 @@ struct UsernamePassword {
 ///       "hashed_password": <hash of the password the user will use to log in>
 ///   }
 pub fn make_register_route(
-    credentials_store: Arc<SplinterCredentialsStore>,
+    credentials_store: Box<dyn CredentialsStore<UserCredentials>>,
     user_store: Box<dyn UserStore<SplinterUser>>,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {
+    let credentials_store = CloneVat::new(credentials_store);
     let user_store = CloneVat::new(user_store);
     Resource::build("/biome/register").add_method(Method::Post, move |_, payload| {
-        let credentials_store = credentials_store.clone();
+        let credentials_store = credentials_store.get_clone();
         let rest_config = rest_config.clone();
         let user_store = user_store.get_clone();
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -119,12 +117,13 @@ pub fn make_register_route(
 
 /// Defines a REST endpoint for login
 pub fn make_login_route(
-    credentials_store: Arc<SplinterCredentialsStore>,
+    credentials_store: Box<dyn CredentialsStore<UserCredentials>>,
     rest_config: Arc<BiomeRestConfig>,
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
+    let credentials_store = CloneVat::new(credentials_store);
     Resource::build("/biome/login").add_method(Method::Post, move |_, payload| {
-        let credentials_store = credentials_store.clone();
+        let credentials_store = credentials_store.get_clone();
         let rest_config = rest_config.clone();
         let token_issuer = token_issuer.clone();
         Box::new(into_bytes(payload).and_then(move |bytes| {
