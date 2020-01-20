@@ -93,4 +93,13 @@ pub trait UserStore<T> {
     ///  * `id` - The unique id of the user.
     ///
     fn is_user(&self, id: &str) -> Result<bool, UserStoreError>;
+
+    /// Creates a boxed clone of the implementation, with only the dynamic features of the trait.
+    fn clone_boxed(&self) -> Box<dyn UserStore<T>>;
+}
+
+impl<T> Clone for Box<dyn UserStore<T>> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }

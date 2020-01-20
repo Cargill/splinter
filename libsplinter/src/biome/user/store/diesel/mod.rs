@@ -24,6 +24,7 @@ use operations::add_user::UserStoreAddUserOperation as _;
 use operations::UserStoreOperations;
 
 /// Manages creating, updating and fetching SplinterUser from the databae
+#[derive(Clone)]
 pub struct SplinterUserStore {
     connection_pool: ConnectionPool,
 }
@@ -64,5 +65,9 @@ impl UserStore<SplinterUser> for SplinterUserStore {
 
     fn is_user(&self, _id: &str) -> Result<bool, UserStoreError> {
         unimplemented!()
+    }
+
+    fn clone_boxed(&self) -> Box<dyn UserStore<SplinterUser>> {
+        Box::new(self.clone())
     }
 }
