@@ -30,6 +30,7 @@ pub mod key_management;
 #[cfg(feature = "biome-notifications")]
 pub mod notifications;
 
+pub (in crate::biome) mod clone;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod secrets;
