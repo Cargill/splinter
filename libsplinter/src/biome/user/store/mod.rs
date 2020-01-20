@@ -48,7 +48,7 @@ impl SplinterUser {
 
 /// Defines methods for CRUD operations and fetching and listing users
 /// without defining a storage strategy
-pub trait UserStore<T> {
+pub trait UserStore<T>: Send {
     /// Adds a user to the underlying storage
     ///
     /// # Arguments
