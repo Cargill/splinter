@@ -50,9 +50,7 @@ use crate::database::ConnectionPool;
 use crate::rest_api::{Resource, RestResourceProvider};
 
 #[cfg(feature = "biome-key-management")]
-use super::key_management::{
-    rest_resources::make_key_management_route, store::postgres::PostgresKeyStore,
-};
+use super::key_management::{rest_resources::make_key_management_route, store::KeyStore, Key};
 use super::secrets::{AutoSecretManager, SecretManager};
 use super::user::store::{SplinterUser, UserStore};
 
@@ -74,7 +72,7 @@ pub struct BiomeRestResourceManager {
     #[allow(dead_code)]
     user_store: Box<dyn UserStore<SplinterUser>>,
     #[cfg(feature = "biome-key-management")]
-    key_store: Arc<PostgresKeyStore>,
+    key_store: Arc<dyn KeyStore<Key>>,
     // Disable lint warning, for now this is only used if the biome-credentials feature is enabled
     #[allow(dead_code)]
     rest_config: Arc<BiomeRestConfig>,
@@ -126,7 +124,7 @@ impl RestResourceProvider for BiomeRestResourceManager {
 pub struct BiomeRestResourceManagerBuilder {
     user_store: Option<Box<dyn UserStore<SplinterUser>>>,
     #[cfg(feature = "biome-key-management")]
-    key_store: Option<PostgresKeyStore>,
+    key_store: Option<Box<dyn KeyStore<Key>>>,
     rest_config: Option<BiomeRestConfig>,
     token_secret_manager: Option<Arc<dyn SecretManager>>,
     #[cfg(feature = "biome-credentials")]
@@ -153,8 +151,11 @@ impl BiomeRestResourceManagerBuilder {
     ///
     /// * `pool`: ConnectionPool to database that will serve as backend for KeyStore
     #[cfg(feature = "biome-key-management")]
-    pub fn with_key_store(mut self, pool: ConnectionPool) -> BiomeRestResourceManagerBuilder {
-        self.key_store = Some(PostgresKeyStore::new(pool));
+    pub fn with_key_store(
+        mut self,
+        key_store: Box<dyn KeyStore<Key>>,
+    ) -> BiomeRestResourceManagerBuilder {
+        self.key_store = Some(key_store);
         self
     }
 
@@ -225,7 +226,7 @@ impl BiomeRestResourceManagerBuilder {
         Ok(BiomeRestResourceManager {
             user_store,
             #[cfg(feature = "biome-key-management")]
-            key_store: Arc::new(key_store),
+            key_store: Arc::from(key_store),
             rest_config: Arc::new(rest_config),
             token_secret_manager,
             #[cfg(feature = "biome-credentials")]
