@@ -18,6 +18,7 @@ use super::{CredentialsStore, CredentialsStoreError, UserCredentials};
 use crate::database::ConnectionPool;
 
 /// Manages creating, updating and fetching UserCredentials from the databae
+#[derive(Clone)]
 pub struct SplinterCredentialsStore {
     connection_pool: ConnectionPool,
 }
@@ -94,5 +95,9 @@ impl CredentialsStore<UserCredentials> for SplinterCredentialsStore {
                 ))
             })?;
         Ok(UserCredentials::from(credentials))
+    }
+
+    fn clone_boxed(&self) -> Box<dyn CredentialsStore<UserCredentials>> {
+        Box::new(self.clone())
     }
 }

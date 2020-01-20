@@ -184,6 +184,15 @@ pub trait CredentialsStore<T>: Send {
     ///  * `username` - The username the user uses for login
     ///
     fn fetch_credential_by_username(&self, username: &str) -> Result<T, CredentialsStoreError>;
+
+    /// Creates a boxed clone of the implementation, with only the dynamic features of the trait.
+    fn clone_boxed(&self) -> Box<dyn CredentialsStore<T>>;
+}
+
+impl<T> Clone for Box<dyn CredentialsStore<T>> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }
 
 impl From<UserCredentialsModel> for UserCredentials {
