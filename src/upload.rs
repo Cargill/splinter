@@ -18,9 +18,7 @@ use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 
-use sabre_sdk::protocol::payload::{
-    Action, CreateContractActionBuilder, SabrePayload, SabrePayloadBuilder,
-};
+use sabre_sdk::protocol::payload::CreateContractActionBuilder;
 use sawtooth_sdk::signing;
 use yaml_rust::YamlLoader;
 
@@ -61,41 +59,20 @@ pub fn do_upload(
 
     let contract = load_contract_file(contract_path_buf.as_path())?;
 
-    let payload = create_upload_payload(
-        &definition.name,
-        &definition.version,
-        definition.inputs,
-        definition.outputs,
-        contract,
-    )?;
+    let payload = CreateContractActionBuilder::new()
+        .with_name(definition.name)
+        .with_version(definition.version)
+        .with_inputs(definition.inputs)
+        .with_outputs(definition.outputs)
+        .with_contract(contract)
+        .into_payload_builder()?
+        .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
     submit_batch_list(url, &batch_list)
-}
-
-fn create_upload_payload(
-    name: &str,
-    version: &str,
-    inputs: Vec<String>,
-    outputs: Vec<String>,
-    contract: Vec<u8>,
-) -> Result<SabrePayload, CliError> {
-    let create_contract = CreateContractActionBuilder::new()
-        .with_name(String::from(name))
-        .with_version(String::from(version))
-        .with_inputs(inputs)
-        .with_outputs(outputs)
-        .with_contract(contract)
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::CreateContract(create_contract))
-        .build()?;
-
-    Ok(payload)
 }
 
 fn load_contract_file(path: &Path) -> Result<Vec<u8>, CliError> {

@@ -16,9 +16,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
-use sabre_sdk::protocol::payload::{
-    Action, ExecuteContractActionBuilder, SabrePayload, SabrePayloadBuilder,
-};
+use sabre_sdk::protocol::payload::ExecuteContractActionBuilder;
 use sawtooth_sdk::signing;
 
 use crate::error::CliError;
@@ -43,35 +41,20 @@ pub fn do_exec(
 
     let contract_payload = load_contract_payload_file(payload_file)?;
 
-    let txn_payload = create_exec_txn_payload(name, version, inputs, outputs, contract_payload)?;
+    let txn_payload = ExecuteContractActionBuilder::new()
+        .with_name(name.into())
+        .with_version(version.into())
+        .with_inputs(inputs)
+        .with_outputs(outputs)
+        .with_payload(contract_payload)
+        .into_payload_builder()?
+        .build()?;
 
     let txn = create_transaction(txn_payload, &signer, &public_key)?;
     let batch = create_batch(txn, &signer, &public_key)?;
     let batch_list = create_batch_list_from_one(batch);
 
     submit_batch_list(url, &batch_list)
-}
-
-fn create_exec_txn_payload(
-    name: &str,
-    version: &str,
-    inputs: Vec<String>,
-    outputs: Vec<String>,
-    contract_payload: Vec<u8>,
-) -> Result<SabrePayload, CliError> {
-    let exec_contract = ExecuteContractActionBuilder::new()
-        .with_name(name.into())
-        .with_version(version.into())
-        .with_inputs(inputs)
-        .with_outputs(outputs)
-        .with_payload(contract_payload)
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::ExecuteContract(exec_contract))
-        .build()?;
-
-    Ok(payload)
 }
 
 fn load_contract_payload_file(payload_file: &str) -> Result<Vec<u8>, CliError> {

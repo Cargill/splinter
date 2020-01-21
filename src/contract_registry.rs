@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use sabre_sdk::protocol::payload::{
-    Action, CreateContractRegistryActionBuilder, DeleteContractRegistryActionBuilder,
-    SabrePayloadBuilder, UpdateContractRegistryOwnersActionBuilder,
+    CreateContractRegistryActionBuilder, DeleteContractRegistryActionBuilder,
+    UpdateContractRegistryOwnersActionBuilder,
 };
 use sawtooth_sdk::signing;
 
@@ -35,13 +35,10 @@ pub fn do_cr_create(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let action = CreateContractRegistryActionBuilder::new()
+    let payload = CreateContractRegistryActionBuilder::new()
         .with_name(name.into())
         .with_owners(owners)
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::CreateContractRegistry(action))
+        .into_payload_builder()?
         .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;
@@ -63,13 +60,10 @@ pub fn do_cr_update(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let action = UpdateContractRegistryOwnersActionBuilder::new()
+    let payload = UpdateContractRegistryOwnersActionBuilder::new()
         .with_name(name.into())
         .with_owners(owners)
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::UpdateContractRegistryOwners(action))
+        .into_payload_builder()?
         .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;
@@ -86,12 +80,9 @@ pub fn do_cr_delete(key_name: Option<&str>, url: &str, name: &str) -> Result<Str
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let action = DeleteContractRegistryActionBuilder::new()
+    let payload = DeleteContractRegistryActionBuilder::new()
         .with_name(name.into())
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::DeleteContractRegistry(action))
+        .into_payload_builder()?
         .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;

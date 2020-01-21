@@ -18,15 +18,7 @@ use std::error::Error as StdError;
 
 use hyper;
 use protobuf;
-use sabre_sdk::protocol::payload::{
-    CreateContractActionBuildError, CreateContractRegistryActionBuildError,
-    CreateNamespaceRegistryActionBuildError, CreateNamespaceRegistryPermissionActionBuildError,
-    CreateSmartPermissionActionBuildError, DeleteContractRegistryActionBuildError,
-    DeleteNamespaceRegistryActionBuildError, DeleteNamespaceRegistryPermissionActionBuildError,
-    DeleteSmartPermissionActionBuildError, ExecuteContractActionBuildError, SabrePayloadBuildError,
-    UpdateContractRegistryOwnersActionBuildError, UpdateNamespaceRegistryOwnersActionBuildError,
-    UpdateSmartPermissionActionBuildError,
-};
+use sabre_sdk::protocol::payload::{ActionBuildError, SabrePayloadBuildError};
 use sabre_sdk::protos::ProtoConversionError;
 use sawtooth_sdk::signing;
 
@@ -114,19 +106,4 @@ macro_rules! impl_builder_errors {
     };
 }
 
-impl_builder_errors!(
-    CreateContractRegistryActionBuildError,
-    UpdateContractRegistryOwnersActionBuildError,
-    DeleteContractRegistryActionBuildError,
-    SabrePayloadBuildError,
-    CreateNamespaceRegistryActionBuildError,
-    UpdateNamespaceRegistryOwnersActionBuildError,
-    CreateNamespaceRegistryPermissionActionBuildError,
-    DeleteNamespaceRegistryActionBuildError,
-    ExecuteContractActionBuildError,
-    DeleteNamespaceRegistryPermissionActionBuildError,
-    CreateSmartPermissionActionBuildError,
-    UpdateSmartPermissionActionBuildError,
-    DeleteSmartPermissionActionBuildError,
-    CreateContractActionBuildError
-);
+impl_builder_errors!(ActionBuildError, SabrePayloadBuildError);

@@ -18,8 +18,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use sabre_sdk::protocol::payload::{
-    Action, CreateSmartPermissionActionBuilder, DeleteSmartPermissionActionBuilder,
-    SabrePayloadBuilder, UpdateSmartPermissionActionBuilder,
+    CreateSmartPermissionActionBuilder, DeleteSmartPermissionActionBuilder,
+    UpdateSmartPermissionActionBuilder,
 };
 use sawtooth_sdk::signing;
 
@@ -46,14 +46,11 @@ pub fn do_create(
 
     let function = load_smart_permission_file(smart_permission_path_buf.as_path())?;
 
-    let action = CreateSmartPermissionActionBuilder::new()
+    let payload = CreateSmartPermissionActionBuilder::new()
         .with_name(name.to_string())
         .with_org_id(org_id.to_string())
         .with_function(function)
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::CreateSmartPermission(action))
+        .into_payload_builder()?
         .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;
@@ -81,14 +78,11 @@ pub fn do_update(
 
     let function = load_smart_permission_file(smart_permission_path_buf.as_path())?;
 
-    let action = UpdateSmartPermissionActionBuilder::new()
+    let payload = UpdateSmartPermissionActionBuilder::new()
         .with_name(name.to_string())
         .with_org_id(org_id.to_string())
         .with_function(function)
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::UpdateSmartPermission(action))
+        .into_payload_builder()?
         .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;
@@ -110,13 +104,10 @@ pub fn do_delete(
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
 
-    let action = DeleteSmartPermissionActionBuilder::new()
+    let payload = DeleteSmartPermissionActionBuilder::new()
         .with_name(name.to_string())
         .with_org_id(org_id.to_string())
-        .build()?;
-
-    let payload = SabrePayloadBuilder::new()
-        .with_action(Action::DeleteSmartPermission(action))
+        .into_payload_builder()?
         .build()?;
 
     let txn = create_transaction(payload, &signer, &public_key)?;
