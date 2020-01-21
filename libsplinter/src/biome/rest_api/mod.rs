@@ -59,7 +59,8 @@ pub use error::BiomeRestResourceManagerBuilderError;
 #[cfg(feature = "biome-credentials")]
 use super::credentials::{
     rest_resources::{make_login_route, make_register_route},
-    CredentialsStore, UserCredentials,
+    store::CredentialsStore,
+    UserCredentials,
 };
 
 #[allow(unused_imports)]

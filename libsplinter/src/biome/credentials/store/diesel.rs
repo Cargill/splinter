@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::database::helpers::{fetch_credential_by_username, insert_credential};
-use super::{CredentialsStore, CredentialsStoreError, UserCredentials};
-
+use crate::biome::credentials::database::helpers::{
+    fetch_credential_by_username, insert_credential,
+};
+use crate::biome::credentials::UserCredentials;
 use crate::database::ConnectionPool;
+
+use super::{error::CredentialsStoreError, CredentialsStore};
 
 /// Manages creating, updating and fetching UserCredentials from the databae
 #[derive(Clone)]

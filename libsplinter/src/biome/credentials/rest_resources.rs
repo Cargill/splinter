@@ -23,7 +23,8 @@ use crate::rest_api::{into_bytes, ErrorResponse, Method, Resource};
 use super::super::rest_api::BiomeRestConfig;
 use super::super::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 use super::super::user::store::{SplinterUser, UserStore};
-use super::{CredentialsStore, CredentialsStoreError, UserCredentials, UserCredentialsBuilder};
+use super::store::{CredentialsStore, CredentialsStoreError};
+use super::{UserCredentials, UserCredentialsBuilder};
 
 #[derive(Deserialize)]
 struct UsernamePassword {
