@@ -33,8 +33,8 @@ function App() {
   const saplingDomNode = useRef(null);
   const [userSaplingManifests, setUserSaplingManifests] = useState([]);
   const [user, setUser] = useUserState();
-  const [sharedConfig, setSharedConfig] = useState({});
 
+  const sharedConfig = useRef(null);
   const appSapling = useRef(null);
   const configSaplings = useRef({});
 
@@ -49,7 +49,7 @@ function App() {
 
   window.$CANOPY.setUser = setUser;
   window.$CANOPY.getUser = () => user;
-  window.$CANOPY.getSharedConfig = () => sharedConfig;
+  window.$CANOPY.getSharedConfig = () => sharedConfig.current;
 
   // This useEffect with zero dependencies will run only when the component first loads.
   useEffect(() => {
@@ -60,7 +60,7 @@ function App() {
         sharedConfigResponse
       ] = await Promise.all([loadAllSaplings(), loadSharedConfig()]);
 
-      setSharedConfig(sharedConfigResponse);
+      sharedConfig.current = sharedConfigResponse;
       setUserSaplingManifests(userSaplingsResponse);
 
       // Load the config saplings
