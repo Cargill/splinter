@@ -21,12 +21,10 @@ use sabre_sdk::protocol::payload::{
     CreateSmartPermissionActionBuilder, DeleteSmartPermissionActionBuilder,
     UpdateSmartPermissionActionBuilder,
 };
-use sawtooth_sdk::signing;
 
 use crate::error::CliError;
-use crate::key;
-use crate::submit::submit_batch_list;
-use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use crate::key::new_signer;
+use crate::submit::submit_batches;
 
 pub fn do_create(
     url: &str,
@@ -35,29 +33,22 @@ pub fn do_create(
     filename: &str,
     key: Option<&str>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
     let mut smart_permission_path_buf = PathBuf::new();
     smart_permission_path_buf.push(filename);
 
     let function = load_smart_permission_file(smart_permission_path_buf.as_path())?;
 
-    let payload = CreateSmartPermissionActionBuilder::new()
+    let signer = new_signer(key)?;
+    let batch = CreateSmartPermissionActionBuilder::new()
         .with_name(name.to_string())
         .with_org_id(org_id.to_string())
         .with_function(function)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_update(
@@ -67,29 +58,22 @@ pub fn do_update(
     filename: &str,
     key: Option<&str>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
     let mut smart_permission_path_buf = PathBuf::new();
     smart_permission_path_buf.push(filename);
 
     let function = load_smart_permission_file(smart_permission_path_buf.as_path())?;
 
-    let payload = UpdateSmartPermissionActionBuilder::new()
+    let signer = new_signer(key)?;
+    let batch = UpdateSmartPermissionActionBuilder::new()
         .with_name(name.to_string())
         .with_org_id(org_id.to_string())
         .with_function(function)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_delete(
@@ -98,23 +82,16 @@ pub fn do_delete(
     name: &str,
     key: Option<&str>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = DeleteSmartPermissionActionBuilder::new()
+    let signer = new_signer(key)?;
+    let batch = DeleteSmartPermissionActionBuilder::new()
         .with_name(name.to_string())
         .with_org_id(org_id.to_string())
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 fn load_smart_permission_file(path: &Path) -> Result<Vec<u8>, CliError> {

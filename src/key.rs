@@ -14,15 +14,25 @@
 
 //! Contains functions which assist with signing key management
 
+use std::convert::TryInto;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 
 use dirs;
-use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
+use sawtooth_sdk::signing::{
+    create_context, secp256k1::Secp256k1PrivateKey, transact::TransactSigner, Signer,
+};
 use users::get_current_username;
 
 use crate::error::CliError;
+
+/// Return a `TransactSigner`, loading the signing key from the user's environment.
+pub fn new_signer(key_name: Option<&str>) -> Result<TransactSigner, CliError> {
+    let context = create_context("secp256k1")?;
+    let private_key = load_signing_key(key_name)?;
+    Ok(Signer::new_boxed(context, Box::new(private_key)).try_into()?)
+}
 
 /// Return a signing key loaded from the user's environment
 ///
@@ -46,7 +56,7 @@ use crate::error::CliError;
 ///
 /// If a HOME or USER environment variable is required but cannot be
 /// retrieved from the environment, a CliError::VarError is returned.
-pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
+fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
     let username: String = name
         .map(String::from)
         .ok_or_else(|| env::var("USER"))

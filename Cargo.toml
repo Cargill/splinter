@@ -15,7 +15,7 @@ futures = "0.1"
 hyper = "0.11"
 protobuf = "2"
 rust-crypto = "0.2"
-sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
+sawtooth-sdk = { version = "0.4", features = ["transact-compat"] }
 tokio-core = "0.1"
 users = "0.6"
 yaml-rust = "0.4"
@@ -23,6 +23,7 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 sabre-sdk = {path = "../sdks/rust"}
+transact = "0.2"
 
 [build-dependencies]
 protoc-rust = "2"

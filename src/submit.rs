@@ -21,16 +21,15 @@ use hyper::client::{Client, Request};
 use hyper::header::{ContentLength, ContentType};
 use hyper::Method;
 use hyper::StatusCode;
-use protobuf::Message;
 use serde_json;
 use std::{fmt, str};
 use tokio_core;
 
-use sawtooth_sdk::messages::batch::BatchList;
+use transact::{protocol::batch::Batch, protos::IntoBytes};
 
 use crate::error::CliError;
 
-pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, CliError> {
+pub fn submit_batches(url: &str, batch_list: Vec<Batch>) -> Result<String, CliError> {
     let post_url = String::from(url) + "/batches";
     let hyper_uri = match post_url.parse::<hyper::Uri>() {
         Ok(uri) => uri,
@@ -55,7 +54,7 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<String, Cl
     let handle = core.handle();
     let client = Client::configure().build(&handle);
 
-    let bytes = batch_list.write_to_bytes()?;
+    let bytes = batch_list.into_bytes()?;
 
     let mut req = Request::new(Method::Post, hyper_uri);
     req.headers_mut().set(ContentType::octet_stream());

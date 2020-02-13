@@ -17,12 +17,10 @@ use std::io::prelude::*;
 use std::io::BufReader;
 
 use sabre_sdk::protocol::payload::ExecuteContractActionBuilder;
-use sawtooth_sdk::signing;
 
 use crate::error::CliError;
-use crate::key;
-use crate::submit::submit_batch_list;
-use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use crate::key::new_signer;
+use crate::submit::submit_batches;
 
 pub fn do_exec(
     name: &str,
@@ -33,28 +31,20 @@ pub fn do_exec(
     key_name: Option<&str>,
     url: &str,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
     let contract_payload = load_contract_payload_file(payload_file)?;
-
-    let txn_payload = ExecuteContractActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = ExecuteContractActionBuilder::new()
         .with_name(name.into())
         .with_version(version.into())
         .with_inputs(inputs)
         .with_outputs(outputs)
         .with_payload(contract_payload)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(txn_payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 fn load_contract_payload_file(payload_file: &str) -> Result<Vec<u8>, CliError> {

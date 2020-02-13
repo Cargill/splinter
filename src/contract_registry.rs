@@ -16,12 +16,10 @@ use sabre_sdk::protocol::payload::{
     CreateContractRegistryActionBuilder, DeleteContractRegistryActionBuilder,
     UpdateContractRegistryOwnersActionBuilder,
 };
-use sawtooth_sdk::signing;
 
 use crate::error::CliError;
-use crate::key;
-use crate::submit::submit_batch_list;
-use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use crate::key::new_signer;
+use crate::submit::submit_batches;
 
 pub fn do_cr_create(
     key_name: Option<&str>,
@@ -29,23 +27,16 @@ pub fn do_cr_create(
     name: &str,
     owners: Vec<String>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = CreateContractRegistryActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = CreateContractRegistryActionBuilder::new()
         .with_name(name.into())
         .with_owners(owners)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_cr_update(
@@ -54,40 +45,26 @@ pub fn do_cr_update(
     name: &str,
     owners: Vec<String>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = UpdateContractRegistryOwnersActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = UpdateContractRegistryOwnersActionBuilder::new()
         .with_name(name.into())
         .with_owners(owners)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_cr_delete(key_name: Option<&str>, url: &str, name: &str) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = DeleteContractRegistryActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = DeleteContractRegistryActionBuilder::new()
         .with_name(name.into())
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }

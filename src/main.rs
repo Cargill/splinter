@@ -24,7 +24,6 @@ mod key;
 mod namespace;
 mod smart_permission;
 mod submit;
-mod transaction;
 mod upload;
 
 use std::time::Instant;

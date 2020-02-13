@@ -17,12 +17,10 @@ use sabre_sdk::protocol::payload::{
     DeleteNamespaceRegistryActionBuilder, DeleteNamespaceRegistryPermissionActionBuilder,
     UpdateNamespaceRegistryOwnersActionBuilder,
 };
-use sawtooth_sdk::signing;
 
 use crate::error::CliError;
-use crate::key;
-use crate::submit::submit_batch_list;
-use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use crate::key::new_signer;
+use crate::submit::submit_batches;
 
 pub fn do_ns_create(
     key_name: Option<&str>,
@@ -30,23 +28,16 @@ pub fn do_ns_create(
     namespace: &str,
     owners: Vec<String>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = CreateNamespaceRegistryActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = CreateNamespaceRegistryActionBuilder::new()
         .with_namespace(namespace.into())
         .with_owners(owners)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_ns_update(
@@ -55,23 +46,16 @@ pub fn do_ns_update(
     namespace: &str,
     owners: Vec<String>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = UpdateNamespaceRegistryOwnersActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = UpdateNamespaceRegistryOwnersActionBuilder::new()
         .with_namespace(namespace.into())
         .with_owners(owners)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_ns_delete(
@@ -79,22 +63,15 @@ pub fn do_ns_delete(
     url: &str,
     namespace: &str,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = DeleteNamespaceRegistryActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = DeleteNamespaceRegistryActionBuilder::new()
         .with_namespace(namespace.into())
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 pub fn do_perm_create(
@@ -105,45 +82,31 @@ pub fn do_perm_create(
     read: bool,
     write: bool,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = CreateNamespaceRegistryPermissionActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = CreateNamespaceRegistryPermissionActionBuilder::new()
         .with_namespace(namespace.into())
         .with_contract_name(contract.into())
         .with_read(read)
         .with_write(write)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 pub fn do_perm_delete(
     key_name: Option<&str>,
     url: &str,
     namespace: &str,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
-    let payload = DeleteNamespaceRegistryPermissionActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = DeleteNamespaceRegistryPermissionActionBuilder::new()
         .with_namespace(namespace.into())
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }

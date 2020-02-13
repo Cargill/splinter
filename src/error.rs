@@ -17,10 +17,12 @@ use std::borrow::Borrow;
 use std::error::Error as StdError;
 
 use hyper;
-use protobuf;
 use sabre_sdk::protocol::payload::{ActionBuildError, SabrePayloadBuildError};
-use sabre_sdk::protos::ProtoConversionError;
 use sawtooth_sdk::signing;
+use transact::{
+    protocol::{batch::BatchBuildError, transaction::TransactionBuildError},
+    protos::ProtoConversionError,
+};
 
 #[derive(Debug)]
 pub enum CliError {
@@ -29,7 +31,6 @@ pub enum CliError {
     UserError(String),
     IoError(std::io::Error),
     SigningError(signing::Error),
-    ProtobufError(protobuf::ProtobufError),
     HyperError(hyper::Error),
     ProtocolBuildError(Box<dyn StdError>),
     ProtoConversionError(ProtoConversionError),
@@ -41,7 +42,6 @@ impl StdError for CliError {
             CliError::UserError(_) => None,
             CliError::IoError(err) => Some(err),
             CliError::SigningError(err) => Some(err),
-            CliError::ProtobufError(err) => Some(err),
             CliError::HyperError(err) => Some(err),
             CliError::ProtocolBuildError(ref err) => Some(err.borrow()),
             CliError::ProtoConversionError(err) => Some(err),
@@ -55,7 +55,6 @@ impl std::fmt::Display for CliError {
             CliError::UserError(ref s) => write!(f, "Error: {}", s),
             CliError::IoError(ref err) => write!(f, "IoError: {}", err),
             CliError::SigningError(ref err) => write!(f, "SigningError: {}", err.description()),
-            CliError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err.description()),
             CliError::HyperError(ref err) => write!(f, "HyperError: {}", err.description()),
             CliError::ProtocolBuildError(ref err) => write!(f, "Protocol Error: {}", err),
             CliError::ProtoConversionError(ref err) => write!(f, "Proto Conversion Error: {}", err),
@@ -66,12 +65,6 @@ impl std::fmt::Display for CliError {
 impl From<std::io::Error> for CliError {
     fn from(e: std::io::Error) -> Self {
         CliError::IoError(e)
-    }
-}
-
-impl From<protobuf::ProtobufError> for CliError {
-    fn from(e: protobuf::ProtobufError) -> Self {
-        CliError::ProtobufError(e)
     }
 }
 
@@ -93,7 +86,7 @@ impl From<ProtoConversionError> for CliError {
     }
 }
 
-// used to convert BuildErrors from the sabre sdk protocols into a CliError.
+// used to convert BuildErrors into a CliError.
 macro_rules! impl_builder_errors {
     ($($x:ty),*) => {
         $(
@@ -106,4 +99,9 @@ macro_rules! impl_builder_errors {
     };
 }
 
-impl_builder_errors!(ActionBuildError, SabrePayloadBuildError);
+impl_builder_errors!(
+    ActionBuildError,
+    BatchBuildError,
+    TransactionBuildError,
+    SabrePayloadBuildError
+);
