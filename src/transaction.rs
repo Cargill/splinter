@@ -36,8 +36,8 @@ use crate::error::CliError;
 /// The Sawtooth Sabre transaction family name (sabre)
 const SABRE_FAMILY_NAME: &str = "sabre";
 
-/// The Sawtooth Sabre transaction family version (0.4)
-const SABRE_FAMILY_VERSION: &str = "0.4";
+/// The Sawtooth Sabre transaction family version (0.5)
+const SABRE_FAMILY_VERSION: &str = "0.5";
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
