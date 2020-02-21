@@ -143,15 +143,35 @@ services:
             echo 'waiting for key registry'; \
             sleep 1; \
           done && \
+          until PGPASSWORD=admin psql -h splinterd-db-acme -U admin -d splinter -c '\q'; do
+            >&2 echo \"Database is unavailable - sleeping\"
+            sleep 1
+          done && \
+          splinter database migrate -C postgres://admin:admin@splinterd-db-acme:5432/splinter && \
           # Copy the generated key registry to its expected location
           cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
+              --database postgres://admin:admin@splinterd-db-acme:5432/splinter \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
               --bind 0.0.0.0:8085 \
-              --insecure
+              --insecure \
+              --enable-biome
         "
+
+    splinterd-db-acme:
+      image: postgres
+      container_name: splinterd-db-acme
+      restart: always
+      expose:
+        - 5432
+      ports:
+        - "5435:5432"
+      environment:
+        POSTGRES_USER: admin
+        POSTGRES_PASSWORD: admin
+        POSTGRES_DB: splinter
 
     db-bubba:
       image: gameroom-database
@@ -253,12 +273,33 @@ services:
             echo 'waiting for key registry'; \
             sleep 1; \
           done && \
+          until PGPASSWORD=admin psql -h splinterd-db-bubba -U admin -d splinter -c '\q'; do
+            >&2 echo \"Database is unavailable - sleeping\"
+            sleep 1
+          done && \
+          splinter database migrate -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
           # Copy the generated key registry to its expected location
           cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
+              --database postgres://admin:admin@splinterd-db-bubba:5432/splinter \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
               --bind 0.0.0.0:8085 \
-              --insecure
+              --insecure \
+              --enable-biome
         "
+
+    splinterd-db-bubba:
+      image: postgres
+      container_name: splinterd-db-bubba
+      restart: always
+      expose:
+        - 5432
+      ports:
+        - "5434:5432"
+      environment:
+        POSTGRES_USER: admin
+        POSTGRES_PASSWORD: admin
+        POSTGRES_DB: splinter
+
