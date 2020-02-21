@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{error, web, Error, HttpResponse};
-use bcrypt::{hash, verify};
-use gameroom_database::{helpers, models::GameroomUser, ConnectionPool};
+use actix_web::{client::Client, http::StatusCode, web, Error, HttpResponse};
 use serde::{Deserialize, Serialize};
+use splinter::protocol;
 
 use super::{ErrorResponse, SuccessResponse};
-use crate::rest_api::RestApiResponseError;
-
-// Default cost is 12. This value should not be used in a production
-// environment.
-const HASH_COST: u32 = 4;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,28 +26,147 @@ pub struct AuthResponseData {
     encrypted_private_key: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthData {
     pub email: String,
     pub hashed_password: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UsernamePassword {
+    pub username: String,
+    pub hashed_password: String,
+}
+
+impl From<AuthData> for UsernamePassword {
+    fn from(auth_data: AuthData) -> Self {
+        Self {
+            username: auth_data.email,
+            hashed_password: auth_data.hashed_password,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct Token {
+    pub message: String,
+    pub user_id: String,
+    pub token: String,
+}
+
+#[derive(Clone, Deserialize)]
+struct Keys {
+    pub data: Vec<Key>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct Key {
+    pub public_key: String,
+    pub encrypted_private_key: String,
+    pub user_id: String,
+    pub display_name: String,
+}
+
+#[derive(Serialize)]
+struct NewKey {
+    pub public_key: String,
+    pub encrypted_private_key: String,
+    pub display_name: String,
+}
+
 pub async fn login(
     auth_data: web::Json<AuthData>,
-    pool: web::Data<ConnectionPool>,
+    splinterd_url: web::Data<String>,
+    client: web::Data<Client>,
 ) -> Result<HttpResponse, Error> {
-    match web::block(move || authenticate_user(pool, auth_data.into_inner())).await {
-        Ok(user) => Ok(HttpResponse::Ok().json(SuccessResponse::new(user))),
-        Err(err) => match err {
-            error::BlockingError::Error(_) => Ok(HttpResponse::Unauthorized()
-                .json(ErrorResponse::unauthorized("Invalid email or password"))),
-            error::BlockingError::Canceled => {
-                debug!("Internal Server Error: {}", err);
-                Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+    // forward login to splinterd
+    let mut login_response = client
+        .post(format!("{}/biome/login", splinterd_url.get_ref()))
+        .header(
+            "SplinterProtocolVersion",
+            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+        )
+        .send_json(&UsernamePassword::from(auth_data.into_inner()))
+        .await?;
+
+    let token: Token = match login_response.status() {
+        StatusCode::OK => login_response.json().await?,
+        StatusCode::BAD_REQUEST => {
+            let body = login_response.body().await?;
+            let body_value: serde_json::Value = serde_json::from_slice(&body)?;
+            let message = match body_value.get("message") {
+                Some(value) => value.as_str().unwrap_or("Request was malformed."),
+                None => "Request malformed.",
+            };
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+        }
+        StatusCode::UNAUTHORIZED => {
+            let body = login_response.body().await?;
+            let body_value: serde_json::Value = serde_json::from_slice(&body)?;
+            let message = match body_value.get("Unauthorized") {
+                Some(value) => value.as_str().unwrap_or("Unauthorized user"),
+                None => "Unauthorized user",
+            };
+            return Ok(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized(&message)));
+        }
+        _ => {
+            error!(
+                "Internal Server Error. Splinterd responded with error {}",
+                login_response.status(),
+            );
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
+        }
+    };
+
+    // Get user's key
+    let mut key_response = client
+        .get(format!("{}/biome/keys", splinterd_url.get_ref(),))
+        .header(
+            "SplinterProtocolVersion",
+            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+        )
+        .header("Authorization", token.token.clone())
+        .send()
+        .await?;
+
+    let key = match key_response.status() {
+        StatusCode::OK => {
+            let data = key_response.json::<Keys>().await?.data;
+            if let Some(key) = data.get(0) {
+                key.clone()
+            } else {
+                error!("User does not have any keys");
+                return Ok(
+                    HttpResponse::InternalServerError().json(ErrorResponse::internal_error())
+                );
             }
-        },
-    }
+        }
+        StatusCode::BAD_REQUEST => {
+            let body = login_response.body().await?;
+            let body_value: serde_json::Value = serde_json::from_slice(&body)?;
+            let message = match body_value.get("message") {
+                Some(value) => value.as_str().unwrap_or("Request was malformed."),
+                None => "Request malformed.",
+            };
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+        }
+        _ => {
+            error!(
+                "Internal Server Error. Splinterd responded with error {}",
+                login_response.status(),
+            );
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
+        }
+    };
+
+    Ok(
+        HttpResponse::Ok().json(SuccessResponse::new(AuthResponseData {
+            email: key.display_name,
+            public_key: key.public_key,
+            encrypted_private_key: key.encrypted_private_key,
+        })),
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,63 +179,104 @@ pub struct UserCreate {
 }
 
 pub async fn register(
-    new_user: web::Json<UserCreate>,
-    pool: web::Data<ConnectionPool>,
+    json_wrapper: web::Json<UserCreate>,
+    splinterd_url: web::Data<String>,
+    client: web::Data<Client>,
 ) -> Result<HttpResponse, Error> {
-    match web::block(move || create_user(pool, new_user.into_inner())).await {
-        Ok(user) => Ok(HttpResponse::Ok().json(SuccessResponse::new(user))),
-        Err(err) => match err {
-            error::BlockingError::Error(err) => {
-                Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&err.to_string())))
-            }
-            error::BlockingError::Canceled => {
-                debug!("Internal Server Error: {}", err);
-                Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
-            }
-        },
-    }
-}
+    let new_user = json_wrapper.into_inner();
 
-fn create_user(
-    pool: web::Data<ConnectionPool>,
-    new_user: UserCreate,
-) -> Result<AuthResponseData, RestApiResponseError> {
-    if helpers::fetch_user_by_email(&*pool.get()?, &new_user.email)?.is_some() {
-        return Err(RestApiResponseError::BadRequest(
-            "User already exists".to_string(),
-        ));
-    } else {
-        let gameroom_user = GameroomUser {
-            public_key: new_user.public_key.to_string(),
-            encrypted_private_key: new_user.encrypted_private_key.to_string(),
-            email: new_user.email.to_string(),
-            hashed_password: hash_password(&new_user.hashed_password)?,
-        };
-        helpers::insert_user(&*pool.get()?, gameroom_user)?
+    let username_password = UsernamePassword {
+        username: new_user.email.clone(),
+        hashed_password: new_user.hashed_password.clone(),
+    };
+
+    let mut registered_response = client
+        .post(format!("{}/biome/register", splinterd_url.get_ref()))
+        .header(
+            "SplinterProtocolVersion",
+            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+        )
+        .send_json(&username_password)
+        .await?;
+
+    match registered_response.status() {
+        StatusCode::OK => (),
+        StatusCode::BAD_REQUEST => {
+            let body = registered_response.body().await?;
+            let body_value: serde_json::Value = serde_json::from_slice(&body)?;
+            let message = match body_value.get("message") {
+                Some(value) => value.as_str().unwrap_or("Request was malformed."),
+                None => "Request malformed.",
+            };
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+        }
+        _ => {
+            error!(
+                "Internal Server Error. Splinterd responded with error {}",
+                registered_response.status(),
+            );
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
+        }
+    };
+
+    let mut login_response = client
+        .post(format!("{}/biome/login", splinterd_url.get_ref()))
+        .header(
+            "SplinterProtocolVersion",
+            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+        )
+        .send_json(&username_password)
+        .await?;
+
+    let token: Token = match login_response.status() {
+        StatusCode::OK => login_response.json().await?,
+        StatusCode::BAD_REQUEST => {
+            let body = login_response.body().await?;
+            let body_value: serde_json::Value = serde_json::from_slice(&body)?;
+            let message = match body_value.get("message") {
+                Some(value) => value.as_str().unwrap_or("Request was malformed."),
+                None => "Request malformed.",
+            };
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)));
+        }
+        _ => {
+            error!(
+                "Internal Server Error. Splinterd responded with error {}",
+                login_response.status(),
+            );
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
+        }
+    };
+
+    // Create Key
+    let create_key_response = client
+        .post(format!("{}/biome/keys", splinterd_url.get_ref(),))
+        .header(
+            "SplinterProtocolVersion",
+            protocol::BIOME_PROTOCOL_VERSION.to_string(),
+        )
+        .header("Authorization", token.token.clone())
+        .send_json(&NewKey {
+            display_name: new_user.email.clone(),
+            encrypted_private_key: new_user.encrypted_private_key.clone(),
+            public_key: new_user.public_key.clone(),
+        })
+        .await?;
+
+    match create_key_response.status() {
+        StatusCode::OK => (),
+        _ => {
+            error!(
+                "Internal Server Error. Failed to create key {}",
+                create_key_response.status(),
+            );
+            return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
+        }
     }
-    Ok(AuthResponseData {
+
+    Ok(HttpResponse::Ok().json(AuthResponseData {
         email: new_user.email,
         public_key: new_user.public_key,
         encrypted_private_key: new_user.encrypted_private_key,
-    })
-}
-
-fn hash_password(password: &str) -> Result<String, RestApiResponseError> {
-    hash(password, HASH_COST).map_err(RestApiResponseError::from)
-}
-
-fn authenticate_user(
-    pool: web::Data<ConnectionPool>,
-    auth_data: AuthData,
-) -> Result<AuthResponseData, RestApiResponseError> {
-    if let Some(user) = helpers::fetch_user_by_email(&*pool.get()?, &auth_data.email)? {
-        if verify(&auth_data.hashed_password, &user.hashed_password)? {
-            return Ok(AuthResponseData {
-                email: user.email.to_string(),
-                public_key: user.public_key.to_string(),
-                encrypted_private_key: user.encrypted_private_key,
-            });
-        }
-    }
-    Err(RestApiResponseError::Unauthorized)
+    }))
 }
