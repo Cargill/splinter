@@ -16,11 +16,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::StreamExt;
 use transact::protocol::batch::BatchPair;
 use transact::protos::FromBytes;
 
-use crate::actix_web::{web, Error as ActixError, HttpResponse};
-use crate::futures::{stream::Stream, Future, IntoFuture};
+use crate::actix_web::{web, HttpResponse};
+use crate::futures::executor::block_on;
 use crate::protocol;
 use crate::rest_api::{
     new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
@@ -59,13 +60,9 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 Some(s) => s,
                 None => {
                     error!("Failed to downcast to scabbard service");
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({
-                                "message": "An internal error occurred"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    })));
                 }
             };
 
@@ -73,13 +70,9 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 match web::Query::<HashMap<String, String>>::from_query(request.query_string()) {
                     Ok(query) => query,
                     Err(_) => {
-                        return Box::new(
-                            HttpResponse::BadRequest()
-                                .json(json!({
-                                    "message": "Invalid query"
-                                }))
-                                .into_future(),
-                        )
+                        return Ok(HttpResponse::BadRequest().json(json!({
+                            "message": "Invalid query"
+                        })))
                     }
                 };
 
@@ -87,13 +80,9 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
 
             match last_seen_event_id {
                 Some(ref id) if id.trim().is_empty() => {
-                    return Box::new(
-                        HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": "last_seen_event must not be empty",
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::BadRequest().json(json!({
+                        "message": "last_seen_event must not be empty",
+                    })));
                 }
                 Some(ref id) => debug!("Getting all state-delta events since {}", id),
                 None => debug!("Getting all state-delta events"),
@@ -103,11 +92,8 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 Ok(events) => events,
                 Err(err) => {
                     error!("Unable to load unseen scabbard events: {}", err);
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({ "message": "An internal error occurred" }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError()
+                        .json(json!({ "message": "An internal error occurred" })));
                 }
             };
 
@@ -118,21 +104,15 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                         scabbard.add_state_subscriber(Box::new(WsStateSubscriber { sender }))
                     {
                         error!("Unable to add scabbard event sender: {}", err);
-                        return Box::new(
-                            HttpResponse::InternalServerError()
-                                .json(json!({ "message": "An internal error occurred" }))
-                                .into_future(),
-                        );
+                        return Ok(HttpResponse::InternalServerError()
+                            .json(json!({ "message": "An internal error occurred" })));
                     }
-                    Box::new(res.into_future())
+                    Ok(res.into())
                 }
                 Err(err) => {
                     error!("Failed to create websocket: {:?}", err);
-                    Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({ "message": "An internal error occurred" }))
-                            .into_future(),
-                    )
+                    Ok(HttpResponse::InternalServerError()
+                        .json(json!({ "message": "An internal error occurred" })))
                 }
             }
         }),
@@ -148,60 +128,45 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
         route: "/batches".into(),
         method: Method::Post,
-        handler: Arc::new(move |_, payload, service| {
+        handler: Arc::new(move |_, mut payload, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
                 Some(s) => s,
                 None => {
                     error!("Failed to downcast to scabbard service");
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({
-                                "message": "An internal error occurred"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    })));
                 }
             }
             .clone();
+            let bytes = block_on(async {
+                let mut bytes = web::BytesMut::new();
+                while let Some(body) = payload.next().await {
+                    bytes.extend_from_slice(&body.unwrap());
+                }
+                bytes
+            });
+            let batches: Vec<BatchPair> = match Vec::from_bytes(&bytes) {
+                Ok(b) => b,
+                Err(_) => {
+                    return Ok(HttpResponse::BadRequest().json(json!({
+                        "message": "invalid body: not a valid list of batches"
+                    })))
+                }
+            };
 
-            Box::new(
-                payload
-                    .from_err::<ActixError>()
-                    .fold(web::BytesMut::new(), move |mut body, chunk| {
-                        body.extend_from_slice(&chunk);
-                        Ok::<_, ActixError>(body)
-                    })
-                    .into_future()
-                    .and_then(move |body| {
-                        let batches: Vec<BatchPair> = match Vec::from_bytes(&body) {
-                            Ok(b) => b,
-                            Err(_) => {
-                                return HttpResponse::BadRequest()
-                                    .json(json!({
-                                        "message": "invalid body: not a valid list of batches"
-                                    }))
-                                    .into_future()
-                            }
-                        };
-
-                        match scabbard.add_batches(batches) {
-                            Ok(Some(link)) => HttpResponse::Accepted().json(link).into_future(),
-                            Ok(None) => HttpResponse::BadRequest()
-                                .json(json!({
-                                    "message": "no valid batches provided"
-                                }))
-                                .into_future(),
-                            Err(err) => {
-                                error!("Failed to add batches: {}", err);
-                                HttpResponse::InternalServerError()
-                                    .json(json!({
-                                        "message": "An internal error occurred"
-                                    }))
-                                    .into_future()
-                            }
-                        }
-                    }),
-            )
+            match scabbard.add_batches(batches) {
+                Ok(Some(link)) => Ok(HttpResponse::Accepted().json(link)),
+                Ok(None) => Ok(HttpResponse::BadRequest().json(json!({
+                    "message": "no valid batches provided"
+                }))),
+                Err(err) => {
+                    error!("Failed to add batches: {}", err);
+                    Ok(HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    })))
+                }
+            }
         }),
         request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
             protocol::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
@@ -220,13 +185,9 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
                 Some(s) => s,
                 None => {
                     error!("Failed to downcast to scabbard service");
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({
-                                "message": "An internal error occurred"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    })));
                 }
             }
             .clone();
@@ -234,25 +195,17 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
                 if let Ok(q) = web::Query::from_query(req.query_string()) {
                     q
                 } else {
-                    return Box::new(
-                        HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": "Invalid query"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::BadRequest().json(json!({
+                        "message": "Invalid query"
+                    })));
                 };
 
             let ids = if let Some(ids) = query.get("ids") {
                 ids.split(',').map(String::from).collect()
             } else {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(json!({
-                            "message": "No batch IDs specified"
-                        }))
-                        .into_future(),
-                );
+                return Ok(HttpResponse::BadRequest().json(json!({
+                    "message": "No batch IDs specified"
+                })));
             };
 
             let wait = query
@@ -273,24 +226,16 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
                 Ok(iter) => iter,
                 Err(err) => {
                     error!("Failed to get batch statuses iterator: {}", err);
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({ "message": "An internal error occurred" }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError()
+                        .json(json!({ "message": "An internal error occurred" })));
                 }
             };
 
             match batch_info_iter.collect::<Result<Vec<_>, _>>() {
-                Ok(batch_infos) => Box::new(HttpResponse::Ok().json(batch_infos).into_future()),
-                Err(err) => Box::new(
-                    HttpResponse::RequestTimeout()
-                        .json(json!({
-                            "message":
-                                format!("Failed to get batch statuses before timeout: {}", err)
-                        }))
-                        .into_future(),
-                ),
+                Ok(batch_infos) => Ok(HttpResponse::Ok().json(batch_infos)),
+                Err(err) => Ok(HttpResponse::RequestTimeout().json(json!({
+                    "message": format!("Failed to get batch statuses before timeout: {}", err)
+                }))),
             }
         }),
         request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
@@ -311,13 +256,9 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
                 Some(s) => s,
                 None => {
                     error!("Failed to downcast to scabbard service");
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({
-                                "message": "An internal error occurred"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    })));
                 }
             };
 
@@ -326,20 +267,16 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
                 .get("address")
                 .expect("address should not be none");
 
-            Box::new(match scabbard.get_state_at_address(address) {
-                Ok(Some(value)) => HttpResponse::Ok().json(value).into_future(),
-                Ok(None) => HttpResponse::NotFound()
-                    .json(json!({
-                        "message": "address not set"
-                    }))
-                    .into_future(),
+            Ok(match scabbard.get_state_at_address(address) {
+                Ok(Some(value)) => HttpResponse::Ok().json(value),
+                Ok(None) => HttpResponse::NotFound().json(json!({
+                    "message": "address not set"
+                })),
                 Err(err) => {
                     error!("Failed to get state at adddress: {}", err);
-                    HttpResponse::InternalServerError()
-                        .json(json!({
-                            "message": "An internal error occurred"
-                        }))
-                        .into_future()
+                    HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    }))
                 }
             })
         }),
@@ -361,13 +298,9 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
                 Some(s) => s,
                 None => {
                     error!("Failed to downcast to scabbard service");
-                    return Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(json!({
-                                "message": "An internal error occurred"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    })));
                 }
             };
 
@@ -375,18 +308,14 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
                 if let Ok(q) = web::Query::from_query(request.query_string()) {
                     q
                 } else {
-                    return Box::new(
-                        HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": "Invalid query"
-                            }))
-                            .into_future(),
-                    );
+                    return Ok(HttpResponse::BadRequest().json(json!({
+                        "message": "Invalid query"
+                    })));
                 };
 
             let prefix = query.get("prefix").map(String::as_str);
 
-            Box::new(match scabbard.get_state_with_prefix(prefix) {
+            Ok(match scabbard.get_state_with_prefix(prefix) {
                 Ok(state_iter) => {
                     let res = state_iter
                         .map(|res| {
@@ -399,24 +328,20 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
                         })
                         .collect::<Result<Vec<_>, _>>();
                     match res {
-                        Ok(entries) => HttpResponse::Ok().json(entries).into_future(),
+                        Ok(entries) => HttpResponse::Ok().json(entries),
                         Err(err) => {
                             error!("Failed to convert state iterator: {}", err);
-                            HttpResponse::InternalServerError()
-                                .json(json!({
-                                    "message": "An internal error occurred"
-                                }))
-                                .into_future()
+                            HttpResponse::InternalServerError().json(json!({
+                                "message": "An internal error occurred"
+                            }))
                         }
                     }
                 }
                 Err(err) => {
                     error!("Failed to get state with prefix: {}", err);
-                    HttpResponse::InternalServerError()
-                        .json(json!({
-                            "message": "An internal error occurred"
-                        }))
-                        .into_future()
+                    HttpResponse::InternalServerError().json(json!({
+                        "message": "An internal error occurred"
+                    }))
                 }
             })
         }),
