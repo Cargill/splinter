@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::executor::block_on;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::actix_web::HttpResponse;
-use crate::futures::{Future, IntoFuture};
+use crate::actix_web::{web::Payload, Error, HttpResponse};
 use crate::protocol;
 use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
@@ -49,69 +49,72 @@ pub fn make_register_route(
             let credentials_store = credentials_store.clone();
             let user_store = user_store.clone();
             let rest_config = rest_config.clone();
-            Box::new(into_bytes(payload).and_then(move |bytes| {
-                let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
-                    Ok(val) => val,
-                    Err(err) => {
-                        debug!("Error parsing payload {}", err);
-                        return HttpResponse::BadRequest()
-                            .json(ErrorResponse::bad_request(&format!(
-                                "Failed to parse payload: {}",
-                                err
-                            )))
-                            .into_future();
-                    }
-                };
-                let user_id = Uuid::new_v4().to_string();
-                let splinter_user = SplinterUser::new(&user_id);
-                match user_store.add_user(splinter_user) {
-                    Ok(()) => {
-                        let credentials_builder: UserCredentialsBuilder = Default::default();
-                        let credentials = match credentials_builder
-                            .with_user_id(&user_id)
-                            .with_username(&username_password.username)
-                            .with_password(&username_password.hashed_password)
-                            .with_password_encryption_cost(rest_config.password_encryption_cost())
-                            .build()
-                        {
-                            Ok(credential) => credential,
-                            Err(err) => {
-                                debug!("Failed to create credentials {}", err);
-                                return HttpResponse::InternalServerError()
-                                    .json(ErrorResponse::internal_error())
-                                    .into_future();
-                            }
-                        };
 
-                        match credentials_store.add_credentials(credentials) {
-                            Ok(()) => HttpResponse::Ok()
-                                .json(json!({ "message": "User created successfully" }))
-                                .into_future(),
-                            Err(err) => {
-                                debug!("Failed to add new credentials to database {}", err);
-                                match err {
-                                    CredentialsStoreError::DuplicateError(err) => {
-                                        HttpResponse::BadRequest()
-                                            .json(ErrorResponse::bad_request(&format!(
-                                                "Failed to create user: {}",
-                                                err
-                                            )))
-                                            .into_future()
-                                    }
-                                    _ => HttpResponse::InternalServerError()
-                                        .json(ErrorResponse::internal_error())
-                                        .into_future(),
-                                }
-                            }
+            make_register_method(credentials_store, user_store, rest_config, payload)
+        })
+}
+
+fn make_register_method(
+    credentials_store: Arc<SplinterCredentialsStore>,
+    user_store: Arc<SplinterUserStore>,
+    rest_config: Arc<BiomeRestConfig>,
+    payload: Payload,
+) -> Result<HttpResponse, Error> {
+    let bytes = block_on(async { into_bytes(payload).await })?;
+    let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
+        Ok(val) => val,
+        Err(err) => {
+            debug!("Error parsing payload {}", err);
+            return Ok(
+                HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                    "Failed to parse payload: {}",
+                    err
+                ))),
+            );
+        }
+    };
+    let user_id = Uuid::new_v4().to_string();
+    let splinter_user = SplinterUser::new(&user_id);
+    match user_store.add_user(splinter_user) {
+        Ok(()) => {
+            let credentials_builder: UserCredentialsBuilder = Default::default();
+            let credentials = match credentials_builder
+                .with_user_id(&user_id)
+                .with_username(&username_password.username)
+                .with_password(&username_password.hashed_password)
+                .with_password_encryption_cost(rest_config.password_encryption_cost())
+                .build()
+            {
+                Ok(credential) => credential,
+                Err(err) => {
+                    debug!("Failed to create credentials {}", err);
+                    return Ok(
+                        HttpResponse::InternalServerError().json(ErrorResponse::internal_error())
+                    );
+                }
+            };
+
+            match credentials_store.add_credentials(credentials) {
+                Ok(()) => {
+                    Ok(HttpResponse::Ok().json(json!({ "message": "User created successfully" })))
+                }
+                Err(err) => {
+                    debug!("Failed to add new credentials to database {}", err);
+                    match err {
+                        CredentialsStoreError::DuplicateError(err) => {
+                            Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                                &format!("Failed to create user: {}", err),
+                            )))
                         }
-                    }
-                    Err(err) => {
-                        debug!("Failed to add new user to database {}", err);
-                        HttpResponse::InternalServerError()
-                            .json(ErrorResponse::internal_error())
-                            .into_future()
+                        _ => Ok(HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())),
                     }
                 }
-            }))
-        })
+            }
+        }
+        Err(err) => {
+            debug!("Failed to add new user to database {}", err);
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+        }
+    }
 }

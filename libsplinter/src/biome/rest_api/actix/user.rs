@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::executor::block_on;
 use std::sync::Arc;
 
+use super::super::resources::authorize::AuthorizationResult;
+use super::super::resources::credentials::UsernamePassword;
+use super::authorize::authorize_user;
 use crate::actix_web::{web::Payload, Error, HttpRequest, HttpResponse};
-use crate::futures::{Future, IntoFuture};
-use crate::protocol;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
-
 use crate::biome::credentials::store::{
     diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
 };
@@ -27,10 +27,8 @@ use crate::biome::secrets::SecretManager;
 use crate::biome::user::store::{
     diesel::SplinterUserStore, SplinterUser, UserStore, UserStoreError,
 };
-
-use super::super::resources::authorize::AuthorizationResult;
-use super::super::resources::credentials::UsernamePassword;
-use super::authorize::authorize_user;
+use crate::protocol;
+use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<SplinterCredentialsStore>) -> Resource {
@@ -41,15 +39,13 @@ pub fn make_list_route(credentials_store: Arc<SplinterCredentialsStore>) -> Reso
         ))
         .add_method(Method::Get, move |_, _| {
             let credentials_store = credentials_store.clone();
-            Box::new(match credentials_store.get_usernames() {
-                Ok(users) => HttpResponse::Ok().json(users).into_future(),
+            match credentials_store.get_usernames() {
+                Ok(users) => Ok(HttpResponse::Ok().json(users)),
                 Err(err) => {
                     debug!("Failed to get users from the database {}", err);
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future()
+                    Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
                 }
-            })
+            }
         })
 }
 
@@ -95,35 +91,26 @@ pub fn make_user_routes(
 fn add_fetch_user_method(
     request: HttpRequest,
     credentials_store: Arc<SplinterCredentialsStore>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> Result<HttpResponse, Error> {
     let user_id = if let Some(t) = request.match_info().get("id") {
         t.to_string()
     } else {
-        return Box::new(
-            HttpResponse::BadRequest()
-                .json(ErrorResponse::bad_request(
-                    &"Failed to process request: no user id".to_string(),
-                ))
-                .into_future(),
-        );
+        return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+            &"Failed to process request: no user id".to_string(),
+        )));
     };
-    Box::new(match credentials_store.fetch_username_by_id(&user_id) {
-        Ok(user) => HttpResponse::Ok().json(user).into_future(),
+    match credentials_store.fetch_username_by_id(&user_id) {
+        Ok(user) => Ok(HttpResponse::Ok().json(user)),
         Err(err) => {
             debug!("Failed to get user from the database {}", err);
             match err {
-                CredentialsStoreError::NotFoundError(_) => HttpResponse::NotFound()
-                    .json(ErrorResponse::not_found(&format!(
-                        "User ID not found: {}",
-                        &user_id
-                    )))
-                    .into_future(),
-                _ => HttpResponse::InternalServerError()
-                    .json(ErrorResponse::internal_error())
-                    .into_future(),
+                CredentialsStoreError::NotFoundError(_) => Ok(HttpResponse::NotFound().json(
+                    ErrorResponse::not_found(&format!("User ID not found: {}", &user_id)),
+                )),
+                _ => Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error())),
             }
         }
-    })
+    }
 }
 
 /// Defines a REST endpoint to edit a user's credentials in the database
@@ -138,127 +125,112 @@ fn add_modify_user_method(
     payload: Payload,
     credentials_store: Arc<SplinterCredentialsStore>,
     user_store: Arc<SplinterUserStore>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> Result<HttpResponse, Error> {
     let user_id = if let Some(t) = request.match_info().get("id") {
         t.to_string()
     } else {
-        return Box::new(
-            HttpResponse::BadRequest()
-                .json(ErrorResponse::bad_request(
-                    &"Failed to parse payload: no user id".to_string(),
-                ))
-                .into_future(),
-        );
+        return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+            &"Failed to parse payload: no user id".to_string(),
+        )));
     };
-    Box::new(into_bytes(payload).and_then(move |bytes| {
-        let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
-            Ok(val) => val,
-            Err(err) => {
-                debug!("Error parsing request body {}", err);
-                return HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request(&format!(
-                        "Failed to parse payload body: {}",
-                        err
-                    )))
-                    .into_future();
-            }
-        };
-        let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
-            Ok(val) => val,
-            Err(err) => {
-                debug!("Error parsing payload {}", err);
-                return HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request(&format!(
-                        "Failed to parse payload: {}",
-                        err
-                    )))
-                    .into_future();
-            }
-        };
+    let bytes = block_on(async { into_bytes(payload).await })?;
 
-        let credentials =
-            match credentials_store.fetch_credential_by_username(&username_password.username) {
-                Ok(credentials) => credentials,
-                Err(err) => {
-                    debug!("Failed to fetch credentials {}", err);
-                    match err {
-                        CredentialsStoreError::NotFoundError(_) => {
-                            return HttpResponse::NotFound()
-                                .json(ErrorResponse::not_found(&format!(
-                                    "Username not found: {}",
-                                    username_password.username
-                                )))
-                                .into_future();
-                        }
-                        _ => {
-                            return HttpResponse::InternalServerError()
-                                .json(ErrorResponse::internal_error())
-                                .into_future()
-                        }
+    let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
+        Ok(val) => val,
+        Err(err) => {
+            debug!("Error parsing request body {}", err);
+            return Ok(
+                HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                    "Failed to parse payload body: {}",
+                    err
+                ))),
+            );
+        }
+    };
+    let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
+        Ok(val) => val,
+        Err(err) => {
+            debug!("Error parsing payload {}", err);
+            return Ok(
+                HttpResponse::BadRequest().json(ErrorResponse::bad_request(&format!(
+                    "Failed to parse payload: {}",
+                    err
+                ))),
+            );
+        }
+    };
+
+    let credentials =
+        match credentials_store.fetch_credential_by_username(&username_password.username) {
+            Ok(credentials) => credentials,
+            Err(err) => {
+                debug!("Failed to fetch credentials {}", err);
+                match err {
+                    CredentialsStoreError::NotFoundError(_) => {
+                        return Ok(HttpResponse::NotFound().json(ErrorResponse::not_found(
+                            &format!("Username not found: {}", username_password.username),
+                        )));
+                    }
+                    _ => {
+                        return Ok(HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error()))
                     }
                 }
-            };
-        let splinter_user = SplinterUser::new(&user_id);
-        match credentials.verify_password(&username_password.hashed_password) {
-            Ok(is_valid) => {
-                if is_valid {
-                    let new_password = match body.get("new_password") {
-                        Some(val) => match val.as_str() {
-                            Some(val) => val,
-                            None => &username_password.hashed_password,
-                        },
+            }
+        };
+    let splinter_user = SplinterUser::new(&user_id);
+    match credentials.verify_password(&username_password.hashed_password) {
+        Ok(is_valid) => {
+            if is_valid {
+                let new_password = match body.get("new_password") {
+                    Some(val) => match val.as_str() {
+                        Some(val) => val,
                         None => &username_password.hashed_password,
-                    };
+                    },
+                    None => &username_password.hashed_password,
+                };
 
-                    match user_store.update_user(splinter_user) {
-                        Ok(()) => {
-                            match credentials_store.update_credentials(
-                                &user_id,
-                                &username_password.username,
-                                &new_password,
-                            ) {
-                                Ok(()) => HttpResponse::Ok()
-                                    .json(json!({ "message": "User updated successfully" }))
-                                    .into_future(),
-                                Err(err) => {
-                                    debug!("Failed to update credentials in database {}", err);
-                                    match err {
-                                        CredentialsStoreError::DuplicateError(err) => {
-                                            HttpResponse::BadRequest()
-                                                .json(ErrorResponse::bad_request(&format!(
-                                                    "Failed to update user: {}",
-                                                    err
-                                                )))
-                                                .into_future()
-                                        }
-                                        _ => HttpResponse::InternalServerError()
-                                            .json(ErrorResponse::internal_error())
-                                            .into_future(),
+                match user_store.update_user(splinter_user) {
+                    Ok(()) => {
+                        match credentials_store.update_credentials(
+                            &user_id,
+                            &username_password.username,
+                            &new_password,
+                        ) {
+                            Ok(()) => Ok(HttpResponse::Ok()
+                                .json(json!({ "message": "User updated successfully" }))),
+                            Err(err) => {
+                                debug!("Failed to update credentials in database {}", err);
+                                match err {
+                                    CredentialsStoreError::DuplicateError(err) => {
+                                        Ok(HttpResponse::BadRequest().json(
+                                            ErrorResponse::bad_request(&format!(
+                                                "Failed to update user: {}",
+                                                err
+                                            )),
+                                        ))
                                     }
+                                    _ => Ok(HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())),
                                 }
                             }
                         }
-                        Err(err) => {
-                            debug!("Failed to update user in database {}", err);
-                            HttpResponse::InternalServerError()
-                                .json(ErrorResponse::internal_error())
-                                .into_future()
-                        }
                     }
-                } else {
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request("Invalid password"))
-                        .into_future()
+                    Err(err) => {
+                        debug!("Failed to update user in database {}", err);
+                        Ok(HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error()))
+                    }
                 }
-            }
-            Err(err) => {
-                debug!("Failed to verify password {}", err);
-                HttpResponse::InternalServerError()
-                    .json(ErrorResponse::internal_error())
-                    .into_future()
+            } else {
+                Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request("Invalid password")))
             }
         }
-    }))
+        Err(err) => {
+            debug!("Failed to verify password {}", err);
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+        }
+    }
 }
 
 /// Defines a REST endpoint to delete a user from the database
@@ -267,59 +239,39 @@ fn add_delete_user_method(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     user_store: Arc<SplinterUserStore>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> Result<HttpResponse, Error> {
     let user_id = if let Some(t) = request.match_info().get("id") {
         t.to_string()
     } else {
-        return Box::new(
-            HttpResponse::BadRequest()
-                .json(ErrorResponse::bad_request(
-                    &"Failed to parse payload: no user id".to_string(),
-                ))
-                .into_future(),
-        );
+        return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+            &"Failed to parse payload: no user id".to_string(),
+        )));
     };
     match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
         AuthorizationResult::Authorized => match user_store.remove_user(&user_id) {
-            Ok(()) => Box::new(
-                HttpResponse::Ok()
-                    .json(json!({ "message": "User deleted sucessfully" }))
-                    .into_future(),
-            ),
+            Ok(()) => Ok(HttpResponse::Ok().json(json!({ "message": "User deleted sucessfully" }))),
             Err(err) => match err {
                 UserStoreError::NotFoundError(msg) => {
                     debug!("User not found: {}", msg);
-                    Box::new(
-                        HttpResponse::NotFound()
-                            .json(ErrorResponse::not_found(&format!(
-                                "User ID not found: {}",
-                                &user_id
-                            )))
-                            .into_future(),
+                    Ok(
+                        HttpResponse::NotFound().json(ErrorResponse::not_found(&format!(
+                            "User ID not found: {}",
+                            &user_id
+                        ))),
                     )
                 }
                 _ => {
                     error!("Failed to delete user in database {}", err);
-                    Box::new(
-                        HttpResponse::InternalServerError()
-                            .json(ErrorResponse::internal_error())
-                            .into_future(),
-                    )
+                    Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
                 }
             },
         },
-        AuthorizationResult::Unauthorized(msg) => Box::new(
-            HttpResponse::Unauthorized()
-                .json(ErrorResponse::unauthorized(&msg))
-                .into_future(),
-        ),
+        AuthorizationResult::Unauthorized(msg) => {
+            Ok(HttpResponse::Unauthorized().json(ErrorResponse::unauthorized(&msg)))
+        }
         AuthorizationResult::Failed => {
             error!("Failed to authorize user");
-            Box::new(
-                HttpResponse::InternalServerError()
-                    .json(ErrorResponse::internal_error())
-                    .into_future(),
-            )
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
         }
     }
 }
