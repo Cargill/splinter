@@ -16,7 +16,7 @@
 //! in Splinter's state.
 
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
-use futures::{future::IntoFuture, Future};
+use futures::executor::block_on;
 use std::collections::HashMap;
 
 use crate::circuit::store::{CircuitFilter, CircuitStore};
@@ -36,58 +36,46 @@ pub fn make_list_circuits_resource<T: CircuitStore + 'static>(store: T) -> Resou
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
-            list_circuits(r, web::Data::new(store.clone()))
+            block_on(list_circuits(r, web::Data::new(store.clone())))
         })
 }
 
-fn list_circuits<T: CircuitStore + 'static>(
+async fn list_circuits<T: CircuitStore + 'static>(
     req: HttpRequest,
     store: web::Data<T>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> Result<HttpResponse, Error> {
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
             q
         } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request("Invalid query"))
-                    .into_future(),
-            );
+            return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request("Invalid query")));
         };
 
-    let offset = match query.get("offset") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid offset value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_OFFSET,
-    };
+    let offset =
+        match query.get("offset") {
+            Some(value) => match value.parse::<usize>() {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                        &format!("Invalid offset value passed: {}. Error: {}", value, err),
+                    )))
+                }
+            },
+            None => DEFAULT_OFFSET,
+        };
 
-    let limit = match query.get("limit") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid limit value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_LIMIT,
-    };
+    let limit =
+        match query.get("limit") {
+            Some(value) => match value.parse::<usize>() {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                        &format!("Invalid limit value passed: {}. Error: {}", value, err),
+                    )))
+                }
+            },
+            None => DEFAULT_LIMIT,
+        };
 
     let mut link = req.uri().path().to_string();
 
@@ -99,23 +87,17 @@ fn list_circuits<T: CircuitStore + 'static>(
         None => None,
     };
 
-    Box::new(query_list_circuits(
-        store,
-        link,
-        filters,
-        Some(offset),
-        Some(limit),
-    ))
+    query_list_circuits(store, link, filters, Some(offset), Some(limit)).await
 }
 
-fn query_list_circuits<T: CircuitStore + 'static>(
+async fn query_list_circuits<T: CircuitStore + 'static>(
     store: web::Data<T>,
     link: String,
     filters: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    web::block(move || {
+) -> Result<HttpResponse, Error> {
+    match web::block(move || {
         let circuits = store.circuits(filters.map(CircuitFilter::WithMember))?;
         let offset_value = offset.unwrap_or(0);
         let total = circuits.total();
@@ -138,7 +120,8 @@ fn query_list_circuits<T: CircuitStore + 'static>(
 
         Ok((circuits_data, link, limit, offset, total as usize))
     })
-    .then(|res| match res {
+    .await
+    {
         Ok((circuits, link, limit, offset, total_count)) => {
             Ok(HttpResponse::Ok().json(ListCircuitsResponse {
                 data: circuits,
@@ -157,7 +140,7 @@ fn query_list_circuits<T: CircuitStore + 'static>(
                 Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
             }
         },
-    })
+    }
 }
 
 #[cfg(test)]
@@ -180,12 +163,9 @@ mod tests {
     fn test_list_circuits_ok() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(
-            App::new().data(splinter_state.clone()).service(
-                web::resource("/admin/circuits")
-                    .route(web::get().to_async(list_circuits::<SplinterState>)),
-            ),
-        );
+        let mut app = test::init_service(App::new().data(splinter_state.clone()).service(
+            web::resource("/admin/circuits").route(web::get().to(list_circuits::<SplinterState>)),
+        ));
 
         let req = test::TestRequest::get().uri("/admin/circuits").to_request();
 
@@ -206,12 +186,9 @@ mod tests {
     fn test_list_circuit_with_filters_ok() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(
-            App::new().data(splinter_state.clone()).service(
-                web::resource("/admin/circuits")
-                    .route(web::get().to_async(list_circuits::<SplinterState>)),
-            ),
-        );
+        let mut app = test::init_service(App::new().data(splinter_state.clone()).service(
+            web::resource("/admin/circuits").route(web::get().to(list_circuits::<SplinterState>)),
+        ));
 
         let req = test::TestRequest::get()
             .uri(&format!("/admin/circuits?filter={}", "node_1"))

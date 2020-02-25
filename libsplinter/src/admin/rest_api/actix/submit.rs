@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use actix_web::HttpResponse;
-use futures::{Future, IntoFuture};
+use futures::executor::block_on;
 
 use crate::admin::service::{AdminCommands, AdminServiceError};
 use crate::protocol;
@@ -29,30 +29,24 @@ pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) 
         ))
         .add_method(Method::Post, move |_, payload| {
             let admin_commands = admin_commands.clone();
-            Box::new(
-                into_protobuf::<CircuitManagementPayload>(payload).and_then(move |payload| {
-                    match admin_commands.submit_circuit_change(payload) {
-                        Ok(()) => HttpResponse::Accepted().finish().into_future(),
-                        Err(AdminServiceError::ServiceError(
-                            ServiceError::UnableToHandleMessage(err),
-                        )) => HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": format!("Unable to handle message: {}", err)
-                            }))
-                            .into_future(),
-                        Err(AdminServiceError::ServiceError(
-                            ServiceError::InvalidMessageFormat(err),
-                        )) => HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": format!("Failed to parse payload: {}", err)
-                            }))
-                            .into_future(),
-                        Err(err) => {
-                            error!("{}", err);
-                            HttpResponse::InternalServerError().finish().into_future()
-                        }
-                    }
-                }),
-            )
+            let proto_payload =
+                block_on(async { into_protobuf::<CircuitManagementPayload>(payload).await })?;
+            match admin_commands.submit_circuit_change(proto_payload) {
+                Ok(()) => Ok(HttpResponse::Accepted().finish()),
+                Err(AdminServiceError::ServiceError(ServiceError::UnableToHandleMessage(err))) => {
+                    Ok(HttpResponse::BadRequest().json(json!({
+                        "message": format!("Unable to handle message: {}", err)
+                    })))
+                }
+                Err(AdminServiceError::ServiceError(ServiceError::InvalidMessageFormat(err))) => {
+                    Ok(HttpResponse::BadRequest().json(json!({
+                        "message": format!("Failed to parse payload: {}", err)
+                    })))
+                }
+                Err(err) => {
+                    error!("{}", err);
+                    Ok(HttpResponse::InternalServerError().finish())
+                }
+            }
         })
 }

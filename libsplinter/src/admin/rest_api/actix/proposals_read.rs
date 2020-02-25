@@ -14,7 +14,7 @@
 //! Provides the `GET /admin/proposals` endpoint for listing circuit proposals.
 
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
-use futures::{future::IntoFuture, Future};
+use futures::executor::block_on;
 use std::collections::HashMap;
 
 use crate::admin::messages::CircuitProposal;
@@ -33,58 +33,48 @@ pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store:
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
-            list_proposals(r, web::Data::new(proposal_store.clone()))
+            block_on(list_proposals(r, web::Data::new(proposal_store.clone())))
         })
 }
 
-fn list_proposals<PS: ProposalStore + 'static>(
+async fn list_proposals<PS: ProposalStore + Clone + 'static>(
     req: HttpRequest,
     proposal_store: web::Data<PS>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> Result<HttpResponse, Error> {
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
             q
         } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request("Invalid query"))
-                    .into_future(),
-            );
+            return Ok(HttpResponse::BadRequest().json(json!({
+                "message": "Invalid query"
+            })));
         };
 
-    let offset = match query.get("offset") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid offset value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_OFFSET,
-    };
+    let offset =
+        match query.get("offset") {
+            Some(value) => match value.parse::<usize>() {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                        &format!("Invalid offset value passed: {}. Error: {}", value, err),
+                    )))
+                }
+            },
+            None => DEFAULT_OFFSET,
+        };
 
-    let limit = match query.get("limit") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid limit value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_LIMIT,
-    };
+    let limit =
+        match query.get("limit") {
+            Some(value) => match value.parse::<usize>() {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                        &format!("Invalid limit value passed: {}. Error: {}", value, err),
+                    )))
+                }
+            },
+            None => DEFAULT_LIMIT,
+        };
 
     let mut link = req.uri().path().to_string();
 
@@ -96,7 +86,7 @@ fn list_proposals<PS: ProposalStore + 'static>(
         None => None,
     };
 
-    Box::new(query_list_proposals(
+    block_on(query_list_proposals(
         proposal_store,
         link,
         filters,
@@ -105,17 +95,18 @@ fn list_proposals<PS: ProposalStore + 'static>(
     ))
 }
 
-fn query_list_proposals<PS: ProposalStore + 'static>(
+async fn query_list_proposals<PS: ProposalStore + 'static>(
     proposal_store: web::Data<PS>,
     link: String,
     filters: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    web::block(move || {
+) -> Result<HttpResponse, Error> {
+    let result = web::block(move || {
         let proposals = proposal_store
             .proposals()
             .map_err(|err| ProposalListError::InternalError(err.to_string()))?;
+
         let offset_value = offset.unwrap_or(0);
         let limit_value = limit.unwrap_or_else(|| proposals.total());
         if proposals.total() != 0 {
@@ -148,7 +139,9 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
             Ok((vec![], link, limit, offset, proposals.total()))
         }
     })
-    .then(|res| match res {
+    .await;
+
+    match result {
         Ok((circuits, link, limit, offset, total_count)) => {
             Ok(HttpResponse::Ok().json(ListProposalsResponse {
                 data: circuits,
@@ -164,5 +157,5 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
             },
             _ => Ok(HttpResponse::InternalServerError().into()),
         },
-    })
+    }
 }

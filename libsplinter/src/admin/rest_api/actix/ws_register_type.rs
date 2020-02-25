@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use actix_web::{web, HttpResponse};
-use futures::IntoFuture;
 use std::collections::HashMap;
 use std::time;
 
@@ -36,7 +35,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
             let circuit_management_type = if let Some(t) = request.match_info().get("type") {
                 t.to_string()
             } else {
-                return Box::new(HttpResponse::BadRequest().finish().into_future());
+                return Ok(HttpResponse::BadRequest().finish());
             };
             debug!(
                 "Beginning application authorization handler registration for \"{}\"",
@@ -46,7 +45,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
             let mut query =
                 match web::Query::<HashMap<String, u64>>::from_query(request.query_string()) {
                     Ok(query) => query,
-                    Err(_) => return Box::new(HttpResponse::BadRequest().finish().into_future()),
+                    Err(_) => return Ok(HttpResponse::BadRequest().finish()),
                 };
 
             let (skip, last_seen_timestamp) = query
@@ -71,7 +70,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                         "Unable to load initial set of admin events for {}: {}",
                         &circuit_management_type, err
                     );
-                    return Box::new(HttpResponse::InternalServerError().finish().into_future());
+                    return Ok(HttpResponse::InternalServerError().finish());
                 }
             };
 
@@ -83,16 +82,15 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                         Box::new(WsAdminServiceEventSubscriber { sender }),
                     ) {
                         error!("Unable to add admin event subscriber: {}", err);
-                        return Box::new(
-                            HttpResponse::InternalServerError().finish().into_future(),
-                        );
+                        return Ok(HttpResponse::InternalServerError().finish());
                     }
                     debug!("Websocket response: {:?}", res);
-                    Box::new(res.into_future())
+                    let http_res: HttpResponse = res.into();
+                    Ok(http_res)
                 }
                 Err(err) => {
                     debug!("Failed to create websocket: {:?}", err);
-                    Box::new(HttpResponse::InternalServerError().finish().into_future())
+                    Ok(HttpResponse::InternalServerError().finish())
                 }
             }
         })
