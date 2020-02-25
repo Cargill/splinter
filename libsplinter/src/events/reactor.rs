@@ -20,7 +20,7 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{bounded, RecvTimeoutError, Sender};
-use futures::Future;
+use futures::future;
 use tokio::runtime::Runtime;
 
 use crate::events::ws::{Context, Listen, ParseBytes, ShutdownHandle, WebSocketClient};
@@ -59,7 +59,7 @@ impl Reactor {
                     match receiver.recv_timeout(Duration::from_millis(500)) {
                         Ok(ReactorMessage::StartWs(listen)) => {
                             let (future, handle) = listen.into_shutdown_handle();
-                            runtime.spawn(futures::lazy(|| future.map_err(|_| ())));
+                            runtime.spawn(future::lazy(|_| future.map_err(|_| ())));
                             connections.push(handle);
                         }
                         Ok(ReactorMessage::HttpRequest(req)) => {
@@ -201,10 +201,7 @@ impl Igniter {
             })
     }
 
-    pub fn send(
-        &self,
-        req: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-    ) -> Result<(), ReactorError> {
+    pub fn send(&self, req: Result<(), ()>) -> Result<(), ReactorError> {
         self.sender
             .send(ReactorMessage::HttpRequest(req))
             .map_err(|err| {
@@ -226,5 +223,5 @@ impl Igniter {
 enum ReactorMessage {
     Stop,
     StartWs(Listen),
-    HttpRequest(Box<dyn Future<Item = (), Error = ()> + Send + 'static>),
+    HttpRequest(Result<(), ()>),
 }
