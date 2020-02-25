@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PGPASSWORD=gameroom_test psql -h db-cypress-test -U gameroom_test -c \
-    'TRUNCATE gameroom, gameroom_proposal, proposal_vote_record,
-      gameroom_member, gameroom_service, gameroom_notification, xo_games';
+PGPASSWORD=admin psql -h splinterd-db-node -U admin -d splinter -c \
+    'TRUNCATE keys, notification_properties, notifications, splinter_user,
+     user_credentials, user_notifications';
