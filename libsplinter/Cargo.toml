@@ -58,7 +58,8 @@ serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
 tar = { version = "0.4", optional = true }
-tokio = { version = "0.1.22", optional = true }
+tokio = { version = "0.2.11", optional = true, features = ["stream", "time"] }
+tokio-util = { version = "0.2", optional = true, features = ["codec"] }
 transact = { version = "0.2", features = ["sawtooth-compat"] }
 url = "1.7.1"
 ursa = { version = "0.1", optional = true }
@@ -117,7 +118,7 @@ proposal-read = []
 connection-manager = ["matrix"]
 connection-manager-notification-iter-try-next = ["connection-manager"]
 database = ["diesel/postgres", "diesel_migrations"]
-events = ["actix-http", "futures", "hyper", "tokio", "awc"]
+events = ["actix-http", "futures", "hyper", "tokio", "awc", "tokio-util"]
 matrix = []
 node-registry-unified = []
 postgres = ["diesel/postgres"]
