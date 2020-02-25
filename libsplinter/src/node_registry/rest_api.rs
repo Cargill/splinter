@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
-use crate::futures::{future::IntoFuture, stream::Stream, Future};
+use crate::futures::{executor::block_on, StreamExt};
 use crate::protocol;
 use crate::rest_api::{
     paging::{get_response_paging_info, Paging, DEFAULT_LIMIT, DEFAULT_OFFSET},
@@ -47,13 +47,13 @@ where
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
-            fetch_node(r, web::Data::new(registry.clone()))
+            block_on(fetch_node(r, web::Data::new(registry.clone())))
         })
         .add_method(Method::Put, move |r, p| {
-            put_node(r, p, web::Data::new(registry1.clone()))
+            block_on(put_node(r, p, web::Data::new(registry1.clone())))
         })
         .add_method(Method::Delete, move |r, _| {
-            delete_node(r, web::Data::new(registry2.clone()))
+            block_on(delete_node(r, web::Data::new(registry2.clone())))
         })
 }
 
@@ -71,14 +71,14 @@ where
             list_nodes(r, web::Data::new(registry.clone()))
         })
         .add_method(Method::Post, move |_, p| {
-            add_node(p, web::Data::new(registry1.clone()))
+            block_on(add_node(p, web::Data::new(registry1.clone())))
         })
 }
 
-fn fetch_node<NR>(
+async fn fetch_node<NR>(
     request: HttpRequest,
     registry: web::Data<NR>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
+) -> Result<HttpResponse, Error>
 where
     NR: NodeRegistryReader + 'static,
 {
@@ -87,25 +87,23 @@ where
         .get("identity")
         .unwrap_or("")
         .to_string();
-    Box::new(
-        web::block(move || registry.fetch_node(&identity)).then(|res| match res {
-            Ok(node) => Ok(HttpResponse::Ok().json(node)),
-            Err(err) => match err {
-                BlockingError::Error(err) => match err {
-                    NodeRegistryError::NotFoundError(err) => Ok(HttpResponse::NotFound().json(err)),
-                    _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
-                },
+    match web::block(move || registry.fetch_node(&identity)).await {
+        Ok(node) => Ok(HttpResponse::Ok().json(node)),
+        Err(err) => match err {
+            BlockingError::Error(err) => match err {
+                NodeRegistryError::NotFoundError(err) => Ok(HttpResponse::NotFound().json(err)),
                 _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
             },
-        }),
-    )
+            _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+        },
+    }
 }
 
-fn put_node<NW>(
+async fn put_node<NW>(
     request: HttpRequest,
-    payload: web::Payload,
+    mut payload: web::Payload,
     registry: web::Data<NW>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
+) -> Result<HttpResponse, Error>
 where
     NW: NodeRegistryWriter + 'static,
 {
@@ -114,60 +112,46 @@ where
         .get("identity")
         .unwrap_or("")
         .to_string();
-    Box::new(
-        payload
-            .from_err::<Error>()
-            .fold(web::BytesMut::new(), move |mut body, chunk| {
-                body.extend_from_slice(&chunk);
-                Ok::<_, Error>(body)
+    let mut bytes = web::BytesMut::new();
+    while let Some(body) = payload.next().await {
+        bytes.extend_from_slice(&body?);
+    }
+    match serde_json::from_slice::<Node>(&bytes) {
+        Ok(node) => {
+            match web::block(move || {
+                if node.identity != path_identity {
+                    Err(NodeRegistryError::InvalidNode(
+                        InvalidNodeError::InvalidIdentity(
+                            node.identity,
+                            "node identity cannot be changed".into(),
+                        ),
+                    ))
+                } else {
+                    registry.insert_node(node)
+                }
             })
-            .into_future()
-            .and_then(move |body| match serde_json::from_slice::<Node>(&body) {
-                Ok(node) => Box::new(
-                    web::block(move || {
-                        if node.identity != path_identity {
-                            Err(NodeRegistryError::InvalidNode(
-                                InvalidNodeError::InvalidIdentity(
-                                    node.identity,
-                                    "node identity cannot be changed".into(),
-                                ),
-                            ))
-                        } else {
-                            registry.insert_node(node)
+            .await
+            {
+                Ok(_) => Ok(HttpResponse::Ok().finish()),
+                Err(err) => match err {
+                    BlockingError::Error(err) => match err {
+                        NodeRegistryError::InvalidNode(err) => {
+                            Ok(HttpResponse::Forbidden().json(format!("node is invalid: {}", err)))
                         }
-                    })
-                    .then(|res| {
-                        Ok(match res {
-                            Ok(_) => HttpResponse::Ok().finish(),
-                            Err(err) => match err {
-                                BlockingError::Error(err) => match err {
-                                    NodeRegistryError::InvalidNode(err) => {
-                                        HttpResponse::Forbidden()
-                                            .json(format!("node is invalid: {}", err))
-                                    }
-                                    _ => {
-                                        HttpResponse::InternalServerError().json(format!("{}", err))
-                                    }
-                                },
-                                _ => HttpResponse::InternalServerError().json(format!("{}", err)),
-                            },
-                        })
-                    }),
-                )
-                    as Box<dyn Future<Item = HttpResponse, Error = Error>>,
-                Err(err) => Box::new(
-                    HttpResponse::BadRequest()
-                        .json(format!("invalid node: {}", err))
-                        .into_future(),
-                ),
-            }),
-    )
+                        _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+                    },
+                    _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+                },
+            }
+        }
+        Err(err) => Ok(HttpResponse::BadRequest().json(format!("invalid node: {}", err))),
+    }
 }
 
-fn delete_node<NW>(
+async fn delete_node<NW>(
     request: HttpRequest,
     registry: web::Data<NW>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
+) -> Result<HttpResponse, Error>
 where
     NW: NodeRegistryWriter + 'static,
 {
@@ -176,24 +160,19 @@ where
         .get("identity")
         .unwrap_or("")
         .to_string();
-    Box::new(
-        web::block(move || registry.delete_node(&identity)).then(|res| match res {
-            Ok(_) => Ok(HttpResponse::Ok().finish()),
-            Err(err) => match err {
-                BlockingError::Error(err) => match err {
-                    NodeRegistryError::NotFoundError(err) => Ok(HttpResponse::NotFound().json(err)),
-                    _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
-                },
+    match web::block(move || registry.delete_node(&identity)).await {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(err) => match err {
+            BlockingError::Error(err) => match err {
+                NodeRegistryError::NotFoundError(err) => Ok(HttpResponse::NotFound().json(err)),
                 _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
             },
-        }),
-    )
+            _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+        },
+    }
 }
 
-fn list_nodes<NR>(
-    req: HttpRequest,
-    registry: web::Data<NR>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
+fn list_nodes<NR>(req: HttpRequest, registry: web::Data<NR>) -> Result<HttpResponse, Error>
 where
     NR: NodeRegistryReader + 'static,
 {
@@ -201,27 +180,19 @@ where
         if let Ok(q) = web::Query::from_query(req.query_string()) {
             q
         } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(json!({
-                        "message": "Invalid query"
-                    }))
-                    .into_future(),
-            );
+            return Ok(HttpResponse::BadRequest().json(json!({
+                "message": "Invalid query"
+            })));
         };
 
     let offset = match query.get("offset") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(format!(
-                            "Invalid offset value passed: {}. Error: {}",
-                            value, err
-                        ))
-                        .into_future(),
-                )
+                return Ok(HttpResponse::BadRequest().json(format!(
+                    "Invalid offset value passed: {}. Error: {}",
+                    value, err
+                )))
             }
         },
         None => DEFAULT_OFFSET,
@@ -231,14 +202,10 @@ where
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(format!(
-                            "Invalid limit value passed: {}. Error: {}",
-                            value, err
-                        ))
-                        .into_future(),
-                )
+                return Ok(HttpResponse::BadRequest().json(format!(
+                    "Invalid limit value passed: {}. Error: {}",
+                    value, err
+                )))
             }
         },
         None => DEFAULT_LIMIT,
@@ -253,14 +220,10 @@ where
                 Some(val)
             }
             Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(format!(
-                            "Invalid filter value passed: {}. Error: {}",
-                            value, err
-                        ))
-                        .into_future(),
-                )
+                return Ok(HttpResponse::BadRequest().json(format!(
+                    "Invalid filter value passed: {}. Error: {}",
+                    value, err
+                )))
             }
         },
         None => None,
@@ -268,52 +231,47 @@ where
 
     let predicates = match to_predicates(filters) {
         Ok(predicates) => predicates,
-        Err(err) => return Box::new(HttpResponse::BadRequest().json(err).into_future()),
+        Err(err) => return Ok(HttpResponse::BadRequest().json(err)),
     };
 
-    Box::new(query_list_nodes(
-        registry,
-        link,
-        predicates,
-        Some(offset),
-        Some(limit),
-    ))
+    query_list_nodes(registry, link, predicates, Some(offset), Some(limit)).await
 }
 
-fn query_list_nodes<NR>(
+async fn query_list_nodes<NR>(
     registry: web::Data<NR>,
     link: String,
     filters: Vec<MetadataPredicate>,
     offset: Option<usize>,
     limit: Option<usize>,
-) -> impl Future<Item = HttpResponse, Error = Error>
+) -> Result<HttpResponse, Error>
 where
     NR: NodeRegistryReader + 'static,
 {
     let count_filters = filters.clone();
-    web::block(move || match registry.count_nodes(&count_filters) {
+    let (registry, total_count) = web::block(move || match registry.count_nodes(&count_filters) {
         Ok(count) => Ok((registry, count)),
         Err(err) => Err(err),
     })
-    .and_then(move |(registry, total_count)| {
-        web::block(move || match registry.list_nodes(&filters) {
-            Ok(nodes_iter) => Ok(ListNodesResponse {
-                data: nodes_iter
-                    .skip(offset.as_ref().copied().unwrap_or(0))
-                    .take(limit.as_ref().copied().unwrap_or(std::usize::MAX))
-                    .collect::<Vec<_>>(),
-                paging: get_response_paging_info(limit, offset, &link, total_count as usize),
-            }),
-            Err(err) => Err(err),
-        })
+    .await?;
+
+    let result = web::block(move || match registry.list_nodes(&filters) {
+        Ok(nodes_iter) => Ok(ListNodesResponse {
+            data: nodes_iter
+                .skip(offset.as_ref().copied().unwrap_or(0))
+                .take(limit.as_ref().copied().unwrap_or(std::usize::MAX))
+                .collect::<Vec<_>>(),
+            paging: get_response_paging_info(limit, offset, &link, total_count as usize),
+        }),
+        Err(err) => Err(err),
     })
-    .then(|res| match res {
+    .await;
+    match result {
         Ok(list_res) => Ok(HttpResponse::Ok().json(list_res)),
         Err(err) => {
             error!("Unable to list nodes: {}", err);
             Ok(HttpResponse::InternalServerError().into())
         }
-    })
+    }
 }
 
 fn to_predicates(filters: Option<Filter>) -> Result<Vec<MetadataPredicate>, String> {
@@ -334,58 +292,42 @@ fn to_predicates(filters: Option<Filter>) -> Result<Vec<MetadataPredicate>, Stri
     }
 }
 
-fn add_node<NW>(
-    payload: web::Payload,
+async fn add_node<NW>(
+    mut payload: web::Payload,
     registry: web::Data<NW>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
+) -> Result<HttpResponse, Error>
 where
     NW: NodeRegistryReader + NodeRegistryWriter + 'static,
 {
-    Box::new(
-        payload
-            .from_err::<Error>()
-            .fold(web::BytesMut::new(), move |mut body, chunk| {
-                body.extend_from_slice(&chunk);
-                Ok::<_, Error>(body)
-            })
-            .into_future()
-            .and_then(move |body| match serde_json::from_slice::<Node>(&body) {
-                Ok(node) => Box::new(
-                    web::block(move || {
-                        if registry.has_node(&node.identity)? {
-                            Err(NodeRegistryError::InvalidNode(
-                                InvalidNodeError::DuplicateIdentity(node.identity),
-                            ))
-                        } else {
-                            registry.insert_node(node)
-                        }
-                    })
-                    .then(|res| {
-                        Ok(match res {
-                            Ok(_) => HttpResponse::Ok().finish(),
-                            Err(err) => match err {
-                                BlockingError::Error(err) => match err {
-                                    NodeRegistryError::InvalidNode(err) => {
-                                        HttpResponse::Forbidden()
-                                            .json(format!("node is invalid: {}", err))
-                                    }
-                                    _ => {
-                                        HttpResponse::InternalServerError().json(format!("{}", err))
-                                    }
-                                },
-                                _ => HttpResponse::InternalServerError().json(format!("{}", err)),
-                            },
-                        })
-                    }),
-                )
-                    as Box<dyn Future<Item = HttpResponse, Error = Error>>,
-                Err(err) => Box::new(
-                    HttpResponse::BadRequest()
-                        .json(format!("invalid node: {}", err))
-                        .into_future(),
-                ),
-            }),
-    )
+    let mut bytes = web::BytesMut::new();
+    while let Some(body) = payload.next().await {
+        bytes.extend_from_slice(&body?);
+    }
+    match serde_json::from_slice::<Node>(&bytes) {
+        Ok(node) => match web::block(move || {
+            if registry.has_node(&node.identity)? {
+                Err(NodeRegistryError::InvalidNode(
+                    InvalidNodeError::DuplicateIdentity(node.identity),
+                ))
+            } else {
+                registry.insert_node(node)
+            }
+        })
+        .await
+        {
+            Ok(_) => Ok(HttpResponse::Ok().finish()),
+            Err(err) => match err {
+                BlockingError::Error(err) => match err {
+                    NodeRegistryError::InvalidNode(err) => {
+                        Ok(HttpResponse::Forbidden().json(format!("node is invalid: {}", err)))
+                    }
+                    _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+                },
+                _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+            },
+        },
+        Err(err) => Ok(HttpResponse::BadRequest().json(format!("invalid node: {}", err))),
+    }
 }
 
 #[cfg(test)]
