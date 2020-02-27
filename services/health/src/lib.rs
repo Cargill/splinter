@@ -17,7 +17,6 @@ extern crate log;
 
 use splinter::{
     actix_web::HttpResponse,
-    futures::IntoFuture,
     rest_api::{Method, Resource, RestResourceProvider},
     service::{
         error::{ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError},
@@ -89,7 +88,6 @@ impl RestResourceProvider for HealthService {
 }
 
 fn make_status_resource() -> Resource {
-    Resource::build("/health/status").add_method(Method::Get, move |_, _| {
-        Box::new(HttpResponse::Ok().finish().into_future())
-    })
+    Resource::build("/health/status")
+        .add_method(Method::Get, move |_, _| Ok(HttpResponse::Ok().finish()))
 }
