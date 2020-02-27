@@ -592,13 +592,12 @@ pub fn get_authorization_token(request: &HttpRequest) -> Result<String, RequestE
 mod test {
     use super::*;
     use actix_http::Response;
-    use futures::IntoFuture;
 
     #[test]
     fn test_resource() {
         Resource::build("/test")
             .add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
-                Box::new(Response::Ok().finish())
+                Ok(Response::Ok().finish())
             })
             .into_route();
     }
@@ -607,10 +606,10 @@ mod test {
     fn test_resource_with_guard() {
         Resource::build("/test-guarded")
             .add_request_guard(|_: &HttpRequest| {
-                Continuation::terminate(Response::BadRequest().finish())
+                Continuation::terminate(Ok(Response::BadRequest().finish()))
             })
             .add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
-                Box::new(Response::Ok().finish())
+                Ok(Response::Ok().finish())
             })
             .into_route();
     }

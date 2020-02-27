@@ -93,53 +93,59 @@ async fn fetch_circuit<T: CircuitStore + 'static>(
 mod tests {
     use super::*;
 
-    use crate::actix_web::{http::StatusCode, test, web, App};
+    use crate::actix_web::{
+        http::{Method, StatusCode},
+        test, web, App,
+    };
     use crate::circuit::{
         directory::CircuitDirectory, AuthorizationType, Circuit, DurabilityType, PersistenceType,
         Roster, RouteType, ServiceDefinition, SplinterState,
     };
     use crate::storage::get_storage;
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/circuit/{identity} request returns the expected circuit.
-    fn test_fetch_circuit_ok() {
+    async fn test_fetch_circuit_ok() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(
+        let srv = test::start(move || {
             App::new().data(splinter_state.clone()).service(
                 web::resource("/admin/circuits/{circuit_id}")
                     .route(web::get().to(fetch_circuit::<SplinterState>)),
-            ),
-        );
+            )
+        });
 
-        let req = test::TestRequest::get()
-            .uri(&format!("/admin/circuits/{}", get_circuit_1().id))
-            .to_request();
-
-        let resp = test::call_service(&mut app, req);
+        let mut resp = srv
+            .request(
+                Method::GET,
+                srv.url(&format!("/admin/circuits/{}", get_circuit_1().id)),
+            )
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
-        let circuit: CircuitResponse = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
+        let circuit: CircuitResponse = serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
         assert_eq!(circuit, get_circuit_1())
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/circuits/{identity} request returns NotFound when an invalid identity is
     /// passed
-    fn test_fetch_circuit_not_found() {
+    async fn test_fetch_circuit_not_found() {
         let splinter_state = filled_splinter_state();
-        let mut app = test::init_service(
+        let srv = test::start(move || {
             App::new().data(splinter_state.clone()).service(
                 web::resource("/admin/circuits/{circuit_id}")
                     .route(web::get().to(fetch_circuit::<SplinterState>)),
-            ),
-        );
+            )
+        });
 
-        let req = test::TestRequest::get()
-            .uri("/admin/circuit/Circuit-not-valid")
-            .to_request();
-
-        let resp = test::call_service(&mut app, req);
+        let resp = srv
+            .request(Method::GET, srv.url("/admin/circuit/Circuit-not-valid"))
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }

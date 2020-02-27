@@ -148,7 +148,7 @@ mod tests {
     use super::*;
 
     use crate::actix_web::{
-        http::{header, StatusCode},
+        http::{header, Method, StatusCode},
         test, web, App,
     };
     use crate::circuit::{
@@ -158,22 +158,27 @@ mod tests {
     use crate::rest_api::paging::Paging;
     use crate::storage::get_storage;
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/circuits request with no filters returns the expected circuits.
-    fn test_list_circuits_ok() {
+    async fn test_list_circuits_ok() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(App::new().data(splinter_state.clone()).service(
-            web::resource("/admin/circuits").route(web::get().to(list_circuits::<SplinterState>)),
-        ));
+        let srv = test::start(move || {
+            App::new().data(splinter_state.clone()).service(
+                web::resource("/admin/circuits")
+                    .route(web::get().to(list_circuits::<SplinterState>)),
+            )
+        });
 
-        let req = test::TestRequest::get().uri("/admin/circuits").to_request();
-
-        let resp = test::call_service(&mut app, req);
+        let mut resp = srv
+            .request(Method::GET, srv.url("/admin/circuits"))
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
         let circuits: ListCircuitsResponse =
-            serde_yaml::from_slice(&test::read_body(resp)).unwrap();
+            serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
         assert_eq!(circuits.data, vec![get_circuit_1(), get_circuit_2()]);
         assert_eq!(
             circuits.paging,
@@ -181,25 +186,31 @@ mod tests {
         )
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/circuits request with filter returns the expected circuit.
-    fn test_list_circuit_with_filters_ok() {
+    async fn test_list_circuit_with_filters_ok() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(App::new().data(splinter_state.clone()).service(
-            web::resource("/admin/circuits").route(web::get().to(list_circuits::<SplinterState>)),
-        ));
+        let srv = test::start(move || {
+            App::new().data(splinter_state.clone()).service(
+                web::resource("/admin/circuits")
+                    .route(web::get().to(list_circuits::<SplinterState>)),
+            )
+        });
 
-        let req = test::TestRequest::get()
-            .uri(&format!("/admin/circuits?filter={}", "node_1"))
+        let mut resp = srv
+            .request(
+                Method::GET,
+                srv.url(&format!("/admin/circuits?filter={}", "node_1")),
+            )
             .header(header::CONTENT_TYPE, "application/json")
-            .to_request();
-
-        let resp = test::call_service(&mut app, req);
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
         let circuits: ListCircuitsResponse =
-            serde_yaml::from_slice(&test::read_body(resp)).unwrap();
+            serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
         assert_eq!(circuits.data, vec![get_circuit_1()]);
         let link = format!("/admin/circuits?filter={}&", "node_1");
         assert_eq!(
@@ -208,25 +219,27 @@ mod tests {
         )
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /circuits?limit=1 request returns the expected circuit.
-    fn test_list_circuit_with_limit() {
+    async fn test_list_circuit_with_limit() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(App::new().data(splinter_state.clone()).service(
-            web::resource("/circuits").route(web::get().to_async(list_circuits::<SplinterState>)),
-        ));
+        let srv = test::start(move || {
+            App::new().data(splinter_state.clone()).service(
+                web::resource("/circuits").route(web::get().to(list_circuits::<SplinterState>)),
+            )
+        });
 
-        let req = test::TestRequest::get()
-            .uri(&format!("/circuits?limit={}", 1))
+        let mut resp = srv
+            .request(Method::GET, srv.url(&format!("/circuits?limit={}", 1)))
             .header(header::CONTENT_TYPE, "application/json")
-            .to_request();
-
-        let resp = test::call_service(&mut app, req);
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
         let circuits: ListCircuitsResponse =
-            serde_yaml::from_slice(&test::read_body(resp)).unwrap();
+            serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
         assert_eq!(circuits.data, vec![get_circuit_1()]);
         assert_eq!(
             circuits.paging,
@@ -234,25 +247,27 @@ mod tests {
         )
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /circuits?offset=1 request returns the expected circuit.
-    fn test_list_circuit_with_offset() {
+    async fn test_list_circuit_with_offset() {
         let splinter_state = filled_splinter_state();
 
-        let mut app = test::init_service(App::new().data(splinter_state.clone()).service(
-            web::resource("/circuits").route(web::get().to_async(list_circuits::<SplinterState>)),
-        ));
+        let srv = test::start(move || {
+            App::new().data(splinter_state.clone()).service(
+                web::resource("/circuits").route(web::get().to(list_circuits::<SplinterState>)),
+            )
+        });
 
-        let req = test::TestRequest::get()
-            .uri(&format!("/circuits?offset={}", 1))
+        let mut resp = srv
+            .request(Method::GET, srv.url(&format!("/circuits?offset={}", 1)))
             .header(header::CONTENT_TYPE, "application/json")
-            .to_request();
-
-        let resp = test::call_service(&mut app, req);
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
         let circuits: ListCircuitsResponse =
-            serde_yaml::from_slice(&test::read_body(resp)).unwrap();
+            serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
         assert_eq!(circuits.data, vec![get_circuit_2()]);
         assert_eq!(
             circuits.paging,

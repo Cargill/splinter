@@ -68,7 +68,7 @@ where
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
-            list_nodes(r, web::Data::new(registry.clone()))
+            block_on(list_nodes(r, web::Data::new(registry.clone())))
         })
         .add_method(Method::Post, move |_, p| {
             block_on(add_node(p, web::Data::new(registry1.clone())))
@@ -172,7 +172,7 @@ where
     }
 }
 
-fn list_nodes<NR>(req: HttpRequest, registry: web::Data<NR>) -> Result<HttpResponse, Error>
+async fn list_nodes<NR>(req: HttpRequest, registry: web::Data<NR>) -> Result<HttpResponse, Error>
 where
     NR: NodeRegistryReader + 'static,
 {
@@ -340,7 +340,7 @@ mod tests {
     use std::thread;
 
     use crate::actix_web::{
-        http::{header, StatusCode},
+        http::{header, Method, StatusCode},
         test, web, App,
     };
     use crate::node_registry::yaml::YamlNodeRegistry;
@@ -349,301 +349,352 @@ mod tests {
         YamlNodeRegistry::new(file_path).expect("Error creating YamlNodeRegistry")
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/nodes/{identity} request returns the expected node.
-    fn test_fetch_node_ok() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+    async fn test_fetch_node_ok() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
 
-            let req = test::TestRequest::get()
-                .uri(&format!("/admin/nodes/{}", get_node_1().identity))
-                .to_request();
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let resp = test::call_service(&mut app, req);
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes/{identity}")
+                    .route(web::get().to(fetch_node::<YamlNodeRegistry>)),
+            )
+        });
 
-            assert_eq!(resp.status(), StatusCode::OK);
-            let node: Node = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
-            assert_eq!(node, get_node_1())
-        })
+        let mut resp = srv
+            .request(
+                Method::GET,
+                srv.url(&format!("/admin/nodes/{}", get_node_1().identity)),
+            )
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let node: Node = serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
+        assert_eq!(node, get_node_1());
+
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/nodes/{identity} request returns NotFound when an invalid identity is passed
-    fn test_fetch_node_not_found() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+    async fn test_fetch_node_not_found() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
 
-            let req = test::TestRequest::get()
-                .uri("/admin/nodes/Node-not-valid")
-                .to_request();
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let resp = test::call_service(&mut app, req);
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes/{identity}")
+                    .route(web::get().to(fetch_node::<YamlNodeRegistry>)),
+            )
+        });
 
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        })
+        let resp = srv
+            .request(Method::GET, srv.url("/admin/nodes/Node-not-valid"))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Test the PUT /admin/nodes/{identity} route for adding or updating a node in the registry.
-    fn test_put_node() {
-        run_test(|test_yaml_file_path| {
-            let mut node = get_node_1();
-            write_to_file(&test_yaml_file_path, &[node.clone()]);
+    async fn test_put_node() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::patch().to_async(put_node::<YamlNodeRegistry>))
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
-                ),
-            );
+        let mut node = get_node_1();
 
-            // Verify no body (e.g. no updated Node) gets a BAD_REQUEST response
-            let req = test::TestRequest::patch()
-                .uri(&format!("/admin/nodes/{}", &node.identity))
-                .to_request();
+        write_to_file(&test_yaml_file_path, &[node.clone()]);
 
-            let resp = test::call_service(&mut app, req);
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes/{identity}")
+                    .route(web::patch().to(put_node::<YamlNodeRegistry>))
+                    .route(web::get().to(fetch_node::<YamlNodeRegistry>)),
+            )
+        });
 
-            // Verify that updating an existing node gets an OK response and the fetched node has
-            // the updated values
-            node.endpoint = "12.0.0.123:8432".to_string();
-            node.metadata
-                .insert("location".to_string(), "Minneapolis".to_string());
+        let resp = srv
+            .request(
+                Method::PATCH,
+                srv.url(&format!("/admin/nodes/{}", &node.identity)),
+            )
+            .send()
+            .await
+            .unwrap();
 
-            let req = test::TestRequest::patch()
-                .uri(&format!("/admin/nodes/{}", &node.identity))
-                .header(header::CONTENT_TYPE, "application/json")
-                .set_json(&node)
-                .to_request();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
-            let resp = test::call_service(&mut app, req);
+        // Verify that updating an existing node gets an OK response and the fetched node has
+        // the updated values
+        node.endpoint = "12.0.0.123:8432".to_string();
+        node.metadata
+            .insert("location".to_string(), "Minneapolis".to_string());
 
-            assert_eq!(resp.status(), StatusCode::OK);
+        let resp = srv
+            .request(
+                Method::PATCH,
+                srv.url(&format!("/admin/nodes/{}", &node.identity)),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .send_json(&node)
+            .await
+            .unwrap();
 
-            let req = test::TestRequest::get()
-                .uri(&format!("/admin/nodes/{}", &node.identity))
-                .to_request();
+        assert_eq!(resp.status(), StatusCode::OK);
 
-            let resp = test::call_service(&mut app, req);
+        let mut resp = srv
+            .request(
+                Method::GET,
+                srv.url(&format!("/admin/nodes/{}", &node.identity)),
+            )
+            .send()
+            .await
+            .unwrap();
 
-            assert_eq!(resp.status(), StatusCode::OK);
-            let updated_node: Node = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
-            assert_eq!(updated_node, node);
+        assert_eq!(resp.status(), StatusCode::OK);
+        let updated_node: Node = serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
+        assert_eq!(updated_node, node);
 
-            // Verify that attempting to change the node identity gets a FORBIDDEN response
-            let old_identity = node.identity.clone();
-            node.identity = "Node-789".into();
+        // Verify that attempting to change the node identity gets a FORBIDDEN response
+        let old_identity = node.identity.clone();
+        node.identity = "Node-789".into();
 
-            let req = test::TestRequest::patch()
-                .uri(&format!("/admin/nodes/{}", &old_identity))
-                .header(header::CONTENT_TYPE, "application/json")
-                .set_json(&node)
-                .to_request();
+        let resp = srv
+            .request(
+                Method::PATCH,
+                srv.url(&format!("/admin/nodes/{}", &old_identity)),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .send_json(&node)
+            .await
+            .unwrap();
 
-            let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 
-            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
-        })
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Test the DELETE /admin/nodes/{identity} route for deleting a node from the registry.
-    fn test_delete_node() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1()]);
+    async fn test_delete_node() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::delete().to_async(delete_node::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[get_node_1()]);
 
-            // Verify that an existing node gets an OK response
-            let req = test::TestRequest::delete()
-                .uri(&format!("/admin/nodes/{}", get_node_1().identity))
-                .to_request();
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let resp = test::call_service(&mut app, req);
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes/{identity}")
+                    .route(web::delete().to(delete_node::<YamlNodeRegistry>)),
+            )
+        });
 
-            assert_eq!(resp.status(), StatusCode::OK);
+        let resp = srv
+            .request(
+                Method::DELETE,
+                srv.url(&format!("/admin/nodes/{}", get_node_1().identity)),
+            )
+            .send()
+            .await
+            .unwrap();
 
-            // Verify that a non-existent node gets a NOT_FOUND response
-            let req = test::TestRequest::delete()
-                .uri(&format!("/admin/nodes/{}", get_node_1().identity))
-                .to_request();
+        assert_eq!(resp.status(), StatusCode::OK);
 
-            let resp = test::call_service(&mut app, req);
+        let resp = srv
+            .request(
+                Method::DELETE,
+                srv.url(&format!("/admin/nodes/{}", get_node_1().identity)),
+            )
+            .send()
+            .await
+            .unwrap();
 
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        })
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/nodes request with no filters returns the expected nodes.
-    fn test_list_node_ok() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+    async fn test_list_node_ok() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes")
-                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
 
-            let req = test::TestRequest::get().uri("/admin/nodes").to_request();
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::OK);
-            let nodes: ListNodesResponse = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
-            assert_eq!(nodes.data, vec![get_node_1(), get_node_2()]);
-            assert_eq!(
-                nodes.paging,
-                create_test_paging_response(0, 100, 0, 0, 0, 2, "/admin/nodes?")
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes").route(web::get().to(list_nodes::<YamlNodeRegistry>)),
             )
-        })
+        });
+
+        let mut resp = srv
+            .request(Method::GET, srv.url("/admin/nodes"))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let nodes: ListNodesResponse = serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
+        assert_eq!(nodes.data, vec![get_node_1(), get_node_2()]);
+        assert_eq!(
+            nodes.paging,
+            create_test_paging_response(0, 100, 0, 0, 0, 2, "/admin/nodes?")
+        );
+
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/nodes request with filters returns the expected node.
-    fn test_list_node_with_filters_ok() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+    async fn test_list_node_with_filters_ok() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes")
-                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
 
-            let filter = percent_encode_filter_query("{\"company\":[\"=\",\"Bitwise IO\"]}");
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let req = test::TestRequest::get()
-                .uri(&format!("/admin/nodes?filter={}", filter))
-                .header(header::CONTENT_TYPE, "application/json")
-                .to_request();
-
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::OK);
-            let nodes: ListNodesResponse = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
-            assert_eq!(nodes.data, vec![get_node_1()]);
-            let link = format!("/admin/nodes?filter={}&", filter);
-            assert_eq!(
-                nodes.paging,
-                create_test_paging_response(0, 100, 0, 0, 0, 1, &link)
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes").route(web::get().to(list_nodes::<YamlNodeRegistry>)),
             )
-        })
+        });
+
+        let filter = percent_encode_filter_query("{\"company\":[\"=\",\"Bitwise IO\"]}");
+
+        let mut resp = srv
+            .request(
+                Method::GET,
+                srv.url(&format!("/admin/nodes?filter={}", filter)),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let nodes: ListNodesResponse = serde_yaml::from_slice(&resp.body().await.unwrap()).unwrap();
+        assert_eq!(nodes.data, vec![get_node_1()]);
+        let link = format!("/admin/nodes?filter={}&", filter);
+        assert_eq!(
+            nodes.paging,
+            create_test_paging_response(0, 100, 0, 0, 0, 1, &link)
+        );
+
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Tests a GET /admin/nodes request with invalid filter returns BadRequest response.
-    fn test_list_node_with_filters_bad_request() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+    async fn test_list_node_with_filters_bad_request() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes")
-                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
 
-            let filter = percent_encode_filter_query("{\"company\":[\"*\",\"Bitwise IO\"]}");
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let req = test::TestRequest::get()
-                .uri(&format!("/admin/nodes?filter={}", filter))
-                .header(header::CONTENT_TYPE, "application/json")
-                .to_request();
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes").route(web::get().to(list_nodes::<YamlNodeRegistry>)),
+            )
+        });
 
-            let resp = test::call_service(&mut app, req);
+        let filter = percent_encode_filter_query("{\"company\":[\"*\",\"Bitwise IO\"]}");
 
-            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-        })
+        let resp = srv
+            .request(
+                Method::GET,
+                srv.url(&format!("/admin/nodes?filter={}", filter)),
+            )
+            .header(header::CONTENT_TYPE, "application/json")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+        remove_file(test_yaml_file).unwrap();
     }
 
-    #[test]
+    #[actix_rt::test]
     /// Test the POST /admin/nodes route for adding a node to the registry.
-    fn test_add_node() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[]);
+    async fn test_add_node() {
+        let test_yaml_file = temp_yaml_file_path();
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let test_yaml_file_path = test_yaml_file.clone();
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes")
-                        .route(web::post().to_async(add_node::<YamlNodeRegistry>))
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
-                ),
-            );
+        write_to_file(&test_yaml_file_path, &[]);
 
-            // Verify an invalid node gets a BAD_REQUEST response
-            let req = test::TestRequest::post()
-                .uri("/admin/nodes")
-                .header(header::CONTENT_TYPE, "application/json")
-                .to_request();
+        let node_registry = new_yaml_node_registry(&test_yaml_file_path);
 
-            let resp = test::call_service(&mut app, req);
+        let srv = test::start(move || {
+            App::new().data(node_registry.clone()).service(
+                web::resource("/admin/nodes")
+                    .route(web::post().to(add_node::<YamlNodeRegistry>))
+                    .route(web::get().to(fetch_node::<YamlNodeRegistry>)),
+            )
+        });
 
-            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let resp = srv
+            .request(Method::POST, srv.url("/admin/nodes"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .send()
+            .await
+            .unwrap();
 
-            // Verify a valid node gets an OK response
-            let req = test::TestRequest::post()
-                .uri("/admin/nodes")
-                .header(header::CONTENT_TYPE, "application/json")
-                .set_json(&get_node_1())
-                .to_request();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
-            let resp = test::call_service(&mut app, req);
+        // Verify a valid node gets an OK response
+        let resp = srv
+            .request(Method::POST, srv.url("/admin/nodes"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .send_json(&get_node_1())
+            .await
+            .unwrap();
 
-            assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.status(), StatusCode::OK);
 
-            // Verify a duplicate node gets a FORBIDDEN response
-            let req = test::TestRequest::post()
-                .uri("/admin/nodes")
-                .header(header::CONTENT_TYPE, "application/json")
-                .set_json(&get_node_1())
-                .to_request();
+        // Verify a duplicate node gets a FORBIDDEN response
+        let resp = srv
+            .request(Method::POST, srv.url("/admin/nodes"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .send_json(&get_node_1())
+            .await
+            .unwrap();
 
-            let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 
-            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
-        })
+        remove_file(test_yaml_file).unwrap();
     }
 
     fn create_test_paging_response(
@@ -699,20 +750,6 @@ mod tests {
             display_name: "Cargill - Node 1".to_string(),
             metadata,
         }
-    }
-
-    fn run_test<T>(test: T) -> ()
-    where
-        T: FnOnce(&str) -> () + panic::UnwindSafe,
-    {
-        let test_yaml_file = temp_yaml_file_path();
-
-        let test_path = test_yaml_file.clone();
-        let result = panic::catch_unwind(move || test(&test_path));
-
-        remove_file(test_yaml_file).unwrap();
-
-        assert!(result.is_ok())
     }
 
     fn temp_yaml_file_path() -> String {
