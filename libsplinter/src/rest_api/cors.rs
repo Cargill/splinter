@@ -15,11 +15,14 @@
 //! Provides CORS support for the REST API
 //!
 //! This is an experimental feature.  To enable, use the feature `"rest-api-cors"`.
+
+use std::{cell::RefCell, pin::Pin, rc::Rc, task::Context};
+
 use actix_web::dev::*;
 use actix_web::{http::header, http::header::HeaderValue, Error as ActixError, HttpResponse};
 use futures::{
-    future::{ok, FutureResult},
-    Future, IntoFuture, Poll,
+    future::{ok, Future, Ready},
+    task::Poll,
 };
 
 /// Configuration for CORS support
@@ -42,20 +45,21 @@ impl Cors {
 
 impl<S, B> Transform<S> for Cors
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixError>,
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixError>
+        + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
-    type Error = S::Error;
+    type Error = ActixError;
     type InitError = ();
     type Transform = CorsMiddleware<S>;
-    type Future = FutureResult<Self::Transform, Self::InitError>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         ok(CorsMiddleware {
-            service,
+            service: Rc::new(RefCell::new(service)),
             whitelist: self.whitelist.clone(),
         })
     }
@@ -63,23 +67,26 @@ where
 
 #[doc(hidden)]
 pub struct CorsMiddleware<S> {
-    service: S,
+    service: Rc<RefCell<S>>,
     whitelist: Vec<String>,
 }
 
 impl<S, B> Service for CorsMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixError>,
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixError>
+        + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = S::Error;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.service.poll_ready()
+    #[allow(clippy::type_complexity)]
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, ct: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(ct)
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
@@ -100,7 +107,10 @@ where
                     .iter()
                     .any(|domain| domain == "*" || origin.contains(domain));
                 if allowed_origin {
-                    Box::new(self.service.call(req).map(move |mut res| {
+                    let mut svc = self.service.clone();
+                    Box::pin(async move {
+                        let mut res = svc.call(req).await?;
+
                         let headers = res.headers_mut();
                         headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin_header);
                         headers.insert(
@@ -111,21 +121,26 @@ where
                             header::ACCESS_CONTROL_ALLOW_HEADERS,
                             request_headers.unwrap_or_else(|| HeaderValue::from_static("*")),
                         );
-                        res
-                    }))
+
+                        Ok(res)
+                    })
                 } else {
-                    Box::new(
-                        req.into_response(HttpResponse::PreconditionFailed().finish().into_body())
-                            .into_future(),
-                    )
+                    let response =
+                        req.into_response(HttpResponse::PreconditionFailed().finish().into_body());
+
+                    Box::pin(async { Ok(response) })
                 }
             }
             (Ok(Some(_)), None) => unreachable!(),
-            (Ok(None), _) => Box::new(self.service.call(req)),
-            (Err(_), _) => Box::new(
-                req.into_response(HttpResponse::BadRequest().finish().into_body())
-                    .into_future(),
-            ),
+            (Ok(None), _) => {
+                let mut svc = self.service.clone();
+                Box::pin(async move { svc.call(req).await })
+            }
+            (Err(_), _) => {
+                let response = req.into_response(HttpResponse::BadRequest().finish().into_body());
+
+                Box::pin(async { Ok(response) })
+            }
         }
     }
 }
