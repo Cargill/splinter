@@ -34,6 +34,7 @@ actix-web-actors = { version = "2.0", optional = true }
 atomicwrites = "0.2"
 awc = { version = "1.0", optional = true }
 bcrypt = {version = "0.6", optional = true}
+bytes = "0.5"
 byteorder = "1"
 bzip2 = { version = "0.3", optional = true }
 crossbeam-channel = "0.3"

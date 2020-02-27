@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -20,7 +21,7 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{bounded, RecvTimeoutError, Sender};
-use futures::future;
+use futures::future::{self, Future};
 use tokio::runtime::Runtime;
 
 use crate::events::ws::{Context, Listen, ParseBytes, ShutdownHandle, WebSocketClient};
@@ -46,7 +47,7 @@ impl Reactor {
         let thread_builder = thread::Builder::new().name("EventReactor".into());
         let thread_handle = thread_builder
             .spawn(move || {
-                let mut runtime = match Runtime::new() {
+                let runtime = match Runtime::new() {
                     Ok(runtime) => runtime,
                     Err(err) => {
                         error!("Unable to create event reactor runtime: {}", err);
@@ -59,7 +60,7 @@ impl Reactor {
                     match receiver.recv_timeout(Duration::from_millis(500)) {
                         Ok(ReactorMessage::StartWs(listen)) => {
                             let (future, handle) = listen.into_shutdown_handle();
-                            runtime.spawn(future::lazy(|_| future.map_err(|_| ())));
+                            runtime.spawn(future::lazy(|_| future));
                             connections.push(handle);
                         }
                         Ok(ReactorMessage::HttpRequest(req)) => {
@@ -101,22 +102,8 @@ impl Reactor {
                     connections = live_connections;
                 };
 
-                if let Err(err) = runtime
-                    .shutdown_on_idle()
-                    .wait()
-                    .map_err(|_| {
-                        ReactorError::ReactorShutdownError(
-                            "An Error occurred while shutting down Reactor".to_string(),
-                        )
-                    })
-                    .and_then(|_| {
-                        if shutdown_errors.is_empty() {
-                            Ok(())
-                        } else {
-                            Err(ReactorError::ShutdownHandleErrors(shutdown_errors))
-                        }
-                    })
-                {
+                if !shutdown_errors.is_empty() {
+                    let err = ReactorError::ShutdownHandleErrors(shutdown_errors);
                     error!("Unable to cleanly shutdown event reactor: {}", err);
                 }
             })
@@ -201,7 +188,10 @@ impl Igniter {
             })
     }
 
-    pub fn send(&self, req: Result<(), ()>) -> Result<(), ReactorError> {
+    pub fn send(
+        &self,
+        req: Pin<Box<dyn Future<Output = ()> + Send + 'static>>,
+    ) -> Result<(), ReactorError> {
         self.sender
             .send(ReactorMessage::HttpRequest(req))
             .map_err(|err| {
@@ -223,5 +213,5 @@ impl Igniter {
 enum ReactorMessage {
     Stop,
     StartWs(Listen),
-    HttpRequest(Result<(), ()>),
+    HttpRequest(Pin<Box<dyn Future<Output = ()> + Send + 'static>>),
 }

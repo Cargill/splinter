@@ -54,7 +54,6 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::str::from_utf8;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -63,14 +62,16 @@ use std::time::{Duration, SystemTime};
 
 use actix_http::ws;
 use awc::ws::{CloseCode, CloseReason, Codec, Frame, Message};
+use bytes::Bytes;
 use futures::{
     channel::mpsc::{channel, Sender},
-    executor::block_on,
-    future::{self, Either, Future},
-    Sink, SinkExt, StreamExt as FutureStreamExt, TryFutureExt, TryStreamExt,
+    future::Future,
+    stream,
+    stream::SplitSink,
+    SinkExt, StreamExt as FutureStreamExt,
 };
 use hyper::{self, header, upgrade::Upgraded, Body, Client, Request, StatusCode};
-use tokio::stream::StreamExt;
+use tokio::time;
 use tokio_util::codec::{Decoder, Framed};
 
 use crate::events::{Igniter, ParseError, WebSocketError};
@@ -91,8 +92,11 @@ pub struct Listen {
     running: Arc<AtomicBool>,
 }
 
+type ListenHandleFuture =
+    Pin<Box<dyn Future<Output = Result<(), WebSocketError>> + Send + 'static>>;
+
 impl Listen {
-    pub fn into_shutdown_handle(self) -> (Result<(), WebSocketError>, ShutdownHandle) {
+    pub fn into_shutdown_handle(self) -> (ListenHandleFuture, ShutdownHandle) {
         (
             self.future,
             ShutdownHandle {
@@ -226,7 +230,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
     }
 
     /// Returns `Listen` for WebSocket.
-    pub async fn listen(&self, mut context: Context<T>) -> Result<Listen, WebSocketError> {
+    pub fn listen(&self, mut context: Context<T>) -> Result<Listen, WebSocketError> {
         let url = self.url.clone();
         let (cmd_sender, cmd_receiver) = channel(1);
         let running = Arc::new(AtomicBool::new(true));
@@ -237,7 +241,6 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             .unwrap_or_else(|| Arc::new(|_| WsResponse::Empty));
         let on_message = self.on_message.clone();
 
-        let mut context_timeout = context.clone();
         let timeout = self.timeout;
 
         let running_connection = running.clone();
@@ -245,7 +248,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
 
         debug!("starting: {}", url);
 
-        let mut builder = Request::builder();
+        let builder = Request::builder();
         let mut request_builder = builder.uri(url);
 
         for (header, value) in self.additional_headers.iter() {
@@ -260,159 +263,155 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             .body(Body::empty())
             .map_err(|err| WebSocketError::RequestBuilderError(format!("{:?}", err)))?;
 
-        let future = Client::new()
-            .request(request)
-            .await
-            .and_then(|res| {
-                if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-                    error!("The server didn't upgrade: {}", res.status());
-                }
-                debug!("response: {:?}", res);
-
-                Ok(res.into_body().on_upgrade())
-            })?
-            .timeout(Duration::from_secs(timeout))
-            .map_err(move |err| {
-                if let Err(err) = context_connection.try_reconnect() {
-                    error!("Context returned an error  {}", err);
-                }
-
-                running_connection.store(false, Ordering::SeqCst);
-                WebSocketError::ConnectError(format!("Failed to connect: {}", err))
-            })
-            .and_then(move |upgraded| {
-                let codec = Codec::new().max_size(MAX_FRAME_SIZE).client_mode();
-                let framed = codec.framed(upgraded);
-                let (sink, stream) = framed.split();
-
-                let source = stream
-                    .timeout(Duration::from_secs(timeout))
+        #[allow(clippy::cognitive_complexity)]
+        let future = async move {
+            let response =
+                time::timeout(Duration::from_secs(timeout), Client::new().request(request))
+                    .await
                     .map_err(move |err| {
-                        error!("Connection timeout: {}", err);
-
-                        if let Err(err) = context_timeout.try_reconnect() {
+                        if let Err(err) = context_connection.try_reconnect() {
                             error!("Context returned an error  {}", err);
                         }
 
-                        WebSocketError::ListenError("Connection timeout".to_string())
-                    })
-                    .map(WebSocketClientCmd::Frame)
-                    .select(cmd_receiver);
+                        running_connection.store(false, Ordering::SeqCst);
+                        WebSocketError::ConnectError(format!("Failed to connect: {}", err))
+                    })??;
 
-                if let Err(_err) =
-                    handle_response(&mut sink, on_open(context.clone()), running_clone.clone())
-                {
-                    return Either::Right(future::ok(()));
-                }
+            if response.status() != StatusCode::SWITCHING_PROTOCOLS {
+                error!("The server didn't upgrade: {}", response.status());
+            }
 
-                // We're connected
-                context.ws_connected();
-                Either::Left(
-                    source
-                        .take_while(move |message| {
-                            let mut closed = false;
-                            let status = match message {
-                                WebSocketClientCmd::Frame(Frame::Text(msg))
-                                | WebSocketClientCmd::Frame(Frame::Binary(msg)) => {
-                                    let bytes = msg.to_vec();
-                                    let result = T::from_bytes(&bytes)
-                                        .map_err(|parse_error| {
-                                            error!(
-                                                "Failed to parse server message {}",
-                                                parse_error
-                                            );
-                                            if let Err(protocol_error) = do_shutdown(
-                                                &mut sink,
-                                                CloseCode::Protocol,
-                                                running_clone.clone(),
-                                            ) {
-                                                WebSocketError::ParserError {
-                                                    parse_error,
-                                                    shutdown_error: Some(protocol_error),
-                                                }
-                                            } else {
-                                                WebSocketError::ParserError {
-                                                    parse_error,
-                                                    shutdown_error: None,
-                                                }
-                                            }
-                                        })
-                                        .and_then(|message| {
-                                            handle_response(
-                                                &mut sink,
-                                                on_message(context.clone(), message),
-                                                running_clone.clone(),
-                                            )
-                                        });
+            debug!("response: {:?}", response);
 
-                                    if let Err(err) = result {
-                                        ConnectionStatus::UnexpectedClose(err)
-                                    } else {
-                                        ConnectionStatus::Open
-                                    }
-                                }
-                                WebSocketClientCmd::Frame(Frame::Ping(msg)) => {
-                                    trace!("Received Ping {:?} sending pong", msg);
-                                    if let Err(err) = handle_response(
-                                        &mut sink,
-                                        WsResponse::Pong(format!("{:?}", msg)),
-                                        running_clone.clone(),
-                                    ) {
-                                        ConnectionStatus::UnexpectedClose(err)
-                                    } else {
-                                        ConnectionStatus::Open
-                                    }
-                                }
-                                WebSocketClientCmd::Frame(Frame::Pong(msg)) => {
-                                    trace!("Received Pong {:?}", msg);
-                                    ConnectionStatus::Open
-                                }
-                                WebSocketClientCmd::Frame(Frame::Close(msg)) => {
-                                    debug!("Received close message {:?}", msg);
-                                    let result = do_shutdown(
-                                        &mut sink,
-                                        CloseCode::Normal,
-                                        running_clone.clone(),
-                                    )
-                                    .map_err(WebSocketError::from);
-                                    ConnectionStatus::Close(result)
-                                }
-                                WebSocketClientCmd::Stop => {
-                                    closed = true;
-                                    let result = do_shutdown(
-                                        &mut sink,
-                                        CloseCode::Normal,
-                                        running_clone.clone(),
-                                    )
-                                    .map_err(WebSocketError::from);
-                                    ConnectionStatus::Close(result)
-                                }
-                            };
+            let upgraded = response.into_body().on_upgrade().await?;
 
-                            if closed {
-                                future::ok(false)
-                            } else {
-                                match status {
-                                    ConnectionStatus::Open => future::ok(true),
-                                    ConnectionStatus::UnexpectedClose(_original_error) => {
-                                        if let Err(err) = context.try_reconnect() {
-                                            error!("Context returned an error  {}", err);
-                                        }
+            let codec = Codec::new().max_size(MAX_FRAME_SIZE).client_mode();
+            let framed = codec.framed(upgraded);
 
-                                        future::ok(false)
-                                    }
-                                    ConnectionStatus::Close(_res) => {
-                                        if let Err(err) = context.try_reconnect() {
-                                            error!("Context returned an error  {}", err);
-                                        }
-                                        future::ok(false)
-                                    }
+            let (mut sink, stream) = framed.split();
+
+            let mut source = stream::select(
+                stream.map(|result| WebSocketClientCmd::Frame(result.unwrap())),
+                cmd_receiver,
+            );
+
+            if handle_response(&mut sink, on_open(context.clone()), running_clone.clone())
+                .await
+                .is_err()
+            {
+                return Ok(());
+            }
+
+            context.ws_connected();
+
+            while let Some(message) = source.next().await {
+                let mut closed = false;
+                let status = match message {
+                    WebSocketClientCmd::Frame(Frame::Text(msg))
+                    | WebSocketClientCmd::Frame(Frame::Binary(msg)) => {
+                        let bytes = msg.to_vec();
+
+                        let result = match T::from_bytes(&bytes) {
+                            Ok(message) => {
+                                handle_response(
+                                    &mut sink,
+                                    on_message(context.clone(), message),
+                                    running_clone.clone(),
+                                )
+                                .await
+                            }
+                            Err(parse_error) => {
+                                error!("Failed to parse server message {}", parse_error);
+                                if let Err(shutdown_error) = do_shutdown(
+                                    &mut sink,
+                                    CloseCode::Protocol,
+                                    running_clone.clone(),
+                                )
+                                .await
+                                {
+                                    Err(WebSocketError::ParserError {
+                                        parse_error,
+                                        shutdown_error: Some(shutdown_error),
+                                    })
+                                } else {
+                                    Err(WebSocketError::ParserError {
+                                        parse_error,
+                                        shutdown_error: None,
+                                    })
                                 }
                             }
-                        })
-                        .for_each(|_| future::ok(())),
-                )
-            });
+                        };
+
+                        if let Err(err) = result {
+                            ConnectionStatus::UnexpectedClose(err)
+                        } else {
+                            ConnectionStatus::Open
+                        }
+                    }
+                    WebSocketClientCmd::Frame(Frame::Ping(msg)) => {
+                        trace!("Received Ping {:?} sending pong", msg);
+                        if let Err(err) = handle_response(
+                            &mut sink,
+                            WsResponse::Pong(format!("{:?}", msg)),
+                            running_clone.clone(),
+                        )
+                        .await
+                        {
+                            ConnectionStatus::UnexpectedClose(err)
+                        } else {
+                            ConnectionStatus::Open
+                        }
+                    }
+                    WebSocketClientCmd::Frame(Frame::Pong(msg)) => {
+                        trace!("Received Pong {:?}", msg);
+                        ConnectionStatus::Open
+                    }
+                    WebSocketClientCmd::Frame(Frame::Close(msg)) => {
+                        debug!("Received close message {:?}", msg);
+                        let result =
+                            do_shutdown(&mut sink, CloseCode::Normal, running_clone.clone())
+                                .await
+                                .map_err(WebSocketError::from);
+                        ConnectionStatus::Close(result)
+                    }
+                    WebSocketClientCmd::Frame(Frame::Continuation(msg)) => {
+                        trace!("Received Continuation Frame: {:?}", msg);
+                        ConnectionStatus::Open
+                    }
+                    WebSocketClientCmd::Stop => {
+                        closed = true;
+                        let result =
+                            do_shutdown(&mut sink, CloseCode::Normal, running_clone.clone())
+                                .await
+                                .map_err(WebSocketError::from);
+                        ConnectionStatus::Close(result)
+                    }
+                };
+
+                if closed {
+                    break;
+                } else {
+                    match status {
+                        ConnectionStatus::Open => continue,
+                        ConnectionStatus::UnexpectedClose(_original_error) => {
+                            if let Err(err) = context.try_reconnect() {
+                                error!("Context returned an error  {}", err);
+                            }
+
+                            break;
+                        }
+                        ConnectionStatus::Close(_res) => {
+                            if let Err(err) = context.try_reconnect() {
+                                error!("Context returned an error  {}", err);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Ok(())
+        };
 
         Ok(Listen {
             future: Box::pin(future),
@@ -422,54 +421,61 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
     }
 }
 
-fn handle_response(
-    wait_sink: &mut dyn Sink<ws::Message, Error = ws::ProtocolError>,
+async fn handle_response(
+    wait_sink: &mut SplitSink<Framed<Upgraded, Codec>, ws::Message>,
     res: WsResponse,
     running: Arc<AtomicBool>,
 ) -> Result<(), WebSocketError> {
     let outgoing = match res {
         WsResponse::Text(msg) => Message::Text(msg),
-        WsResponse::Bytes(bytes) => Message::Binary(bytes.as_slice().into()),
-        WsResponse::Pong(msg) => Message::Pong(msg),
+        WsResponse::Bytes(bytes) => {
+            //let bytes = bytes.as_slice().into().clone();
+            Message::Binary(Bytes::copy_from_slice(bytes.as_ref()))
+        }
+        WsResponse::Pong(msg) => Message::Pong(Bytes::copy_from_slice(msg.as_bytes())),
         WsResponse::Close => {
-            return do_shutdown(wait_sink, CloseCode::Normal, running).map_err(WebSocketError::from)
+            return do_shutdown(wait_sink, CloseCode::Normal, running)
+                .await
+                .map_err(WebSocketError::from);
         }
         WsResponse::Empty => return Ok(()),
     };
-    wait_sink
-        .send(outgoing)
-        .and_then(|_| wait_sink.flush())
-        .or_else(|protocol_error| {
-            error!("Error occurred while handling message {:?}", protocol_error);
-            if let Err(shutdown_error) = do_shutdown(wait_sink, CloseCode::Protocol, running) {
-                Err(WebSocketError::AbnormalShutdownError {
-                    protocol_error,
-                    shutdown_error,
-                })
-            } else {
-                Err(WebSocketError::from(protocol_error))
-            }
-        })
+
+    if let Err(protocol_error) = wait_sink.send(outgoing).await {
+        error!("Error occurred while handling message {:?}", protocol_error);
+        if let Err(shutdown_error) = do_shutdown(wait_sink, CloseCode::Protocol, running).await {
+            Err(WebSocketError::AbnormalShutdownError {
+                protocol_error,
+                shutdown_error,
+            })
+        } else {
+            Err(WebSocketError::from(protocol_error))
+        }
+    } else {
+        wait_sink.flush().await?;
+        Ok(())
+    }
 }
 
-fn do_shutdown(
-    blocking_sink: &mut dyn Sink<ws::Message, Error = ws::ProtocolError>,
+async fn do_shutdown(
+    blocking_sink: &mut SplitSink<Framed<Upgraded, Codec>, ws::Message>,
     close_code: CloseCode,
     running: Arc<AtomicBool>,
 ) -> Result<(), ws::ProtocolError> {
     debug!("Sending close to server");
 
     running.store(false, Ordering::SeqCst);
-    block_on(
-        blocking_sink
-            .send(Message::Close(Some(CloseReason::from(close_code))))
-            .and_then(|_| blocking_sink.flush())
-            .and_then(|_| {
-                debug!("Socket connection closed successfully");
-                blocking_sink.close()
-            })
-            .or_else(|_| blocking_sink.close()),
-    )
+
+    if blocking_sink
+        .send(Message::Close(Some(CloseReason::from(close_code))))
+        .await
+        .is_err()
+    {
+        blocking_sink.close().await
+    } else {
+        debug!("Socket connection closed successfully");
+        blocking_sink.close().await
+    }
 }
 
 /// Websocket context object. It contains an Igniter pointing
