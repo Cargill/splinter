@@ -19,13 +19,11 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use sabre_sdk::protocol::payload::CreateContractActionBuilder;
-use sawtooth_sdk::signing;
 use yaml_rust::YamlLoader;
 
 use crate::error::CliError;
-use crate::key;
-use crate::submit::submit_batch_list;
-use crate::transaction::{create_batch, create_batch_list_from_one, create_transaction};
+use crate::key::new_signer;
+use crate::submit::submit_batches;
 
 pub fn do_upload(
     filename: &str,
@@ -33,12 +31,6 @@ pub fn do_upload(
     url: &str,
     wasm_name: Option<&str>,
 ) -> Result<String, CliError> {
-    let private_key = key::load_signing_key(key_name)?;
-    let context = signing::create_context("secp256k1")?;
-    let public_key = context.get_public_key(&private_key)?.as_hex();
-    let factory = signing::CryptoFactory::new(&*context);
-    let signer = factory.new_signer(&private_key);
-
     let definition = ContractDefinition::load(filename)?;
 
     // Load the contract file relative to the directory containing the
@@ -59,20 +51,19 @@ pub fn do_upload(
 
     let contract = load_contract_file(contract_path_buf.as_path())?;
 
-    let payload = CreateContractActionBuilder::new()
+    let signer = new_signer(key_name)?;
+    let batch = CreateContractActionBuilder::new()
         .with_name(definition.name)
         .with_version(definition.version)
         .with_inputs(definition.inputs)
         .with_outputs(definition.outputs)
         .with_contract(contract)
         .into_payload_builder()?
-        .build()?;
+        .into_transaction_builder(&signer)?
+        .into_batch_builder(&signer)?
+        .build(&signer)?;
 
-    let txn = create_transaction(payload, &signer, &public_key)?;
-    let batch = create_batch(txn, &signer, &public_key)?;
-    let batch_list = create_batch_list_from_one(batch);
-
-    submit_batch_list(url, &batch_list)
+    submit_batches(url, vec![batch])
 }
 
 fn load_contract_file(path: &Path) -> Result<Vec<u8>, CliError> {
