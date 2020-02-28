@@ -40,20 +40,18 @@ ctrlc = "3.0"
 diesel = { version = "1.0.0", features = ["serde_json"] }
 flate2 = "1.0.10"
 flexi_logger = "0.14"
-futures = "0.1"
 gameroom-database = { path = "../database" }
-hyper = "0.12"
 log = "0.4"
 openssl = "0.10"
 percent-encoding = "2.0"
 protobuf = "2"
 sabre-sdk = "0.5"
 sawtooth-sdk = { version = "0.4", features = ["transact-compat"] }
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 splinter = { path = "../../../libsplinter", features = ["events"]}
-tokio = "0.1"
 transact = "0.2"
 uuid = { version = "0.7", features = ["v4"]}
 

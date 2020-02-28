@@ -22,9 +22,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
-use futures::future::{self, Future};
-use futures::stream::Stream;
-use hyper::{Body, Client, Request, StatusCode};
+use reqwest;
 use sabre_sdk::protocol::{
     compute_contract_address,
     payload::{
@@ -58,7 +56,7 @@ pub fn setup_xo(
     splinterd_url: &str,
     circuit_id: &str,
     service_id: &str,
-) -> Result<Box<dyn Future<Item = (), Error = ()> + Send + 'static>, AppAuthHandlerError> {
+) -> Result<(), AppAuthHandlerError> {
     let signer = new_signer(private_key)?;
 
     // The node with the first key in the list of scabbard admins is responsible for setting up xo
@@ -68,7 +66,7 @@ pub fn setup_xo(
         None => false,
     };
     if !is_submitter {
-        return Ok(Box::new(future::ok(())));
+        return Ok(());
     }
 
     // Create the transactions and batch them
@@ -82,56 +80,34 @@ pub fn setup_xo(
     let payload = vec![batch].into_bytes()?;
 
     // Submit the batch to the scabbard service
-    let body_stream = futures::stream::once::<_, std::io::Error>(Ok(payload));
-    let req = Request::builder()
-        .uri(format!(
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(&format!(
             "{}/scabbard/{}/{}/batches",
             splinterd_url, circuit_id, service_id
         ))
-        .method("POST")
         .header(
             "SplinterProtocolVersion",
             protocol::SCABBARD_PROTOCOL_VERSION.to_string(),
         )
-        .body(Body::wrap_stream(body_stream))
+        .body(payload)
+        .send()
         .map_err(|err| AppAuthHandlerError::BatchSubmitError(format!("{}", err)))?;
 
-    let client = Client::new();
+    let status = response.status().as_u16();
 
-    Ok(Box::new(
-        client
-            .request(req)
-            .then(|response| match response {
-                Ok(res) => {
-                    let status = res.status();
-                    let body = res
-                        .into_body()
-                        .concat2()
-                        .wait()
-                        .map_err(|err| {
-                            AppAuthHandlerError::BatchSubmitError(format!(
-                                "The client encountered an error {}",
-                                err
-                            ))
-                        })?
-                        .to_vec();
+    if status != 202 {
+        let body = response
+            .text()
+            .map_err(|err| AppAuthHandlerError::BatchSubmitError(format!("{}", err)))?;
 
-                    match status {
-                        StatusCode::ACCEPTED => Ok(()),
-                        _ => Err(AppAuthHandlerError::BatchSubmitError(format!(
-                            "The server returned an error. Status: {}, {}",
-                            status,
-                            String::from_utf8(body)?
-                        ))),
-                    }
-                }
-                Err(err) => Err(AppAuthHandlerError::BatchSubmitError(format!(
-                    "The client encountered an error {}",
-                    err
-                ))),
-            })
-            .map_err(|_| ()),
-    ))
+        return Err(AppAuthHandlerError::BatchSubmitError(format!(
+            "The server returned an error. Status: {}, {}",
+            body, status,
+        )));
+    }
+
+    Ok(())
 }
 
 fn new_signer(private_key: &str) -> Result<TransactSigner, AppAuthHandlerError> {

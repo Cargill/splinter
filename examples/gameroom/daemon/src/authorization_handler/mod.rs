@@ -423,23 +423,16 @@ fn process_admin_event(
 
             let url_to_string = url.to_string();
             let private_key_to_string = private_key.to_string();
-            xo_ws.on_open(move |ctx| {
+            xo_ws.on_open(move |_| {
                 debug!("Starting XO State Delta Export");
-                let future = match setup_xo(
+
+                if let Err(err) = setup_xo(
                     &private_key_to_string,
                     scabbard_admin_keys.clone(),
                     &url_to_string,
                     &msg_proposal.circuit_id.clone(),
                     &service_id.clone(),
                 ) {
-                    Ok(f) => f,
-                    Err(err) => {
-                        error!("{}", err);
-                        return WsResponse::Close;
-                    }
-                };
-
-                if let Err(err) = ctx.igniter().send(future) {
                     error!("Failed to setup scabbard: {}", err);
                     WsResponse::Close
                 } else {
