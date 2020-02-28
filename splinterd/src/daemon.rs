@@ -442,9 +442,7 @@ impl SplinterDaemon {
                 error!("Unable to cleanly shut down Admin service: {}", err);
             }
 
-            if let Err(err) = rest_api_shutdown_handle.shutdown() {
-                error!("Unable to cleanly shut down REST API server: {}", err);
-            }
+            rest_api_shutdown_handle.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
 

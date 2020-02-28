@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use splinter::actix_web::{web, Error, HttpRequest, HttpResponse};
-use splinter::futures::{Future, IntoFuture};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Status {
@@ -22,28 +21,18 @@ struct Status {
     version: String,
 }
 
-pub fn get_status(
-    node_id: String,
-    endpoint: String,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+pub fn get_status(node_id: String, endpoint: String) -> Result<HttpResponse, Error> {
     let status = Status {
         node_id,
         endpoint,
         version: get_version(),
     };
 
-    Box::new(HttpResponse::Ok().json(status).into_future())
+    Ok(HttpResponse::Ok().json(status))
 }
 
-pub fn get_openapi(
-    _: HttpRequest,
-    _: web::Payload,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(
-        HttpResponse::Ok()
-            .body(include_str!("../../api/static/openapi.yml"))
-            .into_future(),
-    )
+pub fn get_openapi(_: HttpRequest, _: web::Payload) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok().body(include_str!("../../api/static/openapi.yml")))
 }
 
 fn get_version() -> String {
