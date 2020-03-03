@@ -119,5 +119,6 @@ RUN rm \
     target/release/deps/private_counter* \
     target/release/deps/private_xo* \
     target/release/deps/splinter_cli* \
-    target/release/deps/splinterd*
+    target/release/deps/splinterd* \
+    Cargo.lock
 
