@@ -12,14 +12,6 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Create tables
-CREATE TABLE IF NOT EXISTS gameroom_user (
-  email                     TEXT        PRIMARY KEY,
-  public_key                TEXT        NOT NULL,
-  encrypted_private_key     TEXT        NOT NULL,
-  hashed_password           TEXT        NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS  gameroom (
   circuit_id                TEXT        PRIMARY KEY,
   authorization_type        TEXT        NOT NULL,

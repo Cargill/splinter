@@ -18,15 +18,6 @@
 use super::schema::*;
 use std::time::SystemTime;
 
-#[derive(Insertable, Queryable)]
-#[table_name = "gameroom_user"]
-pub struct GameroomUser {
-    pub email: String,
-    pub public_key: String,
-    pub encrypted_private_key: String,
-    pub hashed_password: String,
-}
-
 #[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
 #[table_name = "gameroom"]
 #[primary_key(circuit_id)]
