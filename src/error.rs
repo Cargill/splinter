@@ -54,8 +54,8 @@ impl std::fmt::Display for CliError {
         match *self {
             CliError::UserError(ref s) => write!(f, "Error: {}", s),
             CliError::IoError(ref err) => write!(f, "IoError: {}", err),
-            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err.description()),
-            CliError::HyperError(ref err) => write!(f, "HyperError: {}", err.description()),
+            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err),
+            CliError::HyperError(ref err) => write!(f, "HyperError: {}", err),
             CliError::ProtocolBuildError(ref err) => write!(f, "Protocol Error: {}", err),
             CliError::ProtoConversionError(ref err) => write!(f, "Proto Conversion Error: {}", err),
         }
