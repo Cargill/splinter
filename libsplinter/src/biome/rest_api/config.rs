@@ -29,7 +29,7 @@ pub struct BiomeRestConfig {
     /// Duration of JWT tokens issued by this service
     access_token_duration: Duration,
     #[cfg(feature = "biome-credentials")]
-    /// Cost for encripting users password
+    /// Cost for encrypting user's password
     password_encryption_cost: PasswordEncryptionCost,
 }
 
