@@ -118,54 +118,61 @@ impl RestResourceProvider for BiomeRestResourceManager {
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(all(
-            feature = "biome-credentials",
-            feature = "rest-api-actix",
-            feature = "json-web-tokens"
-        ))]
         match &self.credentials_store {
             Some(credentials_store) => {
-                resources.push(make_register_route(
-                    credentials_store.clone(),
-                    self.user_store.clone(),
-                    self.rest_config.clone(),
-                ));
-                resources.push(make_login_route(
-                    credentials_store.clone(),
-                    self.rest_config.clone(),
-                    Arc::new(AccessTokenIssuer::new(
+                #[cfg(all(
+                    feature = "biome-credentials",
+                    feature = "json-web-tokens",
+                    feature = "rest-api-actix",
+                ))]
+                {
+                    resources.push(make_user_routes(
+                        self.rest_config.clone(),
                         self.token_secret_manager.clone(),
-                        self.refresh_token_secret_manager.clone(),
-                    )),
-                ));
-                resources.push(make_user_routes(
-                    self.rest_config.clone(),
-                    self.token_secret_manager.clone(),
-                    credentials_store.clone(),
-                    self.user_store.clone(),
-                ));
-                resources.push(make_list_route(credentials_store.clone()));
-                resources.push(make_verify_route(
-                    credentials_store.clone(),
-                    self.rest_config.clone(),
-                    self.token_secret_manager.clone(),
-                ));
-            }
-            None => {
-                debug!(
-                    "Credentials store not provided. Credentials REST API resources will not be'
-                ' included in the biome endpoints."
-                );
-            }
-        };
-        #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
-        match &self.credentials_store {
-            Some(credentials_store) => {
-                resources.push(make_register_route(
-                    credentials_store.clone(),
-                    self.user_store.clone(),
-                    self.rest_config.clone(),
-                ));
+                        credentials_store.clone(),
+                        self.user_store.clone(),
+                    ));
+                    resources.push(make_list_route(credentials_store.clone()));
+                    resources.push(make_verify_route(
+                        credentials_store.clone(),
+                        self.rest_config.clone(),
+                        self.token_secret_manager.clone(),
+                    ));
+                    #[cfg(not(feature = "biome-refresh-tokens"))]
+                    {
+                        resources.push(make_login_route(
+                            credentials_store.clone(),
+                            self.rest_config.clone(),
+                            Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
+                        ));
+                    }
+                }
+                #[cfg(all(
+                    feature = "biome-credentials",
+                    feature = "biome-refresh-tokens",
+                    feature = "json-web-tokens",
+                    feature = "rest-api-actix",
+                ))]
+                {
+                    resources.push(make_login_route(
+                        credentials_store.clone(),
+                        self.refresh_token_store.clone(),
+                        self.rest_config.clone(),
+                        Arc::new(AccessTokenIssuer::new(
+                            self.token_secret_manager.clone(),
+                            self.refresh_token_secret_manager.clone(),
+                        )),
+                    ));
+                }
+
+                #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
+                {
+                    resources.push(make_register_route(
+                        credentials_store.clone(),
+                        self.user_store.clone(),
+                        self.rest_config.clone(),
+                    ));
+                }
             }
             None => {
                 debug!(
