@@ -836,7 +836,9 @@ paths:
                     type: string
                     example: "User created successfully"
                   data:
-                    ref: '#/components/schemas/BiomeNewUser'
+                    type: object
+                    example:
+                      ref: '#/components/schemas/BiomeNewUser'
         400:
           description: Invalid request
           content:
