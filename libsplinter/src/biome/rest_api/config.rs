@@ -97,17 +97,19 @@ impl BiomeRestConfigBuilder {
         if self.issuer.is_none() {
             debug!("Using default value for issuer");
         }
-        let issuer = self.issuer.unwrap_or_default();
+        let issuer = self.issuer.unwrap_or_else(|| DEFAULT_ISSUER.to_string());
 
         if self.access_token_duration.is_none() {
             debug!("Using default value for access_token_duration");
         }
-        let access_token_duration = self.access_token_duration.unwrap_or_default();
+        let access_token_duration = self
+            .access_token_duration
+            .unwrap_or_else(|| Duration::from_secs(DEFAULT_DURATION));
 
         #[cfg(feature = "biome-credentials")]
         let password_encryption_cost: PasswordEncryptionCost = self
             .password_encryption_cost
-            .unwrap_or_default()
+            .unwrap_or_else(|| "high".to_string())
             .parse()
             .map_err(BiomeRestConfigBuilderError::InvalidValue)?;
 
