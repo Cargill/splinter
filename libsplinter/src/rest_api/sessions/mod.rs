@@ -42,3 +42,13 @@ pub(crate) fn default_validation(issuer: &str) -> Validation {
     validation.iss = Some(issuer.to_string());
     validation
 }
+
+/// Validates authorization token but ignores the expiration date
+#[cfg(feature = "biome-refresh-tokens")]
+pub(crate) fn ignore_exp_validation(issuer: &str) -> Validation {
+    let mut validation = Validation::default();
+    validation.leeway = DEFAULT_LEEWAY;
+    validation.iss = Some(issuer.to_string());
+    validation.validate_exp = false;
+    validation
+}

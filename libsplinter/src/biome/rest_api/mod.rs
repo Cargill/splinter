@@ -76,6 +76,13 @@ pub use error::BiomeRestResourceManagerBuilderError;
 use self::actix::register::make_register_route;
 #[cfg(all(
     feature = "biome-credentials",
+    feature = "biome-refresh-tokens",
+    feature = "json-web-tokens",
+    feature = "rest-api-actix"
+))]
+use self::actix::token::make_token_route;
+#[cfg(all(
+    feature = "biome-credentials",
     feature = "rest-api-actix",
     feature = "json-web-tokens"
 ))]
@@ -162,6 +169,16 @@ impl RestResourceProvider for BiomeRestResourceManager {
                             self.token_secret_manager.clone(),
                             self.refresh_token_secret_manager.clone(),
                         )),
+                    ));
+                    resources.push(make_token_route(
+                        self.refresh_token_store.clone(),
+                        self.token_secret_manager.clone(),
+                        self.refresh_token_secret_manager.clone(),
+                        Arc::new(AccessTokenIssuer::new(
+                            self.token_secret_manager.clone(),
+                            self.refresh_token_secret_manager.clone(),
+                        )),
+                        self.rest_config.clone(),
                     ));
                 }
 

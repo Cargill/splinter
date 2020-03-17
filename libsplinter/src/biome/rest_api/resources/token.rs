@@ -12,16 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides structures for the REST resources.
-
-#[cfg(all(
-    feature = "json-web-tokens",
-    any(feature = "biome-key-management", feature = "biome-credentials")
-))]
-pub(in crate::biome::rest_api) mod authorize;
-#[cfg(feature = "biome-credentials")]
-pub(in crate::biome::rest_api) mod credentials;
-#[cfg(feature = "biome-key-management")]
-pub(in crate::biome::rest_api) mod key_management;
-#[cfg(feature = "biome-refresh-tokens")]
-pub(in crate::biome::rest_api) mod token;
+#[derive(Deserialize)]
+pub struct RefreshToken {
+    pub token: String,
+}
