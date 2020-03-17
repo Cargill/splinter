@@ -78,7 +78,7 @@ where
     extra_validation(claims)
 }
 
-fn default_validation(issuer: &str) -> Validation {
+pub(crate) fn default_validation(issuer: &str) -> Validation {
     let mut validation = Validation::default();
     validation.leeway = DEFAULT_LEEWAY;
     validation.iss = Some(issuer.to_string());
