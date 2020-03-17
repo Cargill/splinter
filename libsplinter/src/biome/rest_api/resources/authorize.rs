@@ -14,8 +14,10 @@
 
 //! Defines results from user authorization.
 
+use crate::rest_api::sessions::Claims;
+
 pub(crate) enum AuthorizationResult {
-    Authorized,
+    Authorized(Claims),
     Unauthorized(String),
     Failed,
 }

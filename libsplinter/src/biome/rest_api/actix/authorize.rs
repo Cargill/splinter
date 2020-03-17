@@ -14,21 +14,21 @@
 
 use std::sync::Arc;
 
+use jsonwebtoken::{decode, Validation};
+
 use crate::actix_web::HttpRequest;
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
-use crate::biome::rest_api::BiomeRestConfig;
 use crate::rest_api::get_authorization_token;
 use crate::rest_api::secrets::SecretManager;
-use crate::rest_api::sessions::{validate_token, TokenValidationError};
+use crate::rest_api::sessions::Claims;
 
 /// Verifies the user has the correct permissions
 pub(crate) fn authorize_user(
     request: &HttpRequest,
-    user_id: &str,
     secret_manager: &Arc<dyn SecretManager>,
-    rest_config: &BiomeRestConfig,
+    validation: &Validation,
 ) -> AuthorizationResult {
-    let auth_token = match get_authorization_token(&request) {
+    let token = match get_authorization_token(&request) {
         Ok(token) => token,
         Err(err) => {
             debug!("Failed to get token: {}", err);
@@ -36,6 +36,14 @@ pub(crate) fn authorize_user(
         }
     };
 
+    validate_claims(&token, secret_manager, validation)
+}
+
+pub(crate) fn validate_claims(
+    token: &str,
+    secret_manager: &Arc<dyn SecretManager>,
+    validation: &Validation,
+) -> AuthorizationResult {
     let secret = match secret_manager.secret() {
         Ok(secret) => secret,
         Err(err) => {
@@ -44,18 +52,11 @@ pub(crate) fn authorize_user(
         }
     };
 
-    if let Err(err) = validate_token(&auth_token, &secret, &rest_config.issuer(), |claim| {
-        if user_id != claim.user_id() {
-            return Err(TokenValidationError::InvalidClaim(format!(
-                "User is not update keys for user {}",
-                user_id
-            )));
+    match decode::<Claims>(&token, secret.as_ref(), validation) {
+        Ok(claims) => AuthorizationResult::Authorized(claims.claims),
+        Err(err) => {
+            debug!("Invalid token: {}", err);
+            AuthorizationResult::Unauthorized("User is not authorized".to_string())
         }
-        Ok(())
-    }) {
-        debug!("Invalid token: {}", err);
-        return AuthorizationResult::Unauthorized("User is not authorized".to_string());
-    };
-
-    AuthorizationResult::Authorized
+    }
 }

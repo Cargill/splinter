@@ -17,8 +17,10 @@ use std::sync::Arc;
 use crate::actix_web::HttpResponse;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::secrets::SecretManager;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    into_bytes, secrets::SecretManager, sessions::default_validation, ErrorResponse, Method,
+    ProtocolVersionRangeGuard, Resource,
+};
 
 use crate::biome::credentials::store::{
     diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
@@ -88,8 +90,9 @@ pub fn make_verify_route(
                         }
                     };
 
-                match authorize_user(&request, &credentials.user_id, &secret_manager, &rest_config) {
-                    AuthorizationResult::Authorized => {
+                let validation = default_validation(&rest_config.issuer());
+                match authorize_user(&request, &secret_manager, &validation) {
+                    AuthorizationResult::Authorized(_) => {
                         match credentials.verify_password(&username_password.hashed_password) {
                             Ok(true) => {
                                     HttpResponse::Ok()
