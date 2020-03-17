@@ -72,15 +72,15 @@ pub fn validate_token<F>(
 where
     F: Fn(Claims) -> Result<(), TokenValidationError>,
 {
-    let validation = default_validation(DEFAULT_LEEWAY, issuer);
+    let validation = default_validation(issuer);
     let claims = decode::<Claims>(&token, secret.as_ref(), &validation)?.claims;
 
     extra_validation(claims)
 }
 
-fn default_validation(leeway: i64, issuer: &str) -> Validation {
+fn default_validation(issuer: &str) -> Validation {
     let mut validation = Validation::default();
-    validation.leeway = leeway;
+    validation.leeway = DEFAULT_LEEWAY;
     validation.iss = Some(issuer.to_string());
     validation
 }
