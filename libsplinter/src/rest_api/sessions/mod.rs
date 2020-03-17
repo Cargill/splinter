@@ -31,8 +31,10 @@ const DEFAULT_LEEWAY: i64 = 10; // default leeway in seconds.
 pub trait TokenIssuer<T: Serialize> {
     /// Issues a JWT token with the given claims
     fn issue_token_with_claims(&self, claims: T) -> Result<String, TokenIssuerError>;
-}
 
+    #[cfg(feature = "biome-refresh-tokens")]
+    fn issue_refresh_token_with_claims(&self, claims: T) -> Result<String, TokenIssuerError>;
+}
 
 pub(crate) fn default_validation(issuer: &str) -> Validation {
     let mut validation = Validation::default();

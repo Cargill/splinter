@@ -102,6 +102,8 @@ pub struct BiomeRestResourceManager {
     #[allow(dead_code)]
     #[cfg(feature = "json-web-tokens")]
     token_secret_manager: Arc<dyn SecretManager>,
+    #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
+    refresh_token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Option<Arc<SplinterCredentialsStore>>,
 }
@@ -127,7 +129,10 @@ impl RestResourceProvider for BiomeRestResourceManager {
                 resources.push(make_login_route(
                     credentials_store.clone(),
                     self.rest_config.clone(),
-                    Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
+                    Arc::new(AccessTokenIssuer::new(
+                        self.token_secret_manager.clone(),
+                        self.refresh_token_secret_manager.clone(),
+                    )),
                 ));
                 resources.push(make_user_routes(
                     self.rest_config.clone(),
@@ -195,6 +200,8 @@ pub struct BiomeRestResourceManagerBuilder {
     rest_config: Option<BiomeRestConfig>,
     #[cfg(feature = "json-web-tokens")]
     token_secret_manager: Option<Arc<dyn SecretManager>>,
+    #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
+    refresh_token_secret_manager: Option<Arc<dyn SecretManager>>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Option<SplinterCredentialsStore>,
 }
@@ -252,11 +259,26 @@ impl BiomeRestResourceManagerBuilder {
     ///
     /// * `secret_manager`: the SecretManager to be used for fetching and generating secrets to
     ///   sign and verify JWT tokens
-    pub fn set_token_secret_manager(
+    pub fn with_token_secret_manager(
         mut self,
         secret_manager: impl SecretManager + 'static,
     ) -> BiomeRestResourceManagerBuilder {
         self.token_secret_manager = Some(Arc::new(secret_manager));
+        self
+    }
+
+    /// Sets a SecretManager for the refresh tokens for the BiomeRestResourceManager
+    ///
+    /// # Arguments
+    ///
+    /// * `secret_manager`: the SecretManager to be used for fetching and generating secrets to
+    ///   sign and verify JWT tokens
+    #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
+    pub fn with_refresh_token_secret_manager(
+        mut self,
+        secret_manager: impl SecretManager + 'static,
+    ) -> BiomeRestResourceManagerBuilder {
+        self.refresh_token_secret_manager = Some(Arc::new(secret_manager));
         self
     }
 
@@ -287,6 +309,12 @@ impl BiomeRestResourceManagerBuilder {
             Arc::new(AutoSecretManager::default())
         });
 
+        #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
+        let refresh_token_secret_manager = self.refresh_token_secret_manager.unwrap_or_else(|| {
+            debug!("Building BiomeRestResourceManager with default token SecretManager.");
+            Arc::new(AutoSecretManager::default())
+        });
+
         Ok(BiomeRestResourceManager {
             user_store,
             #[cfg(all(feature = "biome-key-management", feature = "json-web-tokens"))]
@@ -294,6 +322,8 @@ impl BiomeRestResourceManagerBuilder {
             rest_config: Arc::new(rest_config),
             #[cfg(feature = "json-web-tokens")]
             token_secret_manager,
+            #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
+            refresh_token_secret_manager,
             #[cfg(feature = "biome-credentials")]
             credentials_store: match self.credentials_store {
                 Some(credentials_store) => Some(Arc::new(credentials_store)),
