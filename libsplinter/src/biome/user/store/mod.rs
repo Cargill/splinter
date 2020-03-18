@@ -94,3 +94,117 @@ pub trait UserStore<T> {
     ///
     fn list_users(&self) -> Result<Vec<T>, UserStoreError>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[derive(Clone)]
+    struct MockUser {
+        pub id: String,
+    }
+
+    struct MockUserStore {
+        users: HashMap<String, MockUser>,
+    }
+
+    impl MockUserStore {
+        fn new() -> Self {
+            MockUserStore {
+                users: HashMap::new(),
+            }
+        }
+    }
+
+    impl UserStore<MockUser> for MockUserStore {
+        fn add_user(&mut self, user: MockUser) -> Result<(), UserStoreError> {
+            self.users.insert(user.id.clone(), user);
+            Ok(())
+        }
+
+        fn update_user(&mut self, updated_user: MockUser) -> Result<(), UserStoreError> {
+            self.users.insert(updated_user.id.clone(), updated_user);
+            Ok(())
+        }
+
+        fn remove_user(&mut self, id: &str) -> Result<(), UserStoreError> {
+            self.users.remove(id);
+            Ok(())
+        }
+
+        fn fetch_user(&self, id: &str) -> Result<MockUser, UserStoreError> {
+            Ok(self.users.get(id).map(MockUser::clone).unwrap())
+        }
+
+        fn list_users(&self) -> Result<Vec<MockUser>, UserStoreError> {
+            Ok(self.users.iter().map(|(_, user)| user.clone()).collect())
+        }
+    }
+
+    #[test]
+    fn test_add_user() {
+        let user = MockUser {
+            id: "user_1".to_string(),
+        };
+
+        let mut store = MockUserStore::new();
+
+        assert!(store.add_user(user).is_ok());
+    }
+
+    #[test]
+    fn test_update_user() {
+        let mut user = MockUser {
+            id: "user_1".to_string(),
+        };
+        let mut store = MockUserStore::new();
+        store.add_user(user.clone()).unwrap();
+
+        user.id = "user_update".to_string();
+
+        assert!(store.update_user(user).is_ok());
+    }
+
+    #[test]
+    fn test_fetch_user() {
+        let user = MockUser {
+            id: "user_1".to_string(),
+        };
+        let mut store = MockUserStore::new();
+        store.add_user(user.clone()).unwrap();
+        let store_user = store.fetch_user("user_1").unwrap();
+
+        assert_eq!(user.id, store_user.id);
+    }
+
+    #[test]
+    fn test_list_user() {
+        let user = MockUser {
+            id: "user_1".to_string(),
+        };
+        let mut store = MockUserStore::new();
+        store.add_user(user.clone()).unwrap();
+        let store_users = store.list_users().unwrap();
+
+        assert_eq!(user.id, store_users[0].id);
+    }
+
+    #[test]
+    fn test_remove_user() {
+        let user = MockUser {
+            id: "user_1".to_string(),
+        };
+        let mut store = MockUserStore::new();
+        store.add_user(user.clone()).unwrap();
+        let store_user = store.fetch_user("user_1").unwrap();
+
+        assert_eq!(user.id, store_user.id);
+
+        store.remove_user("user_1").unwrap();
+
+        let user_count = store.list_users().unwrap().len();
+
+        assert_eq!(0, user_count);
+    }
+}
