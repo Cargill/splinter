@@ -59,3 +59,29 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockUpdateUser;
+
+    impl UserStoreUpdateUserOperation for MockUpdateUser {
+        fn update_user(&self, _: SplinterUser) -> Result<(), UserStoreError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_update_user() {
+        let user = SplinterUser {
+            id: String::from("this_is_an_id"),
+        };
+
+        let mock = MockUpdateUser {};
+
+        let result = mock.update_user(user).unwrap();
+
+        assert_eq!((), result);
+    }
+}

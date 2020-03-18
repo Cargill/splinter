@@ -48,3 +48,29 @@ where
         Ok(users)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockListUsers;
+
+    impl UserStoreListUsersOperation for MockListUsers {
+        fn list_users(&self) -> Result<Vec<SplinterUser>, UserStoreError> {
+            Ok(vec![SplinterUser {
+                id: "this_is_an_id".to_string(),
+            }])
+        }
+    }
+
+    #[test]
+    fn test_list_user() {
+        let user_id = String::from("this_is_an_id");
+
+        let mock = MockListUsers {};
+
+        let users = mock.list_users().unwrap();
+
+        assert_eq!(user_id, users[0].id);
+    }
+}

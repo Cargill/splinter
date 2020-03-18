@@ -45,3 +45,29 @@ where
         Ok(SplinterUser::from(user))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockFetchUser;
+
+    impl UserStoreFetchUserOperation for MockFetchUser {
+        fn fetch_user(&self, _: &str) -> Result<SplinterUser, UserStoreError> {
+            Ok(SplinterUser {
+                id: "this_is_an_id".to_string(),
+            })
+        }
+    }
+
+    #[test]
+    fn test_fetch_user() {
+        let user_id = String::from("this_is_an_id");
+
+        let mock = MockFetchUser {};
+
+        let user = mock.fetch_user(&user_id).unwrap();
+
+        assert_eq!(user_id, user.id);
+    }
+}

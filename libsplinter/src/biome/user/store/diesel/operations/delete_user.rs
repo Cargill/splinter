@@ -56,3 +56,27 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockDeleteUser;
+
+    impl UserStoreDeleteUserOperation for MockDeleteUser {
+        fn delete_user(&self, _: &str) -> Result<(), UserStoreError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_delete_user() {
+        let user_id = String::from("this_is_an_id");
+
+        let mock = MockDeleteUser {};
+
+        let result = mock.delete_user(&user_id).unwrap();
+
+        assert_eq!((), result);
+    }
+}

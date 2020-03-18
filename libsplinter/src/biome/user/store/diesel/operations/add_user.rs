@@ -40,3 +40,29 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockAddUser;
+
+    impl UserStoreAddUserOperation for MockAddUser {
+        fn add_user(&self, _: UserModel) -> Result<(), UserStoreError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_add_user() {
+        let user_model = UserModel {
+            id: "this_is_an_id".to_string(),
+        };
+
+        let mock = MockAddUser {};
+
+        let result = mock.add_user(user_model).unwrap();
+
+        assert_eq!((), result);
+    }
+}
