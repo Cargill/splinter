@@ -1144,9 +1144,16 @@ paths:
                 new_password:
                   description: |
                     Hash of the new password to be used for user authentication
+                new_key_pairs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BiomeNewUserKey'
               required:
                 - username
                 - hashed_password
+                - display_name
+                - public_key
+                - encrypted_private_key
               example:
                 username: alice@acme.com
                 hashed_password: |-
@@ -1161,9 +1168,19 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "User updated successfully"
+                    example: "Credentials and key updated successfully"
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BiomeUserKey'
         400:
           description: Invalid request
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+        401:
+          description: Unauthorized request
           content:
             application/json:
                 schema:
@@ -1806,6 +1823,23 @@ components:
           type: string
           description: "Internal unique identifier for the user"
           example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
+
+    BiomeNewUserKey:
+      type: object
+      properties:
+        display_name:
+          type: string
+          description: "Display name for key"
+          example: "Biome Admin Key"
+        encrypted_private_key:
+          type: string
+          description: "Encrypted private key"
+          example: "XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
+            riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
+        public_key:
+          type: string
+          description: "Public key"
+          example: "026c889058c2d22558ead2c61b321634b74e705c42f890e6b7bc2c80abb4713118"
 
     BiomeCredentials:
       type: object

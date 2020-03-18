@@ -14,7 +14,6 @@
 
 use std::sync::Arc;
 
-use super::authorize::authorize_user;
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{
     diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
@@ -22,14 +21,24 @@ use crate::biome::credentials::store::{
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore, UserStoreError};
+use crate::biome::user::store::{diesel::DieselUserStore, UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
     into_bytes, sessions::default_validation, ErrorResponse, HandlerFunction, Method,
     ProtocolVersionRangeGuard, Resource,
 };
+
+#[cfg(feature = "biome-key-management")]
+use crate::biome::key_management::{
+    store::{KeyStore, KeyStoreError},
+    Key,
+};
+use crate::rest_api::secrets::SecretManager;
+
+use crate::biome::rest_api::actix::authorize::authorize_user;
+#[cfg(feature = "biome-key-management")]
+use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<SplinterCredentialsStore>) -> Resource {
@@ -52,12 +61,14 @@ pub fn make_list_route(credentials_store: Arc<SplinterCredentialsStore>) -> Reso
         })
 }
 
+#[cfg(feature = "biome-key-management")]
 /// Defines the `/biome/users/{id}` REST resource for managing users
 pub fn make_user_routes(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     credentials_store: Arc<SplinterCredentialsStore>,
     user_store: DieselUserStore,
+    key_store: Arc<dyn KeyStore<Key>>,
 ) -> Resource {
     Resource::build("/biome/users/{id}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
@@ -66,7 +77,12 @@ pub fn make_user_routes(
         ))
         .add_method(
             Method::Put,
-            add_modify_user_method(credentials_store.clone(), user_store.clone()),
+            add_modify_user_method(
+                credentials_store.clone(),
+                rest_config.clone(),
+                secret_manager.clone(),
+                key_store,
+            ),
         )
         .add_method(Method::Get, add_fetch_user_method(credentials_store))
         .add_method(
@@ -111,32 +127,52 @@ fn add_fetch_user_method(credentials_store: Arc<SplinterCredentialsStore>) -> Ha
     })
 }
 
+#[cfg(feature = "biome-key-management")]
 /// Defines a REST endpoint to edit a user's credentials in the database
 ///
 /// The payload should be in the JSON format:
 ///   {
 ///       "username": <existing username of the user>
 ///       "hashed_password": <hash of the user's existing password>
-///       "new_password": OPTIONAL <hash of the user's updated password>
+///       "new_password": <hash of the user's updated password>
+///       "new_key_pairs":
+///       [
+///           {
+///               "display_name": <display name for key>
+///               "public_key": <public key of the user>
+///               "encrypted_private_key": <updated encrypted private key of the the user>
+///           },
+///           { ... }, { ... }, ...
+///       ]
 ///   }
 fn add_modify_user_method(
     credentials_store: Arc<SplinterCredentialsStore>,
-    user_store: DieselUserStore,
+    rest_config: Arc<BiomeRestConfig>,
+    secret_manager: Arc<dyn SecretManager>,
+    key_store: Arc<dyn KeyStore<Key>>,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let credentials_store = credentials_store.clone();
-        let mut user_store = user_store.clone();
-        let user_id = if let Some(t) = request.match_info().get("id") {
-            t.to_string()
-        } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request(
-                        &"Failed to parse payload: no user id".to_string(),
-                    ))
-                    .into_future(),
-            );
+        let key_store = key_store.clone();
+        let validation = default_validation(&rest_config.issuer());
+        let user_id = match authorize_user(&request, &secret_manager, &validation) {
+            AuthorizationResult::Authorized(claims) => claims.user_id(),
+            AuthorizationResult::Unauthorized(msg) => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized(&msg))
+                        .into_future(),
+                )
+            }
+            AuthorizationResult::Failed => {
+                return Box::new(
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future(),
+                );
+            }
         };
+
         Box::new(into_bytes(payload).and_then(move |bytes| {
             let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
                 Ok(val) => val,
@@ -162,6 +198,28 @@ fn add_modify_user_method(
                         .into_future();
                 }
             };
+            let new_key_pairs: Vec<Key> = match serde_json::from_slice::<Vec<NewKey>>(&bytes) {
+                Ok(val) => val,
+                Err(err) => {
+                    debug!("Error parsing payload {}", err);
+                    return HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(&format!(
+                            "Failed to parse payload: {}",
+                            err
+                        )))
+                        .into_future();
+                }
+            }
+            .iter()
+            .map(|new_key| {
+                Key::new(
+                    &new_key.public_key,
+                    &new_key.encrypted_private_key,
+                    &user_id,
+                    &new_key.display_name,
+                )
+            })
+            .collect::<Vec<Key>>();
 
             let credentials =
                 match credentials_store.fetch_credential_by_username(&username_password.username) {
@@ -185,61 +243,50 @@ fn add_modify_user_method(
                         }
                     }
                 };
-            let splinter_user = User::new(&user_id);
             match credentials.verify_password(&username_password.hashed_password) {
-                Ok(is_valid) => {
-                    if is_valid {
-                        let new_password = match body.get("new_password") {
-                            Some(val) => match val.as_str() {
-                                Some(val) => val,
-                                None => &username_password.hashed_password,
-                            },
+                Ok(true) => {
+                    let new_password = match body.get("new_password") {
+                        Some(val) => match val.as_str() {
+                            Some(val) => val,
                             None => &username_password.hashed_password,
-                        };
+                        },
+                        None => &username_password.hashed_password,
+                    };
 
-                        match user_store.update_user(splinter_user) {
-                            Ok(()) => {
-                                match credentials_store.update_credentials(
-                                    &user_id,
-                                    &username_password.username,
-                                    &new_password,
-                                ) {
-                                    Ok(()) => HttpResponse::Ok()
-                                        .json(json!({ "message": "User updated successfully" }))
-                                        .into_future(),
-                                    Err(err) => {
-                                        debug!("Failed to update credentials in database {}", err);
-                                        match err {
-                                            CredentialsStoreError::DuplicateError(err) => {
-                                                HttpResponse::BadRequest()
-                                                    .json(ErrorResponse::bad_request(&format!(
-                                                        "Failed to update user: {}",
-                                                        err
-                                                    )))
-                                                    .into_future()
-                                            }
-                                            _ => HttpResponse::InternalServerError()
-                                                .json(ErrorResponse::internal_error())
-                                                .into_future(),
-                                        }
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                debug!("Failed to update user in database {}", err);
-                                HttpResponse::InternalServerError()
-                                    .json(ErrorResponse::internal_error())
-                                    .into_future()
-                            }
-                        }
-                    } else {
-                        HttpResponse::BadRequest()
-                            .json(ErrorResponse::bad_request("Invalid password"))
-                            .into_future()
+                    let response_keys = new_key_pairs
+                        .iter()
+                        .map(ResponseKey::from)
+                        .collect::<Vec<ResponseKey>>();
+
+                    match key_store.update_keys_and_password(
+                        &user_id,
+                        &new_password,
+                        &new_key_pairs,
+                    ) {
+                        Ok(()) => HttpResponse::Ok()
+                            .json(json!({
+                                "message": "Credentials and key updated successfully",
+                                "data": response_keys,
+                            }))
+                            .into_future(),
+                        Err(err) => match err {
+                            KeyStoreError::DuplicateKeyError(msg) => HttpResponse::BadRequest()
+                                .json(ErrorResponse::bad_request(&msg))
+                                .into_future(),
+                            KeyStoreError::UserDoesNotExistError(msg) => HttpResponse::BadRequest()
+                                .json(ErrorResponse::bad_request(&msg))
+                                .into_future(),
+                            _ => HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                                .into_future(),
+                        },
                     }
                 }
+                Ok(false) => HttpResponse::BadRequest()
+                    .json(ErrorResponse::bad_request("Invalid password"))
+                    .into_future(),
                 Err(err) => {
-                    debug!("Failed to verify password {}", err);
+                    error!("Failed to verify password {}", err);
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
                         .into_future()
