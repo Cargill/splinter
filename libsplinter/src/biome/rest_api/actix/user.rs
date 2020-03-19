@@ -14,10 +14,12 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::{web::Payload, Error, HttpRequest, HttpResponse};
+use crate::actix_web::{web::Payload, Error, HttpResponse};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource,
+};
 
 use crate::biome::credentials::store::{
     diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
@@ -93,10 +95,10 @@ pub fn make_user_routes(
 /// Defines a REST endpoint to fetch a user from the database
 /// returns the user's ID and username
 fn add_fetch_user_method(
-    request: HttpRequest,
+    request: Request,
     credentials_store: Arc<SplinterCredentialsStore>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let user_id = if let Some(t) = request.match_info().get("id") {
+    let user_id = if let Some(t) = request.path_parameter("id") {
         t.to_string()
     } else {
         return Box::new(
@@ -135,12 +137,12 @@ fn add_fetch_user_method(
 ///       "new_password": OPTIONAL <hash of the user's updated password>
 ///   }
 fn add_modify_user_method(
-    request: HttpRequest,
+    request: Request,
     payload: Payload,
     credentials_store: Arc<SplinterCredentialsStore>,
     mut user_store: SplinterUserStore,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let user_id = if let Some(t) = request.match_info().get("id") {
+    let user_id = if let Some(t) = request.path_parameter("id") {
         t.to_string()
     } else {
         return Box::new(
@@ -264,12 +266,12 @@ fn add_modify_user_method(
 
 /// Defines a REST endpoint to delete a user from the database
 fn add_delete_user_method(
-    request: HttpRequest,
+    request: Request,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     mut user_store: SplinterUserStore,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let user_id = if let Some(t) = request.match_info().get("id") {
+    let user_id = if let Some(t) = request.path_parameter("id") {
         t.to_string()
     } else {
         return Box::new(

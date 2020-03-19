@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use splinter::actix_web::{web, Error, HttpRequest, HttpResponse};
+use splinter::actix_web::{Error, HttpResponse};
 use splinter::futures::{Future, IntoFuture};
+use splinter::rest_api::Request;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Status {
@@ -36,7 +37,7 @@ pub fn get_status(
 }
 
 pub fn get_openapi(
-    _: HttpRequest,
+    _: Request,
     _: web::Payload,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(

@@ -15,13 +15,13 @@
 //! Provides the `GET /admin/proposals/{circuit_id} endpoint for fetching circuit proposals by
 //! circuit ID.
 
-use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use actix_web::{error::BlockingError, web, Error, HttpResponse};
 use futures::Future;
 
 use crate::admin::rest_api::error::ProposalFetchError;
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource};
 
 use super::super::resources::proposals_circuit_id::ProposalResponse;
 
@@ -37,12 +37,11 @@ pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store:
 }
 
 fn fetch_proposal<PS: ProposalStore + 'static>(
-    request: HttpRequest,
+    request: Request,
     proposal_store: web::Data<PS>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let circuit_id = request
-        .match_info()
-        .get("circuit_id")
+        .path_parameter("circuit_id")
         .unwrap_or("")
         .to_string();
     Box::new(

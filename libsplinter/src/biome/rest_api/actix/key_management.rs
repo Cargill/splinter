@@ -73,7 +73,7 @@ fn handle_post(
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
+        let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
             None => {
                 error!("User ID is not in path request");
@@ -155,7 +155,7 @@ fn handle_get(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
+        let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
             None => {
                 error!("User ID is not in path request");
@@ -211,7 +211,7 @@ fn handle_patch(
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
+        let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
             None => {
                 error!("User ID is not in path request");
@@ -312,7 +312,7 @@ fn handle_fetch(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
+        let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
             None => {
                 error!("User ID is not in path request");
@@ -326,7 +326,7 @@ fn handle_fetch(
             }
         };
 
-        let public_key = match request.match_info().get("public_key") {
+        let public_key = match request.path_parameter("public_key") {
             Some(id) => id.to_owned(),
             None => {
                 error!("Public key is not in path request");
@@ -394,7 +394,7 @@ fn handle_delete(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
+        let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
             None => {
                 error!("User ID is not in path request");
@@ -408,7 +408,7 @@ fn handle_delete(
             }
         };
 
-        let public_key = match request.match_info().get("public_key") {
+        let public_key = match request.path_parameter("public_key") {
             Some(id) => id.to_owned(),
             None => {
                 error!("Public key is not in path request");

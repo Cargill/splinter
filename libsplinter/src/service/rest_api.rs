@@ -14,15 +14,15 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
+use crate::actix_web::{web, Error as ActixError, HttpResponse};
 use crate::futures::Future;
-use crate::rest_api::{Continuation, Method, RequestGuard};
+use crate::rest_api::{Continuation, Method, Request, RequestGuard};
 
 use super::Service;
 
 type Handler = Arc<
     dyn Fn(
-            HttpRequest,
+            Request,
             web::Payload,
             &dyn Service,
         ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
@@ -62,7 +62,7 @@ impl Clone for Box<dyn ServiceRequestGuard> {
 }
 
 impl RequestGuard for Box<dyn ServiceRequestGuard> {
-    fn evaluate(&self, req: &HttpRequest) -> Continuation {
+    fn evaluate(&self, req: &Request) -> Continuation {
         (**self).evaluate(req)
     }
 }

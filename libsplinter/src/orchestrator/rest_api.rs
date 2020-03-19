@@ -44,14 +44,10 @@ impl RestResourceProvider for ServiceOrchestrator {
                         let service_type = endpoint.service_type;
                         let handler = endpoint.handler;
                         resource_builder.add_method(endpoint.method, move |request, payload| {
-                            let circuit = request
-                                .match_info()
-                                .get("circuit")
-                                .unwrap_or("")
-                                .to_string();
+                            let circuit =
+                                request.path_parameter("circuit").unwrap_or("").to_string();
                             let service_id = request
-                                .match_info()
-                                .get("service_id")
+                                .path_parameter("service_id")
                                 .unwrap_or("")
                                 .to_string();
 

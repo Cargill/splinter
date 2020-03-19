@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{web, HttpResponse};
+use actix_web::HttpResponse;
 use futures::IntoFuture;
-use std::collections::HashMap;
 use std::time;
 
 use crate::admin::messages::AdminServiceEvent;
@@ -33,7 +32,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |request, payload| {
-            let circuit_management_type = if let Some(t) = request.match_info().get("type") {
+            let circuit_management_type = if let Some(t) = request.path_parameter("type") {
                 t.to_string()
             } else {
                 return Box::new(HttpResponse::BadRequest().finish().into_future());
@@ -43,15 +42,14 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                 circuit_management_type
             );
 
-            let mut query =
-                match web::Query::<HashMap<String, u64>>::from_query(request.query_string()) {
-                    Ok(query) => query,
-                    Err(_) => return Box::new(HttpResponse::BadRequest().finish().into_future()),
-                };
+            let since_millis_opt = match request.query_parameter("last").map(str::parse).transpose()
+            {
+                Ok(opt) => opt,
+                Err(_) => return Box::new(HttpResponse::BadRequest().finish().into_future()),
+            };
 
-            let (skip, last_seen_timestamp) = query
-                .remove("last")
-                .map(|since_millis| {
+            let (skip, last_seen_timestamp) = match since_millis_opt {
+                Some(since_millis) => {
                     // Since this is the last seen event, we will skip it in our since
                     // query
                     debug!("Catching up on events since {}", since_millis);
@@ -59,8 +57,9 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                         1usize,
                         time::SystemTime::UNIX_EPOCH + time::Duration::from_millis(since_millis),
                     )
-                })
-                .unwrap_or((0, time::SystemTime::UNIX_EPOCH));
+                }
+                None => (0, time::SystemTime::UNIX_EPOCH),
+            };
 
             let initial_events = match admin_commands
                 .get_events_since(&last_seen_timestamp, &circuit_management_type)
@@ -75,7 +74,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                 }
             };
 
-            match new_websocket_event_sender(request, payload, Box::new(initial_events.skip(skip)))
+            match new_websocket_event_sender(&request, payload, Box::new(initial_events.skip(skip)))
             {
                 Ok((sender, res)) => {
                     if let Err(err) = admin_commands.add_event_subscriber(

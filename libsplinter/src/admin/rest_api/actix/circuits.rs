@@ -15,15 +15,14 @@
 //! This module provides the `GET /admin/circuits` endpoint for listing the definitions of circuits
 //! in Splinter's state.
 
-use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use actix_web::{error::BlockingError, web, Error, HttpResponse};
 use futures::{future::IntoFuture, Future};
-use std::collections::HashMap;
 
 use crate::circuit::store::{CircuitFilter, CircuitStore};
 use crate::protocol;
 use crate::rest_api::{
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
+    ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource,
 };
 
 use super::super::error::CircuitListError;
@@ -41,21 +40,10 @@ pub fn make_list_circuits_resource<T: CircuitStore + 'static>(store: T) -> Resou
 }
 
 fn list_circuits<T: CircuitStore + 'static>(
-    req: HttpRequest,
+    req: Request,
     store: web::Data<T>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let query: web::Query<HashMap<String, String>> =
-        if let Ok(q) = web::Query::from_query(req.query_string()) {
-            q
-        } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request("Invalid query"))
-                    .into_future(),
-            );
-        };
-
-    let offset = match query.get("offset") {
+    let offset = match req.query_parameter("offset") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
@@ -72,7 +60,7 @@ fn list_circuits<T: CircuitStore + 'static>(
         None => DEFAULT_OFFSET,
     };
 
-    let limit = match query.get("limit") {
+    let limit = match req.query_parameter("limit") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
@@ -89,9 +77,9 @@ fn list_circuits<T: CircuitStore + 'static>(
         None => DEFAULT_LIMIT,
     };
 
-    let mut link = req.uri().path().to_string();
+    let mut link = req.path().to_string();
 
-    let filters = match query.get("filter") {
+    let filters = match req.query_parameter("filter") {
         Some(value) => {
             link.push_str(&format!("?filter={}&", value));
             Some(value.to_string())

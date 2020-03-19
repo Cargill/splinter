@@ -14,7 +14,7 @@
 
 //! Routes for key registry operations
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use serde::Serializer;
@@ -84,7 +84,7 @@ fn make_fetch_key_resource(key_registry: Box<dyn KeyRegistry>) -> Resource {
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |req, _| {
-            let public_key = match parse_hex(req.match_info().get("public_key").unwrap_or("")) {
+            let public_key = match parse_hex(req.path_parameter("public_key").unwrap_or("")) {
                 Ok(public_key) => public_key,
                 Err(err_msg) => {
                     return Box::new(
@@ -119,20 +119,7 @@ fn make_list_key_resources(key_registry: Box<dyn KeyRegistry>) -> Resource {
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |req, _| {
-            let query: web::Query<HashMap<String, String>> =
-                if let Ok(q) = web::Query::from_query(req.query_string()) {
-                    q
-                } else {
-                    return Box::new(
-                        HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": "Invalid query"
-                            }))
-                            .into_future(),
-                    );
-                };
-
-            let offset = match query.get("offset") {
+            let offset = match req.query_parameter("offset") {
                 Some(value) => match value.parse::<usize>() {
                     Ok(val) => val,
                     Err(err) => {
@@ -149,7 +136,7 @@ fn make_list_key_resources(key_registry: Box<dyn KeyRegistry>) -> Resource {
                 None => DEFAULT_OFFSET,
             };
 
-            let limit = match query.get("limit") {
+            let limit = match req.query_parameter("limit") {
                 Some(value) => match value.parse::<usize>() {
                     Ok(val) => val,
                     Err(err) => {
@@ -166,7 +153,7 @@ fn make_list_key_resources(key_registry: Box<dyn KeyRegistry>) -> Resource {
                 None => DEFAULT_LIMIT,
             };
 
-            let link = format!("{}?", req.uri().path());
+            let link = format!("{}?", req.path());
             let registry = web::Data::new(key_registry.clone());
 
             Box::new(

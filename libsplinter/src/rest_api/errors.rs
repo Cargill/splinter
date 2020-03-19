@@ -89,3 +89,20 @@ impl From<ActixError> for ResponseError {
         ResponseError::ActixError(err)
     }
 }
+
+#[derive(Debug)]
+pub(super) enum RequestBuilderError {
+    MissingRequiredField(String),
+}
+
+impl Error for RequestBuilderError {}
+
+impl fmt::Display for RequestBuilderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RequestBuilderError::MissingRequiredField(field) => {
+                write!(f, "Required field is missing: {}", field)
+            }
+        }
+    }
+}

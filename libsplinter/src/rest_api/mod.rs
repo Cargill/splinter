@@ -51,6 +51,8 @@
 //!     .run();
 //! ```
 
+#[cfg(feature = "rest-api-actix")]
+mod actix_impl;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
 mod errors;
@@ -62,9 +64,13 @@ pub mod secrets;
 #[cfg(feature = "json-web-tokens")]
 pub mod sessions;
 
+use std::collections::BTreeMap;
+
+#[cfg(feature = "rest-api-actix")]
+use actix_web::HttpRequest as ActixRequest;
 use actix_web::{
-    error::ErrorBadRequest, http::header, middleware, web, App, Error as ActixError, HttpRequest,
-    HttpResponse, HttpServer,
+    error::ErrorBadRequest, http::header, middleware, web, App, Error as ActixError, HttpResponse,
+    HttpServer,
 };
 use futures::{stream::Stream, Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
@@ -73,6 +79,7 @@ use std::boxed::Box;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
+use errors::RequestBuilderError;
 pub use errors::{ResponseError, RestApiServerError};
 
 pub use events::{new_websocket_event_sender, EventSender};
@@ -100,11 +107,115 @@ pub trait RestResourceProvider {
 }
 
 pub type HandlerFunction = Box<
-    dyn Fn(HttpRequest, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+    dyn Fn(Request, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
         + Send
         + Sync
         + 'static,
 >;
+
+#[derive(Clone, Debug)]
+pub struct Request {
+    path: String,
+    headers: BTreeMap<String, String>,
+    path_parameters: BTreeMap<String, String>,
+    query_parameters: BTreeMap<String, String>,
+    // This field is required by the Actix implementation of WebSocket subscription, since the
+    // `actix_web_actors::ws::start` function takes the Actix request as an argument.
+    #[cfg(feature = "rest-api-actix")]
+    actix_request: ActixRequest,
+}
+
+impl Request {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn headers(&self) -> &BTreeMap<String, String> {
+        &self.headers
+    }
+
+    pub fn header(&self, header: &str) -> Option<&str> {
+        self.headers.get(header).map(String::as_str)
+    }
+
+    pub fn path_parameters(&self) -> &BTreeMap<String, String> {
+        &self.path_parameters
+    }
+
+    pub fn path_parameter(&self, param: &str) -> Option<&str> {
+        self.path_parameters.get(param).map(String::as_str)
+    }
+
+    pub fn query_parameters(&self) -> &BTreeMap<String, String> {
+        &self.query_parameters
+    }
+
+    pub fn query_parameter(&self, param: &str) -> Option<&str> {
+        self.query_parameters.get(param).map(String::as_str)
+    }
+
+    #[cfg(feature = "rest-api-actix")]
+    pub fn actix_request(&self) -> &ActixRequest {
+        &self.actix_request
+    }
+}
+
+#[derive(Default)]
+struct RequestBuilder {
+    path: Option<String>,
+    headers: Option<BTreeMap<String, String>>,
+    path_parameters: Option<BTreeMap<String, String>>,
+    query_parameters: Option<BTreeMap<String, String>>,
+    #[cfg(feature = "rest-api-actix")]
+    actix_request: Option<ActixRequest>,
+}
+
+impl RequestBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_path(mut self, path: String) -> Self {
+        self.path = Some(path);
+        self
+    }
+
+    pub fn with_headers(mut self, headers: BTreeMap<String, String>) -> Self {
+        self.headers = Some(headers);
+        self
+    }
+
+    pub fn with_path_parameters(mut self, path_parameters: BTreeMap<String, String>) -> Self {
+        self.path_parameters = Some(path_parameters);
+        self
+    }
+
+    pub fn with_query_parameters(mut self, query_parameters: BTreeMap<String, String>) -> Self {
+        self.query_parameters = Some(query_parameters);
+        self
+    }
+
+    #[cfg(feature = "rest-api-actix")]
+    pub fn with_actix_request(mut self, actix_request: ActixRequest) -> Self {
+        self.actix_request = Some(actix_request);
+        self
+    }
+
+    pub fn build(self) -> Result<Request, RequestBuilderError> {
+        Ok(Request {
+            path: self
+                .path
+                .ok_or_else(|| RequestBuilderError::MissingRequiredField("path".into()))?,
+            headers: self.headers.unwrap_or_default(),
+            path_parameters: self.path_parameters.unwrap_or_default(),
+            query_parameters: self.query_parameters.unwrap_or_default(),
+            #[cfg(feature = "rest-api-actix")]
+            actix_request: self
+                .actix_request
+                .ok_or_else(|| RequestBuilderError::MissingRequiredField("actix_request".into()))?,
+        })
+    }
+}
 
 /// Shutdown handle returned by `RestApi::run`. Allows rest api instance to be shut down
 /// gracefully.
@@ -169,10 +280,7 @@ impl Resource {
     #[deprecated(note = "Please use the `build` and `add_method` methods instead")]
     pub fn new<F>(method: Method, route: &str, handle: F) -> Self
     where
-        F: Fn(
-                HttpRequest,
-                web::Payload,
-            ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+        F: Fn(Request, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
             + 'static,
@@ -190,10 +298,7 @@ impl Resource {
 
     pub fn add_method<F>(mut self, method: Method, handle: F) -> Self
     where
-        F: Fn(
-                HttpRequest,
-                web::Payload,
-            ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+        F: Fn(Request, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
             + 'static,
@@ -209,12 +314,12 @@ impl Resource {
     /// # Example
     ///
     /// ```
-    /// use splinter::rest_api::{Resource, Method, Continuation};
-    /// use actix_web::{HttpRequest, HttpResponse};
+    /// use splinter::rest_api::{Request, Resource, Method, Continuation};
+    /// use actix_web::HttpResponse;
     /// use futures::IntoFuture;
     ///
     /// Resource::build("/index")
-    ///     .add_request_guard(|r: &HttpRequest| {
+    ///     .add_request_guard(|r: &Request| {
     ///         if !r.headers().contains_key("GuardFlag") {
     ///             Continuation::terminate(
     ///                 HttpResponse::BadRequest().finish().into_future(),
@@ -252,7 +357,7 @@ impl Resource {
         allowed_methods += ", OPTIONS";
 
         resource = resource.route(web::route().guard(actix_web::guard::Options()).to(
-            move |_: HttpRequest| {
+            move |_: Request| {
                 HttpResponse::Ok()
                     .header(header::ALLOW, allowed_methods.clone())
                     .finish()
@@ -264,7 +369,7 @@ impl Resource {
             .into_iter()
             .fold(resource, |resource, (method, handler)| {
                 let guards = request_guards.clone();
-                let func = move |r: HttpRequest, p: web::Payload| {
+                let func = move |r: Request, p: web::Payload| {
                     // This clone satisfies a requirement that this be FnOnce
                     if !guards.is_empty() {
                         for guard in guards.clone() {
@@ -310,20 +415,20 @@ impl Continuation {
 pub trait RequestGuard: Send + Sync {
     /// Evaluates the request and determines whether or not the request should be continued or
     /// short-circuited with a terminating future.
-    fn evaluate(&self, req: &HttpRequest) -> Continuation;
+    fn evaluate(&self, req: &Request) -> Continuation;
 }
 
 impl<F> RequestGuard for F
 where
-    F: Fn(&HttpRequest) -> Continuation + Sync + Send,
+    F: Fn(&Request) -> Continuation + Sync + Send,
 {
-    fn evaluate(&self, req: &HttpRequest) -> Continuation {
+    fn evaluate(&self, req: &Request) -> Continuation {
         (*self)(req)
     }
 }
 
 impl RequestGuard for Box<dyn RequestGuard> {
-    fn evaluate(&self, req: &HttpRequest) -> Continuation {
+    fn evaluate(&self, req: &Request) -> Continuation {
         (**self).evaluate(req)
     }
 }
@@ -346,21 +451,11 @@ impl ProtocolVersionRangeGuard {
 }
 
 impl RequestGuard for ProtocolVersionRangeGuard {
-    fn evaluate(&self, req: &HttpRequest) -> Continuation {
-        if let Some(header_value) = req.headers().get("SplinterProtocolVersion") {
-            let parsed_header = header_value
-                .to_str()
-                .map_err(|err| {
-                    format!(
-                        "Invalid characters in SplinterProtocolVersion header: {}",
-                        err
-                    )
-                })
-                .and_then(|val_str| {
-                    val_str.parse::<u32>().map_err(|_| {
-                        "SplinterProtocolVersion must be a valid positive integer".to_string()
-                    })
-                });
+    fn evaluate(&self, req: &Request) -> Continuation {
+        if let Some(header_value) = req.header("SplinterProtocolVersion") {
+            let parsed_header = header_value.parse::<u32>().map_err(|_| {
+                "SplinterProtocolVersion must be a valid positive integer".to_string()
+            });
             match parsed_header {
                 Err(msg) => Continuation::terminate(
                     HttpResponse::BadRequest()
@@ -590,7 +685,7 @@ mod test {
     #[test]
     fn test_resource() {
         Resource::build("/test")
-            .add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
+            .add_method(Method::Get, |_: Request, _: web::Payload| {
                 Box::new(Response::Ok().finish().into_future())
             })
             .into_route();
@@ -599,10 +694,10 @@ mod test {
     #[test]
     fn test_resource_with_guard() {
         Resource::build("/test-guarded")
-            .add_request_guard(|_: &HttpRequest| {
+            .add_request_guard(|_: &Request| {
                 Continuation::terminate(Response::BadRequest().finish().into_future())
             })
-            .add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
+            .add_method(Method::Get, |_: Request, _: web::Payload| {
                 Box::new(Response::Ok().finish().into_future())
             })
             .into_route();

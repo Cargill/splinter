@@ -13,14 +13,13 @@
 
 //! Provides the `GET /admin/proposals` endpoint for listing circuit proposals.
 
-use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use actix_web::{error::BlockingError, web, Error, HttpResponse};
 use futures::{future::IntoFuture, Future};
-use std::collections::HashMap;
 
 use crate::admin::service::proposal_store::{ProposalFilter, ProposalStore};
 use crate::protocol;
 use crate::rest_api::paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET};
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource};
 
 use super::super::error::ProposalListError;
 use super::super::resources::proposals::{ListProposalsResponse, ProposalResponse};
@@ -37,21 +36,10 @@ pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store:
 }
 
 fn list_proposals<PS: ProposalStore + 'static>(
-    req: HttpRequest,
+    req: Request,
     proposal_store: web::Data<PS>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let query: web::Query<HashMap<String, String>> =
-        if let Ok(q) = web::Query::from_query(req.query_string()) {
-            q
-        } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request("Invalid query"))
-                    .into_future(),
-            );
-        };
-
-    let offset = match query.get("offset") {
+    let offset = match req.query_parameter("offset") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
@@ -68,7 +56,7 @@ fn list_proposals<PS: ProposalStore + 'static>(
         None => DEFAULT_OFFSET,
     };
 
-    let limit = match query.get("limit") {
+    let limit = match req.query_parameter("limit") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
@@ -86,16 +74,18 @@ fn list_proposals<PS: ProposalStore + 'static>(
     };
 
     let mut new_queries = vec![];
-    let management_type_filter = query.get("management_type").map(|management_type| {
-        new_queries.push(format!("management_type={}", management_type));
-        management_type.to_string()
-    });
-    let member_filter = query.get("member").map(|member| {
+    let management_type_filter = req
+        .query_parameter("management_type")
+        .map(|management_type| {
+            new_queries.push(format!("management_type={}", management_type));
+            management_type.to_string()
+        });
+    let member_filter = req.query_parameter("member").map(|member| {
         new_queries.push(format!("member={}", member));
         member.to_string()
     });
 
-    let mut link = req.uri().path().to_string();
+    let mut link = req.path().to_string();
     if !new_queries.is_empty() {
         link.push_str(&format!("?{}&", new_queries.join("&")));
     }

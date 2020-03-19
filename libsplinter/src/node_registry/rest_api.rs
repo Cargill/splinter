@@ -14,12 +14,12 @@
 
 use std::collections::HashMap;
 
-use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use crate::actix_web::{error::BlockingError, web, Error, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
 use crate::rest_api::{
     paging::{get_response_paging_info, Paging, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    percent_encode_filter_query, Method, ProtocolVersionRangeGuard, Resource,
+    percent_encode_filter_query, Method, ProtocolVersionRangeGuard, Request, Resource,
 };
 
 use super::{
@@ -76,17 +76,13 @@ where
 }
 
 fn fetch_node<NR>(
-    request: HttpRequest,
+    request: Request,
     registry: web::Data<NR>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
 where
     NR: NodeRegistryReader + 'static,
 {
-    let identity = request
-        .match_info()
-        .get("identity")
-        .unwrap_or("")
-        .to_string();
+    let identity = request.path_parameter("identity").unwrap_or("").to_string();
     Box::new(
         web::block(move || registry.fetch_node(&identity)).then(|res| match res {
             Ok(node) => Ok(HttpResponse::Ok().json(node)),
@@ -102,18 +98,14 @@ where
 }
 
 fn put_node<NW>(
-    request: HttpRequest,
+    request: Request,
     payload: web::Payload,
     registry: web::Data<NW>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
 where
     NW: NodeRegistryWriter + 'static,
 {
-    let path_identity = request
-        .match_info()
-        .get("identity")
-        .unwrap_or("")
-        .to_string();
+    let path_identity = request.path_parameter("identity").unwrap_or("").to_string();
     Box::new(
         payload
             .from_err::<Error>()
@@ -165,17 +157,13 @@ where
 }
 
 fn delete_node<NW>(
-    request: HttpRequest,
+    request: Request,
     registry: web::Data<NW>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
 where
     NW: NodeRegistryWriter + 'static,
 {
-    let identity = request
-        .match_info()
-        .get("identity")
-        .unwrap_or("")
-        .to_string();
+    let identity = request.path_parameter("identity").unwrap_or("").to_string();
     Box::new(
         web::block(move || registry.delete_node(&identity)).then(|res| match res {
             Ok(_) => Ok(HttpResponse::Ok().finish()),
@@ -191,26 +179,13 @@ where
 }
 
 fn list_nodes<NR>(
-    req: HttpRequest,
+    req: Request,
     registry: web::Data<NR>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
 where
     NR: NodeRegistryReader + 'static,
 {
-    let query: web::Query<HashMap<String, String>> =
-        if let Ok(q) = web::Query::from_query(req.query_string()) {
-            q
-        } else {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(json!({
-                        "message": "Invalid query"
-                    }))
-                    .into_future(),
-            );
-        };
-
-    let offset = match query.get("offset") {
+    let offset = match req.query_parameter("offset") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
@@ -227,7 +202,7 @@ where
         None => DEFAULT_OFFSET,
     };
 
-    let limit = match query.get("limit") {
+    let limit = match req.query_parameter("limit") {
         Some(value) => match value.parse::<usize>() {
             Ok(val) => val,
             Err(err) => {
@@ -244,9 +219,9 @@ where
         None => DEFAULT_LIMIT,
     };
 
-    let mut link = format!("{}?", req.uri().path());
+    let mut link = format!("{}?", req.path());
 
-    let filters = match query.get("filter") {
+    let filters = match req.query_parameter("filter") {
         Some(value) => match serde_json::from_str(value) {
             Ok(val) => {
                 link.push_str(&format!("filter={}&", percent_encode_filter_query(value)));

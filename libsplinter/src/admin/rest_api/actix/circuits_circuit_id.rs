@@ -15,12 +15,12 @@
 //! This module provides the `GET /admin/circuits/{circuit_id} endpoint for fetching the
 //! definition of a circuit in Splinter's state by its circuit ID.
 
-use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use actix_web::{error::BlockingError, web, Error, HttpResponse};
 use futures::Future;
 
 use crate::circuit::store::CircuitStore;
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource};
 
 use super::super::error::CircuitFetchError;
 use super::super::resources::circuits_circuit_id::CircuitResponse;
@@ -37,12 +37,11 @@ pub fn make_fetch_circuit_resource<T: CircuitStore + 'static>(store: T) -> Resou
 }
 
 fn fetch_circuit<T: CircuitStore + 'static>(
-    request: HttpRequest,
+    request: Request,
     store: web::Data<T>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let circuit_id = request
-        .match_info()
-        .get("circuit_id")
+        .path_parameter("circuit_id")
         .unwrap_or("")
         .to_string();
     Box::new(

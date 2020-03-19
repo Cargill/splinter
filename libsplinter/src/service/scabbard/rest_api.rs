@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -67,21 +66,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            let mut query =
-                match web::Query::<HashMap<String, String>>::from_query(request.query_string()) {
-                    Ok(query) => query,
-                    Err(_) => {
-                        return Box::new(
-                            HttpResponse::BadRequest()
-                                .json(json!({
-                                    "message": "Invalid query"
-                                }))
-                                .into_future(),
-                        )
-                    }
-                };
-
-            let last_seen_event_id = query.remove("last_seen_event");
+            let last_seen_event_id = request.query_parameter("last_seen_event").map(String::from);
 
             match last_seen_event_id {
                 Some(ref id) if id.trim().is_empty() => {
@@ -109,7 +94,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            match new_websocket_event_sender(request, payload, Box::new(unseen_events)) {
+            match new_websocket_event_sender(&request, payload, Box::new(unseen_events)) {
                 Ok((sender, res)) => {
                     if let Err(err) =
                         scabbard.add_state_subscriber(Box::new(WsStateSubscriber { sender }))
@@ -227,20 +212,8 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
                 }
             }
             .clone();
-            let query: web::Query<HashMap<String, String>> =
-                if let Ok(q) = web::Query::from_query(req.query_string()) {
-                    q
-                } else {
-                    return Box::new(
-                        HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": "Invalid query"
-                            }))
-                            .into_future(),
-                    );
-                };
 
-            let ids = if let Some(ids) = query.get("ids") {
+            let ids = if let Some(ids) = req.query_parameter("ids") {
                 ids.split(',').map(String::from).collect()
             } else {
                 return Box::new(
@@ -252,10 +225,10 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
                 );
             };
 
-            let wait = query
-                .get("wait")
+            let wait = req
+                .query_parameter("wait")
                 .and_then(|wait_str| {
-                    if wait_str.as_str() == "false" {
+                    if wait_str == "false" {
                         None
                     } else {
                         wait_str
@@ -319,8 +292,7 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
             };
 
             let address = request
-                .match_info()
-                .get("address")
+                .path_parameter("address")
                 .expect("address should not be none");
 
             Box::new(match scabbard.get_state_at_address(address) {
@@ -368,20 +340,7 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            let query: web::Query<HashMap<String, String>> =
-                if let Ok(q) = web::Query::from_query(request.query_string()) {
-                    q
-                } else {
-                    return Box::new(
-                        HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": "Invalid query"
-                            }))
-                            .into_future(),
-                    );
-                };
-
-            let prefix = query.get("prefix").map(String::as_str);
+            let prefix = request.query_parameter("prefix");
 
             Box::new(match scabbard.get_state_with_prefix(prefix) {
                 Ok(state_iter) => {
