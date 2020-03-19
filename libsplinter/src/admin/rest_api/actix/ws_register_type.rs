@@ -21,7 +21,7 @@ use crate::admin::messages::AdminServiceEvent;
 use crate::admin::service::{AdminCommands, AdminServiceEventSubscriber, AdminSubscriberError};
 use crate::protocol;
 use crate::rest_api::{
-    new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request, Resource,
+    new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Resource,
 };
 
 pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 'static>(
@@ -75,8 +75,8 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                 }
             };
 
-            let request = Request::from((request, payload));
-            match new_websocket_event_sender(request, Box::new(initial_events.skip(skip))) {
+            match new_websocket_event_sender(request, payload, Box::new(initial_events.skip(skip)))
+            {
                 Ok((sender, res)) => {
                     if let Err(err) = admin_commands.add_event_subscriber(
                         &circuit_management_type,

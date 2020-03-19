@@ -16,6 +16,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use actix::prelude::*;
+use actix_web::{web::Payload, HttpRequest, HttpResponse};
 use actix_web_actors::ws::{self, CloseCode, CloseReason};
 use futures::{
     stream::{iter_ok, Stream},
@@ -24,18 +25,17 @@ use futures::{
 use serde::ser::Serialize;
 use serde_json;
 
-use crate::rest_api::{errors::ResponseError, Request, Response};
+use crate::rest_api::errors::ResponseError;
 
 /// Wait time in seconds between ping messages being sent by the ws server to the ws client
 const PING_INTERVAL: u64 = 30;
 
 pub fn new_websocket_event_sender<T: Serialize + Debug>(
-    req: Request,
+    request: HttpRequest,
+    payload: Payload,
     initial_events: Box<dyn Iterator<Item = T> + Send>,
-) -> Result<(EventSender<T>, Response), ResponseError> {
+) -> Result<(EventSender<T>, HttpResponse), ResponseError> {
     let (sender, recv) = unbounded();
-
-    let (request, payload) = req.into();
 
     let stream = iter_ok::<_, ()>(initial_events.map(MessageWrapper::Message)).chain(recv);
 
@@ -46,7 +46,7 @@ pub fn new_websocket_event_sender<T: Serialize + Debug>(
     )
     .map_err(ResponseError::from)?;
 
-    Ok((EventSender { sender }, Response::from(res)))
+    Ok((EventSender { sender }, res))
 }
 
 #[derive(Clone)]

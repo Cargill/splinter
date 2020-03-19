@@ -22,9 +22,7 @@ use transact::protos::FromBytes;
 use crate::actix_web::{web, Error as ActixError, HttpResponse};
 use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::{
-    new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request,
-};
+use crate::rest_api::{new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard};
 use crate::service::rest_api::ServiceEndpoint;
 
 use super::error::StateSubscriberError;
@@ -111,8 +109,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            let request = Request::from((request, payload));
-            match new_websocket_event_sender(request, Box::new(unseen_events)) {
+            match new_websocket_event_sender(request, payload, Box::new(unseen_events)) {
                 Ok((sender, res)) => {
                     if let Err(err) =
                         scabbard.add_state_subscriber(Box::new(WsStateSubscriber { sender }))

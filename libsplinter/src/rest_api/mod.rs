@@ -66,7 +66,7 @@ use actix_web::{
     error::ErrorBadRequest, http::header, middleware, web, App, Error as ActixError, HttpRequest,
     HttpResponse, HttpServer,
 };
-use futures::{future::FutureResult, stream::Stream, Future, IntoFuture};
+use futures::{stream::Stream, Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
 use protobuf::{self, Message};
 use std::boxed::Box;
@@ -115,44 +115,6 @@ pub struct RestApiShutdownHandle {
 impl RestApiShutdownHandle {
     pub fn shutdown(&self) -> Result<(), RestApiServerError> {
         (*self.do_shutdown)()
-    }
-}
-
-pub struct Request(HttpRequest, web::Payload);
-
-impl From<(HttpRequest, web::Payload)> for Request {
-    fn from((http_request, payload): (HttpRequest, web::Payload)) -> Self {
-        Self(http_request, payload)
-    }
-}
-
-impl Into<(HttpRequest, web::Payload)> for Request {
-    fn into(self) -> (HttpRequest, web::Payload) {
-        (self.0, self.1)
-    }
-}
-
-pub struct Response(HttpResponse);
-
-impl From<HttpResponse> for Response {
-    fn from(res: HttpResponse) -> Self {
-        Self(res)
-    }
-}
-
-impl IntoFuture for Response {
-    type Item = HttpResponse;
-    type Error = ActixError;
-    type Future = FutureResult<HttpResponse, ActixError>;
-
-    fn into_future(self) -> Self::Future {
-        self.0.into_future()
-    }
-}
-
-impl std::fmt::Debug for Response {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.0)
     }
 }
 
