@@ -148,7 +148,7 @@ fn add_modify_user_method(
         return Box::new(
             HttpResponse::BadRequest()
                 .json(ErrorResponse::bad_request(
-                    &"Failed to parse payload: no user id".to_string(),
+                    &"Failed to parse request: no user id".to_string(),
                 ))
                 .into_future(),
         );
@@ -277,7 +277,7 @@ fn add_delete_user_method(
         return Box::new(
             HttpResponse::BadRequest()
                 .json(ErrorResponse::bad_request(
-                    &"Failed to parse payload: no user id".to_string(),
+                    &"Failed to parse request: no user id".to_string(),
                 ))
                 .into_future(),
         );
