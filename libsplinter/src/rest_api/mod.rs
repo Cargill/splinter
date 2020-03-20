@@ -64,7 +64,10 @@ pub mod secrets;
 #[cfg(feature = "json-web-tokens")]
 pub mod sessions;
 
+use std::boxed::Box;
 use std::collections::BTreeMap;
+use std::sync::{mpsc, Arc};
+use std::thread;
 
 #[cfg(feature = "rest-api-actix")]
 use actix_web::HttpRequest as ActixRequest;
@@ -73,9 +76,6 @@ use actix_web::{
 };
 use futures::{Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
-use std::boxed::Box;
-use std::sync::{mpsc, Arc};
-use std::thread;
 
 use errors::RequestBuilderError;
 pub use errors::{RestApiServerError, WebSocketError};
