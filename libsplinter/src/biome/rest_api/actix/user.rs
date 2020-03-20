@@ -14,12 +14,10 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::{web::Payload, Error, HttpResponse};
+use crate::actix_web::{Error, HttpResponse};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::{
-    into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource,
-};
+use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Request, Resource};
 
 use crate::biome::credentials::store::{
     diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
@@ -41,7 +39,7 @@ pub fn make_list_route(credentials_store: Arc<SplinterCredentialsStore>) -> Reso
             protocol::BIOME_LIST_USERS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |_, _| {
+        .add_method(Method::Get, move |_| {
             let credentials_store = credentials_store.clone();
             Box::new(match credentials_store.get_usernames() {
                 Ok(users) => HttpResponse::Ok().json(users).into_future(),
@@ -71,18 +69,17 @@ pub fn make_user_routes(
             protocol::BIOME_USER_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Put, move |request, payload| {
+        .add_method(Method::Put, move |request| {
             add_modify_user_method(
                 request,
-                payload,
                 credentials_store_modify.clone(),
                 user_store_modify.clone(),
             )
         })
-        .add_method(Method::Get, move |request, _| {
+        .add_method(Method::Get, move |request| {
             add_fetch_user_method(request, credentials_store_fetch.clone())
         })
-        .add_method(Method::Delete, move |request, _| {
+        .add_method(Method::Delete, move |request| {
             add_delete_user_method(
                 request,
                 rest_config.clone(),
@@ -138,7 +135,6 @@ fn add_fetch_user_method(
 ///   }
 fn add_modify_user_method(
     request: Request,
-    payload: Payload,
     credentials_store: Arc<SplinterCredentialsStore>,
     mut user_store: SplinterUserStore,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
@@ -153,55 +149,67 @@ fn add_modify_user_method(
                 .into_future(),
         );
     };
-    Box::new(into_bytes(payload).and_then(move |bytes| {
-        let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
-            Ok(val) => val,
-            Err(err) => {
-                debug!("Error parsing request body {}", err);
-                return HttpResponse::BadRequest()
+
+    let body = match serde_json::from_slice::<serde_json::Value>(request.body()) {
+        Ok(val) => val,
+        Err(err) => {
+            debug!("Error parsing request body {}", err);
+            return Box::new(
+                HttpResponse::BadRequest()
                     .json(ErrorResponse::bad_request(&format!(
                         "Failed to parse payload body: {}",
                         err
                     )))
-                    .into_future();
-            }
-        };
-        let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
-            Ok(val) => val,
-            Err(err) => {
-                debug!("Error parsing payload {}", err);
-                return HttpResponse::BadRequest()
+                    .into_future(),
+            );
+        }
+    };
+
+    let username_password = match serde_json::from_slice::<UsernamePassword>(request.body()) {
+        Ok(val) => val,
+        Err(err) => {
+            debug!("Error parsing payload {}", err);
+            return Box::new(
+                HttpResponse::BadRequest()
                     .json(ErrorResponse::bad_request(&format!(
                         "Failed to parse payload: {}",
                         err
                     )))
-                    .into_future();
-            }
-        };
+                    .into_future(),
+            );
+        }
+    };
 
-        let credentials =
-            match credentials_store.fetch_credential_by_username(&username_password.username) {
-                Ok(credentials) => credentials,
-                Err(err) => {
-                    debug!("Failed to fetch credentials {}", err);
-                    match err {
-                        CredentialsStoreError::NotFoundError(_) => {
-                            return HttpResponse::NotFound()
+    let credentials =
+        match credentials_store.fetch_credential_by_username(&username_password.username) {
+            Ok(credentials) => credentials,
+            Err(err) => {
+                debug!("Failed to fetch credentials {}", err);
+                match err {
+                    CredentialsStoreError::NotFoundError(_) => {
+                        return Box::new(
+                            HttpResponse::NotFound()
                                 .json(ErrorResponse::not_found(&format!(
                                     "Username not found: {}",
                                     username_password.username
                                 )))
-                                .into_future();
-                        }
-                        _ => {
-                            return HttpResponse::InternalServerError()
+                                .into_future(),
+                        );
+                    }
+                    _ => {
+                        return Box::new(
+                            HttpResponse::InternalServerError()
                                 .json(ErrorResponse::internal_error())
-                                .into_future()
-                        }
+                                .into_future(),
+                        )
                     }
                 }
-            };
-        let splinter_user = SplinterUser::new(&user_id);
+            }
+        };
+
+    let splinter_user = SplinterUser::new(&user_id);
+
+    Box::new(
         match credentials.verify_password(&username_password.hashed_password) {
             Ok(is_valid) => {
                 if is_valid {
@@ -260,8 +268,8 @@ fn add_modify_user_method(
                     .json(ErrorResponse::internal_error())
                     .into_future()
             }
-        }
-    }))
+        },
+    )
 }
 
 /// Defines a REST endpoint to delete a user from the database

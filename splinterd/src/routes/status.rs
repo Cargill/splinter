@@ -36,10 +36,7 @@ pub fn get_status(
     Box::new(HttpResponse::Ok().json(status).into_future())
 }
 
-pub fn get_openapi(
-    _: Request,
-    _: web::Payload,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+pub fn get_openapi(_: Request) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(
         HttpResponse::Ok()
             .body(include_str!("../../api/static/openapi.yml"))

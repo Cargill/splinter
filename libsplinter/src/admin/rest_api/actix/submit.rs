@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use actix_web::HttpResponse;
-use futures::{Future, IntoFuture};
+use futures::IntoFuture;
 
 use crate::admin::service::{AdminCommands, AdminServiceError};
 use crate::protocol;
 use crate::protos::admin::CircuitManagementPayload;
-use crate::rest_api::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{Method, ProtocolVersionRangeGuard, Resource};
 use crate::service::ServiceError;
 
 pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) -> Resource {
@@ -27,35 +27,41 @@ pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) 
             protocol::ADMIN_SUBMIT_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Post, move |_, payload| {
+        .add_method(Method::Post, move |req| {
             let admin_commands = admin_commands.clone();
-            Box::new(
-                into_protobuf::<CircuitManagementPayload>(payload).and_then(move |payload| {
-                    match admin_commands.submit_circuit_change(payload) {
-                        Ok(()) => HttpResponse::Accepted().finish().into_future(),
-                        Err(AdminServiceError::ServiceError(
-                            ServiceError::UnableToHandleMessage(err),
-                        )) => {
-                            debug!("{}", err);
-                            HttpResponse::BadRequest()
-                                .json(json!({
-                                    "message": format!("Unable to handle message: {}", err)
-                                }))
-                                .into_future()
-                        }
-                        Err(AdminServiceError::ServiceError(
-                            ServiceError::InvalidMessageFormat(err),
-                        )) => HttpResponse::BadRequest()
-                            .json(json!({
-                                "message": format!("Failed to parse payload: {}", err)
-                            }))
+
+            let payload = match protobuf::parse_from_bytes::<CircuitManagementPayload>(req.body()) {
+                Ok(payload) => payload,
+                Err(err) => {
+                    return Box::new(
+                        HttpResponse::BadRequest()
+                            .json(json!({ "message": format!("Invalid payload: {}", err) }))
                             .into_future(),
-                        Err(err) => {
-                            error!("{}", err);
-                            HttpResponse::InternalServerError().finish().into_future()
-                        }
-                    }
-                }),
-            )
+                    )
+                }
+            };
+
+            Box::new(match admin_commands.submit_circuit_change(payload) {
+                Ok(()) => HttpResponse::Accepted().finish().into_future(),
+                Err(AdminServiceError::ServiceError(ServiceError::UnableToHandleMessage(err))) => {
+                    debug!("{}", err);
+                    HttpResponse::BadRequest()
+                        .json(json!({
+                            "message": format!("Unable to handle message: {}", err)
+                        }))
+                        .into_future()
+                }
+                Err(AdminServiceError::ServiceError(ServiceError::InvalidMessageFormat(err))) => {
+                    HttpResponse::BadRequest()
+                        .json(json!({
+                            "message": format!("Failed to parse payload: {}", err)
+                        }))
+                        .into_future()
+                }
+                Err(err) => {
+                    error!("{}", err);
+                    HttpResponse::InternalServerError().finish().into_future()
+                }
+            })
         })
 }

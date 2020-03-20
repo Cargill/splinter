@@ -19,19 +19,26 @@ use std::error::Error;
 use std::fmt;
 
 use actix_http::Payload;
-use actix_web::{web::Query, FromRequest, HttpRequest, ResponseError};
+use actix_web::{
+    client::PayloadError,
+    web::{BytesMut, Query},
+    FromRequest, HttpRequest, ResponseError,
+};
+use futures::{stream::Stream, Future, IntoFuture};
 
 use super::{Request, RequestBuilder};
 
 impl FromRequest for Request {
     type Error = RequestConversionError;
-    type Future = Result<Self, Self::Error>;
+    type Future = Box<dyn Future<Item = Self, Error = Self::Error>>;
     type Config = ();
 
-    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
+        let req = req.clone();
+
         let path = req.path().to_string();
 
-        let headers = req
+        let headers = match req
             .headers()
             .iter()
             .map(|(name, value)| {
@@ -47,7 +54,11 @@ impl FromRequest for Request {
                     .to_string();
                 Ok((header_name, header_value))
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<BTreeMap<String, String>, RequestConversionError>>()
+        {
+            Ok(headers) => headers,
+            Err(err) => return Box::new(Err(err).into_future()),
+        };
 
         let path_parameters = req
             .match_info()
@@ -55,20 +66,40 @@ impl FromRequest for Request {
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect();
 
-        let query_parameters = Query::<BTreeMap<String, String>>::from_query(req.query_string())
-            .map(Query::into_inner)
-            .map_err(|err| RequestConversionError::new(&format!("Query is invalid: {}", err)))?;
+        let query_parameters =
+            match Query::<BTreeMap<String, String>>::from_query(req.query_string())
+                .map(Query::into_inner)
+                .map_err(|err| RequestConversionError::new(&format!("Query is invalid: {}", err)))
+            {
+                Ok(query_parameters) => query_parameters,
+                Err(err) => return Box::new(Err(err).into_future()),
+            };
 
-        RequestBuilder::new()
-            .with_path(path)
-            .with_headers(headers)
-            .with_path_parameters(path_parameters)
-            .with_query_parameters(query_parameters)
-            .with_actix_request(req.clone())
-            .build()
-            .map_err(|err| {
-                RequestConversionError::new_with_source("Failed to convert request", err.into())
-            })
+        Box::new(
+            payload
+                .take()
+                .from_err::<RequestConversionError>()
+                .fold(BytesMut::new(), move |mut body, chunk| {
+                    body.extend_from_slice(&chunk);
+                    Ok::<_, RequestConversionError>(body)
+                })
+                .and_then(move |body| {
+                    RequestBuilder::new()
+                        .with_path(path)
+                        .with_headers(headers)
+                        .with_path_parameters(path_parameters)
+                        .with_query_parameters(query_parameters)
+                        .with_body(body.to_vec())
+                        .with_actix_request(req)
+                        .build()
+                        .map_err(|err| {
+                            RequestConversionError::new_with_source(
+                                "Failed to convert request",
+                                err.into(),
+                            )
+                        })
+                }),
+        )
     }
 }
 
@@ -110,3 +141,9 @@ impl fmt::Display for RequestConversionError {
 }
 
 impl ResponseError for RequestConversionError {}
+
+impl From<PayloadError> for RequestConversionError {
+    fn from(err: PayloadError) -> Self {
+        Self::new(&format!("Failed to parse Actix payload: {}", err))
+    }
+}

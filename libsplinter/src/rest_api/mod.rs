@@ -32,7 +32,7 @@
 //!     fn resources(&self) -> Vec<Resource> {
 //!         let name = self.name.clone();
 //!
-//!         vec![Resource::build("/index").add_method(Method::Get, move |r, p| {
+//!         vec![Resource::build("/index").add_method(Method::Get, move |r| {
 //!             Box::new(
 //!                 HttpResponse::Ok()
 //!                 .body(format!("Hello, I am {}", name))
@@ -69,12 +69,10 @@ use std::collections::BTreeMap;
 #[cfg(feature = "rest-api-actix")]
 use actix_web::HttpRequest as ActixRequest;
 use actix_web::{
-    error::ErrorBadRequest, http::header, middleware, web, App, Error as ActixError, HttpResponse,
-    HttpServer,
+    http::header, middleware, web, App, Error as ActixError, HttpResponse, HttpServer,
 };
-use futures::{stream::Stream, Future, IntoFuture};
+use futures::{Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
-use protobuf::{self, Message};
 use std::boxed::Box;
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -107,7 +105,7 @@ pub trait RestResourceProvider {
 }
 
 pub type HandlerFunction = Box<
-    dyn Fn(Request, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+    dyn Fn(Request) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
         + Send
         + Sync
         + 'static,
@@ -119,6 +117,7 @@ pub struct Request {
     headers: BTreeMap<String, String>,
     path_parameters: BTreeMap<String, String>,
     query_parameters: BTreeMap<String, String>,
+    body: Vec<u8>,
     // This field is required by the Actix implementation of WebSocket subscription, since the
     // `actix_web_actors::ws::start` function takes the Actix request as an argument.
     #[cfg(feature = "rest-api-actix")]
@@ -154,6 +153,10 @@ impl Request {
         self.query_parameters.get(param).map(String::as_str)
     }
 
+    pub fn body(&self) -> &[u8] {
+        &self.body
+    }
+
     #[cfg(feature = "rest-api-actix")]
     pub fn actix_request(&self) -> &ActixRequest {
         &self.actix_request
@@ -166,6 +169,7 @@ struct RequestBuilder {
     headers: Option<BTreeMap<String, String>>,
     path_parameters: Option<BTreeMap<String, String>>,
     query_parameters: Option<BTreeMap<String, String>>,
+    body: Option<Vec<u8>>,
     #[cfg(feature = "rest-api-actix")]
     actix_request: Option<ActixRequest>,
 }
@@ -195,6 +199,11 @@ impl RequestBuilder {
         self
     }
 
+    pub fn with_body(mut self, body: Vec<u8>) -> Self {
+        self.body = Some(body);
+        self
+    }
+
     #[cfg(feature = "rest-api-actix")]
     pub fn with_actix_request(mut self, actix_request: ActixRequest) -> Self {
         self.actix_request = Some(actix_request);
@@ -209,6 +218,7 @@ impl RequestBuilder {
             headers: self.headers.unwrap_or_default(),
             path_parameters: self.path_parameters.unwrap_or_default(),
             query_parameters: self.query_parameters.unwrap_or_default(),
+            body: self.body.unwrap_or_default(),
             #[cfg(feature = "rest-api-actix")]
             actix_request: self
                 .actix_request
@@ -261,7 +271,7 @@ impl std::fmt::Display for Method {
 /// use futures::IntoFuture;
 ///
 /// Resource::build("/index")
-///     .add_method(Method::Get, |r, p| {
+///     .add_method(Method::Get, |r| {
 ///         Box::new(
 ///             HttpResponse::Ok()
 ///                 .body("Hello, World")
@@ -280,7 +290,7 @@ impl Resource {
     #[deprecated(note = "Please use the `build` and `add_method` methods instead")]
     pub fn new<F>(method: Method, route: &str, handle: F) -> Self
     where
-        F: Fn(Request, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+        F: Fn(Request) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
             + 'static,
@@ -298,7 +308,7 @@ impl Resource {
 
     pub fn add_method<F>(mut self, method: Method, handle: F) -> Self
     where
-        F: Fn(Request, web::Payload) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+        F: Fn(Request) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
             + Send
             + Sync
             + 'static,
@@ -328,7 +338,7 @@ impl Resource {
     ///             Continuation::Continue
     ///         }
     ///     })
-    ///     .add_method(Method::Get, |r, p| {
+    ///     .add_method(Method::Get, |r| {
     ///         Box::new(
     ///             HttpResponse::Ok()
     ///                 .body("Hello, World")
@@ -369,7 +379,7 @@ impl Resource {
             .into_iter()
             .fold(resource, |resource, (method, handler)| {
                 let guards = request_guards.clone();
-                let func = move |r: Request, p: web::Payload| {
+                let func = move |r: Request| {
                     // This clone satisfies a requirement that this be FnOnce
                     if !guards.is_empty() {
                         for guard in guards.clone() {
@@ -379,7 +389,7 @@ impl Resource {
                             }
                         }
                     }
-                    (handler)(r, p)
+                    (handler)(r)
                 };
                 resource.route(match method {
                     Method::Get => web::get().to_async(func),
@@ -645,33 +655,6 @@ impl RestApiBuilder {
     }
 }
 
-pub fn into_protobuf<M: Message>(
-    payload: web::Payload,
-) -> impl Future<Item = M, Error = ActixError> {
-    payload
-        .from_err::<ActixError>()
-        .fold(web::BytesMut::new(), move |mut body, chunk| {
-            body.extend_from_slice(&chunk);
-            Ok::<_, ActixError>(body)
-        })
-        .and_then(|body| match protobuf::parse_from_bytes::<M>(&body) {
-            Ok(proto) => Ok(proto),
-            Err(err) => Err(ErrorBadRequest(json!({ "message": format!("{}", err) }))),
-        })
-        .into_future()
-}
-
-pub fn into_bytes(payload: web::Payload) -> impl Future<Item = Vec<u8>, Error = ActixError> {
-    payload
-        .from_err::<ActixError>()
-        .fold(web::BytesMut::new(), move |mut body, chunk| {
-            body.extend_from_slice(&chunk);
-            Ok::<_, ActixError>(body)
-        })
-        .and_then(|body| Ok(body.to_vec()))
-        .into_future()
-}
-
 pub fn percent_encode_filter_query(input: &str) -> String {
     percent_encoding::utf8_percent_encode(input, QUERY_ENCODE_SET).to_string()
 }
@@ -685,7 +668,7 @@ mod test {
     #[test]
     fn test_resource() {
         Resource::build("/test")
-            .add_method(Method::Get, |_: Request, _: web::Payload| {
+            .add_method(Method::Get, |_: Request| {
                 Box::new(Response::Ok().finish().into_future())
             })
             .into_route();
@@ -697,7 +680,7 @@ mod test {
             .add_request_guard(|_: &Request| {
                 Continuation::terminate(Response::BadRequest().finish().into_future())
             })
-            .add_method(Method::Get, |_: Request, _: web::Payload| {
+            .add_method(Method::Get, |_: Request| {
                 Box::new(Response::Ok().finish().into_future())
             })
             .into_route();

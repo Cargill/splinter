@@ -30,7 +30,7 @@ pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store:
             protocol::ADMIN_LIST_PROPOSALS_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |r, _| {
+        .add_method(Method::Get, move |r| {
             list_proposals(r, web::Data::new(proposal_store.clone()))
         })
 }

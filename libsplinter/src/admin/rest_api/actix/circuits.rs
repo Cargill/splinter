@@ -34,7 +34,7 @@ pub fn make_list_circuits_resource<T: CircuitStore + 'static>(store: T) -> Resou
             protocol::ADMIN_LIST_CIRCUITS_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |r, _| {
+        .add_method(Method::Get, move |r| {
             list_circuits(r, web::Data::new(store.clone()))
         })
 }

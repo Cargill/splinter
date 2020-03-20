@@ -31,7 +31,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
             protocol::ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |request, payload| {
+        .add_method(Method::Get, move |request| {
             let circuit_management_type = if let Some(t) = request.path_parameter("type") {
                 t.to_string()
             } else {
@@ -74,8 +74,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                 }
             };
 
-            match new_websocket_event_sender(&request, payload, Box::new(initial_events.skip(skip)))
-            {
+            match new_websocket_event_sender(&request, Box::new(initial_events.skip(skip))) {
                 Ok((sender, res)) => {
                     if let Err(err) = admin_commands.add_event_subscriber(
                         &circuit_management_type,

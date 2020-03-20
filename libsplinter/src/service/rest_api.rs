@@ -14,18 +14,14 @@
 
 use std::sync::Arc;
 
-use crate::actix_web::{web, Error as ActixError, HttpResponse};
+use crate::actix_web::{Error as ActixError, HttpResponse};
 use crate::futures::Future;
 use crate::rest_api::{Continuation, Method, Request, RequestGuard};
 
 use super::Service;
 
 type Handler = Arc<
-    dyn Fn(
-            Request,
-            web::Payload,
-            &dyn Service,
-        ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+    dyn Fn(Request, &dyn Service) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
         + Send
         + Sync
         + 'static,

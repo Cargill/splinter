@@ -83,7 +83,7 @@ fn make_fetch_key_resource(key_registry: Box<dyn KeyRegistry>) -> Resource {
             protocol::ADMIN_FETCH_KEY_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |req, _| {
+        .add_method(Method::Get, move |req| {
             let public_key = match parse_hex(req.path_parameter("public_key").unwrap_or("")) {
                 Ok(public_key) => public_key,
                 Err(err_msg) => {
@@ -118,7 +118,7 @@ fn make_list_key_resources(key_registry: Box<dyn KeyRegistry>) -> Resource {
             protocol::ADMIN_LIST_KEYS_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |req, _| {
+        .add_method(Method::Get, move |req| {
             let offset = match req.query_parameter("offset") {
                 Some(value) => match value.parse::<usize>() {
                     Ok(val) => val,

@@ -18,8 +18,8 @@ use std::time::Duration;
 use transact::protocol::batch::BatchPair;
 use transact::protos::FromBytes;
 
-use crate::actix_web::{web, Error as ActixError, HttpResponse};
-use crate::futures::{stream::Stream, Future, IntoFuture};
+use crate::actix_web::HttpResponse;
+use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard};
 use crate::service::rest_api::ServiceEndpoint;
@@ -51,7 +51,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
         route: "/ws/subscribe".into(),
         method: Method::Get,
-        handler: Arc::new(move |request, payload, service| {
+        handler: Arc::new(move |request, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
                 Some(s) => s,
                 None => {
@@ -94,7 +94,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            match new_websocket_event_sender(&request, payload, Box::new(unseen_events)) {
+            match new_websocket_event_sender(&request, Box::new(unseen_events)) {
                 Ok((sender, res)) => {
                     if let Err(err) =
                         scabbard.add_state_subscriber(Box::new(WsStateSubscriber { sender }))
@@ -130,7 +130,7 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
         route: "/batches".into(),
         method: Method::Post,
-        handler: Arc::new(move |_, payload, service| {
+        handler: Arc::new(move |request, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
                 Some(s) => s,
                 None => {
@@ -146,44 +146,35 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
             }
             .clone();
 
-            Box::new(
-                payload
-                    .from_err::<ActixError>()
-                    .fold(web::BytesMut::new(), move |mut body, chunk| {
-                        body.extend_from_slice(&chunk);
-                        Ok::<_, ActixError>(body)
-                    })
-                    .into_future()
-                    .and_then(move |body| {
-                        let batches: Vec<BatchPair> = match Vec::from_bytes(&body) {
-                            Ok(b) => b,
-                            Err(_) => {
-                                return HttpResponse::BadRequest()
-                                    .json(json!({
-                                        "message": "invalid body: not a valid list of batches"
-                                    }))
-                                    .into_future()
-                            }
-                        };
+            let batches: Vec<BatchPair> = match Vec::from_bytes(request.body()) {
+                Ok(b) => b,
+                Err(_) => {
+                    return Box::new(
+                        HttpResponse::BadRequest()
+                            .json(json!({
+                                "message": "invalid body: not a valid list of batches"
+                            }))
+                            .into_future(),
+                    )
+                }
+            };
 
-                        match scabbard.add_batches(batches) {
-                            Ok(Some(link)) => HttpResponse::Accepted().json(link).into_future(),
-                            Ok(None) => HttpResponse::BadRequest()
-                                .json(json!({
-                                    "message": "no valid batches provided"
-                                }))
-                                .into_future(),
-                            Err(err) => {
-                                error!("Failed to add batches: {}", err);
-                                HttpResponse::InternalServerError()
-                                    .json(json!({
-                                        "message": "An internal error occurred"
-                                    }))
-                                    .into_future()
-                            }
-                        }
-                    }),
-            )
+            Box::new(match scabbard.add_batches(batches) {
+                Ok(Some(link)) => HttpResponse::Accepted().json(link).into_future(),
+                Ok(None) => HttpResponse::BadRequest()
+                    .json(json!({
+                        "message": "no valid batches provided"
+                    }))
+                    .into_future(),
+                Err(err) => {
+                    error!("Failed to add batches: {}", err);
+                    HttpResponse::InternalServerError()
+                        .json(json!({
+                            "message": "An internal error occurred"
+                        }))
+                        .into_future()
+                }
+            })
         }),
         request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
             protocol::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
@@ -197,7 +188,7 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
         route: "/batch_statuses".into(),
         method: Method::Get,
-        handler: Arc::new(move |req, _, service| {
+        handler: Arc::new(move |req, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
                 Some(s) => s,
                 None => {
@@ -276,7 +267,7 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
         route: "/state/{address}".into(),
         method: Method::Get,
-        handler: Arc::new(move |request, _, service| {
+        handler: Arc::new(move |request, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
                 Some(s) => s,
                 None => {
@@ -325,7 +316,7 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
         route: "/state".into(),
         method: Method::Get,
-        handler: Arc::new(move |request, _, service| {
+        handler: Arc::new(move |request, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
                 Some(s) => s,
                 None => {

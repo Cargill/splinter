@@ -31,7 +31,7 @@ pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store:
             protocol::ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |r, _| {
+        .add_method(Method::Get, move |r| {
             fetch_proposal(r, web::Data::new(proposal_store.clone()))
         })
 }

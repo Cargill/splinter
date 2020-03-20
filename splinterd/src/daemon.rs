@@ -396,7 +396,7 @@ impl SplinterDaemon {
                 Resource::build("/openapi.yml").add_method(Method::Get, routes::get_openapi),
             )
             .add_resource(
-                Resource::build("/status").add_method(Method::Get, move |_, _| {
+                Resource::build("/status").add_method(Method::Get, move |_| {
                     routes::get_status(node_id.clone(), service_endpoint.clone())
                 }),
             )

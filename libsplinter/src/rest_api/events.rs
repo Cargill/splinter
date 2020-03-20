@@ -16,10 +16,10 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use actix::prelude::*;
-use actix_web::{web::Payload, HttpResponse};
+use actix_web::{web::Bytes, HttpResponse};
 use actix_web_actors::ws::{self, CloseCode, CloseReason};
 use futures::{
-    stream::{iter_ok, Stream},
+    stream::{iter_ok, iter_result, Stream},
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use serde::ser::Serialize;
@@ -32,7 +32,6 @@ const PING_INTERVAL: u64 = 30;
 
 pub fn new_websocket_event_sender<T: Serialize + Debug>(
     request: &Request,
-    payload: Payload,
     initial_events: Box<dyn Iterator<Item = T> + Send>,
 ) -> Result<(EventSender<T>, HttpResponse), ResponseError> {
     let (sender, recv) = unbounded();
@@ -42,7 +41,7 @@ pub fn new_websocket_event_sender<T: Serialize + Debug>(
     let res = ws::start(
         EventSenderWebSocket::new(Box::new(stream)),
         request.actix_request(),
-        payload,
+        iter_result(std::iter::once(Ok(Bytes::from(request.body())))),
     )
     .map_err(ResponseError::from)?;
 

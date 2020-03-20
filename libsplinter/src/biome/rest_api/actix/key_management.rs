@@ -15,10 +15,10 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
-use crate::futures::{Future, IntoFuture};
+use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{
-    into_bytes, ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
+    ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
 };
 
 use crate::biome::key_management::{
@@ -71,7 +71,7 @@ fn handle_post(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
-    Box::new(move |request, payload| {
+    Box::new(move |request| {
         let key_store = key_store.clone();
         let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
@@ -103,47 +103,47 @@ fn handle_post(
             }
         }
 
-        Box::new(into_bytes(payload).and_then(move |bytes| {
-            let new_key = match serde_json::from_slice::<NewKey>(&bytes) {
-                Ok(val) => val,
-                Err(err) => {
-                    debug!("Error parsing payload {}", err);
-                    return HttpResponse::BadRequest()
+        let new_key = match serde_json::from_slice::<NewKey>(request.body()) {
+            Ok(val) => val,
+            Err(err) => {
+                debug!("Error parsing payload {}", err);
+                return Box::new(
+                    HttpResponse::BadRequest()
                         .json(ErrorResponse::bad_request(&format!(
                             "Failed to parse payload: {}",
                             err
                         )))
-                        .into_future();
-                }
-            };
-            let key = Key::new(
-                &new_key.public_key,
-                &new_key.encrypted_private_key,
-                &user_id,
-                &new_key.display_name,
-            );
-            let response_key = ResponseKey::from(&key);
+                        .into_future(),
+                );
+            }
+        };
+        let key = Key::new(
+            &new_key.public_key,
+            &new_key.encrypted_private_key,
+            &user_id,
+            &new_key.display_name,
+        );
+        let response_key = ResponseKey::from(&key);
 
-            match key_store.add_key(key.clone()) {
-                Ok(()) => HttpResponse::Ok()
-                    .json(json!({ "message": "Key added successfully", "data": response_key }))
-                    .into_future(),
-                Err(err) => {
-                    debug!("Failed to add new key to database {}", err);
-                    match err {
-                        KeyStoreError::DuplicateKeyError(msg) => HttpResponse::BadRequest()
-                            .json(ErrorResponse::bad_request(&msg))
-                            .into_future(),
-                        KeyStoreError::UserDoesNotExistError(msg) => HttpResponse::BadRequest()
-                            .json(ErrorResponse::bad_request(&msg))
-                            .into_future(),
-                        _ => HttpResponse::InternalServerError()
-                            .json(ErrorResponse::internal_error())
-                            .into_future(),
-                    }
+        Box::new(match key_store.add_key(key.clone()) {
+            Ok(()) => HttpResponse::Ok()
+                .json(json!({ "message": "Key added successfully", "data": response_key }))
+                .into_future(),
+            Err(err) => {
+                debug!("Failed to add new key to database {}", err);
+                match err {
+                    KeyStoreError::DuplicateKeyError(msg) => HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(&msg))
+                        .into_future(),
+                    KeyStoreError::UserDoesNotExistError(msg) => HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(&msg))
+                        .into_future(),
+                    _ => HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future(),
                 }
             }
-        }))
+        })
     })
 }
 
@@ -153,7 +153,7 @@ fn handle_get(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
-    Box::new(move |request, _| {
+    Box::new(move |request| {
         let key_store = key_store.clone();
         let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
@@ -209,7 +209,7 @@ fn handle_patch(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
-    Box::new(move |request, payload| {
+    Box::new(move |request| {
         let key_store = key_store.clone();
         let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
@@ -241,20 +241,22 @@ fn handle_patch(
             }
         }
 
-        Box::new(into_bytes(payload).and_then(move |bytes| {
-            let updated_key = match serde_json::from_slice::<UpdatedKey>(&bytes) {
-                Ok(val) => val,
-                Err(err) => {
-                    debug!("Error parsing payload {}", err);
-                    return HttpResponse::BadRequest()
+        let updated_key = match serde_json::from_slice::<UpdatedKey>(request.body()) {
+            Ok(val) => val,
+            Err(err) => {
+                debug!("Error parsing payload {}", err);
+                return Box::new(
+                    HttpResponse::BadRequest()
                         .json(ErrorResponse::bad_request(&format!(
                             "Failed to parse payload: {}",
                             err
                         )))
-                        .into_future();
-                }
-            };
+                        .into_future(),
+                );
+            }
+        };
 
+        Box::new(
             match key_store.update_key(
                 &user_id,
                 &updated_key.public_key,
@@ -274,8 +276,8 @@ fn handle_patch(
                             .into_future(),
                     }
                 }
-            }
-        }))
+            },
+        )
     })
 }
 
@@ -310,7 +312,7 @@ fn handle_fetch(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
-    Box::new(move |request, _| {
+    Box::new(move |request| {
         let key_store = key_store.clone();
         let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),
@@ -392,7 +394,7 @@ fn handle_delete(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
-    Box::new(move |request, _| {
+    Box::new(move |request| {
         let key_store = key_store.clone();
         let user_id = match request.path_parameter("user_id") {
             Some(id) => id.to_owned(),

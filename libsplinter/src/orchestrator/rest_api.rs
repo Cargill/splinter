@@ -43,7 +43,7 @@ impl RestResourceProvider for ServiceOrchestrator {
 
                         let service_type = endpoint.service_type;
                         let handler = endpoint.handler;
-                        resource_builder.add_method(endpoint.method, move |request, payload| {
+                        resource_builder.add_method(endpoint.method, move |request| {
                             let circuit =
                                 request.path_parameter("circuit").unwrap_or("").to_string();
                             let service_id = request
@@ -94,7 +94,7 @@ impl RestResourceProvider for ServiceOrchestrator {
                                     }
                                 };
 
-                            handler(request, payload, service)
+                            handler(request, service)
                         })
                     })
                     .collect::<Vec<_>>();

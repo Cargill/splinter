@@ -15,10 +15,10 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
-use crate::futures::{Future, IntoFuture};
+use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::secrets::SecretManager;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 use crate::biome::credentials::store::{
     diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
@@ -46,61 +46,73 @@ pub fn make_verify_route(
             protocol::BIOME_VERIFY_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Post, move |request, payload| {
+        .add_method(Method::Post, move |request| {
             let credentials_store = credentials_store.clone();
             let rest_config = rest_config.clone();
             let secret_manager = secret_manager.clone();
-            Box::new(into_bytes(payload).and_then(move |bytes| {
-                let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
-                    Ok(val) => val,
-                    Err(err) => {
-                        debug!("Error parsing payload: {}", err);
-                        return HttpResponse::BadRequest()
+
+            let username_password = match serde_json::from_slice::<UsernamePassword>(request.body())
+            {
+                Ok(val) => val,
+                Err(err) => {
+                    debug!("Error parsing payload: {}", err);
+                    return Box::new(
+                        HttpResponse::BadRequest()
                             .json(ErrorResponse::bad_request(&format!(
                                 "Failed to parse payload: {}",
                                 err
                             )))
-                            .into_future();
-                    }
-                };
+                            .into_future(),
+                    );
+                }
+            };
 
-                let credentials =
-                    match credentials_store.fetch_credential_by_username(&username_password.username) {
-                        Ok(credentials) => credentials,
-                        Err(err) => {
-                            debug!("Failed to fetch credentials: {}", err);
-                            match err {
-                                CredentialsStoreError::NotFoundError(_) => {
-                                    return HttpResponse::BadRequest()
+            let credentials =
+                match credentials_store.fetch_credential_by_username(&username_password.username) {
+                    Ok(credentials) => credentials,
+                    Err(err) => {
+                        debug!("Failed to fetch credentials: {}", err);
+                        match err {
+                            CredentialsStoreError::NotFoundError(_) => {
+                                return Box::new(
+                                    HttpResponse::BadRequest()
                                         .json(ErrorResponse::bad_request(&format!(
                                             "Username not found: {}",
                                             username_password.username
                                         )))
-                                        .into_future()
-                                }
-                                _ => {
-                                    error!("Failed to fetch credentials: {}", err);
-                                    return HttpResponse::InternalServerError()
+                                        .into_future(),
+                                )
+                            }
+                            _ => {
+                                error!("Failed to fetch credentials: {}", err);
+                                return Box::new(
+                                    HttpResponse::InternalServerError()
                                         .json(ErrorResponse::internal_error())
-                                        .into_future()
-                                }
+                                        .into_future(),
+                                );
                             }
                         }
-                    };
+                    }
+                };
 
-                match authorize_user(&request, &credentials.user_id, &secret_manager, &rest_config) {
+            Box::new(
+                match authorize_user(
+                    &request,
+                    &credentials.user_id,
+                    &secret_manager,
+                    &rest_config,
+                ) {
                     AuthorizationResult::Authorized => {
                         match credentials.verify_password(&username_password.hashed_password) {
-                            Ok(true) => {
-                                    HttpResponse::Ok()
-                                        .json(json!({ "message": "Successful verification", "user_id": credentials.user_id }))
-                                        .into_future()
-                                    }
-                            Ok(false) => {
-                                HttpResponse::BadRequest()
-                                    .json(ErrorResponse::bad_request("Invalid password"))
-                                    .into_future()
-                            }
+                            Ok(true) => HttpResponse::Ok()
+                                .json(json!({
+                                    "message": "Successful verification",
+                                    "user_id": credentials.user_id
+                                }))
+                                .into_future(),
+                            Ok(false) => HttpResponse::BadRequest()
+                                .json(ErrorResponse::bad_request("Invalid password"))
+                                .into_future(),
                             Err(err) => {
                                 error!("Failed to verify password: {}", err);
                                 HttpResponse::InternalServerError()
@@ -109,18 +121,16 @@ pub fn make_verify_route(
                             }
                         }
                     }
-                    AuthorizationResult::Unauthorized(msg) => {
-                        HttpResponse::Unauthorized()
-                                .json(ErrorResponse::unauthorized(&msg))
-                                .into_future()
-                    }
+                    AuthorizationResult::Unauthorized(msg) => HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized(&msg))
+                        .into_future(),
                     AuthorizationResult::Failed => {
                         error!("Failed to authorize user");
-                            HttpResponse::InternalServerError()
-                                .json(ErrorResponse::internal_error())
-                                .into_future()
+                        HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())
+                            .into_future()
                     }
-                }
-            }))
+                },
+            )
         })
 }
