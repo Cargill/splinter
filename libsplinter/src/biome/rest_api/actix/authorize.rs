@@ -16,9 +16,10 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpRequest;
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::rest_api::get_authorization_token;
-use crate::rest_api::secrets::SecretManager;
-use crate::rest_api::sessions::{validate_token, TokenValidationError};
+use crate::rest_api::{
+    secrets::SecretManager,
+    sessions::{validate_token, TokenValidationError},
+};
 
 use super::super::resources::authorize::AuthorizationResult;
 
@@ -29,11 +30,27 @@ pub(crate) fn authorize_user(
     secret_manager: &Arc<dyn SecretManager>,
     rest_config: &BiomeRestConfig,
 ) -> AuthorizationResult {
-    let auth_token = match get_authorization_token(&request) {
-        Ok(token) => token,
-        Err(err) => {
-            debug!("Failed to get token: {}", err);
-            return AuthorizationResult::Unauthorized("User is not authorized".to_string());
+    let auth_token = match request.headers().get("Authorization") {
+        Some(header_value) => match header_value.to_str() {
+            Ok(header_string) => match header_string.split_whitespace().last() {
+                Some(auth_token) => auth_token.to_string(),
+                None => {
+                    return AuthorizationResult::Unauthorized(
+                        "Authorization token not included in request".into(),
+                    )
+                }
+            },
+            Err(err) => {
+                return AuthorizationResult::Unauthorized(format!(
+                    "Invalid value for 'Authorization' header: {}",
+                    err
+                ))
+            }
+        },
+        None => {
+            return AuthorizationResult::Unauthorized(
+                "'Authorization' header not included in request".into(),
+            )
         }
     };
 
