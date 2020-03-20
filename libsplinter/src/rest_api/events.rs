@@ -25,7 +25,7 @@ use futures::{
 use serde::ser::Serialize;
 use serde_json;
 
-use super::{errors::ResponseError, Request};
+use super::{errors::WebSocketError, Request};
 
 /// Wait time in seconds between ping messages being sent by the ws server to the ws client
 const PING_INTERVAL: u64 = 30;
@@ -33,7 +33,7 @@ const PING_INTERVAL: u64 = 30;
 pub fn new_websocket_event_sender<T: Serialize + Debug>(
     request: &Request,
     initial_events: Box<dyn Iterator<Item = T> + Send>,
-) -> Result<(EventSender<T>, HttpResponse), ResponseError> {
+) -> Result<(EventSender<T>, HttpResponse), WebSocketError> {
     let (sender, recv) = unbounded();
 
     let stream = iter_ok::<_, ()>(initial_events.map(MessageWrapper::Message)).chain(recv);
@@ -43,7 +43,7 @@ pub fn new_websocket_event_sender<T: Serialize + Debug>(
         request.actix_request(),
         iter_result(std::iter::once(Ok(Bytes::from(request.body())))),
     )
-    .map_err(ResponseError::from)?;
+    .map_err(|err| WebSocketError::new(&format!("Failed to start WebSocket: {}", err)))?;
 
     Ok((EventSender { sender }, res))
 }

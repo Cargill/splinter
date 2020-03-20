@@ -15,8 +15,6 @@
 use std::error::Error;
 use std::fmt;
 
-use actix_web::Error as ActixError;
-
 /// Error module for `rest_api`.
 #[derive(Debug)]
 pub enum RestApiServerError {
@@ -57,36 +55,39 @@ impl fmt::Display for RestApiServerError {
 }
 
 #[derive(Debug)]
-pub enum ResponseError {
-    ActixError(ActixError),
-    InternalError(String),
+pub struct WebSocketError {
+    context: String,
+    source: Option<Box<dyn Error>>,
 }
 
-impl Error for ResponseError {
+impl WebSocketError {
+    pub fn new(context: &str) -> Self {
+        Self {
+            context: context.into(),
+            source: None,
+        }
+    }
+
+    pub fn new_with_source(context: &str, err: Box<dyn Error>) -> Self {
+        Self {
+            context: context.into(),
+            source: Some(err),
+        }
+    }
+}
+
+impl Error for WebSocketError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            ResponseError::ActixError(err) => Some(err),
-            ResponseError::InternalError(_) => None,
-        }
+        self.source.as_ref().map(|err| &**err)
     }
 }
 
-impl fmt::Display for ResponseError {
+impl fmt::Display for WebSocketError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ResponseError::ActixError(err) => write!(
-                f,
-                "Failed to get response when setting up websocket: {}",
-                err
-            ),
-            ResponseError::InternalError(msg) => f.write_str(&msg),
+        match self.source {
+            Some(ref err) => write!(f, "{}: {}", self.context, err),
+            None => f.write_str(&self.context),
         }
-    }
-}
-
-impl From<ActixError> for ResponseError {
-    fn from(err: ActixError) -> Self {
-        ResponseError::ActixError(err)
     }
 }
 

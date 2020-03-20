@@ -78,10 +78,8 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 use errors::RequestBuilderError;
-pub use errors::{ResponseError, RestApiServerError};
-
+pub use errors::{RestApiServerError, WebSocketError};
 pub use events::{new_websocket_event_sender, EventSender};
-
 pub use response_models::ErrorResponse;
 
 const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS
