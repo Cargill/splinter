@@ -139,7 +139,7 @@ sawtooth-signing-compat = ["sawtooth-sdk"]
 scabbard-client = ["reqwest"]
 scabbard-get-state = []
 service-arg-validation = []
-service-network = []
+service-network = ["connection-manager"]
 ws-transport = ["websocket"]
 zmq-transport = ["zmq"]
 
