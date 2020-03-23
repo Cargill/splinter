@@ -49,6 +49,8 @@ mod resources;
 
 use std::sync::Arc;
 
+#[cfg(feature = "biome-refresh-tokens")]
+use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::database::ConnectionPool;
 use crate::rest_api::{Resource, RestResourceProvider};
 
@@ -104,6 +106,8 @@ pub struct BiomeRestResourceManager {
     token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
     refresh_token_secret_manager: Arc<dyn SecretManager>,
+    #[cfg(feature = "biome-refresh-tokens")]
+    refresh_token_store: Arc<dyn RefreshTokenStore>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Option<Arc<SplinterCredentialsStore>>,
 }
@@ -202,6 +206,8 @@ pub struct BiomeRestResourceManagerBuilder {
     token_secret_manager: Option<Arc<dyn SecretManager>>,
     #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
     refresh_token_secret_manager: Option<Arc<dyn SecretManager>>,
+    #[cfg(feature = "biome-refresh-tokens")]
+    refresh_token_store: Option<Arc<dyn RefreshTokenStore>>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Option<SplinterCredentialsStore>,
 }
@@ -282,6 +288,22 @@ impl BiomeRestResourceManagerBuilder {
         self
     }
 
+    /// Sets a Refresh token store for the refresh tokens for the BiomeRestResourceManager
+    ///
+    /// # Arguments
+    ///
+    /// * `store`: the RefreshTokenStore to be used for performing CRUD operation on a
+    ///   serialized refresh tokena.
+    ///
+    #[cfg(feature = "biome-refresh-tokens")]
+    pub fn with_refresh_token_store(
+        mut self,
+        store: impl RefreshTokenStore + 'static,
+    ) -> BiomeRestResourceManagerBuilder {
+        self.refresh_token_store = Some(Arc::new(store));
+        self
+    }
+
     /// Consumes the builder and returns a BiomeRestResourceManager
     pub fn build(self) -> Result<BiomeRestResourceManager, BiomeRestResourceManagerBuilderError> {
         let user_store = self.user_store.ok_or_else(|| {
@@ -315,6 +337,13 @@ impl BiomeRestResourceManagerBuilder {
             Arc::new(AutoSecretManager::default())
         });
 
+        #[cfg(feature = "biome-refresh-tokens")]
+        let refresh_token_store = self.refresh_token_store.ok_or_else(|| {
+            BiomeRestResourceManagerBuilderError::MissingRequiredField(
+                "Missing refresh token store".to_string(),
+            )
+        })?;
+
         Ok(BiomeRestResourceManager {
             user_store,
             #[cfg(all(feature = "biome-key-management", feature = "json-web-tokens"))]
@@ -324,6 +353,8 @@ impl BiomeRestResourceManagerBuilder {
             token_secret_manager,
             #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
             refresh_token_secret_manager,
+            #[cfg(feature = "biome-refresh-tokens")]
+            refresh_token_store,
             #[cfg(feature = "biome-credentials")]
             credentials_store: match self.credentials_store {
                 Some(credentials_store) => Some(Arc::new(credentials_store)),
