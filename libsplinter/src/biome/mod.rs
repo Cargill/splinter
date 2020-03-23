@@ -36,6 +36,9 @@ pub mod migrations;
 #[cfg(feature = "biome-notifications")]
 pub mod notifications;
 
+#[cfg(feature = "biome-refresh-tokens")]
+pub mod refresh_tokens;
+
 #[cfg(all(feature = "rest-api", feature = "biome-rest-api"))]
 pub mod rest_api;
 mod user;
