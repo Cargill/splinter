@@ -140,38 +140,12 @@ impl PeerManager {
             sender: sender.clone(),
         };
 
-        let mut subscriber = connector.subscribe().expect("Cannot get subscriber");
         let notification_sender = sender.clone();
-        // start thread to listen for notifications from the connection manager
-        thread::Builder::new()
-            .name("Peer Manager Notification".into())
-            .spawn(move || loop {
-                // convert connection mangager notification to peer manager notifications
-                // this enables it to be handled in the same thread as other peer manager messages
-                match subscriber.next() {
-                    Some(notification) => {
-                        match notification_sender
-                            .send(PeerManagerMessage::InternalNotification(notification))
-                        {
-                            Ok(_) => (),
-                            Err(_) => {
-                                info!("Peer Manager has shutdown");
-                                break;
-                            }
-                        }
-                    }
-                    None => {
-                        info!("ConnectionManager has shutdown");
-                        break;
-                    }
-                }
+        let subscriber_id = connector
+            .subscribe(move |notification| {
+                notification_sender.send(PeerManagerMessage::InternalNotification(notification))
             })
-            .map_err(|err| {
-                PeerManagerError::StartUpError(format!(
-                    "Unable to start PeerManager notification thread {}",
-                    err
-                ))
-            })?;
+            .expect("Cannot get subscriber");
 
         let max_retry_attempts = self
             .max_retry_attempts
@@ -211,6 +185,13 @@ impl PeerManager {
                             break;
                         }
                     }
+                }
+
+                if let Err(err) = connector.unsubscribe(subscriber_id) {
+                    error!(
+                        "Unable to unsubscribe from connection manager notifications: {}",
+                        err
+                    );
                 }
             });
 
