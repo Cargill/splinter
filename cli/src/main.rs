@@ -244,7 +244,7 @@ fn run() -> Result<(), CliError> {
                     .required(true)
                     .multiple(true)
                     .long_help(
-                        "Node that are part of the circuit. \
+                        "Node that is part of the circuit. \
                          Format: <node_id>::<endpoint>. \
                          Endpoint is optional if node alias has been set.",
                     ),
@@ -257,7 +257,7 @@ fn run() -> Result<(), CliError> {
                     .min_values(2)
                     .required_unless("template")
                     .long_help(
-                        "Service ID and allowed node. \
+                        "Service ID and allowed nodes. \
                          Format <service-id>::<allowed_nodes>",
                     ),
             )
