@@ -134,7 +134,7 @@ impl Transport for TlsTransport {
                 FrameError::UnsupportedVersion => ConnectError::ProtocolError(
                     "Unable to connect; remote version is not with in range".into(),
                 ),
-                FrameError::IoError(err) => ConnectError::IoError(err),
+                FrameError::IoError(err) => ConnectError::from(err),
                 e => ConnectError::ProtocolError(format!("Unexpected protocol error: {}", e)),
             })?;
 
@@ -183,7 +183,7 @@ impl Listener for TlsListener {
                 FrameError::UnsupportedVersion => AcceptError::ProtocolError(
                     "Unable to connect; local version not supported by remote".into(),
                 ),
-                FrameError::IoError(err) => AcceptError::IoError(err),
+                FrameError::IoError(err) => AcceptError::from(err),
                 err => AcceptError::ProtocolError(format!("Unexpected protocol error: {}", err)),
             })?;
 
@@ -208,7 +208,7 @@ pub struct TlsConnection {
 impl Connection for TlsConnection {
     fn send(&mut self, message: &[u8]) -> Result<(), SendError> {
         match FrameRef::new(self.frame_version, message).write(&mut self.stream) {
-            Err(FrameError::IoError(e)) => Err(SendError::IoError(e)),
+            Err(FrameError::IoError(e)) => Err(SendError::from(e)),
             Err(err) => Err(SendError::ProtocolError(err.to_string())),
             Ok(_) => Ok(()),
         }
@@ -216,7 +216,7 @@ impl Connection for TlsConnection {
 
     fn recv(&mut self) -> Result<Vec<u8>, RecvError> {
         match Frame::read(&mut self.stream) {
-            Err(FrameError::IoError(e)) => Err(RecvError::IoError(e)),
+            Err(FrameError::IoError(e)) => Err(RecvError::from(e)),
             Err(err) => Err(RecvError::ProtocolError(err.to_string())),
             Ok(frame) => Ok(frame.into_inner()),
         }
