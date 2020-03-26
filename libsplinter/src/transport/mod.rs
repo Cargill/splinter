@@ -25,10 +25,7 @@ pub mod zmq;
 
 use mio::Evented;
 
-pub use error::{
-    AcceptError, ConnectError, DisconnectError, ListenError, PollError, RecvError, SendError,
-    StatusError,
-};
+pub use error::{AcceptError, ConnectError, DisconnectError, ListenError, RecvError, SendError};
 
 pub enum Status {
     Connected,

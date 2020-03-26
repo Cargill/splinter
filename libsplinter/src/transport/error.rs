@@ -93,9 +93,6 @@ pub enum ListenError {
 impl_from_io_error!(ListenError);
 
 #[derive(Debug)]
-pub enum PollError {}
-
-#[derive(Debug)]
 pub enum RecvError {
     IoError(io::Error),
     ProtocolError(String),
@@ -114,6 +111,3 @@ pub enum SendError {
 }
 
 impl_from_io_error_ext!(SendError);
-
-#[derive(Debug)]
-pub enum StatusError {}
