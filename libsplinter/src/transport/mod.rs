@@ -27,10 +27,6 @@ use mio::Evented;
 
 pub use error::{AcceptError, ConnectError, DisconnectError, ListenError, RecvError, SendError};
 
-pub enum Status {
-    Connected,
-    Disconnected,
-
 /// A bi-directional connection between two nodes
 pub trait Connection: Send {
     /// Attempt to send a message consisting of bytes across the connection.
