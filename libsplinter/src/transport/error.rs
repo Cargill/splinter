@@ -15,37 +15,17 @@
 use std::error::Error;
 use std::io;
 
-macro_rules! impl_from_io_error {
-    ($err:ident) => {
-        impl From<io::Error> for $err {
-            fn from(io_error: io::Error) -> Self {
-                $err::IoError(io_error)
-            }
-        }
-    };
-}
-
-macro_rules! impl_from_io_error_ext {
-    ($err:ident) => {
-        impl From<io::Error> for $err {
-            fn from(io_error: io::Error) -> Self {
-                match io_error.kind() {
-                    io::ErrorKind::UnexpectedEof => $err::Disconnected,
-                    io::ErrorKind::WouldBlock => $err::WouldBlock,
-                    _ => $err::IoError(io_error),
-                }
-            }
-        }
-    };
-}
-
 #[derive(Debug)]
 pub enum AcceptError {
     IoError(io::Error),
     ProtocolError(String),
 }
 
-impl_from_io_error!(AcceptError);
+impl From<io::Error> for AcceptError {
+    fn from(io_error: io::Error) -> Self {
+        AcceptError::IoError(io_error)
+    }
+}
 
 #[derive(Debug)]
 pub enum ConnectError {
@@ -74,7 +54,11 @@ impl std::fmt::Display for ConnectError {
     }
 }
 
-impl_from_io_error!(ConnectError);
+impl From<io::Error> for ConnectError {
+    fn from(io_error: io::Error) -> Self {
+        ConnectError::IoError(io_error)
+    }
+}
 
 #[derive(Debug)]
 pub enum DisconnectError {
@@ -82,7 +66,11 @@ pub enum DisconnectError {
     ProtocolError(String),
 }
 
-impl_from_io_error!(DisconnectError);
+impl From<io::Error> for DisconnectError {
+    fn from(io_error: io::Error) -> Self {
+        DisconnectError::IoError(io_error)
+    }
+}
 
 #[derive(Debug)]
 pub enum ListenError {
@@ -90,7 +78,11 @@ pub enum ListenError {
     ProtocolError(String),
 }
 
-impl_from_io_error!(ListenError);
+impl From<io::Error> for ListenError {
+    fn from(io_error: io::Error) -> Self {
+        ListenError::IoError(io_error)
+    }
+}
 
 #[derive(Debug)]
 pub enum RecvError {
@@ -100,7 +92,15 @@ pub enum RecvError {
     Disconnected,
 }
 
-impl_from_io_error_ext!(RecvError);
+impl From<io::Error> for RecvError {
+    fn from(io_error: io::Error) -> Self {
+        match io_error.kind() {
+            io::ErrorKind::UnexpectedEof => RecvError::Disconnected,
+            io::ErrorKind::WouldBlock => RecvError::WouldBlock,
+            _ => RecvError::IoError(io_error),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum SendError {
@@ -110,4 +110,12 @@ pub enum SendError {
     Disconnected,
 }
 
-impl_from_io_error_ext!(SendError);
+impl From<io::Error> for SendError {
+    fn from(io_error: io::Error) -> Self {
+        match io_error.kind() {
+            io::ErrorKind::UnexpectedEof => SendError::Disconnected,
+            io::ErrorKind::WouldBlock => SendError::WouldBlock,
+            _ => SendError::IoError(io_error),
+        }
+    }
+}
