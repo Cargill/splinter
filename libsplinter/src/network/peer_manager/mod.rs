@@ -21,8 +21,10 @@ use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 use self::error::{
-    PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError, PeerRefUpdateError,
+    PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
+    PeerRefUpdateError,
 };
+use crate::collections::BiHashMap;
 use crate::network::connection_manager::ConnectionManagerNotification;
 use crate::network::connection_manager::Connector;
 pub use crate::network::peer_manager::connector::PeerManagerConnector;
@@ -65,6 +67,9 @@ pub(crate) enum PeerManagerRequest {
     },
     ListPeers {
         sender: Sender<Result<Vec<String>, PeerListError>>,
+    },
+    ConnectionIds {
+        sender: Sender<Result<BiHashMap<String, String>, PeerConnectionIdError>>,
     },
 }
 
@@ -323,6 +328,11 @@ fn handle_request(
         PeerManagerRequest::ListPeers { sender } => {
             if sender.send(Ok(peers.peer_ids())).is_err() {
                 warn!("connector dropped before receiving result of list peers");
+            }
+        }
+        PeerManagerRequest::ConnectionIds { sender } => {
+            if sender.send(Ok(peers.connection_ids())).is_err() {
+                warn!("connector dropped before receiving result of connection ids");
             }
         }
     };
@@ -735,6 +745,60 @@ pub mod tests {
             peer_list,
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
+        peer_manager.shutdown_and_wait();
+        cm.shutdown_and_wait();
+    }
+
+    // Test that list_peer returns the correct list of peers
+    //
+    // 1. add test_peer
+    // 2. add next_peer
+    // 3. call connection_ids
+    // 4. verify that the sorted map contains both test_peer and next_peer
+    #[test]
+    fn test_peer_manager_connection_ids() {
+        let mut transport = Box::new(InprocTransport::default());
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mut listener = transport.listen("inproc://test_2").unwrap();
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mesh = Mesh::new(512, 128);
+        let mut cm = ConnectionManager::new(
+            mesh.get_life_cycle(),
+            mesh.get_sender(),
+            transport,
+            None,
+            None,
+        );
+        let connector = cm.start().unwrap();
+        let mut peer_manager = PeerManager::new(connector, None);
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_ref_1 = peer_connector
+            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .expect("Unable to add peer");
+
+        assert_eq!(peer_ref_1.peer_id, "test_peer");
+
+        let peer_ref_2 = peer_connector
+            .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
+            .expect("Unable to add peer");
+
+        assert_eq!(peer_ref_2.peer_id, "next_peer");
+
+        let peers = peer_connector
+            .connection_ids()
+            .expect("Unable to get peer list");
+
+        assert!(peers.get_by_key("next_peer").is_some());
+
+        assert!(peers.get_by_key("test_peer").is_some());
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
     }
