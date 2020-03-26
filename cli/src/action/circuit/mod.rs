@@ -357,7 +357,7 @@ fn parse_service_type_argument(service_type: &str) -> Result<(String, String), C
 }
 
 /// Reads a private key from the given file name.
-pub fn read_private_key(file_name: &str) -> Result<String, CliError> {
+fn read_private_key(file_name: &str) -> Result<String, CliError> {
     let mut file = File::open(file_name).map_err(|err| {
         CliError::EnvironmentError(format!("Unable to open {}: {}", file_name, err))
     })?;
