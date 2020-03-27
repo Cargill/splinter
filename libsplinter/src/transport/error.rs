@@ -21,6 +21,24 @@ pub enum AcceptError {
     ProtocolError(String),
 }
 
+impl Error for AcceptError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            AcceptError::IoError(err) => Some(err),
+            AcceptError::ProtocolError(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for AcceptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AcceptError::IoError(err) => write!(f, "io error occurred: {}", err),
+            AcceptError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
+        }
+    }
+}
+
 impl From<io::Error> for AcceptError {
     fn from(io_error: io::Error) -> Self {
         AcceptError::IoError(io_error)
@@ -66,6 +84,24 @@ pub enum DisconnectError {
     ProtocolError(String),
 }
 
+impl Error for DisconnectError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            DisconnectError::IoError(err) => Some(err),
+            DisconnectError::ProtocolError(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for DisconnectError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DisconnectError::IoError(err) => write!(f, "io error occurred: {}", err),
+            DisconnectError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
+        }
+    }
+}
+
 impl From<io::Error> for DisconnectError {
     fn from(io_error: io::Error) -> Self {
         DisconnectError::IoError(io_error)
@@ -76,6 +112,24 @@ impl From<io::Error> for DisconnectError {
 pub enum ListenError {
     IoError(io::Error),
     ProtocolError(String),
+}
+
+impl Error for ListenError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ListenError::IoError(err) => Some(err),
+            ListenError::ProtocolError(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ListenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ListenError::IoError(err) => write!(f, "io error occurred: {}", err),
+            ListenError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
+        }
+    }
 }
 
 impl From<io::Error> for ListenError {
@@ -90,6 +144,28 @@ pub enum RecvError {
     ProtocolError(String),
     WouldBlock,
     Disconnected,
+}
+
+impl Error for RecvError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            RecvError::IoError(err) => Some(err),
+            RecvError::ProtocolError(_) => None,
+            RecvError::WouldBlock => None,
+            RecvError::Disconnected => None,
+        }
+    }
+}
+
+impl std::fmt::Display for RecvError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RecvError::IoError(err) => write!(f, "io error occurred: {}", err),
+            RecvError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
+            RecvError::WouldBlock => write!(f, "would block"),
+            RecvError::Disconnected => write!(f, "disconnected"),
+        }
+    }
 }
 
 impl From<io::Error> for RecvError {
@@ -108,6 +184,28 @@ pub enum SendError {
     ProtocolError(String),
     WouldBlock,
     Disconnected,
+}
+
+impl Error for SendError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SendError::IoError(err) => Some(err),
+            SendError::ProtocolError(_) => None,
+            SendError::WouldBlock => None,
+            SendError::Disconnected => None,
+        }
+    }
+}
+
+impl std::fmt::Display for SendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SendError::IoError(err) => write!(f, "io error occurred: {}", err),
+            SendError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
+            SendError::WouldBlock => write!(f, "would block"),
+            SendError::Disconnected => write!(f, "disconnected"),
+        }
+    }
 }
 
 impl From<io::Error> for SendError {
