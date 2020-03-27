@@ -26,6 +26,7 @@ use crate::biome::key_management::Key;
 use crate::database::ConnectionPool;
 
 /// Manages creating, updating and fetching keys from a PostgreSQL database.
+#[derive(Clone)]
 pub struct PostgresKeyStore {
     pub connection_pool: ConnectionPool,
 }

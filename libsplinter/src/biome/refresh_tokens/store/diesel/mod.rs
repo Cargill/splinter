@@ -25,6 +25,7 @@ use operations::{
     update_token::RefreshTokenStoreUpdateTokenOperation, RefreshTokenStoreOperations,
 };
 
+#[derive(Clone)]
 pub struct DieselRefreshTokenStore {
     connection_pool: ConnectionPool,
 }

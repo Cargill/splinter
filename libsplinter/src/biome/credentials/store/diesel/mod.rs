@@ -29,6 +29,7 @@ use operations::update_credentials::CredentialsStoreUpdateCredentialsOperation a
 use operations::CredentialsStoreOperations;
 
 /// Manages creating, updating and fetching SplinterCredentials from the database
+#[derive(Clone)]
 pub struct DieselCredentialsStore {
     connection_pool: ConnectionPool,
 }
