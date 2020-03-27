@@ -14,8 +14,11 @@
 
 use std::sync::mpsc::{channel, Sender};
 
+use crate::collections::BiHashMap;
+
 use super::error::{
-    PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError, PeerRefUpdateError,
+    PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
+    PeerRefUpdateError,
 };
 use super::notification::PeerNotificationIter;
 use super::PeerRef;
@@ -123,6 +126,26 @@ impl PeerManagerConnector {
 
         recv.recv()
             .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
+    }
+
+    // Request the map of currently connected peers to connection id
+    ///
+    /// Returns a map of peer id to connection id
+    pub fn connection_ids(&self) -> Result<BiHashMap<String, String>, PeerConnectionIdError> {
+        let (sender, recv) = channel();
+        let message = PeerManagerMessage::Request(PeerManagerRequest::ConnectionIds { sender });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerConnectionIdError::InternalError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerConnectionIdError::ReceiveError(format!("{:?}", err)))?
     }
 
     /// Subscribe to PeerManager notifications.

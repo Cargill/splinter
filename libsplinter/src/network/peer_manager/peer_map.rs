@@ -14,6 +14,8 @@
 
 use std::collections::HashMap;
 
+use crate::collections::BiHashMap;
+
 use super::error::PeerUpdateError;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -58,6 +60,18 @@ impl PeerMap {
             .iter()
             .map(|(_, metadata)| metadata.id.to_string())
             .collect()
+    }
+
+    /// Returns the current map of peer ids to connection_ids
+    ///
+    /// This list does not include any of the redirected peer ids.
+    pub fn connection_ids(&self) -> BiHashMap<String, String> {
+        let mut peer_to_connection_id = BiHashMap::new();
+        for (peer, metadata) in self.peers.iter() {
+            peer_to_connection_id.insert(peer.to_string(), metadata.connection_id.to_string());
+        }
+
+        peer_to_connection_id
     }
 
     /// Insert a new peer id and endpoints
@@ -211,6 +225,41 @@ pub mod tests {
         let mut peers = peer_map.peer_ids();
         peers.sort();
         assert_eq!(peers, vec!["new_peer".to_string(), "next_peer".to_string()]);
+    }
+
+    // Test that connection_ids() returns correctly
+    //  1. Test that an empty peer_map returns an empty BiHashMap
+    //  2. Add two peers and test that their ids are returned from connection_ids()
+    #[test]
+    fn test_get_connection_ids() {
+        let mut peer_map = PeerMap::new();
+
+        let peers = peer_map.peer_ids();
+        assert_eq!(peers, Vec::<String>::new());
+
+        peer_map.insert(
+            "test_peer".to_string(),
+            "connection_id_1".to_string(),
+            vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
+            "test_endpoint2".to_string(),
+        );
+
+        peer_map.insert(
+            "next_peer".to_string(),
+            "connection_id_2".to_string(),
+            vec!["endpoint1".to_string(), "endpoint2".to_string()],
+            "next_endpoint1".to_string(),
+        );
+
+        let peers = peer_map.connection_ids();
+        assert_eq!(
+            peers.get_by_key("test_peer"),
+            Some(&"connection_id_1".to_string())
+        );
+        assert_eq!(
+            peers.get_by_key("next_peer"),
+            Some(&"connection_id_2".to_string())
+        );
     }
 
     // Test that peer_metadata() return the correct PeerMetadata for the provided id

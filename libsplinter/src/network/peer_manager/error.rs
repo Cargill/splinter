@@ -121,6 +121,31 @@ impl fmt::Display for PeerListError {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum PeerConnectionIdError {
+    InternalError(String),
+    ReceiveError(String),
+    ListError(String),
+}
+
+impl error::Error for PeerConnectionIdError {}
+
+impl fmt::Display for PeerConnectionIdError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PeerConnectionIdError::InternalError(msg) => {
+                write!(f, "Received internal error: {}", msg)
+            }
+            PeerConnectionIdError::ReceiveError(msg) => {
+                write!(f, "Unable to receive response from PeerManager: {}", msg)
+            }
+            PeerConnectionIdError::ListError(msg) => {
+                write!(f, "Unable to get connection id map: {}", msg)
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PeerUpdateError(pub String);
 
