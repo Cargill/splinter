@@ -31,9 +31,9 @@ use crate::rest_api::{
 use crate::rest_api::{secrets::SecretManager, sessions::default_validation};
 
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
-pub fn make_key_management_route(
+pub fn make_key_management_route<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     Resource::build("/biome/users/keys")
@@ -64,13 +64,13 @@ pub fn make_key_management_route(
 }
 
 /// Defines a REST endpoint for adding a key to the underlying storage
-fn handle_post(
+fn handle_post<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
-        let key_store = key_store.clone();
+        let mut key_store = key_store.clone();
         let validation = default_validation(&rest_config.issuer());
 
         let user_id = match authorize_user(&request, &secret_manager, &validation) {
@@ -136,9 +136,9 @@ fn handle_post(
 }
 
 /// Defines a REST endpoint for retrieving keys from the underlying storage
-fn handle_get(
+fn handle_get<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
@@ -188,13 +188,13 @@ fn handle_get(
 }
 
 /// Defines a REST endpoint for updating a key in the underlying storage
-fn handle_patch(
+fn handle_patch<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
-        let key_store = key_store.clone();
+        let mut key_store = key_store.clone();
         let validation = default_validation(&rest_config.issuer());
 
         let user_id = match authorize_user(&request, &secret_manager, &validation) {
@@ -254,9 +254,9 @@ fn handle_patch(
 }
 
 /// Defines a REST endpoint for managing keys including fetching and deleting a user's key
-pub fn make_key_management_route_with_public_key(
+pub fn make_key_management_route_with_public_key<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     Resource::build("/biome/users/keys/{public_key}")
@@ -279,9 +279,9 @@ pub fn make_key_management_route_with_public_key(
 }
 
 /// Defines a REST endpoint method to fetch a key from the underlying storage
-fn handle_fetch(
+fn handle_fetch<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
@@ -349,13 +349,13 @@ fn handle_fetch(
 }
 
 /// Defines a REST endpoint method to delete a key from the underlying storage
-fn handle_delete(
+fn handle_delete<K: KeyStore<Key> + Clone + 'static>(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
-        let key_store = key_store.clone();
+        let mut key_store = key_store.clone();
         let validation = default_validation(&rest_config.issuer());
 
         let public_key = match request.match_info().get("public_key") {

@@ -15,17 +15,14 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
+use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
+use crate::biome::rest_api::config::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
     into_bytes, secrets::SecretManager, sessions::default_validation, ErrorResponse, Method,
     ProtocolVersionRangeGuard, Resource,
 };
-
-use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError,
-};
-use crate::biome::rest_api::config::BiomeRestConfig;
 
 use super::super::resources::authorize::AuthorizationResult;
 use super::super::resources::credentials::UsernamePassword;
@@ -38,8 +35,8 @@ use super::authorize::authorize_user;
 ///       "username": <existing username of the user>
 ///       "hashed_password": <hash of the user's existing password>
 ///   }
-pub fn make_verify_route(
-    credentials_store: Arc<DieselCredentialsStore>,
+pub fn make_verify_route<C: CredentialsStore + Clone + 'static>(
+    credentials_store: C,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {

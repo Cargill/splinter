@@ -45,8 +45,8 @@ use crate::rest_api::{
 ///   {
 ///     "token": <new auth token>
 ///   }
-pub fn make_token_route(
-    refresh_token_store: Arc<dyn RefreshTokenStore>,
+pub fn make_token_route<R: RefreshTokenStore + Clone + 'static>(
+    refresh_token_store: R,
     secret_manager: Arc<dyn SecretManager>,
     refresh_token_secret_manager: Arc<dyn SecretManager>,
     token_issuer: Arc<AccessTokenIssuer>,
@@ -62,7 +62,7 @@ pub fn make_token_route(
             let refresh_token_validation = default_validation(&rest_config.issuer());
             let secret_manager = secret_manager.clone();
             let refresh_token_secret_manager = refresh_token_secret_manager.clone();
-            let refresh_token_store = refresh_token_store.clone();
+            let mut refresh_token_store = refresh_token_store.clone();
             let token_issuer = token_issuer.clone();
             let rest_config = rest_config.clone();
             Box::new(into_bytes(payload).and_then(move |bytes| {

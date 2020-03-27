@@ -29,8 +29,8 @@ use crate::rest_api::{
 
 /// Defines a REST endpoint to remove any refresh tokens belonging to the user.
 ///
-pub fn make_logout_route(
-    refresh_token_store: Arc<dyn RefreshTokenStore>,
+pub fn make_logout_route<R: RefreshTokenStore + Clone + 'static>(
+    refresh_token_store: R,
     secret_manager: Arc<dyn SecretManager>,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {
@@ -45,15 +45,15 @@ pub fn make_logout_route(
         )
 }
 
-pub fn add_logout_route(
-    refresh_token_store: Arc<dyn RefreshTokenStore>,
+pub fn add_logout_route<R: RefreshTokenStore + Clone + 'static>(
+    refresh_token_store: R,
     secret_manager: Arc<dyn SecretManager>,
     rest_config: Arc<BiomeRestConfig>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let rest_config = rest_config.clone();
         let secret_manager = secret_manager.clone();
-        let refresh_token_store = refresh_token_store.clone();
+        let mut refresh_token_store = refresh_token_store.clone();
         let validation = default_validation(&rest_config.issuer());
         let user_id = match authorize_user(&request, &secret_manager, &validation) {
             AuthorizationResult::Authorized(claims) => claims.user_id(),

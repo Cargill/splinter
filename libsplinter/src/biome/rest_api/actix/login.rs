@@ -15,18 +15,15 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
+use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 #[cfg(feature = "biome-refresh-tokens")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
-use crate::futures::{Future, IntoFuture};
-use crate::protocol;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
-
-use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError,
-};
 use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
+use crate::futures::{Future, IntoFuture};
+use crate::protocol;
 use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
+use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 /// Defines a REST endpoint for login
 ///
@@ -35,9 +32,12 @@ use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 ///       "username": <existing username of the user>
 ///       "hashed_password": <hash of the user's existing password>
 ///   }
-pub fn make_login_route(
-    credentials_store: Arc<DieselCredentialsStore>,
-    #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: Arc<dyn RefreshTokenStore>,
+pub fn make_login_route<
+    C: CredentialsStore + Clone + 'static,
+    R: RefreshTokenStore + Clone + 'static,
+>(
+    credentials_store: C,
+    #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: R,
     rest_config: Arc<BiomeRestConfig>,
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
@@ -51,7 +51,7 @@ pub fn make_login_route(
             let rest_config = rest_config.clone();
             let token_issuer = token_issuer.clone();
             #[cfg(feature = "biome-refresh-tokens")]
-            let refresh_token_store = refresh_token_store.clone();
+            let mut refresh_token_store = refresh_token_store.clone();
             Box::new(into_bytes(payload).and_then(move |bytes| {
                 let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
                     Ok(val) => val,

@@ -60,8 +60,11 @@ use self::actix::key_management::{
 };
 
 #[cfg(feature = "biome-key-management")]
-use super::key_management::store::PostgresKeyStore;
-use super::user::store::diesel::DieselUserStore;
+use super::key_management::{
+    store::{diesel::postgres::PostgresKeyStore, KeyStore},
+    Key,
+};
+use super::user::store::{diesel::DieselUserStore, UserStore};
 use crate::rest_api::secrets::{AutoSecretManager, SecretManager};
 
 pub use config::{BiomeRestConfig, BiomeRestConfigBuilder};
@@ -86,7 +89,7 @@ use self::actix::user::make_user_routes;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
 use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
 #[cfg(feature = "biome-credentials")]
-use super::credentials::store::diesel::DieselCredentialsStore;
+use super::credentials::store::CredentialsStore;
 
 #[allow(unused_imports)]
 use crate::rest_api::sessions::AccessTokenIssuer;
@@ -113,24 +116,35 @@ use crate::rest_api::sessions::AccessTokenIssuer;
 /// * `PUT /biome/user/{id}` - Update user with specified ID
 /// * `GET /biome/user/{id}` - Retrieve user with specified ID
 /// * `DELETE /biome/user/{id}` - Remove user with specified ID
-pub struct BiomeRestResourceManager {
+pub struct BiomeRestResourceManager<
+    C: CredentialsStore + Clone + 'static,
+    K: KeyStore<Key> + Clone + 'static,
+    R: RefreshTokenStore + Clone + 'static,
+    U: UserStore + Clone + 'static,
+> {
     #[cfg(feature = "biome-rest-api")]
-    user_store: DieselUserStore,
-    #[cfg(feature = "biome-key-management")]
-    key_store: Arc<PostgresKeyStore>,
+    user_store: U,
+    #[cfg(feature = "biome-key-management",)]
+    key_store: K,
     #[cfg(feature = "biome-rest-api")]
     rest_config: Arc<BiomeRestConfig>,
     token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(feature = "biome-refresh-tokens")]
-    refresh_token_store: Arc<dyn RefreshTokenStore>,
+    refresh_token_store: R,
     #[cfg(feature = "biome-credentials")]
-    credentials_store: Option<Arc<DieselCredentialsStore>>,
+    credentials_store: Option<C>,
 }
 
 #[cfg(feature = "biome-rest-api")]
-impl RestResourceProvider for BiomeRestResourceManager {
+impl<
+        C: CredentialsStore + Clone + 'static,
+        K: KeyStore<Key> + Clone + 'static,
+        R: RefreshTokenStore + Clone + 'static,
+        U: UserStore + Clone + 'static,
+    > RestResourceProvider for BiomeRestResourceManager<C, K, R, U>
+{
     fn resources(&self) -> Vec<Resource> {
         // This needs to be mutable if biome-credentials feature is enable
         #[allow(unused_mut)]
@@ -238,29 +252,39 @@ impl RestResourceProvider for BiomeRestResourceManager {
 }
 
 /// Builder for BiomeRestResourceManager
-#[derive(Default)]
-pub struct BiomeRestResourceManagerBuilder {
-    user_store: Option<DieselUserStore>,
+pub struct BiomeRestResourceManagerBuilder<
+    C: CredentialsStore + Clone + 'static,
+    K: KeyStore<Key> + Clone + 'static,
+    R: RefreshTokenStore + Clone + 'static,
+    U: UserStore + Clone + 'static,
+> {
+    user_store: Option<U>,
     #[cfg(feature = "biome-key-management")]
-    key_store: Option<PostgresKeyStore>,
+    key_store: Option<K>,
     rest_config: Option<BiomeRestConfig>,
     token_secret_manager: Option<Arc<dyn SecretManager>>,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_secret_manager: Option<Arc<dyn SecretManager>>,
     #[cfg(feature = "biome-refresh-tokens")]
-    refresh_token_store: Option<Arc<dyn RefreshTokenStore>>,
+    refresh_token_store: Option<R>,
     #[cfg(feature = "biome-credentials")]
-    credentials_store: Option<DieselCredentialsStore>,
+    credentials_store: Option<C>,
 }
 
-impl BiomeRestResourceManagerBuilder {
+impl<
+        C: CredentialsStore + Clone + 'static,
+        K: KeyStore<Key> + Clone + 'static,
+        R: RefreshTokenStore + Clone + 'static,
+        U: UserStore + Clone + 'static,
+    > BiomeRestResourceManagerBuilder<C, K, R, U>
+{
     /// Sets a UserStore for the BiomeRestResourceManager
     ///
     /// # Arguments
     ///
     /// * `pool`: ConnectionPool to database that will serve as backend for UserStore
-    pub fn with_user_store(mut self, pool: ConnectionPool) -> BiomeRestResourceManagerBuilder {
-        self.user_store = Some(DieselUserStore::new(pool));
+    pub fn with_user_store(mut self, store: U) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+        self.user_store = Some(store);
         self
     }
 
@@ -270,8 +294,8 @@ impl BiomeRestResourceManagerBuilder {
     ///
     /// * `pool`: ConnectionPool to database that will serve as backend for KeyStore
     #[cfg(feature = "biome-key-management")]
-    pub fn with_key_store(mut self, pool: ConnectionPool) -> BiomeRestResourceManagerBuilder {
-        self.key_store = Some(PostgresKeyStore::new(pool));
+    pub fn with_key_store(mut self, store: K) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+        self.key_store = Some(store);
         self
     }
 
@@ -280,7 +304,10 @@ impl BiomeRestResourceManagerBuilder {
     /// # Arguments
     ///
     /// * `config`: the BiomeRestConfig that will be used to configure the Biome resources
-    pub fn with_rest_config(mut self, config: BiomeRestConfig) -> BiomeRestResourceManagerBuilder {
+    pub fn with_rest_config(
+        mut self,
+        config: BiomeRestConfig,
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
         self.rest_config = Some(config);
         self
     }
@@ -293,9 +320,9 @@ impl BiomeRestResourceManagerBuilder {
     /// * `pool`: ConnectionPool to database that will serve as backend for CredentialsStore
     pub fn with_credentials_store(
         mut self,
-        pool: ConnectionPool,
-    ) -> BiomeRestResourceManagerBuilder {
-        self.credentials_store = Some(DieselCredentialsStore::new(pool));
+        credentials_store: C,
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+        self.credentials_store = Some(credentials_store);
         self
     }
 
@@ -308,7 +335,7 @@ impl BiomeRestResourceManagerBuilder {
     pub fn with_token_secret_manager(
         mut self,
         secret_manager: impl SecretManager + 'static,
-    ) -> BiomeRestResourceManagerBuilder {
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
         self.token_secret_manager = Some(Arc::new(secret_manager));
         self
     }
@@ -323,7 +350,7 @@ impl BiomeRestResourceManagerBuilder {
     pub fn with_refresh_token_secret_manager(
         mut self,
         secret_manager: impl SecretManager + 'static,
-    ) -> BiomeRestResourceManagerBuilder {
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
         self.refresh_token_secret_manager = Some(Arc::new(secret_manager));
         self
     }
@@ -338,14 +365,16 @@ impl BiomeRestResourceManagerBuilder {
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn with_refresh_token_store(
         mut self,
-        pool: ConnectionPool,
-    ) -> BiomeRestResourceManagerBuilder {
-        self.refresh_token_store = Some(Arc::new(DieselRefreshTokenStore::new(pool)));
+        store: R,
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+        self.refresh_token_store = Some(store);
         self
     }
 
     /// Consumes the builder and returns a BiomeRestResourceManager
-    pub fn build(self) -> Result<BiomeRestResourceManager, BiomeRestResourceManagerBuilderError> {
+    pub fn build(
+        self,
+    ) -> Result<BiomeRestResourceManager<C, K, R, U>, BiomeRestResourceManagerBuilderError> {
         let user_store = self.user_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
                 "Missing user store".to_string(),
@@ -386,7 +415,7 @@ impl BiomeRestResourceManagerBuilder {
         Ok(BiomeRestResourceManager {
             user_store,
             #[cfg(feature = "biome-key-management")]
-            key_store: Arc::new(key_store),
+            key_store,
             rest_config: Arc::new(rest_config),
             token_secret_manager,
             #[cfg(feature = "biome-refresh-tokens")]
@@ -394,13 +423,7 @@ impl BiomeRestResourceManagerBuilder {
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_store,
             #[cfg(feature = "biome-credentials")]
-            credentials_store: match self.credentials_store {
-                Some(credentials_store) => Some(Arc::new(credentials_store)),
-                None => {
-                    debug!("Building BiomeRestResourceManager without credentials store");
-                    None
-                }
-            },
+            credentials_store: self.credentials_store,
         })
     }
 }
