@@ -34,7 +34,7 @@ use crate::storage::get_storage;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Circuit {
-    #[serde(skip)]
+    #[serde(default)]
     id: String,
     auth: AuthorizationType,
     members: Vec<String>,
