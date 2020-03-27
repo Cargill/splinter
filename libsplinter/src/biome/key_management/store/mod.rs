@@ -29,7 +29,7 @@ pub trait KeyStore<T>: Sync + Send {
     /// # Arguments
     ///
     ///  * `key` - The key to be added
-    fn add_key(&self, key: T) -> Result<(), KeyStoreError>;
+    fn add_key(&mut self, key: T) -> Result<(), KeyStoreError>;
 
     /// Updates a key information in the underling storage
     ///
@@ -39,7 +39,7 @@ pub trait KeyStore<T>: Sync + Send {
     /// * `user_id`: The ID owner of the key record to be updated.
     /// * `new_display_name`: The new display name of the key record.
     fn update_key(
-        &self,
+        &mut self,
         public_key: &str,
         user_id: &str,
         new_display_name: &str,
@@ -51,7 +51,7 @@ pub trait KeyStore<T>: Sync + Send {
     ///
     /// * `public_key`: The public key of the key record to be removed.
     /// * `user_id`: The ID owner of the key record to be removed.
-    fn remove_key(&self, public_key: &str, user_id: &str) -> Result<T, KeyStoreError>;
+    fn remove_key(&mut self, public_key: &str, user_id: &str) -> Result<T, KeyStoreError>;
 
     /// Fetches a key from the underlying storage
     ///

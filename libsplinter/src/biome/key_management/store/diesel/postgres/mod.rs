@@ -43,12 +43,12 @@ impl PostgresKeyStore {
 }
 
 impl KeyStore<Key> for PostgresKeyStore {
-    fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
+    fn add_key(&mut self, key: Key) -> Result<(), KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).insert_key(key)
     }
 
     fn update_key(
-        &self,
+        &mut self,
         public_key: &str,
         user_id: &str,
         new_display_name: &str,
@@ -60,7 +60,7 @@ impl KeyStore<Key> for PostgresKeyStore {
         )
     }
 
-    fn remove_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
+    fn remove_key(&mut self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).remove_key(public_key, user_id)
     }
 

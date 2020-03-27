@@ -133,7 +133,7 @@ impl UserCredentialsBuilder {
 
 /// Defines methods for CRUD operations and fetching a user’s
 /// credentials without defining a storage strategy
-pub trait CredentialsStore {
+pub trait CredentialsStore: Send + Sync {
     /// Adds a credential to the underlying storage
     ///
     /// # Arguments
@@ -144,7 +144,10 @@ pub trait CredentialsStore {
     ///
     /// Returns a CredentialsStoreError if the implementation cannot add a new
     /// credential
-    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError>;
+    fn add_credentials(
+        &mut self,
+        credentials: UserCredentials,
+    ) -> Result<(), CredentialsStoreError>;
 
     /// Replaces a credential for a user in the underlying storage with new credentials. This
     /// assumes that the user has only one credential in storage
@@ -160,7 +163,7 @@ pub trait CredentialsStore {
     /// Returns a CredentialsStoreError if the implementation cannot update
     /// credentials or if the specified credentials do not exist
     fn update_credentials(
-        &self,
+        &mut self,
         user_id: &str,
         updated_username: &str,
         updated_password: &str,
@@ -176,7 +179,7 @@ pub trait CredentialsStore {
     ///
     /// Returns a CredentialsStoreError if implementation cannot delete the
     /// credential
-    fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError>;
+    fn remove_credentials(&mut self, user_id: &str) -> Result<(), CredentialsStoreError>;
 
     /// Fetches a credential for a user
     ///

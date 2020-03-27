@@ -46,12 +46,15 @@ impl DieselCredentialsStore {
 }
 
 impl CredentialsStore for DieselCredentialsStore {
-    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError> {
+    fn add_credentials(
+        &mut self,
+        credentials: UserCredentials,
+    ) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }
 
     fn update_credentials(
-        &self,
+        &mut self,
         user_id: &str,
         username: &str,
         password: &str,
@@ -60,7 +63,7 @@ impl CredentialsStore for DieselCredentialsStore {
             .update_credentials(user_id, username, password)
     }
 
-    fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
+    fn remove_credentials(&mut self, user_id: &str) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).remove_credentials(user_id)
     }
 

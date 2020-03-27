@@ -26,14 +26,14 @@ pub trait RefreshTokenStore: Send + Sync {
     ///
     ///   * `user_id` - The user whom which the token is for
     ///   * `token` - A refresh token for user
-    fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError>;
+    fn add_token(&mut self, user_id: &str, token: &str) -> Result<(), RefreshTokenError>;
 
     /// Removes a token in underlying storage
     ///
     /// # Arguments
     ///
     ///   * `user_id` - The user whom which the token is for
-    fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError>;
+    fn remove_token(&mut self, user_id: &str) -> Result<(), RefreshTokenError>;
 
     /// Update a refresh to token to underlying storage
     ///
@@ -41,7 +41,7 @@ pub trait RefreshTokenStore: Send + Sync {
     ///
     ///   * `user_id` - The user whom which the token is for
     ///   * `token` - A refresh token for user
-    fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError>;
+    fn update_token(&mut self, user_id: &str, token: &str) -> Result<(), RefreshTokenError>;
 
     /// Fetch a token from underlying storage
     ///

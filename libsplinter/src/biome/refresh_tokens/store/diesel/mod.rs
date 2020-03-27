@@ -36,13 +36,13 @@ impl DieselRefreshTokenStore {
 }
 
 impl RefreshTokenStore for DieselRefreshTokenStore {
-    fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+    fn add_token(&mut self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
     }
-    fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError> {
+    fn remove_token(&mut self, user_id: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).remove_token(user_id)
     }
-    fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+    fn update_token(&mut self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).update_token(user_id, token)
     }
     fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError> {
