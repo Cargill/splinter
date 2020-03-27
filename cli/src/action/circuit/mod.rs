@@ -25,6 +25,7 @@ use std::fs::File;
 use std::io::Read;
 
 use clap::ArgMatches;
+use splinter::admin::messages::{CreateCircuit, SplinterService};
 
 use crate::error::CliError;
 #[cfg(feature = "circuit-template")]
@@ -32,6 +33,7 @@ use crate::template::CircuitTemplate;
 
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
+use api::{CircuitServiceSlice, CircuitSlice};
 use builder::CreateCircuitMessageBuilder;
 
 pub struct CircuitCreateAction;
@@ -174,31 +176,22 @@ impl Action for CircuitCreateAction {
 
         let create_circuit = builder.build()?;
 
-        let circuit_id = create_circuit.circuit_id.clone();
-
         let client = api::SplinterRestClient::new(&url);
         let requester_node = client.fetch_node_id()?;
         let private_key_hex = read_private_key(key)?;
 
-        if args.is_present("dry_run") {
-            println!(
-                "\n{}",
-                serde_yaml::to_string(&create_circuit).map_err(|err| CliError::ActionError(
-                    format!("Cannot format circuit into yaml: {}", err)
-                ))?
-            );
-            return Ok(());
+        let circuit_slice = CircuitSlice::from(&create_circuit);
+
+        if !args.is_present("dry_run") {
+            let signed_payload =
+                payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
+
+            client.submit_admin_payload(signed_payload)?;
+
+            info!("The circuit proposal was submited successfully");
         }
 
-        let signed_payload =
-            payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
-
-        client.submit_admin_payload(signed_payload)?;
-
-        info!(
-            "The circuit proposal was submited successfully. Circuit ID: {}",
-            circuit_id
-        );
+        info!("{}", circuit_slice);
 
         Ok(())
     }
@@ -357,7 +350,7 @@ fn parse_service_type_argument(service_type: &str) -> Result<(String, String), C
 }
 
 /// Reads a private key from the given file name.
-pub fn read_private_key(file_name: &str) -> Result<String, CliError> {
+fn read_private_key(file_name: &str) -> Result<String, CliError> {
     let mut file = File::open(file_name).map_err(|err| {
         CliError::EnvironmentError(format!("Unable to open {}: {}", file_name, err))
     })?;
@@ -369,6 +362,36 @@ pub fn read_private_key(file_name: &str) -> Result<String, CliError> {
     let key = buf.trim().to_string();
 
     Ok(key)
+}
+
+impl From<&CreateCircuit> for CircuitSlice {
+    fn from(circuit: &CreateCircuit) -> Self {
+        Self {
+            id: circuit.circuit_id.clone(),
+            members: circuit
+                .members
+                .iter()
+                .map(|member| member.node_id.clone())
+                .collect(),
+            roster: circuit
+                .roster
+                .iter()
+                .map(|service| service.into())
+                .collect(),
+            management_type: circuit.circuit_management_type.clone(),
+        }
+    }
+}
+
+impl From<&SplinterService> for CircuitServiceSlice {
+    fn from(service: &SplinterService) -> Self {
+        Self {
+            service_id: service.service_id.clone(),
+            service_type: service.service_type.clone(),
+            allowed_nodes: service.allowed_nodes.clone(),
+            arguments: service.arguments.iter().cloned().collect(),
+        }
+    }
 }
 
 pub(self) enum Vote {
