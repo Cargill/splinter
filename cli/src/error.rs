@@ -11,13 +11,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 use std::error::Error;
 use std::fmt;
+
+use clap::Error as ClapError;
 
 #[derive(Debug)]
 pub enum CliError {
     RequiresArgs,
     InvalidSubcommand,
+    ClapError(ClapError),
     ActionError(String),
     EnvironmentError(String),
     #[cfg(feature = "database")]
@@ -31,6 +35,7 @@ impl fmt::Display for CliError {
         match self {
             CliError::RequiresArgs => write!(f, "action requires arguments"),
             CliError::InvalidSubcommand => write!(f, "received invalid subcommand"),
+            CliError::ClapError(err) => f.write_str(&err.message),
             CliError::ActionError(msg) => write!(f, "action encountered an error: {}", msg),
             CliError::EnvironmentError(msg) => {
                 write!(f, "action encountered an environment error: {}", msg)
@@ -38,5 +43,11 @@ impl fmt::Display for CliError {
             #[cfg(feature = "database")]
             CliError::DatabaseError(msg) => write!(f, "database error: {}", msg),
         }
+    }
+}
+
+impl From<ClapError> for CliError {
+    fn from(err: ClapError) -> Self {
+        Self::ClapError(err)
     }
 }

@@ -23,6 +23,8 @@ mod error;
 #[cfg(feature = "circuit-template")]
 mod template;
 
+use std::ffi::OsString;
+
 use clap::{clap_app, AppSettings, Arg, SubCommand};
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
@@ -66,7 +68,7 @@ pub fn log_format(
     write!(w, "{}", record.args(),)
 }
 
-fn run() -> Result<(), CliError> {
+fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<(), CliError> {
     let mut app = clap_app!(myapp =>
         (name: APP_NAME)
         (version: VERSION)
@@ -553,7 +555,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(circuit_command);
     }
 
-    let matches = app.get_matches();
+    let matches = app.get_matches_from_safe(args)?;
 
     // set default to info
     let log_level = if matches.is_present("quiet") {
@@ -641,8 +643,12 @@ fn run() -> Result<(), CliError> {
 }
 
 fn main() {
-    if let Err(e) = run() {
-        error!("ERROR: {}", e);
-        std::process::exit(1);
+    match run(std::env::args_os()) {
+        Ok(_) => {}
+        Err(CliError::ClapError(err)) => err.exit(),
+        Err(e) => {
+            error!("ERROR: {}", e);
+            std::process::exit(1);
+        }
     }
 }
