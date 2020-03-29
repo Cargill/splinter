@@ -26,6 +26,8 @@ mod template;
 use std::ffi::OsString;
 
 use clap::{clap_app, AppSettings, Arg, SubCommand};
+#[cfg(test)]
+use flexi_logger::FlexiLoggerError;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 
@@ -575,11 +577,18 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     log_spec_builder.module("mio", log::LevelFilter::Warn);
     log_spec_builder.module("want", log::LevelFilter::Warn);
 
-    Logger::with(log_spec_builder.build())
+    match Logger::with(log_spec_builder.build())
         .format(log_format)
         .log_target(flexi_logger::LogTarget::StdOut)
         .start()
-        .expect("Failed to create logger");
+    {
+        Ok(_) => {}
+        #[cfg(test)]
+        // `FlexiLoggerError::Log` means the logger has already been initialized; this will happen
+        // when `run` is called more than once in the tests.
+        Err(FlexiLoggerError::Log(_)) => {}
+        Err(err) => panic!("Failed to start logger: {}", err),
+    }
 
     let mut subcommands = SubcommandActions::new()
         .with_command(
