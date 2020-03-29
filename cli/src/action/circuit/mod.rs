@@ -37,9 +37,9 @@ use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 use api::{CircuitServiceSlice, CircuitSlice};
 use builder::CreateCircuitMessageBuilder;
 
-pub struct CircuitCreateAction;
+pub struct CircuitProposeAction;
 
-impl Action for CircuitCreateAction {
+impl Action for CircuitProposeAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
         let url = args

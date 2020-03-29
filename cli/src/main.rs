@@ -233,7 +233,7 @@ fn run() -> Result<(), CliError> {
 
     #[cfg(feature = "circuit")]
     {
-        let create_circuit = SubCommand::with_name("create")
+        let propose_circuit = SubCommand::with_name("propose")
             .about("Propose that a new circuit is created")
             .arg(
                 Arg::with_name("url")
@@ -345,7 +345,7 @@ fn run() -> Result<(), CliError> {
             .after_help(CIRCUIT_CREATE_AFTER_HELP);
 
         #[cfg(feature = "circuit-auth-type")]
-        let create_circuit = create_circuit.arg(
+        let propose_circuit = propose_circuit.arg(
             Arg::with_name("authorization_type")
                 .long("auth-type")
                 .possible_values(&["trust"])
@@ -355,7 +355,7 @@ fn run() -> Result<(), CliError> {
         );
 
         #[cfg(feature = "circuit-template")]
-        let create_circuit = create_circuit
+        let propose_circuit = propose_circuit
             .arg(
                 Arg::with_name("template")
                     .long("template")
@@ -374,7 +374,7 @@ fn run() -> Result<(), CliError> {
         let circuit_command = SubCommand::with_name("circuit")
             .about("Provides circuit management functionality")
             .setting(AppSettings::SubcommandRequiredElseHelp)
-            .subcommand(create_circuit)
+            .subcommand(propose_circuit)
             .subcommand(
                 SubCommand::with_name("vote")
                     .about("Vote on a new circuit proposal")
@@ -706,7 +706,7 @@ fn run() -> Result<(), CliError> {
     {
         use action::circuit;
         let circuit_command = SubcommandActions::new()
-            .with_command("create", circuit::CircuitCreateAction)
+            .with_command("propose", circuit::CircuitProposeAction)
             .with_command("vote", circuit::CircuitVoteAction)
             .with_command("list", circuit::CircuitListAction)
             .with_command("show", circuit::CircuitShowAction)
