@@ -34,6 +34,19 @@ use error::CliError;
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg(feature = "circuit")]
+const CIRCUIT_CREATE_AFTER_HELP: &str = r"DETAILS:
+    One or more nodes must be specified using the --node and/or --node-file arguments. These
+    arguments can be used on their own or together, but at least one of them is required.
+
+    The --node-file argument must be a valid YAML file. A valid YAML file will be a list of nodes,
+    where each node has an 'identity' or 'node_id' field, as well as an 'endpoint' field. Example:
+        ---
+        - identity: 'node-1'
+          endpoint: tls://node-1-endpoint:8044
+        - node_id: 'node-2'
+          endpoint: tls://node-2-endpoint:8045";
+
 // log format for cli that will only show the log message
 pub fn log_format(
     w: &mut dyn std::io::Write,
@@ -238,13 +251,20 @@ fn run() -> Result<(), CliError> {
                     .help("Path to private key file"),
             )
             .arg(
+                Arg::with_name("node_file")
+                    .long("node-file")
+                    .takes_value(true)
+                    .required_unless("node")
+                    .help("File system path or HTTP(S) URL to nodes file"),
+            )
+            .arg(
                 Arg::with_name("node")
                     .long("node")
                     .takes_value(true)
-                    .required(true)
+                    .required_unless("node_file")
                     .multiple(true)
                     .long_help(
-                        "Node that are part of the circuit. \
+                        "Node that is part of the circuit. \
                          Format: <node_id>::<endpoint>. \
                          Endpoint is optional if node alias has been set.",
                     ),
@@ -257,7 +277,7 @@ fn run() -> Result<(), CliError> {
                     .min_values(2)
                     .required_unless("template")
                     .long_help(
-                        "Service ID and allowed node. \
+                        "Service ID and allowed nodes. \
                          Format <service-id>::<allowed_nodes>",
                     ),
             )
@@ -321,7 +341,8 @@ fn run() -> Result<(), CliError> {
                     .long("dry-run")
                     .short("n")
                     .help("Print the circuit definition without submitting the proposal"),
-            );
+            )
+            .after_help(CIRCUIT_CREATE_AFTER_HELP);
 
         #[cfg(feature = "circuit-auth-type")]
         let create_circuit = create_circuit.arg(

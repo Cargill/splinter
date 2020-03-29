@@ -25,6 +25,7 @@ use std::fs::File;
 use std::io::Read;
 
 use clap::ArgMatches;
+use serde::Deserialize;
 use splinter::admin::messages::{CreateCircuit, SplinterService};
 
 use crate::error::CliError;
@@ -50,24 +51,33 @@ impl Action for CircuitCreateAction {
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
-        let nodes = match args.values_of("node") {
-            Some(nodes) => nodes,
-            None => return Err(CliError::ActionError("Node is required".into())),
-        };
+        if args.value_of("node_file").is_none() && args.values_of("node").is_none() {
+            return Err(CliError::ActionError(
+                "--node and/or --node-file arguments must be provided".into(),
+            ));
+        }
 
-        for node_argument in nodes {
-            let (node, endpoint) = parse_node_argument(node_argument)?;
-            if let Some(endpoint) = endpoint {
-                builder.add_node(&node, &endpoint)?;
-            } else {
-                #[cfg(feature = "node-alias")]
-                builder.add_node_by_alias(&node)?;
+        if let Some(node_file) = args.value_of("node_file") {
+            for node in load_nodes_from_file(node_file)? {
+                builder.add_node(&node.identity, &node.endpoint)?;
+            }
+        }
 
-                #[cfg(not(feature = "node-alias"))]
-                return Err(CliError::ActionError(format!(
-                    "Invalid node argument: {}",
-                    node_argument
-                )));
+        if let Some(nodes) = args.values_of("node") {
+            for node_argument in nodes {
+                let (node, endpoint) = parse_node_argument(node_argument)?;
+                if let Some(endpoint) = endpoint {
+                    builder.add_node(&node, &endpoint)?;
+                } else {
+                    #[cfg(feature = "node-alias")]
+                    builder.add_node_by_alias(&node)?;
+
+                    #[cfg(not(feature = "node-alias"))]
+                    return Err(CliError::ActionError(format!(
+                        "Invalid node argument: {}",
+                        node_argument
+                    )));
+                }
             }
         }
 
@@ -195,6 +205,54 @@ impl Action for CircuitCreateAction {
 
         Ok(())
     }
+}
+
+#[derive(Deserialize)]
+struct Node {
+    #[serde(alias = "node_id")]
+    identity: String,
+    endpoint: String,
+}
+
+fn load_nodes_from_file(node_file: &str) -> Result<Vec<Node>, CliError> {
+    if node_file.starts_with("http://") || node_file.starts_with("https://") {
+        load_nodes_from_remote(node_file)
+    } else {
+        load_nodes_from_local(node_file)
+    }
+}
+
+fn load_nodes_from_remote(url: &str) -> Result<Vec<Node>, CliError> {
+    let bytes = reqwest::blocking::get(url)
+        .map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to fetch remote node file from {}: {}",
+                url, err
+            ))
+        })?
+        .bytes()
+        .map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to get bytes from remote node file HTTP response: {}",
+                err
+            ))
+        })?;
+    serde_yaml::from_slice(&bytes).map_err(|err| {
+        CliError::ActionError(format!("Failed to deserialize remote node file: {}", err))
+    })
+}
+
+fn load_nodes_from_local(node_file: &str) -> Result<Vec<Node>, CliError> {
+    let path = if node_file.starts_with("file://") {
+        node_file.split_at(7).1
+    } else {
+        node_file
+    };
+    let file = File::open(path).map_err(|err| {
+        CliError::EnvironmentError(format!("Unable to open node file {}: {}", path, err))
+    })?;
+    serde_yaml::from_reader(file)
+        .map_err(|err| CliError::ActionError(format!("Failed to read node file {}: {}", path, err)))
 }
 
 fn parse_node_argument(node_argument: &str) -> Result<(String, Option<String>), CliError> {
