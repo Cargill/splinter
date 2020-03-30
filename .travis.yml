@@ -93,3 +93,9 @@ jobs:
           on:
             tags: true
             all_branches: true
+
+notifications:
+  slack:
+    secure: $SLACK_TOKEN
+    on_success: change
+    on_failure: always
