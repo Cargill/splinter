@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #[cfg(feature = "diesel")]
-pub(crate) mod diesel;
+pub(in crate::biome) mod diesel;
 mod error;
 
 pub use error::RefreshTokenError;
