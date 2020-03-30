@@ -16,7 +16,6 @@
 //! migrations.
 //!
 //! ```ignore
-//!
 //! use biome::migrations::run_postgres_migrations;
 //! use diesel::{pg::PgConnection};
 //!
