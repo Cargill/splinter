@@ -29,7 +29,9 @@ use health::HealthService;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
 #[cfg(feature = "biome")]
-use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
+use splinter::biome::rest_api::{
+    DieselBiomeRestResourceManager, DieselBiomeRestResourceManagerBuilder,
+};
 use splinter::circuit::directory::CircuitDirectory;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -628,7 +630,7 @@ fn start_health_service(
 }
 
 #[cfg(feature = "biome")]
-fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartError> {
+fn build_biome_routes(db_url: &str) -> Result<DieselBiomeRestResourceManager, StartError> {
     info!("Adding biome routes");
     let connection_pool: ConnectionPool =
         database::ConnectionPool::new_pg(db_url).map_err(|err| {
@@ -637,7 +639,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
                 err
             ))
         })?;
-    let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
+    let mut biome_rest_provider_builder = DieselBiomeRestResourceManagerBuilder::default();
     biome_rest_provider_builder =
         biome_rest_provider_builder.with_user_store(connection_pool.clone());
     #[cfg(feature = "biome-credentials")]

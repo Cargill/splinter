@@ -19,7 +19,7 @@
 //!
 //! ```no_run
 //! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
-//! use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
+//! use splinter::biome::rest_api::{BiomeRestResourceManager, DieselBiomeRestResourceManagerBuilder};
 //! use splinter::database::{self, ConnectionPool};
 //!
 //! let connection_pool: ConnectionPool = database::ConnectionPool::new_pg(
@@ -27,7 +27,7 @@
 //!        )
 //!        .unwrap();
 //!
-//! let biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
+//! let biome_rest_provider_builder = DieselBiomeRestResourceManagerBuilder::default();
 //! let biome_rest_provider = biome_rest_provider_builder
 //!             .with_user_store(connection_pool.clone())
 //!             .build()
@@ -89,7 +89,7 @@ use self::actix::user::make_user_routes;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
 use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
 #[cfg(feature = "biome-credentials")]
-use super::credentials::store::CredentialsStore;
+use super::credentials::store::{diesel::DieselCredentialsStore, CredentialsStore};
 
 #[allow(unused_imports)]
 use crate::rest_api::sessions::AccessTokenIssuer;
@@ -425,5 +425,116 @@ impl<
             #[cfg(feature = "biome-credentials")]
             credentials_store: self.credentials_store,
         })
+    }
+}
+
+impl<
+        C: CredentialsStore + Clone + 'static,
+        K: KeyStore<Key> + Clone + 'static,
+        R: RefreshTokenStore + Clone + 'static,
+        U: UserStore<User> + Clone + 'static,
+    > Default for BiomeRestResourceManagerBuilder<C, K, R, U>
+{
+    fn default() -> Self {
+        Self {
+            user_store: None,
+            #[cfg(feature = "biome-key-management")]
+            key_store: None,
+            rest_config: None,
+            token_secret_manager: None,
+            #[cfg(feature = "biome-refresh-tokens")]
+            refresh_token_secret_manager: None,
+            #[cfg(feature = "biome-refresh-tokens")]
+            refresh_token_store: None,
+            #[cfg(feature = "biome-credentials")]
+            credentials_store: None,
+        }
+    }
+}
+
+pub type DieselBiomeRestResourceManager = BiomeRestResourceManager<
+    DieselCredentialsStore,
+    PostgresKeyStore,
+    DieselRefreshTokenStore,
+    DieselUserStore,
+>;
+
+/// Builder for creating a biome resource manager that is backed by
+/// diesel implementations of database stores.
+#[derive(Default)]
+pub struct DieselBiomeRestResourceManagerBuilder {
+    builder: BiomeRestResourceManagerBuilder<
+        DieselCredentialsStore,
+        PostgresKeyStore,
+        DieselRefreshTokenStore,
+        DieselUserStore,
+    >,
+}
+
+impl DieselBiomeRestResourceManagerBuilder {
+    pub fn with_user_store(mut self, pool: ConnectionPool) -> Self {
+        self.builder = self.builder.with_user_store(DieselUserStore::new(pool));
+        self
+    }
+
+    #[cfg(feature = "biome-key-management")]
+    pub fn with_key_store(mut self, pool: ConnectionPool) -> Self {
+        self.builder = self.builder.with_key_store(PostgresKeyStore::new(pool));
+        self
+    }
+
+    pub fn with_rest_config(mut self, config: BiomeRestConfig) -> Self {
+        self.builder = self.builder.with_rest_config(config);
+        self
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    pub fn with_credentials_store(mut self, pool: ConnectionPool) -> Self {
+        self.builder = self
+            .builder
+            .with_credentials_store(DieselCredentialsStore::new(pool));
+        self
+    }
+
+    #[cfg(feature = "json-web-tokens")]
+    pub fn with_token_secret_manager(
+        mut self,
+        secret_manager: impl SecretManager + 'static,
+    ) -> Self {
+        self.builder = self.builder.with_token_secret_manager(secret_manager);
+        self
+    }
+
+    #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
+    pub fn with_refresh_token_secret_manager(
+        mut self,
+        secret_manager: impl SecretManager + 'static,
+    ) -> Self {
+        self.builder = self
+            .builder
+            .with_refresh_token_secret_manager(secret_manager);
+        self
+    }
+
+    #[cfg(feature = "biome-refresh-tokens")]
+    pub fn with_refresh_token_store(mut self, pool: ConnectionPool) -> Self {
+        self.builder = self
+            .builder
+            .with_refresh_token_store(DieselRefreshTokenStore::new(pool));
+        self
+    }
+
+    pub fn build(
+        self,
+    ) -> Result<
+        BiomeRestResourceManager<
+            DieselCredentialsStore,
+            PostgresKeyStore,
+            DieselRefreshTokenStore,
+            DieselUserStore,
+        >,
+        BiomeRestResourceManagerBuilderError,
+    > {
+        self.builder.build()
     }
 }
