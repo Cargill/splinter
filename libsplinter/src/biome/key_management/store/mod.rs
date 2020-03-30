@@ -67,4 +67,20 @@ pub trait KeyStore<T>: Sync + Send {
     ///
     /// * `user_id`: The ID owner of the key records to list.
     fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<T>, KeyStoreError>;
+
+    #[cfg(feature = "biome-credentials")]
+    /// Updates keys and the associated user's password in the underlying storage
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id`: The ID owner of the key records to list.
+    ///  * `updated_password` - The updated password for the user
+    ///  * `keys` - The keys to be replaced
+    ///
+    fn update_keys_and_password(
+        &self,
+        user_id: &str,
+        updated_password: &str,
+        keys: &[T],
+    ) -> Result<(), KeyStoreError>;
 }

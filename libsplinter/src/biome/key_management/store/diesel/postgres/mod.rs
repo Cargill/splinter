@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "biome-credentials")]
+use super::operations::update_keys_and_password::KeyStoreUpdateKeysAndPasswordOperation as _;
 use super::operations::{
     fetch_key::KeyStoreFetchKeyOperation as _, insert_key::KeyStoreInsertKeyOperation as _,
     list_keys::KeyStoreListKeysOperation as _, list_keys::KeyStoreListKeysWithUserIDOperation as _,
@@ -72,5 +74,19 @@ impl KeyStore<Key> for PostgresKeyStore {
                 .list_keys_with_user_id(user_id),
             None => KeyStoreOperations::new(&*self.connection_pool.get()?).list_keys(),
         }
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    fn update_keys_and_password(
+        &self,
+        user_id: &str,
+        updated_password: &str,
+        keys: &[Key],
+    ) -> Result<(), KeyStoreError> {
+        KeyStoreOperations::new(&*self.connection_pool.get()?).update_keys_and_password(
+            user_id,
+            updated_password,
+            keys,
+        )
     }
 }
