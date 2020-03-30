@@ -78,6 +78,7 @@ glob = "0.2"
 default = []
 
 stable = [
+    "biome",
     "default",
     "events",
     "rest-api",
@@ -89,7 +90,6 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "biome",
     "biome-credentials",
     "biome-key-management",
     "biome-notifications",
