@@ -37,6 +37,7 @@ impl WsListener {
 impl Listener for WsListener {
     fn accept(&mut self) -> Result<Box<dyn Connection>, AcceptError> {
         let client = self.server.accept()?.accept()?;
+        client.set_nonblocking(true)?;
 
         let remote_endpoint = format!("ws://{}", client.peer_addr()?);
         let local_endpoint = format!("ws://{}", client.local_addr()?);

@@ -100,6 +100,7 @@ impl Transport for WsTransport {
         }
 
         let client = ClientBuilder::new(endpoint)?.connect_insecure()?;
+        client.set_nonblocking(true)?;
 
         let remote_endpoint = format!("ws://{}", client.peer_addr()?);
         let local_endpoint = format!("ws://{}", client.local_addr()?);

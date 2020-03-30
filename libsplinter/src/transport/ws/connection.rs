@@ -14,8 +14,6 @@
 
 use std::io::{self, Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::thread;
-use std::time::Duration;
 
 use mio::{unix::EventedFd, Evented, Poll, PollOpt, Ready, Token};
 use websocket::{
@@ -58,28 +56,20 @@ where
     }
 
     fn recv(&mut self) -> Result<Vec<u8>, RecvError> {
-        loop {
-            match self.client.recv_message() {
-                Ok(message) => match message {
-                    Binary(v) => break Ok(v),
-                    _ => {
-                        break Err(RecvError::ProtocolError(
-                            "message received was not
-                            websocket::message::OwnedMessage::Binary"
-                                .to_string(),
-                        ))
-                    }
-                },
-                Err(WebSocketError::IoError(ref e)) if e.kind() == io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(100));
-                    continue;
-                }
-                Err(WebSocketError::NoDataAvailable) => {
-                    thread::sleep(Duration::from_millis(100));
-                    continue;
-                }
-                Err(err) => break Err(err.into()),
+        match self.client.recv_message() {
+            Ok(message) => match message {
+                Binary(v) => Ok(v),
+                _ => Err(RecvError::ProtocolError(
+                    "message received was not
+                        websocket::message::OwnedMessage::Binary"
+                        .to_string(),
+                )),
+            },
+            Err(WebSocketError::IoError(ref e)) if e.kind() == io::ErrorKind::WouldBlock => {
+                Err(RecvError::WouldBlock)
             }
+            Err(WebSocketError::NoDataAvailable) => Err(RecvError::WouldBlock),
+            Err(err) => Err(err.into()),
         }
     }
 
