@@ -918,6 +918,44 @@ paths:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
+
+  /biome/logout:
+    patch:
+      tags:
+        - Biome
+      description: Removes access tokens associated with a user
+      parameters:
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User successfully logged out"
+        400:
+          description: Invalid request
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+        401:
+          description: Access token is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBiome'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+
   /biome/token:
     post:
       tags:
