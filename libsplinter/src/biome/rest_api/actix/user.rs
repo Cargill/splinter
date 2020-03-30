@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
@@ -65,9 +63,10 @@ pub fn make_user_routes<
     C: CredentialsStore + Clone + 'static,
     U: UserStore + Clone + 'static,
     K: KeyStore<Key> + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
 >(
     rest_config: BiomeRestConfig,
-    secret_manager: Arc<dyn SecretManager>,
+    secret_manager: SM,
     credentials_store: C,
     user_store: U,
     key_store: K,
@@ -152,10 +151,11 @@ fn add_fetch_user_method<C: CredentialsStore + Clone + Sync + 'static>(
 fn add_modify_user_method<
     C: CredentialsStore + Clone + 'static,
     K: KeyStore<Key> + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
 >(
     credentials_store: C,
     rest_config: BiomeRestConfig,
-    secret_manager: Arc<dyn SecretManager>,
+    secret_manager: SM,
     key_store: K,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
@@ -304,9 +304,9 @@ fn add_modify_user_method<
 }
 
 /// Defines a REST endpoint to delete a user from the database
-fn add_delete_user_method<U: UserStore + Clone + 'static>(
+fn add_delete_user_method<U: UserStore + Clone + 'static, SM: SecretManager + Clone + 'static>(
     rest_config: BiomeRestConfig,
-    secret_manager: Arc<dyn SecretManager>,
+    secret_manager: SM,
     user_store: U,
 ) -> HandlerFunction {
     Box::new(move |request, _| {

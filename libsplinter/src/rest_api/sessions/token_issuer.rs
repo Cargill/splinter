@@ -14,26 +14,24 @@
 
 //! Provides an implementation of a TokenIssuer
 
-use std::sync::Arc;
-
 use jsonwebtoken::{encode, Header};
 
 use super::{Claims, TokenIssuer, TokenIssuerError};
 use crate::rest_api::secrets::SecretManager;
 
 /// Issues JWT access tokens
-pub struct AccessTokenIssuer {
-    secret_manager: Arc<dyn SecretManager>,
+pub struct AccessTokenIssuer<SM: SecretManager + Clone + 'static> {
+    secret_manager: SM,
     #[cfg(feature = "biome-refresh-tokens")]
-    refresh_secret_manager: Arc<dyn SecretManager>,
+    refresh_secret_manager: SM,
 }
 
-impl AccessTokenIssuer {
+impl<SM: SecretManager + Clone + 'static> AccessTokenIssuer<SM> {
     /// Creates a new AccessTokenIssuer that will use the given secret manager for issuing tokens
     pub fn new(
-        secret_manager: Arc<dyn SecretManager>,
-        #[cfg(feature = "biome-refresh-tokens")] refresh_secret_manager: Arc<dyn SecretManager>,
-    ) -> AccessTokenIssuer {
+        secret_manager: SM,
+        #[cfg(feature = "biome-refresh-tokens")] refresh_secret_manager: SM,
+    ) -> AccessTokenIssuer<SM> {
         AccessTokenIssuer {
             secret_manager,
             #[cfg(feature = "biome-refresh-tokens")]
@@ -42,7 +40,7 @@ impl AccessTokenIssuer {
     }
 }
 
-impl TokenIssuer<Claims> for AccessTokenIssuer {
+impl<SM: SecretManager + Clone + 'static> TokenIssuer<Claims> for AccessTokenIssuer<SM> {
     fn issue_token_with_claims(&self, claims: Claims) -> Result<String, TokenIssuerError> {
         let token = encode(
             &Header::default(),

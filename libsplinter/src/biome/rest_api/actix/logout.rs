@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use crate::actix_web::HttpResponse;
 use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
 use crate::biome::rest_api::{
@@ -29,9 +27,12 @@ use crate::rest_api::{
 
 /// Defines a REST endpoint to remove any refresh tokens belonging to the user.
 ///
-pub fn make_logout_route<R: RefreshTokenStore + Clone + 'static>(
+pub fn make_logout_route<
+    R: RefreshTokenStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
+>(
     refresh_token_store: R,
-    secret_manager: Arc<dyn SecretManager>,
+    secret_manager: SM,
     rest_config: BiomeRestConfig,
 ) -> Resource {
     Resource::build("/biome/logout")
@@ -45,9 +46,12 @@ pub fn make_logout_route<R: RefreshTokenStore + Clone + 'static>(
         )
 }
 
-pub fn add_logout_route<R: RefreshTokenStore + Clone + 'static>(
+pub fn add_logout_route<
+    R: RefreshTokenStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
+>(
     refresh_token_store: R,
-    secret_manager: Arc<dyn SecretManager>,
+    secret_manager: SM,
     rest_config: BiomeRestConfig,
 ) -> HandlerFunction {
     Box::new(move |request, _| {

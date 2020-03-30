@@ -121,6 +121,7 @@ pub struct BiomeRestResourceManager<
     K: KeyStore<Key> + Clone + 'static,
     R: RefreshTokenStore + Clone + 'static,
     U: UserStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
 > {
     #[cfg(feature = "biome-rest-api")]
     user_store: U,
@@ -128,9 +129,9 @@ pub struct BiomeRestResourceManager<
     key_store: K,
     #[cfg(feature = "biome-rest-api")]
     rest_config: BiomeRestConfig,
-    token_secret_manager: Arc<dyn SecretManager>,
+    token_secret_manager: SM,
     #[cfg(feature = "biome-refresh-tokens")]
-    refresh_token_secret_manager: Arc<dyn SecretManager>,
+    refresh_token_secret_manager: SM,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_store: R,
     #[cfg(feature = "biome-credentials")]
@@ -143,7 +144,8 @@ impl<
         K: KeyStore<Key> + Clone + 'static,
         R: RefreshTokenStore + Clone + 'static,
         U: UserStore + Clone + 'static,
-    > RestResourceProvider for BiomeRestResourceManager<C, K, R, U>
+        SM: SecretManager + Clone + 'static,
+    > RestResourceProvider for BiomeRestResourceManager<C, K, R, U, SM>
 {
     fn resources(&self) -> Vec<Resource> {
         // This needs to be mutable if biome-credentials feature is enable
@@ -257,14 +259,15 @@ pub struct BiomeRestResourceManagerBuilder<
     K: KeyStore<Key> + Clone + 'static,
     R: RefreshTokenStore + Clone + 'static,
     U: UserStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
 > {
     user_store: Option<U>,
     #[cfg(feature = "biome-key-management")]
     key_store: Option<K>,
     rest_config: Option<BiomeRestConfig>,
-    token_secret_manager: Option<Arc<dyn SecretManager>>,
+    token_secret_manager: Option<SM>,
     #[cfg(feature = "biome-refresh-tokens")]
-    refresh_token_secret_manager: Option<Arc<dyn SecretManager>>,
+    refresh_token_secret_manager: Option<SM>,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_store: Option<R>,
     #[cfg(feature = "biome-credentials")]
@@ -276,14 +279,15 @@ impl<
         K: KeyStore<Key> + Clone + 'static,
         R: RefreshTokenStore + Clone + 'static,
         U: UserStore + Clone + 'static,
-    > BiomeRestResourceManagerBuilder<C, K, R, U>
+        SM: SecretManager + Clone + 'static,
+    > BiomeRestResourceManagerBuilder<C, K, R, U, SM>
 {
     /// Sets a UserStore for the BiomeRestResourceManager
     ///
     /// # Arguments
     ///
     /// * `pool`: ConnectionPool to database that will serve as backend for UserStore
-    pub fn with_user_store(mut self, store: U) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+    pub fn with_user_store(mut self, store: U) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
         self.user_store = Some(store);
         self
     }
@@ -294,7 +298,7 @@ impl<
     ///
     /// * `pool`: ConnectionPool to database that will serve as backend for KeyStore
     #[cfg(feature = "biome-key-management")]
-    pub fn with_key_store(mut self, store: K) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+    pub fn with_key_store(mut self, store: K) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
         self.key_store = Some(store);
         self
     }
@@ -307,7 +311,7 @@ impl<
     pub fn with_rest_config(
         mut self,
         config: BiomeRestConfig,
-    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
         self.rest_config = Some(config);
         self
     }
@@ -321,7 +325,7 @@ impl<
     pub fn with_credentials_store(
         mut self,
         credentials_store: C,
-    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
         self.credentials_store = Some(credentials_store);
         self
     }
@@ -334,9 +338,9 @@ impl<
     ///   sign and verify JWT tokens
     pub fn with_token_secret_manager(
         mut self,
-        secret_manager: impl SecretManager + 'static,
-    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
-        self.token_secret_manager = Some(Arc::new(secret_manager));
+        secret_manager: SM,
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
+        self.token_secret_manager = Some(secret_manager);
         self
     }
 
@@ -349,9 +353,9 @@ impl<
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn with_refresh_token_secret_manager(
         mut self,
-        secret_manager: impl SecretManager + 'static,
-    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
-        self.refresh_token_secret_manager = Some(Arc::new(secret_manager));
+        secret_manager: SM,
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
+        self.refresh_token_secret_manager = Some(secret_manager);
         self
     }
 
@@ -366,7 +370,7 @@ impl<
     pub fn with_refresh_token_store(
         mut self,
         store: R,
-    ) -> BiomeRestResourceManagerBuilder<C, K, R, U> {
+    ) -> BiomeRestResourceManagerBuilder<C, K, R, U, SM> {
         self.refresh_token_store = Some(store);
         self
     }
@@ -374,7 +378,8 @@ impl<
     /// Consumes the builder and returns a BiomeRestResourceManager
     pub fn build(
         self,
-    ) -> Result<BiomeRestResourceManager<C, K, R, U>, BiomeRestResourceManagerBuilderError> {
+    ) -> Result<BiomeRestResourceManager<C, K, R, U, SM>, BiomeRestResourceManagerBuilderError>
+    {
         let user_store = self.user_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
                 "Missing user store".to_string(),
@@ -394,16 +399,18 @@ impl<
             }
         };
 
-        let token_secret_manager = self.token_secret_manager.unwrap_or_else(|| {
-            debug!("Building BiomeRestResourceManager with default SecretManager.");
-            Arc::new(AutoSecretManager::default())
-        });
+        let token_secret_manager = self.token_secret_manager.ok_or_else(|| {
+            BiomeRestResourceManagerBuilderError::MissingRequiredField(
+                "Missing token secret manager".to_string(),
+            )
+        })?;
 
         #[cfg(feature = "biome-refresh-tokens")]
-        let refresh_token_secret_manager = self.refresh_token_secret_manager.unwrap_or_else(|| {
-            debug!("Building BiomeRestResourceManager with default token SecretManager.");
-            Arc::new(AutoSecretManager::default())
-        });
+        let refresh_token_secret_manager = self.refresh_token_secret_manager.ok_or_else(|| {
+            BiomeRestResourceManagerBuilderError::MissingRequiredField(
+                "Missing refresh token secret manager".to_string(),
+            )
+        })?;
 
         #[cfg(feature = "biome-refresh-tokens")]
         let refresh_token_store = self.refresh_token_store.ok_or_else(|| {
@@ -433,7 +440,8 @@ impl<
         K: KeyStore<Key> + Clone + 'static,
         R: RefreshTokenStore + Clone + 'static,
         U: UserStore + Clone + 'static,
-    > Default for BiomeRestResourceManagerBuilder<C, K, R, U>
+        SM: SecretManager + Clone + 'static,
+    > Default for BiomeRestResourceManagerBuilder<C, K, R, U, SM>
 {
     fn default() -> Self {
         Self {
@@ -457,6 +465,7 @@ pub type DieselBiomeRestResourceManager = BiomeRestResourceManager<
     PostgresKeyStore,
     DieselRefreshTokenStore,
     DieselUserStore,
+    AutoSecretManager,
 >;
 
 /// Builder for creating a biome resource manager that is backed by
@@ -468,6 +477,7 @@ pub struct DieselBiomeRestResourceManagerBuilder {
         PostgresKeyStore,
         DieselRefreshTokenStore,
         DieselUserStore,
+        AutoSecretManager,
     >,
 }
 
@@ -497,19 +507,13 @@ impl DieselBiomeRestResourceManagerBuilder {
     }
 
     #[cfg(feature = "json-web-tokens")]
-    pub fn with_token_secret_manager(
-        mut self,
-        secret_manager: impl SecretManager + 'static,
-    ) -> Self {
+    pub fn with_token_secret_manager(mut self, secret_manager: AutoSecretManager) -> Self {
         self.builder = self.builder.with_token_secret_manager(secret_manager);
         self
     }
 
     #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
-    pub fn with_refresh_token_secret_manager(
-        mut self,
-        secret_manager: impl SecretManager + 'static,
-    ) -> Self {
+    pub fn with_refresh_token_secret_manager(mut self, secret_manager: AutoSecretManager) -> Self {
         self.builder = self
             .builder
             .with_refresh_token_secret_manager(secret_manager);
@@ -532,6 +536,7 @@ impl DieselBiomeRestResourceManagerBuilder {
             PostgresKeyStore,
             DieselRefreshTokenStore,
             DieselUserStore,
+            AutoSecretManager,
         >,
         BiomeRestResourceManagerBuilderError,
     > {

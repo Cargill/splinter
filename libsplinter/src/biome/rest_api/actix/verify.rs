@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::config::BiomeRestConfig;
@@ -35,10 +33,13 @@ use super::authorize::authorize_user;
 ///       "username": <existing username of the user>
 ///       "hashed_password": <hash of the user's existing password>
 ///   }
-pub fn make_verify_route<C: CredentialsStore + Clone + 'static>(
+pub fn make_verify_route<
+    C: CredentialsStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
+>(
     credentials_store: C,
     rest_config: BiomeRestConfig,
-    secret_manager: Arc<dyn SecretManager>,
+    secret_manager: SM,
 ) -> Resource {
     Resource::build("/biome/verify")
         .add_request_guard(ProtocolVersionRangeGuard::new(

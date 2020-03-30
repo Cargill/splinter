@@ -19,6 +19,7 @@ use super::{SecretManager, SecretManagerError};
 const SECRET_LENGTH: usize = 64;
 
 /// A SecretManager that generates a random string as a secret and keeps it in memory
+#[derive(Clone)]
 pub struct AutoSecretManager {
     secret: String,
 }

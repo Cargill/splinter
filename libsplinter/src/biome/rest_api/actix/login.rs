@@ -22,8 +22,12 @@ use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    into_bytes,
+    secrets::SecretManager,
+    sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer},
+    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
+};
 
 /// Defines a REST endpoint for login
 ///
@@ -35,11 +39,12 @@ use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGua
 pub fn make_login_route<
     C: CredentialsStore + Clone + 'static,
     R: RefreshTokenStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
 >(
     credentials_store: C,
     #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: R,
     rest_config: BiomeRestConfig,
-    token_issuer: Arc<AccessTokenIssuer>,
+    token_issuer: Arc<AccessTokenIssuer<SM>>,
 ) -> Resource {
     Resource::build("/biome/login")
         .add_request_guard(ProtocolVersionRangeGuard::new(

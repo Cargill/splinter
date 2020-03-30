@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use jsonwebtoken::{decode, Validation};
 
 use crate::actix_web::HttpRequest;
@@ -23,9 +21,9 @@ use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::sessions::Claims;
 
 /// Verifies the user has the correct permissions
-pub(crate) fn authorize_user(
+pub(crate) fn authorize_user<SM: SecretManager>(
     request: &HttpRequest,
-    secret_manager: &Arc<dyn SecretManager>,
+    secret_manager: &SM,
     validation: &Validation,
 ) -> AuthorizationResult {
     let token = match get_authorization_token(&request) {
@@ -39,9 +37,9 @@ pub(crate) fn authorize_user(
     validate_claims(&token, secret_manager, validation)
 }
 
-pub(crate) fn validate_claims(
+pub(crate) fn validate_claims<SM: SecretManager>(
     token: &str,
-    secret_manager: &Arc<dyn SecretManager>,
+    secret_manager: &SM,
     validation: &Validation,
 ) -> AuthorizationResult {
     let secret = match secret_manager.secret() {

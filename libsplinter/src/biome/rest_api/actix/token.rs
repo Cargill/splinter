@@ -45,11 +45,14 @@ use crate::rest_api::{
 ///   {
 ///     "token": <new auth token>
 ///   }
-pub fn make_token_route<R: RefreshTokenStore + Clone + 'static>(
+pub fn make_token_route<
+    R: RefreshTokenStore + Clone + 'static,
+    SM: SecretManager + Clone + 'static,
+>(
     refresh_token_store: R,
-    secret_manager: Arc<dyn SecretManager>,
-    refresh_token_secret_manager: Arc<dyn SecretManager>,
-    token_issuer: Arc<AccessTokenIssuer>,
+    secret_manager: SM,
+    refresh_token_secret_manager: SM,
+    token_issuer: Arc<AccessTokenIssuer<SM>>,
     rest_config: BiomeRestConfig,
 ) -> Resource {
     Resource::build("/biome/token")
