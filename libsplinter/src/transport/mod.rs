@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod error;
 pub mod inproc;
 pub mod multi;
 #[deprecated(since = "0.3.14", note = "please use splinter::transport::socket")]
@@ -24,13 +25,7 @@ pub mod zmq;
 
 use mio::Evented;
 
-use std::error::Error;
-use std::io;
-
-pub enum Status {
-    Connected,
-    Disconnected,
-}
+pub use error::{AcceptError, ConnectError, DisconnectError, ListenError, RecvError, SendError};
 
 /// A bi-directional connection between two nodes
 pub trait Connection: Send {
@@ -108,111 +103,6 @@ impl<'a> Iterator for IncomingIter<'a> {
         Some(self.listener.accept())
     }
 }
-
-// -- Errors --
-
-macro_rules! impl_from_io_error {
-    ($err:ident) => {
-        impl From<io::Error> for $err {
-            fn from(io_error: io::Error) -> Self {
-                $err::IoError(io_error)
-            }
-        }
-    };
-}
-
-macro_rules! impl_from_io_error_ext {
-    ($err:ident) => {
-        impl From<io::Error> for $err {
-            fn from(io_error: io::Error) -> Self {
-                match io_error.kind() {
-                    io::ErrorKind::UnexpectedEof => $err::Disconnected,
-                    io::ErrorKind::WouldBlock => $err::WouldBlock,
-                    _ => $err::IoError(io_error),
-                }
-            }
-        }
-    };
-}
-
-#[derive(Debug)]
-pub enum SendError {
-    IoError(io::Error),
-    ProtocolError(String),
-    WouldBlock,
-    Disconnected,
-}
-
-impl_from_io_error_ext!(SendError);
-
-#[derive(Debug)]
-pub enum RecvError {
-    IoError(io::Error),
-    ProtocolError(String),
-    WouldBlock,
-    Disconnected,
-}
-
-impl_from_io_error_ext!(RecvError);
-
-#[derive(Debug)]
-pub enum StatusError {}
-
-#[derive(Debug)]
-pub enum DisconnectError {
-    IoError(io::Error),
-    ProtocolError(String),
-}
-
-impl_from_io_error!(DisconnectError);
-
-#[derive(Debug)]
-pub enum AcceptError {
-    IoError(io::Error),
-    ProtocolError(String),
-}
-
-impl_from_io_error!(AcceptError);
-
-#[derive(Debug)]
-pub enum ConnectError {
-    IoError(io::Error),
-    ParseError(String),
-    ProtocolError(String),
-}
-
-impl Error for ConnectError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            ConnectError::IoError(err) => Some(err),
-            ConnectError::ParseError(_) => None,
-            ConnectError::ProtocolError(_) => None,
-        }
-    }
-}
-
-impl std::fmt::Display for ConnectError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ConnectError::IoError(err) => write!(f, "io error occurred: {}", err),
-            ConnectError::ParseError(err) => write!(f, "error while parsing: {}", err),
-            ConnectError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
-        }
-    }
-}
-
-impl_from_io_error!(ConnectError);
-
-#[derive(Debug)]
-pub enum ListenError {
-    IoError(io::Error),
-    ProtocolError(String),
-}
-
-impl_from_io_error!(ListenError);
-
-#[derive(Debug)]
-pub enum PollError {}
 
 #[cfg(test)]
 pub mod tests {
