@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use crate::actix_web::HttpResponse;
 use crate::biome::{
     refresh_tokens::store::{RefreshTokenError, RefreshTokenStore},
@@ -52,7 +50,7 @@ pub fn make_token_route<
     refresh_token_store: R,
     secret_manager: SM,
     refresh_token_secret_manager: SM,
-    token_issuer: Arc<AccessTokenIssuer<SM>>,
+    token_issuer: AccessTokenIssuer<SM>,
     rest_config: BiomeRestConfig,
 ) -> Resource {
     Resource::build("/biome/token")

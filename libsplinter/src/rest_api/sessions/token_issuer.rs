@@ -20,6 +20,7 @@ use super::{Claims, TokenIssuer, TokenIssuerError};
 use crate::rest_api::secrets::SecretManager;
 
 /// Issues JWT access tokens
+#[derive(Clone)]
 pub struct AccessTokenIssuer<SM: SecretManager + Clone + 'static> {
     secret_manager: SM,
     #[cfg(feature = "biome-refresh-tokens")]

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 #[cfg(feature = "biome-refresh-tokens")]
@@ -44,7 +42,7 @@ pub fn make_login_route<
     credentials_store: C,
     #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: R,
     rest_config: BiomeRestConfig,
-    token_issuer: Arc<AccessTokenIssuer<SM>>,
+    token_issuer: AccessTokenIssuer<SM>,
 ) -> Resource {
     Resource::build("/biome/login")
         .add_request_guard(ProtocolVersionRangeGuard::new(

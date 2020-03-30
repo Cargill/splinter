@@ -47,8 +47,6 @@ mod config;
 mod error;
 mod resources;
 
-use std::sync::Arc;
-
 #[cfg(feature = "biome-refresh-tokens")]
 use crate::biome::refresh_tokens::store::{diesel::DieselRefreshTokenStore, RefreshTokenStore};
 use crate::database::ConnectionPool;
@@ -195,19 +193,19 @@ impl<
                         credentials_store.clone(),
                         self.refresh_token_store.clone(),
                         self.rest_config.clone(),
-                        Arc::new(AccessTokenIssuer::new(
+                        AccessTokenIssuer::new(
                             self.token_secret_manager.clone(),
                             self.refresh_token_secret_manager.clone(),
-                        )),
+                        ),
                     ));
                     resources.push(make_token_route(
                         self.refresh_token_store.clone(),
                         self.token_secret_manager.clone(),
                         self.refresh_token_secret_manager.clone(),
-                        Arc::new(AccessTokenIssuer::new(
+                        AccessTokenIssuer::new(
                             self.token_secret_manager.clone(),
                             self.refresh_token_secret_manager.clone(),
-                        )),
+                        ),
                         self.rest_config.clone(),
                     ));
                 }
