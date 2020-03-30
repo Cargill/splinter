@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "circuit-read")]
 pub(super) mod circuits;
-#[cfg(feature = "circuit-read")]
 pub(super) mod circuits_circuit_id;
 #[cfg(feature = "proposal-read")]
 pub(super) mod proposals;

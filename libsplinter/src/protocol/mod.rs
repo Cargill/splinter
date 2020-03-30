@@ -26,9 +26,9 @@ pub(crate) const ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
 #[cfg(all(feature = "rest-api", feature = "proposal-read"))]
 pub(crate) const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
-#[cfg(all(feature = "circuit-read", feature = "rest-api"))]
+#[cfg(feature = "rest-api")]
 pub(crate) const ADMIN_LIST_CIRCUITS_MIN: u32 = 1;
-#[cfg(all(feature = "circuit-read", feature = "rest-api"))]
+#[cfg(feature = "rest-api")]
 pub(crate) const ADMIN_FETCH_CIRCUIT_MIN: u32 = 1;
 #[cfg(feature = "rest-api")]
 pub(crate) const ADMIN_LIST_NODES_MIN: u32 = 1;
