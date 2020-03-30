@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::actix_web::HttpResponse;
@@ -39,7 +38,7 @@ pub fn make_register_route<
 >(
     credentials_store: C,
     user_store: U,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
 ) -> Resource {
     Resource::build("/biome/register")
         .add_request_guard(ProtocolVersionRangeGuard::new(

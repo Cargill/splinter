@@ -32,7 +32,7 @@ use crate::rest_api::{secrets::SecretManager, sessions::default_validation};
 
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
 pub fn make_key_management_route<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
@@ -65,7 +65,7 @@ pub fn make_key_management_route<K: KeyStore<Key> + Clone + 'static>(
 
 /// Defines a REST endpoint for adding a key to the underlying storage
 fn handle_post<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
@@ -137,7 +137,7 @@ fn handle_post<K: KeyStore<Key> + Clone + 'static>(
 
 /// Defines a REST endpoint for retrieving keys from the underlying storage
 fn handle_get<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
@@ -189,7 +189,7 @@ fn handle_get<K: KeyStore<Key> + Clone + 'static>(
 
 /// Defines a REST endpoint for updating a key in the underlying storage
 fn handle_patch<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
@@ -255,7 +255,7 @@ fn handle_patch<K: KeyStore<Key> + Clone + 'static>(
 
 /// Defines a REST endpoint for managing keys including fetching and deleting a user's key
 pub fn make_key_management_route_with_public_key<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
@@ -280,7 +280,7 @@ pub fn make_key_management_route_with_public_key<K: KeyStore<Key> + Clone + 'sta
 
 /// Defines a REST endpoint method to fetch a key from the underlying storage
 fn handle_fetch<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
@@ -350,7 +350,7 @@ fn handle_fetch<K: KeyStore<Key> + Clone + 'static>(
 
 /// Defines a REST endpoint method to delete a key from the underlying storage
 fn handle_delete<K: KeyStore<Key> + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     key_store: K,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {

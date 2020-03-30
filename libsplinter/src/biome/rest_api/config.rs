@@ -24,7 +24,7 @@ const DEFAULT_DURATION: u64 = 5400; // in seconds = 90 minutes
 const DEFAULT_REFRESH_DURATION: u64 = 5_184_000; // in seconds = 60 days
 
 /// Configuration for Biome REST resources
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct BiomeRestConfig {
     /// The issuer for JWT tokens issued by this service
     issuer: String,

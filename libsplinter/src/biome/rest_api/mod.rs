@@ -124,10 +124,10 @@ pub struct BiomeRestResourceManager<
 > {
     #[cfg(feature = "biome-rest-api")]
     user_store: U,
-    #[cfg(feature = "biome-key-management",)]
+    #[cfg(feature = "biome-key-management")]
     key_store: K,
     #[cfg(feature = "biome-rest-api")]
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_secret_manager: Arc<dyn SecretManager>,
@@ -416,7 +416,7 @@ impl<
             user_store,
             #[cfg(feature = "biome-key-management")]
             key_store,
-            rest_config: Arc::new(rest_config),
+            rest_config,
             token_secret_manager,
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_secret_manager,
@@ -432,7 +432,7 @@ impl<
         C: CredentialsStore + Clone + 'static,
         K: KeyStore<Key> + Clone + 'static,
         R: RefreshTokenStore + Clone + 'static,
-        U: UserStore<User> + Clone + 'static,
+        U: UserStore + Clone + 'static,
     > Default for BiomeRestResourceManagerBuilder<C, K, R, U>
 {
     fn default() -> Self {

@@ -66,7 +66,7 @@ pub fn make_user_routes<
     U: UserStore + Clone + 'static,
     K: KeyStore<Key> + Clone + 'static,
 >(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     secret_manager: Arc<dyn SecretManager>,
     credentials_store: C,
     user_store: U,
@@ -154,7 +154,7 @@ fn add_modify_user_method<
     K: KeyStore<Key> + Clone + 'static,
 >(
     credentials_store: C,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     secret_manager: Arc<dyn SecretManager>,
     key_store: K,
 ) -> HandlerFunction {
@@ -305,7 +305,7 @@ fn add_modify_user_method<
 
 /// Defines a REST endpoint to delete a user from the database
 fn add_delete_user_method<U: UserStore + Clone + 'static>(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     secret_manager: Arc<dyn SecretManager>,
     user_store: U,
 ) -> HandlerFunction {

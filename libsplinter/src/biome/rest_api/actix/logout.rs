@@ -32,7 +32,7 @@ use crate::rest_api::{
 pub fn make_logout_route<R: RefreshTokenStore + Clone + 'static>(
     refresh_token_store: R,
     secret_manager: Arc<dyn SecretManager>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
 ) -> Resource {
     Resource::build("/biome/logout")
         .add_request_guard(ProtocolVersionRangeGuard::new(
@@ -48,7 +48,7 @@ pub fn make_logout_route<R: RefreshTokenStore + Clone + 'static>(
 pub fn add_logout_route<R: RefreshTokenStore + Clone + 'static>(
     refresh_token_store: R,
     secret_manager: Arc<dyn SecretManager>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let rest_config = rest_config.clone();

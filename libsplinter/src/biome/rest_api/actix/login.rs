@@ -38,7 +38,7 @@ pub fn make_login_route<
 >(
     credentials_store: C,
     #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: R,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
     Resource::build("/biome/login")

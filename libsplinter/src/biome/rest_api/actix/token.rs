@@ -50,7 +50,7 @@ pub fn make_token_route<R: RefreshTokenStore + Clone + 'static>(
     secret_manager: Arc<dyn SecretManager>,
     refresh_token_secret_manager: Arc<dyn SecretManager>,
     token_issuer: Arc<AccessTokenIssuer>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
 ) -> Resource {
     Resource::build("/biome/token")
         .add_request_guard(ProtocolVersionRangeGuard::new(

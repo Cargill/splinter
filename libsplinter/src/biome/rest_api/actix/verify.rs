@@ -37,7 +37,7 @@ use super::authorize::authorize_user;
 ///   }
 pub fn make_verify_route<C: CredentialsStore + Clone + 'static>(
     credentials_store: C,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: BiomeRestConfig,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     Resource::build("/biome/verify")
