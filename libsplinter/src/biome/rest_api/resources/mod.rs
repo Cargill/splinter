@@ -23,3 +23,5 @@ pub(in crate::biome::rest_api) mod authorize;
 pub(in crate::biome::rest_api) mod credentials;
 #[cfg(feature = "biome-key-management")]
 pub(in crate::biome::rest_api) mod key_management;
+#[cfg(feature = "biome-refresh-tokens")]
+pub(in crate::biome::rest_api) mod token;

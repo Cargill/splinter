@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines results from user authorization.
+use super::schema::refresh_tokens;
 
-use crate::rest_api::sessions::Claims;
+#[derive(Queryable, Identifiable, PartialEq, Debug)]
+#[table_name = "refresh_tokens"]
+#[primary_key(id)]
+pub struct RefreshToken {
+    pub id: i64,
+    pub user_id: String,
+    pub token: String,
+}
 
-pub(crate) enum AuthorizationResult {
-    Authorized(Claims),
-    Unauthorized(String),
-    Failed,
+#[derive(AsChangeset, Insertable, PartialEq, Debug)]
+#[table_name = "refresh_tokens"]
+pub struct NewRefreshToken<'a> {
+    pub user_id: &'a str,
+    pub token: &'a str,
 }

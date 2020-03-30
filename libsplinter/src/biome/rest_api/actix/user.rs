@@ -28,7 +28,10 @@ use crate::biome::user::store::{
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::secrets::SecretManager;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    into_bytes, sessions::default_validation, ErrorResponse, Method, ProtocolVersionRangeGuard,
+    Resource,
+};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<SplinterCredentialsStore>) -> Resource {
@@ -267,6 +270,7 @@ fn add_delete_user_method(
     secret_manager: Arc<dyn SecretManager>,
     mut user_store: SplinterUserStore,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let validation = default_validation(&rest_config.issuer());
     let user_id = if let Some(t) = request.match_info().get("id") {
         t.to_string()
     } else {
@@ -278,8 +282,8 @@ fn add_delete_user_method(
                 .into_future(),
         );
     };
-    match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
-        AuthorizationResult::Authorized => match user_store.remove_user(&user_id) {
+    match authorize_user(&request, &secret_manager, &validation) {
+        AuthorizationResult::Authorized(_) => match user_store.remove_user(&user_id) {
             Ok(()) => Box::new(
                 HttpResponse::Ok()
                     .json(json!({ "message": "User deleted sucessfully" }))

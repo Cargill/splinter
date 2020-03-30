@@ -836,7 +836,9 @@ paths:
                     type: string
                     example: "User created successfully"
                   data:
-                    ref: '#/components/schemas/BiomeNewUser'
+                    type: object
+                    example:
+                      ref: '#/components/schemas/BiomeNewUser'
         400:
           description: Invalid request
           content:
@@ -897,12 +899,80 @@ paths:
                       IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
                       XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
                       riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
+                  refresh_token:
+                    type: string
+                    description: "JWT refresh token used for obtaining a new access to token"
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
+                      IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
+                      XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
+                      riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
         400:
           description: Invalid request
           content:
             application/json:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+  /biome/token:
+    post:
+      tags:
+        - Biome
+      description: Issues a new access token
+      parameters:
+        - $ref: "#/components/parameters/protocol_version"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                refresh_token:
+                  description: a refresh token issues by biome
+
+              required:
+                - refresh_token
+              example:
+                refresh_token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
+                  IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
+                  XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
+                  riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: "JWT access token used for authorizing access to protected resources"
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
+                      IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
+                      XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
+                      riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
+        400:
+          description: Invalid request
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+        401:
+          description: Access token is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBiome'
+        403:
+          description: Refresh token is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBiome'
         500:
           description: Internal server error occurred
           content:
@@ -1159,20 +1229,13 @@ paths:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
 
-  /biome/users/{user_id}/keys:
+  /biome/users/keys:
     get:
       tags:
       - Biome
       description: List keys of a user
       parameters:
         - $ref: "#/components/parameters/protocol_version"
-        - name: user_id
-          in: path
-          description: ID of the user
-          required: true
-          schema:
-            type: string
-            example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
       responses:
         200:
           description: User's keys
@@ -1206,13 +1269,6 @@ paths:
       description: Update a key's display name
       parameters:
         - $ref: "#/components/parameters/protocol_version"
-        - name: user_id
-          in: path
-          description: ID of the user
-          required: true
-          schema:
-            type: string
-            example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
       requestBody:
         content:
           application/json:
@@ -1271,13 +1327,6 @@ paths:
       description: Add a new key for user
       parameters:
         - $ref: "#/components/parameters/protocol_version"
-        - name: user_id
-          in: path
-          description: ID of the user
-          required: true
-          schema:
-            type: string
-            example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
       requestBody:
         content:
           application/json:
@@ -1315,20 +1364,13 @@ paths:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
 
-  /biome/users/{user_id}/keys/{public_key}:
+  /biome/users/keys/{public_key}:
     get:
       tags:
       - Biome
       description: Fetch key of a user
       parameters:
         - $ref: "#/components/parameters/protocol_version"
-        - name: user_id
-          in: path
-          description: ID of the user
-          required: true
-          schema:
-            type: string
-            example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
         - name: public_key
           in: path
           description: Public key of the user

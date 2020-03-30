@@ -25,10 +25,10 @@ use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey, Upd
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
     into_bytes, ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
 };
+use crate::rest_api::{secrets::SecretManager, sessions::default_validation};
 
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
 pub fn make_key_management_route(
@@ -36,7 +36,7 @@ pub fn make_key_management_route(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    Resource::build("/biome/users/{user_id}/keys")
+    Resource::build("/biome/users/keys")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
@@ -71,20 +71,10 @@ fn handle_post(
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
-            Some(id) => id.to_owned(),
-            None => {
-                error!("User ID is not in path request");
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
-        };
+        let validation = default_validation(&rest_config.issuer());
 
-        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
-            AuthorizationResult::Authorized => (),
+        let user_id = match authorize_user(&request, &secret_manager, &validation) {
+            AuthorizationResult::Authorized(claims) => claims.user_id(),
             AuthorizationResult::Unauthorized(msg) => {
                 return Box::new(
                     HttpResponse::Unauthorized()
@@ -99,7 +89,7 @@ fn handle_post(
                         .into_future(),
                 );
             }
-        }
+        };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
             let new_key = match serde_json::from_slice::<NewKey>(&bytes) {
@@ -153,20 +143,10 @@ fn handle_get(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
-            Some(id) => id.to_owned(),
-            None => {
-                error!("User ID is not in path request");
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
-        };
+        let validation = default_validation(&rest_config.issuer());
 
-        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
-            AuthorizationResult::Authorized => (),
+        let user_id = match authorize_user(&request, &secret_manager, &validation) {
+            AuthorizationResult::Authorized(claims) => claims.user_id(),
             AuthorizationResult::Unauthorized(msg) => {
                 return Box::new(
                     HttpResponse::Unauthorized()
@@ -181,7 +161,7 @@ fn handle_get(
                         .into_future(),
                 );
             }
-        }
+        };
 
         match key_store.list_keys(Some(&user_id)) {
             Ok(keys) => Box::new(
@@ -209,20 +189,10 @@ fn handle_patch(
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
-            Some(id) => id.to_owned(),
-            None => {
-                error!("User ID is not in path request");
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
-        };
+        let validation = default_validation(&rest_config.issuer());
 
-        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
-            AuthorizationResult::Authorized => (),
+        let user_id = match authorize_user(&request, &secret_manager, &validation) {
+            AuthorizationResult::Authorized(claims) => claims.user_id(),
             AuthorizationResult::Unauthorized(msg) => {
                 return Box::new(
                     HttpResponse::Unauthorized()
@@ -237,7 +207,7 @@ fn handle_patch(
                         .into_future(),
                 );
             }
-        }
+        };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
             let updated_key = match serde_json::from_slice::<UpdatedKey>(&bytes) {
@@ -283,7 +253,7 @@ pub fn make_key_management_route_with_public_key(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    Resource::build("/biome/users/{user_id}/keys/{public_key}")
+    Resource::build("/biome/users/keys/{public_key}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
@@ -310,19 +280,7 @@ fn handle_fetch(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
-            Some(id) => id.to_owned(),
-            None => {
-                error!("User ID is not in path request");
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(
-                            &"Failed to process request: no user id".to_string(),
-                        ))
-                        .into_future(),
-                );
-            }
-        };
+        let validation = default_validation(&rest_config.issuer());
 
         let public_key = match request.match_info().get("public_key") {
             Some(id) => id.to_owned(),
@@ -338,8 +296,8 @@ fn handle_fetch(
             }
         };
 
-        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
-            AuthorizationResult::Authorized => (),
+        let user_id = match authorize_user(&request, &secret_manager, &validation) {
+            AuthorizationResult::Authorized(claims) => claims.user_id(),
             AuthorizationResult::Unauthorized(msg) => {
                 return Box::new(
                     HttpResponse::Unauthorized()
@@ -354,7 +312,7 @@ fn handle_fetch(
                         .into_future(),
                 );
             }
-        }
+        };
 
         match key_store.fetch_key(&user_id, &public_key) {
             Ok(key) => Box::new(
@@ -392,19 +350,7 @@ fn handle_delete(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let user_id = match request.match_info().get("user_id") {
-            Some(id) => id.to_owned(),
-            None => {
-                error!("User ID is not in path request");
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(
-                            &"Failed to process request: no user id".to_string(),
-                        ))
-                        .into_future(),
-                );
-            }
-        };
+        let validation = default_validation(&rest_config.issuer());
 
         let public_key = match request.match_info().get("public_key") {
             Some(id) => id.to_owned(),
@@ -420,8 +366,8 @@ fn handle_delete(
             }
         };
 
-        match authorize_user(&request, &user_id, &secret_manager, &rest_config) {
-            AuthorizationResult::Authorized => (),
+        let user_id = match authorize_user(&request, &secret_manager, &validation) {
+            AuthorizationResult::Authorized(claims) => claims.user_id(),
             AuthorizationResult::Unauthorized(msg) => {
                 return Box::new(
                     HttpResponse::Unauthorized()
@@ -436,7 +382,7 @@ fn handle_delete(
                         .into_future(),
                 );
             }
-        }
+        };
 
         match key_store.remove_key(&user_id, &public_key) {
             Ok(key) => Box::new(

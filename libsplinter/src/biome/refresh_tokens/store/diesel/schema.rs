@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines results from user authorization.
-
-use crate::rest_api::sessions::Claims;
-
-pub(crate) enum AuthorizationResult {
-    Authorized(Claims),
-    Unauthorized(String),
-    Failed,
+table! {
+    refresh_tokens (id) {
+        id -> Int8,
+        user_id -> Text,
+        token -> Text,
+    }
 }

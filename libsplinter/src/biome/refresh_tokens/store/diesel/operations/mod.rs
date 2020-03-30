@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines results from user authorization.
+pub(super) mod add_token;
+pub(super) mod fetch_token;
+pub(super) mod remove_token;
+pub(super) mod update_token;
 
-use crate::rest_api::sessions::Claims;
+pub(super) struct RefreshTokenStoreOperations<'a, C> {
+    conn: &'a C,
+}
 
-pub(crate) enum AuthorizationResult {
-    Authorized(Claims),
-    Unauthorized(String),
-    Failed,
+impl<'a, C> RefreshTokenStoreOperations<'a, C>
+where
+    C: diesel::Connection,
+{
+    pub fn new(conn: &'a C) -> Self {
+        RefreshTokenStoreOperations { conn }
+    }
 }

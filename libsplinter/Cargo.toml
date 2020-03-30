@@ -93,6 +93,7 @@ experimental = [
     "biome-credentials",
     "biome-key-management",
     "biome-notifications",
+    "biome-refresh-tokens",
     "biome-rest-api",
     "biome-user",
     "circuit-read",
@@ -118,6 +119,7 @@ biome = ["database"]
 biome-credentials = ["biome", "biome-user", "database", "bcrypt"]
 biome-key-management = ["biome", "database"]
 biome-notifications = ["biome", "database"]
+biome-refresh-tokens = []
 biome-rest-api = ["biome"]
 biome-user = ["biome", "database"]
 circuit-read = []

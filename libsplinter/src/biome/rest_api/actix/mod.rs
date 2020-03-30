@@ -23,6 +23,12 @@ pub(super) mod key_management;
 pub(super) mod login;
 #[cfg(feature = "biome-credentials")]
 pub(super) mod register;
+#[cfg(all(
+    feature = "biome-credentials",
+    feature = "biome-refresh-tokens",
+    feature = "json-web-tokens"
+))]
+pub(super) mod token;
 #[cfg(all(feature = "biome-credentials", feature = "json-web-tokens"))]
 pub(super) mod user;
 #[cfg(all(feature = "biome-credentials", feature = "json-web-tokens"))]

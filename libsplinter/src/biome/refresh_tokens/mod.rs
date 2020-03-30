@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines results from user authorization.
+//! Defines a basic representation of a user and provides an API to manage credentials.
 
-use crate::rest_api::sessions::Claims;
-
-pub(crate) enum AuthorizationResult {
-    Authorized(Claims),
-    Unauthorized(String),
-    Failed,
-}
+pub mod store;

@@ -14,7 +14,7 @@
 
 pub(in crate::biome) mod models;
 mod operations;
-mod schema;
+pub(in crate::biome) mod schema;
 
 use super::{SplinterUser, UserStore, UserStoreError};
 use crate::database::ConnectionPool;

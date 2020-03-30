@@ -47,4 +47,11 @@ impl ErrorResponse {
             message: message.to_string(),
         }
     }
+
+    pub fn forbidden(message: &str) -> ErrorResponse {
+        ErrorResponse {
+            code: "403".to_string(),
+            message: message.to_string(),
+        }
+    }
 }
