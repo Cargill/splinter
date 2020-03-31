@@ -187,8 +187,14 @@ pub trait CredentialsStore<T> {
     ///
     fn fetch_credential_by_username(&self, username: &str) -> Result<T, CredentialsStoreError>;
 
+    /// Fetches the username for a user by user_id
+    ///
+    /// # Arguments
+    ///
+    ///  * `user_id` - The unique identifier of the user the credential belongs to
     fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError>;
 
+    /// Fetches user names
     fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
