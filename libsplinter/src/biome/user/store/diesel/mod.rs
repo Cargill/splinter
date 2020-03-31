@@ -27,24 +27,24 @@ use operations::UserStoreOperations;
 
 /// Manages creating, updating and fetching SplinterUser from the databae
 #[derive(Clone)]
-pub struct SplinterUserStore {
+pub struct DieselUserStore {
     connection_pool: ConnectionPool,
 }
 
-impl SplinterUserStore {
-    /// Creates a new SplinterUserStore
+impl DieselUserStore {
+    /// Creates a new DieselUserStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the database
     // Allow dead code if diesel feature is not enabled
     #[allow(dead_code)]
-    pub fn new(connection_pool: ConnectionPool) -> SplinterUserStore {
-        SplinterUserStore { connection_pool }
+    pub fn new(connection_pool: ConnectionPool) -> DieselUserStore {
+        DieselUserStore { connection_pool }
     }
 }
 
-impl UserStore<SplinterUser> for SplinterUserStore {
+impl UserStore<SplinterUser> for DieselUserStore {
     fn add_user(&mut self, user: SplinterUser) -> Result<(), UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).add_user(user.into())
     }

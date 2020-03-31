@@ -22,7 +22,7 @@ use crate::biome::credentials::store::{
 };
 use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{diesel::SplinterUserStore, SplinterUser, UserStore};
+use crate::biome::user::store::{diesel::DieselUserStore, SplinterUser, UserStore};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
@@ -36,7 +36,7 @@ use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGua
 ///   }
 pub fn make_register_route(
     credentials_store: Arc<SplinterCredentialsStore>,
-    user_store: SplinterUserStore,
+    user_store: DieselUserStore,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {
     Resource::build("/biome/register")

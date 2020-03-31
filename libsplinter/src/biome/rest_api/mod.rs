@@ -63,7 +63,7 @@ use self::actix::key_management::{
 
 #[cfg(feature = "biome-key-management")]
 use super::key_management::store::PostgresKeyStore;
-use super::user::store::diesel::SplinterUserStore;
+use super::user::store::diesel::DieselUserStore;
 #[cfg(feature = "json-web-tokens")]
 use crate::rest_api::secrets::{AutoSecretManager, SecretManager};
 
@@ -93,7 +93,7 @@ use crate::rest_api::sessions::AccessTokenIssuer;
 pub struct BiomeRestResourceManager {
     // Disable lint warning, for now this is only used if the biome-credentials feature is enabled
     #[allow(dead_code)]
-    user_store: SplinterUserStore,
+    user_store: DieselUserStore,
     #[cfg(all(feature = "biome-key-management", feature = "json-web-tokens"))]
     key_store: Arc<PostgresKeyStore>,
     // Disable lint warning, for now this is only used if the biome-credentials feature is enabled
@@ -189,7 +189,7 @@ impl RestResourceProvider for BiomeRestResourceManager {
 /// Builder for BiomeRestResourceManager
 #[derive(Default)]
 pub struct BiomeRestResourceManagerBuilder {
-    user_store: Option<SplinterUserStore>,
+    user_store: Option<DieselUserStore>,
     #[cfg(feature = "biome-key-management")]
     key_store: Option<PostgresKeyStore>,
     rest_config: Option<BiomeRestConfig>,
@@ -206,7 +206,7 @@ impl BiomeRestResourceManagerBuilder {
     ///
     /// * `pool`: ConnectionPool to database that will serve as backend for UserStore
     pub fn with_user_store(mut self, pool: ConnectionPool) -> BiomeRestResourceManagerBuilder {
-        self.user_store = Some(SplinterUserStore::new(pool));
+        self.user_store = Some(DieselUserStore::new(pool));
         self
     }
 
