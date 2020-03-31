@@ -177,9 +177,7 @@ impl CreateCircuitMessageBuilder {
             }
         };
 
-        let node = make_splinter_node(&node_id, &endpoint)?;
-        self.nodes.push(node);
-        Ok(())
+        self.add_node(&node_id, &endpoint)
     }
 
     pub fn add_node(&mut self, node_id: &str, node_endpoint: &str) -> Result<(), CliError> {
