@@ -112,7 +112,7 @@ impl UserCredentialsBuilder {
             UserCredentialsBuilderError::MissingRequiredField("Missing user_id".to_string())
         })?;
         let username = self.username.ok_or_else(|| {
-            UserCredentialsBuilderError::MissingRequiredField("Missing user_id".to_string())
+            UserCredentialsBuilderError::MissingRequiredField("Missing username".to_string())
         })?;
 
         let cost = self
