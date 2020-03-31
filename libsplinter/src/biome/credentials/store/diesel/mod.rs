@@ -45,7 +45,7 @@ impl SplinterCredentialsStore {
     }
 }
 
-impl CredentialsStore<UserCredentials> for SplinterCredentialsStore {
+impl CredentialsStore for SplinterCredentialsStore {
     fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }

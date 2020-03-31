@@ -132,7 +132,7 @@ impl UserCredentialsBuilder {
 
 /// Defines methods for CRUD operations and fetching a user’s
 /// credentials without defining a storage strategy
-pub trait CredentialsStore<T> {
+pub trait CredentialsStore {
     /// Adds a credential to the underlying storage
     ///
     /// # Arguments
@@ -143,11 +143,10 @@ pub trait CredentialsStore<T> {
     ///
     /// Returns a CredentialsStoreError if the implementation cannot add a new
     /// credential
-    fn add_credentials(&self, credentials: T) -> Result<(), CredentialsStoreError>;
+    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError>;
 
-    /// Replaces a credential of a certain type for a user in the underlying storage with new
-    /// credentials. This assumes that the user has only one credential of a certain type in
-    /// storage
+    /// Replaces a credential for a user in the underlying storage with new credentials. This
+    /// assumes that the user has only one credential in storage
     ///
     /// # Arguments
     ///
@@ -188,7 +187,10 @@ pub trait CredentialsStore<T> {
     ///
     /// Returns a CredentialsStoreError if implementation cannot fetch the credential or
     /// if the credential cannot be found
-    fn fetch_credential_by_user_id(&self, user_id: &str) -> Result<T, CredentialsStoreError>;
+    fn fetch_credential_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<UserCredentials, CredentialsStoreError>;
 
     /// Fetches a credential for a user
     ///
@@ -200,7 +202,10 @@ pub trait CredentialsStore<T> {
     ///
     /// Returns a CredentialsStoreError if implementation cannot fetch the credential or
     /// if the credential cannot be found
-    fn fetch_credential_by_username(&self, username: &str) -> Result<T, CredentialsStoreError>;
+    fn fetch_credential_by_username(
+        &self,
+        username: &str,
+    ) -> Result<UserCredentials, CredentialsStoreError>;
 
     /// Fetches the username for a user by user_id
     ///
