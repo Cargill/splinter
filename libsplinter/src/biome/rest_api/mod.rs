@@ -14,8 +14,8 @@
 
 //! Provides an API for managing Biome REST API endpoints
 //!
-//! Below is an example of building an instance of BiomeRestResourceManager and passing its resources
-//! to a running instance of `RestApi`.
+//! Below is an example of building an instance of BiomeRestResourceManager and passing its
+//! resources to a running instance of `RestApi`.
 //!
 //! ```no_run
 //! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
@@ -317,7 +317,7 @@ impl BiomeRestResourceManagerBuilder {
     /// # Arguments
     ///
     /// * `store`: the RefreshTokenStore to be used for performing CRUD operation on a
-    ///   serialized refresh tokena.
+    ///   serialized refresh token.
     ///
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn with_refresh_token_store(
@@ -338,7 +338,7 @@ impl BiomeRestResourceManagerBuilder {
         #[cfg(all(feature = "biome-key-management", feature = "json-web-tokens"))]
         let key_store = self.key_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
-                "MissingKeyStore".to_string(),
+                "Missing key store".to_string(),
             )
         })?;
         let rest_config = match self.rest_config {
