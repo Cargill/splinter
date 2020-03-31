@@ -56,11 +56,3 @@ services:
             (cd splinterd && cargo test --features experimental)
         "
     stop_signal: SIGKILL
-
-  unit-test-canopy-app:
-    build:
-      context: ../canopy/app
-    environment:
-      - CI=true
-    image: canopy-app:${ISOLATION_ID}
-    command: yarn test
