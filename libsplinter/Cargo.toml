@@ -80,6 +80,7 @@ default = []
 stable = [
     "default",
     "events",
+    "postgres",
     "rest-api",
     "rest-api-actix",
     "sawtooth-signing-compat",
@@ -106,7 +107,6 @@ experimental = [
     "network-peer-manager",
     "network-ref-map",
     "node-registry-unified",
-    "postgres",
     "proposal-read",
     "rest-api-cors",
     "scabbard-client",
