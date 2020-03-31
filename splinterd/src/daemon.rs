@@ -638,7 +638,7 @@ fn start_health_service(
 fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartError> {
     info!("Adding biome routes");
     let connection_pool: ConnectionPool =
-        database::create_connection_pool(db_url).map_err(|err| {
+        database::ConnectionPool::new_pg(db_url).map_err(|err| {
             StartError::RestApiError(format!(
                 "Unable to connect to the Splinter database: {}",
                 err

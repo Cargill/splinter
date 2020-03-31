@@ -28,15 +28,6 @@ use diesel::{
 
 pub use super::database::error::DatabaseError;
 
-pub fn create_connection_pool(database_url: &str) -> Result<ConnectionPool, DatabaseError> {
-    let connection_manager = ConnectionManager::<PgConnection>::new(database_url);
-    Ok(ConnectionPool {
-        pool: Pool::builder()
-            .build(connection_manager)
-            .map_err(|err| DatabaseError::ConnectionError(Box::new(err)))?,
-    })
-}
-
 pub fn run_migrations(conn: &PgConnection) -> Result<(), DatabaseError> {
     embedded_migrations::run(conn).map_err(|err| DatabaseError::ConnectionError(Box::new(err)))?;
 
@@ -45,26 +36,60 @@ pub fn run_migrations(conn: &PgConnection) -> Result<(), DatabaseError> {
     Ok(())
 }
 
-pub struct Connection(PooledConnection<ConnectionManager<PgConnection>>);
+enum InnerConnection {
+    Pg(PooledConnection<ConnectionManager<PgConnection>>),
+}
+
+pub struct Connection {
+    inner: InnerConnection,
+}
+
+impl Connection {
+    fn new_pg(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
+        Connection {
+            inner: InnerConnection::Pg(conn),
+        }
+    }
+}
 
 impl Deref for Connection {
     type Target = PgConnection;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        match &self.inner {
+            InnerConnection::Pg(conn) => &conn,
+        }
     }
 }
 
 #[derive(Clone)]
+enum InnerPool {
+    Pg(Pool<ConnectionManager<PgConnection>>),
+}
+
+#[derive(Clone)]
 pub struct ConnectionPool {
-    pool: Pool<ConnectionManager<PgConnection>>,
+    inner: InnerPool,
 }
 
 impl ConnectionPool {
+    pub fn new_pg(database_url: &str) -> Result<Self, DatabaseError> {
+        let connection_manager = ConnectionManager::<PgConnection>::new(database_url);
+        Ok(ConnectionPool {
+            inner: InnerPool::Pg(
+                Pool::builder()
+                    .build(connection_manager)
+                    .map_err(|err| DatabaseError::ConnectionError(Box::new(err)))?,
+            ),
+        })
+    }
+
     pub fn get(&self) -> Result<Connection, DatabaseError> {
-        self.pool
-            .get()
-            .map(Connection)
-            .map_err(|err| DatabaseError::ConnectionError(Box::new(err)))
+        match &self.inner {
+            InnerPool::Pg(pool) => pool
+                .get()
+                .map(Connection::new_pg)
+                .map_err(|err| DatabaseError::ConnectionError(Box::new(err))),
+        }
     }
 }
