@@ -22,9 +22,7 @@ use crate::biome::credentials::store::{
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{
-    diesel::SplinterUserStore, SplinterUser, UserStore, UserStoreError,
-};
+use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::secrets::SecretManager;
@@ -59,7 +57,7 @@ pub fn make_user_routes(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     credentials_store: Arc<SplinterCredentialsStore>,
-    user_store: SplinterUserStore,
+    user_store: DieselUserStore,
 ) -> Resource {
     let credentials_store_modify = credentials_store.clone();
     let credentials_store_fetch = credentials_store;
@@ -139,7 +137,7 @@ fn add_modify_user_method(
     request: HttpRequest,
     payload: Payload,
     credentials_store: Arc<SplinterCredentialsStore>,
-    mut user_store: SplinterUserStore,
+    mut user_store: DieselUserStore,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let user_id = if let Some(t) = request.match_info().get("id") {
         t.to_string()
@@ -200,7 +198,7 @@ fn add_modify_user_method(
                     }
                 }
             };
-        let splinter_user = SplinterUser::new(&user_id);
+        let splinter_user = User::new(&user_id);
         match credentials.verify_password(&username_password.hashed_password) {
             Ok(is_valid) => {
                 if is_valid {
@@ -268,7 +266,7 @@ fn add_delete_user_method(
     request: HttpRequest,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
-    mut user_store: SplinterUserStore,
+    mut user_store: DieselUserStore,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let validation = default_validation(&rest_config.issuer());
     let user_id = if let Some(t) = request.match_info().get("id") {

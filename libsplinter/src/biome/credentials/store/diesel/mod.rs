@@ -34,7 +34,7 @@ pub struct SplinterCredentialsStore {
 }
 
 impl SplinterCredentialsStore {
-    /// Creates a new SplinterUserStore
+    /// Creates a new SplinterCredentialsStore
     ///
     /// # Arguments
     ///

@@ -16,7 +16,7 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
-use super::{SplinterUser, UserStore, UserStoreError};
+use super::{User, UserStore, UserStoreError};
 use crate::database::ConnectionPool;
 use operations::add_user::UserStoreAddUserOperation as _;
 use operations::delete_user::UserStoreDeleteUserOperation as _;
@@ -25,31 +25,31 @@ use operations::list_users::UserStoreListUsersOperation as _;
 use operations::update_user::UserStoreUpdateUserOperation as _;
 use operations::UserStoreOperations;
 
-/// Manages creating, updating and fetching SplinterUser from the databae
+/// Manages creating, updating and fetching User from the databae
 #[derive(Clone)]
-pub struct SplinterUserStore {
+pub struct DieselUserStore {
     connection_pool: ConnectionPool,
 }
 
-impl SplinterUserStore {
-    /// Creates a new SplinterUserStore
+impl DieselUserStore {
+    /// Creates a new DieselUserStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the database
     // Allow dead code if diesel feature is not enabled
     #[allow(dead_code)]
-    pub fn new(connection_pool: ConnectionPool) -> SplinterUserStore {
-        SplinterUserStore { connection_pool }
+    pub fn new(connection_pool: ConnectionPool) -> DieselUserStore {
+        DieselUserStore { connection_pool }
     }
 }
 
-impl UserStore<SplinterUser> for SplinterUserStore {
-    fn add_user(&mut self, user: SplinterUser) -> Result<(), UserStoreError> {
+impl UserStore<User> for DieselUserStore {
+    fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).add_user(user.into())
     }
 
-    fn update_user(&mut self, updated_user: SplinterUser) -> Result<(), UserStoreError> {
+    fn update_user(&mut self, updated_user: User) -> Result<(), UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).update_user(updated_user)
     }
 
@@ -57,11 +57,11 @@ impl UserStore<SplinterUser> for SplinterUserStore {
         UserStoreOperations::new(&*self.connection_pool.get()?).delete_user(id)
     }
 
-    fn fetch_user(&self, id: &str) -> Result<SplinterUser, UserStoreError> {
+    fn fetch_user(&self, id: &str) -> Result<User, UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).fetch_user(id)
     }
 
-    fn list_users(&self) -> Result<Vec<SplinterUser>, UserStoreError> {
+    fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).list_users()
     }
 }

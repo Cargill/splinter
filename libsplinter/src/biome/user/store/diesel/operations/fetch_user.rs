@@ -16,12 +16,12 @@ use super::UserStoreOperations;
 use crate::biome::user::store::diesel::models::UserModel;
 use crate::biome::user::store::diesel::schema::splinter_user;
 use crate::biome::user::store::error::UserStoreError;
-use crate::biome::user::store::SplinterUser;
+use crate::biome::user::store::User;
 
 use diesel::{prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::user) trait UserStoreFetchUserOperation {
-    fn fetch_user(&self, user_id: &str) -> Result<SplinterUser, UserStoreError>;
+    fn fetch_user(&self, user_id: &str) -> Result<User, UserStoreError>;
 }
 
 impl<'a, C> UserStoreFetchUserOperation for UserStoreOperations<'a, C>
@@ -31,7 +31,7 @@ where
     <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn fetch_user(&self, user_id: &str) -> Result<SplinterUser, UserStoreError> {
+    fn fetch_user(&self, user_id: &str) -> Result<User, UserStoreError> {
         let user = splinter_user::table
             .find(user_id)
             .first::<UserModel>(self.conn)
@@ -44,6 +44,6 @@ where
             .ok_or_else(|| {
                 UserStoreError::NotFoundError(format!("Failed to find user: {}", user_id))
             })?;
-        Ok(SplinterUser::from(user))
+        Ok(User::from(user))
     }
 }
