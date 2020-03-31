@@ -45,7 +45,6 @@ use crate::rest_api::{
 ///   {
 ///     "token": <new auth token>
 ///   }
-///
 pub fn make_token_route(
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     secret_manager: Arc<dyn SecretManager>,

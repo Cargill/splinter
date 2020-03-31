@@ -63,7 +63,6 @@ impl UserCredentialsBuilder {
     /// # Arguments
     ///
     /// * `user_id`: unique identifier for the user the credentials belong to
-    ///
     pub fn with_user_id(mut self, user_id: &str) -> UserCredentialsBuilder {
         self.user_id = Some(user_id.to_owned());
         self
@@ -74,7 +73,6 @@ impl UserCredentialsBuilder {
     /// # Arguments
     ///
     /// * `username`: username that will be used to authenticate the user
-    ///
     pub fn with_username(mut self, username: &str) -> UserCredentialsBuilder {
         self.username = Some(username.to_owned());
         self
@@ -85,7 +83,6 @@ impl UserCredentialsBuilder {
     /// # Arguments
     ///
     /// * `password`: password that will be used to authenticate the user
-    ///
     pub fn with_password(mut self, password: &str) -> UserCredentialsBuilder {
         self.password = Some(password.to_owned());
         self
@@ -96,7 +93,6 @@ impl UserCredentialsBuilder {
     /// # Arguments
     ///
     /// * `cost`: cost of the password encryption, default is high
-    ///
     pub fn with_password_encryption_cost(
         mut self,
         cost: PasswordEncryptionCost,
@@ -142,8 +138,6 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `credentials` - Credentials to be added
-    ///
-    ///
     fn add_credentials(&self, credentials: T) -> Result<(), CredentialsStoreError>;
 
     /// Replaces a credential of a certain type for a user in the underlying storage with new
@@ -155,7 +149,6 @@ pub trait CredentialsStore<T> {
     ///  * `user_id` - The unique identifier of the user the credential belongs to
     ///  * `updated_username` - The updated username for the user
     ///  * `updated_password` - The updated password for the user
-    ///
     fn update_credentials(
         &self,
         user_id: &str,
@@ -168,7 +161,6 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `user_id` - The unique identifier of the user the credential belongs to
-    ///
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError>;
 
     /// Fetches a credential for a user
@@ -176,7 +168,6 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `user_id` - The unique identifier of the user the credential belongs to
-    ///
     fn fetch_credential_by_user_id(&self, user_id: &str) -> Result<T, CredentialsStoreError>;
 
     /// Fetches a credential for a user
@@ -184,7 +175,6 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `username` - The username the user uses for login
-    ///
     fn fetch_credential_by_username(&self, username: &str) -> Result<T, CredentialsStoreError>;
 
     /// Fetches the username for a user by user_id

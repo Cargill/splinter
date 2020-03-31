@@ -29,8 +29,6 @@ pub trait KeyStore<T>: Sync + Send {
     /// # Arguments
     ///
     ///  * `key` - The key to be added
-    ///
-    ///
     fn add_key(&self, key: T) -> Result<(), KeyStoreError>;
 
     /// Updates a key information in the underling storage
@@ -40,7 +38,6 @@ pub trait KeyStore<T>: Sync + Send {
     /// * `public_key`: The public key of the key record to be updated.
     /// * `user_id`: The ID owner of the key record to be updated.
     /// * `new_display_name`: The new display name of the key record.
-    ///
     fn update_key(
         &self,
         public_key: &str,
@@ -54,7 +51,6 @@ pub trait KeyStore<T>: Sync + Send {
     ///
     /// * `public_key`: The public key of the key record to be removed.
     /// * `user_id`: The ID owner of the key record to be removed.
-    ///
     fn remove_key(&self, public_key: &str, user_id: &str) -> Result<T, KeyStoreError>;
 
     /// Fetches a key from the underlying storage
@@ -63,7 +59,6 @@ pub trait KeyStore<T>: Sync + Send {
     ///
     /// * `public_key`: The public key of the key record to be fetched.
     /// * `user_id`: The ID owner of the key record to be fetched.
-    ///
     fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<T, KeyStoreError>;
 
     /// List all keys from the underlying storage
@@ -71,6 +66,5 @@ pub trait KeyStore<T>: Sync + Send {
     /// # Arguments
     ///
     /// * `user_id`: The ID owner of the key records to list.
-    ///
     fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<T>, KeyStoreError>;
 }
