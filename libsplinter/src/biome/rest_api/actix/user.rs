@@ -22,7 +22,7 @@ use crate::biome::credentials::store::{
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{diesel::DieselUserStore, SplinterUser, UserStore, UserStoreError};
+use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::secrets::SecretManager;
@@ -195,7 +195,7 @@ fn add_modify_user_method(
                     }
                 }
             };
-        let splinter_user = SplinterUser::new(&user_id);
+        let splinter_user = User::new(&user_id);
         match credentials.verify_password(&username_password.hashed_password) {
             Ok(is_valid) => {
                 if is_valid {

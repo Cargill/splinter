@@ -22,12 +22,12 @@ pub use error::UserStoreError;
 
 /// Represents a user of a splinter application
 #[derive(Serialize)]
-pub struct SplinterUser {
+pub struct User {
     id: String,
 }
 
-impl SplinterUser {
-    /// Creates a new SplinterUser
+impl User {
+    /// Creates a new User
     ///
     /// # Arguments
     ///
@@ -35,7 +35,7 @@ impl SplinterUser {
     ///
     #[cfg(feature = "rest-api")]
     pub fn new(user_id: &str) -> Self {
-        SplinterUser {
+        User {
             id: user_id.to_string(),
         }
     }

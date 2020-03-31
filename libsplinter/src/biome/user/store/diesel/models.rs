@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::biome::user::store::diesel::schema::*;
-use crate::biome::user::store::diesel::SplinterUser;
+use crate::biome::user::store::diesel::User;
 
 #[derive(Insertable, Queryable, Identifiable, PartialEq, Debug)]
 #[table_name = "splinter_user"]
@@ -22,13 +22,13 @@ pub struct UserModel {
     pub id: String,
 }
 
-impl From<UserModel> for SplinterUser {
+impl From<UserModel> for User {
     fn from(user: UserModel) -> Self {
-        SplinterUser { id: user.id }
+        User { id: user.id }
     }
 }
 
-impl Into<UserModel> for SplinterUser {
+impl Into<UserModel> for User {
     fn into(self) -> UserModel {
         UserModel { id: self.id }
     }

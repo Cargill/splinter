@@ -22,7 +22,7 @@ use crate::biome::credentials::store::{
 };
 use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{diesel::DieselUserStore, SplinterUser, UserStore};
+use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
@@ -62,7 +62,7 @@ pub fn make_register_route(
                     }
                 };
                 let user_id = Uuid::new_v4().to_string();
-                let splinter_user = SplinterUser::new(&user_id);
+                let splinter_user = User::new(&user_id);
                 match user_store.add_user(splinter_user) {
                     Ok(()) => {
                         let credentials_builder: UserCredentialsBuilder = Default::default();

@@ -16,12 +16,12 @@ use super::UserStoreOperations;
 use crate::biome::user::store::diesel::models::UserModel;
 use crate::biome::user::store::diesel::schema::splinter_user;
 use crate::biome::user::store::error::UserStoreError;
-use crate::biome::user::store::SplinterUser;
+use crate::biome::user::store::User;
 
 use diesel::{dsl::update, prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::user) trait UserStoreUpdateUserOperation {
-    fn update_user(&self, updated_user: SplinterUser) -> Result<(), UserStoreError>;
+    fn update_user(&self, updated_user: User) -> Result<(), UserStoreError>;
 }
 
 impl<'a, C> UserStoreUpdateUserOperation for UserStoreOperations<'a, C>
@@ -31,7 +31,7 @@ where
     <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn update_user(&self, updated_user: SplinterUser) -> Result<(), UserStoreError> {
+    fn update_user(&self, updated_user: User) -> Result<(), UserStoreError> {
         let id = updated_user.id();
         let user = splinter_user::table
             .find(&id)

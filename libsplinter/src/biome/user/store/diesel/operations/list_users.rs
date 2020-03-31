@@ -16,12 +16,12 @@ use super::UserStoreOperations;
 use crate::biome::user::store::diesel::models::UserModel;
 use crate::biome::user::store::diesel::schema::splinter_user;
 use crate::biome::user::store::error::UserStoreError;
-use crate::biome::user::store::SplinterUser;
+use crate::biome::user::store::User;
 
 use diesel::{prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::user) trait UserStoreListUsersOperation {
-    fn list_users(&self) -> Result<Vec<SplinterUser>, UserStoreError>;
+    fn list_users(&self) -> Result<Vec<User>, UserStoreError>;
 }
 
 impl<'a, C> UserStoreListUsersOperation for UserStoreOperations<'a, C>
@@ -31,7 +31,7 @@ where
     <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn list_users(&self) -> Result<Vec<SplinterUser>, UserStoreError> {
+    fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
         let users = splinter_user::table
             .select(splinter_user::all_columns)
             .load::<UserModel>(self.conn)
@@ -45,7 +45,7 @@ where
                 UserStoreError::NotFoundError("Could not get all users from storage".to_string())
             })?
             .into_iter()
-            .map(SplinterUser::from)
+            .map(User::from)
             .collect();
         Ok(users)
     }
