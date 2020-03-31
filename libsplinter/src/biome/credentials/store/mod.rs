@@ -138,6 +138,11 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `credentials` - Credentials to be added
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if the implementation cannot add a new
+    /// credential
     fn add_credentials(&self, credentials: T) -> Result<(), CredentialsStoreError>;
 
     /// Replaces a credential of a certain type for a user in the underlying storage with new
@@ -149,6 +154,11 @@ pub trait CredentialsStore<T> {
     ///  * `user_id` - The unique identifier of the user the credential belongs to
     ///  * `updated_username` - The updated username for the user
     ///  * `updated_password` - The updated password for the user
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if the implementation cannot update
+    /// credentials or if the specified credentials do not exist
     fn update_credentials(
         &self,
         user_id: &str,
@@ -161,6 +171,11 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `user_id` - The unique identifier of the user the credential belongs to
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if implementation cannot delete the
+    /// credential
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError>;
 
     /// Fetches a credential for a user
@@ -168,6 +183,11 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `user_id` - The unique identifier of the user the credential belongs to
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if implementation cannot fetch the credential or
+    /// if the credential cannot be found
     fn fetch_credential_by_user_id(&self, user_id: &str) -> Result<T, CredentialsStoreError>;
 
     /// Fetches a credential for a user
@@ -175,6 +195,11 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `username` - The username the user uses for login
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if implementation cannot fetch the credential or
+    /// if the credential cannot be found
     fn fetch_credential_by_username(&self, username: &str) -> Result<T, CredentialsStoreError>;
 
     /// Fetches the username for a user by user_id
@@ -182,9 +207,18 @@ pub trait CredentialsStore<T> {
     /// # Arguments
     ///
     ///  * `user_id` - The unique identifier of the user the credential belongs to
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if implementation cannot fetch the user ID or
+    /// if the user ID cannot be found
     fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError>;
 
     /// Fetches user names
+    ///
+    /// # Errors
+    ///
+    /// Returns a CredentialsStoreError if implementation cannot fetch the user IDs
     fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
