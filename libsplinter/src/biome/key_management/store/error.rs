@@ -15,6 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "diesel")]
 use crate::database::error::DatabaseError;
 
 /// Represents KeyStore errors
@@ -85,6 +86,7 @@ impl fmt::Display for KeyStoreError {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<DatabaseError> for KeyStoreError {
     fn from(err: DatabaseError) -> KeyStoreError {
         match err {

@@ -15,6 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "diesel")]
 use crate::database::error::DatabaseError;
 
 #[derive(Debug)]
@@ -74,6 +75,7 @@ impl fmt::Display for RefreshTokenError {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<DatabaseError> for RefreshTokenError {
     fn from(err: DatabaseError) -> RefreshTokenError {
         match err {

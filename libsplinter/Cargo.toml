@@ -100,7 +100,6 @@ experimental = [
     "circuit-template",
     "connection-manager",
     "connection-manager-notification-iter-try-next",
-    "database",
     "json-web-tokens",
     "matrix",
     "network-peer-manager",
@@ -115,26 +114,25 @@ experimental = [
     "zmq-transport",
 ]
 
-biome = ["database"]
-biome-credentials = ["biome", "biome-user", "database", "bcrypt"]
-biome-key-management = ["biome", "database"]
-biome-notifications = ["biome", "database"]
+biome = []
+biome-credentials = ["biome", "biome-user", "bcrypt"]
+biome-key-management = ["biome"]
+biome-notifications = ["biome"]
 biome-refresh-tokens = []
-biome-rest-api = ["biome"]
-biome-user = ["biome", "database"]
+biome-rest-api = ["biome", "postgres"]
+biome-user = ["biome"]
 circuit-read = []
 circuit-template = []
 proposal-read = []
 connection-manager = ["matrix"]
 connection-manager-notification-iter-try-next = ["connection-manager"]
-database = ["diesel_migrations", "postgres"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 json-web-tokens = ["jsonwebtoken"]
 matrix = []
 network-peer-manager = ["connection-manager", "network-ref-map"]
 network-ref-map = []
 node-registry-unified = []
-postgres = ["diesel/postgres"]
+postgres = ["diesel/postgres", "diesel_migrations"]
 rest-api = [
     "actix",
     "actix-http",

@@ -27,6 +27,7 @@
 //!
 //! ```
 
+#[cfg(feature = "diesel")]
 mod diesel;
 
 #[cfg(feature = "postgres")]

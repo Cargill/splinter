@@ -23,6 +23,7 @@ pub use error::CredentialsStoreError;
 
 use bcrypt::{hash, verify, DEFAULT_COST};
 
+#[cfg(feature = "diesel")]
 use self::diesel::models::{NewUserCredentialsModel, UserCredentialsModel};
 use error::{UserCredentialsBuilderError, UserCredentialsError};
 
@@ -222,6 +223,7 @@ pub trait CredentialsStore<T> {
     fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
+#[cfg(feature = "diesel")]
 impl Into<NewUserCredentialsModel> for UserCredentials {
     fn into(self) -> NewUserCredentialsModel {
         NewUserCredentialsModel {
