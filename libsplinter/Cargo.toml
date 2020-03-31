@@ -105,7 +105,6 @@ experimental = [
     "network-peer-manager",
     "network-ref-map",
     "node-registry-unified",
-    "proposal-read",
     "rest-api-cors",
     "scabbard-client",
     "scabbard-get-state",
@@ -121,7 +120,6 @@ biome-refresh-tokens = []
 biome-rest-api = ["biome", "postgres"]
 biome-user = ["biome"]
 circuit-template = []
-proposal-read = []
 connection-manager = ["matrix"]
 connection-manager-notification-iter-try-next = ["connection-manager"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]

@@ -895,7 +895,6 @@ impl AdminServiceShared {
         Ok(self.open_proposals.get_proposal(circuit_id)?)
     }
 
-    #[cfg(feature = "proposal-read")]
     pub fn get_proposals(&self) -> BTreeMap<String, messages::CircuitProposal> {
         self.open_proposals.get_proposals()
     }

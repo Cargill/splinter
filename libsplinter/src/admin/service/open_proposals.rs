@@ -72,7 +72,6 @@ impl OpenProposals {
         self.proposal_registry.get_proposal(circuit_id)
     }
 
-    #[cfg(feature = "proposal-read")]
     pub fn get_proposals(&self) -> BTreeMap<String, messages::CircuitProposal> {
         self.proposal_registry.get_proposals()
     }
@@ -136,7 +135,6 @@ impl ProposalRegistry {
         }
     }
 
-    #[cfg(feature = "proposal-read")]
     pub fn get_proposals(&self) -> BTreeMap<String, messages::CircuitProposal> {
         self.proposals.clone()
     }

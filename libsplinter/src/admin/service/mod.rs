@@ -17,7 +17,6 @@ pub(crate) mod error;
 mod mailbox;
 pub(crate) mod messages;
 pub(super) mod open_proposals;
-#[cfg(feature = "proposal-read")]
 pub(super) mod proposal_store;
 mod shared;
 
@@ -50,7 +49,6 @@ use crate::signing::SignatureVerifier;
 
 use self::consensus::AdminConsensusManager;
 use self::error::{AdminError, Sha256Error};
-#[cfg(feature = "proposal-read")]
 use self::proposal_store::{AdminServiceProposals, ProposalStore};
 use self::shared::AdminServiceShared;
 
@@ -196,7 +194,6 @@ impl AdminService {
         }
     }
 
-    #[cfg(feature = "proposal-read")]
     pub fn proposals(&self) -> impl ProposalStore {
         AdminServiceProposals::new(&self.admin_service_shared)
     }

@@ -14,7 +14,5 @@
 
 pub(in super::super) mod circuits;
 pub(in super::super) mod circuits_circuit_id;
-#[cfg(feature = "proposal-read")]
 pub(in super::super) mod proposals;
-#[cfg(feature = "proposal-read")]
 pub(in super::super) mod proposals_circuit_id;

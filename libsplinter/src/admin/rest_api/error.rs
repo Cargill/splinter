@@ -16,14 +16,12 @@ use std::error::Error;
 
 use crate::circuit::store;
 
-#[cfg(feature = "proposal-read")]
 #[derive(Debug)]
 pub enum ProposalFetchError {
     NotFound(String),
     InternalError(String),
 }
 
-#[cfg(feature = "proposal-read")]
 impl Error for ProposalFetchError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -33,7 +31,6 @@ impl Error for ProposalFetchError {
     }
 }
 
-#[cfg(feature = "proposal-read")]
 impl std::fmt::Display for ProposalFetchError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -43,13 +40,11 @@ impl std::fmt::Display for ProposalFetchError {
     }
 }
 
-#[cfg(feature = "proposal-read")]
 #[derive(Debug)]
 pub enum ProposalListError {
     InternalError(String),
 }
 
-#[cfg(feature = "proposal-read")]
 impl Error for ProposalListError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -58,7 +53,6 @@ impl Error for ProposalListError {
     }
 }
 
-#[cfg(feature = "proposal-read")]
 impl std::fmt::Display for ProposalListError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

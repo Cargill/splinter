@@ -14,9 +14,7 @@
 
 pub(super) mod circuits;
 pub(super) mod circuits_circuit_id;
-#[cfg(feature = "proposal-read")]
 pub(super) mod proposals;
-#[cfg(feature = "proposal-read")]
 pub(super) mod proposals_circuit_id;
 pub(super) mod submit;
 pub(super) mod ws_register_type;

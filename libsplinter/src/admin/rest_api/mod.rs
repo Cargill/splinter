@@ -27,9 +27,9 @@ use crate::rest_api::{Resource, RestResourceProvider};
 use self::actix::circuits::make_list_circuits_resource;
 #[cfg(feature = "rest-api-actix")]
 use self::actix::circuits_circuit_id::make_fetch_circuit_resource;
-#[cfg(all(feature = "proposal-read", feature = "rest-api-actix"))]
+#[cfg(feature = "rest-api-actix")]
 use self::actix::proposals::make_list_proposals_resource;
-#[cfg(all(feature = "proposal-read", feature = "rest-api-actix"))]
+#[cfg(feature = "rest-api-actix")]
 use self::actix::proposals_circuit_id::make_fetch_proposal_resource;
 #[cfg(feature = "rest-api-actix")]
 use self::actix::submit::make_submit_route;
@@ -57,9 +57,9 @@ impl RestResourceProvider for AdminService {
         #[cfg(feature = "rest-api-actix")]
         resources.push(make_submit_route(self.commands()));
 
-        #[cfg(all(feature = "proposal-read", feature = "rest-api-actix"))]
+        #[cfg(feature = "rest-api-actix")]
         resources.push(make_fetch_proposal_resource(self.proposals()));
-        #[cfg(all(feature = "proposal-read", feature = "rest-api-actix"))]
+        #[cfg(feature = "rest-api-actix")]
         resources.push(make_list_proposals_resource(self.proposals()));
 
         resources
