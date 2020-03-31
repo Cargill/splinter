@@ -69,12 +69,7 @@ experimental = [
 circuit = ["reqwest", "serde_json", "splinter/sawtooth-signing-compat", "dirs"]
 circuit-auth-type = ["circuit"]
 circuit-template = ["splinter/circuit-template", "circuit"]
-database-migrate-biome = [
-    "splinter/biome-credentials",
-    "splinter/biome-key-management",
-    "splinter/biome-notifications"
-]
-
+database-migrate-biome = ["splinter/biome"]
 
 health = ["reqwest", "serde_json"]
 keygen = ["dirs", "whoami"]
