@@ -101,7 +101,7 @@ use self::actix::user::make_user_routes;
 ))]
 use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
 #[cfg(feature = "biome-credentials")]
-use super::credentials::store::diesel::SplinterCredentialsStore;
+use super::credentials::store::diesel::DieselCredentialsStore;
 
 #[allow(unused_imports)]
 #[cfg(feature = "json-web-tokens")]
@@ -125,7 +125,7 @@ pub struct BiomeRestResourceManager {
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     #[cfg(feature = "biome-credentials")]
-    credentials_store: Option<Arc<SplinterCredentialsStore>>,
+    credentials_store: Option<Arc<DieselCredentialsStore>>,
 }
 
 impl RestResourceProvider for BiomeRestResourceManager {
@@ -263,7 +263,7 @@ pub struct BiomeRestResourceManagerBuilder {
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_store: Option<Arc<dyn RefreshTokenStore>>,
     #[cfg(feature = "biome-credentials")]
-    credentials_store: Option<SplinterCredentialsStore>,
+    credentials_store: Option<DieselCredentialsStore>,
 }
 
 impl BiomeRestResourceManagerBuilder {
@@ -308,7 +308,7 @@ impl BiomeRestResourceManagerBuilder {
         mut self,
         pool: ConnectionPool,
     ) -> BiomeRestResourceManagerBuilder {
-        self.credentials_store = Some(SplinterCredentialsStore::new(pool));
+        self.credentials_store = Some(DieselCredentialsStore::new(pool));
         self
     }
 

@@ -23,7 +23,7 @@ use crate::rest_api::{
 };
 
 use crate::biome::credentials::store::{
-    diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
+    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError,
 };
 use crate::biome::rest_api::config::BiomeRestConfig;
 
@@ -39,7 +39,7 @@ use super::authorize::authorize_user;
 ///       "hashed_password": <hash of the user's existing password>
 ///   }
 pub fn make_verify_route(
-    credentials_store: Arc<SplinterCredentialsStore>,
+    credentials_store: Arc<DieselCredentialsStore>,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
