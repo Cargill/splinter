@@ -78,6 +78,7 @@ glob = "0.2"
 default = []
 
 stable = [
+    "database",
     "default",
     "events",
     "rest-api",
@@ -100,7 +101,6 @@ experimental = [
     "circuit-template",
     "connection-manager",
     "connection-manager-notification-iter-try-next",
-    "database",
     "json-web-tokens",
     "matrix",
     "network-peer-manager",
