@@ -44,7 +44,7 @@ impl DieselUserStore {
     }
 }
 
-impl UserStore<User> for DieselUserStore {
+impl UserStore for DieselUserStore {
     fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).add_user(user.into())
     }

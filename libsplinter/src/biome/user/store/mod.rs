@@ -48,7 +48,7 @@ impl User {
 
 /// Defines methods for CRUD operations and fetching and listing users
 /// without defining a storage strategy
-pub trait UserStore<T>: Send + Sync {
+pub trait UserStore: Send + Sync {
     /// Adds a user to the underlying storage
     ///
     /// # Arguments
@@ -56,7 +56,7 @@ pub trait UserStore<T>: Send + Sync {
     ///  * `user` - The user to be added
     ///
     ///
-    fn add_user(&mut self, user: T) -> Result<(), UserStoreError>;
+    fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
 
     /// Updates a user information in the underling storage
     ///
@@ -64,7 +64,7 @@ pub trait UserStore<T>: Send + Sync {
     ///
     ///  * `user` - The user with the updated information
     ///
-    fn update_user(&mut self, updated_user: T) -> Result<(), UserStoreError>;
+    fn update_user(&mut self, updated_user: User) -> Result<(), UserStoreError>;
 
     /// Removes a user from the underlying storage
     ///
@@ -80,19 +80,19 @@ pub trait UserStore<T>: Send + Sync {
     ///
     ///  * `id` - The unique id of the user to be returned
     ///
-    fn fetch_user(&self, id: &str) -> Result<T, UserStoreError>;
+    fn fetch_user(&self, id: &str) -> Result<User, UserStoreError>;
 
     /// List all users from the underlying storage
     ///
-    fn list_users(&self) -> Result<Vec<T>, UserStoreError>;
+    fn list_users(&self) -> Result<Vec<User>, UserStoreError>;
 }
 
-pub trait CloneBoxUserStore<T>: UserStore<T> {
-    fn clone_box(&self) -> Box<dyn CloneBoxUserStore<T>>;
+pub trait CloneBoxUserStore: UserStore {
+    fn clone_box(&self) -> Box<dyn CloneBoxUserStore>;
 }
 
-impl<T> Clone for Box<dyn CloneBoxUserStore<T>> {
-    fn clone(&self) -> Box<dyn CloneBoxUserStore<T>> {
+impl Clone for Box<dyn CloneBoxUserStore> {
+    fn clone(&self) -> Box<dyn CloneBoxUserStore> {
         self.clone_box()
     }
 }
