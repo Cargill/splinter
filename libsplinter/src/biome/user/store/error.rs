@@ -78,10 +78,6 @@ impl From<DatabaseError> for UserStoreError {
     fn from(err: DatabaseError) -> UserStoreError {
         match err {
             DatabaseError::ConnectionError(_) => UserStoreError::ConnectionError(Box::new(err)),
-            _ => UserStoreError::StorageError {
-                context: "The database returned an error".to_string(),
-                source: Box::new(err),
-            },
         }
     }
 }

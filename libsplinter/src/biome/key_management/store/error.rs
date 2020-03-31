@@ -89,10 +89,6 @@ impl From<DatabaseError> for KeyStoreError {
     fn from(err: DatabaseError) -> KeyStoreError {
         match err {
             DatabaseError::ConnectionError(_) => KeyStoreError::ConnectionError(Box::new(err)),
-            _ => KeyStoreError::StorageError {
-                context: "The database returned an error".to_string(),
-                source: Box::new(err),
-            },
         }
     }
 }
