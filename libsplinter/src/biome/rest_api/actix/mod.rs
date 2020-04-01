@@ -21,6 +21,8 @@ pub(crate) mod authorize;
 pub(super) mod key_management;
 #[cfg(all(feature = "biome-credentials", feature = "json-web-tokens"))]
 pub(super) mod login;
+#[cfg(all(feature = "biome-refresh-tokens", feature = "json-web-tokens"))]
+pub(super) mod logout;
 #[cfg(feature = "biome-credentials")]
 pub(super) mod register;
 #[cfg(all(

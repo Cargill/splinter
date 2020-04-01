@@ -72,6 +72,12 @@ use crate::rest_api::secrets::{AutoSecretManager, SecretManager};
 pub use config::{BiomeRestConfig, BiomeRestConfigBuilder};
 pub use error::BiomeRestResourceManagerBuilderError;
 
+#[cfg(all(
+    feature = "json-web-tokens",
+    feature = "rest-api-actix",
+    feature = "biome-refresh-tokens"
+))]
+use self::actix::logout::make_logout_route;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
 use self::actix::register::make_register_route;
 #[cfg(all(
@@ -178,6 +184,18 @@ impl RestResourceProvider for BiomeRestResourceManager {
                             self.token_secret_manager.clone(),
                             self.refresh_token_secret_manager.clone(),
                         )),
+                        self.rest_config.clone(),
+                    ));
+                }
+                #[cfg(all(
+                    feature = "biome-refresh-tokens",
+                    feature = "json-web-tokens",
+                    feature = "rest-api-actix",
+                ))]
+                {
+                    resources.push(make_logout_route(
+                        self.refresh_token_store.clone(),
+                        self.token_secret_manager.clone(),
                         self.rest_config.clone(),
                     ));
                 }
