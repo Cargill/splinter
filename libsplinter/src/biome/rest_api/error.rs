@@ -21,14 +21,14 @@ pub enum BiomeRestResourceManagerBuilderError {
     /// Returned if a required field is missing
     MissingRequiredField(String),
     /// Returned if a required field is missing
-    BuildingError(Box<dyn Error>),
+    BuildingError(BiomeRestConfigBuilderError),
 }
 
 impl Error for BiomeRestResourceManagerBuilderError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(_) => None,
-            BiomeRestResourceManagerBuilderError::BuildingError(err) => Some(&**err),
+            BiomeRestResourceManagerBuilderError::BuildingError(err) => Some(err),
         }
     }
 }
@@ -48,7 +48,7 @@ impl fmt::Display for BiomeRestResourceManagerBuilderError {
 
 impl From<BiomeRestConfigBuilderError> for BiomeRestResourceManagerBuilderError {
     fn from(err: BiomeRestConfigBuilderError) -> BiomeRestResourceManagerBuilderError {
-        BiomeRestResourceManagerBuilderError::BuildingError(Box::new(err))
+        BiomeRestResourceManagerBuilderError::BuildingError(err)
     }
 }
 
