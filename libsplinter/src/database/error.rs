@@ -16,22 +16,19 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug)]
-pub enum DatabaseError {
-    ConnectionError(Box<dyn Error>),
+pub struct ConnectionError {
+    pub context: String,
+    pub source: Box<dyn Error>,
 }
 
-impl Error for DatabaseError {
+impl Error for ConnectionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            DatabaseError::ConnectionError(e) => Some(&**e),
-        }
+        Some(&*self.source)
     }
 }
 
-impl fmt::Display for DatabaseError {
+impl fmt::Display for ConnectionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DatabaseError::ConnectionError(e) => write!(f, "Unable to connect to database: {}", e),
-        }
+        write!(f, "Unable to connect to database: {}", self.context)
     }
 }
