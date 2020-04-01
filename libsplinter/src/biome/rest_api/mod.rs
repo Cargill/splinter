@@ -22,7 +22,7 @@
 //! use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
 //! use splinter::database::{self, ConnectionPool};
 //!
-//! let connection_pool: ConnectionPool = database::create_connection_pool(
+//! let connection_pool: ConnectionPool = database::ConnectionPool::new_pg(
 //!            "postgres://db_admin:db_password@0.0.0.0:5432/db",
 //!        )
 //!        .unwrap();
