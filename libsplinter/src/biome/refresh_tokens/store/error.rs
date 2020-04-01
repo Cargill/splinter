@@ -78,10 +78,6 @@ impl From<DatabaseError> for RefreshTokenError {
     fn from(err: DatabaseError) -> RefreshTokenError {
         match err {
             DatabaseError::ConnectionError(_) => RefreshTokenError::ConnectionError(Box::new(err)),
-            _ => RefreshTokenError::StorageError {
-                context: "The database returned an error".to_string(),
-                source: Box::new(err),
-            },
         }
     }
 }

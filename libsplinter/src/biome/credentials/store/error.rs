@@ -91,10 +91,6 @@ impl From<DatabaseError> for CredentialsStoreError {
             DatabaseError::ConnectionError(_) => {
                 CredentialsStoreError::ConnectionError(Box::new(err))
             }
-            _ => CredentialsStoreError::StorageError {
-                context: "The database returned an error".to_string(),
-                source: Box::new(err),
-            },
         }
     }
 }
