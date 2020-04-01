@@ -475,6 +475,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                     .arg(
                         Arg::with_name("circuit")
                             .help("ID of the circuit to be shown")
+                            .required(true)
                             .takes_value(true),
                     )
                     .arg(
