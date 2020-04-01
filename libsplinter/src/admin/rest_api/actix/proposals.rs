@@ -181,7 +181,7 @@ mod tests {
     #[test]
     /// Tests a GET /admin/proposals request with no filters returns the expected proposals.
     fn test_list_proposals_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals", bind_url))
@@ -218,14 +218,19 @@ mod tests {
                 "/admin/proposals?"
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/proposals request with the `management_type` filter returns the expected
     /// proposal.
     fn test_list_proposals_with_management_type_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!(
@@ -261,14 +266,19 @@ mod tests {
                 &format!("/admin/proposals?management_type=mgmt_type_1&")
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/proposals request with the `member` filter returns the expected
     /// proposals.
     fn test_list_proposals_with_member_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!(
@@ -307,14 +317,19 @@ mod tests {
                 &format!("/admin/proposals?member=node_id&")
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/proposals request with both the `management_type` and `member` filters returns
     /// the expected proposal.
     fn test_list_proposals_with_management_type_and_member_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!(
@@ -350,13 +365,18 @@ mod tests {
                 &format!("/admin/proposals?management_type=mgmt_type_2&member=node_id&")
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/proposals?limit=1 request returns the expected proposal.
     fn test_list_proposal_with_limit() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals?limit=1", bind_url))
@@ -389,13 +409,18 @@ mod tests {
                 "/admin/proposals?"
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/proposals?offset=1 request returns the expected proposals.
     fn test_list_proposal_with_offset() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!("http://{}/admin/proposals?offset=1", bind_url))
@@ -431,7 +456,12 @@ mod tests {
                 "/admin/proposals?"
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     fn create_test_paging_response(
