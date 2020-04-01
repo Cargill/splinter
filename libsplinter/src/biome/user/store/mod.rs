@@ -32,7 +32,6 @@ impl User {
     /// # Arguments
     ///
     /// * `user_id`: unique identifier for the user being created
-    ///
     #[cfg(feature = "rest-api")]
     pub fn new(user_id: &str) -> Self {
         User {
@@ -54,8 +53,6 @@ pub trait UserStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `user` - The user to be added
-    ///
-    ///
     fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
 
     /// Updates a user information in the underling storage
@@ -63,7 +60,6 @@ pub trait UserStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `user` - The user with the updated information
-    ///
     fn update_user(&mut self, updated_user: User) -> Result<(), UserStoreError>;
 
     /// Removes a user from the underlying storage
@@ -71,7 +67,6 @@ pub trait UserStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `id` - The unique id of the user to be removed
-    ///
     fn remove_user(&mut self, id: &str) -> Result<(), UserStoreError>;
 
     /// Fetches a user from the underlying storage
@@ -79,11 +74,9 @@ pub trait UserStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `id` - The unique id of the user to be returned
-    ///
     fn fetch_user(&self, id: &str) -> Result<User, UserStoreError>;
 
     /// List all users from the underlying storage
-    ///
     fn list_users(&self) -> Result<Vec<User>, UserStoreError>;
 }
 
