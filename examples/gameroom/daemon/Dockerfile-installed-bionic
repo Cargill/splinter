@@ -21,6 +21,7 @@ COPY examples/gameroom/cli /build/examples/gameroom/cli
 COPY examples/gameroom/database /build/examples/gameroom/database
 COPY examples/gameroom/daemon/ /build/examples/gameroom/daemon
 COPY libsplinter /build/libsplinter
+COPY splinterd /build/splinterd
 
 # Build the gameroomd package
 WORKDIR /build/examples/gameroom/daemon
