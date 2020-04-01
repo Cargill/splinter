@@ -89,14 +89,17 @@ use self::actix::register::make_register_route;
 use self::actix::token::make_token_route;
 #[cfg(all(
     feature = "biome-credentials",
+    feature = "biome-key-management",
     feature = "rest-api-actix",
     feature = "json-web-tokens"
 ))]
-use self::actix::{
-    login::make_login_route,
-    user::{make_list_route, make_user_routes},
-    verify::make_verify_route,
-};
+use self::actix::user::make_user_routes;
+#[cfg(all(
+    feature = "biome-credentials",
+    feature = "rest-api-actix",
+    feature = "json-web-tokens"
+))]
+use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
 #[cfg(feature = "biome-credentials")]
 use super::credentials::store::diesel::SplinterCredentialsStore;
 
@@ -139,12 +142,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
                     feature = "rest-api-actix",
                 ))]
                 {
-                    resources.push(make_user_routes(
-                        self.rest_config.clone(),
-                        self.token_secret_manager.clone(),
-                        credentials_store.clone(),
-                        self.user_store.clone(),
-                    ));
                     resources.push(make_list_route(credentials_store.clone()));
                     resources.push(make_verify_route(
                         credentials_store.clone(),
@@ -159,6 +156,21 @@ impl RestResourceProvider for BiomeRestResourceManager {
                             Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
                         ));
                     }
+                }
+                #[cfg(all(
+                    feature = "biome-credentials",
+                    feature = "biome-key-management",
+                    feature = "json-web-tokens",
+                    feature = "rest-api-actix",
+                ))]
+                {
+                    resources.push(make_user_routes(
+                        self.rest_config.clone(),
+                        self.token_secret_manager.clone(),
+                        credentials_store.clone(),
+                        self.user_store.clone(),
+                        self.key_store.clone(),
+                    ));
                 }
                 #[cfg(all(
                     feature = "biome-credentials",

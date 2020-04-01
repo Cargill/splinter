@@ -17,6 +17,8 @@ pub(super) mod insert_key;
 pub(super) mod list_keys;
 pub(super) mod remove_key;
 pub(super) mod update_key;
+#[cfg(feature = "biome-credentials")]
+pub(super) mod update_keys_and_password;
 
 pub(super) struct KeyStoreOperations<'a, C> {
     conn: &'a C,
