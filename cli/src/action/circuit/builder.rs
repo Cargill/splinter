@@ -177,13 +177,27 @@ impl CreateCircuitMessageBuilder {
             }
         };
 
-        let node = make_splinter_node(&node_id, &endpoint)?;
-        self.nodes.push(node);
-        Ok(())
+        self.add_node(&node_id, &endpoint)
     }
 
     pub fn add_node(&mut self, node_id: &str, node_endpoint: &str) -> Result<(), CliError> {
         let node = make_splinter_node(node_id, node_endpoint)?;
+
+        for node in &self.nodes {
+            if node.node_id == node_id {
+                return Err(CliError::ActionError(format!(
+                    "Duplicate node ID detected: {}",
+                    node_id
+                )));
+            }
+            if node.endpoint == node_endpoint {
+                return Err(CliError::ActionError(format!(
+                    "Duplicate node endpoint detected: {}",
+                    node_endpoint
+                )));
+            }
+        }
+
         self.nodes.push(node);
         Ok(())
     }
