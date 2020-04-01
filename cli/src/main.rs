@@ -19,6 +19,8 @@ extern crate diesel;
 
 mod action;
 mod error;
+#[cfg(test)]
+mod tests;
 
 #[cfg(feature = "circuit-template")]
 mod template;
