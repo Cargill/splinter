@@ -29,6 +29,12 @@ pub struct DieselRefreshTokenStore {
     connection_pool: ConnectionPool,
 }
 
+impl DieselRefreshTokenStore {
+    pub fn new(connection_pool: ConnectionPool) -> Self {
+        Self { connection_pool }
+    }
+}
+
 impl RefreshTokenStore for DieselRefreshTokenStore {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)

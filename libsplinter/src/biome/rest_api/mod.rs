@@ -50,7 +50,7 @@ mod resources;
 use std::sync::Arc;
 
 #[cfg(feature = "biome-refresh-tokens")]
-use crate::biome::refresh_tokens::store::RefreshTokenStore;
+use crate::biome::refresh_tokens::store::{diesel::DieselRefreshTokenStore, RefreshTokenStore};
 use crate::database::ConnectionPool;
 use crate::rest_api::{Resource, RestResourceProvider};
 
@@ -340,9 +340,9 @@ impl BiomeRestResourceManagerBuilder {
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn with_refresh_token_store(
         mut self,
-        store: impl RefreshTokenStore + 'static,
+        pool: ConnectionPool,
     ) -> BiomeRestResourceManagerBuilder {
-        self.refresh_token_store = Some(Arc::new(store));
+        self.refresh_token_store = Some(Arc::new(DieselRefreshTokenStore::new(pool)));
         self
     }
 
