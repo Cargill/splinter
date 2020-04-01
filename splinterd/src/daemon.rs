@@ -656,6 +656,11 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
     {
         biome_rest_provider_builder = biome_rest_provider_builder.with_key_store(connection_pool)
     }
+    #[cfg(features = "biome-refresh-tokens")]
+    {
+        biome_rest_provider_builder =
+            biome_rest_provider_builder.with_refresh_token_store(connection_pool);
+    }
     let biome_rest_provider = biome_rest_provider_builder.build().map_err(|err| {
         StartError::RestApiError(format!("Unable to build Biome REST routes: {}", err))
     })?;
