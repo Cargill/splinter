@@ -95,7 +95,7 @@ mod tests {
     #[test]
     /// Tests a GET /admin/proposals/{circuit_id} request returns the expected proposal.
     fn test_fetch_proposal_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!(
@@ -117,13 +117,18 @@ mod tests {
             to_value(ProposalResponse::from(&get_proposal()))
                 .expect("failed to convert expected data")
         );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/proposals/{circuit_id} request returns NotFound when an invalid
     /// circuit_id is passed.
     fn test_fetch_proposal_not_found() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_fetch_proposal_resource(MockProposalStore)]);
 
         let url = Url::parse(&format!(
@@ -137,6 +142,11 @@ mod tests {
         let resp = req.send().expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[derive(Clone)]

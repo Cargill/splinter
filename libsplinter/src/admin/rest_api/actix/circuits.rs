@@ -169,7 +169,7 @@ mod tests {
     #[test]
     /// Tests a GET /admin/circuits request with no filters returns the expected circuits.
     fn test_list_circuits_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
 
         let url = Url::parse(&format!("http://{}/admin/circuits", bind_url))
@@ -202,13 +202,18 @@ mod tests {
                 "/admin/circuits?",
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/circuits request with filter returns the expected circuit.
     fn test_list_circuit_with_filters_ok() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
 
         let url = Url::parse(&format!("http://{}/admin/circuits?filter=node_1", bind_url))
@@ -239,13 +244,18 @@ mod tests {
                 &format!("/admin/circuits?filter=node_1&"),
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/circuits?limit=1 request returns the expected circuit.
     fn test_list_circuit_with_limit() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
 
         let url = Url::parse(&format!("http://{}/admin/circuits?limit=1", bind_url))
@@ -276,13 +286,18 @@ mod tests {
                 "/admin/circuits?",
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Tests a GET /admin/circuits?offset=1 request returns the expected circuit.
     fn test_list_circuit_with_offset() {
-        let (_shutdown_handle, _join_handle, bind_url) =
+        let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
 
         let url = Url::parse(&format!("http://{}/admin/circuits?offset=1", bind_url))
@@ -313,7 +328,12 @@ mod tests {
                 "/admin/circuits?"
             ))
             .expect("failed to convert expected paging")
-        )
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     fn create_test_paging_response(
