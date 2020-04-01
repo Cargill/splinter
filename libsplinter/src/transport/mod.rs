@@ -12,6 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Traits and implementations for low-level message-based network communication.
+//!
+//! The `splinter::transport` module defines traits for low-level networking required to pass
+//! messages between two endpoints. The primary traits defined here are [`Connection`],
+//! [`Listener`], and [`Transport`].
+//!
+//! Messages are passed between the endpoints via a [`Connection`]. The sending side calls
+//! [`Connection::send`] and the receiving side calls [`Connection::recv`].  Communication across
+//! a transport is bi-directional, and both sides of the [`Connection`] are a sender and receiver.
+//!
+//! A connection can be created in two ways. The first is by initiating the connection by calling
+//! [`Connection::connect`]. The second is by listening on a local endpoint for new connections
+//! initiated by others; this is accomplished with a [`Listener`] and specifically calling
+//! [`Listener::accept`].
+//!
+//! [`Connection`]: trait.Connection.html
+//! [`Connection::connect`]: trait.Connection.html#tymethod.connect
+//! [`Connection::recv`]: trait.Connection.html#tymethod.recv
+//! [`Connection::send`]: trait.Connection.html#tymethod.send
+//! [`Listener`]: trait.Listener.html
+//! [`Listener::accept`]: trait.Listener.html#tymethod.accept
+//! [`Transport`]: trait.Transport.html
+
 mod error;
 pub mod inproc;
 pub mod multi;
