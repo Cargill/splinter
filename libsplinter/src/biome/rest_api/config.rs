@@ -39,19 +39,27 @@ pub struct BiomeRestConfig {
 }
 
 impl BiomeRestConfig {
+    /// Returns token issuer string. Defaults to "self-issued".
     pub fn issuer(&self) -> String {
         self.issuer.to_owned()
     }
 
+    /// Returns duration that the access token is valid.
+    /// Defaults to 90 minutes.
     pub fn access_token_duration(&self) -> Duration {
         self.access_token_duration.to_owned()
     }
 
+    /// Returns durations the refresh token is valid.
+    /// Defaults to 60 days.
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn refresh_token_duration(&self) -> Duration {
         self.refresh_token_duration.to_owned()
     }
 
+    /// Returns the password encryption cost. This roughly equates to
+    /// how many rounds of hashing passwords will undergo when
+    /// being salted. Defaults to 12 rounds of hashing or "high".
     #[cfg(feature = "biome-credentials")]
     pub fn password_encryption_cost(&self) -> PasswordEncryptionCost {
         self.password_encryption_cost.clone()
@@ -82,6 +90,7 @@ impl Default for BiomeRestConfigBuilder {
 }
 
 impl BiomeRestConfigBuilder {
+    // Creates a new instance of BiomeRestConfigBuilder.
     pub fn new() -> Self {
         BiomeRestConfigBuilder {
             issuer: None,
@@ -93,28 +102,34 @@ impl BiomeRestConfigBuilder {
         }
     }
 
+    /// Adds an issuer to the builder.
     pub fn with_issuer(mut self, issuer: &str) -> Self {
         self.issuer = Some(issuer.to_string());
         self
     }
 
+    /// Adds an access token duration in seconds.
     pub fn with_access_token_duration_in_secs(mut self, duration: u64) -> Self {
         self.access_token_duration = Some(Duration::from_secs(duration));
         self
     }
 
+    /// Adds a refresh token duration in seconds.
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn with_refresh_token_duration_in_secs(mut self, duration: u64) -> Self {
         self.refresh_token_duration = Some(Duration::from_secs(duration));
         self
     }
 
+    /// Adds a password encryption cost. Accepts the following strings
+    /// "low", "medium", or "high".
     #[cfg(feature = "biome-credentials")]
     pub fn with_password_encryption_cost(mut self, cost: &str) -> Self {
         self.password_encryption_cost = Some(cost.to_string());
         self
     }
 
+    /// Creates a new BiomeRestConfig.
     pub fn build(self) -> Result<BiomeRestConfig, BiomeRestConfigBuilderError> {
         if self.issuer.is_none() {
             debug!("Using default value for issuer");
