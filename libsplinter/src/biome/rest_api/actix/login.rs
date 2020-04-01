@@ -37,7 +37,9 @@ use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 ///   }
 pub fn make_login_route(
     credentials_store: Arc<SplinterCredentialsStore>,
-    #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: Arc<dyn RefreshTokenStore>,
+    #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: Option<
+        Arc<dyn RefreshTokenStore>,
+    >,
     rest_config: Arc<BiomeRestConfig>,
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
@@ -147,13 +149,15 @@ pub fn make_login_route(
                                     }
                                 };
 
-                                if let Err(err) = refresh_token_store
-                                    .add_token(&credentials.user_id, &refresh_token)
-                                {
-                                    debug!("Failed to store refresh token {}", err);
-                                    return HttpResponse::InternalServerError()
-                                        .json(ErrorResponse::internal_error())
-                                        .into_future();
+                                if let Some(store) = refresh_token_store {
+                                    if let Err(err) =
+                                        store.add_token(&credentials.user_id, &refresh_token)
+                                    {
+                                        debug!("Failed to store refresh token {}", err);
+                                        return HttpResponse::InternalServerError()
+                                            .json(ErrorResponse::internal_error())
+                                            .into_future();
+                                    }
                                 }
 
                                 HttpResponse::Ok()
