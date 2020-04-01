@@ -166,7 +166,13 @@ fn handle_get(
         match key_store.list_keys(Some(&user_id)) {
             Ok(keys) => Box::new(
                 HttpResponse::Ok()
-                    .json(json!({ "data": keys.iter().map(ResponseKey::from).collect::<Vec<ResponseKey>>() }))
+                    .json(json!(
+                        {
+                            "data": keys.iter()
+                                .map(ResponseKey::from)
+                                .collect::<Vec<ResponseKey>>()
+                        }
+                    ))
                     .into_future(),
             ),
             Err(err) => {
@@ -387,7 +393,11 @@ fn handle_delete(
         match key_store.remove_key(&user_id, &public_key) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
-                    .json(json!({ "message": "Key successfully deleted", "data": ResponseKey::from(&key) }))
+                    .json(json!(
+                    {
+                        "message": "Key successfully deleted",
+                        "data": ResponseKey::from(&key)
+                    }))
                     .into_future(),
             ),
             Err(err) => match err {

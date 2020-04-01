@@ -66,44 +66,45 @@ pub fn make_verify_route(
                     }
                 };
 
-                let credentials =
-                    match credentials_store.fetch_credential_by_username(&username_password.username) {
-                        Ok(credentials) => credentials,
-                        Err(err) => {
-                            debug!("Failed to fetch credentials: {}", err);
-                            match err {
-                                CredentialsStoreError::NotFoundError(_) => {
-                                    return HttpResponse::BadRequest()
-                                        .json(ErrorResponse::bad_request(&format!(
-                                            "Username not found: {}",
-                                            username_password.username
-                                        )))
-                                        .into_future()
-                                }
-                                _ => {
-                                    error!("Failed to fetch credentials: {}", err);
-                                    return HttpResponse::InternalServerError()
-                                        .json(ErrorResponse::internal_error())
-                                        .into_future()
-                                }
+                let credentials = match credentials_store
+                    .fetch_credential_by_username(&username_password.username)
+                {
+                    Ok(credentials) => credentials,
+                    Err(err) => {
+                        debug!("Failed to fetch credentials: {}", err);
+                        match err {
+                            CredentialsStoreError::NotFoundError(_) => {
+                                return HttpResponse::BadRequest()
+                                    .json(ErrorResponse::bad_request(&format!(
+                                        "Username not found: {}",
+                                        username_password.username
+                                    )))
+                                    .into_future()
+                            }
+                            _ => {
+                                error!("Failed to fetch credentials: {}", err);
+                                return HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
+                                    .into_future();
                             }
                         }
-                    };
+                    }
+                };
 
                 let validation = default_validation(&rest_config.issuer());
                 match authorize_user(&request, &secret_manager, &validation) {
                     AuthorizationResult::Authorized(_) => {
                         match credentials.verify_password(&username_password.hashed_password) {
-                            Ok(true) => {
-                                    HttpResponse::Ok()
-                                        .json(json!({ "message": "Successful verification", "user_id": credentials.user_id }))
-                                        .into_future()
-                                    }
-                            Ok(false) => {
-                                HttpResponse::BadRequest()
-                                    .json(ErrorResponse::bad_request("Invalid password"))
-                                    .into_future()
-                            }
+                            Ok(true) => HttpResponse::Ok()
+                                .json(json!(
+                                    {
+                                        "message": "Successful verification",
+                                        "user_id": credentials.user_id
+                                }))
+                                .into_future(),
+                            Ok(false) => HttpResponse::BadRequest()
+                                .json(ErrorResponse::bad_request("Invalid password"))
+                                .into_future(),
                             Err(err) => {
                                 error!("Failed to verify password: {}", err);
                                 HttpResponse::InternalServerError()
@@ -112,16 +113,14 @@ pub fn make_verify_route(
                             }
                         }
                     }
-                    AuthorizationResult::Unauthorized(msg) => {
-                        HttpResponse::Unauthorized()
-                                .json(ErrorResponse::unauthorized(&msg))
-                                .into_future()
-                    }
+                    AuthorizationResult::Unauthorized(msg) => HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized(&msg))
+                        .into_future(),
                     AuthorizationResult::Failed => {
                         error!("Failed to authorize user");
-                            HttpResponse::InternalServerError()
-                                .json(ErrorResponse::internal_error())
-                                .into_future()
+                        HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())
+                            .into_future()
                     }
                 }
             }))
