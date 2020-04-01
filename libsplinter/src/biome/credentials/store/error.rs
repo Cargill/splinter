@@ -17,6 +17,7 @@ use bcrypt::BcryptError;
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "diesel")]
 use crate::database::error::DatabaseError;
 
 /// Represents CredentialsStore errors
@@ -85,6 +86,7 @@ impl fmt::Display for CredentialsStoreError {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<DatabaseError> for CredentialsStoreError {
     fn from(err: DatabaseError) -> CredentialsStoreError {
         match err {

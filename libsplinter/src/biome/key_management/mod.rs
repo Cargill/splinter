@@ -16,6 +16,7 @@
 
 pub mod store;
 
+#[cfg(feature = "diesel")]
 use store::diesel::models::KeyModel;
 
 // Represents a public and private key pair
@@ -54,6 +55,7 @@ impl Key {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<KeyModel> for Key {
     fn from(key: KeyModel) -> Self {
         Key {
@@ -65,6 +67,7 @@ impl From<KeyModel> for Key {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl Into<KeyModel> for Key {
     fn into(self) -> KeyModel {
         KeyModel {

@@ -20,10 +20,10 @@ extern crate serde_derive;
 #[cfg(feature = "rest-api")]
 extern crate serde_json;
 #[macro_use]
-#[cfg(feature = "database")]
+#[cfg(feature = "diesel")]
 extern crate diesel;
 #[macro_use]
-#[cfg(feature = "database")]
+#[cfg(feature = "diesel")]
 extern crate diesel_migrations;
 
 #[macro_export]
@@ -64,7 +64,7 @@ pub mod channel;
 pub mod circuit;
 pub mod collections;
 pub mod consensus;
-#[cfg(feature = "database")]
+#[cfg(feature = "diesel")]
 pub mod database;
 #[cfg(feature = "events")]
 pub mod events;
