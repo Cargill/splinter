@@ -297,7 +297,7 @@ impl fmt::Display for CircuitSlice {
             for service in self.roster.iter() {
                 if service.allowed_nodes.contains(member) {
                     display_string += &format!(
-                        "        Service ({}): {}\n ",
+                        "        Service ({}): {}\n",
                         service.service_type, service.service_id
                     );
 
