@@ -35,7 +35,7 @@ const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(feature = "circuit")]
-const CIRCUIT_CREATE_AFTER_HELP: &str = r"DETAILS:
+const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
     One or more nodes must be specified using the --node and/or --node-file arguments. These
     arguments can be used on their own or together, but at least one of them is required.
 
@@ -344,7 +344,7 @@ fn run() -> Result<(), CliError> {
                     .short("n")
                     .help("Print circuit definition without submitting the proposal"),
             )
-            .after_help(CIRCUIT_CREATE_AFTER_HELP);
+            .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
 
         #[cfg(feature = "circuit-auth-type")]
         let propose_circuit = propose_circuit.arg(
