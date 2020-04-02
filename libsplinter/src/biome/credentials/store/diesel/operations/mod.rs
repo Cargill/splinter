@@ -18,7 +18,7 @@ pub(super) mod add_credentials;
 pub(super) mod fetch_credential_by_id;
 pub(super) mod fetch_credential_by_username;
 pub(super) mod fetch_username;
-pub(super) mod get_usernames;
+pub(super) mod list_usernames;
 pub(super) mod remove_credentials;
 pub(super) mod update_credentials;
 

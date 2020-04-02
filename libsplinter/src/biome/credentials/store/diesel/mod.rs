@@ -23,7 +23,7 @@ use operations::add_credentials::CredentialsStoreAddCredentialsOperation as _;
 use operations::fetch_credential_by_id::CredentialsStoreFetchCredentialByIdOperation as _;
 use operations::fetch_credential_by_username::CredentialsStoreFetchCredentialByUsernameOperation as _;
 use operations::fetch_username::CredentialsStoreFetchUsernameOperation as _;
-use operations::get_usernames::CredentialsStoreGetUsernamesOperation as _;
+use operations::list_usernames::CredentialsStoreListUsernamesOperation as _;
 use operations::remove_credentials::CredentialsStoreRemoveCredentialsOperation as _;
 use operations::update_credentials::CredentialsStoreUpdateCredentialsOperation as _;
 use operations::CredentialsStoreOperations;
@@ -84,8 +84,8 @@ impl CredentialsStore for DieselCredentialsStore {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).fetch_username_by_id(user_id)
     }
 
-    fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?).get_usernames()
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).list_usernames()
     }
 }
 

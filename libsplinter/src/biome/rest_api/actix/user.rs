@@ -49,7 +49,7 @@ pub fn make_list_route(credentials_store: Arc<DieselCredentialsStore>) -> Resour
         ))
         .add_method(Method::Get, move |_, _| {
             let credentials_store = credentials_store.clone();
-            Box::new(match credentials_store.get_usernames() {
+            Box::new(match credentials_store.list_usernames() {
                 Ok(users) => HttpResponse::Ok().json(users).into_future(),
                 Err(err) => {
                     debug!("Failed to get users from the database {}", err);

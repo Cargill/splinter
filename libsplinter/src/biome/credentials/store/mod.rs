@@ -225,7 +225,7 @@ pub trait CredentialsStore {
     /// # Errors
     ///
     /// Returns a CredentialsStoreError if implementation cannot fetch the user IDs
-    fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
 #[cfg(feature = "diesel")]
