@@ -107,17 +107,35 @@ use super::credentials::store::diesel::DieselCredentialsStore;
 #[cfg(feature = "json-web-tokens")]
 use crate::rest_api::sessions::AccessTokenIssuer;
 
-/// Manages Biome REST API endpoints
+/// Provides the REST API endpoints for biome
+///
+/// The following endponts are provided
+///
+/// * `GET /biome/users/keys` - Get all keys for authorized user
+/// * `POST /biome/users/keys` - Create a new key for authorized user
+/// * `PATCH /biome/users/keys` - Update the display name associated with a key for
+///    an authorized user.
+/// * `GET /biome/users/keys/{public_key}` - Retrieve a key for an authroized user that has
+///    `public_key`
+/// * `DELETE /biome/users/keys/{public_key}` - delete a  key for an authorized user that has
+///    `public key`
+/// * `POST /biome/login` - Login enpoint for getting access tokens and refresh tokens
+/// * `PATCH /biome/login` - Login endpoint for removing refresh tokens
+/// * `POST /biome/register - Creates credentials for a user
+/// * `POST /biome/token` - Creates a new access token for the authorized user
+/// * `POST /biome/verify` - Verify a users password
+/// * `POST /biome/users` - Create new user
+/// * `GET /biome/user` - Get a list of all users in biome
+/// * `PUT /biome/user/{id}` - Update user with specified ID
+/// * `GET /biome/user/{id}` - Retrieve user with specified ID
+/// * `DELETE /biome/user/{id}` - Remove user with specified ID
 pub struct BiomeRestResourceManager {
-    // Disable lint warning, for now this is only used if the biome-credentials feature is enabled
-    #[allow(dead_code)]
+    #[cfg(feature = "biome-rest-api")]
     user_store: DieselUserStore,
     #[cfg(all(feature = "biome-key-management", feature = "json-web-tokens"))]
     key_store: Arc<PostgresKeyStore>,
-    // Disable lint warning, for now this is only used if the biome-credentials feature is enabled
-    #[allow(dead_code)]
+    #[cfg(feature = "biome-rest-api")]
     rest_config: Arc<BiomeRestConfig>,
-    #[allow(dead_code)]
     #[cfg(feature = "json-web-tokens")]
     token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(all(feature = "json-web-tokens", feature = "biome-refresh-tokens"))]
@@ -128,6 +146,7 @@ pub struct BiomeRestResourceManager {
     credentials_store: Option<Arc<DieselCredentialsStore>>,
 }
 
+#[cfg(feature = "biome-rest-api")]
 impl RestResourceProvider for BiomeRestResourceManager {
     fn resources(&self) -> Vec<Resource> {
         // This needs to be mutable if biome-credentials feature is enable

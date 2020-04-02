@@ -18,7 +18,9 @@ use super::error::BiomeRestConfigBuilderError;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::credentials::store::PasswordEncryptionCost;
 
+#[cfg(feature = "json-web-tokens")]
 const DEFAULT_ISSUER: &str = "self-issued";
+#[cfg(feature = "json-web-tokens")]
 const DEFAULT_DURATION: u64 = 5400; // in seconds = 90 minutes
 #[cfg(feature = "biome-refresh-tokens")]
 const DEFAULT_REFRESH_DURATION: u64 = 5_184_000; // in seconds = 60 days
@@ -27,8 +29,10 @@ const DEFAULT_REFRESH_DURATION: u64 = 5_184_000; // in seconds = 60 days
 #[derive(Deserialize, Debug)]
 pub struct BiomeRestConfig {
     /// The issuer for JWT tokens issued by this service
+    #[cfg(feature = "json-web-tokens")]
     issuer: String,
     /// Duration of JWT tokens issued by this service
+    #[cfg(feature = "json-web-tokens")]
     access_token_duration: Duration,
     /// Duration of refresh tokens issued by this service
     #[cfg(feature = "biome-refresh-tokens")]
@@ -39,19 +43,29 @@ pub struct BiomeRestConfig {
 }
 
 impl BiomeRestConfig {
+    /// Returns token issuer string. Defaults to "self-issued".
+    #[cfg(feature = "json-web-tokens")]
     pub fn issuer(&self) -> String {
         self.issuer.to_owned()
     }
 
+    /// Returns duration that the access token is valid.
+    /// Defaults to 90 minutes.
+    #[cfg(feature = "json-web-tokens")]
     pub fn access_token_duration(&self) -> Duration {
         self.access_token_duration.to_owned()
     }
 
+    /// Returns durations the refresh token is valid.
+    /// Defaults to 60 days.
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn refresh_token_duration(&self) -> Duration {
         self.refresh_token_duration.to_owned()
     }
 
+    /// Returns the password encryption cost. This roughly equates to
+    /// how many rounds of hashing passwords will undergo when
+    /// being salted. Defaults to 12 rounds of hashing or "high".
     #[cfg(feature = "biome-credentials")]
     pub fn password_encryption_cost(&self) -> PasswordEncryptionCost {
         self.password_encryption_cost.clone()
@@ -60,7 +74,9 @@ impl BiomeRestConfig {
 
 /// Builder for BiomeRestConfig
 pub struct BiomeRestConfigBuilder {
+    #[cfg(feature = "json-web-tokens")]
     issuer: Option<String>,
+    #[cfg(feature = "json-web-tokens")]
     access_token_duration: Option<Duration>,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_duration: Option<Duration>,
@@ -71,7 +87,9 @@ pub struct BiomeRestConfigBuilder {
 impl Default for BiomeRestConfigBuilder {
     fn default() -> BiomeRestConfigBuilder {
         BiomeRestConfigBuilder {
+            #[cfg(feature = "json-web-tokens")]
             issuer: Some(DEFAULT_ISSUER.to_string()),
+            #[cfg(feature = "json-web-tokens")]
             access_token_duration: Some(Duration::from_secs(DEFAULT_DURATION)),
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_duration: Some(Duration::from_secs(DEFAULT_REFRESH_DURATION)),
@@ -82,9 +100,12 @@ impl Default for BiomeRestConfigBuilder {
 }
 
 impl BiomeRestConfigBuilder {
+    // Creates a new instance of BiomeRestConfigBuilder.
     pub fn new() -> Self {
         BiomeRestConfigBuilder {
+            #[cfg(feature = "json-web-tokens")]
             issuer: None,
+            #[cfg(feature = "json-web-tokens")]
             access_token_duration: None,
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_duration: None,
@@ -93,40 +114,48 @@ impl BiomeRestConfigBuilder {
         }
     }
 
+    /// Adds an issuer to the builder.
+    #[cfg(feature = "json-web-tokens")]
     pub fn with_issuer(mut self, issuer: &str) -> Self {
         self.issuer = Some(issuer.to_string());
         self
     }
 
+    /// Adds an access token duration in seconds.
+    #[cfg(feature = "json-web-tokens")]
     pub fn with_access_token_duration_in_secs(mut self, duration: u64) -> Self {
         self.access_token_duration = Some(Duration::from_secs(duration));
         self
     }
 
+    /// Adds a refresh token duration in seconds.
     #[cfg(feature = "biome-refresh-tokens")]
     pub fn with_refresh_token_duration_in_secs(mut self, duration: u64) -> Self {
         self.refresh_token_duration = Some(Duration::from_secs(duration));
         self
     }
 
+    /// Adds a password encryption cost. Accepts the following strings
+    /// "low", "medium", or "high".
     #[cfg(feature = "biome-credentials")]
     pub fn with_password_encryption_cost(mut self, cost: &str) -> Self {
         self.password_encryption_cost = Some(cost.to_string());
         self
     }
 
+    /// Creates a new BiomeRestConfig.
     pub fn build(self) -> Result<BiomeRestConfig, BiomeRestConfigBuilderError> {
-        if self.issuer.is_none() {
+        #[cfg(feature = "json-web-tokens")]
+        let issuer = self.issuer.unwrap_or_else(|| {
             debug!("Using default value for issuer");
-        }
-        let issuer = self.issuer.unwrap_or_else(|| DEFAULT_ISSUER.to_string());
+            DEFAULT_ISSUER.to_string()
+        });
 
-        if self.access_token_duration.is_none() {
+        #[cfg(feature = "json-web-tokens")]
+        let access_token_duration = self.access_token_duration.unwrap_or_else(|| {
             debug!("Using default value for access_token_duration");
-        }
-        let access_token_duration = self
-            .access_token_duration
-            .unwrap_or_else(|| Duration::from_secs(DEFAULT_DURATION));
+            Duration::from_secs(DEFAULT_DURATION)
+        });
         #[cfg(feature = "biome-refresh-tokens")]
         let refresh_token_duration = self
             .refresh_token_duration
@@ -140,7 +169,9 @@ impl BiomeRestConfigBuilder {
             .map_err(BiomeRestConfigBuilderError::InvalidValue)?;
 
         Ok(BiomeRestConfig {
+            #[cfg(feature = "json-web-tokens")]
             issuer,
+            #[cfg(feature = "json-web-tokens")]
             access_token_duration,
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_duration,
