@@ -14,7 +14,6 @@
 
 use std::error::Error;
 
-#[cfg(feature = "circuit-read")]
 use crate::circuit::store;
 
 #[cfg(feature = "proposal-read")]
@@ -68,14 +67,12 @@ impl std::fmt::Display for ProposalListError {
     }
 }
 
-#[cfg(feature = "circuit-read")]
 #[derive(Debug)]
 pub enum CircuitFetchError {
     NotFound(String),
     CircuitStoreError(store::CircuitStoreError),
 }
 
-#[cfg(feature = "circuit-read")]
 impl Error for CircuitFetchError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -85,7 +82,6 @@ impl Error for CircuitFetchError {
     }
 }
 
-#[cfg(feature = "circuit-read")]
 impl std::fmt::Display for CircuitFetchError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -95,20 +91,17 @@ impl std::fmt::Display for CircuitFetchError {
     }
 }
 
-#[cfg(feature = "circuit-read")]
 impl From<store::CircuitStoreError> for CircuitFetchError {
     fn from(err: store::CircuitStoreError) -> Self {
         CircuitFetchError::CircuitStoreError(err)
     }
 }
 
-#[cfg(feature = "circuit-read")]
 #[derive(Debug)]
 pub enum CircuitListError {
     CircuitStoreError(store::CircuitStoreError),
 }
 
-#[cfg(feature = "circuit-read")]
 impl Error for CircuitListError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -117,7 +110,6 @@ impl Error for CircuitListError {
     }
 }
 
-#[cfg(feature = "circuit-read")]
 impl std::fmt::Display for CircuitListError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -126,7 +118,6 @@ impl std::fmt::Display for CircuitListError {
     }
 }
 
-#[cfg(feature = "circuit-read")]
 impl From<store::CircuitStoreError> for CircuitListError {
     fn from(err: store::CircuitStoreError) -> Self {
         CircuitListError::CircuitStoreError(err)

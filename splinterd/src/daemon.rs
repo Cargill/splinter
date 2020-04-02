@@ -26,7 +26,6 @@ use crossbeam_channel;
 
 #[cfg(feature = "health")]
 use health::HealthService;
-#[cfg(feature = "circuit-read")]
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
 #[cfg(feature = "biome")]
@@ -367,9 +366,6 @@ impl SplinterDaemon {
             },
             peer_connector,
             Box::new(auth_manager),
-            // Allowing possibly redundant clone of `state` since it will be needed again if the
-            // `circuit-read` feature is enabled
-            #[allow(clippy::redundant_clone)]
             state.clone(),
             Box::new(signature_verifier),
             key_registry.clone(),
@@ -387,8 +383,10 @@ impl SplinterDaemon {
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
 
-        // Allowing unused_mut because rest_api_builder must be mutable if feature circuit-read is
-        // enabled
+        let circuit_resource_provider =
+            CircuitResourceProvider::new(self.node_id.to_string(), state);
+
+        // Allowing unused_mut because rest_api_builder must be mutable if feature biome is enabled
         #[allow(unused_mut)]
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(&self.rest_api_endpoint)
@@ -404,13 +402,8 @@ impl SplinterDaemon {
             .add_resource(make_nodes_resource(node_registry.clone()))
             .add_resources(key_registry_manager.resources())
             .add_resources(admin_service.resources())
-            .add_resources(orchestrator_resources);
-
-        #[cfg(feature = "circuit-read")]
-        {
-            let circuit_resource = CircuitResourceProvider::new(self.node_id.to_string(), state);
-            rest_api_builder = rest_api_builder.add_resources(circuit_resource.resources());
-        }
+            .add_resources(orchestrator_resources)
+            .add_resources(circuit_resource_provider.resources());
 
         #[cfg(feature = "biome")]
         {

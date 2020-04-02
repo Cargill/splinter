@@ -16,7 +16,6 @@
 
 #[cfg(feature = "rest-api-actix")]
 mod actix;
-#[cfg(any(feature = "circuit-read", feature = "proposal-read"))]
 mod error;
 mod resources;
 
@@ -24,9 +23,9 @@ use crate::admin::service::AdminService;
 use crate::circuit::store;
 use crate::rest_api::{Resource, RestResourceProvider};
 
-#[cfg(all(feature = "circuit-read", feature = "rest-api-actix"))]
+#[cfg(feature = "rest-api-actix")]
 use self::actix::circuits::make_list_circuits_resource;
-#[cfg(all(feature = "circuit-read", feature = "rest-api-actix"))]
+#[cfg(feature = "rest-api-actix")]
 use self::actix::circuits_circuit_id::make_fetch_circuit_resource;
 #[cfg(all(feature = "proposal-read", feature = "rest-api-actix"))]
 use self::actix::proposals::make_list_proposals_resource;
@@ -102,10 +101,11 @@ impl<T: store::CircuitStore + 'static> CircuitResourceProvider<T> {
 /// * `rest-api-actix`
 impl<T: store::CircuitStore + 'static> RestResourceProvider for CircuitResourceProvider<T> {
     fn resources(&self) -> Vec<Resource> {
-        // Allowing unused_mut because resources must be mutable if feature circuit-read is enabled
+        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
+        // enabled
         #[allow(unused_mut)]
         let mut resources = Vec::new();
-        #[cfg(all(feature = "circuit-read", feature = "rest-api-actix"))]
+        #[cfg(feature = "rest-api-actix")]
         {
             resources.append(&mut vec![
                 make_fetch_circuit_resource(self.store.clone()),
