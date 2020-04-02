@@ -24,21 +24,21 @@ pub use error::CredentialsStoreError;
 use bcrypt::{hash, verify, DEFAULT_COST};
 
 #[cfg(feature = "diesel")]
-use self::diesel::models::{NewUserCredentialsModel, UserCredentialsModel};
-use error::{UserCredentialsBuilderError, UserCredentialsError};
+use self::diesel::models::{CredentialsModel, NewCredentialsModel};
+use error::{CredentialsBuilderError, CredentialsError};
 
 const MEDIUM_COST: u32 = 8;
 const LOW_COST: u32 = 4;
 
 /// Represents crendentials used to authenticate a user
-pub struct UserCredentials {
+pub struct Credentials {
     pub user_id: String,
     pub username: String,
     pub password: String,
 }
 
-impl UserCredentials {
-    pub fn verify_password(&self, password: &str) -> Result<bool, UserCredentialsError> {
+impl Credentials {
+    pub fn verify_password(&self, password: &str) -> Result<bool, CredentialsError> {
         Ok(verify(password, &self.password)?)
     }
 }
@@ -49,22 +49,22 @@ pub struct UsernameId {
     user_id: String,
 }
 
-/// Builder for UsersCredential. It hashes the password upon build.
+/// Builder for Credential. It hashes the password upon build.
 #[derive(Default)]
-pub struct UserCredentialsBuilder {
+pub struct CredentialsBuilder {
     user_id: Option<String>,
     username: Option<String>,
     password: Option<String>,
     password_encryption_cost: Option<PasswordEncryptionCost>,
 }
 
-impl UserCredentialsBuilder {
+impl CredentialsBuilder {
     /// Sets the user_id for the user the credentials belong to
     ///
     /// # Arguments
     ///
     /// * `user_id`: unique identifier for the user the credentials belong to
-    pub fn with_user_id(mut self, user_id: &str) -> UserCredentialsBuilder {
+    pub fn with_user_id(mut self, user_id: &str) -> CredentialsBuilder {
         self.user_id = Some(user_id.to_owned());
         self
     }
@@ -74,7 +74,7 @@ impl UserCredentialsBuilder {
     /// # Arguments
     ///
     /// * `username`: username that will be used to authenticate the user
-    pub fn with_username(mut self, username: &str) -> UserCredentialsBuilder {
+    pub fn with_username(mut self, username: &str) -> CredentialsBuilder {
         self.username = Some(username.to_owned());
         self
     }
@@ -84,7 +84,7 @@ impl UserCredentialsBuilder {
     /// # Arguments
     ///
     /// * `password`: password that will be used to authenticate the user
-    pub fn with_password(mut self, password: &str) -> UserCredentialsBuilder {
+    pub fn with_password(mut self, password: &str) -> CredentialsBuilder {
         self.password = Some(password.to_owned());
         self
     }
@@ -97,19 +97,19 @@ impl UserCredentialsBuilder {
     pub fn with_password_encryption_cost(
         mut self,
         cost: PasswordEncryptionCost,
-    ) -> UserCredentialsBuilder {
+    ) -> CredentialsBuilder {
         self.password_encryption_cost = Some(cost);
         self
     }
 
-    /// Consumes the builder, hashes the password and returns UserCredentials with the hashed
+    /// Consumes the builder, hashes the password and returns Credentials with the hashed
     /// password
-    pub fn build(self) -> Result<UserCredentials, UserCredentialsBuilderError> {
+    pub fn build(self) -> Result<Credentials, CredentialsBuilderError> {
         let user_id = self.user_id.ok_or_else(|| {
-            UserCredentialsBuilderError::MissingRequiredField("Missing user_id".to_string())
+            CredentialsBuilderError::MissingRequiredField("Missing user_id".to_string())
         })?;
         let username = self.username.ok_or_else(|| {
-            UserCredentialsBuilderError::MissingRequiredField("Missing username".to_string())
+            CredentialsBuilderError::MissingRequiredField("Missing username".to_string())
         })?;
 
         let cost = self
@@ -118,12 +118,12 @@ impl UserCredentialsBuilder {
 
         let hashed_password = hash(
             self.password.ok_or_else(|| {
-                UserCredentialsBuilderError::MissingRequiredField("Missing password".to_string())
+                CredentialsBuilderError::MissingRequiredField("Missing password".to_string())
             })?,
             cost.to_value(),
         )?;
 
-        Ok(UserCredentials {
+        Ok(Credentials {
             user_id,
             username,
             password: hashed_password,
@@ -144,7 +144,7 @@ pub trait CredentialsStore {
     ///
     /// Returns a CredentialsStoreError if the implementation cannot add a new
     /// credential
-    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError>;
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError>;
 
     /// Replaces a credential for a user in the underlying storage with new credentials. This
     /// assumes that the user has only one credential in storage
@@ -191,7 +191,7 @@ pub trait CredentialsStore {
     fn fetch_credential_by_user_id(
         &self,
         user_id: &str,
-    ) -> Result<UserCredentials, CredentialsStoreError>;
+    ) -> Result<Credentials, CredentialsStoreError>;
 
     /// Fetches a credential for a user
     ///
@@ -206,7 +206,7 @@ pub trait CredentialsStore {
     fn fetch_credential_by_username(
         &self,
         username: &str,
-    ) -> Result<UserCredentials, CredentialsStoreError>;
+    ) -> Result<Credentials, CredentialsStoreError>;
 
     /// Fetches the username for a user by user_id
     ///
@@ -229,9 +229,9 @@ pub trait CredentialsStore {
 }
 
 #[cfg(feature = "diesel")]
-impl Into<NewUserCredentialsModel> for UserCredentials {
-    fn into(self) -> NewUserCredentialsModel {
-        NewUserCredentialsModel {
+impl Into<NewCredentialsModel> for Credentials {
+    fn into(self) -> NewCredentialsModel {
+        NewCredentialsModel {
             user_id: self.user_id,
             username: self.username,
             password: self.password,

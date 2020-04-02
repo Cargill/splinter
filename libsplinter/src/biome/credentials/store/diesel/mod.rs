@@ -16,9 +16,9 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
-use super::{CredentialsStore, CredentialsStoreError, UserCredentials, UsernameId};
+use super::{Credentials, CredentialsStore, CredentialsStoreError, UsernameId};
 use crate::database::ConnectionPool;
-use models::UserCredentialsModel;
+use models::CredentialsModel;
 use operations::add_credentials::CredentialsStoreAddCredentialsOperation as _;
 use operations::fetch_credential_by_id::CredentialsStoreFetchCredentialByIdOperation as _;
 use operations::fetch_credential_by_username::CredentialsStoreFetchCredentialByUsernameOperation as _;
@@ -46,7 +46,7 @@ impl DieselCredentialsStore {
 }
 
 impl CredentialsStore for DieselCredentialsStore {
-    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError> {
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }
 
@@ -67,7 +67,7 @@ impl CredentialsStore for DieselCredentialsStore {
     fn fetch_credential_by_user_id(
         &self,
         user_id: &str,
-    ) -> Result<UserCredentials, CredentialsStoreError> {
+    ) -> Result<Credentials, CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?)
             .fetch_credential_by_id(user_id)
     }
@@ -75,7 +75,7 @@ impl CredentialsStore for DieselCredentialsStore {
     fn fetch_credential_by_username(
         &self,
         username: &str,
-    ) -> Result<UserCredentials, CredentialsStoreError> {
+    ) -> Result<Credentials, CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?)
             .fetch_credential_by_username(username)
     }
@@ -89,8 +89,8 @@ impl CredentialsStore for DieselCredentialsStore {
     }
 }
 
-impl From<UserCredentialsModel> for UsernameId {
-    fn from(user_credentials: UserCredentialsModel) -> Self {
+impl From<CredentialsModel> for UsernameId {
+    fn from(user_credentials: CredentialsModel) -> Self {
         Self {
             user_id: user_credentials.user_id,
             username: user_credentials.username,
@@ -98,8 +98,8 @@ impl From<UserCredentialsModel> for UsernameId {
     }
 }
 
-impl From<UserCredentialsModel> for UserCredentials {
-    fn from(user_credentials: UserCredentialsModel) -> Self {
+impl From<CredentialsModel> for Credentials {
+    fn from(user_credentials: CredentialsModel) -> Self {
         Self {
             user_id: user_credentials.user_id,
             username: user_credentials.username,
