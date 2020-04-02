@@ -52,8 +52,8 @@ impl Credentials {
 /// Represents a user's username
 #[derive(Deserialize, Serialize)]
 pub struct UsernameId {
-    username: String,
-    user_id: String,
+    pub username: String,
+    pub user_id: String,
 }
 
 /// Builder for Credential. It hashes the password upon build.
