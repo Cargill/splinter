@@ -93,7 +93,7 @@ impl Action for CircuitProposeAction {
             Some(services) => {
                 for service in services {
                     let (service_id, allowed_nodes) = parse_service(service)?;
-                    builder.add_service(&service_id, &allowed_nodes);
+                    builder.add_service(&service_id, &allowed_nodes)?;
                 }
             }
             None => {

@@ -280,11 +280,28 @@ impl CreateCircuitMessageBuilder {
         Ok(create_circuit)
     }
 
-    pub fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
+    pub fn add_service(
+        &mut self,
+        service_id: &str,
+        allowed_nodes: &[String],
+    ) -> Result<(), CliError> {
+        if self
+            .services
+            .iter()
+            .any(|service_builder| service_builder.service_id().unwrap_or_default() == service_id)
+        {
+            return Err(CliError::ActionError(format!(
+                "Duplicate service ID detected: {}",
+                service_id,
+            )));
+        }
+
         let service_builder = SplinterServiceBuilder::new()
             .with_service_id(service_id)
             .with_allowed_nodes(allowed_nodes);
         self.services.push(service_builder);
+
+        Ok(())
     }
 }
 
