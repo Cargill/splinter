@@ -36,6 +36,7 @@ pub trait TokenIssuer<T: Serialize> {
     fn issue_refresh_token_with_claims(&self, claims: T) -> Result<String, TokenIssuerError>;
 }
 
+#[cfg(feature = "biome-rest-api")]
 pub(crate) fn default_validation(issuer: &str) -> Validation {
     let mut validation = Validation::default();
     validation.leeway = DEFAULT_LEEWAY;
