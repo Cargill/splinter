@@ -367,6 +367,7 @@ fn run() -> Result<(), CliError> {
                 Arg::with_name("template")
                     .long("template")
                     .takes_value(true)
+                    .required_unless("service")
                     .help("Template name to be applied to circuit"),
             )
             .arg(

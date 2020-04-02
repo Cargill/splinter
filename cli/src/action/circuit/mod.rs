@@ -77,19 +77,12 @@ impl Action for CircuitProposeAction {
             }
         }
 
-        match args.values_of("service") {
-            Some(services) => {
-                for service in services {
-                    let (service_id, allowed_nodes) = parse_service(service)?;
-                    builder.add_service(&service_id, &allowed_nodes)?;
-                }
+        if let Some(services) = args.values_of("service") {
+            for service in services {
+                let (service_id, allowed_nodes) = parse_service(service)?;
+                builder.add_service(&service_id, &allowed_nodes)?;
             }
-            None => {
-                if args.value_of("template").is_none() {
-                    return Err(CliError::ActionError("Service is required".into()));
-                }
-            }
-        };
+        }
 
         if let Some(service_arguments) = args.values_of("service_argument") {
             for service_argument in service_arguments {
