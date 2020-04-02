@@ -588,65 +588,6 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(circuit_command);
     }
 
-    #[cfg(feature = "node-alias")]
-    {
-        app = app.subcommand(
-            SubCommand::with_name("node")
-                .about("Provides node management functionality")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommand(
-                    SubCommand::with_name("alias")
-                        .about("Manage node alias")
-                        .setting(AppSettings::SubcommandRequiredElseHelp)
-                        .subcommand(
-                            SubCommand::with_name("add")
-                                .about("Add a new node alias")
-                                .arg(
-                                    Arg::with_name("alias")
-                                        .takes_value(true)
-                                        .help("Alias for the node"),
-                                )
-                                .arg(
-                                    Arg::with_name("node_id")
-                                        .takes_value(true)
-                                        .value_name("node-id")
-                                        .help("ID of the node"),
-                                )
-                                .arg(
-                                    Arg::with_name("endpoint")
-                                        .takes_value(true)
-                                        .help("Endpoint for the node"),
-                                )
-                                .arg(
-                                    Arg::with_name("force")
-                                        .short("f")
-                                        .long("force")
-                                        .help("Overwrite alias data if it already exists"),
-                                ),
-                        )
-                        .subcommand(SubCommand::with_name("list").about("List all node alias"))
-                        .subcommand(
-                            SubCommand::with_name("show")
-                                .about("Show endpoint for a node")
-                                .arg(
-                                    Arg::with_name("alias")
-                                        .takes_value(true)
-                                        .help("Alias for the node"),
-                                ),
-                        )
-                        .subcommand(
-                            SubCommand::with_name("delete")
-                                .about("Delete alias for a node")
-                                .arg(
-                                    Arg::with_name("alias")
-                                        .takes_value(true)
-                                        .help("Alias for the node"),
-                                ),
-                        ),
-                ),
-        );
-    }
-
     let matches = app.get_matches();
 
     // set default to info
@@ -730,22 +671,6 @@ fn run() -> Result<(), CliError> {
         );
 
         subcommands = subcommands.with_command("circuit", circuit_command);
-    }
-
-    #[cfg(feature = "node-alias")]
-    {
-        use action::node;
-        subcommands = subcommands.with_command(
-            "node",
-            SubcommandActions::new().with_command(
-                "alias",
-                SubcommandActions::new()
-                    .with_command("add", node::AddNodeAliasAction)
-                    .with_command("show", node::ShowNodeAliasAction)
-                    .with_command("list", node::ListNodeAliasAction)
-                    .with_command("delete", node::DeleteNodeAliasAction),
-            ),
-        )
     }
 
     #[cfg(feature = "keygen")]

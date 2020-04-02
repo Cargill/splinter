@@ -66,18 +66,7 @@ impl Action for CircuitProposeAction {
         if let Some(nodes) = args.values_of("node") {
             for node_argument in nodes {
                 let (node, endpoint) = parse_node_argument(node_argument)?;
-                if let Some(endpoint) = endpoint {
-                    builder.add_node(&node, &endpoint)?;
-                } else {
-                    #[cfg(feature = "node-alias")]
-                    builder.add_node_by_alias(&node)?;
-
-                    #[cfg(not(feature = "node-alias"))]
-                    return Err(CliError::ActionError(format!(
-                        "Invalid node argument: {}",
-                        node_argument
-                    )));
-                }
+                builder.add_node(&node, &endpoint)?;
             }
         }
 
@@ -255,7 +244,7 @@ fn load_nodes_from_local(node_file: &str) -> Result<Vec<Node>, CliError> {
         .map_err(|err| CliError::ActionError(format!("Failed to read node file {}: {}", path, err)))
 }
 
-fn parse_node_argument(node_argument: &str) -> Result<(String, Option<String>), CliError> {
+fn parse_node_argument(node_argument: &str) -> Result<(String, String), CliError> {
     let mut iter = node_argument.split("::");
 
     let node_id = iter
@@ -265,11 +254,14 @@ fn parse_node_argument(node_argument: &str) -> Result<(String, Option<String>), 
         })?
         .to_string();
 
-    if let Some(endpoint) = iter.next() {
-        Ok((node_id, Some(endpoint.to_string())))
-    } else {
-        Ok((node_argument.to_string(), None))
-    }
+    let endpoint = iter
+        .next()
+        .ok_or_else(|| {
+            CliError::ActionError(format!("Node argument is not valid {}", node_argument))
+        })?
+        .to_string();
+
+    Ok((node_id, endpoint))
 }
 
 fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {
