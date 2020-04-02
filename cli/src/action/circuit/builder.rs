@@ -326,3 +326,33 @@ fn make_splinter_node(node_id: &str, endpoint: &str) -> Result<SplinterNode, Cli
         .map_err(|err| CliError::ActionError(format!("Failed to build SplinterNode: {}", err)))?;
     Ok(node)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that the `is_match` method for matching (potentially wild-carded) service IDs works
+    /// correctly.
+    #[test]
+    fn service_id_matching() {
+        assert!(is_match("abcd", "abcd"));
+        assert!(is_match("*bcd", "abcd"));
+        assert!(is_match("*cd", "abcd"));
+        assert!(is_match("*d", "abcd"));
+        assert!(is_match("*", "abcd"));
+        assert!(is_match("a*", "abcd"));
+        assert!(is_match("ab*", "abcd"));
+        assert!(is_match("abc*", "abcd"));
+        assert!(is_match("a*cd", "abcd"));
+        assert!(is_match("ab*d", "abcd"));
+        assert!(is_match("a*d", "abcd"));
+        assert!(is_match("*b*d", "abcd"));
+        assert!(is_match("a*c*", "abcd"));
+
+        assert!(!is_match("0123", "abcd"));
+        assert!(!is_match("0*", "abcd"));
+        assert!(!is_match("*0", "abcd"));
+        assert!(!is_match("0*0", "abcd"));
+        assert!(!is_match("*0*", "abcd"));
+    }
+}
