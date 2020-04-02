@@ -83,7 +83,7 @@ impl CreateCircuitMessageBuilder {
     pub fn apply_service_arguments(
         &mut self,
         service_id_match: &str,
-        args: &(String, String),
+        arg: &(String, String),
     ) -> Result<(), CliError> {
         self.services = self
             .services
@@ -93,7 +93,7 @@ impl CreateCircuitMessageBuilder {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
-                    if args.0 == PEER_SERVICES_ARG
+                    if arg.0 == PEER_SERVICES_ARG
                         && service_args.iter().any(|arg| arg.0 == PEER_SERVICES_ARG)
                     {
                         return Err(CliError::ActionError(format!(
@@ -101,7 +101,7 @@ impl CreateCircuitMessageBuilder {
                             service_id
                         )));
                     }
-                    service_args.push(args.clone());
+                    service_args.push(arg.clone());
                     Ok(service_builder.with_arguments(&service_args))
                 } else {
                     Ok(service_builder)
