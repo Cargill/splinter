@@ -84,9 +84,11 @@ impl CreateCircuitMessageBuilder {
         service_id_match: &str,
         args: &(String, String),
     ) -> Result<(), CliError> {
-        self.services = self.services.clone().into_iter().try_fold(
-            Vec::new(),
-            |mut acc, service_builder| {
+        self.services = self
+            .services
+            .clone()
+            .into_iter()
+            .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
@@ -99,13 +101,12 @@ impl CreateCircuitMessageBuilder {
                         )));
                     }
                     service_args.push(args.clone());
-                    acc.push(service_builder.with_arguments(&service_args));
+                    Ok(service_builder.with_arguments(&service_args))
                 } else {
-                    acc.push(service_builder);
+                    Ok(service_builder)
                 }
-                Ok(acc)
-            },
-        )?;
+            })
+            .collect::<Result<_, _>>()?;
         Ok(())
     }
 
@@ -126,9 +127,11 @@ impl CreateCircuitMessageBuilder {
             })
             .collect::<Vec<String>>();
 
-        self.services = self.services.clone().into_iter().try_fold(
-            Vec::new(),
-            |mut acc, service_builder| {
+        self.services = self
+            .services
+            .clone()
+            .into_iter()
+            .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 let index = peers.iter().enumerate().find_map(|(index, peer_id)| {
                     if peer_id == &service_id {
@@ -149,13 +152,13 @@ impl CreateCircuitMessageBuilder {
                         )));
                     }
                     service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
-                    acc.push(service_builder.with_arguments(&service_args));
+                    Ok(service_builder.with_arguments(&service_args))
                 } else {
-                    acc.push(service_builder);
+                    Ok(service_builder)
                 }
-                Ok(acc)
-            },
-        )?;
+            })
+            .collect::<Result<_, _>>()?;
+
         Ok(())
     }
 
@@ -226,29 +229,28 @@ impl CreateCircuitMessageBuilder {
             },
         };
 
-        let services =
-            self.services
-                .into_iter()
-                .try_fold(Vec::new(), |mut services, mut builder| {
-                    // if service type is not set, check for default value
-                    if builder.service_type().is_none() {
-                        builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
-                            Some(service_type) => builder.with_service_type(&service_type.value()),
-                            None => {
-                                return Err(CliError::ActionError(
-                                    "Service has no service type and no default value is set"
-                                        .to_string(),
-                                ))
-                            }
+        let services = self
+            .services
+            .into_iter()
+            .map(|mut builder| {
+                // if service type is not set, check for default value
+                if builder.service_type().is_none() {
+                    builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
+                        Some(service_type) => builder.with_service_type(&service_type.value()),
+                        None => {
+                            return Err(CliError::ActionError(
+                                "Service has no service type and no default value is set"
+                                    .to_string(),
+                            ))
                         }
                     }
+                }
 
-                    let service = builder.build().map_err(|err| {
-                        CliError::ActionError(format!("Failed to build service: {}", err))
-                    })?;
-                    services.push(service);
-                    Ok(services)
-                })?;
+                builder.build().map_err(|err| {
+                    CliError::ActionError(format!("Failed to build service: {}", err))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let mut create_circuit_builder = self
             .create_circuit_builder
