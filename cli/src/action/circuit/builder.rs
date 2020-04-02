@@ -160,8 +160,6 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn add_node(&mut self, node_id: &str, node_endpoint: &str) -> Result<(), CliError> {
-        let node = make_splinter_node(node_id, node_endpoint)?;
-
         for node in &self.nodes {
             if node.node_id == node_id {
                 return Err(CliError::ActionError(format!(
@@ -177,7 +175,7 @@ impl CreateCircuitMessageBuilder {
             }
         }
 
-        self.nodes.push(node);
+        self.nodes.push(make_splinter_node(node_id, node_endpoint)?);
         Ok(())
     }
 
