@@ -61,6 +61,7 @@ experimental = [
     "biome",
     "biome-credentials",
     "biome-key-management",
+    "biome-refresh-tokens",
     "biome-rest-api",
     "circuit-read",
     "health",
