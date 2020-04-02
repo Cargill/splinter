@@ -17,8 +17,7 @@ use uuid::Uuid;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{
-    diesel::SplinterCredentialsStore, CredentialsStore, CredentialsStoreError,
-    UserCredentialsBuilder,
+    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError, UserCredentialsBuilder,
 };
 use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::rest_api::BiomeRestConfig;
@@ -35,7 +34,7 @@ use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGua
 ///       "hashed_password": <hash of the password the user will use to log in>
 ///   }
 pub fn make_register_route(
-    credentials_store: Arc<SplinterCredentialsStore>,
+    credentials_store: Arc<DieselCredentialsStore>,
     user_store: DieselUserStore,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {

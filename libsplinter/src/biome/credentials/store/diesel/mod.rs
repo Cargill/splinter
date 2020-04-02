@@ -29,23 +29,23 @@ use operations::update_credentials::CredentialsStoreUpdateCredentialsOperation a
 use operations::CredentialsStoreOperations;
 
 /// Manages creating, updating and fetching SplinterCredentials from the database
-pub struct SplinterCredentialsStore {
+pub struct DieselCredentialsStore {
     connection_pool: ConnectionPool,
 }
 
-impl SplinterCredentialsStore {
-    /// Creates a new SplinterCredentialsStore
+impl DieselCredentialsStore {
+    /// Creates a new DieselCredentialsStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the database
     #[cfg(feature = "biome-rest-api")]
-    pub fn new(connection_pool: ConnectionPool) -> SplinterCredentialsStore {
-        SplinterCredentialsStore { connection_pool }
+    pub fn new(connection_pool: ConnectionPool) -> DieselCredentialsStore {
+        DieselCredentialsStore { connection_pool }
     }
 }
 
-impl CredentialsStore<UserCredentials> for SplinterCredentialsStore {
+impl CredentialsStore for DieselCredentialsStore {
     fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }
