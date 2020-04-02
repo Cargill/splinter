@@ -654,9 +654,10 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
     }
     #[cfg(feature = "biome-key-management")]
     {
-        biome_rest_provider_builder = biome_rest_provider_builder.with_key_store(connection_pool)
+        biome_rest_provider_builder =
+            biome_rest_provider_builder.with_key_store(connection_pool.clone())
     }
-    #[cfg(features = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-refresh-tokens")]
     {
         biome_rest_provider_builder =
             biome_rest_provider_builder.with_refresh_token_store(connection_pool);
