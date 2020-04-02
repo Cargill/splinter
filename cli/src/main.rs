@@ -35,7 +35,7 @@ const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(feature = "circuit")]
-const CIRCUIT_CREATE_AFTER_HELP: &str = r"DETAILS:
+const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
     One or more nodes must be specified using the --node and/or --node-file arguments. These
     arguments can be used on their own or together, but at least one of them is required.
 
@@ -263,10 +263,9 @@ fn run() -> Result<(), CliError> {
                     .takes_value(true)
                     .required_unless("node_file")
                     .multiple(true)
-                    .long_help(
-                        "Node that is part of the circuit. \
-                         Format: <node_id>::<endpoint>. \
-                         Endpoint is optional if node alias has been set.",
+                    .help(
+                        "Node that is part of a circuit \
+                         (<node_id>::<endpoint>)",
                     ),
             )
             .arg(
@@ -276,9 +275,9 @@ fn run() -> Result<(), CliError> {
                     .multiple(true)
                     .min_values(2)
                     .required_unless("template")
-                    .long_help(
-                        "Service ID and allowed nodes. \
-                         Format <service-id>::<allowed_nodes>",
+                    .help(
+                        "Service ID and allowed nodes \
+                         (<service-id>::<allowed_nodes>)",
                     ),
             )
             .arg(
@@ -286,9 +285,9 @@ fn run() -> Result<(), CliError> {
                     .long("service-arg")
                     .takes_value(true)
                     .multiple(true)
-                    .long_help(
-                        "Special arguments to be passed to the service. \
-                         Format <service_id>::<key>=<value>",
+                    .help(
+                        "Pass arguments to a service \
+                         (<service_id>::<key>=<value>)",
                     ),
             )
             .arg(
@@ -309,9 +308,9 @@ fn run() -> Result<(), CliError> {
                     .long("service-type")
                     .takes_value(true)
                     .multiple(true)
-                    .long_help(
-                        "Service type for a service. \
-                         Format <service-id>::<service_type>",
+                    .help(
+                        "Service type \
+                         (<service-id>::<service_type>)",
                     ),
             )
             .arg(
@@ -320,7 +319,7 @@ fn run() -> Result<(), CliError> {
                     .value_name("application_metadata")
                     .takes_value(true)
                     .multiple(true)
-                    .help("Application metadata for the circuit proposal"),
+                    .help("Application metadata of the proposal"),
             )
             .arg(
                 Arg::with_name("metadata_encoding")
@@ -328,21 +327,24 @@ fn run() -> Result<(), CliError> {
                     .takes_value(true)
                     .possible_values(&["json", "string"])
                     .requires("metadata")
-                    .help("Set the encoding for the application metadata. Default value: string"),
+                    .help(
+                        "Set encoding of application metadata \
+                           (default: string)",
+                    ),
             )
             .arg(
                 Arg::with_name("comments")
                     .long("comments")
                     .takes_value(true)
-                    .help("Add human-readable comments to the circuit proposal"),
+                    .help("Add human-readable comments to the proposal"),
             )
             .arg(
                 Arg::with_name("dry_run")
                     .long("dry-run")
                     .short("n")
-                    .help("Print the circuit definition without submitting the proposal"),
+                    .help("Print circuit definition without submitting the proposal"),
             )
-            .after_help(CIRCUIT_CREATE_AFTER_HELP);
+            .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
 
         #[cfg(feature = "circuit-auth-type")]
         let propose_circuit = propose_circuit.arg(
@@ -368,7 +370,10 @@ fn run() -> Result<(), CliError> {
                     .multiple(true)
                     .takes_value(true)
                     .requires("template")
-                    .help("Arguments for the template argument. Format <key>=<value>"),
+                    .help(
+                        "Arguments for the template argument \
+                         (<key>=<value>)",
+                    ),
             );
 
         let circuit_command = SubCommand::with_name("circuit")
@@ -398,7 +403,7 @@ fn run() -> Result<(), CliError> {
                             .value_name("circuit-id")
                             .takes_value(true)
                             .required(true)
-                            .help("The circuit id of the proposed circuit"),
+                            .help("ID of the proposed circuit"),
                     )
                     .arg(
                         Arg::with_name("accept")
@@ -422,14 +427,14 @@ fn run() -> Result<(), CliError> {
                         Arg::with_name("url")
                             .short("U")
                             .long("url")
-                            .help("The URL of the Splinter daemon REST API")
+                            .help("URL of the Splinter daemon REST API")
                             .takes_value(true),
                     )
                     .arg(
                         Arg::with_name("member")
                             .short("m")
                             .long("member")
-                            .help("Filter the circuits by a node ID in the member list")
+                            .help("Filter circuits by a node ID in the member list")
                             .takes_value(true),
                     )
                     .arg(
@@ -449,12 +454,12 @@ fn run() -> Result<(), CliError> {
                         Arg::with_name("url")
                             .short("U")
                             .long("url")
-                            .help("The URL of the Splinter daemon REST API")
+                            .help("URL of the Splinter daemon REST API")
                             .takes_value(true),
                     )
                     .arg(
                         Arg::with_name("circuit")
-                            .help("The circuit ID of the circuit to be shown")
+                            .help("ID of the circuit to be shown")
                             .takes_value(true),
                     )
                     .arg(
@@ -474,24 +479,24 @@ fn run() -> Result<(), CliError> {
                         Arg::with_name("url")
                             .short("U")
                             .long("url")
-                            .help("The URL of the Splinter daemon REST API")
+                            .help("URL of the Splinter daemon REST API")
                             .takes_value(true),
                     )
                     .arg(
                         Arg::with_name("management_type")
                             .long("management-type")
-                            .long_help(
-                                "Filter the circuit proposals by the circuit \
-                                 management type of the circuits",
+                            .help(
+                                "Filter circuit proposals by circuit \
+                                 management type",
                             )
                             .takes_value(true),
                     )
                     .arg(
                         Arg::with_name("member")
                             .long("member")
-                            .long_help(
-                                "Only show proposals whose circuits have the given node ID as \
-                                 a member",
+                            .help(
+                                "Show proposals with the given node ID in \
+                                its member list",
                             )
                             .takes_value(true),
                     )
@@ -517,19 +522,19 @@ fn run() -> Result<(), CliError> {
                                     .takes_value(true)
                                     .value_name("name")
                                     .possible_values(&["service-type", "management-type"])
-                                    .help("The name of the default setting"),
+                                    .help("Name of default setting"),
                             )
                             .arg(
                                 Arg::with_name("value")
                                     .takes_value(true)
                                     .value_name("value")
-                                    .help("The value for the default setting"),
+                                    .help("Value of default setting"),
                             )
                             .arg(
                                 Arg::with_name("force")
                                     .short("f")
                                     .long("force")
-                                    .help("Overwrite default if it is already set"),
+                                    .help("Overwrite default"),
                             ),
                     )
                     .subcommand(
@@ -540,7 +545,7 @@ fn run() -> Result<(), CliError> {
                                     .takes_value(true)
                                     .value_name("name")
                                     .possible_values(&["service-type", "management-type"])
-                                    .help("The name of the default setting"),
+                                    .help("Name of default setting"),
                             ),
                     )
                     .subcommand(SubCommand::with_name("list").about("List set default values"))
@@ -552,7 +557,7 @@ fn run() -> Result<(), CliError> {
                                     .takes_value(true)
                                     .value_name("name")
                                     .possible_values(&["service-type", "management-type"])
-                                    .help("The name of the default setting"),
+                                    .help("Name of default setting"),
                             ),
                     ),
             );
@@ -569,7 +574,7 @@ fn run() -> Result<(), CliError> {
                             .required(true)
                             .takes_value(true)
                             .value_name("name")
-                            .help("The name of the template"),
+                            .help("Name of template"),
                     ),
                 )
                 .subcommand(
@@ -580,7 +585,7 @@ fn run() -> Result<(), CliError> {
                                 .required(true)
                                 .takes_value(true)
                                 .value_name("name")
-                                .help("The name of the template"),
+                                .help("Name of template"),
                         ),
                 ),
         );
