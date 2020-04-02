@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines a basic API to register and authenticate a SplinterUser using a username and a password.
+//! Defines a basic API to register and authenticate a User using a username and a password.
 //! Not recommended for use in production.
 
 pub mod store;
