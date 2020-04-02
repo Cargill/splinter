@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
-use crate::error::CliError;
-use crate::store::default_value::DefaultValueStore;
-
 use splinter::admin::messages::{
     AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
     SplinterServiceBuilder,
 };
+
+use crate::error::CliError;
+use crate::store::default_value::DefaultValueStore;
+
+use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
 
 const PEER_SERVICES_ARG: &str = "peer_services";
 
