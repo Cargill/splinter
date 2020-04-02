@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use splinter::admin::messages::{
-    AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
-    SplinterServiceBuilder,
+    AuthorizationType, BuilderError, CreateCircuit, CreateCircuitBuilder, SplinterNode,
+    SplinterNodeBuilder, SplinterServiceBuilder,
 };
 
 use crate::error::CliError;
@@ -234,6 +234,7 @@ impl CreateCircuitMessageBuilder {
             .services
             .into_iter()
             .map(|mut builder| {
+                let service_id = builder.service_id().unwrap_or_default();
                 // if service type is not set, check for default value
                 if builder.service_type().is_none() {
                     builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
@@ -248,7 +249,11 @@ impl CreateCircuitMessageBuilder {
                 }
 
                 builder.build().map_err(|err| {
-                    CliError::ActionError(format!("Failed to build service: {}", err))
+                    CliError::ActionError(format!(
+                        "Failed to build service '{}': {}",
+                        service_id,
+                        msg_from_builder_error(err)
+                    ))
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -278,7 +283,10 @@ impl CreateCircuitMessageBuilder {
         };
 
         let create_circuit = create_circuit_builder.build().map_err(|err| {
-            CliError::ActionError(format!("Failed to build CreateCircuit message: {}", err))
+            CliError::ActionError(format!(
+                "Failed to build circuit: {}",
+                msg_from_builder_error(err)
+            ))
         })?;
         Ok(create_circuit)
     }
@@ -323,8 +331,20 @@ fn make_splinter_node(node_id: &str, endpoint: &str) -> Result<SplinterNode, Cli
         .with_node_id(&node_id)
         .with_endpoint(&endpoint)
         .build()
-        .map_err(|err| CliError::ActionError(format!("Failed to build SplinterNode: {}", err)))?;
+        .map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to build node: {}",
+                msg_from_builder_error(err)
+            ))
+        })?;
     Ok(node)
+}
+
+fn msg_from_builder_error(err: BuilderError) -> String {
+    match err {
+        BuilderError::InvalidField(msg) => msg,
+        BuilderError::MissingField(field) => format!("Missing node parameter: {}", field),
+    }
 }
 
 #[cfg(test)]
