@@ -32,7 +32,6 @@ use std::thread::{Builder, JoinHandle};
 use std::time::Duration;
 
 use clap::{App, Arg};
-use crossbeam_channel;
 use log::LogLevel;
 use protobuf::{self, Message};
 use sha2::{Digest, Sha256};
@@ -44,10 +43,7 @@ use splinter::consensus::{
     ConsensusEngine, ConsensusMessage, Proposal, ProposalUpdate, StartupState,
 };
 use splinter::mesh::Mesh;
-use splinter::network::{
-    sender::{NetworkMessageSender, NetworkMessageSenderError, SendRequest},
-    Network, RecvTimeoutError,
-};
+use splinter::network::{sender, sender::NetworkMessageSender, Network, RecvTimeoutError};
 use splinter::protos::authorization::{
     AuthorizationMessage, AuthorizationMessageType, ConnectRequest, ConnectRequest_HandshakeMode,
     ConnectResponse, ConnectResponse_AuthorizationType, TrustRequest,
@@ -71,13 +67,12 @@ const TIMEOUT_SEC: u64 = 2;
 const HEARTBEAT: u64 = 60;
 const TWO_PHASE_COORDINATOR_TIMEOUT_MILLIS: u64 = 30000; // 30 seconds
 
-#[derive(Debug)]
 pub struct ServiceState {
     peer_id: String,
     service_id: String,
     circuit: String,
     verifiers: Vec<String>,
-    service_sender: crossbeam_channel::Sender<SendRequest>,
+    service_sender: NetworkMessageSender,
     consensus_msg_sender: Sender<ConsensusMessage>,
     proposal_update_sender: Sender<ProposalUpdate>,
     counter: u32,
@@ -93,7 +88,7 @@ impl ServiceState {
         service_id: String,
         circuit: String,
         verifiers: Vec<String>,
-        service_sender: crossbeam_channel::Sender<SendRequest>,
+        service_sender: NetworkMessageSender,
         consensus_msg_sender: Sender<ConsensusMessage>,
         proposal_update_sender: Sender<ProposalUpdate>,
     ) -> Self {
@@ -118,21 +113,19 @@ fn main() -> Result<(), ServiceError> {
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     let listener = TcpListener::bind(matches.value_of("bind").unwrap()).unwrap();
-    ctrlc::set_handler(move || {
-        info!("Received Shutdown");
-        r.store(false, Ordering::SeqCst);
-
-        // wake the listener so it can shutdown
-        TcpStream::connect(matches2.value_of("bind").unwrap()).unwrap();
-    })
-    .expect("Error setting Ctrl-C handler");
 
     configure_logging(&matches);
 
     let mut transport = get_transport(&matches)?;
     let network =
         create_network_and_connect(&mut *transport, matches.value_of("connect").unwrap())?;
-    let (send, recv) = crossbeam_channel::bounded(5);
+
+    let network_message_queue = sender::Builder::new()
+        .with_network(network.clone())
+        .build()
+        .expect("Unable to create queue");
+    let network_sender = network_message_queue.new_network_sender();
+    let shutdown_signaler = network_message_queue.shutdown_signaler();
 
     // Create channels for interacting with consensus
     let (consensus_msg_tx, consensus_msg_rx) = std::sync::mpsc::channel();
@@ -147,7 +140,7 @@ fn main() -> Result<(), ServiceError> {
             .unwrap()
             .map(ToString::to_string)
             .collect(),
-        send.clone(),
+        network_sender.clone(),
         consensus_msg_tx,
         proposal_update_tx,
     )));
@@ -187,9 +180,9 @@ fn main() -> Result<(), ServiceError> {
         })
         .map_err(|err| ServiceError(format!("Unable to start consensus thread: {}", err)))?;
 
-    let (sender_thread, receiver_thread) = start_service_loop(
+    let receiver_thread = start_service_loop(
         format!("private-counter-{}", Uuid::new_v4()),
-        (send, recv),
+        network_sender,
         network,
         state.clone(),
         running.clone(),
@@ -214,7 +207,15 @@ fn main() -> Result<(), ServiceError> {
         });
     }
 
-    let _ = sender_thread.join();
+    ctrlc::set_handler(move || {
+        info!("Received Shutdown");
+        r.store(false, Ordering::SeqCst);
+        shutdown_signaler.shutdown();
+        // wake the listener so it can shutdown
+        TcpStream::connect(matches2.value_of("bind").unwrap()).unwrap();
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let _ = receiver_thread.join();
     let _ = consensus_thread.join();
 
@@ -254,44 +255,22 @@ fn create_network_and_connect(
     Ok(network)
 }
 
-type StartServiceJoinHandle = (
-    JoinHandle<Result<(), NetworkMessageSenderError>>,
-    JoinHandle<()>,
-);
+type StartServiceJoinHandle = JoinHandle<()>;
 
 fn start_service_loop(
     auth_identity: String,
-    channel: (
-        crossbeam_channel::Sender<SendRequest>,
-        crossbeam_channel::Receiver<SendRequest>,
-    ),
+    network_sender: NetworkMessageSender,
     network: Network,
     state: Arc<Mutex<ServiceState>>,
     running: Arc<AtomicBool>,
 ) -> Result<StartServiceJoinHandle, ServiceError> {
     info!("Starting Private Counter Service");
-    let sender_network = network.clone();
-    let (send, recv) = channel;
-
-    let running_clone = running.clone();
-    let sender_thread = Builder::new()
-        .name("NetworkMessageSender".into())
-        .spawn(move || {
-            let network_sender =
-                NetworkMessageSender::new(Box::new(recv), sender_network, running_clone);
-            network_sender.run()
-        })
-        .map_err(|err| {
-            ServiceError(format!(
-                "Unable to start network message sender thread: {}",
-                err
-            ))
-        })?;
-
     let recv_network = network.clone();
     let receiver_thread = Builder::new()
         .name("NetworkReceiver".into())
-        .spawn(move || run_service_loop(recv_network, &send, auth_identity, state, running))
+        .spawn(move || {
+            run_service_loop(recv_network, &network_sender, auth_identity, state, running)
+        })
         .map_err(|err| ServiceError(format!("Unable to start network receiver thread: {}", err)))?;
 
     let connect_request_msg_bytes = create_connect_request()
@@ -303,12 +282,12 @@ fn start_service_loop(
             .map_err(|err| ServiceError(format!("Unable to send connect request: {:?}", err)))?;
     }
 
-    Ok((sender_thread, receiver_thread))
+    Ok(receiver_thread)
 }
 
 fn run_service_loop(
     network: Network,
-    reply_sender: &crossbeam_channel::Sender<SendRequest>,
+    network_sender: &NetworkMessageSender,
     auth_identity: String,
     state: Arc<Mutex<ServiceState>>,
     running: Arc<AtomicBool>,
@@ -328,7 +307,7 @@ fn run_service_loop(
                             auth_msg,
                             message.peer_id(),
                             &auth_identity,
-                            &reply_sender
+                            network_sender
                         )) {
                             info!("Successfully authorized with peer {}", message.peer_id());
                             let state = state.lock().expect("State lock poisoned");
@@ -396,7 +375,7 @@ fn handle_authorized_msg(
     auth_msg: AuthorizationMessage,
     source_peer_id: &str,
     auth_identity: &str,
-    sender: &crossbeam_channel::Sender<SendRequest>,
+    sender: &NetworkMessageSender,
 ) -> Result<bool, ServiceError> {
     match auth_msg.get_message_type() {
         AuthorizationMessageType::CONNECT_RESPONSE => {
@@ -409,13 +388,13 @@ fn handle_authorized_msg(
             {
                 let mut trust_request = TrustRequest::new();
                 trust_request.set_identity(auth_identity.to_string());
-                sender.send(SendRequest::new(
+                sender.send(
                     source_peer_id.to_string(),
                     wrap_in_network_auth_envelopes(
                         AuthorizationMessageType::TRUST_REQUEST,
                         trust_request,
                     )?,
-                ))?;
+                )?;
             }
             // send trust request
             Ok(false)

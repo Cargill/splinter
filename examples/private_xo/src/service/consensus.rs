@@ -25,7 +25,7 @@ use splinter::consensus::{
     ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId, ProposalManager,
     ProposalUpdate,
 };
-use splinter::network::sender::SendRequest;
+use splinter::network::sender::NetworkMessageSender;
 use transact::protos::{batch::Batch, FromProto};
 
 use crate::protos::private_xo::{PrivateXoMessage, PrivateXoMessage_Type, ProposedBatch};
@@ -39,7 +39,7 @@ pub struct PrivateXoProposalManager {
     pending_batches: Arc<Mutex<VecDeque<Batch>>>,
     pending_proposal: Arc<Mutex<Option<(Proposal, Batch)>>>,
     proposal_update_sender: Sender<ProposalUpdate>,
-    service_sender: crossbeam_channel::Sender<SendRequest>,
+    service_sender: NetworkMessageSender,
 }
 
 impl PrivateXoProposalManager {
@@ -49,7 +49,7 @@ impl PrivateXoProposalManager {
         pending_batches: Arc<Mutex<VecDeque<Batch>>>,
         pending_proposal: Arc<Mutex<Option<(Proposal, Batch)>>>,
         proposal_update_sender: Sender<ProposalUpdate>,
-        service_sender: crossbeam_channel::Sender<SendRequest>,
+        service_sender: NetworkMessageSender,
     ) -> Self {
         PrivateXoProposalManager {
             config,
@@ -108,7 +108,7 @@ impl ProposalManager for PrivateXoProposalManager {
 
             for verifier in self.config.verifiers() {
                 self.service_sender
-                    .send(SendRequest::new(
+                    .send(
                         self.config.peer_id().into(),
                         create_circuit_direct_msg(
                             self.config.circuit().into(),
@@ -117,7 +117,7 @@ impl ProposalManager for PrivateXoProposalManager {
                             &msg,
                             Uuid::new_v4().to_string(),
                         )?,
-                    ))
+                    )
                     .map_err(ServiceError::from)?;
             }
 
@@ -231,14 +231,11 @@ impl ProposalManager for PrivateXoProposalManager {
 
 pub struct PrivateXoNetworkSender {
     config: ServiceConfig,
-    service_sender: crossbeam_channel::Sender<SendRequest>,
+    service_sender: NetworkMessageSender,
 }
 
 impl PrivateXoNetworkSender {
-    pub fn new(
-        config: ServiceConfig,
-        service_sender: crossbeam_channel::Sender<SendRequest>,
-    ) -> Self {
+    pub fn new(config: ServiceConfig, service_sender: NetworkMessageSender) -> Self {
         PrivateXoNetworkSender {
             config,
             service_sender,
@@ -255,7 +252,7 @@ impl ConsensusNetworkSender for PrivateXoNetworkSender {
         msg.set_consensus_message(consensus_message.try_into()?);
 
         self.service_sender
-            .send(SendRequest::new(
+            .send(
                 self.config.peer_id().into(),
                 create_circuit_direct_msg(
                     self.config.circuit().into(),
@@ -266,7 +263,7 @@ impl ConsensusNetworkSender for PrivateXoNetworkSender {
                     Uuid::new_v4().to_string(),
                 )
                 .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?,
-            ))
+            )
             .map_err(|err| ConsensusSendError::Internal(Box::new(ServiceError::from(err))))?;
 
         Ok(())
@@ -281,7 +278,7 @@ impl ConsensusNetworkSender for PrivateXoNetworkSender {
 
         for verifier in self.config.verifiers() {
             self.service_sender
-                .send(SendRequest::new(
+                .send(
                     self.config.peer_id().into(),
                     create_circuit_direct_msg(
                         self.config.circuit().into(),
@@ -291,7 +288,7 @@ impl ConsensusNetworkSender for PrivateXoNetworkSender {
                         Uuid::new_v4().to_string(),
                     )
                     .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?,
-                ))
+                )
                 .map_err(|err| ConsensusSendError::Internal(Box::new(ServiceError::from(err))))?;
         }
 

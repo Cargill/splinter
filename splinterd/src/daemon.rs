@@ -51,7 +51,7 @@ use splinter::network::auth::AuthorizationManager;
 use splinter::network::dispatch::{DispatchLoop, DispatchMessage, Dispatcher};
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
 use splinter::network::peer::PeerConnector;
-use splinter::network::sender::{NetworkMessageSender, SendRequest};
+use splinter::network::{sender, sender::NetworkMessageSender};
 use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
 use splinter::node_registry::{
     self,
@@ -179,17 +179,17 @@ impl SplinterDaemon {
         info!("Starting SpinterNode with ID {}", self.node_id);
 
         let network = self.network.clone();
-        let (send, recv) = crossbeam_channel::bounded(5);
-        let r = running.clone();
-        let network_message_sender_thread = thread::spawn(move || {
-            let network_sender = NetworkMessageSender::new(Box::new(recv), network, r);
-            network_sender.run()
-        });
+        let network_message_queue = sender::Builder::new()
+            .with_network(network)
+            .build()
+            .expect("Unable to create queue");
+        let network_sender = network_message_queue.new_network_sender();
+        let sender_shutdown_signaler = network_message_queue.shutdown_signaler();
 
         // Set up the Circuit dispatcher
         let (circuit_dispatch_send, circuit_dispatch_recv) = crossbeam_channel::bounded(5);
         let circuit_dispatcher = set_up_circuit_dispatcher(
-            send.clone(),
+            network_sender.clone(),
             &self.node_id,
             &self.network_endpoint,
             state.clone(),
@@ -204,7 +204,7 @@ impl SplinterDaemon {
         // Set up the Auth dispatcher
         let (auth_dispatch_send, auth_dispatch_recv) = crossbeam_channel::bounded(5);
         let auth_dispatcher =
-            create_authorization_dispatcher(auth_manager.clone(), Box::new(send.clone()));
+            create_authorization_dispatcher(auth_manager.clone(), network_sender.clone());
         let auth_dispatch_loop = DispatchLoop::new(
             Box::new(auth_dispatch_recv),
             auth_dispatcher,
@@ -215,7 +215,7 @@ impl SplinterDaemon {
         // Set up the Network dispatcher
         let (network_dispatch_send, network_dispatch_recv) = crossbeam_channel::bounded(5);
         let network_dispatcher = set_up_network_dispatcher(
-            send,
+            network_sender,
             &self.node_id,
             auth_manager.clone(),
             circuit_dispatch_send,
@@ -438,6 +438,8 @@ impl SplinterDaemon {
             info!("Received Shutdown");
             r.store(false, Ordering::SeqCst);
 
+            sender_shutdown_signaler.shutdown();
+
             if let Err(err) = admin_shutdown_handle.shutdown() {
                 error!("Unable to cleanly shut down Admin service: {}", err);
             }
@@ -462,7 +464,6 @@ impl SplinterDaemon {
         }
 
         // Join network sender and dispatcher threads
-        let _ = network_message_sender_thread.join();
         let _ = circuit_dispatcher_thread.join();
         let _ = auth_dispatcher_thread.join();
         let _ = network_dispatcher_thread.join();
@@ -850,13 +851,13 @@ impl SplinterDaemonBuilder {
 }
 
 fn set_up_network_dispatcher(
-    send: crossbeam_channel::Sender<SendRequest>,
+    network_sender: NetworkMessageSender,
     node_id: &str,
     auth_manager: AuthorizationManager,
     circuit_sender: crossbeam_channel::Sender<DispatchMessage<CircuitMessageType>>,
     auth_sender: crossbeam_channel::Sender<DispatchMessage<AuthorizationMessageType>>,
 ) -> Dispatcher<NetworkMessageType> {
-    let mut dispatcher = Dispatcher::<NetworkMessageType>::new(Box::new(send));
+    let mut dispatcher = Dispatcher::<NetworkMessageType>::new(network_sender);
 
     let network_echo_handler = NetworkEchoHandler::new(node_id.to_string());
     dispatcher.set_handler(
@@ -893,12 +894,12 @@ fn set_up_network_dispatcher(
 }
 
 fn set_up_circuit_dispatcher(
-    send: crossbeam_channel::Sender<SendRequest>,
+    network_sender: NetworkMessageSender,
     node_id: &str,
     endpoint: &str,
     state: SplinterState,
 ) -> Dispatcher<CircuitMessageType> {
-    let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(send));
+    let mut dispatcher = Dispatcher::<CircuitMessageType>::new(network_sender);
 
     let service_connect_request_handler =
         ServiceConnectRequestHandler::new(node_id.to_string(), endpoint.to_string(), state.clone());

@@ -11,93 +11,121 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::mpsc::{channel, Sender};
 
-use crate::channel::{Receiver, RecvTimeoutError};
 use crate::network::Network;
-
-// Recv timeout in secs
-const TIMEOUT_SEC: u64 = 2;
 
 // Message to send to the network message sender with the recipient and payload
 #[derive(Clone, Debug, PartialEq)]
-pub struct SendRequest {
-    recipient: String,
-    payload: Vec<u8>,
+enum SendRequest {
+    Shutdown,
+    Message { recipient: String, payload: Vec<u8> },
 }
 
-impl SendRequest {
-    pub fn new(recipient: String, payload: Vec<u8>) -> Self {
-        SendRequest { recipient, payload }
-    }
-
-    pub fn recipient(&self) -> &str {
-        &self.recipient
-    }
-
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
-    }
-}
-
-// The NetworkMessageSender recv messages that should be sent over the network. The Sender side of
-// the channel will be passed to handlers.
+#[derive(Clone)]
 pub struct NetworkMessageSender {
-    rc: Box<dyn Receiver<SendRequest>>,
-    network: Network,
-    running: Arc<AtomicBool>,
+    sender: Sender<SendRequest>,
 }
 
 impl NetworkMessageSender {
-    pub fn new(
-        rc: Box<dyn Receiver<SendRequest>>,
-        network: Network,
-        running: Arc<AtomicBool>,
-    ) -> Self {
-        NetworkMessageSender {
-            rc,
-            network,
-            running,
+    pub fn send(&self, recipient: String, payload: Vec<u8>) -> Result<(), (String, Vec<u8>)> {
+        self.sender
+            .send(SendRequest::Message { recipient, payload })
+            .map_err(|err| match err.0 {
+                SendRequest::Message { recipient, payload } => (recipient, payload),
+                SendRequest::Shutdown => unreachable!(), // we didn't send this
+            })
+    }
+}
+
+pub struct ShutdownSignaler {
+    sender: Sender<SendRequest>,
+}
+
+impl ShutdownSignaler {
+    pub fn shutdown(&self) {
+        if self.sender.send(SendRequest::Shutdown).is_err() {
+            error!("Unable to send shutdown signal to already-shutdown network message queue");
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Builder {
+    network: Option<Network>,
+}
+
+impl Builder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_network(mut self, network: Network) -> Self {
+        self.network = Some(network);
+        self
+    }
+
+    pub fn build(mut self) -> Result<NetworkMessageSendQueue, String> {
+        let (tx, rx) = channel();
+
+        let network = self
+            .network
+            .take()
+            .ok_or_else(|| "No network provided".to_string())?;
+
+        let join_handle = std::thread::spawn(move || {
+            loop {
+                match rx.recv() {
+                    Ok(SendRequest::Message { recipient, payload }) => {
+                        if let Err(err) = network.send(&recipient, &payload) {
+                            warn!("Unable to send message: {:?}", err);
+                        }
+                    }
+                    Ok(SendRequest::Shutdown) => {
+                        debug!("Received shutdown signal");
+                        break;
+                    }
+                    Err(_) => {
+                        debug!("No more network senders attached to this queue; aborting");
+                        break;
+                    }
+                }
+            }
+
+            debug!("Exiting network message send queue loop");
+        });
+
+        Ok(NetworkMessageSendQueue {
+            sender: tx,
+            join_handle,
+        })
+    }
+}
+
+// The NetworkMessageSendQueue recv messages that should be sent over the network. The Sender side of
+// the channel will be passed to handlers.
+pub struct NetworkMessageSendQueue {
+    sender: Sender<SendRequest>,
+    join_handle: std::thread::JoinHandle<()>,
+}
+
+impl NetworkMessageSendQueue {
+    pub fn wait_for_shutdown(self) {
+        if self.join_handle.join().is_err() {
+            error!("Unable to cleanly wait for network message send queue shutdown");
         }
     }
 
-    pub fn run(&self) -> Result<(), NetworkMessageSenderError> {
-        let timeout = Duration::from_secs(TIMEOUT_SEC);
-        while self.running.load(Ordering::SeqCst) {
-            let send_request = match self.rc.recv_timeout(timeout) {
-                Ok(send_request) => send_request,
-                Err(RecvTimeoutError::Timeout) => continue,
-                Err(RecvTimeoutError::Disconnected) => {
-                    error!("Received Disconnected Error from receiver");
-                    return Err(NetworkMessageSenderError::RecvTimeoutError(String::from(
-                        "Received Disconnected Error from receiver",
-                    )));
-                }
-            };
-
-            match self
-                .network
-                .send(send_request.recipient(), send_request.payload())
-            {
-                Ok(_) => (),
-                Err(err) => warn!("Unable to send message: {:?}", err),
-            };
+    pub fn new_network_sender(&self) -> NetworkMessageSender {
+        NetworkMessageSender {
+            sender: self.sender.clone(),
         }
+    }
 
-        // Finish sending any messages that may be queued
-        while let Ok(send_request) = self.rc.try_recv() {
-            match self
-                .network
-                .send(send_request.recipient(), send_request.payload())
-            {
-                Ok(_) => (),
-                Err(err) => warn!("Unable to send message: {:?}", err),
-            };
+    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
+        ShutdownSignaler {
+            sender: self.sender.clone(),
         }
-
-        Ok(())
     }
 }
 
@@ -108,33 +136,31 @@ pub enum NetworkMessageSenderError {
 
 #[cfg(test)]
 mod tests {
-    use crate::channel::{Receiver, Sender};
-    use crossbeam_channel;
-
-    use std::sync::mpsc;
     use std::thread;
 
     use super::*;
     use crate::mesh::Mesh;
     use crate::network::Network;
-    use crate::transport::socket::TcpTransport;
+    use crate::transport::inproc::InprocTransport;
     use crate::transport::Transport;
 
-    // Test that a message can successfully be sent by passing it to the sender end of the
-    // NetworkMessageSender channel, recv the message, and then send it over the network.
-    fn test_network_message_sender(
-        sender: Box<dyn Sender<SendRequest>>,
-        receiver: Box<dyn Receiver<SendRequest>>,
-    ) {
-        let mut transport = TcpTransport::default();
-        let mut listener = transport.listen("127.0.0.1:0").unwrap();
+    // Test that a message can successfully be sent by passing it to the
+    // NetworkMessageSender, the message is received by the NetworkMessageSendQueue, and then
+    // sent over the network.
+    #[test]
+    fn test_network_message_sender() {
+        let mut transport = InprocTransport::default();
+        let mut listener = transport.listen("inproc://sender").unwrap();
         let endpoint = listener.endpoint();
 
         let mesh1 = Mesh::new(1, 1);
         let network1 = Network::new(mesh1.clone(), 0).unwrap();
 
-        let running = Arc::new(AtomicBool::new(true));
-        let network_message_sender = NetworkMessageSender::new(receiver, network1.clone(), running);
+        let network_message_queue = Builder::new()
+            .with_network(network1.clone())
+            .build()
+            .expect("Unable to create queue");
+        let network_message_sender = network_message_queue.new_network_sender();
 
         thread::spawn(move || {
             let mesh2 = Mesh::new(1, 1);
@@ -147,33 +173,39 @@ mod tests {
                 network_message.payload().to_vec(),
                 b"FromNetworkMessageSender".to_vec()
             );
+
+            network2
+                .send("ABC", &vec![])
+                .expect("Unable to send message");
         });
 
         let connection = transport.connect(&endpoint).unwrap();
         network1.add_peer("123".to_string(), connection).unwrap();
 
-        thread::spawn(move || network_message_sender.run());
+        network_message_sender
+            .send("123".to_string(), b"FromNetworkMessageSender".to_vec())
+            .unwrap();
 
-        let send_request =
-            SendRequest::new("123".to_string(), b"FromNetworkMessageSender".to_vec());
-        sender.send(send_request).unwrap();
+        // block until we can receive a message from the other thread
+        network1.recv().expect("Unable to recv message");
     }
 
-    // Test that a messages can successfully be sent by passing it to the sender end of the
-    // NetworkMessageSender channel, recv the message, and then send it over the network.
-    fn test_network_message_sender_rapid_fire(
-        sender: Box<dyn Sender<SendRequest>>,
-        receiver: Box<dyn Receiver<SendRequest>>,
-    ) {
-        let mut transport = TcpTransport::default();
-        let mut listener = transport.listen("127.0.0.1:0").unwrap();
-        let endpoint = listener.endpoint();
+    // Test that 100 messages can successfully be sent by passing them to the
+    // NetworkMessageSender, the messages are received by the NetworkMessageSendQueue, and then
+    // sent over the network.
+    #[test]
+    fn test_network_message_sender_rapid_fire() {
+        let mut transport = InprocTransport::default();
+        let mut listener = transport.listen("inproc://sender").unwrap();
 
         let mesh1 = Mesh::new(5, 5);
         let network1 = Network::new(mesh1.clone(), 0).unwrap();
 
-        let running = Arc::new(AtomicBool::new(true));
-        let network_message_sender = NetworkMessageSender::new(receiver, network1.clone(), running);
+        let network_message_queue = Builder::new()
+            .with_network(network1.clone())
+            .build()
+            .expect("Unable to create queue");
+        let network_message_sender = network_message_queue.new_network_sender();
 
         thread::spawn(move || {
             let mesh2 = Mesh::new(5, 5);
@@ -187,46 +219,21 @@ mod tests {
                     network_message.payload().to_vec(),
                     b"FromNetworkMessageSender".to_vec()
                 );
+                network2
+                    .send("ABC", &vec![])
+                    .expect("Unable to send message");
             }
         });
 
-        let connection = transport.connect(&endpoint).unwrap();
+        let connection = transport.connect("inproc://sender").unwrap();
         network1.add_peer("123".to_string(), connection).unwrap();
-
-        thread::spawn(move || network_message_sender.run());
-
-        let send_request =
-            SendRequest::new("123".to_string(), b"FromNetworkMessageSender".to_vec());
-
         for _ in 0..100 {
-            sender.send(send_request.clone()).unwrap();
+            network_message_sender
+                .send("123".to_string(), b"FromNetworkMessageSender".to_vec())
+                .expect("Unable to send message");
+
+            // block until we can receive a message from the other thread
+            network1.recv().expect("Unable to recv message");
         }
-    }
-
-    #[test]
-    fn test_receiver_crossbeam() {
-        let (send, recv) = crossbeam_channel::bounded(5);
-        // test that send is cloneable.
-        let send_box = Box::new(send);
-        let send_clone = send_box.clone();
-        test_network_message_sender(send_clone, Box::new(recv));
-    }
-
-    #[test]
-    fn test_receiver_mpsc() {
-        let (send, recv) = mpsc::channel();
-        test_network_message_sender(Box::new(send), Box::new(recv));
-    }
-
-    #[test]
-    fn test_receiver_crossbeam_rapid_fire() {
-        let (send, recv) = crossbeam_channel::bounded(5);
-        test_network_message_sender_rapid_fire(Box::new(send), Box::new(recv));
-    }
-
-    #[test]
-    fn test_receiver_mpsc_rapid_fire() {
-        let (send, recv) = mpsc::channel();
-        test_network_message_sender_rapid_fire(Box::new(send), Box::new(recv));
     }
 }

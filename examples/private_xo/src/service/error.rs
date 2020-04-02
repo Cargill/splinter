@@ -41,6 +41,12 @@ impl<T> From<std::sync::mpsc::SendError<T>> for ServiceError {
     }
 }
 
+impl From<(String, Vec<u8>)> for ServiceError {
+    fn from(err: (String, Vec<u8>)) -> Self {
+        ServiceError(format!("Unable to send to {}", err.0))
+    }
+}
+
 impl From<ServiceError> for ProposalManagerError {
     fn from(err: ServiceError) -> Self {
         ProposalManagerError::Internal(Box::new(err))

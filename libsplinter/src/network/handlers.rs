@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::channel::Sender;
+
 use crate::network::dispatch::{DispatchError, Handler, MessageContext};
-use crate::network::sender::SendRequest;
+use crate::network::sender::NetworkMessageSender;
 use crate::protos::network::{NetworkEcho, NetworkHeartbeat, NetworkMessage, NetworkMessageType};
 
 use protobuf::Message;
@@ -28,7 +28,7 @@ impl Handler<NetworkMessageType, NetworkEcho> for NetworkEchoHandler {
         &self,
         mut msg: NetworkEcho,
         context: &MessageContext<NetworkMessageType>,
-        sender: &dyn Sender<SendRequest>,
+        sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("ECHO: {:?}", msg);
 
@@ -54,8 +54,11 @@ impl Handler<NetworkMessageType, NetworkEcho> for NetworkEchoHandler {
         network_msg.set_payload(echo_bytes);
         let network_msg_bytes = network_msg.write_to_bytes().unwrap();
 
-        let send_request = SendRequest::new(recipient, network_msg_bytes);
-        sender.send(send_request)?;
+        sender
+            .send(recipient, network_msg_bytes)
+            .map_err(|(recipient, payload)| {
+                DispatchError::NetworkSendError((recipient, payload))
+            })?;
         Ok(())
     }
 }
@@ -75,7 +78,7 @@ impl Handler<NetworkMessageType, NetworkHeartbeat> for NetworkHeartbeatHandler {
         &self,
         _msg: NetworkHeartbeat,
         context: &MessageContext<NetworkMessageType>,
-        _sender: &dyn Sender<SendRequest>,
+        _sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         trace!("Received Heartbeat from {}", context.source_peer_id());
         Ok(())
@@ -91,43 +94,75 @@ impl NetworkHeartbeatHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::channel::mock::MockSender;
+    use crate::mesh::Mesh;
     use crate::network::dispatch::Dispatcher;
+    use crate::network::sender;
+    use crate::network::Network;
     use crate::protos::network::{NetworkEcho, NetworkMessageType};
+    use crate::transport::inproc::InprocTransport;
+    use crate::transport::Transport;
 
     #[test]
     fn dispatch_to_handler() {
-        let sender = Box::new(MockSender::default());
-        let mut dispatcher = Dispatcher::new(sender.box_clone());
+        // Set up dispatcher and mock sender
+        let mesh1 = Mesh::new(1, 1);
+        let network1 = Network::new(mesh1.clone(), 0).unwrap();
 
-        let handler = NetworkEchoHandler::new("TestPeer".to_string());
+        let network_message_queue = sender::Builder::new()
+            .with_network(network1.clone())
+            .build()
+            .expect("Unable to create queue");
+        let network_sender = network_message_queue.new_network_sender();
 
-        dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
+        let mut inproc_transport = InprocTransport::default();
+        let mut dispatcher: Dispatcher<NetworkMessageType> = Dispatcher::new(network_sender);
+        let mut listener = inproc_transport
+            .listen("inproc://network_echo")
+            .expect("Cannot get listener");
 
-        let msg = {
-            let mut echo = NetworkEcho::new();
-            echo.set_payload(b"HelloWorld".to_vec());
-            echo.set_recipient("TestPeer".to_string());
-            echo.set_time_to_live(3);
-            echo
-        };
+        std::thread::spawn(move || {
+            let connection = listener.accept().expect("Cannot accept connection");
+            network1
+                .add_peer("OTHER_PEER".to_string(), connection)
+                .expect("Unable to add peer");
 
-        let outgoing_message_bytes = msg.write_to_bytes().unwrap();
+            let handler = NetworkEchoHandler::new("TestPeer".to_string());
 
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch(
-                "OTHER_PEER",
-                &NetworkMessageType::NETWORK_ECHO,
-                outgoing_message_bytes.clone()
-            )
-        );
+            dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
 
-        let send_request = sender.sent().get(0).unwrap().clone();
+            let msg = {
+                let mut echo = NetworkEcho::new();
+                echo.set_payload(b"HelloWorld".to_vec());
+                echo.set_recipient("TestPeer".to_string());
+                echo.set_time_to_live(3);
+                echo
+            };
 
-        assert_eq!(send_request.recipient(), "OTHER_PEER");
+            let outgoing_message_bytes = msg.write_to_bytes().unwrap();
+
+            assert_eq!(
+                Ok(()),
+                dispatcher.dispatch(
+                    "OTHER_PEER",
+                    &NetworkMessageType::NETWORK_ECHO,
+                    outgoing_message_bytes.clone()
+                )
+            );
+        });
+
+        let mesh2 = Mesh::new(1, 1);
+        let network2 = Network::new(mesh2.clone(), 0).unwrap();
+        let connection = inproc_transport
+            .connect("inproc://network_echo")
+            .expect("Unable to connect to inproc");
+        network2
+            .add_peer("TestPeer".to_string(), connection)
+            .expect("Unable to add peer");
+        let network_message = network2
+            .recv()
+            .expect("Unable to receive message over the network");
         let network_msg: NetworkMessage =
-            protobuf::parse_from_bytes(send_request.payload()).unwrap();
+            protobuf::parse_from_bytes(network_message.payload()).unwrap();
         let echo: NetworkEcho = protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
 
         assert_eq!(echo.get_recipient(), "TestPeer");
