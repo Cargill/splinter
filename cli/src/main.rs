@@ -300,7 +300,7 @@ fn run() -> Result<(), CliError> {
                     .long("service-peer-group")
                     .takes_value(true)
                     .multiple(true)
-                    .help("List of peer services"),
+                    .help("List of peer services (comma-separated list)"),
             )
             .arg(
                 Arg::with_name("management_type")
