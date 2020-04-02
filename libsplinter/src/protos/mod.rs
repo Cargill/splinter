@@ -107,4 +107,20 @@ where
     }
 }
 
+pub mod prelude {
+    //! Allows for the convenient requirement of the proto conversion traits and errors.
+    //!
+    //! ```
+    //! use splinter::protos::prelude::*;
+    //! ```
+
+    pub use super::FromBytes;
+    pub use super::FromNative;
+    pub use super::FromProto;
+    pub use super::IntoBytes;
+    pub use super::IntoNative;
+    pub use super::IntoProto;
+    pub use super::ProtoConversionError;
+}
+
 include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
