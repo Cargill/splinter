@@ -19,7 +19,6 @@ use crate::error::CliError;
 use diesel::{connection::Connection as _, pg::PgConnection};
 #[cfg(feature = "database-migrate-biome")]
 use splinter::biome::migrations::run_postgres_migrations;
-use splinter::database::run_migrations as run_setup_migrations;
 
 pub struct MigrateAction;
 
@@ -34,10 +33,6 @@ impl Action for MigrateAction {
 
         let connection =
             PgConnection::establish(url).map_err(|err| CliError::DatabaseError(err.to_string()))?;
-
-        run_setup_migrations(&connection).map_err(|err| {
-            CliError::DatabaseError(format!("Unable to run Biome setup migrations: {}", err))
-        })?;
 
         #[cfg(feature = "database-migrate-biome")]
         run_postgres_migrations(&connection).map_err(|err| {
