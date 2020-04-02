@@ -18,7 +18,7 @@ embed_migrations!("./src/biome/migrations/diesel/postgres/migrations");
 
 use diesel::pg::PgConnection;
 
-use crate::database::error::DatabaseError;
+use crate::database::error::ConnectionError;
 
 /// Run database migrations to create tables defined in the user module
 ///
@@ -26,8 +26,11 @@ use crate::database::error::DatabaseError;
 ///
 /// * `conn` - Connection to database
 ///
-pub fn run_migrations(conn: &PgConnection) -> Result<(), DatabaseError> {
-    embedded_migrations::run(conn).map_err(|err| DatabaseError::ConnectionError(Box::new(err)))?;
+pub fn run_migrations(conn: &PgConnection) -> Result<(), ConnectionError> {
+    embedded_migrations::run(conn).map_err(|err| ConnectionError {
+        context: "Failed to embed migrations".to_string(),
+        source: Box::new(err),
+    })?;
 
     info!("Successfully applied biome credentials migrations");
 

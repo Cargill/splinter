@@ -26,7 +26,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
 };
 
-pub use super::database::error::DatabaseError;
+pub use super::database::error::ConnectionError;
 
 enum InnerConnection {
     Pg(PooledConnection<ConnectionManager<PgConnection>>),
@@ -65,23 +65,28 @@ pub struct ConnectionPool {
 }
 
 impl ConnectionPool {
-    pub fn new_pg(database_url: &str) -> Result<Self, DatabaseError> {
+    pub fn new_pg(database_url: &str) -> Result<Self, ConnectionError> {
         let connection_manager = ConnectionManager::<PgConnection>::new(database_url);
         Ok(ConnectionPool {
-            inner: InnerPool::Pg(
-                Pool::builder()
-                    .build(connection_manager)
-                    .map_err(|err| DatabaseError::ConnectionError(Box::new(err)))?,
-            ),
+            inner: InnerPool::Pg(Pool::builder().build(connection_manager).map_err(|err| {
+                ConnectionError {
+                    context: "Failed to build connection pool".to_string(),
+                    source: Box::new(err),
+                }
+            })?),
         })
     }
 
-    pub fn get(&self) -> Result<Connection, DatabaseError> {
+    pub fn get(&self) -> Result<Connection, ConnectionError> {
         match &self.inner {
-            InnerPool::Pg(pool) => pool
-                .get()
-                .map(Connection::new_pg)
-                .map_err(|err| DatabaseError::ConnectionError(Box::new(err))),
+            InnerPool::Pg(pool) => {
+                pool.get()
+                    .map(Connection::new_pg)
+                    .map_err(|err| ConnectionError {
+                        context: "Failed to get Connection from connection pool".to_string(),
+                        source: Box::new(err),
+                    })
+            }
         }
     }
 }

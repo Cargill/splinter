@@ -18,7 +18,7 @@ use std::error::Error;
 use std::fmt;
 
 #[cfg(feature = "diesel")]
-use crate::database::error::DatabaseError;
+use crate::database::error;
 
 /// Represents CredentialsStore errors
 #[derive(Debug)]
@@ -87,13 +87,9 @@ impl fmt::Display for CredentialsStoreError {
 }
 
 #[cfg(feature = "diesel")]
-impl From<DatabaseError> for CredentialsStoreError {
-    fn from(err: DatabaseError) -> CredentialsStoreError {
-        match err {
-            DatabaseError::ConnectionError(_) => {
-                CredentialsStoreError::ConnectionError(Box::new(err))
-            }
-        }
+impl From<error::ConnectionError> for CredentialsStoreError {
+    fn from(err: error::ConnectionError) -> CredentialsStoreError {
+        CredentialsStoreError::ConnectionError(Box::new(err))
     }
 }
 
