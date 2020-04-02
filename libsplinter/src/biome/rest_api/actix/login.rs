@@ -122,6 +122,7 @@ pub fn make_login_route(
                             #[cfg(feature = "biome-refresh-tokens")]
                             {
                                 let refresh_claims = match ClaimsBuilder::default()
+                                    .with_user_id(&credentials.user_id)
                                     .with_issuer(&rest_config.issuer())
                                     .with_duration(rest_config.refresh_token_duration())
                                     .build()
