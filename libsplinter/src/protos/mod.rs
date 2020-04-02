@@ -48,12 +48,37 @@ pub trait FromNative<N>: Sized {
     fn from_native(other: N) -> Result<Self, ProtoConversionError>;
 }
 
-pub trait FromBytes<N>: Sized {
-    fn from_bytes(bytes: &[u8]) -> Result<N, ProtoConversionError>;
+/// Convert from bytes into a native struct, via the given protocol.
+pub trait FromBytes<ViaProtocol>: Sized {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ProtoConversionError>;
 }
 
-pub trait IntoBytes: Sized {
+impl<P, N> FromBytes<P> for N
+where
+    P: protobuf::Message,
+    N: FromProto<P>,
+{
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ProtoConversionError> {
+        let p: P = protobuf::parse_from_bytes(bytes)
+            .map_err(|err| ProtoConversionError::DeserializationError(err.to_string()))?;
+        N::from_proto(p)
+    }
+}
+
+/// Convert to bytes from a native struct, via the given protocol.
+pub trait IntoBytes<ViaProtocol>: Sized {
     fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError>;
+}
+
+impl<P, N> IntoBytes<P> for N
+where
+    P: protobuf::Message + FromNative<N>,
+{
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let p = P::from_native(self)?;
+        p.write_to_bytes()
+            .map_err(|err| ProtoConversionError::SerializationError(err.to_string()))
+    }
 }
 
 pub trait IntoNative<T>: Sized
