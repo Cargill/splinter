@@ -126,7 +126,7 @@ pub struct BiomeRestResourceManager {
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     #[cfg(feature = "biome-credentials")]
-    credentials_store: Option<Arc<DieselCredentialsStore>>,
+    credentials_store: Arc<DieselCredentialsStore>,
 }
 
 #[cfg(feature = "biome-rest-api")]
@@ -136,90 +136,80 @@ impl RestResourceProvider for BiomeRestResourceManager {
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        match &self.credentials_store {
-            Some(credentials_store) => {
-                #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
-                {
-                    resources.push(make_list_route(credentials_store.clone()));
-                    resources.push(make_verify_route(
-                        credentials_store.clone(),
-                        self.rest_config.clone(),
-                        self.token_secret_manager.clone(),
-                    ));
-                    #[cfg(not(feature = "biome-refresh-tokens"))]
-                    {
-                        resources.push(make_login_route(
-                            credentials_store.clone(),
-                            self.rest_config.clone(),
-                            Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
-                        ));
-                    }
-                }
-                #[cfg(all(
-                    feature = "biome-credentials",
-                    feature = "biome-key-management",
-                    feature = "rest-api-actix",
-                ))]
-                {
-                    resources.push(make_user_routes(
-                        self.rest_config.clone(),
-                        self.token_secret_manager.clone(),
-                        credentials_store.clone(),
-                        self.user_store.clone(),
-                        self.key_store.clone(),
-                    ));
-                }
-                #[cfg(all(
-                    feature = "biome-credentials",
-                    feature = "biome-refresh-tokens",
-                    feature = "rest-api-actix",
-                ))]
-                {
-                    resources.push(make_login_route(
-                        credentials_store.clone(),
-                        self.refresh_token_store.clone(),
-                        self.rest_config.clone(),
-                        Arc::new(AccessTokenIssuer::new(
-                            self.token_secret_manager.clone(),
-                            self.refresh_token_secret_manager.clone(),
-                        )),
-                    ));
-                    resources.push(make_token_route(
-                        self.refresh_token_store.clone(),
-                        self.token_secret_manager.clone(),
-                        self.refresh_token_secret_manager.clone(),
-                        Arc::new(AccessTokenIssuer::new(
-                            self.token_secret_manager.clone(),
-                            self.refresh_token_secret_manager.clone(),
-                        )),
-                        self.rest_config.clone(),
-                    ));
-                }
-                #[cfg(all(feature = "biome-refresh-tokens", feature = "rest-api-actix",))]
-                {
-                    resources.push(make_logout_route(
-                        self.refresh_token_store.clone(),
-                        self.token_secret_manager.clone(),
-                        self.rest_config.clone(),
-                    ));
-                }
+        #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
+        {
+            resources.push(make_list_route(self.credentials_store.clone()));
+            resources.push(make_verify_route(
+                self.credentials_store.clone(),
+                self.rest_config.clone(),
+                self.token_secret_manager.clone(),
+            ));
+            #[cfg(not(feature = "biome-refresh-tokens"))]
+            {
+                resources.push(make_login_route(
+                    credentials_store.clone(),
+                    self.rest_config.clone(),
+                    Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
+                ));
+            }
+        }
+        #[cfg(all(
+            feature = "biome-credentials",
+            feature = "biome-key-management",
+            feature = "rest-api-actix",
+        ))]
+        {
+            resources.push(make_user_routes(
+                self.rest_config.clone(),
+                self.token_secret_manager.clone(),
+                self.credentials_store.clone(),
+                self.user_store.clone(),
+                self.key_store.clone(),
+            ));
+        }
+        #[cfg(all(
+            feature = "biome-credentials",
+            feature = "biome-refresh-tokens",
+            feature = "rest-api-actix",
+        ))]
+        {
+            resources.push(make_login_route(
+                self.credentials_store.clone(),
+                self.refresh_token_store.clone(),
+                self.rest_config.clone(),
+                Arc::new(AccessTokenIssuer::new(
+                    self.token_secret_manager.clone(),
+                    self.refresh_token_secret_manager.clone(),
+                )),
+            ));
+            resources.push(make_token_route(
+                self.refresh_token_store.clone(),
+                self.token_secret_manager.clone(),
+                self.refresh_token_secret_manager.clone(),
+                Arc::new(AccessTokenIssuer::new(
+                    self.token_secret_manager.clone(),
+                    self.refresh_token_secret_manager.clone(),
+                )),
+                self.rest_config.clone(),
+            ));
+        }
+        #[cfg(all(feature = "biome-refresh-tokens", feature = "rest-api-actix",))]
+        {
+            resources.push(make_logout_route(
+                self.refresh_token_store.clone(),
+                self.token_secret_manager.clone(),
+                self.rest_config.clone(),
+            ));
+        }
 
-                #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
-                {
-                    resources.push(make_register_route(
-                        credentials_store.clone(),
-                        self.user_store.clone(),
-                        self.rest_config.clone(),
-                    ));
-                }
-            }
-            None => {
-                debug!(
-                    "Credentials store not provided. Credentials REST API resources will not be'
-                ' included in the biome endpoints."
-                );
-            }
-        };
+        #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
+        {
+            resources.push(make_register_route(
+                self.credentials_store.clone(),
+                self.user_store.clone(),
+                self.rest_config.clone(),
+            ));
+        }
         #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
         {
             resources.push(make_key_management_route(
@@ -383,6 +373,13 @@ impl BiomeRestResourceManagerBuilder {
             )
         })?;
 
+        #[cfg(feature = "biome-credentials")]
+        let credentials_store = self.credentials_store.ok_or_else(|| {
+            BiomeRestResourceManagerBuilderError::MissingRequiredField(
+                "Missing credentials store".to_string(),
+            )
+        })?;
+
         Ok(BiomeRestResourceManager {
             user_store,
             #[cfg(feature = "biome-key-management")]
@@ -394,13 +391,7 @@ impl BiomeRestResourceManagerBuilder {
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_store,
             #[cfg(feature = "biome-credentials")]
-            credentials_store: match self.credentials_store {
-                Some(credentials_store) => Some(Arc::new(credentials_store)),
-                None => {
-                    debug!("Building BiomeRestResourceManager without credentials store");
-                    None
-                }
-            },
+            credentials_store: Arc::new(credentials_store),
         })
     }
 }
