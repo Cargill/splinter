@@ -45,7 +45,12 @@ const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
         - identity: 'node-1'
           endpoint: tls://node-1-endpoint:8044
         - node_id: 'node-2'
-          endpoint: tls://node-2-endpoint:8045";
+          endpoint: tls://node-2-endpoint:8045
+
+    For the --service-arg, --service-peer-group, and --service-type options, service IDs can be
+    wildcarded with '*' to match multiple services. For example, '--service-type *::scabbard' match
+    all services, and '--service-type sc*::scabbard' will match all services with IDs that start
+    with 'sc'.";
 
 // log format for cli that will only show the log message
 pub fn log_format(
@@ -310,7 +315,7 @@ fn run() -> Result<(), CliError> {
                     .multiple(true)
                     .help(
                         "Service type \
-                         (<service-id>::<service_type>)",
+                         (<service_id>::<service_type>)",
                     ),
             )
             .arg(
