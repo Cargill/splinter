@@ -81,20 +81,28 @@ where
     }
 }
 
-pub trait IntoNative<T>: Sized
+pub trait IntoNative<T>: Sized {
+    fn into_native(self) -> Result<T, ProtoConversionError>;
+}
+
+impl<N, P> IntoNative<N> for P
 where
-    T: FromProto<Self>,
+    N: FromProto<P>,
 {
-    fn into_native(self) -> Result<T, ProtoConversionError> {
+    fn into_native(self) -> Result<N, ProtoConversionError> {
         FromProto::from_proto(self)
     }
 }
 
-pub trait IntoProto<T>: Sized
+pub trait IntoProto<T>: Sized {
+    fn into_proto(self) -> Result<T, ProtoConversionError>;
+}
+
+impl<N, P> IntoProto<P> for N
 where
-    T: FromNative<Self>,
+    P: FromNative<N>,
 {
-    fn into_proto(self) -> Result<T, ProtoConversionError> {
+    fn into_proto(self) -> Result<P, ProtoConversionError> {
         FromNative::from_native(self)
     }
 }
