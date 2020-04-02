@@ -45,12 +45,6 @@ impl Action for CircuitProposeAction {
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
-        if args.value_of("node_file").is_none() && args.values_of("node").is_none() {
-            return Err(CliError::ActionError(
-                "--node and/or --node-file arguments must be provided".into(),
-            ));
-        }
-
         if let Some(node_file) = args.value_of("node_file") {
             for node in load_nodes_from_file(node_file)? {
                 builder.add_node(&node.identity, &node.endpoint)?;
