@@ -38,11 +38,18 @@ pub struct Credentials {
 }
 
 impl Credentials {
+    /// Verifies that a user's password is valid, return true if it is and
+    /// false otherwise.
+    ///
+    /// # Arguements
+    ///
+    /// * `password` - A hashed password to be verified
     pub fn verify_password(&self, password: &str) -> Result<bool, CredentialsError> {
         Ok(verify(password, &self.password)?)
     }
 }
 
+/// Represents a user's username
 #[derive(Deserialize, Serialize)]
 pub struct UsernameId {
     username: String,
