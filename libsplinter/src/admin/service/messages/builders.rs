@@ -144,26 +144,21 @@ impl CreateCircuitBuilder {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
             Some(circuit_id) => {
                 return Err(BuilderError::InvalidField(format!(
-                    "Field circuit_id is invalid ({}): must be an 11 character string \
-                     composed of two, 5 character base62 strings joined with a '-' (example: \
-                     abcDE-F0123)",
+                    "circuit_id is invalid ({}): must be an 11 character string composed of two, \
+                     5 character base62 strings joined with a '-' (example: abcDE-F0123)",
                     circuit_id,
                 )))
             }
             None => generate_random_base62_string(5) + "-" + &generate_random_base62_string(5),
         };
 
-        let roster = self.roster.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build CreateCircuit message. Missing required field roster".to_string(),
-            )
-        })?;
+        let roster = self
+            .roster
+            .ok_or_else(|| BuilderError::MissingField("roster".to_string()))?;
 
-        let members = self.members.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build CreateCircuit message. Missing required field members".to_string(),
-            )
-        })?;
+        let members = self
+            .members
+            .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
 
         let authorization_type = self.authorization_type.unwrap_or_else(|| {
             debug!(
@@ -197,13 +192,9 @@ impl CreateCircuitBuilder {
             RouteType::default()
         });
 
-        let circuit_management_type = self.circuit_management_type.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build CreateCircuit message. \
-                 Missing required field circuit_management_type"
-                    .to_string(),
-            )
-        })?;
+        let circuit_management_type = self
+            .circuit_management_type
+            .ok_or_else(|| BuilderError::MissingField("circuit_management_type".to_string()))?;
 
         let application_metadata = self.application_metadata.unwrap_or_default();
 
@@ -280,24 +271,20 @@ impl SplinterServiceBuilder {
             Some(service_id) if is_valid_service_id(&service_id) => service_id,
             Some(service_id) => {
                 return Err(BuilderError::InvalidField(format!(
-                    "Field service_id is invalid ({}): must be a 4 character base62 string",
+                    "service_id is invalid ({}): must be a 4 character base62 string",
                     service_id,
                 )))
             }
             None => generate_random_base62_string(4),
         };
 
-        let service_type = self.service_type.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build SplinterService. Missing required field service_type".to_string(),
-            )
-        })?;
+        let service_type = self
+            .service_type
+            .ok_or_else(|| BuilderError::MissingField("service_type".to_string()))?;
 
-        let allowed_nodes = self.allowed_nodes.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build SplinterService. Missing required field allowed_nodes".to_string(),
-            )
-        })?;
+        let allowed_nodes = self
+            .allowed_nodes
+            .ok_or_else(|| BuilderError::MissingField("allowed_nodes".to_string()))?;
 
         let arguments = self.arguments.unwrap_or_default();
 
@@ -342,17 +329,13 @@ impl SplinterNodeBuilder {
     }
 
     pub fn build(self) -> Result<SplinterNode, BuilderError> {
-        let node_id = self.node_id.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build SplinterNode. Missing required field node_id".to_string(),
-            )
-        })?;
+        let node_id = self
+            .node_id
+            .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
 
-        let endpoint = self.endpoint.ok_or_else(|| {
-            BuilderError::MissingField(
-                "Unable to build SplinterNode. Missing required field endpoint".to_string(),
-            )
-        })?;
+        let endpoint = self
+            .endpoint
+            .ok_or_else(|| BuilderError::MissingField("endpoint".to_string()))?;
 
         let node = SplinterNode { node_id, endpoint };
 
@@ -371,8 +354,8 @@ impl StdError for BuilderError {}
 impl std::fmt::Display for BuilderError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            BuilderError::InvalidField(ref s) => write!(f, "InvalidField: {}", s),
-            BuilderError::MissingField(ref s) => write!(f, "MissingField: {}", s),
+            BuilderError::InvalidField(ref s) => write!(f, "invalid field: {}", s),
+            BuilderError::MissingField(ref s) => write!(f, "missing field: {}", s),
         }
     }
 }
