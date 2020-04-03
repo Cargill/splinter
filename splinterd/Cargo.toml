@@ -64,7 +64,6 @@ experimental = [
     "biome-refresh-tokens",
     "biome-rest-api",
     "health",
-    "proposal-read",
     "rest-api-cors",
     "scabbard-get-state",
     "service-arg-validation"
@@ -75,7 +74,6 @@ biome-credentials = ["splinter/biome-credentials", "biome-refresh-tokens", "biom
 biome-key-management = ["splinter/biome-key-management", "biome-refresh-tokens", "biome"]
 biome-refresh-tokens = ["splinter/biome-refresh-tokens"]
 biome-rest-api = ["splinter/biome-rest-api"]
-proposal-read = ["splinter/proposal-read"]
 config-default = []
 config-command-line = []
 config-env-var = []
