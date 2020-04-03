@@ -42,12 +42,6 @@ pub struct CircuitProposeAction;
 impl Action for CircuitProposeAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
-        let url = args
-            .value_of("url")
-            .map(ToOwned::to_owned)
-            .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
-            .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let key = args.value_of("key").unwrap_or("./splinter.priv");
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
@@ -175,13 +169,20 @@ impl Action for CircuitProposeAction {
 
         let create_circuit = builder.build()?;
 
-        let client = api::SplinterRestClient::new(&url);
-        let requester_node = client.fetch_node_id()?;
-        let private_key_hex = read_private_key(key)?;
-
         let circuit_slice = CircuitSlice::from(&create_circuit);
 
         if !args.is_present("dry_run") {
+            let url = args
+                .value_of("url")
+                .map(ToOwned::to_owned)
+                .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
+            let key = args.value_of("key").unwrap_or("./splinter.priv");
+
+            let client = api::SplinterRestClient::new(&url);
+            let requester_node = client.fetch_node_id()?;
+            let private_key_hex = read_private_key(key)?;
+
             let signed_payload =
                 payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
 
