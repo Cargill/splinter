@@ -23,7 +23,6 @@ use splinter::consensus::{
     ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId, ProposalManager,
     ProposalUpdate,
 };
-use splinter::network::sender::SendRequest;
 
 use crate::error::ServiceError;
 use crate::protos::private_counter::{
@@ -74,7 +73,7 @@ impl ProposalManager for PrivateCounterProposalManager {
                 for verifier in &state.verifiers {
                     state
                         .service_sender
-                        .send(SendRequest::new(
+                        .send(
                             state.peer_id.clone(),
                             create_circuit_direct_msg(
                                 state.circuit.clone(),
@@ -83,7 +82,7 @@ impl ProposalManager for PrivateCounterProposalManager {
                                 msg.write_to_bytes().map_err(ServiceError::from)?,
                                 Uuid::new_v4().to_string(),
                             )?,
-                        ))
+                        )
                         .map_err(ServiceError::from)?;
                 }
 
@@ -208,7 +207,7 @@ impl ConsensusNetworkSender for PrivateCounterNetworkSender {
 
         state
             .service_sender
-            .send(SendRequest::new(
+            .send(
                 state.peer_id.clone(),
                 create_circuit_direct_msg(
                     state.circuit.clone(),
@@ -220,7 +219,7 @@ impl ConsensusNetworkSender for PrivateCounterNetworkSender {
                     Uuid::new_v4().to_string(),
                 )
                 .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?,
-            ))
+            )
             .map_err(|err| ConsensusSendError::Internal(Box::new(ServiceError::from(err))))?;
 
         Ok(())
@@ -237,7 +236,7 @@ impl ConsensusNetworkSender for PrivateCounterNetworkSender {
         for verifier in &state.verifiers {
             state
                 .service_sender
-                .send(SendRequest::new(
+                .send(
                     state.peer_id.clone(),
                     create_circuit_direct_msg(
                         state.circuit.clone(),
@@ -248,7 +247,7 @@ impl ConsensusNetworkSender for PrivateCounterNetworkSender {
                         Uuid::new_v4().to_string(),
                     )
                     .map_err(|err| ConsensusSendError::Internal(Box::new(err)))?,
-                ))
+                )
                 .map_err(|err| ConsensusSendError::Internal(Box::new(ServiceError::from(err))))?;
         }
 

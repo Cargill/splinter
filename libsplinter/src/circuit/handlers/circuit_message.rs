@@ -13,7 +13,7 @@
 // limitations under the License.
 use crate::channel::Sender;
 use crate::network::dispatch::{DispatchError, DispatchMessage, Handler, MessageContext};
-use crate::network::sender::SendRequest;
+use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{CircuitMessage, CircuitMessageType};
 use crate::protos::network::NetworkMessageType;
 
@@ -27,7 +27,7 @@ impl Handler<NetworkMessageType, CircuitMessage> for CircuitMessageHandler {
         &self,
         msg: CircuitMessage,
         context: &MessageContext<NetworkMessageType>,
-        _: &dyn Sender<SendRequest>,
+        _: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(
             "Handle CircuitMessage {:?} from {} [{} byte{}]",
@@ -45,7 +45,9 @@ impl Handler<NetworkMessageType, CircuitMessage> for CircuitMessageHandler {
             msg.get_payload().to_vec(),
             context.source_peer_id().to_string(),
         );
-        self.sender.send(dispatch_msg)?;
+        self.sender.send(dispatch_msg).map_err(|_| {
+            DispatchError::NetworkSendError((context.source_peer_id().to_string(), msg.payload))
+        })?;
         Ok(())
     }
 }
@@ -62,7 +64,10 @@ mod tests {
     use super::*;
     use crate::channel::mock::MockSender;
     use crate::channel::Sender;
+    use crate::mesh::Mesh;
     use crate::network::dispatch::Dispatcher;
+    use crate::network::sender;
+    use crate::network::Network;
     use crate::protos::network::NetworkMessageType;
 
     use protobuf::Message;
@@ -70,10 +75,18 @@ mod tests {
     #[test]
     // Test that circuit message is sent to the circuit dispatch sender
     fn test_circuit_message_handler() {
-        // Set up the dispatcher and handler
-        let network_sender = Box::new(MockSender::default());
+        // Set up dispatcher and mock sender
+        let mesh1 = Mesh::new(1, 1);
+        let network1 = Network::new(mesh1.clone(), 0).unwrap();
+
+        let network_message_queue = sender::Builder::new()
+            .with_network(network1.clone())
+            .build()
+            .expect("Unable to create queue");
+        let network_sender = network_message_queue.new_network_sender();
+
         let circuit_sender = Box::new(MockSender::default());
-        let mut network_dispatcher = Dispatcher::new(network_sender.box_clone());
+        let mut network_dispatcher = Dispatcher::new(network_sender);
 
         let handler = CircuitMessageHandler::new(circuit_sender.box_clone());
         network_dispatcher.set_handler(NetworkMessageType::CIRCUIT, Box::new(handler));

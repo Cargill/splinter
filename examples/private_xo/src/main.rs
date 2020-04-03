@@ -37,7 +37,7 @@ use router::Router;
 use splinter::consensus::two_phase::TwoPhaseEngine;
 use splinter::consensus::{ConsensusEngine, StartupState};
 use splinter::mesh::Mesh;
-use splinter::network::Network;
+use splinter::network::{sender, sender::ShutdownSignaler, Network};
 use splinter::transport::{
     socket::{TcpTransport, TlsTransport},
     Transport,
@@ -64,7 +64,6 @@ fn main() -> Result<(), CliError> {
         .expect("Bind was not marked as a required attribute");
 
     let running = Arc::new(AtomicBool::new(true));
-    configure_shutdown_handler(Arc::clone(&running))?;
 
     let xo_state = XoState::new()?;
     let pending_batches = Arc::new(Mutex::new(VecDeque::new()));
@@ -78,6 +77,13 @@ fn main() -> Result<(), CliError> {
             .expect("Connect was not marked as a required attribute"),
     )?;
 
+    let network_message_queue = sender::Builder::new()
+        .with_network(network.clone())
+        .build()
+        .expect("Unable to create queue");
+    let network_sender = network_message_queue.new_network_sender();
+    let shutdown_signaler = network_message_queue.shutdown_signaler();
+
     let service_config = get_service_config(
         network
             .peer_ids()
@@ -86,8 +92,6 @@ fn main() -> Result<(), CliError> {
             .ok_or_else(|| CliError("Unable to connect to Splinter Node".into()))?,
         &matches,
     );
-
-    let (send, recv) = crossbeam_channel::bounded(5);
 
     let (consensus_msg_tx, consensus_msg_rx) = std::sync::mpsc::channel();
     let (proposal_update_tx, proposal_update_rx) = std::sync::mpsc::channel();
@@ -98,10 +102,10 @@ fn main() -> Result<(), CliError> {
         pending_batches.clone(),
         pending_proposal.clone(),
         proposal_update_tx.clone(),
-        send.clone(),
+        network_sender.clone(),
     );
     let consensus_network_sender =
-        PrivateXoNetworkSender::new(service_config.clone(), send.clone());
+        PrivateXoNetworkSender::new(service_config.clone(), network_sender.clone());
     let startup_state = StartupState {
         id: service_config.service_id().as_bytes().into(),
         peer_ids: service_config
@@ -133,13 +137,15 @@ fn main() -> Result<(), CliError> {
 
     start_service_loop(
         service_config.clone(),
-        (send.clone(), recv),
+        network_sender,
         consensus_msg_tx,
         proposal_update_tx,
         pending_proposal,
         network,
-        running,
+        running.clone(),
     )?;
+
+    configure_shutdown_handler(Arc::clone(&running), shutdown_signaler)?;
 
     let (address, port) = split_endpoint(bind_value)?;
 
@@ -156,7 +162,6 @@ fn main() -> Result<(), CliError> {
         req.set_mut(State::new(service_config.clone()));
         req.set_mut(State::new(xo_state.clone()));
         req.set_mut(State::new(pending_batches.clone()));
-        req.set_mut(State::new(send.clone()));
 
         Ok(())
     });
@@ -359,10 +364,14 @@ fn configure_logging(matches: &clap::ArgMatches) {
     logger.expect("Failed to create logger");
 }
 
-fn configure_shutdown_handler(running: Arc<AtomicBool>) -> Result<(), CliError> {
+fn configure_shutdown_handler(
+    running: Arc<AtomicBool>,
+    shutdown_signaler: ShutdownSignaler,
+) -> Result<(), CliError> {
     ctrlc::set_handler(move || {
         info!("Received Shutdown");
         running.store(false, Ordering::SeqCst);
+        shutdown_signaler.shutdown()
     })
     .map_err(|err| CliError(format!("Unable to create control c handler: {}", err)))
 }

@@ -26,10 +26,7 @@ use crossbeam_channel;
 use protobuf::Message;
 
 use splinter::consensus::{ConsensusMessage, Proposal, ProposalUpdate};
-use splinter::network::{
-    sender::{NetworkMessageSender, SendRequest},
-    Network, RecvTimeoutError,
-};
+use splinter::network::{sender::NetworkMessageSender, Network, RecvTimeoutError};
 use splinter::protos::authorization::{
     AuthorizationMessage, AuthorizationMessageType, ConnectRequest, ConnectRequest_HandshakeMode,
     ConnectResponse, ConnectResponse_AuthorizationType, TrustRequest,
@@ -101,10 +98,7 @@ impl ServiceConfig {
 
 pub fn start_service_loop(
     service_config: ServiceConfig,
-    channel: (
-        crossbeam_channel::Sender<SendRequest>,
-        crossbeam_channel::Receiver<SendRequest>,
-    ),
+    network_sender: NetworkMessageSender,
     consensus_msg_sender: Sender<ConsensusMessage>,
     proposal_update_sender: Sender<ProposalUpdate>,
     pending_proposal: Arc<Mutex<Option<(Proposal, Batch)>>>,
@@ -112,17 +106,6 @@ pub fn start_service_loop(
     running: Arc<AtomicBool>,
 ) -> Result<(), ServiceError> {
     info!("Starting Private Counter Service");
-    let sender_network = network.clone();
-    let (send, recv) = channel;
-
-    let network_sender_run_flag = running.clone();
-    let _ = Builder::new()
-        .name("NetworkMessageSender".into())
-        .spawn(move || {
-            let network_sender =
-                NetworkMessageSender::new(Box::new(recv), sender_network, network_sender_run_flag);
-            network_sender.run()
-        });
 
     let recv_network = network.clone();
     let _ = Builder::new()
@@ -130,7 +113,7 @@ pub fn start_service_loop(
         .spawn(move || {
             run_service_loop(
                 recv_network,
-                &send,
+                &network_sender,
                 consensus_msg_sender,
                 proposal_update_sender,
                 pending_proposal,
@@ -154,7 +137,7 @@ pub fn start_service_loop(
 #[allow(clippy::cognitive_complexity)]
 fn run_service_loop(
     network: Network,
-    reply_sender: &crossbeam_channel::Sender<SendRequest>,
+    reply_sender: &NetworkMessageSender,
     consensus_msg_sender: Sender<ConsensusMessage>,
     proposal_update_sender: Sender<ProposalUpdate>,
     pending_proposal: Arc<Mutex<Option<(Proposal, Batch)>>>,
@@ -241,7 +224,7 @@ fn handle_authorized_msg(
     auth_msg: AuthorizationMessage,
     source_peer_id: &str,
     identity: &str,
-    sender: &crossbeam_channel::Sender<SendRequest>,
+    sender: &NetworkMessageSender,
 ) -> Result<bool, ServiceError> {
     match auth_msg.get_message_type() {
         AuthorizationMessageType::CONNECT_RESPONSE => {
@@ -254,13 +237,13 @@ fn handle_authorized_msg(
             {
                 let mut trust_request = TrustRequest::new();
                 trust_request.set_identity(identity.to_string());
-                sender.send(SendRequest::new(
+                sender.send(
                     source_peer_id.to_string(),
                     wrap_in_network_auth_envelopes(
                         AuthorizationMessageType::TRUST_REQUEST,
                         trust_request,
                     )?,
-                ))?;
+                )?;
             }
             // send trust request
             Ok(false)
