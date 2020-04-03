@@ -161,8 +161,8 @@ impl CreateCircuitMessageBuilder {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
                     if service_args.iter().any(|arg| arg.0 == PEER_SERVICES_ARG) {
                         return Err(CliError::ActionError(format!(
-                            "Peer services argument for service {} is already set.",
-                            service_id
+                            "Peer services for service '{}' is already set",
+                            service_id,
                         )));
                     }
 
@@ -234,20 +234,21 @@ impl CreateCircuitMessageBuilder {
         let default_store = get_default_value_store();
 
         // if management type is not set check for default value
-        let management_type = match self.management_type {
-            Some(management_type) => management_type,
-            None => match self.create_circuit_builder.circuit_management_type() {
+        let management_type =
+            match self.management_type {
                 Some(management_type) => management_type,
-                None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
-                    Some(management_type) => management_type.value(),
-                    None => {
-                        return Err(CliError::ActionError(
-                            "Management type not provided and no default value set".to_string(),
-                        ))
-                    }
+                None => match self.create_circuit_builder.circuit_management_type() {
+                    Some(management_type) => management_type,
+                    None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
+                        Some(management_type) => management_type.value(),
+                        None => return Err(CliError::ActionError(
+                            "Failed to build circuit: Management type not provided and no default \
+                             set"
+                            .into(),
+                        )),
+                    },
                 },
-            },
-        };
+            };
 
         let services = self
             .services
@@ -259,10 +260,11 @@ impl CreateCircuitMessageBuilder {
                     builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
                         Some(service_type) => builder.with_service_type(&service_type.value()),
                         None => {
-                            return Err(CliError::ActionError(
-                                "Service has no service type and no default value is set"
-                                    .to_string(),
-                            ))
+                            return Err(CliError::ActionError(format!(
+                                "Failed to build service '{}': Service type not provided and no \
+                                 default set",
+                                service_id,
+                            )))
                         }
                     }
                 }
