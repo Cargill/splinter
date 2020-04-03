@@ -137,13 +137,7 @@ impl CreateCircuitMessageBuilder {
             .into_iter()
             .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
-                let index = peers.iter().enumerate().find_map(|(index, peer_id)| {
-                    if peer_id == &service_id {
-                        Some(index)
-                    } else {
-                        None
-                    }
-                });
+                let index = peers.iter().position(|peer_id| peer_id == &service_id);
 
                 if let Some(index) = index {
                     let mut service_peers = peers.clone();
