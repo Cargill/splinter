@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
-use crate::error::CliError;
-use crate::store::default_value::DefaultValueStore;
-
 use splinter::admin::messages::{
     AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
     SplinterServiceBuilder,
 };
+
+use crate::error::CliError;
+use crate::store::default_value::DefaultValueStore;
+
+use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
 
 const PEER_SERVICES_ARG: &str = "peer_services";
 
@@ -84,9 +85,11 @@ impl CreateCircuitMessageBuilder {
         service_id_match: &str,
         args: &(String, String),
     ) -> Result<(), CliError> {
-        self.services = self.services.clone().into_iter().try_fold(
-            Vec::new(),
-            |mut acc, service_builder| {
+        self.services = self
+            .services
+            .clone()
+            .into_iter()
+            .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
@@ -99,13 +102,12 @@ impl CreateCircuitMessageBuilder {
                         )));
                     }
                     service_args.push(args.clone());
-                    acc.push(service_builder.with_arguments(&service_args));
+                    Ok(service_builder.with_arguments(&service_args))
                 } else {
-                    acc.push(service_builder);
+                    Ok(service_builder)
                 }
-                Ok(acc)
-            },
-        )?;
+            })
+            .collect::<Result<_, _>>()?;
         Ok(())
     }
 
@@ -126,9 +128,11 @@ impl CreateCircuitMessageBuilder {
             })
             .collect::<Vec<String>>();
 
-        self.services = self.services.clone().into_iter().try_fold(
-            Vec::new(),
-            |mut acc, service_builder| {
+        self.services = self
+            .services
+            .clone()
+            .into_iter()
+            .map(|service_builder| {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 let index = peers.iter().enumerate().find_map(|(index, peer_id)| {
                     if peer_id == &service_id {
@@ -149,19 +153,17 @@ impl CreateCircuitMessageBuilder {
                         )));
                     }
                     service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
-                    acc.push(service_builder.with_arguments(&service_args));
+                    Ok(service_builder.with_arguments(&service_args))
                 } else {
-                    acc.push(service_builder);
+                    Ok(service_builder)
                 }
-                Ok(acc)
-            },
-        )?;
+            })
+            .collect::<Result<_, _>>()?;
+
         Ok(())
     }
 
     pub fn add_node(&mut self, node_id: &str, node_endpoint: &str) -> Result<(), CliError> {
-        let node = make_splinter_node(node_id, node_endpoint)?;
-
         for node in &self.nodes {
             if node.node_id == node_id {
                 return Err(CliError::ActionError(format!(
@@ -177,7 +179,7 @@ impl CreateCircuitMessageBuilder {
             }
         }
 
-        self.nodes.push(node);
+        self.nodes.push(make_splinter_node(node_id, node_endpoint)?);
         Ok(())
     }
 
@@ -228,29 +230,28 @@ impl CreateCircuitMessageBuilder {
             },
         };
 
-        let services =
-            self.services
-                .into_iter()
-                .try_fold(Vec::new(), |mut services, mut builder| {
-                    // if service type is not set, check for default value
-                    if builder.service_type().is_none() {
-                        builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
-                            Some(service_type) => builder.with_service_type(&service_type.value()),
-                            None => {
-                                return Err(CliError::ActionError(
-                                    "Service has no service type and no default value is set"
-                                        .to_string(),
-                                ))
-                            }
+        let services = self
+            .services
+            .into_iter()
+            .map(|mut builder| {
+                // if service type is not set, check for default value
+                if builder.service_type().is_none() {
+                    builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
+                        Some(service_type) => builder.with_service_type(&service_type.value()),
+                        None => {
+                            return Err(CliError::ActionError(
+                                "Service has no service type and no default value is set"
+                                    .to_string(),
+                            ))
                         }
                     }
+                }
 
-                    let service = builder.build().map_err(|err| {
-                        CliError::ActionError(format!("Failed to build service: {}", err))
-                    })?;
-                    services.push(service);
-                    Ok(services)
-                })?;
+                builder.build().map_err(|err| {
+                    CliError::ActionError(format!("Failed to build service: {}", err))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let mut create_circuit_builder = self
             .create_circuit_builder
@@ -282,11 +283,28 @@ impl CreateCircuitMessageBuilder {
         Ok(create_circuit)
     }
 
-    pub fn add_service(&mut self, service_id: &str, allowed_nodes: &[String]) {
+    pub fn add_service(
+        &mut self,
+        service_id: &str,
+        allowed_nodes: &[String],
+    ) -> Result<(), CliError> {
+        if self
+            .services
+            .iter()
+            .any(|service_builder| service_builder.service_id().unwrap_or_default() == service_id)
+        {
+            return Err(CliError::ActionError(format!(
+                "Duplicate service ID detected: {}",
+                service_id,
+            )));
+        }
+
         let service_builder = SplinterServiceBuilder::new()
             .with_service_id(service_id)
             .with_allowed_nodes(allowed_nodes);
         self.services.push(service_builder);
+
+        Ok(())
     }
 }
 
@@ -307,4 +325,34 @@ fn make_splinter_node(node_id: &str, endpoint: &str) -> Result<SplinterNode, Cli
         .build()
         .map_err(|err| CliError::ActionError(format!("Failed to build SplinterNode: {}", err)))?;
     Ok(node)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that the `is_match` method for matching (potentially wild-carded) service IDs works
+    /// correctly.
+    #[test]
+    fn service_id_matching() {
+        assert!(is_match("abcd", "abcd"));
+        assert!(is_match("*bcd", "abcd"));
+        assert!(is_match("*cd", "abcd"));
+        assert!(is_match("*d", "abcd"));
+        assert!(is_match("*", "abcd"));
+        assert!(is_match("a*", "abcd"));
+        assert!(is_match("ab*", "abcd"));
+        assert!(is_match("abc*", "abcd"));
+        assert!(is_match("a*cd", "abcd"));
+        assert!(is_match("ab*d", "abcd"));
+        assert!(is_match("a*d", "abcd"));
+        assert!(is_match("*b*d", "abcd"));
+        assert!(is_match("a*c*", "abcd"));
+
+        assert!(!is_match("0123", "abcd"));
+        assert!(!is_match("0*", "abcd"));
+        assert!(!is_match("*0", "abcd"));
+        assert!(!is_match("0*0", "abcd"));
+        assert!(!is_match("*0*", "abcd"));
+    }
 }
