@@ -95,12 +95,13 @@ impl CreateCircuitMessageBuilder {
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
-                    if arg.0 == PEER_SERVICES_ARG
-                        && service_args.iter().any(|arg| arg.0 == PEER_SERVICES_ARG)
-                    {
+
+                    // Check for duplicate argument
+                    let key = &arg.0;
+                    if service_args.iter().any(|arg| &arg.0 == key) {
                         return Err(CliError::ActionError(format!(
-                            "Peer services argument is already set for service: {}",
-                            service_id
+                            "Duplicate service argument '{}' detected for service '{}'",
+                            key, service_id,
                         )));
                     }
                     service_args.push(arg.clone());
