@@ -50,18 +50,19 @@ where
 {
     let action_type = action.action_type();
     let action_proto = action.into_proto()?;
-    let serialized_action = action_proto.write_to_bytes().map_err(|err| {
-        CliError::ActionError(format!("Unable to serialize action to bytes: {}", err))
-    })?;
+    let serialized_action = action_proto
+        .write_to_bytes()
+        .map_err(|err| CliError::ActionError(format!("Failed to serialize action: {}", err)))?;
 
     let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)?;
 
     let signing_context = secp256k1::Secp256k1Context::new();
-    let private_key = secp256k1::Secp256k1PrivateKey::from_hex(private_key)
-        .map_err(|_| CliError::ActionError("Invalid private key provided".into()))?;
+    let private_key = secp256k1::Secp256k1PrivateKey::from_hex(private_key).map_err(|err| {
+        CliError::ActionError(format!("Invalid secp256k1 private key provided: {}", err))
+    })?;
 
     let signer = sawtooth::SawtoothSecp256k1RefSigner::new(&signing_context, private_key).map_err(
-        |err| CliError::ActionError(format!("Unable to create signer from private key: {}", err)),
+        |err| CliError::ActionError(format!("Failed to create signer from private key: {}", err)),
     )?;
 
     let public_key = signer.public_key().to_vec();
@@ -72,20 +73,20 @@ where
     header.set_requester(public_key);
     header.set_requester_node_id(requester_node.into());
     let header_bytes = header.write_to_bytes().map_err(|err| {
-        CliError::ActionError(format!("Unable to serialize header to bytes: {}", err))
+        CliError::ActionError(format!("Failed to serialize payload header: {}", err))
     })?;
 
     let header_signature = signer
         .sign(&header_bytes)
-        .map_err(|err| CliError::ActionError(format!("Unable to sign payload header: {}", err)))?;
+        .map_err(|err| CliError::ActionError(format!("Failed to sign payload header: {}", err)))?;
 
     let mut circuit_management_payload = CircuitManagementPayload::new();
     circuit_management_payload.set_header(header_bytes);
     circuit_management_payload.set_signature(header_signature);
     action_proto.apply(&mut circuit_management_payload);
-    let payload_bytes = circuit_management_payload.write_to_bytes().map_err(|err| {
-        CliError::ActionError(format!("Unable to serialize payload to bytes: {}", err))
-    })?;
+    let payload_bytes = circuit_management_payload
+        .write_to_bytes()
+        .map_err(|err| CliError::ActionError(format!("Failed to serialize payload: {}", err)))?;
     Ok(payload_bytes)
 }
 
@@ -98,7 +99,10 @@ impl CircuitAction<CircuitCreateRequest> for CreateCircuit {
 
     fn into_proto(self) -> Result<CircuitCreateRequest, CliError> {
         CreateCircuit::into_proto(self).map_err(|err| {
-            CliError::ActionError(format!("Unable to convert proposal to protobuf: {}", err))
+            CliError::ActionError(format!(
+                "Failed to convert circuit create request to protobuf: {}",
+                err
+            ))
         })
     }
 }
