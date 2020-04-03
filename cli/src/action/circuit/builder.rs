@@ -20,11 +20,10 @@ use splinter::admin::messages::{
 };
 
 use crate::error::CliError;
-use crate::store::default_value::DefaultValueStore;
-
-use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
 
 const PEER_SERVICES_ARG: &str = "peer_services";
+const MANAGEMENT_TYPE_ENV: &str = "SPLINTER_CIRCUIT_MANAGEMENT_TYPE";
+const SERVICE_TYPE_ENV: &str = "SPLINTER_CIRCUIT_SERVICE_TYPE";
 
 pub struct CreateCircuitMessageBuilder {
     create_circuit_builder: CreateCircuitBuilder,
@@ -231,39 +230,29 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn build(self) -> Result<CreateCircuit, CliError> {
-        let default_store = get_default_value_store();
-
-        // if management type is not set check for default value
-        let management_type =
-            match self.management_type {
-                Some(management_type) => management_type,
-                None => match self.create_circuit_builder.circuit_management_type() {
-                    Some(management_type) => management_type,
-                    None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
-                        Some(management_type) => management_type.value(),
-                        None => return Err(CliError::ActionError(
-                            "Failed to build circuit: Management type not provided and no default \
-                             set"
-                            .into(),
-                        )),
-                    },
-                },
-            };
+        // if management type is not set, check for environment variable
+        let management_type = self
+            .management_type
+            .or_else(|| std::env::var(MANAGEMENT_TYPE_ENV).ok())
+            .ok_or_else(|| {
+                CliError::ActionError(
+                    "Failed to build circuit: Management type not provided".into(),
+                )
+            })?;
 
         let services = self
             .services
             .into_iter()
             .map(|mut builder| {
                 let service_id = builder.service_id().unwrap_or_default();
-                // if service type is not set, check for default value
+                // if service type is not set, check for environment variable
                 if builder.service_type().is_none() {
-                    builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
-                        Some(service_type) => builder.with_service_type(&service_type.value()),
-                        None => {
+                    match std::env::var(SERVICE_TYPE_ENV) {
+                        Ok(service_type) => builder = builder.with_service_type(&service_type),
+                        Err(_) => {
                             return Err(CliError::ActionError(format!(
-                                "Failed to build service '{}': Service type not provided and no \
-                                 default set",
-                                service_id,
+                                "Failed to build service '{}': Service type not provided",
+                                service_id
                             )))
                         }
                     }
