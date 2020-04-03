@@ -149,7 +149,12 @@ impl CreateCircuitMessageBuilder {
                             service_id
                         )));
                     }
-                    service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
+
+                    // Add the argument
+                    service_args.push((
+                        PEER_SERVICES_ARG.into(),
+                        format!("[\"{}\"]", service_peers.join("\", \"")),
+                    ));
                     Ok(service_builder.with_arguments(&service_args))
                 } else {
                     Ok(service_builder)
