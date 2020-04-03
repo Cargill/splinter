@@ -67,6 +67,8 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn apply_service_type(&mut self, service_id_match: &str, service_type: &str) {
+        // Clone the service builders, add the type to matching services builders, and use the
+        // updated builders to replace the existing ones.
         self.services = self
             .services
             .clone()
@@ -87,11 +89,14 @@ impl CreateCircuitMessageBuilder {
         service_id_match: &str,
         arg: &(String, String),
     ) -> Result<(), CliError> {
+        // Clone the service builders, add the argument to matching services builders, and use the
+        // updated builders to replace the existing ones.
         self.services = self
             .services
             .clone()
             .into_iter()
             .map(|service_builder| {
+                // Determine if the service builder matches the pattern
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
@@ -104,9 +109,12 @@ impl CreateCircuitMessageBuilder {
                             key, service_id,
                         )));
                     }
+
+                    // Add the argument
                     service_args.push(arg.clone());
                     Ok(service_builder.with_arguments(&service_args))
                 } else {
+                    // Pattern didn't match, so leave the builder as-is
                     Ok(service_builder)
                 }
             })
@@ -115,6 +123,7 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn apply_peer_services(&mut self, service_id_globs: &[&str]) -> Result<(), CliError> {
+        // Get list of all peer IDs that are matched by the service ID globs
         let peers = self
             .services
             .iter()
@@ -131,17 +140,24 @@ impl CreateCircuitMessageBuilder {
             })
             .collect::<Vec<String>>();
 
+        // Clone the service builders, add PEER_SERVICES_ARG to matching services builders, and use
+        // the updated builders to replace the existing ones.
         self.services = self
             .services
             .clone()
             .into_iter()
             .map(|service_builder| {
+                // Determine if the builder is in the list of IDs and get the index of its ID
                 let service_id = service_builder.service_id().unwrap_or_default();
                 let index = peers.iter().position(|peer_id| peer_id == &service_id);
 
                 if let Some(index) = index {
+                    // Copy the list of IDs and remove the builder's own ID, since it won't be a
+                    // peer of itself
                     let mut service_peers = peers.clone();
                     service_peers.remove(index);
+
+                    // Check if the argument has already been set
                     let mut service_args = service_builder.arguments().unwrap_or_default();
                     if service_args.iter().any(|arg| arg.0 == PEER_SERVICES_ARG) {
                         return Err(CliError::ActionError(format!(
@@ -157,6 +173,7 @@ impl CreateCircuitMessageBuilder {
                     ));
                     Ok(service_builder.with_arguments(&service_args))
                 } else {
+                    // Pattern didn't match, so leave the builder as-is
                     Ok(service_builder)
                 }
             })

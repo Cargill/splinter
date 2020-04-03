@@ -296,6 +296,7 @@ fn parse_application_metadata_json(metadata: &str) -> Result<String, CliError> {
         })?
         .to_string();
 
+    // If the value isn't an array or object, add quotes to make it a valid JSON string
     if !value.contains('[') && !value.contains('{') {
         value = format!("\"{}\"", value);
     }
@@ -567,7 +568,6 @@ impl Action for CircuitShowAction {
             .value_of("circuit")
             .ok_or_else(|| CliError::ActionError("Circuit name must be provided".to_string()))?;
 
-        // A value should always be passed because a default is defined
         let format = args.value_of("format").unwrap_or("human");
 
         show_circuit(&url, circuit_id, format)
