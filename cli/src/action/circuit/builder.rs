@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "node-alias")]
-use super::super::node::get_node_store;
-#[cfg(feature = "node-alias")]
-use crate::store::node::NodeStore;
-
 use super::defaults::{get_default_value_store, MANAGEMENT_TYPE_KEY, SERVICE_TYPE_KEY};
 use crate::error::CliError;
 use crate::store::default_value::DefaultValueStore;
@@ -162,22 +157,6 @@ impl CreateCircuitMessageBuilder {
             },
         )?;
         Ok(())
-    }
-
-    #[cfg(feature = "node-alias")]
-    pub fn add_node_by_alias(&mut self, alias: &str) -> Result<(), CliError> {
-        let node_store = get_node_store();
-        let (node_id, endpoint) = match node_store.get_node(alias)? {
-            Some(node) => (node.node_id(), node.endpoint()),
-            None => {
-                return Err(CliError::ActionError(format!(
-                    "No endpoint provided and an alias for node {} has not been set",
-                    alias
-                )))
-            }
-        };
-
-        self.add_node(&node_id, &endpoint)
     }
 
     pub fn add_node(&mut self, node_id: &str, node_endpoint: &str) -> Result<(), CliError> {

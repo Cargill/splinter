@@ -62,7 +62,6 @@ experimental = [
     "postgres",
     "keygen",
     "circuit-auth-type",
-    "node-alias"
 ]
 
 circuit = ["reqwest", "serde_json", "splinter/sawtooth-signing-compat", "dirs"]
@@ -73,7 +72,6 @@ database-migrate-biome = [
     "splinter/biome-key-management",
     "splinter/biome-notifications"
 ]
-node-alias = ["dirs", "reqwest"]
 
 
 health = ["reqwest", "serde_json"]

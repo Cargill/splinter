@@ -14,6 +14,3 @@
 
 #[cfg(feature = "circuit")]
 pub mod default_value;
-
-#[cfg(feature = "node-alias")]
-pub mod node;
