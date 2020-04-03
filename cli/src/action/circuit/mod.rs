@@ -119,8 +119,9 @@ impl Action for CircuitProposeAction {
                                 .into(),
                         ));
                     }
-                    let metadata = application_metadata.next().unwrap_or_default().as_bytes();
-                    builder.set_application_metadata(metadata);
+                    if let Some(metadata) = application_metadata.next() {
+                        builder.set_application_metadata(metadata.as_bytes());
+                    }
                 }
                 "json" => {
                     let mut json_string = "{".to_string();
@@ -434,12 +435,12 @@ impl From<&SplinterService> for CircuitServiceSlice {
     }
 }
 
-pub(self) enum Vote {
+enum Vote {
     Accept,
     Reject,
 }
 
-pub(self) struct CircuitVote {
+struct CircuitVote {
     circuit_id: String,
     circuit_hash: String,
     vote: Vote,
@@ -456,10 +457,9 @@ impl Action for CircuitVoteAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
         let key = args.value_of("private_key_file").unwrap_or("splinter");
-        let circuit_id = match args.value_of("circuit_id") {
-            Some(circuit_id) => circuit_id,
-            None => return Err(CliError::ActionError("Circuit id is required".into())),
-        };
+        let circuit_id = args
+            .value_of("circuit_id")
+            .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
 
         // accept or reject must be present
         let vote = {
