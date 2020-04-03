@@ -74,8 +74,8 @@ pub trait KeyStore<T>: Sync + Send {
     /// # Arguments
     ///
     /// * `user_id`: The ID owner of the key records to list.
-    ///  * `updated_password` - The updated password for the user
-    ///  * `keys` - The keys to be replaced
+    /// * `updated_password` - The updated password for the user
+    /// * `keys` - The keys to be replaced
     ///
     fn update_keys_and_password(
         &self,
