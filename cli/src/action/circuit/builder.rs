@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "circuit-auth-type")]
+use splinter::admin::messages::AuthorizationType;
 use splinter::admin::messages::{
-    AuthorizationType, BuilderError, CreateCircuit, CreateCircuitBuilder, SplinterNode,
-    SplinterNodeBuilder, SplinterServiceBuilder,
+    BuilderError, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
+    SplinterServiceBuilder,
 };
 
 use crate::error::CliError;
@@ -258,21 +260,13 @@ impl CreateCircuitMessageBuilder {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut create_circuit_builder = self
+        let create_circuit_builder = self
             .create_circuit_builder
             .with_members(&self.nodes)
             .with_roster(&services)
             .with_circuit_management_type(&management_type)
+            .with_application_metadata(&self.application_metadata)
             .with_comments(&self.comments.unwrap_or_default());
-
-        if !self.application_metadata.is_empty() {
-            create_circuit_builder =
-                create_circuit_builder.with_application_metadata(&self.application_metadata);
-        }
-
-        #[cfg(not(feature = "circuit-auth-type"))]
-        let create_circuit_builder =
-            create_circuit_builder.with_authorization_type(&AuthorizationType::Trust);
 
         #[cfg(feature = "circuit-auth-type")]
         let create_circuit_builder = match self.authorization_type {
