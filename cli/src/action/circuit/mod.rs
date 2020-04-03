@@ -201,6 +201,7 @@ fn load_nodes_from_file(node_file: &str) -> Result<Vec<Node>, CliError> {
 
 fn load_nodes_from_remote(url: &str) -> Result<Vec<Node>, CliError> {
     let bytes = reqwest::blocking::get(url)
+        .and_then(|response| response.error_for_status())
         .map_err(|err| {
             CliError::ActionError(format!(
                 "Failed to fetch remote node file from {}: {}",
