@@ -50,7 +50,13 @@ const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
     For the --service-arg, --service-peer-group, and --service-type options, service IDs can be
     wildcarded with '*' to match multiple services. For example, '--service-type *::scabbard' match
     all services, and '--service-type sc*::scabbard' will match all services with IDs that start
-    with 'sc'.";
+    with 'sc'.
+
+    With '--metadata-encoding string' (the default), the --metadata option takes a single string
+    value and the --metadata option can be used only once. With '--metadata-encoding json', the
+    --metadata option takes a key/value pair in the format '<key>=<value>', where '<value>' is a
+    simple string, a JSON array, or a JSON object; the --metadata option can be used multiple times
+    with JSON encoding.";
 
 // log format for cli that will only show the log message
 pub fn log_format(
@@ -367,6 +373,7 @@ fn run() -> Result<(), CliError> {
                 Arg::with_name("template")
                     .long("template")
                     .takes_value(true)
+                    .required_unless("service")
                     .help("Template name to be applied to circuit"),
             )
             .arg(

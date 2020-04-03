@@ -22,7 +22,7 @@ pub mod template;
 #[cfg(feature = "circuit-template")]
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Error as IoError, ErrorKind, Read};
 
 use clap::ArgMatches;
 use serde::Deserialize;
@@ -44,12 +44,6 @@ impl Action for CircuitProposeAction {
         let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
 
         let mut builder = CreateCircuitMessageBuilder::new();
-
-        if args.value_of("node_file").is_none() && args.values_of("node").is_none() {
-            return Err(CliError::ActionError(
-                "--node and/or --node-file arguments must be provided".into(),
-            ));
-        }
 
         if let Some(node_file) = args.value_of("node_file") {
             for node in load_nodes_from_file(node_file)? {
@@ -83,19 +77,12 @@ impl Action for CircuitProposeAction {
             }
         }
 
-        match args.values_of("service") {
-            Some(services) => {
-                for service in services {
-                    let (service_id, allowed_nodes) = parse_service(service)?;
-                    builder.add_service(&service_id, &allowed_nodes)?;
-                }
+        if let Some(services) = args.values_of("service") {
+            for service in services {
+                let (service_id, allowed_nodes) = parse_service(service)?;
+                builder.add_service(&service_id, &allowed_nodes)?;
             }
-            None => {
-                if args.value_of("template").is_none() {
-                    return Err(CliError::ActionError("Service is required".into()));
-                }
-            }
-        };
+        }
 
         if let Some(service_arguments) = args.values_of("service_argument") {
             for service_argument in service_arguments {
@@ -106,7 +93,7 @@ impl Action for CircuitProposeAction {
 
         if let Some(service_peer_group) = args.values_of("service_peer_group") {
             for peer_group in service_peer_group {
-                let group = parse_service_peer_group(peer_group);
+                let group = parse_service_peer_group(peer_group)?;
                 builder.apply_peer_services(&group)?;
             }
         }
@@ -128,12 +115,12 @@ impl Action for CircuitProposeAction {
                 "string" => {
                     if application_metadata.len() > 1 {
                         return Err(CliError::ActionError(
-                            "Multiple metadata values with encoding set to string is not allowed"
-                                .into(),
+                            "Multiple metadata values with encoding 'string' is not allowed".into(),
                         ));
                     }
-                    let metadata = application_metadata.next().unwrap_or_default().as_bytes();
-                    builder.set_application_metadata(metadata);
+                    if let Some(metadata) = application_metadata.next() {
+                        builder.set_application_metadata(metadata.as_bytes());
+                    }
                 }
                 "json" => {
                     let mut json_string = "{".to_string();
@@ -148,7 +135,7 @@ impl Action for CircuitProposeAction {
                 }
                 _ => {
                     return Err(CliError::ActionError(format!(
-                        "Metadata encoding {} is not supported",
+                        "Metadata encoding '{}' is not supported",
                         encoding
                     )))
                 }
@@ -214,6 +201,7 @@ fn load_nodes_from_file(node_file: &str) -> Result<Vec<Node>, CliError> {
 
 fn load_nodes_from_remote(url: &str) -> Result<Vec<Node>, CliError> {
     let bytes = reqwest::blocking::get(url)
+        .and_then(|response| response.error_for_status())
         .map_err(|err| {
             CliError::ActionError(format!(
                 "Failed to fetch remote node file from {}: {}",
@@ -227,8 +215,10 @@ fn load_nodes_from_remote(url: &str) -> Result<Vec<Node>, CliError> {
                 err
             ))
         })?;
-    serde_yaml::from_slice(&bytes).map_err(|err| {
-        CliError::ActionError(format!("Failed to deserialize remote node file: {}", err))
+    serde_yaml::from_slice(&bytes).map_err(|_| {
+        CliError::ActionError(
+            "Failed to deserialize remote node file: Not a valid YAML sequence of nodes".into(),
+        )
     })
 }
 
@@ -239,10 +229,18 @@ fn load_nodes_from_local(node_file: &str) -> Result<Vec<Node>, CliError> {
         node_file
     };
     let file = File::open(path).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to open node file {}: {}", path, err))
+        CliError::EnvironmentError(format!(
+            "Unable to open node file '{}': {}",
+            path,
+            msg_from_io_error(err)
+        ))
     })?;
-    serde_yaml::from_reader(file)
-        .map_err(|err| CliError::ActionError(format!("Failed to read node file {}: {}", path, err)))
+    serde_yaml::from_reader(file).map_err(|_| {
+        CliError::ActionError(format!(
+            "Failed to read node file '{}': Not a valid YAML sequence of nodes",
+            path
+        ))
+    })
 }
 
 fn parse_node_argument(node_argument: &str) -> Result<(String, String), CliError> {
@@ -250,17 +248,24 @@ fn parse_node_argument(node_argument: &str) -> Result<(String, String), CliError
 
     let node_id = iter
         .next()
-        .ok_or_else(|| {
-            CliError::ActionError(format!("Node argument is not valid {}", node_argument))
-        })?
+        .expect("str::split cannot return an empty iterator")
         .to_string();
+    if node_id.is_empty() {
+        return Err(CliError::ActionError(
+            "Empty '--node' argument detected".into(),
+        ));
+    }
 
     let endpoint = iter
         .next()
-        .ok_or_else(|| {
-            CliError::ActionError(format!("Node argument is not valid {}", node_argument))
-        })?
+        .ok_or_else(|| CliError::ActionError(format!("Missing endpoint for node '{}'", node_id)))?
         .to_string();
+    if endpoint.is_empty() {
+        return Err(CliError::ActionError(format!(
+            "Empty endpoint detected for node '{}'",
+            node_id
+        )));
+    }
 
     Ok((node_id, endpoint))
 }
@@ -270,45 +275,78 @@ fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {
 
     let service_id = iter
         .next()
-        .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service)))?
+        .expect("str::split cannot return an empty iterator")
         .to_string();
+    if service_id.is_empty() {
+        return Err(CliError::ActionError(
+            "Empty '--service' argument detected".into(),
+        ));
+    }
 
     let allowed_nodes = iter
         .next()
-        .ok_or_else(|| CliError::ActionError(format!("allowed nodes not valid {}", service)))?
+        .ok_or_else(|| {
+            CliError::ActionError(format!(
+                "Missing allowed nodes for service '{}'",
+                service_id
+            ))
+        })?
         .split(',')
-        .map(String::from)
-        .collect::<Vec<String>>();
+        .map(|allowed_node| {
+            if allowed_node.is_empty() {
+                Err(CliError::ActionError(format!(
+                    "Empty allowed node detected for service '{}'",
+                    service_id
+                )))
+            } else {
+                Ok(allowed_node.to_string())
+            }
+        })
+        .collect::<Result<Vec<String>, CliError>>()?;
 
     Ok((service_id, allowed_nodes))
 }
 
-fn parse_service_peer_group(peer_group: &str) -> Vec<&str> {
-    peer_group.split(',').collect()
+fn parse_service_peer_group(peer_group: &str) -> Result<Vec<&str>, CliError> {
+    peer_group
+        .split(',')
+        .map(|peer| {
+            if peer.is_empty() {
+                Err(CliError::ActionError(
+                    "Empty service_id detected in '--service-peer-group' list".into(),
+                ))
+            } else {
+                Ok(peer)
+            }
+        })
+        .collect::<Result<_, _>>()
 }
 
 fn parse_application_metadata_json(metadata: &str) -> Result<String, CliError> {
     let mut iter = metadata.split('=');
+
     let key = iter
         .next()
-        .ok_or_else(|| {
-            CliError::ActionError(format!(
-                "Application metadata cannot be parsed to json {}",
-                metadata
-            ))
-        })?
+        .expect("str::split cannot return an empty iterator")
         .to_string();
+    if key.is_empty() {
+        return Err(CliError::ActionError(
+            "Empty '--metadata' argument detected".into(),
+        ));
+    }
 
     let mut value = iter
         .next()
-        .ok_or_else(|| {
-            CliError::ActionError(format!(
-                "Application metadata cannot be parsed to json {}",
-                metadata
-            ))
-        })?
+        .ok_or_else(|| CliError::ActionError(format!("Missing value for metadata key '{}'", key)))?
         .to_string();
+    if key.is_empty() {
+        return Err(CliError::ActionError(format!(
+            "Empty value detected for metadata key '{}'",
+            key
+        )));
+    }
 
+    // If the value isn't an array or object, add quotes to make it a valid JSON string
     if !value.contains('[') && !value.contains('{') {
         value = format!("\"{}\"", value);
     }
@@ -358,29 +396,49 @@ fn parse_service_argument(service_argument: &str) -> Result<(String, (String, St
 
     let service_id = iter
         .next()
-        .ok_or_else(|| {
-            CliError::ActionError(format!("service_argument not valid {}", service_argument))
-        })?
+        .expect("str::split cannot return an empty iterator")
         .to_string();
+    if service_id.is_empty() {
+        return Err(CliError::ActionError(
+            "Empty '--service-argument' argument detected".into(),
+        ));
+    }
 
     let arguments = iter
         .next()
         .ok_or_else(|| {
-            CliError::ActionError(format!("service_argument not valid {}", service_argument))
+            CliError::ActionError(format!(
+                "Missing key/value in service argument for '{}'",
+                service_id,
+            ))
         })?
         .to_string();
 
     let mut argument_iter = arguments.split('=');
+
     let key = argument_iter
         .next()
-        .ok_or_else(|| {
-            CliError::ActionError(format!("service_argument not valid {}", service_argument))
-        })?
+        .expect("str::split cannot return an empty iterator")
         .to_string();
+    if key.is_empty() {
+        return Err(CliError::ActionError(format!(
+            "Empty key/value detected in service argument for '{}'",
+            service_id
+        )));
+    }
 
     let value = argument_iter.next().ok_or_else(|| {
-        CliError::ActionError(format!("service_argument not valid {}", service_argument))
+        CliError::ActionError(format!(
+            "Missing value in service argument '{}::{}'",
+            service_id, key,
+        ))
     })?;
+    if value.is_empty() {
+        return Err(CliError::ActionError(format!(
+            "Empty value detected in service argument '{}::{}'",
+            service_id, key,
+        )));
+    }
 
     Ok((service_id, (key, format!("{:?}", vec![value]))))
 }
@@ -390,29 +448,58 @@ fn parse_service_type_argument(service_type: &str) -> Result<(String, String), C
 
     let service_id = iter
         .next()
-        .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service_type)))?
+        .expect("str::split cannot return an empty iterator")
         .to_string();
+    if service_id.is_empty() {
+        return Err(CliError::ActionError(
+            "Empty '--service-type' argument detected".into(),
+        ));
+    }
 
     let service_type = iter
         .next()
-        .ok_or_else(|| CliError::ActionError(format!("service_type not valid {}", service_type)))?
+        .ok_or_else(|| CliError::ActionError(format!("Missing service type for '{}'", service_id)))?
         .to_string();
+    if service_type.is_empty() {
+        return Err(CliError::ActionError(format!(
+            "Empty service type detected for '{}'",
+            service_id
+        )));
+    }
+
     Ok((service_id, service_type))
 }
 
 /// Reads a private key from the given file name.
 fn read_private_key(file_name: &str) -> Result<String, CliError> {
     let mut file = File::open(file_name).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to open {}: {}", file_name, err))
+        CliError::EnvironmentError(format!(
+            "Unable to open key file '{}': {}",
+            file_name,
+            msg_from_io_error(err)
+        ))
     })?;
 
     let mut buf = String::new();
     file.read_to_string(&mut buf).map_err(|err| {
-        CliError::EnvironmentError(format!("Unable to read {}: {}", file_name, err))
+        CliError::EnvironmentError(format!(
+            "Unable to read key file '{}': {}",
+            file_name,
+            msg_from_io_error(err)
+        ))
     })?;
     let key = buf.trim().to_string();
 
     Ok(key)
+}
+
+fn msg_from_io_error(err: IoError) -> String {
+    match err.kind() {
+        ErrorKind::NotFound => "File not found".into(),
+        ErrorKind::PermissionDenied => "Permission denied".into(),
+        ErrorKind::InvalidData => "Invalid data".into(),
+        _ => "Unknown I/O error".into(),
+    }
 }
 
 impl From<&CreateCircuit> for CircuitSlice {
@@ -445,12 +532,12 @@ impl From<&SplinterService> for CircuitServiceSlice {
     }
 }
 
-pub(self) enum Vote {
+enum Vote {
     Accept,
     Reject,
 }
 
-pub(self) struct CircuitVote {
+struct CircuitVote {
     circuit_id: String,
     circuit_hash: String,
     vote: Vote,
@@ -467,10 +554,9 @@ impl Action for CircuitVoteAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
         let key = args.value_of("private_key_file").unwrap_or("splinter");
-        let circuit_id = match args.value_of("circuit_id") {
-            Some(circuit_id) => circuit_id,
-            None => return Err(CliError::ActionError("Circuit id is required".into())),
-        };
+        let circuit_id = args
+            .value_of("circuit_id")
+            .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
 
         // accept or reject must be present
         let vote = {
@@ -510,7 +596,7 @@ fn vote_on_circuit_proposal(
         client.submit_admin_payload(signed_payload)
     } else {
         Err(CliError::ActionError(format!(
-            "Proposal for {} does not exist",
+            "Proposal for circuit '{}' does not exist",
             circuit_id
         )))
     }
@@ -578,9 +664,8 @@ impl Action for CircuitShowAction {
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
         let circuit_id = args
             .value_of("circuit")
-            .ok_or_else(|| CliError::ActionError("Circuit name must be provided".to_string()))?;
+            .ok_or_else(|| CliError::ActionError("'circuit' argument is required".to_string()))?;
 
-        // A value should always be passed because a default is defined
         let format = args.value_of("format").unwrap_or("human");
 
         show_circuit(&url, circuit_id, format)
@@ -638,7 +723,7 @@ fn show_circuit(url: &str, circuit_id: &str, format: &str) -> Result<(), CliErro
 
     if !print_circuit && !print_proposal {
         return Err(CliError::ActionError(format!(
-            "Proposal for {} does not exist",
+            "Circuit or proposal for circuit '{}' does not exist",
             circuit_id
         )));
     }

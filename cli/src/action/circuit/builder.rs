@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "circuit-auth-type")]
+use splinter::admin::messages::AuthorizationType;
 use splinter::admin::messages::{
-    AuthorizationType, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
+    BuilderError, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
     SplinterServiceBuilder,
 };
 
@@ -65,6 +67,8 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn apply_service_type(&mut self, service_id_match: &str, service_type: &str) {
+        // Clone the service builders, add the type to matching services builders, and use the
+        // updated builders to replace the existing ones.
         self.services = self
             .services
             .clone()
@@ -83,27 +87,34 @@ impl CreateCircuitMessageBuilder {
     pub fn apply_service_arguments(
         &mut self,
         service_id_match: &str,
-        args: &(String, String),
+        arg: &(String, String),
     ) -> Result<(), CliError> {
+        // Clone the service builders, add the argument to matching services builders, and use the
+        // updated builders to replace the existing ones.
         self.services = self
             .services
             .clone()
             .into_iter()
             .map(|service_builder| {
+                // Determine if the service builder matches the pattern
                 let service_id = service_builder.service_id().unwrap_or_default();
                 if is_match(service_id_match, &service_id) {
                     let mut service_args = service_builder.arguments().unwrap_or_default();
-                    if args.0 == PEER_SERVICES_ARG
-                        && service_args.iter().any(|arg| arg.0 == PEER_SERVICES_ARG)
-                    {
+
+                    // Check for duplicate argument
+                    let key = &arg.0;
+                    if service_args.iter().any(|arg| &arg.0 == key) {
                         return Err(CliError::ActionError(format!(
-                            "Peer services argument is already set for service: {}",
-                            service_id
+                            "Duplicate service argument '{}' detected for service '{}'",
+                            key, service_id,
                         )));
                     }
-                    service_args.push(args.clone());
+
+                    // Add the argument
+                    service_args.push(arg.clone());
                     Ok(service_builder.with_arguments(&service_args))
                 } else {
+                    // Pattern didn't match, so leave the builder as-is
                     Ok(service_builder)
                 }
             })
@@ -112,6 +123,7 @@ impl CreateCircuitMessageBuilder {
     }
 
     pub fn apply_peer_services(&mut self, service_id_globs: &[&str]) -> Result<(), CliError> {
+        // Get list of all peer IDs that are matched by the service ID globs
         let peers = self
             .services
             .iter()
@@ -128,33 +140,40 @@ impl CreateCircuitMessageBuilder {
             })
             .collect::<Vec<String>>();
 
+        // Clone the service builders, add PEER_SERVICES_ARG to matching services builders, and use
+        // the updated builders to replace the existing ones.
         self.services = self
             .services
             .clone()
             .into_iter()
             .map(|service_builder| {
+                // Determine if the builder is in the list of IDs and get the index of its ID
                 let service_id = service_builder.service_id().unwrap_or_default();
-                let index = peers.iter().enumerate().find_map(|(index, peer_id)| {
-                    if peer_id == &service_id {
-                        Some(index)
-                    } else {
-                        None
-                    }
-                });
+                let index = peers.iter().position(|peer_id| peer_id == &service_id);
 
                 if let Some(index) = index {
+                    // Copy the list of IDs and remove the builder's own ID, since it won't be a
+                    // peer of itself
                     let mut service_peers = peers.clone();
                     service_peers.remove(index);
+
+                    // Check if the argument has already been set
                     let mut service_args = service_builder.arguments().unwrap_or_default();
                     if service_args.iter().any(|arg| arg.0 == PEER_SERVICES_ARG) {
                         return Err(CliError::ActionError(format!(
-                            "Peer services argument for service {} is already set.",
-                            service_id
+                            "Peer services for service '{}' is already set",
+                            service_id,
                         )));
                     }
-                    service_args.push((PEER_SERVICES_ARG.into(), format!("{:?}", service_peers)));
+
+                    // Add the argument
+                    service_args.push((
+                        PEER_SERVICES_ARG.into(),
+                        format!("[\"{}\"]", service_peers.join("\", \"")),
+                    ));
                     Ok(service_builder.with_arguments(&service_args))
                 } else {
+                    // Pattern didn't match, so leave the builder as-is
                     Ok(service_builder)
                 }
             })
@@ -215,59 +234,58 @@ impl CreateCircuitMessageBuilder {
         let default_store = get_default_value_store();
 
         // if management type is not set check for default value
-        let management_type = match self.management_type {
-            Some(management_type) => management_type,
-            None => match self.create_circuit_builder.circuit_management_type() {
+        let management_type =
+            match self.management_type {
                 Some(management_type) => management_type,
-                None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
-                    Some(management_type) => management_type.value(),
-                    None => {
-                        return Err(CliError::ActionError(
-                            "Management type not provided and no default value set".to_string(),
-                        ))
-                    }
+                None => match self.create_circuit_builder.circuit_management_type() {
+                    Some(management_type) => management_type,
+                    None => match default_store.get_default_value(MANAGEMENT_TYPE_KEY)? {
+                        Some(management_type) => management_type.value(),
+                        None => return Err(CliError::ActionError(
+                            "Failed to build circuit: Management type not provided and no default \
+                             set"
+                            .into(),
+                        )),
+                    },
                 },
-            },
-        };
+            };
 
         let services = self
             .services
             .into_iter()
             .map(|mut builder| {
+                let service_id = builder.service_id().unwrap_or_default();
                 // if service type is not set, check for default value
                 if builder.service_type().is_none() {
                     builder = match default_store.get_default_value(SERVICE_TYPE_KEY)? {
                         Some(service_type) => builder.with_service_type(&service_type.value()),
                         None => {
-                            return Err(CliError::ActionError(
-                                "Service has no service type and no default value is set"
-                                    .to_string(),
-                            ))
+                            return Err(CliError::ActionError(format!(
+                                "Failed to build service '{}': Service type not provided and no \
+                                 default set",
+                                service_id,
+                            )))
                         }
                     }
                 }
 
                 builder.build().map_err(|err| {
-                    CliError::ActionError(format!("Failed to build service: {}", err))
+                    CliError::ActionError(format!(
+                        "Failed to build service '{}': {}",
+                        service_id,
+                        msg_from_builder_error(err)
+                    ))
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut create_circuit_builder = self
+        let create_circuit_builder = self
             .create_circuit_builder
             .with_members(&self.nodes)
             .with_roster(&services)
             .with_circuit_management_type(&management_type)
+            .with_application_metadata(&self.application_metadata)
             .with_comments(&self.comments.unwrap_or_default());
-
-        if !self.application_metadata.is_empty() {
-            create_circuit_builder =
-                create_circuit_builder.with_application_metadata(&self.application_metadata);
-        }
-
-        #[cfg(not(feature = "circuit-auth-type"))]
-        let create_circuit_builder =
-            create_circuit_builder.with_authorization_type(&AuthorizationType::Trust);
 
         #[cfg(feature = "circuit-auth-type")]
         let create_circuit_builder = match self.authorization_type {
@@ -278,7 +296,10 @@ impl CreateCircuitMessageBuilder {
         };
 
         let create_circuit = create_circuit_builder.build().map_err(|err| {
-            CliError::ActionError(format!("Failed to build CreateCircuit message: {}", err))
+            CliError::ActionError(format!(
+                "Failed to build circuit: {}",
+                msg_from_builder_error(err)
+            ))
         })?;
         Ok(create_circuit)
     }
@@ -323,8 +344,20 @@ fn make_splinter_node(node_id: &str, endpoint: &str) -> Result<SplinterNode, Cli
         .with_node_id(&node_id)
         .with_endpoint(&endpoint)
         .build()
-        .map_err(|err| CliError::ActionError(format!("Failed to build SplinterNode: {}", err)))?;
+        .map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to build node: {}",
+                msg_from_builder_error(err)
+            ))
+        })?;
     Ok(node)
+}
+
+fn msg_from_builder_error(err: BuilderError) -> String {
+    match err {
+        BuilderError::InvalidField(msg) => msg,
+        BuilderError::MissingField(field) => format!("Missing node parameter: {}", field),
+    }
 }
 
 #[cfg(test)]
