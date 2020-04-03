@@ -27,8 +27,6 @@ pub enum KeyStoreError {
         source: Box<dyn Error>,
     },
     /// Represents database query failures
-    /// Disable warning, this will be used for any database fetch helpers
-    #[allow(dead_code)]
     QueryError {
         context: String,
         source: Box<dyn Error>,
