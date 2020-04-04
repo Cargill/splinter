@@ -216,6 +216,10 @@ impl ServiceProcessor {
                                 error!("Mesh lock was poisoned");
                                 break;
                             }
+                            Err(MeshRecvTimeoutError::Shutdown) => {
+                                error!("Mesh has shutdown");
+                                break;
+                            }
                         };
 
                         if let Err(err) = process_incoming_msg(&message_bytes, &mut inbound_router)

@@ -56,11 +56,18 @@ impl Control {
             Err(_err) => Err(RemoveError::ReceiverDisconnected),
         }
     }
+
+    pub fn shutdown(&self) {
+        if self.tx.send(ControlRequest::Shutdown).is_err() {
+            error!("Mesh has already shutdown")
+        }
+    }
 }
 
 pub(super) enum ControlRequest {
     Add(AddRequest),
     Remove(RemoveRequest),
+    Shutdown,
 }
 
 pub(super) struct AddRequest {

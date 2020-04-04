@@ -119,6 +119,7 @@ fn main() -> Result<(), ServiceError> {
     let mut transport = get_transport(&matches)?;
     let network =
         create_network_and_connect(&mut *transport, matches.value_of("connect").unwrap())?;
+    let network_shutdown = network.shutdown_signaler();
 
     let network_message_queue = sender::Builder::new()
         .with_network(network.clone())
@@ -211,6 +212,7 @@ fn main() -> Result<(), ServiceError> {
         info!("Received Shutdown");
         r.store(false, Ordering::SeqCst);
         shutdown_signaler.shutdown();
+        network_shutdown.shutdown();
         // wake the listener so it can shutdown
         TcpStream::connect(matches2.value_of("bind").unwrap()).unwrap();
     })
@@ -341,6 +343,10 @@ fn run_service_loop(
             }
             Err(RecvTimeoutError::PoisonedLock) => {
                 error!("Mesh lock was poisoned");
+                break;
+            }
+            Err(RecvTimeoutError::Shutdown) => {
+                error!("Mesh has shutdown");
                 break;
             }
             Err(RecvTimeoutError::Timeout) => continue,

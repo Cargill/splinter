@@ -36,8 +36,8 @@ use std::time::Duration;
 
 use crate::collections::BiHashMap;
 use crate::mesh::{
-    AddError, Envelope, Mesh, RecvError as MeshRecvError, RecvTimeoutError as MeshRecvTimeoutError,
-    RemoveError, SendError as MeshSendError,
+    AddError, Envelope, Mesh, MeshShutdownSignaler, RecvError as MeshRecvError,
+    RecvTimeoutError as MeshRecvTimeoutError, RemoveError, SendError as MeshSendError,
 };
 use crate::protos::network::{NetworkHeartbeat, NetworkMessage, NetworkMessageType};
 use crate::transport::Connection;
@@ -362,6 +362,10 @@ impl Network {
 
         Ok(NetworkMessageWrapper::new(peer_id, envelope.take_payload()))
     }
+
+    pub fn shutdown_signaler(&self) -> MeshShutdownSignaler {
+        self.mesh.shutdown_signaler()
+    }
 }
 
 // -------------- Errors --------------
@@ -384,6 +388,7 @@ pub enum RecvTimeoutError {
     Timeout,
     Disconnected,
     PoisonedLock,
+    Shutdown,
 }
 
 impl From<MeshRecvTimeoutError> for RecvTimeoutError {
@@ -392,6 +397,7 @@ impl From<MeshRecvTimeoutError> for RecvTimeoutError {
             MeshRecvTimeoutError::Timeout => RecvTimeoutError::Timeout,
             MeshRecvTimeoutError::Disconnected => RecvTimeoutError::Disconnected,
             MeshRecvTimeoutError::PoisonedLock => RecvTimeoutError::PoisonedLock,
+            MeshRecvTimeoutError::Shutdown => RecvTimeoutError::Shutdown,
         }
     }
 }

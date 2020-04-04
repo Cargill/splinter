@@ -392,6 +392,10 @@ pub fn run_incoming_loop(
                 error!("Mesh lock was poisoned");
                 break;
             }
+            Err(MeshRecvTimeoutError::Shutdown) => {
+                error!("Mesh has shutdown");
+                break;
+            }
         };
 
         let msg: NetworkMessage = protobuf::parse_from_bytes(&message_bytes)
