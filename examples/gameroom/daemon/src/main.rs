@@ -87,6 +87,7 @@ fn run() -> Result<(), GameroomDaemonError> {
 
     Logger::with(log_spec_builder.build())
         .format(log_format)
+        .log_target(flexi_logger::LogTarget::StdOut)
         .start()?;
 
     let config = GameroomConfigBuilder::default()
