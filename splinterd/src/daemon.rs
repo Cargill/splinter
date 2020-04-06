@@ -180,7 +180,12 @@ impl SplinterDaemon {
         let network_message_queue = sender::Builder::new()
             .with_network(network)
             .build()
-            .expect("Unable to create queue");
+            .map_err(|err| {
+                StartError::NetworkError(format!(
+                    "Unable to create network message sender: {}",
+                    err
+                ))
+            })?;
         let network_sender = network_message_queue.new_network_sender();
         let sender_shutdown_signaler = network_message_queue.shutdown_signaler();
 
