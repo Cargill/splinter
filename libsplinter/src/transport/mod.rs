@@ -132,9 +132,10 @@ pub mod tests {
     use super::*;
     use std::fmt::Debug;
 
+    use std::collections::HashMap;
     use std::sync::mpsc::channel;
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use mio::{Events, Poll, PollOpt, Ready, Token};
 
@@ -181,71 +182,198 @@ pub mod tests {
         handle.join().unwrap();
     }
 
-    fn assert_ready(events: &Events, token: Token, readiness: Ready) {
-        assert_eq!(
-            Some(readiness),
-            events
-                .iter()
-                .filter(|event| event.token() == token)
-                .map(|event| event.readiness())
-                .next(),
-        );
-    }
-
+    /// Tests that we can create connections which exhibit normal polling behavior.
+    ///
+    /// We expect connections to initially be writable, and we expect them to be readable once the
+    /// other side has sent some data. This test confirms that we properly see both readable and
+    /// writable states on each connection.
+    ///
+    /// Additionally, this test does send messages in both directions and confirms that the
+    /// messages are recieved on the other end.
+    ///
+    /// The process used is essentially:
+    ///
+    /// 1. Create a listener.
+    /// 2. Create a "connector" thread. The original test thread is now the "listener" thread.
+    /// 3. In the connector thread, create some connections, setup polling, and then notify the
+    ///    listener thread.
+    /// 4. In the listener thread, send some data across each connection, then notify the connector
+    ///    thread.
+    /// 5. In the connector thread, loop around poll collecting ready events and determining if we
+    ///    have seen both read and write for each connection. If we have, exit the loop.
+    /// 6. In the connector thread, receive the message on each connection and then send a message.
+    /// 7. In the listener thread, receive the messages.
+    /// 8. Join the connector thread.
     pub fn test_poll<T: Transport + Send + 'static>(mut transport: T, bind: &str) {
-        // Create aconnections and register them with the poller
+        // The number of connections to create during the test. The higher the number, the more
+        // likely we would be to find issues which only occur occassionally. However, the higher
+        // the number, the more likely we are to cause false failures because of system-level
+        // concerns such as running out of file descriptors.
         const CONNECTIONS: usize = 16;
 
-        let expected_readiness = Ready::readable() | Ready::writable();
+        // The timeout duration when calling poll. This duration is arbitrary but the primary
+        // objectives are: a) bound poll so it will not hang the test indefinitely; b) allow the
+        // main loop to exit not long after TOTAL_DURATION.
+        const POLL_DURATION: u64 = 3000; // 3 seconds
 
-        let mut listener = assert_ok(transport.listen(bind));
+        // The timeout for the entire test. The actual maximum duration of the test will be between
+        // TOTAL_DURATION and TOTAL_DURATION + POLL_DURATION, depending on timing. This value is
+        // set to the highest reasonable value as to not cause false failures because we did not
+        // allow enough time.
+        const TOTAL_DURATION: u64 = 60000; // 60 seconds
+
+        // Bind to a port with listen() and retrieve the actual endpoint. Determining the endpoint
+        // in this manner allows for ports to be system-assigned, in the case that the bind URL was
+        // something like 127.0.0.1:0.
+        let mut listener = transport.listen(bind).unwrap();
         let endpoint = listener.endpoint();
 
-        let (ready_tx, ready_rx) = channel();
+        // Create two sets of channels. The first is for sending message to our connector (client)
+        // thread (the thread we spawn). The second is for sending messages to our listening
+        // (server) thread (which is the primary thread in the test).
+        let (to_listener_tx, to_listener_rx) = channel();
+        let (to_connector_tx, to_connector_rx) = channel();
 
+        // Create the connector thread.
         let handle = thread::spawn(move || {
+            // Attempt to setup all the connections, and create an associated mio Token. The token
+            // is used later to correlate polling events with the connection.
             let mut connections = Vec::with_capacity(CONNECTIONS);
             for i in 0..CONNECTIONS {
                 connections.push((assert_ok(transport.connect(&endpoint)), Token(i)));
             }
 
-            // Register all connections with Poller
+            // Register all connections with Poller. Since we want to monitor for both read and
+            // write, we request Ready::readable() and Ready::writable events. Token is used to
+            // correleate to the connection.
             let poll = Poll::new().unwrap();
             for (conn, token) in &connections {
-                assert_ok(poll.register(
+                poll.register(
                     conn.evented(),
                     *token,
-                    expected_readiness,
+                    Ready::readable() | Ready::writable(),
                     PollOpt::level(),
-                ));
+                )
+                .unwrap();
             }
 
-            // Block waiting for other thread to send everything
-            ready_rx.recv().unwrap();
+            // Notify the listener thread that this thread has finished setting up polling.
+            to_listener_tx.send(()).unwrap();
 
-            let mut events = Events::with_capacity(CONNECTIONS * 2);
-            assert_ok(poll.poll(&mut events, None));
-            for (mut conn, token) in connections {
-                assert_ready(&events, token, expected_readiness);
-                assert_eq!(b"hello".to_vec(), assert_ok(conn.recv()));
+            // Block waiting for the listener thread to send a message on each connection.
+            to_connector_rx.recv().unwrap();
+
+            // Keep a map which has Tokens for keys and Ready for values; we use this to determine
+            // which Ready states we have seen.
+            let mut readiness_map = HashMap::new();
+
+            // The number of connections for which we have seen a readable event.
+            let mut readable_count = 0;
+
+            // The number of connections for which we have seen a writable event.
+            let mut writable_count = 0;
+
+            // If we have timed out due to TOTAL_DURATION, this flag gets set and we break out of
+            // the loop.
+            let mut failure = false;
+
+            // The structure filled in by poll; the capacity is the maximum number of events poll
+            // can return at once. We set this high, though if we overflow it, it should not really
+            // matter since we will call poll again quickly as we go through the loop.
+            let mut events = Events::with_capacity(CONNECTIONS * 8);
+
+            // Timing setup.
+            let start = Instant::now();
+            let poll_duration = Duration::from_millis(POLL_DURATION);
+            let total_duration = Duration::from_millis(TOTAL_DURATION);
+
+            // Loop until the test succeeds or times out.
+            loop {
+                // If we have taken too long, then the test has failed; break out of the loop.
+                if start.elapsed() >= total_duration {
+                    failure = true;
+                    break;
+                }
+
+                // Poll. This will block until there are events, up to POLL_DURATION. When working,
+                // this will return almost immediately with readable and writable events for each
+                // connection. If we do not get them all the first attempt, we should on the
+                // subsequent poll attempts.
+                poll.poll(&mut events, Some(poll_duration)).unwrap();
+
+                // Process the events by merging the readiness state into the state maintained
+                // within the readiness map.
+                for (_conn, token) in &connections {
+                    events
+                        .iter()
+                        .filter(|event| event.token() == *token)
+                        .map(|event| event.readiness())
+                        .for_each(|readiness| {
+                            *readiness_map.entry(token).or_insert(readiness) |= readiness;
+                        });
+                }
+
+                // Calculate both readable_count and writable_count, which are the number of
+                // connections readable/writable.
+                readable_count = readiness_map
+                    .values()
+                    .filter(|value| value.is_readable())
+                    .count();
+                writable_count = readiness_map
+                    .values()
+                    .filter(|value| value.is_writable())
+                    .count();
+
+                // We expect to see each connection become both readable and writable. If that
+                // happens, the test is successful, break out of the loop.
+                if readable_count >= CONNECTIONS && writable_count >= CONNECTIONS {
+                    break;
+                }
+            }
+
+            // For each connection, make sure we can receive the message sent, then send
+            // a response. Sending a response here will unblock the listener thread, so it is
+            // important we do this even in the error case, as the test will hang ohterwise.
+            for (mut conn, _token) in connections {
+                assert_eq!(b"hello".to_vec(), conn.recv().unwrap());
                 assert_ok(conn.send(b"world"));
+            }
+
+            // If we timed out, assert in a way that leaves a breadcrumb as to the state of the
+            // connections.
+            if failure {
+                assert_eq!((CONNECTIONS, CONNECTIONS), (readable_count, writable_count));
             }
         });
 
+        // The code below is part of the listener thread.
+
+        // Accept all the connections that the connector thread has initiated.
         let mut connections = Vec::with_capacity(CONNECTIONS);
         for _ in 0..CONNECTIONS {
-            let mut conn = assert_ok(listener.accept());
-            assert_ok(block!(conn.send(b"hello"), SendError));
-            connections.push(conn);
+            connections.push(listener.accept().unwrap());
         }
 
-        // Signal done sending to background thread
-        ready_tx.send(()).unwrap();
+        // Block until the connector thread tells this thread that polling has been setup. This is
+        // necessary to ensure that we do not lose any readable events.
+        to_listener_rx.recv().unwrap();
 
+        // Send a message on all connections. This should make the poller generate a readable event
+        // for all connections.
+        for conn in &mut connections {
+            block!(conn.send(b"hello"), SendError).unwrap();
+        }
+
+        // Signal the connector thread that this thread has finished sending data on all
+        // connections.
+        to_connector_tx.send(()).unwrap();
+
+        // For each connection, make sure we received the message sent from the connector thread.
         for mut conn in connections {
-            assert_eq!(b"world".to_vec(), assert_ok(block!(conn.recv(), RecvError)));
+            assert_eq!(b"world".to_vec(), block!(conn.recv(), RecvError).unwrap());
         }
 
+        // Join the connector thread.
         handle.join().unwrap();
     }
 }
