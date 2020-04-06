@@ -19,7 +19,6 @@ extern crate diesel;
 
 mod action;
 mod error;
-mod store;
 
 #[cfg(feature = "circuit-template")]
 mod template;
@@ -521,57 +520,6 @@ fn run() -> Result<(), CliError> {
                             .default_value("human")
                             .takes_value(true),
                     ),
-            )
-            .subcommand(
-                SubCommand::with_name("default")
-                    .about("Manage default values for circuit creation")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .subcommand(
-                        SubCommand::with_name("set")
-                            .about("Set a default value")
-                            .arg(
-                                Arg::with_name("name")
-                                    .takes_value(true)
-                                    .value_name("name")
-                                    .possible_values(&["service-type", "management-type"])
-                                    .help("Name of default setting"),
-                            )
-                            .arg(
-                                Arg::with_name("value")
-                                    .takes_value(true)
-                                    .value_name("value")
-                                    .help("Value of default setting"),
-                            )
-                            .arg(
-                                Arg::with_name("force")
-                                    .short("f")
-                                    .long("force")
-                                    .help("Overwrite default"),
-                            ),
-                    )
-                    .subcommand(
-                        SubCommand::with_name("unset")
-                            .about("Unset a default value")
-                            .arg(
-                                Arg::with_name("name")
-                                    .takes_value(true)
-                                    .value_name("name")
-                                    .possible_values(&["service-type", "management-type"])
-                                    .help("Name of default setting"),
-                            ),
-                    )
-                    .subcommand(SubCommand::with_name("list").about("List set default values"))
-                    .subcommand(
-                        SubCommand::with_name("show")
-                            .about("Show a default value")
-                            .arg(
-                                Arg::with_name("name")
-                                    .takes_value(true)
-                                    .value_name("name")
-                                    .possible_values(&["service-type", "management-type"])
-                                    .help("Name of default setting"),
-                            ),
-                    ),
             );
 
         #[cfg(feature = "circuit-template")]
@@ -668,15 +616,7 @@ fn run() -> Result<(), CliError> {
             .with_command("vote", circuit::CircuitVoteAction)
             .with_command("list", circuit::CircuitListAction)
             .with_command("show", circuit::CircuitShowAction)
-            .with_command("proposals", circuit::CircuitProposalsAction)
-            .with_command(
-                "default",
-                SubcommandActions::new()
-                    .with_command("set", circuit::defaults::SetDefaultValueAction)
-                    .with_command("unset", circuit::defaults::UnsetDefaultValueAction)
-                    .with_command("list", circuit::defaults::ListDefaultsAction)
-                    .with_command("show", circuit::defaults::ShowDefaultValueAction),
-            );
+            .with_command("proposals", circuit::CircuitProposalsAction);
 
         #[cfg(feature = "circuit-template")]
         let circuit_command = circuit_command.with_command(

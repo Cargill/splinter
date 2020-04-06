@@ -38,9 +38,35 @@ impl<'a> SplinterRestClient<'a> {
         Client::new()
             .get(&format!("{}/status", self.url))
             .send()
-            .and_then(|res| res.json())
-            .map(|server_status: ServerStatus| server_status.node_id)
-            .map_err(|err| CliError::ActionError(format!("Unable to fetch node id: {}", err)))
+            .map_err(|err| CliError::ActionError(format!("Failed to fetch node ID: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.json::<ServerStatus>()
+                        .map(|server_status| server_status.node_id)
+                        .map_err(|_| {
+                            CliError::ActionError(
+                                "Request was successful, but received an invalid response".into(),
+                            )
+                        })
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            CliError::ActionError(format!(
+                                "Node ID fetch request failed with status code '{}', but error \
+                                 response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(CliError::ActionError(format!(
+                        "Failed to submit admin payload: {}",
+                        message
+                    )))
+                }
+            })
     }
 
     /// Submits an admin payload to this client's Splinter node.
@@ -52,30 +78,29 @@ impl<'a> SplinterRestClient<'a> {
             .body(payload)
             .send()
             .map_err(|err| {
-                CliError::ActionError(format!("Unable to submit admin payload: {}", err))
+                CliError::ActionError(format!("Failed to submit admin payload: {}", err))
             })
-            .and_then(|res| match res.status() {
-                StatusCode::ACCEPTED => Ok(()),
-                StatusCode::BAD_REQUEST | StatusCode::INTERNAL_SERVER_ERROR => {
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    Ok(())
+                } else {
                     let message = res
                         .json::<ServerError>()
-                        .map_err(|err| {
+                        .map_err(|_| {
                             CliError::ActionError(format!(
-                                "Unable to parse error response: {}",
-                                err
+                                "Admin payload submit request failed with status code '{}', but \
+                                 error response was not valid",
+                                status
                             ))
                         })?
                         .message;
 
                     Err(CliError::ActionError(format!(
-                        "Unable to submit admin payload: {}",
+                        "Failed to submit admin payload: {}",
                         message
                     )))
                 }
-                _ => Err(CliError::ActionError(format!(
-                    "Received unknown response status: {}",
-                    res.status()
-                ))),
             })
     }
 
@@ -89,31 +114,32 @@ impl<'a> SplinterRestClient<'a> {
             .get(&request)
             .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| CliError::ActionError(err.to_string()))
-            .and_then(|res| match res.status() {
-                StatusCode::OK => Ok(res
-                    .json::<CircuitListSlice>()
-                    .map_err(|err| CliError::ActionError(err.to_string()))?),
-                StatusCode::BAD_REQUEST | StatusCode::INTERNAL_SERVER_ERROR => {
+            .map_err(|err| CliError::ActionError(format!("Failed to list circuits: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.json::<CircuitListSlice>().map_err(|_| {
+                        CliError::ActionError(
+                            "Request was successful, but received an invalid response".into(),
+                        )
+                    })
+                } else {
                     let message = res
                         .json::<ServerError>()
-                        .map_err(|err| {
+                        .map_err(|_| {
                             CliError::ActionError(format!(
-                                "Unable to parse error response: {}",
-                                err
+                                "Circuit list request failed with status code '{}', but error \
+                                 response was not valid",
+                                status
                             ))
                         })?
                         .message;
 
                     Err(CliError::ActionError(format!(
-                        "Unable to fetch circuits: {}",
+                        "Failed to list circuits: {}",
                         message
                     )))
                 }
-                _ => Err(CliError::ActionError(format!(
-                    "Received unknown response status: {}",
-                    res.status()
-                ))),
             })
     }
 
@@ -122,33 +148,34 @@ impl<'a> SplinterRestClient<'a> {
             .get(&format!("{}/admin/circuits/{}", self.url, circuit_id))
             .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| CliError::ActionError(err.to_string()))
-            .and_then(|res| match res.status() {
-                StatusCode::OK => Ok(Some(
-                    res.json::<CircuitSlice>()
-                        .map_err(|err| CliError::ActionError(err.to_string()))?,
-                )),
-                StatusCode::NOT_FOUND => Ok(None),
-                StatusCode::BAD_REQUEST | StatusCode::INTERNAL_SERVER_ERROR => {
+            .map_err(|err| CliError::ActionError(format!("Failed to fetch circuit: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.json::<CircuitSlice>().map(Some).map_err(|_| {
+                        CliError::ActionError(
+                            "Request was successful, but received an invalid response".into(),
+                        )
+                    })
+                } else if status == StatusCode::NOT_FOUND {
+                    Ok(None)
+                } else {
                     let message = res
                         .json::<ServerError>()
-                        .map_err(|err| {
+                        .map_err(|_| {
                             CliError::ActionError(format!(
-                                "Unable to parse error response: {}",
-                                err
+                                "Circuit fetch request failed with status code '{}', but error \
+                                 response was not valid",
+                                status
                             ))
                         })?
                         .message;
 
                     Err(CliError::ActionError(format!(
-                        "Unable to fetch circuit: {}",
+                        "Failed to fetch circuit: {}",
                         message
                     )))
                 }
-                _ => Err(CliError::ActionError(format!(
-                    "Received unknown response status: {}",
-                    res.status()
-                ))),
             })
     }
 
@@ -174,31 +201,32 @@ impl<'a> SplinterRestClient<'a> {
             .get(&request)
             .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| CliError::ActionError(err.to_string()))
-            .and_then(|res| match res.status() {
-                StatusCode::OK => Ok(res
-                    .json::<ProposalListSlice>()
-                    .map_err(|err| CliError::ActionError(err.to_string()))?),
-                StatusCode::BAD_REQUEST | StatusCode::INTERNAL_SERVER_ERROR => {
+            .map_err(|err| CliError::ActionError(format!("Failed to list proposals: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.json::<ProposalListSlice>().map_err(|_| {
+                        CliError::ActionError(
+                            "Request was successful, but received an invalid response".into(),
+                        )
+                    })
+                } else {
                     let message = res
                         .json::<ServerError>()
-                        .map_err(|err| {
+                        .map_err(|_| {
                             CliError::ActionError(format!(
-                                "Unable to parse error response: {}",
-                                err
+                                "Proposal list request failed with status code '{}', but error \
+                                 response was not valid",
+                                status
                             ))
                         })?
                         .message;
 
                     Err(CliError::ActionError(format!(
-                        "Unable to fetch proposals: {}",
+                        "Failed to list proposals: {}",
                         message
                     )))
                 }
-                _ => Err(CliError::ActionError(format!(
-                    "Received unknown response status: {}",
-                    res.status()
-                ))),
             })
     }
 
@@ -207,33 +235,34 @@ impl<'a> SplinterRestClient<'a> {
             .get(&format!("{}/admin/proposals/{}", self.url, circuit_id))
             .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| CliError::ActionError(err.to_string()))
-            .and_then(|res| match res.status() {
-                StatusCode::OK => Ok(Some(
-                    res.json::<ProposalSlice>()
-                        .map_err(|err| CliError::ActionError(err.to_string()))?,
-                )),
-                StatusCode::NOT_FOUND => Ok(None),
-                StatusCode::BAD_REQUEST | StatusCode::INTERNAL_SERVER_ERROR => {
+            .map_err(|err| CliError::ActionError(format!("Failed to fetch proposal: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.json::<ProposalSlice>().map(Some).map_err(|_| {
+                        CliError::ActionError(
+                            "Request was successful, but received an invalid response".into(),
+                        )
+                    })
+                } else if status == StatusCode::NOT_FOUND {
+                    Ok(None)
+                } else {
                     let message = res
                         .json::<ServerError>()
-                        .map_err(|err| {
+                        .map_err(|_| {
                             CliError::ActionError(format!(
-                                "Unable to parse error response: {}",
-                                err
+                                "Proposal fetch request failed with status code '{}', but error \
+                                 response was not valid",
+                                status
                             ))
                         })?
                         .message;
 
                     Err(CliError::ActionError(format!(
-                        "Unable to fetch proposal: {}",
+                        "Failed to fetch proposal: {}",
                         message
                     )))
                 }
-                _ => Err(CliError::ActionError(format!(
-                    "Received unknown response status: {}",
-                    res.status()
-                ))),
             })
     }
 }

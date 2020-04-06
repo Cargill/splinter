@@ -14,7 +14,6 @@
 
 mod api;
 mod builder;
-pub mod defaults;
 mod payload;
 #[cfg(feature = "circuit-template")]
 pub mod template;
@@ -34,8 +33,9 @@ use crate::template::CircuitTemplate;
 
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
-use api::{CircuitServiceSlice, CircuitSlice};
+use api::{CircuitServiceSlice, CircuitSlice, SplinterRestClient};
 use builder::CreateCircuitMessageBuilder;
+use payload::make_signed_payload;
 
 pub struct CircuitProposeAction;
 
@@ -166,13 +166,12 @@ impl Action for CircuitProposeAction {
                 .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
             let key = args.value_of("key").unwrap_or("./splinter.priv");
 
-            let client = api::SplinterRestClient::new(&url);
+            let client = SplinterRestClient::new(&url);
             let requester_node = client.fetch_node_id()?;
             let private_key_hex = read_private_key(key)?;
 
             let signed_payload =
-                payload::make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
-
+                make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
             client.submit_admin_payload(signed_payload)?;
 
             info!("The circuit proposal was submited successfully");
@@ -577,7 +576,7 @@ fn vote_on_circuit_proposal(
     circuit_id: &str,
     vote: Vote,
 ) -> Result<(), CliError> {
-    let client = api::SplinterRestClient::new(url);
+    let client = SplinterRestClient::new(url);
     let private_key_hex = read_private_key(key)?;
 
     let requester_node = client.fetch_node_id()?;
@@ -589,10 +588,7 @@ fn vote_on_circuit_proposal(
             circuit_hash: proposal.circuit_hash,
             vote,
         };
-
-        let signed_payload =
-            payload::make_signed_payload(&requester_node, &private_key_hex, circuit_vote)?;
-
+        let signed_payload = make_signed_payload(&requester_node, &private_key_hex, circuit_vote)?;
         client.submit_admin_payload(signed_payload)
     } else {
         Err(CliError::ActionError(format!(
@@ -623,7 +619,7 @@ impl Action for CircuitListAction {
 }
 
 fn list_circuits(url: &str, filter: Option<&str>, format: &str) -> Result<(), CliError> {
-    let client = api::SplinterRestClient::new(url);
+    let client = SplinterRestClient::new(url);
 
     let circuits = client.list_circuits(filter)?;
     let mut data = Vec::new();
@@ -673,7 +669,7 @@ impl Action for CircuitShowAction {
 }
 
 fn show_circuit(url: &str, circuit_id: &str, format: &str) -> Result<(), CliError> {
-    let client = api::SplinterRestClient::new(url);
+    let client = SplinterRestClient::new(url);
     let circuit = client.fetch_circuit(circuit_id)?;
     let mut print_circuit = false;
     let mut print_proposal = false;
@@ -759,7 +755,7 @@ fn list_proposals(
     member_filter: Option<&str>,
     format: &str,
 ) -> Result<(), CliError> {
-    let client = api::SplinterRestClient::new(url);
+    let client = SplinterRestClient::new(url);
 
     let proposals = client.list_proposals(management_type_filter, member_filter)?;
     let mut data = Vec::new();
