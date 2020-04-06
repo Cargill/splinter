@@ -727,7 +727,6 @@ impl Listener for ZmqListener {
 mod tests {
     use super::*;
     use crate::transport::tests;
-    use mio::Ready;
 
     #[test]
     fn test_accepts() {
@@ -750,6 +749,6 @@ mod tests {
     fn test_poll() {
         let transport = ZmqTransport::default();
 
-        tests::test_poll(transport, "zmq:tcp://127.0.0.1:8081", Ready::writable());
+        tests::test_poll(transport, "zmq:tcp://127.0.0.1:8081");
     }
 }

@@ -192,13 +192,11 @@ pub mod tests {
         );
     }
 
-    pub fn test_poll<T: Transport + Send + 'static>(
-        mut transport: T,
-        bind: &str,
-        expected_readiness: Ready,
-    ) {
+    pub fn test_poll<T: Transport + Send + 'static>(mut transport: T, bind: &str) {
         // Create aconnections and register them with the poller
         const CONNECTIONS: usize = 16;
+
+        let expected_readiness = Ready::readable() | Ready::writable();
 
         let mut listener = assert_ok(transport.listen(bind));
         let endpoint = listener.endpoint();
