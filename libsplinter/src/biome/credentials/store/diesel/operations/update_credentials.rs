@@ -15,7 +15,7 @@
 use super::CredentialsStoreOperations;
 use crate::biome::credentials::store::diesel::schema::user_credentials;
 use crate::biome::credentials::store::error::CredentialsStoreError;
-use crate::biome::credentials::store::{UserCredentialsBuilder, UserCredentialsModel};
+use crate::biome::credentials::store::{CredentialsBuilder, CredentialsModel};
 use diesel::{dsl::update, prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::credentials) trait CredentialsStoreUpdateCredentialsOperation {
@@ -41,7 +41,7 @@ where
         username: &str,
         password: &str,
     ) -> Result<(), CredentialsStoreError> {
-        let credentials_builder: UserCredentialsBuilder = Default::default();
+        let credentials_builder: CredentialsBuilder = Default::default();
         let credentials = credentials_builder
             .with_user_id(user_id)
             .with_username(username)
@@ -53,7 +53,7 @@ where
             })?;
         let credential_exists = user_credentials::table
             .filter(user_credentials::user_id.eq(&credentials.user_id))
-            .first::<UserCredentialsModel>(self.conn)
+            .first::<CredentialsModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
             .map_err(|err| CredentialsStoreError::QueryError {

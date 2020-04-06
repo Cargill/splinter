@@ -14,13 +14,13 @@
 
 use super::CredentialsStoreOperations;
 use crate::biome::credentials::store::diesel::{
-    schema::user_credentials, CredentialsStoreError, UserCredentials,
+    schema::user_credentials, Credentials, CredentialsStoreError,
 };
-use crate::biome::credentials::store::{NewUserCredentialsModel, UserCredentialsModel};
+use crate::biome::credentials::store::{CredentialsModel, NewCredentialsModel};
 use diesel::{dsl::insert_into, prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::credentials) trait CredentialsStoreAddCredentialsOperation {
-    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError>;
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError>;
 }
 
 impl<'a, C> CredentialsStoreAddCredentialsOperation for CredentialsStoreOperations<'a, C>
@@ -31,10 +31,10 @@ where
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn add_credentials(&self, credentials: UserCredentials) -> Result<(), CredentialsStoreError> {
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
         let duplicate_credentials = user_credentials::table
             .filter(user_credentials::username.eq(&credentials.username))
-            .first::<UserCredentialsModel>(self.conn)
+            .first::<CredentialsModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
             .map_err(|err| CredentialsStoreError::QueryError {
@@ -48,7 +48,7 @@ where
             )));
         }
 
-        let new_credentials: NewUserCredentialsModel = credentials.into();
+        let new_credentials: NewCredentialsModel = credentials.into();
 
         insert_into(user_credentials::table)
             .values(new_credentials)

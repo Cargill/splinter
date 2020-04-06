@@ -14,7 +14,7 @@
 
 use super::CredentialsStoreOperations;
 use crate::biome::credentials::store::diesel::{schema::user_credentials, CredentialsStoreError};
-use crate::biome::credentials::store::UserCredentialsModel;
+use crate::biome::credentials::store::CredentialsModel;
 use diesel::{dsl::delete, prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::credentials) trait CredentialsStoreRemoveCredentialsOperation {
@@ -32,7 +32,7 @@ where
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
         let credentials = user_credentials::table
             .filter(user_credentials::user_id.eq(user_id))
-            .first::<UserCredentialsModel>(self.conn)
+            .first::<CredentialsModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
             .map_err(|err| CredentialsStoreError::QueryError {

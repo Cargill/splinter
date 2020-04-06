@@ -16,7 +16,7 @@ use super::CredentialsStoreOperations;
 use crate::biome::credentials::store::diesel::{
     schema::user_credentials, CredentialsStoreError, UsernameId,
 };
-use crate::biome::credentials::store::UserCredentialsModel;
+use crate::biome::credentials::store::CredentialsModel;
 use diesel::prelude::*;
 
 pub(in crate::biome::credentials) trait CredentialsStoreGetUsernamesOperation {
@@ -34,7 +34,7 @@ where
     fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
         let usernames = user_credentials::table
             .select(user_credentials::all_columns)
-            .load::<UserCredentialsModel>(self.conn)
+            .load::<CredentialsModel>(self.conn)
             .map(Some)
             .or_else(Err)
             .map_err(|err| CredentialsStoreError::QueryError {

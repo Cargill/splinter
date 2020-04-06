@@ -93,9 +93,9 @@ impl From<error::ConnectionError> for CredentialsStoreError {
     }
 }
 
-/// Represents UserCredentialsBuilder errors
+/// Represents CredentialsBuilder errors
 #[derive(Debug)]
-pub enum UserCredentialsBuilderError {
+pub enum CredentialsBuilderError {
     /// Returned when a required field was not set
     MissingRequiredField(String),
     /// Returned when an error occurs building the credentials
@@ -104,65 +104,65 @@ pub enum UserCredentialsBuilderError {
     EncryptionError(Box<dyn Error>),
 }
 
-impl Error for UserCredentialsBuilderError {
+impl Error for CredentialsBuilderError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            UserCredentialsBuilderError::MissingRequiredField(_) => None,
-            UserCredentialsBuilderError::BuildError(err) => Some(&**err),
-            UserCredentialsBuilderError::EncryptionError(err) => Some(&**err),
+            CredentialsBuilderError::MissingRequiredField(_) => None,
+            CredentialsBuilderError::BuildError(err) => Some(&**err),
+            CredentialsBuilderError::EncryptionError(err) => Some(&**err),
         }
     }
 }
 
-impl fmt::Display for UserCredentialsBuilderError {
+impl fmt::Display for CredentialsBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            UserCredentialsBuilderError::MissingRequiredField(ref s) => {
+            CredentialsBuilderError::MissingRequiredField(ref s) => {
                 write!(f, "failed to build user credentials: {}", s)
             }
-            UserCredentialsBuilderError::BuildError(ref s) => {
+            CredentialsBuilderError::BuildError(ref s) => {
                 write!(f, "failed to build credentials: {}", s)
             }
-            UserCredentialsBuilderError::EncryptionError(ref s) => {
+            CredentialsBuilderError::EncryptionError(ref s) => {
                 write!(f, "failed encrypt password: {}", s)
             }
         }
     }
 }
 
-impl From<BcryptError> for UserCredentialsBuilderError {
-    fn from(err: BcryptError) -> UserCredentialsBuilderError {
-        UserCredentialsBuilderError::EncryptionError(Box::new(err))
+impl From<BcryptError> for CredentialsBuilderError {
+    fn from(err: BcryptError) -> CredentialsBuilderError {
+        CredentialsBuilderError::EncryptionError(Box::new(err))
     }
 }
 
-/// Represents UserCredentials errors
+/// Represents Credentials errors
 #[derive(Debug)]
-pub enum UserCredentialsError {
+pub enum CredentialsError {
     /// Returned when an error occurs while attempting to verify the password
     VerificationError(Box<dyn Error>),
 }
 
-impl Error for UserCredentialsError {
+impl Error for CredentialsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            UserCredentialsError::VerificationError(err) => Some(&**err),
+            CredentialsError::VerificationError(err) => Some(&**err),
         }
     }
 }
 
-impl fmt::Display for UserCredentialsError {
+impl fmt::Display for CredentialsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            UserCredentialsError::VerificationError(ref s) => {
+            CredentialsError::VerificationError(ref s) => {
                 write!(f, "failed to build verify password: {}", s)
             }
         }
     }
 }
 
-impl From<BcryptError> for UserCredentialsError {
-    fn from(err: BcryptError) -> UserCredentialsError {
-        UserCredentialsError::VerificationError(Box::new(err))
+impl From<BcryptError> for CredentialsError {
+    fn from(err: BcryptError) -> CredentialsError {
+        CredentialsError::VerificationError(Box::new(err))
     }
 }

@@ -15,14 +15,14 @@
 use super::CredentialsStoreOperations;
 use crate::biome::credentials::store::diesel::schema::user_credentials;
 use crate::biome::credentials::store::error::CredentialsStoreError;
-use crate::biome::credentials::store::{UserCredentials, UserCredentialsModel};
+use crate::biome::credentials::store::{Credentials, CredentialsModel};
 use diesel::{prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::credentials) trait CredentialsStoreFetchCredentialByUsernameOperation {
     fn fetch_credential_by_username(
         &self,
         username: &str,
-    ) -> Result<UserCredentials, CredentialsStoreError>;
+    ) -> Result<Credentials, CredentialsStoreError>;
 }
 
 impl<'a, C> CredentialsStoreFetchCredentialByUsernameOperation for CredentialsStoreOperations<'a, C>
@@ -36,10 +36,10 @@ where
     fn fetch_credential_by_username(
         &self,
         username: &str,
-    ) -> Result<UserCredentials, CredentialsStoreError> {
+    ) -> Result<Credentials, CredentialsStoreError> {
         let credentials = user_credentials::table
             .filter(user_credentials::username.eq(username))
-            .first::<UserCredentialsModel>(self.conn)
+            .first::<CredentialsModel>(self.conn)
             .map(Some)
             .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
             .map_err(|err| CredentialsStoreError::QueryError {
@@ -52,6 +52,6 @@ where
                     username
                 ))
             })?;
-        Ok(UserCredentials::from(credentials))
+        Ok(Credentials::from(credentials))
     }
 }

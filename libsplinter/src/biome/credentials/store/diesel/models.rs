@@ -18,7 +18,7 @@ use crate::biome::user::store::diesel::models::UserModel;
 #[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
 #[table_name = "user_credentials"]
 #[belongs_to(UserModel, foreign_key = "user_id")]
-pub struct UserCredentialsModel {
+pub struct CredentialsModel {
     pub id: i64,
     pub user_id: String,
     pub username: String,
@@ -27,7 +27,7 @@ pub struct UserCredentialsModel {
 
 #[derive(Insertable, PartialEq, Debug)]
 #[table_name = "user_credentials"]
-pub struct NewUserCredentialsModel {
+pub struct NewCredentialsModel {
     pub user_id: String,
     pub username: String,
     pub password: String,

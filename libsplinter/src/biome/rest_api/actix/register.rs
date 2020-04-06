@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError, UserCredentialsBuilder,
+    diesel::DieselCredentialsStore, CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
 use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::rest_api::BiomeRestConfig;
@@ -64,7 +64,7 @@ pub fn make_register_route(
                 let splinter_user = User::new(&user_id);
                 match user_store.add_user(splinter_user) {
                     Ok(()) => {
-                        let credentials_builder: UserCredentialsBuilder = Default::default();
+                        let credentials_builder = CredentialsBuilder::default();
                         let credentials = match credentials_builder
                             .with_user_id(&user_id)
                             .with_username(&username_password.username)
