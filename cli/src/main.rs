@@ -19,11 +19,17 @@ extern crate diesel;
 
 mod action;
 mod error;
+#[cfg(test)]
+mod tests;
 
 #[cfg(feature = "circuit-template")]
 mod template;
 
+use std::ffi::OsString;
+
 use clap::{clap_app, AppSettings, Arg, SubCommand};
+#[cfg(test)]
+use flexi_logger::FlexiLoggerError;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 
@@ -66,7 +72,7 @@ pub fn log_format(
     write!(w, "{}", record.args(),)
 }
 
-fn run() -> Result<(), CliError> {
+fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<(), CliError> {
     let mut app = clap_app!(myapp =>
         (name: APP_NAME)
         (version: VERSION)
@@ -471,6 +477,7 @@ fn run() -> Result<(), CliError> {
                     .arg(
                         Arg::with_name("circuit")
                             .help("ID of the circuit to be shown")
+                            .required(true)
                             .takes_value(true),
                     )
                     .arg(
@@ -553,7 +560,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(circuit_command);
     }
 
-    let matches = app.get_matches();
+    let matches = app.get_matches_from_safe(args)?;
 
     // set default to info
     let log_level = if matches.is_present("quiet") {
@@ -573,11 +580,18 @@ fn run() -> Result<(), CliError> {
     log_spec_builder.module("mio", log::LevelFilter::Warn);
     log_spec_builder.module("want", log::LevelFilter::Warn);
 
-    Logger::with(log_spec_builder.build())
+    match Logger::with(log_spec_builder.build())
         .format(log_format)
         .log_target(flexi_logger::LogTarget::StdOut)
         .start()
-        .expect("Failed to create logger");
+    {
+        Ok(_) => {}
+        #[cfg(test)]
+        // `FlexiLoggerError::Log` means the logger has already been initialized; this will happen
+        // when `run` is called more than once in the tests.
+        Err(FlexiLoggerError::Log(_)) => {}
+        Err(err) => panic!("Failed to start logger: {}", err),
+    }
 
     let mut subcommands = SubcommandActions::new()
         .with_command(
@@ -641,8 +655,12 @@ fn run() -> Result<(), CliError> {
 }
 
 fn main() {
-    if let Err(e) = run() {
-        error!("ERROR: {}", e);
-        std::process::exit(1);
+    match run(std::env::args_os()) {
+        Ok(_) => {}
+        Err(CliError::ClapError(err)) => err.exit(),
+        Err(e) => {
+            error!("ERROR: {}", e);
+            std::process::exit(1);
+        }
     }
 }

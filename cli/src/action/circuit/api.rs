@@ -22,6 +22,8 @@ use splinter::protocol::ADMIN_PROTOCOL_VERSION;
 
 use crate::error::CliError;
 
+const PAGING_LIMIT: &str = "1000";
+
 /// A wrapper around the Splinter REST API.
 pub struct SplinterRestClient<'a> {
     url: &'a str,
@@ -105,9 +107,9 @@ impl<'a> SplinterRestClient<'a> {
     }
 
     pub fn list_circuits(&self, filter: Option<&str>) -> Result<CircuitListSlice, CliError> {
-        let mut request = format!("{}/admin/circuits", self.url);
+        let mut request = format!("{}/admin/circuits?limit={}", self.url, PAGING_LIMIT);
         if let Some(filter) = filter {
-            request = format!("{}?filter={}", &request, &filter);
+            request = format!("{}&filter={}", &request, &filter);
         }
 
         Client::new()
@@ -192,9 +194,9 @@ impl<'a> SplinterRestClient<'a> {
             filters.push(format!("member={}", member));
         }
 
-        let mut request = format!("{}/admin/proposals", self.url);
+        let mut request = format!("{}/admin/proposals?limit={}", self.url, PAGING_LIMIT);
         if !filters.is_empty() {
-            request.push_str(&format!("?{}", filters.join("&")));
+            request.push_str(&format!("&{}", filters.join("&")));
         }
 
         Client::new()
@@ -297,7 +299,7 @@ impl fmt::Display for CircuitSlice {
             for service in self.roster.iter() {
                 if service.allowed_nodes.contains(member) {
                     display_string += &format!(
-                        "        Service ({}): {}\n ",
+                        "        Service ({}): {}\n",
                         service.service_type, service.service_id
                     );
 
