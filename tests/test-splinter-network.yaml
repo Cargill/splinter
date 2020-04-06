@@ -1,0 +1,98 @@
+# Copyright 2018-2020 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.7"
+
+volumes:
+  key-registry:
+
+services:
+
+  orchestrator:
+    image: splinter-network-tests
+    build:
+      dockerfile: network-test.dockerfile
+      context: .
+    container_name: orchestrator
+    volumes:
+      - key-registry:/key_registry_shared
+      - ./configs:/input
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/project
+    command: |
+      bash -c "
+        if [ ! -f /key_registry_shared/keys.yaml ]
+        then
+          splinter admin keyregistry \
+            -i /input/key_registry_spec.yaml \
+            -d /key_registry_shared \
+            --force
+        fi &&
+        sleep 5
+        /project/test-network
+      "
+
+  splinterd-alpha:
+    image: splintercommunity/splinterd:experimental
+    container_name: splinterd-alpha
+    volumes:
+      - key-registry:/key_registry_shared
+    entrypoint: |
+      bash -c "
+        while [ ! -f /key_registry_shared/keys.yaml ]; do \
+          echo 'waiting for key registry'; \
+          sleep 1; \
+        done && \
+        splinter cert generate --skip && \
+        cp  /key_registry_shared/keys.yaml /var/lib/splinter/keys.yaml && \
+        splinterd \
+            --bind 0.0.0.0:8085 \
+            --insecure \
+            --network-endpoint 0.0.0.0:8044 \
+            --node-id alpha \
+            --service-endpoint 0.0.0.0:8043 \
+            --storage yaml \
+            --transport tls \
+            --heartbeat 10 \
+            -vvv
+      "
+    sysctls:
+      - net.ipv4.tcp_retries2=3
+
+  splinterd-beta:
+    image: splintercommunity/splinterd:experimental
+    container_name: splinterd-beta
+    volumes:
+      - key-registry:/key_registry_shared
+    entrypoint: |
+      bash -c "
+        while [ ! -f /key_registry_shared/keys.yaml ]; do \
+          echo 'waiting for key registry'; \
+          sleep 1; \
+        done && \
+        splinter cert generate --skip && \
+        cp  /key_registry_shared/keys.yaml /var/lib/splinter/keys.yaml && \
+        splinterd \
+            --bind 0.0.0.0:8085 \
+            --insecure \
+            --network-endpoint 0.0.0.0:8044 \
+            --node-id beta \
+            --service-endpoint 0.0.0.0:8043 \
+            --storage yaml \
+            --transport tls \
+            --heartbeat 10 \
+            -vvv
+      "
+    sysctls:
+      - net.ipv4.tcp_retries2=3
