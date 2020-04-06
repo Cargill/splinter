@@ -17,17 +17,13 @@
 use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::mpsc::{channel, RecvError, Sender};
 
-use crate::channel::{Receiver, RecvTimeoutError};
 use crate::network::sender::NetworkMessageSender;
-
-// Recv timeout in secs
-const TIMEOUT_SEC: u64 = 2;
 
 /// The Message Context
 ///
@@ -301,35 +297,27 @@ impl<MT: Hash + Eq + Debug + Clone> HandlerWrapper<MT> {
 
 /// A message to be dispatched.
 ///
-/// This struct contains information about a message that will be passed to a `Dispatcher` instance
+/// This enum contains information about a message that will be passed to a `Dispatcher` instance
 /// via a `Sender<DispatchMessage>`.
 #[derive(Clone)]
-pub struct DispatchMessage<MT: Any + Hash + Eq + Debug + Clone> {
-    message_type: MT,
-    message_bytes: Vec<u8>,
-    source_peer_id: String,
+enum DispatchMessage<MT: Any + Hash + Eq + Debug + Clone> {
+    Message {
+        message_type: MT,
+        message_bytes: Vec<u8>,
+        source_peer_id: String,
+    },
+    Shutdown,
 }
 
-impl<MT: Any + Hash + Eq + Debug + Clone> DispatchMessage<MT> {
-    /// Constructs a new DispatchMessage
-    pub fn new(message_type: MT, message_bytes: Vec<u8>, source_peer_id: String) -> Self {
-        DispatchMessage {
-            message_type,
-            message_bytes,
-            source_peer_id,
+pub struct DispatchLoopShutdownSignaler<MT: Any + Hash + Eq + Debug + Clone> {
+    sender: Sender<DispatchMessage<MT>>,
+}
+
+impl<MT: Any + Hash + Eq + Debug + Clone> DispatchLoopShutdownSignaler<MT> {
+    pub fn shutdown(&self) {
+        if self.sender.send(DispatchMessage::Shutdown).is_err() {
+            error!("Unable to send shutdown signal to already shutdown dispatch loop");
         }
-    }
-
-    pub fn message_type(&self) -> &MT {
-        &self.message_type
-    }
-
-    pub fn message_bytes(&self) -> &[u8] {
-        &self.message_bytes
-    }
-
-    pub fn source_peer_id(&self) -> &str {
-        &self.source_peer_id
     }
 }
 
@@ -337,76 +325,142 @@ impl<MT: Any + Hash + Eq + Debug + Clone> DispatchMessage<MT> {
 #[derive(Debug)]
 pub struct DispatchLoopError(String);
 
+impl Error for DispatchLoopError {}
+
+impl fmt::Display for DispatchLoopError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "received error from dispatch loop: {}", self.0)
+    }
+}
+
+#[derive(Default)]
+pub struct DispatchLoopBuilder<MT: Any + Hash + Eq + Debug + Clone> {
+    dispatcher: Option<Dispatcher<MT>>,
+    thread_name: Option<String>,
+}
+
+impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
+    pub fn new() -> Self {
+        DispatchLoopBuilder {
+            dispatcher: None,
+            thread_name: None,
+        }
+    }
+
+    pub fn with_dispatcher(mut self, dispatcher: Dispatcher<MT>) -> Self {
+        self.dispatcher = Some(dispatcher);
+        self
+    }
+
+    pub fn with_thread_name(mut self, name: String) -> Self {
+        self.thread_name = Some(name);
+        self
+    }
+
+    pub fn build(mut self) -> Result<DispatchLoop<MT>, String> {
+        let (tx, rx) = channel();
+
+        let dispatcher = self
+            .dispatcher
+            .take()
+            .ok_or_else(|| "No dispatch provided".to_string())?;
+
+        let thread_name = self
+            .thread_name
+            .unwrap_or_else(|| "DispatchLoop".to_string());
+
+        let join_handle = std::thread::Builder::new()
+            .name(thread_name)
+            .spawn(move || loop {
+                loop {
+                    let (message_type, message_bytes, source_peer_id) = match rx.recv() {
+                        Ok(DispatchMessage::Message {
+                            message_type,
+                            message_bytes,
+                            source_peer_id,
+                        }) => (message_type, message_bytes, source_peer_id),
+                        Ok(DispatchMessage::Shutdown) => {
+                            debug!("Received shutdown signal");
+                            break;
+                        }
+                        Err(RecvError) => {
+                            error!("Received error from receiver");
+                            break;
+                        }
+                    };
+                    match dispatcher.dispatch(&source_peer_id, &message_type, message_bytes) {
+                        Ok(_) => (),
+                        Err(err) => warn!("Unable to dispatch message: {:?}", err),
+                    }
+                }
+            });
+
+        match join_handle {
+            Ok(join_handle) => Ok(DispatchLoop {
+                sender: tx,
+                join_handle,
+            }),
+            Err(err) => Err(format!("Unable to start up dispatch loop thread: {}", err)),
+        }
+    }
+}
+
 /// The Dispatch Loop
 ///
 /// The dispatch loop processes messages that are pulled from a `Receiver<DispatchMessage>` and
 /// passes them to a Dispatcher.  The dispatch loop only processes messages from a specific message
 /// type.
 pub struct DispatchLoop<MT: Any + Hash + Eq + Debug + Clone> {
-    receiver: Box<dyn Receiver<DispatchMessage<MT>>>,
-    dispatcher: Dispatcher<MT>,
-    running: Arc<AtomicBool>,
+    sender: Sender<DispatchMessage<MT>>,
+    join_handle: std::thread::JoinHandle<()>,
 }
 
 impl<MT: Any + Hash + Eq + Debug + Clone> DispatchLoop<MT> {
-    /// Constructs a new DispatchLoop.
-    ///
-    /// This constructs a new dispatch loop with a concrete Receiver implementation and a
-    /// dispatcher instance.
-    pub fn new(
-        receiver: Box<dyn Receiver<DispatchMessage<MT>>>,
-        dispatcher: Dispatcher<MT>,
-        running: Arc<AtomicBool>,
-    ) -> Self {
-        DispatchLoop {
-            receiver,
-            dispatcher,
-            running,
+    pub fn wait_for_shutdown(self) {
+        if self.join_handle.join().is_err() {
+            error!("Unable to cleanly wait for dispatch loop shutdown");
         }
     }
 
-    /// Runs the loop.
-    ///
-    /// Errors
-    ///
-    /// An error will be returned if the receiver no longer can return messages. This is
-    /// effectively an exit signal for the loop.
-    pub fn run(&self) -> Result<(), DispatchLoopError> {
-        let timeout = Duration::from_secs(TIMEOUT_SEC);
-        while self.running.load(Ordering::SeqCst) {
-            let dispatch_msg = match self.receiver.recv_timeout(timeout) {
-                Ok(dispatch_msg) => dispatch_msg,
-                Err(RecvTimeoutError::Timeout) => continue,
-                Err(RecvTimeoutError::Disconnected) => {
-                    error!("Received Disconnected Error from receiver");
-                    return Err(DispatchLoopError(String::from(
-                        "Received Disconnected Error from receiver",
-                    )));
-                }
-            };
-
-            match self.dispatcher.dispatch(
-                &dispatch_msg.source_peer_id,
-                &dispatch_msg.message_type,
-                dispatch_msg.message_bytes,
-            ) {
-                Ok(_) => (),
-                Err(err) => warn!("Unable to dispatch message: {:?}", err),
-            }
+    pub fn new_dispatcher_sender(&self) -> DispatchMessageSender<MT> {
+        DispatchMessageSender {
+            sender: self.sender.clone(),
         }
+    }
 
-        // finish handling any incoming messages
-        while let Ok(dispatch_msg) = self.receiver.try_recv() {
-            match self.dispatcher.dispatch(
-                &dispatch_msg.source_peer_id,
-                &dispatch_msg.message_type,
-                dispatch_msg.message_bytes,
-            ) {
-                Ok(_) => (),
-                Err(err) => warn!("Unable to dispatch message: {:?}", err),
-            }
+    pub fn shutdown_signaler(&self) -> DispatchLoopShutdownSignaler<MT> {
+        DispatchLoopShutdownSignaler {
+            sender: self.sender.clone(),
         }
-        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct DispatchMessageSender<MT: Any + Hash + Eq + Debug + Clone> {
+    sender: Sender<DispatchMessage<MT>>,
+}
+
+impl<MT: Any + Hash + Eq + Debug + Clone> DispatchMessageSender<MT> {
+    pub fn send(
+        &self,
+        message_type: MT,
+        message_bytes: Vec<u8>,
+        source_peer_id: String,
+    ) -> Result<(), (MT, Vec<u8>, String)> {
+        self.sender
+            .send(DispatchMessage::Message {
+                message_type,
+                message_bytes,
+                source_peer_id,
+            })
+            .map_err(|err| match err.0 {
+                DispatchMessage::Message {
+                    message_type,
+                    message_bytes,
+                    source_peer_id,
+                } => (message_type, message_bytes, source_peer_id),
+                DispatchMessage::Shutdown => unreachable!(), // we didn't send this
+            })
     }
 }
 

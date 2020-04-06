@@ -22,8 +22,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use crossbeam_channel;
-
 #[cfg(feature = "health")]
 use health::HealthService;
 use splinter::admin::rest_api::CircuitResourceProvider;
@@ -47,7 +45,7 @@ use splinter::network::auth::handlers::{
     create_authorization_dispatcher, AuthorizationMessageHandler, NetworkAuthGuardHandler,
 };
 use splinter::network::auth::AuthorizationManager;
-use splinter::network::dispatch::{DispatchLoop, DispatchMessage, Dispatcher};
+use splinter::network::dispatch::{DispatchLoopBuilder, DispatchMessageSender, Dispatcher};
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
 use splinter::network::peer::PeerConnector;
 use splinter::network::{sender, sender::NetworkMessageSender};
@@ -187,46 +185,55 @@ impl SplinterDaemon {
         let sender_shutdown_signaler = network_message_queue.shutdown_signaler();
 
         // Set up the Circuit dispatcher
-        let (circuit_dispatch_send, circuit_dispatch_recv) = crossbeam_channel::bounded(5);
         let circuit_dispatcher = set_up_circuit_dispatcher(
             network_sender.clone(),
             &self.node_id,
             &self.network_endpoint,
             state.clone(),
         );
-        let circuit_dispatch_loop = DispatchLoop::new(
-            Box::new(circuit_dispatch_recv),
-            circuit_dispatcher,
-            running.clone(),
-        );
-        let circuit_dispatcher_thread = thread::spawn(move || circuit_dispatch_loop.run());
+        let circuit_dispatch_loop = DispatchLoopBuilder::new()
+            .with_dispatcher(circuit_dispatcher)
+            .with_thread_name("CircuitDispatchLoop".to_string())
+            .build()
+            .map_err(|err| {
+                StartError::NetworkError(format!("Unable to create circuit dispatch loop: {}", err))
+            })?;
+        let circuit_dispatch_sender = circuit_dispatch_loop.new_dispatcher_sender();
+
+        let circuit_dispatcher_shutdown = circuit_dispatch_loop.shutdown_signaler();
 
         // Set up the Auth dispatcher
-        let (auth_dispatch_send, auth_dispatch_recv) = crossbeam_channel::bounded(5);
         let auth_dispatcher =
             create_authorization_dispatcher(auth_manager.clone(), network_sender.clone());
-        let auth_dispatch_loop = DispatchLoop::new(
-            Box::new(auth_dispatch_recv),
-            auth_dispatcher,
-            running.clone(),
-        );
-        let auth_dispatcher_thread = thread::spawn(move || auth_dispatch_loop.run());
+
+        let auth_dispatch_loop = DispatchLoopBuilder::new()
+            .with_dispatcher(auth_dispatcher)
+            .with_thread_name("AuthorizationDispatchLoop".to_string())
+            .build()
+            .map_err(|err| {
+                StartError::NetworkError(format!("Unable to create auth dispatch loop: {}", err))
+            })?;
+        let auth_dispatch_sender = auth_dispatch_loop.new_dispatcher_sender();
+        let auth_dispatcher_shutdown = auth_dispatch_loop.shutdown_signaler();
 
         // Set up the Network dispatcher
-        let (network_dispatch_send, network_dispatch_recv) = crossbeam_channel::bounded(5);
         let network_dispatcher = set_up_network_dispatcher(
             network_sender,
             &self.node_id,
             auth_manager.clone(),
-            circuit_dispatch_send,
-            auth_dispatch_send,
+            circuit_dispatch_sender,
+            auth_dispatch_sender,
         );
-        let network_dispatch_loop = DispatchLoop::new(
-            Box::new(network_dispatch_recv),
-            network_dispatcher,
-            running.clone(),
-        );
-        let network_dispatcher_thread = thread::spawn(move || network_dispatch_loop.run());
+        let network_dispatch_loop = DispatchLoopBuilder::new()
+            .with_dispatcher(network_dispatcher)
+            .with_thread_name("NetworkDispatchLoop".to_string())
+            .build()
+            .map_err(|err| {
+                StartError::NetworkError(format!("Unable to create network dispatch loop: {}", err))
+            })?;
+
+        let network_dispatch_send = network_dispatch_loop.new_dispatcher_sender();
+        let network_dispatcher_shutdown = network_dispatch_loop.shutdown_signaler();
 
         // setup a thread to listen on the network port and add incoming connection to the network
         let network_clone = self.network.clone();
@@ -298,15 +305,16 @@ impl SplinterDaemon {
                                     }
                                 };
 
-                            let dispatch_msg = DispatchMessage::new(
+                            trace!("Received message from {}: {:?}", message.peer_id(), msg);
+                            match network_dispatch_send.send(
                                 msg.get_message_type(),
                                 msg.take_payload(),
                                 message.peer_id().to_string(),
-                            );
-                            trace!("Received Message from {}: {:?}", message.peer_id(), msg);
-                            match network_dispatch_send.send(dispatch_msg) {
+                            ) {
                                 Ok(()) => (),
-                                Err(err) => error!("Dispatch Error {}", err.to_string()),
+                                Err((message_type, _, _)) => {
+                                    error!("Unable to dispatch message of type {:?}", message_type)
+                                }
                             }
                         }
                         Err(RecvTimeoutError::Disconnected) => {
@@ -445,6 +453,9 @@ impl SplinterDaemon {
                 error!("Unable to cleanly shut down REST API server: {}", err);
             }
 
+            auth_dispatcher_shutdown.shutdown();
+            circuit_dispatcher_shutdown.shutdown();
+            network_dispatcher_shutdown.shutdown();
             network_shutdown.shutdown();
             sender_shutdown_signaler.shutdown();
         })
@@ -464,9 +475,6 @@ impl SplinterDaemon {
         }
 
         // Join network sender and dispatcher threads
-        let _ = circuit_dispatcher_thread.join();
-        let _ = auth_dispatcher_thread.join();
-        let _ = network_dispatcher_thread.join();
         let _ = rest_api_join_handle.join();
         let _ = service_processor_join_handle.join_all();
 
@@ -854,8 +862,8 @@ fn set_up_network_dispatcher(
     network_sender: NetworkMessageSender,
     node_id: &str,
     auth_manager: AuthorizationManager,
-    circuit_sender: crossbeam_channel::Sender<DispatchMessage<CircuitMessageType>>,
-    auth_sender: crossbeam_channel::Sender<DispatchMessage<AuthorizationMessageType>>,
+    circuit_sender: DispatchMessageSender<CircuitMessageType>,
+    auth_sender: DispatchMessageSender<AuthorizationMessageType>,
 ) -> Dispatcher<NetworkMessageType> {
     let mut dispatcher = Dispatcher::<NetworkMessageType>::new(network_sender);
 
@@ -875,7 +883,7 @@ fn set_up_network_dispatcher(
         Box::new(network_heartbeat_handler),
     );
 
-    let circuit_message_handler = CircuitMessageHandler::new(Box::new(circuit_sender));
+    let circuit_message_handler = CircuitMessageHandler::new(circuit_sender);
     dispatcher.set_handler(
         NetworkMessageType::CIRCUIT,
         Box::new(NetworkAuthGuardHandler::new(
@@ -884,7 +892,7 @@ fn set_up_network_dispatcher(
         )),
     );
 
-    let auth_message_handler = AuthorizationMessageHandler::new(Box::new(auth_sender));
+    let auth_message_handler = AuthorizationMessageHandler::new(auth_sender);
     dispatcher.set_handler(
         NetworkMessageType::AUTHORIZATION,
         Box::new(auth_message_handler),
