@@ -38,15 +38,22 @@ pub struct Credentials {
 }
 
 impl Credentials {
+    /// Verifies that a user's password is valid, return true if it is and
+    /// false otherwise.
+    ///
+    /// # Arguements
+    ///
+    /// * `password` - A hashed password to be verified
     pub fn verify_password(&self, password: &str) -> Result<bool, CredentialsError> {
         Ok(verify(password, &self.password)?)
     }
 }
 
+/// Represents a user's username
 #[derive(Deserialize, Serialize)]
 pub struct UsernameId {
-    username: String,
-    user_id: String,
+    pub username: String,
+    pub user_id: String,
 }
 
 /// Builder for Credential. It hashes the password upon build.
@@ -225,7 +232,7 @@ pub trait CredentialsStore {
     /// # Errors
     ///
     /// Returns a CredentialsStoreError if implementation cannot fetch the user IDs
-    fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
 #[cfg(feature = "diesel")]

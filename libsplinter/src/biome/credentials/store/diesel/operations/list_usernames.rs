@@ -19,11 +19,11 @@ use crate::biome::credentials::store::diesel::{
 use crate::biome::credentials::store::CredentialsModel;
 use diesel::prelude::*;
 
-pub(in crate::biome::credentials) trait CredentialsStoreGetUsernamesOperation {
-    fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
+pub(in crate::biome::credentials) trait CredentialsStoreListUsernamesOperation {
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
-impl<'a, C> CredentialsStoreGetUsernamesOperation for CredentialsStoreOperations<'a, C>
+impl<'a, C> CredentialsStoreListUsernamesOperation for CredentialsStoreOperations<'a, C>
 where
     C: diesel::Connection,
     <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
@@ -31,7 +31,7 @@ where
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn get_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
         let usernames = user_credentials::table
             .select(user_credentials::all_columns)
             .load::<CredentialsModel>(self.conn)
