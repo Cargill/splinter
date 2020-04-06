@@ -627,6 +627,7 @@ fn run() -> Result<(), CliError> {
 
     Logger::with(log_spec_builder.build())
         .format(log_format)
+        .log_target(flexi_logger::LogTarget::StdOut)
         .start()
         .expect("Failed to create logger");
 
