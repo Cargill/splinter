@@ -20,7 +20,7 @@ use super::InternalEnvelope;
 
 /// Handle for receiving envelopes from the mesh
 #[derive(Clone)]
-pub struct Incoming {
+pub(super) struct Incoming {
     rx: crossbeam_channel::Receiver<InternalEnvelope>,
 }
 

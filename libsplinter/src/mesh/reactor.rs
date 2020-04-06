@@ -137,6 +137,12 @@ impl Reactor {
                 }
                 Turn::Continue
             }
+            Ok(ControlRequest::Shutdown) => {
+                if self.incoming_tx.send(InternalEnvelope::Shutdown).is_err() {
+                    error!("Unable to send shutdown envelope to Mesh")
+                }
+                Turn::Shutdown
+            }
             Err(TryRecvError::Empty) => Turn::Continue,
             Err(TryRecvError::Disconnected) => Turn::Shutdown,
         }

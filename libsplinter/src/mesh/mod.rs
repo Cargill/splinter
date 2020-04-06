@@ -65,39 +65,22 @@ use std::time::Duration;
 
 #[cfg(feature = "matrix")]
 pub use crate::matrix::Envelope;
-pub use crate::mesh::control::{AddError, Control, RemoveError};
-pub use crate::mesh::incoming::Incoming;
+use crate::mesh::control::Control;
+pub use crate::mesh::control::{AddError, RemoveError};
+use crate::mesh::incoming::Incoming;
 #[cfg(feature = "matrix")]
 pub use crate::mesh::matrix::{MeshLifeCycle, MeshMatrixSender};
-pub use crate::mesh::outgoing::Outgoing;
+use crate::mesh::outgoing::Outgoing;
 
 pub use crate::collections::BiHashMap;
 use crate::mesh::reactor::Reactor;
 use crate::transport::Connection;
 
 /// Wrapper around payload to include connection id
-#[derive(Debug, Default, PartialEq)]
-pub struct InternalEnvelope {
-    id: usize,
-    payload: Vec<u8>,
-}
-
-impl InternalEnvelope {
-    pub fn new(id: usize, payload: Vec<u8>) -> Self {
-        InternalEnvelope { id, payload }
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
-    }
-
-    pub fn take_payload(self) -> Vec<u8> {
-        self.payload
-    }
+#[derive(Debug, PartialEq)]
+pub(in crate::mesh) enum InternalEnvelope {
+    Message { id: usize, payload: Vec<u8> },
+    Shutdown,
 }
 
 #[cfg(not(feature = "matrix"))]
@@ -141,6 +124,16 @@ impl MeshState {
     }
 }
 
+pub struct MeshShutdownSignaler {
+    ctrl: Control,
+}
+
+impl MeshShutdownSignaler {
+    pub fn shutdown(&self) {
+        self.ctrl.shutdown();
+    }
+}
+
 /// A Connection reactor
 #[derive(Clone)]
 pub struct Mesh {
@@ -158,6 +151,12 @@ impl Mesh {
             state: Arc::new(RwLock::new(MeshState::new())),
             incoming,
             ctrl,
+        }
+    }
+
+    pub fn shutdown_signaler(&self) -> MeshShutdownSignaler {
+        MeshShutdownSignaler {
+            ctrl: self.ctrl.clone(),
         }
     }
 
@@ -217,17 +216,24 @@ impl Mesh {
     /// Receive a new envelope from the mesh.
     pub fn recv(&self) -> Result<Envelope, RecvError> {
         let internal_envelope = self.incoming.recv().map_err(|_| RecvError::Disconnected)?;
+        match internal_envelope {
+            InternalEnvelope::Shutdown => Err(RecvError::Shutdown),
+            InternalEnvelope::Message {
+                id: connection_id,
+                payload,
+            } => {
+                let id = self
+                    .state
+                    .read()
+                    .map_err(|_| RecvError::PoisonedLock)?
+                    .unique_ids
+                    .get_by_value(&connection_id)
+                    .cloned()
+                    .unwrap_or_default();
 
-        let id = self
-            .state
-            .read()
-            .map_err(|_| RecvError::PoisonedLock)?
-            .unique_ids
-            .get_by_value(&internal_envelope.id)
-            .cloned()
-            .unwrap_or_default();
-
-        Ok(Envelope::new(id, internal_envelope.take_payload()))
+                Ok(Envelope::new(id, payload))
+            }
+        }
     }
 
     /// Receive a new envelope from the mesh.
@@ -236,32 +242,24 @@ impl Mesh {
             .incoming
             .recv_timeout(timeout)
             .map_err(RecvTimeoutError::from)?;
+        match internal_envelope {
+            InternalEnvelope::Shutdown => Err(RecvTimeoutError::Shutdown),
+            InternalEnvelope::Message {
+                id: connection_id,
+                payload,
+            } => {
+                let id = self
+                    .state
+                    .read()
+                    .map_err(|_| RecvTimeoutError::PoisonedLock)?
+                    .unique_ids
+                    .get_by_value(&connection_id)
+                    .cloned()
+                    .unwrap_or_default();
 
-        let id = self
-            .state
-            .read()
-            .map_err(|_| RecvTimeoutError::PoisonedLock)?
-            .unique_ids
-            .get_by_value(&internal_envelope.id)
-            .cloned()
-            .unwrap_or_default();
-
-        Ok(Envelope::new(id, internal_envelope.take_payload()))
-    }
-
-    /// Create a new handle for sending to the existing connection with the given id.
-    ///
-    /// This may be faster if many sends on the same Connection are going to be performed because
-    /// the internal lock around the pool of senders does not need to be reacquired.
-    pub fn outgoing(&self, id: usize) -> Option<Outgoing> {
-        rwlock_read_unwrap!(self.state).outgoings.get(&id).cloned()
-    }
-
-    /// Create a new handle for receiving envelopes from the mesh.
-    ///
-    /// This is useful if an object only needs to receive and doesn't need to send.
-    pub fn incoming(&self) -> Incoming {
-        self.incoming.clone()
+                Ok(Envelope::new(id, payload))
+            }
+        }
     }
 
     #[cfg(feature = "matrix")]
@@ -330,6 +328,7 @@ impl SendError {
 pub enum RecvError {
     Disconnected,
     PoisonedLock,
+    Shutdown,
 }
 
 impl Error for RecvError {}
@@ -339,6 +338,7 @@ impl std::fmt::Display for RecvError {
         match self {
             RecvError::Disconnected => write!(f, "Unable to receive: channel has disconnected"),
             RecvError::PoisonedLock => write!(f, "MeshState lock was poisoned"),
+            RecvError::Shutdown => write!(f, "Mesh has shutdown"),
         }
     }
 }
@@ -348,6 +348,7 @@ pub enum RecvTimeoutError {
     Timeout,
     Disconnected,
     PoisonedLock,
+    Shutdown,
 }
 
 impl Error for RecvTimeoutError {}
@@ -360,6 +361,7 @@ impl std::fmt::Display for RecvTimeoutError {
                 f.write_str("Unable to receive: channel has disconnected")
             }
             RecvTimeoutError::PoisonedLock => write!(f, "MeshState lock was poisoned"),
+            RecvTimeoutError::Shutdown => write!(f, "Mesh has shutdown"),
         }
     }
 }
@@ -512,10 +514,13 @@ mod tests {
         // to that thread
         server_ready_rx.recv().unwrap();
 
-        let incoming = mesh.incoming();
+        let incoming = mesh.incoming.clone();
         for _ in 0..CONNECTIONS {
             let envelope = assert_ok(incoming.recv());
-            assert_eq!(b"world", envelope.payload());
+            match envelope {
+                InternalEnvelope::Message { payload, .. } => assert_eq!(b"world".to_vec(), payload),
+                InternalEnvelope::Shutdown => panic!("Should not have received shutdown"),
+            }
         }
 
         handle.join().unwrap();
@@ -557,5 +562,79 @@ mod tests {
     fn test_add_remove_connections_tls() {
         let tls = create_test_tls_transport(true);
         test_add_remove_connections(tls, "127.0.0.1:0");
+    }
+
+    #[test]
+    // Test that mesh can be shutdown after sending and receiving a message.
+    //
+    // 1. Start up Mesh and pass a clone to a thread. Also get a mesh shutdown signaler.
+    // 2. Add two connections to mesh, one for main and on for the thread.
+    // 3. From the main thread, send a message "hello"
+    // 4. From the other thread recv the message "hello", and respond with "world"
+    // 5. In the main thread, verify that "world" is received
+    // 6. Call shutdown on the shutdown signaler
+    // 7. Verify that an InternalEnvelope::Shutdown was received
+    //
+    // This verifies that that mesh's reactor has been shutdown because InternalEnvelope::Shutdown
+    // is only ever sent from within the reactor when it has received a shutdown request. Other
+    // scenarios can cause the reactor to shutdown, but they will send this signal and result in a
+    // disconnection error.
+    fn test_shutdown() {
+        let mut transport = TcpTransport::default();
+        let mut listener = assert_ok(transport.listen("127.0.0.1:0"));
+        let endpoint = listener.endpoint();
+
+        let mesh = Mesh::new(1, 1);
+
+        let (client_ready_tx, client_ready_rx) = channel();
+        let (server_ready_tx, server_ready_rx) = channel();
+
+        let mesh_clone = mesh.clone();
+        let handle = thread::spawn(move || {
+            let mesh = mesh_clone;
+            assert_ok(mesh.add(
+                assert_ok(transport.connect(&endpoint)),
+                "thread_1".to_string(),
+            ));
+
+            // Block waiting for other thread to send a message
+            client_ready_rx.recv().unwrap();
+
+            let envelope = assert_ok(mesh.recv());
+            assert_eq!(b"hello", envelope.payload());
+
+            // Signal to other thread we are done receiving
+            server_ready_tx.send(()).unwrap();
+
+            assert_ok(mesh.send(Envelope::new("thread_1".to_string(), b"world".to_vec())));
+        });
+
+        let conn = assert_ok(listener.accept());
+        assert_ok(mesh.add(conn, "main".to_string()));
+        assert_ok(mesh.send(Envelope::new("main".to_string(), b"hello".to_vec())));
+
+        // Signal done sending to background thread
+        client_ready_tx.send(()).unwrap();
+        // Wait for other thread to drain the queue so we don't accidentally receive messages sent
+        // to that thread
+        server_ready_rx.recv().unwrap();
+
+        let incoming = mesh.incoming.clone();
+        let envelope = assert_ok(incoming.recv());
+        match envelope {
+            InternalEnvelope::Message { payload, .. } => assert_eq!(b"world".to_vec(), payload),
+            InternalEnvelope::Shutdown => panic!("Should not have received shutdown"),
+        }
+
+        let signaler = mesh.shutdown_signaler();
+        signaler.shutdown();
+
+        let envelope = assert_ok(incoming.recv());
+        match envelope {
+            InternalEnvelope::Message { .. } => panic!("Should have received shutdown"),
+            InternalEnvelope::Shutdown => (),
+        };
+
+        handle.join().unwrap();
     }
 }

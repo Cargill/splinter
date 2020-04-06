@@ -36,7 +36,7 @@ use router::Router;
 
 use splinter::consensus::two_phase::TwoPhaseEngine;
 use splinter::consensus::{ConsensusEngine, StartupState};
-use splinter::mesh::Mesh;
+use splinter::mesh::{Mesh, MeshShutdownSignaler};
 use splinter::network::{sender, sender::ShutdownSignaler, Network};
 use splinter::transport::{
     socket::{TcpTransport, TlsTransport},
@@ -77,6 +77,7 @@ fn main() -> Result<(), CliError> {
             .expect("Connect was not marked as a required attribute"),
     )?;
 
+    let network_shutdown = network.shutdown_signaler();
     let network_message_queue = sender::Builder::new()
         .with_network(network.clone())
         .build()
@@ -145,7 +146,7 @@ fn main() -> Result<(), CliError> {
         running.clone(),
     )?;
 
-    configure_shutdown_handler(Arc::clone(&running), shutdown_signaler)?;
+    configure_shutdown_handler(Arc::clone(&running), shutdown_signaler, network_shutdown)?;
 
     let (address, port) = split_endpoint(bind_value)?;
 
@@ -367,11 +368,13 @@ fn configure_logging(matches: &clap::ArgMatches) {
 fn configure_shutdown_handler(
     running: Arc<AtomicBool>,
     shutdown_signaler: ShutdownSignaler,
+    network_shutdown: MeshShutdownSignaler,
 ) -> Result<(), CliError> {
     ctrlc::set_handler(move || {
         info!("Received Shutdown");
         running.store(false, Ordering::SeqCst);
-        shutdown_signaler.shutdown()
+        shutdown_signaler.shutdown();
+        network_shutdown.shutdown();
     })
     .map_err(|err| CliError(format!("Unable to create control c handler: {}", err)))
 }

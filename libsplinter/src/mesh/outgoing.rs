@@ -31,7 +31,10 @@ impl Outgoing {
     }
 
     pub fn send(&self, payload: Vec<u8>) -> Result<(), SendError> {
-        self.tx.try_send(InternalEnvelope::new(self.id, payload))?;
+        self.tx.try_send(InternalEnvelope::Message {
+            id: self.id,
+            payload,
+        })?;
         Ok(())
     }
 
@@ -50,8 +53,20 @@ pub enum SendError {
 impl From<TrySendError<InternalEnvelope>> for SendError {
     fn from(err: TrySendError<InternalEnvelope>) -> Self {
         match err {
-            TrySendError::Full(envelope) => SendError::Full(envelope.payload),
-            TrySendError::Disconnected(envelope) => SendError::Disconnected(envelope.payload),
+            TrySendError::Full(envelope) => {
+                match envelope {
+                    InternalEnvelope::Message { payload, .. } => SendError::Full(payload),
+                    // this will not be sent
+                    InternalEnvelope::Shutdown => unreachable!(),
+                }
+            }
+            TrySendError::Disconnected(envelope) => {
+                match envelope {
+                    InternalEnvelope::Message { payload, .. } => SendError::Disconnected(payload),
+                    // this will not be sent
+                    InternalEnvelope::Shutdown => unreachable!(),
+                }
+            }
             TrySendError::Io(err) => SendError::IoError(err),
         }
     }

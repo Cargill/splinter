@@ -28,7 +28,7 @@ use super::InternalEnvelope;
 
 /// A structure for holding onto many connections and receivers and assigning new connections
 /// unique ids
-pub struct Pool {
+pub(super) struct Pool {
     entries: HashMap<usize, Entry>,
     tokens: HashMap<Token, usize>,
     next_id: usize,
@@ -269,7 +269,13 @@ impl Entry {
             Err(TryRecvError::Disconnected) => return Err(TryEventError::OutgoingDisconnected),
         };
 
-        self.try_send_connection_or_cache(envelope.take_payload(), poll)
+        match envelope {
+            InternalEnvelope::Message { payload, .. } => {
+                self.try_send_connection_or_cache(payload, poll)
+            }
+            // won't be sent outgoing
+            InternalEnvelope::Shutdown => unreachable!(),
+        }
     }
 
     // -- Connection --
@@ -355,7 +361,10 @@ impl Entry {
             };
             match connection.recv() {
                 Ok(payload) => {
-                    match incoming_tx.try_send(InternalEnvelope::new(self.id, payload)) {
+                    match incoming_tx.try_send(InternalEnvelope::Message {
+                        id: self.id,
+                        payload,
+                    }) {
                         Err(TrySendError::Full(_)) => {
                             warn!("Dropped message due to full incoming queue");
                             Ok(())

@@ -90,6 +90,7 @@ impl MatrixReceiver for MeshMatrixReceiver {
                     "Internal state poisoned".to_string(),
                     Some(Box::new(err)),
                 )),
+                RecvError::Shutdown => Err(MatrixRecvError::Shutdown),
             },
         }
     }
@@ -104,6 +105,7 @@ impl MatrixReceiver for MeshMatrixReceiver {
                     "Internal state poisoned".to_string(),
                     Some(Box::new(err)),
                 )),
+                RecvTimeoutError::Shutdown => Err(MatrixRecvTimeoutError::Shutdown),
             },
         }
     }

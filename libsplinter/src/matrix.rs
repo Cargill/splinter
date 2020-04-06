@@ -162,6 +162,7 @@ pub enum MatrixRecvError {
         context: String,
         source: Option<Box<dyn Error + Send>>,
     },
+    Shutdown,
 }
 
 impl MatrixRecvError {
@@ -181,6 +182,7 @@ impl Error for MatrixRecvError {
                     None
                 }
             }
+            MatrixRecvError::Shutdown => None,
         }
     }
 }
@@ -198,6 +200,7 @@ impl fmt::Display for MatrixRecvError {
                     f.write_str(&context)
                 }
             }
+            MatrixRecvError::Shutdown => f.write_str("Unable to receive: matrix has shutdown"),
         }
     }
 }
@@ -210,6 +213,7 @@ pub enum MatrixRecvTimeoutError {
         context: String,
         source: Option<Box<dyn Error + Send>>,
     },
+    Shutdown,
 }
 
 impl MatrixRecvTimeoutError {
@@ -230,6 +234,7 @@ impl Error for MatrixRecvTimeoutError {
                     None
                 }
             }
+            MatrixRecvTimeoutError::Shutdown => None,
         }
     }
 }
@@ -247,6 +252,9 @@ impl std::fmt::Display for MatrixRecvTimeoutError {
                 } else {
                     f.write_str(&context)
                 }
+            }
+            MatrixRecvTimeoutError::Shutdown => {
+                f.write_str("Unable to receive: matrix has shutdown")
             }
         }
     }

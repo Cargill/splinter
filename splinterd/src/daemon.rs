@@ -177,6 +177,7 @@ impl SplinterDaemon {
 
         info!("Starting SpinterNode with ID {}", self.node_id);
 
+        let network_shutdown = self.network.shutdown_signaler();
         let network = self.network.clone();
         let network_message_queue = sender::Builder::new()
             .with_network(network)
@@ -309,8 +310,13 @@ impl SplinterDaemon {
                             }
                         }
                         Err(RecvTimeoutError::Disconnected) => {
-                            // if the reciever has disconnected, shutdown
+                            // if the receiver has disconnected, shutdown
                             warn!("Received Disconnected Error from Network");
+                            break;
+                        }
+                        Err(RecvTimeoutError::Shutdown) => {
+                            // if network has shutdown, shutdown
+                            warn!("Received Shutdown from Network");
                             break;
                         }
                         Err(_) => {
@@ -431,8 +437,6 @@ impl SplinterDaemon {
             info!("Received Shutdown");
             r.store(false, Ordering::SeqCst);
 
-            sender_shutdown_signaler.shutdown();
-
             if let Err(err) = admin_shutdown_handle.shutdown() {
                 error!("Unable to cleanly shut down Admin service: {}", err);
             }
@@ -440,6 +444,9 @@ impl SplinterDaemon {
             if let Err(err) = rest_api_shutdown_handle.shutdown() {
                 error!("Unable to cleanly shut down REST API server: {}", err);
             }
+
+            network_shutdown.shutdown();
+            sender_shutdown_signaler.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
 
