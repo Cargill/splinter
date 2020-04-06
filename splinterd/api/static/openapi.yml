@@ -1284,7 +1284,7 @@ paths:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
 
-  /biome/users/keys:
+  /biome/keys:
     get:
       tags:
       - Biome
@@ -1419,7 +1419,7 @@ paths:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
 
-  /biome/users/keys/{public_key}:
+  /biome/keys/{public_key}:
     get:
       tags:
       - Biome

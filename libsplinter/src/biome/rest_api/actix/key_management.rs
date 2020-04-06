@@ -36,7 +36,7 @@ pub fn make_key_management_route(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    Resource::build("/biome/users/keys")
+    Resource::build("/biome/keys")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
@@ -259,7 +259,7 @@ pub fn make_key_management_route_with_public_key(
     key_store: Arc<dyn KeyStore<Key>>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    Resource::build("/biome/users/keys/{public_key}")
+    Resource::build("/biome/keys/{public_key}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
