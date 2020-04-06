@@ -28,7 +28,7 @@ use super::InternalEnvelope;
 
 /// A structure for holding onto many connections and receivers and assigning new connections
 /// unique ids
-pub struct Pool {
+pub(super) struct Pool {
     entries: HashMap<usize, Entry>,
     tokens: HashMap<Token, usize>,
     next_id: usize,

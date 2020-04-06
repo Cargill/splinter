@@ -65,11 +65,12 @@ use std::time::Duration;
 
 #[cfg(feature = "matrix")]
 pub use crate::matrix::Envelope;
-pub use crate::mesh::control::{AddError, Control, RemoveError};
-pub use crate::mesh::incoming::Incoming;
+use crate::mesh::control::Control;
+pub use crate::mesh::control::{AddError, RemoveError};
+use crate::mesh::incoming::Incoming;
 #[cfg(feature = "matrix")]
 pub use crate::mesh::matrix::{MeshLifeCycle, MeshMatrixSender};
-pub use crate::mesh::outgoing::Outgoing;
+use crate::mesh::outgoing::Outgoing;
 
 pub use crate::collections::BiHashMap;
 use crate::mesh::reactor::Reactor;
@@ -77,7 +78,7 @@ use crate::transport::Connection;
 
 /// Wrapper around payload to include connection id
 #[derive(Debug, PartialEq)]
-pub enum InternalEnvelope {
+pub(in crate::mesh) enum InternalEnvelope {
     Message { id: usize, payload: Vec<u8> },
     Shutdown,
 }
@@ -259,21 +260,6 @@ impl Mesh {
                 Ok(Envelope::new(id, payload))
             }
         }
-    }
-
-    /// Create a new handle for sending to the existing connection with the given id.
-    ///
-    /// This may be faster if many sends on the same Connection are going to be performed because
-    /// the internal lock around the pool of senders does not need to be reacquired.
-    pub fn outgoing(&self, id: usize) -> Option<Outgoing> {
-        rwlock_read_unwrap!(self.state).outgoings.get(&id).cloned()
-    }
-
-    /// Create a new handle for receiving envelopes from the mesh.
-    ///
-    /// This is useful if an object only needs to receive and doesn't need to send.
-    pub fn incoming(&self) -> Incoming {
-        self.incoming.clone()
     }
 
     #[cfg(feature = "matrix")]
@@ -528,7 +514,7 @@ mod tests {
         // to that thread
         server_ready_rx.recv().unwrap();
 
-        let incoming = mesh.incoming();
+        let incoming = mesh.incoming.clone();
         for _ in 0..CONNECTIONS {
             let envelope = assert_ok(incoming.recv());
             match envelope {
@@ -633,7 +619,7 @@ mod tests {
         // to that thread
         server_ready_rx.recv().unwrap();
 
-        let incoming = mesh.incoming();
+        let incoming = mesh.incoming.clone();
         let envelope = assert_ok(incoming.recv());
         match envelope {
             InternalEnvelope::Message { payload, .. } => assert_eq!(b"world".to_vec(), payload),
