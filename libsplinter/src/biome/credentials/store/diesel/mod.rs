@@ -39,7 +39,6 @@ impl DieselCredentialsStore {
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the database
-    #[cfg(feature = "biome-rest-api")]
     pub fn new(connection_pool: ConnectionPool) -> DieselCredentialsStore {
         DieselCredentialsStore { connection_pool }
     }

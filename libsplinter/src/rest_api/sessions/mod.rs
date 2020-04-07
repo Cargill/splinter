@@ -18,6 +18,7 @@ mod claims;
 mod error;
 mod token_issuer;
 
+#[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
 use jsonwebtoken::Validation;
 use serde::Serialize;
 
@@ -25,6 +26,7 @@ pub use claims::{Claims, ClaimsBuilder};
 pub use error::{ClaimsBuildError, TokenIssuerError, TokenValidationError};
 pub use token_issuer::AccessTokenIssuer;
 
+#[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
 const DEFAULT_LEEWAY: i64 = 10; // default leeway in seconds.
 
 /// Implementers can issue JWT tokens
@@ -36,7 +38,7 @@ pub trait TokenIssuer<T: Serialize> {
     fn issue_refresh_token_with_claims(&self, claims: T) -> Result<String, TokenIssuerError>;
 }
 
-#[cfg(feature = "biome-rest-api")]
+#[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
 pub(crate) fn default_validation(issuer: &str) -> Validation {
     let mut validation = Validation::default();
     validation.leeway = DEFAULT_LEEWAY;
