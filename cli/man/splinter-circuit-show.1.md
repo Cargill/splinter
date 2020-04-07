@@ -7,7 +7,7 @@ NAME
 
 SYNOPSIS
 ========
-**splinter circuit show** \[**FLAGS**\] \[**OPTIONS**\] <circuit>
+**splinter circuit show** \[**FLAGS**\] \[**OPTIONS**\] CIRCUIT
 
 DESCRIPTION
 ===========
@@ -36,24 +36,25 @@ FLAGS
 
 OPTIONS
 =======
-`-f`, `--format` <format>
+`-f`, `--format` FORMAT
 : Specifies the output format of the circuit proposal. (default `human`).
   Possible values for formatting are `human` and `csv`.
 
-`-U`, `--url` <url>
+`-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
   `$SPLINTER_REST_API_URL` is set.
 
 
 ARGUMENTS
 =========
-`<circuit>`
+`CIRCUIT`
 : Specify the circuit ID of the circuit to be shown.
 
 EXAMPLES
 ========
 This command displays information about a circuit with the default `human`
-formatting, which intends to use indentation and labels to make the circuit information understandable.
+formatting, which intends to use indentation and labels to make the circuit
+information understandable.
 
 * The proposing node has ID `alpha001` and endpoint
   `tls://splinterd-node-alpha001:8044`, and a service ID of `AA01`.
@@ -70,16 +71,16 @@ the proposal will not be viewable by any nodes.
 
 ```
 $ splinter circuit show 01234-ABCDE \
-  ---url <URL-of-alpha-node-splinterd-REST-API>
+  ---url URL-of-alpha-node-splinterd-REST-API
 Proposal to create: 01234-ABCDE
     Management Type: mgmt001
 
     alpha-001 (tls://splinterd-node-alpha001:8044)
         Vote: ACCEPT (implied as requester):
-            <alpha-public-key>
+            ALPHA-PUBLIC-KEY
         Service: AA01
             admin_keys:
-                <alpha-public-key>
+                ALPHA-PUBLIC-KEY
             peer_services:
                 BB01
 
@@ -87,7 +88,7 @@ Proposal to create: 01234-ABCDE
         Vote: PENDING
         Service: AA01
             admin_keys:
-                <alpha-public-key>
+                ALPHA-PUBLIC-KEY
             peer_services:
                 AA01
 ```

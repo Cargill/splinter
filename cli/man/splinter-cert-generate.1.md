@@ -52,12 +52,12 @@ flag is not provided and the file exists, an error is returned.
 
 OPTIONS
 =======
-`-d`, `--cert-dir <cert_dir>`
+`-d`, `--cert-dir CERT-DIR`
 : Path to the directory certificates are created in. Defaults to
   /etc/splinter/certs/. This location can also be changed with the
   SPLINTER_CERT_DIR environment variable. This directory must exist.
 
-`--common-name <common_name>`
+`--common-name COMMON-NAME`
 : String that specifies a common name for the generated certificate (defaults to
   localhost). Use this option if the splinterd URL uses a DNS address instead
   of a numerical IP address.
@@ -74,7 +74,7 @@ that are missing.
 
   `$ splinter cert generate --skip`
 
-To recreate the certificates and keys from scratch, use the  `--force` flag to
+To recreate the certificates and keys from scratch, use the `--force` flag to
 overwrite all existing files.
 
   `$ splinter cert generate --force`
@@ -87,7 +87,7 @@ generate:
 **SPLINTER_CERT_DIR**
 
 : The certificates and keys will be generated at the location specified by the
-  environment variable.  (See `--cert-dir`)
+  environment variable. (See `--cert-dir`)
 
 SEE ALSO
 ========
