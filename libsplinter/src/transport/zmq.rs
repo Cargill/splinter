@@ -746,6 +746,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_poll() {
         let transport = ZmqTransport::default();
 
