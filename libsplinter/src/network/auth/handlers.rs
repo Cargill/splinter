@@ -14,12 +14,11 @@
 
 use protobuf::Message;
 
-use crate::channel::Sender;
 use crate::network::auth::{
     AuthorizationAction, AuthorizationInquisitor, AuthorizationManager, AuthorizationState,
 };
 use crate::network::dispatch::{
-    DispatchError, DispatchMessage, Dispatcher, FromMessageBytes, Handler, MessageContext,
+    DispatchError, DispatchMessageSender, Dispatcher, FromMessageBytes, Handler, MessageContext,
 };
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::authorization::{
@@ -85,7 +84,7 @@ pub fn create_authorization_dispatcher(
 /// This Handler accepts authorization network messages, unwraps the envelope, and forwards the
 /// message contents to an authorization dispatcher.
 pub struct AuthorizationMessageHandler {
-    sender: Box<dyn Sender<DispatchMessage<AuthorizationMessageType>>>,
+    sender: DispatchMessageSender<AuthorizationMessageType>,
 }
 
 impl AuthorizationMessageHandler {
@@ -93,7 +92,7 @@ impl AuthorizationMessageHandler {
     ///
     /// This constructs an AuthorizationMessageHandler with a sender that will dispatch messages
     /// to a authorization dispatcher.
-    pub fn new(sender: Box<dyn Sender<DispatchMessage<AuthorizationMessageType>>>) -> Self {
+    pub fn new(sender: DispatchMessageSender<AuthorizationMessageType>) -> Self {
         AuthorizationMessageHandler { sender }
     }
 }
@@ -106,11 +105,11 @@ impl Handler<NetworkMessageType, AuthorizationMessage> for AuthorizationMessageH
         _sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         self.sender
-            .send(DispatchMessage::new(
+            .send(
                 msg.message_type,
                 msg.get_payload().to_vec(),
                 context.source_peer_id().to_string(),
-            ))
+            )
             .map_err(|_| {
                 DispatchError::NetworkSendError((context.source_peer_id().to_string(), msg.payload))
             })?;
