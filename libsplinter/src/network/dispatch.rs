@@ -60,11 +60,10 @@ impl<MT: Hash + Eq + Debug + Clone> MessageContext<MT> {
 }
 
 /// A Handler for a network message.
-pub trait Handler<MT, T>: Send
-where
-    MT: Hash + Eq + Debug + Clone,
-    T: FromMessageBytes,
-{
+pub trait Handler: Send {
+    type MessageType: Hash + Eq + Debug + Clone;
+    type Message: FromMessageBytes;
+
     /// Handles a given message
     ///
     /// # Errors
@@ -72,26 +71,10 @@ where
     /// Any issues that occur during processing of the message will result in a DispatchError.
     fn handle(
         &self,
-        message: T,
-        message_context: &MessageContext<MT>,
+        message: Self::Message,
+        message_context: &MessageContext<PeerId, Self::MessageType>,
         network_sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError>;
-}
-
-impl<MT, T, F> Handler<MT, T> for F
-where
-    MT: Hash + Eq + Debug + Clone,
-    T: FromMessageBytes,
-    F: Fn(T, &MessageContext<MT>, &NetworkMessageSender) -> Result<(), DispatchError> + Send,
-{
-    fn handle(
-        &self,
-        message: T,
-        message_context: &MessageContext<MT>,
-        network_sender: &NetworkMessageSender,
-    ) -> Result<(), DispatchError> {
-        (*self)(message, message_context, network_sender)
-    }
 }
 
 /// Converts bytes into a concrete message instance
@@ -224,8 +207,11 @@ impl<MT: Any + Hash + Eq + Debug + Clone> Dispatcher<MT> {
     /// This sets a handler for a given message type.  Only one handler may exist per message type.
     /// If a user wishes to run a series handlers, they must supply a single handler that composes
     /// the series.
-    pub fn set_handler<T>(&mut self, message_type: MT, handler: Box<dyn Handler<MT, T>>)
-    where
+    pub fn set_handler<T>(
+        &mut self,
+        message_type: MT,
+        handler: Box<dyn Handler<MessageType = MT, Message = T>>,
+    ) where
         T: FromMessageBytes,
     {
         self.handlers.insert(
@@ -468,7 +454,6 @@ impl<MT: Any + Hash + Eq + Debug + Clone> DispatchMessageSender<MT> {
 mod tests {
     use super::*;
 
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
 
     use protobuf::Message;
@@ -477,58 +462,6 @@ mod tests {
     use crate::network::sender;
     use crate::network::Network;
     use crate::protos::network::{NetworkEcho, NetworkMessageType};
-    use crate::transport::inproc::InprocTransport;
-    use crate::transport::Transport;
-
-    /// Verify that messages can be dispatched to handlers implemented as closures.
-    ///
-    /// This test does the following:
-    ///
-    /// * Create a Dispatcher
-    /// * Add a handler implemented as a closure over an atomic Boolean
-    /// * Dispatch a message of an unknown type and verify the error result
-    /// * Dispatch a message of the expected type and verify that it was called
-    #[test]
-    fn dispatch_to_closure() {
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
-        let flag = Arc::new(AtomicBool::new(false));
-        let mut dispatcher = Dispatcher::new(network_sender);
-        let handler_flag = flag.clone();
-        dispatcher.set_handler(
-            NetworkMessageType::NETWORK_ECHO,
-            Box::new(
-                move |_: NetworkEcho,
-                      _: &MessageContext<NetworkMessageType>,
-                      _: &NetworkMessageSender| {
-                    handler_flag.store(true, Ordering::SeqCst);
-                    Ok(())
-                },
-            ),
-        );
-
-        assert_eq!(
-            Err(DispatchError::UnknownMessageType(format!(
-                "No handler for type {:?}",
-                NetworkMessageType::CIRCUIT
-            ))),
-            dispatcher.dispatch("TestPeer", &NetworkMessageType::CIRCUIT, Vec::new())
-        );
-        assert_eq!(false, flag.load(Ordering::SeqCst));
-
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch("TestPeer", &NetworkMessageType::NETWORK_ECHO, Vec::new())
-        );
-        assert_eq!(true, flag.load(Ordering::SeqCst));
-    }
 
     /// Verify that messages can be dispatched to handlers via the trait.
     ///
@@ -572,58 +505,6 @@ mod tests {
             vec!["test_dispatcher".to_string()],
             echos.lock().unwrap().clone()
         );
-    }
-
-    /// Verify that messages can be dispatched to handlers implemented as named function.
-    ///
-    /// This test does the following:
-    ///
-    /// * Create a sent message container for replies
-    /// * Create a Dispatcher with that sent container
-    /// * Add a handler implemented defined as a static, named function
-    /// * Dispatch a message of the expected type and verify that it was called by checking that it
-    ///   submitted the reply message
-    #[test]
-    fn dispatch_to_fn() {
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-        let mut inproc_transport = InprocTransport::default();
-        let mut dispatcher = Dispatcher::new(network_sender);
-        let mut listener = inproc_transport
-            .listen("inproc://dispatcher")
-            .expect("Cannot get listener");
-
-        std::thread::spawn(move || {
-            let connection = listener.accept().expect("Cannot accept connection");
-            network1
-                .add_peer("TestPeer".to_string(), connection)
-                .expect("Unable to add peer");
-
-            dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handle_echo));
-            assert_eq!(
-                Ok(()),
-                dispatcher.dispatch("TestPeer", &NetworkMessageType::NETWORK_ECHO, Vec::new())
-            );
-        });
-
-        let mesh2 = Mesh::new(1, 1);
-        let network2 = Network::new(mesh2.clone(), 0).unwrap();
-        let connection = inproc_transport
-            .connect("inproc://dispatcher")
-            .expect("Unable to connect to inproc");
-        network2
-            .add_peer("dispatch_peer".to_string(), connection)
-            .expect("Unable to add peer");
-
-        let _network_message_wrapper = network2
-            .recv()
-            .expect("Unable to receive message over the network");
     }
 
     /// Verify that a dispatcher can be moved to a thread.
@@ -679,7 +560,10 @@ mod tests {
         echos: Arc<Mutex<Vec<String>>>,
     }
 
-    impl Handler<NetworkMessageType, NetworkEcho> for NetworkEchoHandler {
+    impl Handler for NetworkEchoHandler {
+        type MessageType = NetworkMessageType;
+        type Message = NetworkEcho;
+
         fn handle(
             &self,
             message: NetworkEcho,
@@ -690,21 +574,5 @@ mod tests {
             self.echos.lock().unwrap().push(echo_string);
             Ok(())
         }
-    }
-
-    /// This test handler
-    fn handle_echo(
-        message: RawBytes,
-        message_context: &MessageContext<NetworkMessageType>,
-        network_sender: &NetworkMessageSender,
-    ) -> Result<(), DispatchError> {
-        let expected_message: Vec<u8> = vec![];
-        assert_eq!(expected_message, message.bytes());
-
-        network_sender
-            .send(message_context.source_peer_id().to_string(), vec![])
-            .map_err(|(peer_id, payload)| DispatchError::NetworkSendError((peer_id, payload)))?;
-
-        Ok(())
     }
 }

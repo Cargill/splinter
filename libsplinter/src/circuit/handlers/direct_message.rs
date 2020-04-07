@@ -28,11 +28,14 @@ pub struct CircuitDirectMessageHandler {
     state: SplinterState,
 }
 
-impl Handler<CircuitMessageType, CircuitDirectMessage> for CircuitDirectMessageHandler {
+impl Handler for CircuitDirectMessageHandler {
+    type MessageType = CircuitMessageType;
+    type Message = CircuitDirectMessage;
+
     fn handle(
         &self,
-        msg: CircuitDirectMessage,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(

@@ -32,11 +32,14 @@ pub struct ServiceConnectRequestHandler {
     state: SplinterState,
 }
 
-impl Handler<CircuitMessageType, ServiceConnectRequest> for ServiceConnectRequestHandler {
+impl Handler for ServiceConnectRequestHandler {
+    type MessageType = CircuitMessageType;
+    type Message = ServiceConnectRequest;
+
     fn handle(
         &self,
-        msg: ServiceConnectRequest,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Connect Request {:?}", msg);
@@ -160,11 +163,14 @@ pub struct ServiceDisconnectRequestHandler {
     state: SplinterState,
 }
 
-impl Handler<CircuitMessageType, ServiceDisconnectRequest> for ServiceDisconnectRequestHandler {
+impl Handler for ServiceDisconnectRequestHandler {
+    type MessageType = CircuitMessageType;
+    type Message = ServiceDisconnectRequest;
+
     fn handle(
         &self,
-        msg: ServiceDisconnectRequest,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Disconnect Request {:?}", msg);

@@ -21,11 +21,14 @@ pub struct CircuitMessageHandler {
     sender: DispatchMessageSender<CircuitMessageType>,
 }
 
-impl Handler<NetworkMessageType, CircuitMessage> for CircuitMessageHandler {
+impl Handler for CircuitMessageHandler {
+    type MessageType = NetworkMessageType;
+    type Message = CircuitMessage;
+
     fn handle(
         &self,
-        msg: CircuitMessage,
-        context: &MessageContext<NetworkMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         _: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(
@@ -141,11 +144,14 @@ mod tests {
         echos: Arc<RwLock<Vec<String>>>,
     }
 
-    impl Handler<CircuitMessageType, ServiceConnectRequest> for ServiceConnectedTestHandler {
+    impl Handler for ServiceConnectedTestHandler {
+        type MessageType = CircuitMessageType;
+        type Message = ServiceConnectRequest;
+
         fn handle(
             &self,
-            message: ServiceConnectRequest,
-            _message_context: &MessageContext<CircuitMessageType>,
+            message: Self::Message,
+            _message_context: &MessageContext<Self::MessageType>,
             _: &NetworkMessageSender,
         ) -> Result<(), DispatchError> {
             self.echos

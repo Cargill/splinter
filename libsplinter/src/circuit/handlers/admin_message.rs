@@ -29,11 +29,14 @@ pub struct AdminDirectMessageHandler {
     state: SplinterState,
 }
 
-impl Handler<CircuitMessageType, AdminDirectMessage> for AdminDirectMessageHandler {
+impl Handler for AdminDirectMessageHandler {
+    type MessageType = CircuitMessageType;
+    type Message = AdminDirectMessage;
+
     fn handle(
         &self,
-        msg: AdminDirectMessage,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(

@@ -23,11 +23,14 @@ pub struct NetworkEchoHandler {
     node_id: String,
 }
 
-impl Handler<NetworkMessageType, NetworkEcho> for NetworkEchoHandler {
+impl Handler for NetworkEchoHandler {
+    type MessageType = NetworkMessageType;
+    type Message = NetworkEcho;
+
     fn handle(
         &self,
-        mut msg: NetworkEcho,
-        context: &MessageContext<NetworkMessageType>,
+        mut msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("ECHO: {:?}", msg);
@@ -73,11 +76,14 @@ impl NetworkEchoHandler {
 #[derive(Default)]
 pub struct NetworkHeartbeatHandler {}
 
-impl Handler<NetworkMessageType, NetworkHeartbeat> for NetworkHeartbeatHandler {
+impl Handler for NetworkHeartbeatHandler {
+    type MessageType = NetworkMessageType;
+    type Message = NetworkHeartbeat;
+
     fn handle(
         &self,
-        _msg: NetworkHeartbeat,
-        context: &MessageContext<NetworkMessageType>,
+        _msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         _sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         trace!("Received Heartbeat from {}", context.source_peer_id());

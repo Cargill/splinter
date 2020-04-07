@@ -27,11 +27,14 @@ pub struct CircuitErrorHandler {
 // In most cases the error message will be returned directly back to service, but in the case
 // where it is returned back to a different node, this node will do its best effort to
 // return it back to the service or node who sent the original message.
-impl Handler<CircuitMessageType, CircuitError> for CircuitErrorHandler {
+impl Handler for CircuitErrorHandler {
+    type MessageType = CircuitMessageType;
+    type Message = CircuitError;
+
     fn handle(
         &self,
-        msg: CircuitError,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("Handle Circuit Error Message {:?}", msg);
