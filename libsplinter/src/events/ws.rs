@@ -243,7 +243,8 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         let mut context_timeout = context.clone();
         let timeout = self.timeout;
 
-        let running_connection = running.clone();
+        let running_connection1 = running.clone();
+        let running_connection2 = running.clone();
         let mut context_connection = context.clone();
 
         debug!("starting: {}", url);
@@ -266,9 +267,13 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         let future = Box::new(
             Client::new()
                 .request(request)
-                .and_then(|res| {
+                .and_then(move |res| {
                     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
                         error!("The server didn't upgrade: {}", res.status());
+                    }
+                    if res.status() == StatusCode::NOT_FOUND {
+                        // The requested resource doesn't exist, so no need to keep trying
+                        running_connection1.store(false, Ordering::SeqCst);
                     }
                     debug!("response: {:?}", res);
 
@@ -276,11 +281,14 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                 })
                 .timeout(Duration::from_secs(timeout))
                 .map_err(move |err| {
-                    if let Err(err) = context_connection.try_reconnect() {
-                        error!("Context returned an error  {}", err);
-                    }
+                    // If not running anymore, don't try reconnecting
+                    if running_connection2.load(Ordering::SeqCst) {
+                        if let Err(err) = context_connection.try_reconnect() {
+                            error!("Context returned an error  {}", err);
+                        }
 
-                    running_connection.store(false, Ordering::SeqCst);
+                        running_connection2.store(false, Ordering::SeqCst);
+                    }
                     WebSocketError::ConnectError(format!("Failed to connect: {}", err))
                 })
                 .and_then(move |upgraded| {
