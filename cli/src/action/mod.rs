@@ -14,7 +14,6 @@
 // limitations under the License.
 pub mod admin;
 pub mod certs;
-#[cfg(feature = "circuit")]
 pub mod circuit;
 #[cfg(feature = "database")]
 pub mod database;
@@ -32,9 +31,7 @@ use libc;
 
 use super::error::CliError;
 
-#[cfg(any(feature = "health", feature = "circuit"))]
 const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8085";
-#[cfg(any(feature = "health", feature = "circuit"))]
 const SPLINTER_REST_API_URL_ENV: &str = "SPLINTER_REST_API_URL";
 
 /// A CLI Command Action.
