@@ -33,13 +33,12 @@ use flexi_logger::FlexiLoggerError;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 
-use action::{admin, certs, Action, SubcommandActions};
+use action::{admin, certs, circuit, Action, SubcommandActions};
 use error::CliError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg(feature = "circuit")]
 const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
     One or more nodes must be specified using the --node and/or --node-file arguments. These
     arguments can be used on their own or together, but at least one of them is required.
@@ -179,6 +178,316 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             ),
     );
 
+    let propose_circuit = SubCommand::with_name("propose")
+        .about("Propose that a new circuit is created")
+        .arg(
+            Arg::with_name("url")
+                .short("U")
+                .long("url")
+                .takes_value(true)
+                .help("URL of Splinter Daemon"),
+        )
+        .arg(
+            Arg::with_name("key")
+                .value_name("private-key-file")
+                .short("k")
+                .long("key")
+                .takes_value(true)
+                .help("Path to private key file"),
+        )
+        .arg(
+            Arg::with_name("node_file")
+                .long("node-file")
+                .takes_value(true)
+                .required_unless("node")
+                .help("File system path or HTTP(S) URL to nodes file"),
+        )
+        .arg(
+            Arg::with_name("node")
+                .long("node")
+                .takes_value(true)
+                .required_unless("node_file")
+                .multiple(true)
+                .help(
+                    "Node that is part of a circuit \
+                     (<node_id>::<endpoint>)",
+                ),
+        )
+        .arg(
+            Arg::with_name("service")
+                .long("service")
+                .takes_value(true)
+                .multiple(true)
+                .min_values(2)
+                .required_unless("template")
+                .help(
+                    "Service ID and allowed nodes \
+                     (<service-id>::<allowed_nodes>)",
+                ),
+        )
+        .arg(
+            Arg::with_name("service_argument")
+                .long("service-arg")
+                .takes_value(true)
+                .multiple(true)
+                .help(
+                    "Pass arguments to a service \
+                     (<service_id>::<key>=<value>)",
+                ),
+        )
+        .arg(
+            Arg::with_name("service_peer_group")
+                .long("service-peer-group")
+                .takes_value(true)
+                .multiple(true)
+                .help("List of peer services (comma-separated list)"),
+        )
+        .arg(
+            Arg::with_name("management_type")
+                .long("management")
+                .takes_value(true)
+                .help("Management type for the circuit"),
+        )
+        .arg(
+            Arg::with_name("service_type")
+                .long("service-type")
+                .takes_value(true)
+                .multiple(true)
+                .help(
+                    "Service type \
+                     (<service_id>::<service_type>)",
+                ),
+        )
+        .arg(
+            Arg::with_name("metadata")
+                .long("metadata")
+                .value_name("application_metadata")
+                .takes_value(true)
+                .multiple(true)
+                .help("Application metadata of the proposal"),
+        )
+        .arg(
+            Arg::with_name("metadata_encoding")
+                .long("metadata-encoding")
+                .takes_value(true)
+                .possible_values(&["json", "string"])
+                .requires("metadata")
+                .help(
+                    "Set encoding of application metadata \
+                       (default: string)",
+                ),
+        )
+        .arg(
+            Arg::with_name("comments")
+                .long("comments")
+                .takes_value(true)
+                .help("Add human-readable comments to the proposal"),
+        )
+        .arg(
+            Arg::with_name("dry_run")
+                .long("dry-run")
+                .short("n")
+                .help("Print circuit definition without submitting the proposal"),
+        )
+        .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
+
+    #[cfg(feature = "circuit-auth-type")]
+    let propose_circuit = propose_circuit.arg(
+        Arg::with_name("authorization_type")
+            .long("auth-type")
+            .possible_values(&["trust"])
+            .default_value("trust")
+            .takes_value(true)
+            .help("Authorization type for the circuit"),
+    );
+
+    #[cfg(feature = "circuit-template")]
+    let propose_circuit = propose_circuit
+        .arg(
+            Arg::with_name("template")
+                .long("template")
+                .takes_value(true)
+                .required_unless("service")
+                .help("Template name to be applied to circuit"),
+        )
+        .arg(
+            Arg::with_name("template_arg")
+                .long("template-arg")
+                .multiple(true)
+                .takes_value(true)
+                .requires("template")
+                .help(
+                    "Arguments for the template argument \
+                     (<key>=<value>)",
+                ),
+        );
+
+    let circuit_command = SubCommand::with_name("circuit")
+        .about("Provides circuit management functionality")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .subcommand(propose_circuit)
+        .subcommand(
+            SubCommand::with_name("vote")
+                .about("Vote on a new circuit proposal")
+                .arg(
+                    Arg::with_name("url")
+                        .short("U")
+                        .long("url")
+                        .takes_value(true)
+                        .help("URL of Splinter Daemon"),
+                )
+                .arg(
+                    Arg::with_name("private_key_file")
+                        .value_name("private-key-file")
+                        .short("k")
+                        .long("key")
+                        .takes_value(true)
+                        .help("Path to private key file"),
+                )
+                .arg(
+                    Arg::with_name("circuit_id")
+                        .value_name("circuit-id")
+                        .takes_value(true)
+                        .required(true)
+                        .help("ID of the proposed circuit"),
+                )
+                .arg(
+                    Arg::with_name("accept")
+                        .required(true)
+                        .long("accept")
+                        .conflicts_with("reject")
+                        .help("Accept the proposal"),
+                )
+                .arg(
+                    Arg::with_name("reject")
+                        .required(true)
+                        .long("reject")
+                        .conflicts_with("accept")
+                        .help("Reject the proposal"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("list")
+                .about("List the circuits")
+                .arg(
+                    Arg::with_name("url")
+                        .short("U")
+                        .long("url")
+                        .help("URL of the Splinter daemon REST API")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("member")
+                        .short("m")
+                        .long("member")
+                        .help("Filter circuits by a node ID in the member list")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("format")
+                        .short("f")
+                        .long("format")
+                        .help("Output format")
+                        .possible_values(&["human", "csv"])
+                        .default_value("human")
+                        .takes_value(true),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("show")
+                .about("Show a specific circuit or proposal")
+                .arg(
+                    Arg::with_name("url")
+                        .short("U")
+                        .long("url")
+                        .help("URL of the Splinter daemon REST API")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("circuit")
+                        .help("ID of the circuit to be shown")
+                        .required(true)
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("format")
+                        .short("f")
+                        .long("format")
+                        .help("Output format")
+                        .possible_values(&["human", "yaml", "json"])
+                        .default_value("human")
+                        .takes_value(true),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("proposals")
+                .about("List the circuit proposals")
+                .arg(
+                    Arg::with_name("url")
+                        .short("U")
+                        .long("url")
+                        .help("URL of the Splinter daemon REST API")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("management_type")
+                        .long("management-type")
+                        .help(
+                            "Filter circuit proposals by circuit \
+                             management type",
+                        )
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("member")
+                        .long("member")
+                        .help(
+                            "Show proposals with the given node ID in \
+                            its member list",
+                        )
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("format")
+                        .short("f")
+                        .long("format")
+                        .help("Output format")
+                        .possible_values(&["human", "csv"])
+                        .default_value("human")
+                        .takes_value(true),
+                ),
+        );
+
+    #[cfg(feature = "circuit-template")]
+    let circuit_command = circuit_command.subcommand(
+        SubCommand::with_name("template")
+            .about("Manage circuit templates")
+            .setting(AppSettings::SubcommandRequiredElseHelp)
+            .subcommand(SubCommand::with_name("list").about("List available templates"))
+            .subcommand(
+                SubCommand::with_name("show").about("Show a template").arg(
+                    Arg::with_name("name")
+                        .required(true)
+                        .takes_value(true)
+                        .value_name("name")
+                        .help("Name of template"),
+                ),
+            )
+            .subcommand(
+                SubCommand::with_name("arguments")
+                    .about("List arguments of a template")
+                    .arg(
+                        Arg::with_name("name")
+                            .required(true)
+                            .takes_value(true)
+                            .value_name("name")
+                            .help("Name of template"),
+                    ),
+            ),
+    );
+
+    app = app.subcommand(circuit_command);
+
     #[cfg(feature = "keygen")]
     {
         app = app.subcommand(
@@ -247,319 +556,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
-    #[cfg(feature = "circuit")]
-    {
-        let propose_circuit = SubCommand::with_name("propose")
-            .about("Propose that a new circuit is created")
-            .arg(
-                Arg::with_name("url")
-                    .short("U")
-                    .long("url")
-                    .takes_value(true)
-                    .help("URL of Splinter Daemon"),
-            )
-            .arg(
-                Arg::with_name("key")
-                    .value_name("private-key-file")
-                    .short("k")
-                    .long("key")
-                    .takes_value(true)
-                    .help("Path to private key file"),
-            )
-            .arg(
-                Arg::with_name("node_file")
-                    .long("node-file")
-                    .takes_value(true)
-                    .required_unless("node")
-                    .help("File system path or HTTP(S) URL to nodes file"),
-            )
-            .arg(
-                Arg::with_name("node")
-                    .long("node")
-                    .takes_value(true)
-                    .required_unless("node_file")
-                    .multiple(true)
-                    .help(
-                        "Node that is part of a circuit \
-                         (<node_id>::<endpoint>)",
-                    ),
-            )
-            .arg(
-                Arg::with_name("service")
-                    .long("service")
-                    .takes_value(true)
-                    .multiple(true)
-                    .min_values(2)
-                    .required_unless("template")
-                    .help(
-                        "Service ID and allowed nodes \
-                         (<service-id>::<allowed_nodes>)",
-                    ),
-            )
-            .arg(
-                Arg::with_name("service_argument")
-                    .long("service-arg")
-                    .takes_value(true)
-                    .multiple(true)
-                    .help(
-                        "Pass arguments to a service \
-                         (<service_id>::<key>=<value>)",
-                    ),
-            )
-            .arg(
-                Arg::with_name("service_peer_group")
-                    .long("service-peer-group")
-                    .takes_value(true)
-                    .multiple(true)
-                    .help("List of peer services (comma-separated list)"),
-            )
-            .arg(
-                Arg::with_name("management_type")
-                    .long("management")
-                    .takes_value(true)
-                    .help("Management type for the circuit"),
-            )
-            .arg(
-                Arg::with_name("service_type")
-                    .long("service-type")
-                    .takes_value(true)
-                    .multiple(true)
-                    .help(
-                        "Service type \
-                         (<service_id>::<service_type>)",
-                    ),
-            )
-            .arg(
-                Arg::with_name("metadata")
-                    .long("metadata")
-                    .value_name("application_metadata")
-                    .takes_value(true)
-                    .multiple(true)
-                    .help("Application metadata of the proposal"),
-            )
-            .arg(
-                Arg::with_name("metadata_encoding")
-                    .long("metadata-encoding")
-                    .takes_value(true)
-                    .possible_values(&["json", "string"])
-                    .requires("metadata")
-                    .help(
-                        "Set encoding of application metadata \
-                           (default: string)",
-                    ),
-            )
-            .arg(
-                Arg::with_name("comments")
-                    .long("comments")
-                    .takes_value(true)
-                    .help("Add human-readable comments to the proposal"),
-            )
-            .arg(
-                Arg::with_name("dry_run")
-                    .long("dry-run")
-                    .short("n")
-                    .help("Print circuit definition without submitting the proposal"),
-            )
-            .after_help(CIRCUIT_PROPOSE_AFTER_HELP);
-
-        #[cfg(feature = "circuit-auth-type")]
-        let propose_circuit = propose_circuit.arg(
-            Arg::with_name("authorization_type")
-                .long("auth-type")
-                .possible_values(&["trust"])
-                .default_value("trust")
-                .takes_value(true)
-                .help("Authorization type for the circuit"),
-        );
-
-        #[cfg(feature = "circuit-template")]
-        let propose_circuit = propose_circuit
-            .arg(
-                Arg::with_name("template")
-                    .long("template")
-                    .takes_value(true)
-                    .required_unless("service")
-                    .help("Template name to be applied to circuit"),
-            )
-            .arg(
-                Arg::with_name("template_arg")
-                    .long("template-arg")
-                    .multiple(true)
-                    .takes_value(true)
-                    .requires("template")
-                    .help(
-                        "Arguments for the template argument \
-                         (<key>=<value>)",
-                    ),
-            );
-
-        let circuit_command = SubCommand::with_name("circuit")
-            .about("Provides circuit management functionality")
-            .setting(AppSettings::SubcommandRequiredElseHelp)
-            .subcommand(propose_circuit)
-            .subcommand(
-                SubCommand::with_name("vote")
-                    .about("Vote on a new circuit proposal")
-                    .arg(
-                        Arg::with_name("url")
-                            .short("U")
-                            .long("url")
-                            .takes_value(true)
-                            .help("URL of Splinter Daemon"),
-                    )
-                    .arg(
-                        Arg::with_name("private_key_file")
-                            .value_name("private-key-file")
-                            .short("k")
-                            .long("key")
-                            .takes_value(true)
-                            .help("Path to private key file"),
-                    )
-                    .arg(
-                        Arg::with_name("circuit_id")
-                            .value_name("circuit-id")
-                            .takes_value(true)
-                            .required(true)
-                            .help("ID of the proposed circuit"),
-                    )
-                    .arg(
-                        Arg::with_name("accept")
-                            .required(true)
-                            .long("accept")
-                            .conflicts_with("reject")
-                            .help("Accept the proposal"),
-                    )
-                    .arg(
-                        Arg::with_name("reject")
-                            .required(true)
-                            .long("reject")
-                            .conflicts_with("accept")
-                            .help("Reject the proposal"),
-                    ),
-            )
-            .subcommand(
-                SubCommand::with_name("list")
-                    .about("List the circuits")
-                    .arg(
-                        Arg::with_name("url")
-                            .short("U")
-                            .long("url")
-                            .help("URL of the Splinter daemon REST API")
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("member")
-                            .short("m")
-                            .long("member")
-                            .help("Filter circuits by a node ID in the member list")
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("format")
-                            .short("f")
-                            .long("format")
-                            .help("Output format")
-                            .possible_values(&["human", "csv"])
-                            .default_value("human")
-                            .takes_value(true),
-                    ),
-            )
-            .subcommand(
-                SubCommand::with_name("show")
-                    .about("Show a specific circuit or proposal")
-                    .arg(
-                        Arg::with_name("url")
-                            .short("U")
-                            .long("url")
-                            .help("URL of the Splinter daemon REST API")
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("circuit")
-                            .help("ID of the circuit to be shown")
-                            .required(true)
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("format")
-                            .short("f")
-                            .long("format")
-                            .help("Output format")
-                            .possible_values(&["human", "yaml", "json"])
-                            .default_value("human")
-                            .takes_value(true),
-                    ),
-            )
-            .subcommand(
-                SubCommand::with_name("proposals")
-                    .about("List the circuit proposals")
-                    .arg(
-                        Arg::with_name("url")
-                            .short("U")
-                            .long("url")
-                            .help("URL of the Splinter daemon REST API")
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("management_type")
-                            .long("management-type")
-                            .help(
-                                "Filter circuit proposals by circuit \
-                                 management type",
-                            )
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("member")
-                            .long("member")
-                            .help(
-                                "Show proposals with the given node ID in \
-                                its member list",
-                            )
-                            .takes_value(true),
-                    )
-                    .arg(
-                        Arg::with_name("format")
-                            .short("f")
-                            .long("format")
-                            .help("Output format")
-                            .possible_values(&["human", "csv"])
-                            .default_value("human")
-                            .takes_value(true),
-                    ),
-            );
-
-        #[cfg(feature = "circuit-template")]
-        let circuit_command = circuit_command.subcommand(
-            SubCommand::with_name("template")
-                .about("Manage circuit templates")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommand(SubCommand::with_name("list").about("List available templates"))
-                .subcommand(
-                    SubCommand::with_name("show").about("Show a template").arg(
-                        Arg::with_name("name")
-                            .required(true)
-                            .takes_value(true)
-                            .value_name("name")
-                            .help("Name of template"),
-                    ),
-                )
-                .subcommand(
-                    SubCommand::with_name("arguments")
-                        .about("List arguments of a template")
-                        .arg(
-                            Arg::with_name("name")
-                                .required(true)
-                                .takes_value(true)
-                                .value_name("name")
-                                .help("Name of template"),
-                        ),
-                ),
-        );
-
-        app = app.subcommand(circuit_command);
-    }
-
     let matches = app.get_matches_from_safe(args)?;
 
     // set default to info
@@ -605,6 +601,24 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             SubcommandActions::new().with_command("generate", certs::CertGenAction),
         );
 
+    let circuit_command = SubcommandActions::new()
+        .with_command("propose", circuit::CircuitProposeAction)
+        .with_command("vote", circuit::CircuitVoteAction)
+        .with_command("list", circuit::CircuitListAction)
+        .with_command("show", circuit::CircuitShowAction)
+        .with_command("proposals", circuit::CircuitProposalsAction);
+
+    #[cfg(feature = "circuit-template")]
+    let circuit_command = circuit_command.with_command(
+        "template",
+        SubcommandActions::new()
+            .with_command("list", circuit::template::ListCircuitTemplates)
+            .with_command("show", circuit::template::ShowCircuitTemplate)
+            .with_command("arguments", circuit::template::ListCircuitTemplateArguments),
+    );
+
+    subcommands = subcommands.with_command("circuit", circuit_command);
+
     #[cfg(feature = "health")]
     {
         use action::health;
@@ -621,28 +635,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             "database",
             SubcommandActions::new().with_command("migrate", database::MigrateAction),
         )
-    }
-
-    #[cfg(feature = "circuit")]
-    {
-        use action::circuit;
-        let circuit_command = SubcommandActions::new()
-            .with_command("propose", circuit::CircuitProposeAction)
-            .with_command("vote", circuit::CircuitVoteAction)
-            .with_command("list", circuit::CircuitListAction)
-            .with_command("show", circuit::CircuitShowAction)
-            .with_command("proposals", circuit::CircuitProposalsAction);
-
-        #[cfg(feature = "circuit-template")]
-        let circuit_command = circuit_command.with_command(
-            "template",
-            SubcommandActions::new()
-                .with_command("list", circuit::template::ListCircuitTemplates)
-                .with_command("show", circuit::template::ShowCircuitTemplate)
-                .with_command("arguments", circuit::template::ListCircuitTemplateArguments),
-        );
-
-        subcommands = subcommands.with_command("circuit", circuit_command);
     }
 
     #[cfg(feature = "keygen")]

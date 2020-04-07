@@ -14,5 +14,4 @@
 
 //! This module provides integration tests for the splinter CLI.
 
-#[cfg(feature = "circuit")]
 mod circuit;
