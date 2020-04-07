@@ -47,7 +47,7 @@ what arguments it takes, and the default value/behavior. If appropriate, explain
 how/when it's used, with tips, gotchas, and very short examples.
 -->
 
-`-e`, `--example <example>`
+`-e`, `--example EXAMPLE`
 : Description about example options
 
 

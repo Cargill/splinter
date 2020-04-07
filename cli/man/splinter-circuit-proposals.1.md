@@ -36,22 +36,22 @@ FLAGS
 
 OPTIONS
 =======
-`-f`, `--format` <format>
+`-f`, `--format` FORMAT
 : Specifies the output format of the circuit proposal. (default `human`).
   Possible values for formatting are `human` and `csv`. The `human` option
   displays the circuit proposals information in a formatted table, while `csv`
   prints the circuit proposals information via comma-separated values.
 
-`--management-type` <management_type>
+`--management-type` MANAGEMENT-TYPE
 : Filter the circuit proposals by their circuit management type.
 
-`-m`, `--member` <member>
+`-m`, `--member` MEMBER
 : Filter the circuits list by a node ID that is present in the circuit proposal’s
   members list.
 
-`-U`, `--url` <url>
+`-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
-  `$SPLINTER_REST_API_URL_ENV` is set.
+  `$SPLINTER_REST_API_URL` is set.
 
 EXAMPLES
 ========
@@ -63,7 +63,7 @@ The following command does not specify any filters, therefore all circuit propos
 the local node, `alpha-node-000` is a part of are displayed.
 ```
 $ splinter circuit proposals \
-  --url <URL-of-alpha-node-000-splinterd-REST-API>
+  --url URL-of-alpha-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
 43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
@@ -76,7 +76,7 @@ of `mgmt001` will be listed.
 ```
 $ splinter circuit proposals \
   --management-type mgmt001 \
-  --url <URL-of-alpha-node-000-splinterd-REST-API>
+  --url URL-of-alpha-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
 43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
@@ -88,7 +88,7 @@ ID will be listed.
 ```
 $ splinter circuit proposals \
   member gamma-node-000 \
-  --url <URL-of-alpha-node-000-splinterd-REST-API>
+  --url URL-of-alpha-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
 56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
@@ -96,7 +96,7 @@ ID            MANAGEMENT    MEMBERS
 
 ENVIRONMENT VARIABLES
 =====================
-**SPLINTER_REST_API_URL_ENV**
+**SPLINTER_REST_API_URL**
 : URL for the `splinterd` REST API. (See `-U`, `--url`.)
 
 SEE ALSO

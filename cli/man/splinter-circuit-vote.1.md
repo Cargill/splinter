@@ -7,7 +7,7 @@ NAME
 
 SYNOPSIS
 ========
-**splinter circuit vote** \[**FLAGS**\] \[**OPTIONS**\] <circuit_id> --accept --reject
+**splinter circuit vote** \[**FLAGS**\] \[**OPTIONS**\] CIRCUIT-ID --accept --reject
 
 DESCRIPTION
 ===========
@@ -45,16 +45,16 @@ FLAGS
 
 OPTIONS
 =======
-`-k`, `--key` <private-key-file>
+`-k`, `--key` PRIVATE-KEY-FILE
 : Specifies the full path to the private key file.
 
-`-U`, `--url` <url>
+`-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
   `$SPLINTER_REST_API_URL` is set.
 
 ARGUMENTS
 =========
-`<circuit-id>`
+`CIRCUIT-ID`
 : Specify the circuit ID of the circuit to be voted on.
 
 EXAMPLES
@@ -64,8 +64,8 @@ EXAMPLES
 The following command displays a member node voting to accept the circuit proposal:
 ```
 $ splinter circuit vote \
-  --key <proposed-member-node-private-key> \
-  --url <URL-of-proposed-member-node-splinterd-REST-API> \
+  --key PROPOSED-MEMBER-NODE-PRIVATE-KEY-FILE \
+  --url URL-of-proposed-member-node-splinterd-REST-API \
   1234-ABCDE \
   --accept
 ```
@@ -73,8 +73,8 @@ $ splinter circuit vote \
 The following command displays a member node voting to reject the circuit proposal:
 ```
 $ splinter circuit vote \
-  --key <proposed-member-node-private-key> \
-  --url <URL-of-proposed-member-node-splinterd-REST-API> \
+  --key PROPOSED-MEMBER-NODE-PRIVATE-KEY-FILE \
+  --url URL-of-proposed-member-node-splinterd-REST-API \
   1234-ABCDE \
   --reject
 ```

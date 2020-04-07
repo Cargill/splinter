@@ -37,7 +37,7 @@ FLAGS
 
 OPTIONS
 =======
-`-f`, `--format` <format>
+`-f`, `--format` FORMAT
 : Specifies the output format of the circuit. (default `human`). Possible values
   for formatting are `human` and `csv`.
 
@@ -45,9 +45,9 @@ OPTIONS
 : Filter the circuits list by a node ID that is present in the circuits’ members
   list.
 
-`-U`, `--url` <url>
+`-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
-  `$SPLINTER_REST_API_URL_ENV` is set.
+  `$SPLINTER_REST_API_URL` is set.
 
 EXAMPLES
 ========
@@ -59,7 +59,7 @@ The following command does not specify any filters, therefore all circuits
 the local node, `alpha-node-000` is a member of are displayed.
 ```
 $ splinter circuit list \
-  --url <URL-of-alpha-node-000-splinterd-REST-API>
+  --url URL-of-alpha-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
 43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
@@ -72,20 +72,20 @@ ID will be listed.
 ```
 $ splinter circuit list \
   member gamma-node-000 \
-  --url <URL-of-alpha-node-000-splinterd-REST-API>
+  --url URL-of-alpha-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
 56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
 ```
 
-Since all of the circuits listed have been accepted by each member, the same c
-ircuit information will be displayed for member nodes.
+Since all of the circuits listed have been accepted by each member, the same
+circuit information will be displayed for member nodes.
 
 From the perspective of the `gamma-node-000` node, this command will display the
 following with no filters:
 ```
 $ splinter circuit list \
-  --url <URL-of-gamma-node-000-splinterd-REST-API>
+  --url URL-of-gamma-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
 56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
@@ -95,14 +95,14 @@ From the perspective of the `beta-node-000` node, this command will display the
 following with no filters:
 ```
 $ splinter circuit list \
-  --url <URL-of-gamma-node-000-splinterd-REST-API>
+  --url URL-of-gamma-node-splinterd-REST-API
 ID            MANAGEMENT    MEMBERS
 01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
 ```
 
 ENVIRONMENT VARIABLES
 =====================
-**SPLINTER_REST_API_URL_ENV**
+**SPLINTER_REST_API_URL**
 : URL for the `splinterd` REST API. (See `-U`, `--url`.)
 
 SEE ALSO
