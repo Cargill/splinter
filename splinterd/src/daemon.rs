@@ -53,7 +53,7 @@ use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutEr
 use splinter::node_registry::{
     self,
     rest_api::{make_nodes_identity_resource, make_nodes_resource},
-    RwNodeRegistry,
+    RwNodeRegistry, UnifiedNodeRegistry,
 };
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::protos::authorization::AuthorizationMessageType;
@@ -953,23 +953,25 @@ fn set_up_circuit_dispatcher(
 fn create_node_registry(
     registry_config: &RegistryConfig,
 ) -> Result<Box<dyn RwNodeRegistry>, RestApiServerError> {
-    match registry_config {
+    let local_registry: Box<dyn RwNodeRegistry> = match registry_config {
         RegistryConfig::File { registry_file } => {
             debug!(
-                "Creating node registry with registry file: {:?}",
+                "Creating local node registry with registry file: {:?}",
                 fs::canonicalize(&registry_file)?
             );
-            Ok(Box::new(
+            Box::new(
                 node_registry::yaml::YamlNodeRegistry::new(&registry_file).map_err(|err| {
                     RestApiServerError::StartUpError(format!(
-                        "Failed to initialize YamlNodeRegistry: {}",
+                        "Failed to initialize local YamlNodeRegistry: {}",
                         err
                     ))
                 })?,
-            ))
+            )
         }
-        RegistryConfig::NoOp => Ok(Box::new(node_registry::noop::NoOpNodeRegistry)),
-    }
+        RegistryConfig::NoOp => Box::new(node_registry::noop::NoOpNodeRegistry),
+    };
+
+    Ok(Box::new(UnifiedNodeRegistry::new(local_registry, vec![])))
 }
 
 #[derive(Debug)]
