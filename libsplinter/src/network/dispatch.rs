@@ -420,6 +420,7 @@ where
     Shutdown,
 }
 
+#[derive(Clone)]
 pub struct DispatchLoopShutdownSignaler<MT, Source = PeerId>
 where
     MT: Any + Hash + Eq + Debug + Clone,
