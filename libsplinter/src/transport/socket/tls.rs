@@ -515,11 +515,7 @@ pub(crate) mod tests {
     #[test]
     fn test_poll() {
         let transport = create_test_tls_transport(true);
-        tests::test_poll(
-            transport,
-            "127.0.0.1:0",
-            Ready::readable() | Ready::writable(),
-        );
+        tests::test_poll(transport, "127.0.0.1:0");
     }
 
     #[test]

@@ -17,6 +17,8 @@ use std::path::Path;
 
 use splinter::transport::socket::TcpTransport;
 use splinter::transport::socket::TlsTransport;
+#[cfg(feature = "ws-transport")]
+use splinter::transport::ws::WsTransport;
 use splinter::transport::Transport;
 
 use crate::config::Config;
@@ -113,6 +115,8 @@ pub fn get_transport(config: &Config) -> Result<Box<dyn Transport + Send>, GetTr
             Ok(Box::new(transport))
         }
         "raw" => Ok(Box::new(TcpTransport::default())),
+        #[cfg(feature = "ws-transport")]
+        "ws" => Ok(Box::new(WsTransport::default())),
         _ => Err(GetTransportError::NotSupportedError(format!(
             "Transport type {} is not supported",
             config.transport()
