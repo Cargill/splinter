@@ -14,6 +14,7 @@
 
 mod connector;
 mod error;
+pub mod interconnect;
 mod notification;
 mod peer_map;
 
