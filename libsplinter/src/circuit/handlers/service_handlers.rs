@@ -15,7 +15,7 @@
 use crate::circuit::handlers::create_message;
 use crate::circuit::service::{Service, ServiceId, SplinterNode};
 use crate::circuit::{ServiceDefinition, SplinterState};
-use crate::network::dispatch::{DispatchError, Handler, MessageContext};
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{
     CircuitMessageType, ServiceConnectRequest, ServiceConnectResponse,
@@ -33,13 +33,14 @@ pub struct ServiceConnectRequestHandler {
 }
 
 impl Handler for ServiceConnectRequestHandler {
+    type Source = PeerId;
     type MessageType = CircuitMessageType;
     type Message = ServiceConnectRequest;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Connect Request {:?}", msg);
@@ -164,13 +165,14 @@ pub struct ServiceDisconnectRequestHandler {
 }
 
 impl Handler for ServiceDisconnectRequestHandler {
+    type Source = PeerId;
     type MessageType = CircuitMessageType;
     type Message = ServiceDisconnectRequest;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Disconnect Request {:?}", msg);
@@ -305,7 +307,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "abc",
+                        "abc".into(),
                         &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                         connect_bytes.clone(),
                     )
@@ -358,7 +360,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "BAD",
+                        "BAD".into(),
                         &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                         connect_bytes.clone(),
                     )
@@ -411,7 +413,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "abc",
+                        "abc".into(),
                         &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                         connect_bytes.clone(),
                     )
@@ -470,7 +472,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "abc",
+                        "abc".into(),
                         &CircuitMessageType::SERVICE_CONNECT_REQUEST,
                         connect_bytes.clone(),
                     )
@@ -516,7 +518,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "abc",
+                        "abc".into(),
                         &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                         disconnect_bytes.clone(),
                     )
@@ -565,7 +567,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "BAD",
+                        "BAD".into(),
                         &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                         disconnect_bytes.clone(),
                     )
@@ -621,7 +623,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "abc",
+                        "abc".into(),
                         &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                         disconnect_bytes.clone(),
                     )
@@ -668,7 +670,7 @@ mod tests {
 
                 dispatcher
                     .dispatch(
-                        "abc",
+                        "abc".into(),
                         &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
                         disconnect_bytes.clone(),
                     )

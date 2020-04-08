@@ -14,7 +14,7 @@
 
 use crate::circuit::handlers::create_message;
 use crate::circuit::SplinterState;
-use crate::network::dispatch::{DispatchError, Handler, MessageContext};
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
@@ -30,13 +30,14 @@ pub struct AdminDirectMessageHandler {
 }
 
 impl Handler for AdminDirectMessageHandler {
+    type Source = PeerId;
     type MessageType = CircuitMessageType;
     type Message = AdminDirectMessage;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(
@@ -75,7 +76,7 @@ impl AdminDirectMessageHandler {
     fn create_response(
         &self,
         msg: AdminDirectMessage,
-        context: &MessageContext<CircuitMessageType>,
+        context: &MessageContext<PeerId, CircuitMessageType>,
     ) -> Result<(Vec<u8>, String), DispatchError> {
         let circuit_name = msg.get_circuit();
         let msg_sender = msg.get_sender();
@@ -227,7 +228,7 @@ mod tests {
                 assert_eq!(
                     Ok(()),
                     dispatcher.dispatch(
-                        "5678",
+                        "5678".into(),
                         &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                         direct_bytes
                     )
@@ -288,7 +289,7 @@ mod tests {
                 assert_eq!(
                     Ok(()),
                     dispatcher.dispatch(
-                        "5678",
+                        "5678".into(),
                         &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                         direct_bytes
                     )
@@ -349,7 +350,7 @@ mod tests {
                 assert_eq!(
                     Ok(()),
                     dispatcher.dispatch(
-                        "1234",
+                        "1234".into(),
                         &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                         direct_bytes
                     )
@@ -395,7 +396,7 @@ mod tests {
                 assert_eq!(
                     Ok(()),
                     dispatcher.dispatch(
-                        "1234",
+                        "1234".into(),
                         &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                         direct_bytes
                     )
@@ -441,7 +442,7 @@ mod tests {
                 assert_eq!(
                     Ok(()),
                     dispatcher.dispatch(
-                        "1234",
+                        "1234".into(),
                         &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
                         direct_bytes
                     )

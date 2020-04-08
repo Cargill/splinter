@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::network::dispatch::{DispatchError, Handler, MessageContext};
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::network::{NetworkEcho, NetworkHeartbeat, NetworkMessage, NetworkMessageType};
 
@@ -24,13 +24,14 @@ pub struct NetworkEchoHandler {
 }
 
 impl Handler for NetworkEchoHandler {
+    type Source = PeerId;
     type MessageType = NetworkMessageType;
     type Message = NetworkEcho;
 
     fn handle(
         &self,
         mut msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("ECHO: {:?}", msg);
@@ -77,13 +78,14 @@ impl NetworkEchoHandler {
 pub struct NetworkHeartbeatHandler {}
 
 impl Handler for NetworkHeartbeatHandler {
+    type Source = PeerId;
     type MessageType = NetworkMessageType;
     type Message = NetworkHeartbeat;
 
     fn handle(
         &self,
         _msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         _sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         trace!("Received Heartbeat from {}", context.source_peer_id());
@@ -149,7 +151,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    "OTHER_PEER",
+                    "OTHER_PEER".into(),
                     &NetworkMessageType::NETWORK_ECHO,
                     outgoing_message_bytes.clone()
                 )

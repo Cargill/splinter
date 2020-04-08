@@ -19,6 +19,7 @@ use crate::network::auth::{
 };
 use crate::network::dispatch::{
     DispatchError, DispatchMessageSender, Dispatcher, FromMessageBytes, Handler, MessageContext,
+    PeerId,
 };
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::authorization::{
@@ -88,23 +89,24 @@ impl AuthorizationMessageHandler {
 }
 
 impl Handler for AuthorizationMessageHandler {
+    type Source = PeerId;
     type MessageType = NetworkMessageType;
     type Message = AuthorizationMessage;
 
     fn handle(
         &self,
-        msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        mut msg: Self::Message,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         _sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         self.sender
             .send(
                 msg.message_type,
-                msg.get_payload().to_vec(),
-                context.source_peer_id().to_string(),
+                msg.take_payload(),
+                context.source_id().clone(),
             )
-            .map_err(|_| {
-                DispatchError::NetworkSendError((context.source_peer_id().to_string(), msg.payload))
+            .map_err(|(_, message_bytes, source_id)| {
+                DispatchError::NetworkSendError((source_id.into(), message_bytes))
             })?;
         Ok(())
     }
@@ -113,13 +115,14 @@ impl Handler for AuthorizationMessageHandler {
 pub struct AuthorizedHandler;
 
 impl Handler for AuthorizedHandler {
+    type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = AuthorizedMessage;
 
     fn handle(
         &self,
         _: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         _sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         info!(
@@ -137,7 +140,7 @@ impl Handler for AuthorizedHandler {
 /// NetworkMessageType.
 pub struct NetworkAuthGuardHandler<M: FromMessageBytes> {
     auth_manager: AuthorizationManager,
-    handler: Box<dyn Handler<MessageType = NetworkMessageType, Message = M>>,
+    handler: Box<dyn Handler<Source = PeerId, MessageType = NetworkMessageType, Message = M>>,
 }
 
 impl<M: FromMessageBytes> NetworkAuthGuardHandler<M> {
@@ -146,7 +149,7 @@ impl<M: FromMessageBytes> NetworkAuthGuardHandler<M> {
     /// Handlers must be typed to the NetworkMessageType, but may be any message content type.
     pub fn new(
         auth_manager: AuthorizationManager,
-        handler: Box<dyn Handler<MessageType = NetworkMessageType, Message = M>>,
+        handler: Box<dyn Handler<Source = PeerId, MessageType = NetworkMessageType, Message = M>>,
     ) -> Self {
         NetworkAuthGuardHandler {
             auth_manager,
@@ -156,13 +159,14 @@ impl<M: FromMessageBytes> NetworkAuthGuardHandler<M> {
 }
 
 impl<M: FromMessageBytes> Handler for NetworkAuthGuardHandler<M> {
+    type Source = PeerId;
     type MessageType = NetworkMessageType;
     type Message = M;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         if self.auth_manager.is_authorized(context.source_peer_id()) {
@@ -190,13 +194,14 @@ impl ConnectRequestHandler {
 }
 
 impl Handler for ConnectRequestHandler {
+    type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = ConnectRequest;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         match self
@@ -288,13 +293,14 @@ impl ConnectResponseHandler {
 }
 
 impl Handler for ConnectResponseHandler {
+    type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = ConnectResponse;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(
@@ -337,13 +343,14 @@ impl TrustRequestHandler {
 }
 
 impl Handler for TrustRequestHandler {
+    type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = TrustRequest;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         match self.auth_manager.next_state(
@@ -394,13 +401,14 @@ impl AuthorizationErrorHandler {
 }
 
 impl Handler for AuthorizationErrorHandler {
+    type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = AuthorizationError;
 
     fn handle(
         &self,
         msg: Self::Message,
-        context: &MessageContext<Self::MessageType>,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         _: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         match self
@@ -495,7 +503,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    &peer_id,
+                    peer_id.into(),
                     &AuthorizationMessageType::CONNECT_REQUEST,
                     msg_bytes
                 )
@@ -570,7 +578,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    &peer_id,
+                    peer_id.into(),
                     &AuthorizationMessageType::CONNECT_RESPONSE,
                     msg_bytes
                 )
@@ -628,7 +636,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    &peer_id,
+                    peer_id.clone().into(),
                     &AuthorizationMessageType::CONNECT_REQUEST,
                     msg_bytes
                 )
@@ -642,7 +650,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    &peer_id,
+                    peer_id.into(),
                     &AuthorizationMessageType::TRUST_REQUEST,
                     msg_bytes
                 )
@@ -712,7 +720,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    &peer_id,
+                    peer_id.clone().into(),
                     &AuthorizationMessageType::CONNECT_REQUEST,
                     msg_bytes
                 )
@@ -730,7 +738,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    &peer_id,
+                    peer_id.into(),
                     &AuthorizationMessageType::AUTHORIZATION_ERROR,
                     msg_bytes
                 )
