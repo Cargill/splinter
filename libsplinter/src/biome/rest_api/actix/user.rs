@@ -16,10 +16,9 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError,
+    diesel::DieselCredentialsStore, CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
-use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::{diesel::DieselUserStore, UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
@@ -38,7 +37,7 @@ use crate::rest_api::secrets::SecretManager;
 
 use crate::biome::rest_api::actix::authorize::authorize_user;
 #[cfg(feature = "biome-key-management")]
-use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey};
+use crate::biome::rest_api::resources::{key_management::ResponseKey, user::ModifyUser};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<DieselCredentialsStore>) -> Resource {
@@ -174,7 +173,7 @@ fn add_modify_user_method(
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
-            let body = match serde_json::from_slice::<serde_json::Value>(&bytes) {
+            let modify_user = match serde_json::from_slice::<ModifyUser>(&bytes) {
                 Ok(val) => val,
                 Err(err) => {
                     debug!("Error parsing request body {}", err);
@@ -186,43 +185,21 @@ fn add_modify_user_method(
                         .into_future();
                 }
             };
-            let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
-                Ok(val) => val,
-                Err(err) => {
-                    debug!("Error parsing payload {}", err);
-                    return HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Failed to parse payload: {}",
-                            err
-                        )))
-                        .into_future();
-                }
-            };
-            let new_key_pairs: Vec<Key> = match serde_json::from_slice::<Vec<NewKey>>(&bytes) {
-                Ok(val) => val,
-                Err(err) => {
-                    debug!("Error parsing payload {}", err);
-                    return HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Failed to parse payload: {}",
-                            err
-                        )))
-                        .into_future();
-                }
-            }
-            .iter()
-            .map(|new_key| {
-                Key::new(
-                    &new_key.public_key,
-                    &new_key.encrypted_private_key,
-                    &user_id,
-                    &new_key.display_name,
-                )
-            })
-            .collect::<Vec<Key>>();
+            let new_key_pairs: Vec<Key> = modify_user
+                .new_key_pairs
+                .iter()
+                .map(|new_key| {
+                    Key::new(
+                        &new_key.public_key,
+                        &new_key.encrypted_private_key,
+                        &user_id,
+                        &new_key.display_name,
+                    )
+                })
+                .collect::<Vec<Key>>();
 
             let credentials =
-                match credentials_store.fetch_credential_by_username(&username_password.username) {
+                match credentials_store.fetch_credential_by_username(&modify_user.username) {
                     Ok(credentials) => credentials,
                     Err(err) => {
                         debug!("Failed to fetch credentials {}", err);
@@ -231,7 +208,7 @@ fn add_modify_user_method(
                                 return HttpResponse::NotFound()
                                     .json(ErrorResponse::not_found(&format!(
                                         "Username not found: {}",
-                                        username_password.username
+                                        modify_user.username
                                     )))
                                     .into_future();
                             }
@@ -243,14 +220,28 @@ fn add_modify_user_method(
                         }
                     }
                 };
-            match credentials.verify_password(&username_password.hashed_password) {
+            match credentials.verify_password(&modify_user.hashed_password) {
                 Ok(true) => {
-                    let new_password = match body.get("new_password") {
-                        Some(val) => match val.as_str() {
-                            Some(val) => val,
-                            None => &username_password.hashed_password,
-                        },
-                        None => &username_password.hashed_password,
+                    let new_password = match modify_user.new_password {
+                        Some(val) => {
+                            // Use credentials builder to salt password
+                            match CredentialsBuilder::default()
+                                .with_user_id(&credentials.user_id)
+                                .with_username(&credentials.username)
+                                .with_password(&val)
+                                .build()
+                            {
+                                Ok(creds) => creds.password,
+                                Err(err) => {
+                                    debug!("Failed to salt new password: {}", err);
+                                    return HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                        .into_future();
+                                }
+                            }
+                        }
+                        // If no new password, pull old password for update operation
+                        None => credentials.password,
                     };
 
                     let response_keys = new_key_pairs
