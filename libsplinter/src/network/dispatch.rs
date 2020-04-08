@@ -28,7 +28,7 @@ use crate::network::sender::NetworkMessageSender;
 /// A wrapper for a PeerId.
 ///
 /// This type constrains a dispatcher to peer-specific messages
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PeerId(String);
 
 impl std::ops::Deref for PeerId {
@@ -241,6 +241,8 @@ pub enum DispatchError {
     NetworkSendError((String, Vec<u8>)),
     /// An error occurred while a handler was executing.
     HandleError(String),
+    /// if no network sender is set
+    MissingNetworkSender,
 }
 
 impl std::error::Error for DispatchError {}
@@ -259,6 +261,7 @@ impl std::fmt::Display for DispatchError {
                 write!(f, "unable to send message to receipt {}", recipient)
             }
             DispatchError::HandleError(msg) => write!(f, "unable to handle message: {}", msg),
+            DispatchError::MissingNetworkSender => write!(f, "missing network sender"),
         }
     }
 }
@@ -277,13 +280,14 @@ impl std::fmt::Display for DispatchError {
 ///
 /// Message Types (MT) merely need to implement Hash, Eq and Debug (for unknown message type
 /// results). Beyond that, there are no other requirements.
+#[derive(Default)]
 pub struct Dispatcher<MT, Source = PeerId>
 where
     Source: 'static,
     MT: Any + Hash + Eq + Debug + Clone,
 {
     handlers: HashMap<MT, HandlerWrapper<Source, MT>>,
-    network_sender: NetworkMessageSender,
+    network_sender: Option<NetworkMessageSender>,
 }
 
 impl<MT, Source> Dispatcher<MT, Source>
@@ -298,7 +302,7 @@ where
     pub fn new(network_sender: NetworkMessageSender) -> Self {
         Dispatcher {
             handlers: HashMap::new(),
-            network_sender,
+            network_sender: Some(network_sender),
         }
     }
 
@@ -325,6 +329,10 @@ where
         );
     }
 
+    pub fn set_network_sender(&mut self, network_sender: NetworkMessageSender) {
+        self.network_sender = Some(network_sender);
+    }
+
     /// Dispatch a message by type.
     ///
     /// This dispatches a message (in raw byte form) as a given message type.  The message will be
@@ -345,18 +353,25 @@ where
             message_bytes,
             source_id,
         };
-        self.handlers
-            .get(message_type)
-            .ok_or_else(|| {
-                DispatchError::UnknownMessageType(format!("No handler for type {:?}", message_type))
-            })
-            .and_then(|handler| {
-                handler.handle(
-                    &message_context.message_bytes,
-                    &message_context,
-                    self.network_sender.borrow(),
-                )
-            })
+        if let Some(network_sender) = &self.network_sender {
+            self.handlers
+                .get(message_type)
+                .ok_or_else(|| {
+                    DispatchError::UnknownMessageType(format!(
+                        "No handler for type {:?}",
+                        message_type
+                    ))
+                })
+                .and_then(|handler| {
+                    handler.handle(
+                        &message_context.message_bytes,
+                        &message_context,
+                        network_sender.borrow(),
+                    )
+                })
+        } else {
+            Err(DispatchError::MissingNetworkSender)
+        }
     }
 }
 
