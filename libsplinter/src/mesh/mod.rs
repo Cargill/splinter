@@ -126,6 +126,7 @@ impl MeshState {
     }
 }
 
+#[derive(Clone)]
 pub struct MeshShutdownSignaler {
     ctrl: Control,
 }
