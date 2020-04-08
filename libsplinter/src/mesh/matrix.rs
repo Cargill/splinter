@@ -81,6 +81,12 @@ pub struct MeshMatrixReceiver {
     mesh: Mesh,
 }
 
+impl MeshMatrixReceiver {
+    pub fn new(mesh: Mesh) -> Self {
+        MeshMatrixReceiver { mesh }
+    }
+}
+
 impl MatrixReceiver for MeshMatrixReceiver {
     fn recv(&self) -> Result<Envelope, MatrixRecvError> {
         match self.mesh.recv() {
