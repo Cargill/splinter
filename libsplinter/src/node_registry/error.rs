@@ -17,8 +17,6 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum NodeRegistryError {
-    /// This error is returned when a node is not found.
-    NotFoundError(String),
     InvalidNode(InvalidNodeError),
     /// This error is returned when an internal error occurred
     InternalError(Box<dyn Error + Send>),
@@ -29,7 +27,6 @@ pub enum NodeRegistryError {
 impl Error for NodeRegistryError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            NodeRegistryError::NotFoundError(_) => None,
             NodeRegistryError::InvalidNode(err) => Some(err),
             NodeRegistryError::InternalError(err) => Some(err.as_ref()),
             // Unfortunately, have to match on both arms to return the expected result
@@ -42,7 +39,6 @@ impl Error for NodeRegistryError {
 impl fmt::Display for NodeRegistryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NodeRegistryError::NotFoundError(e) => write!(f, "Node not found: {}", e),
             NodeRegistryError::InvalidNode(e) => write!(f, "Invalid node: {}", e),
             NodeRegistryError::InternalError(e) => write!(f, "Internal error: {}", e),
             NodeRegistryError::UnableToAddNode(msg, err) => write!(

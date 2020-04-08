@@ -96,22 +96,19 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
             })
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Node, NodeRegistryError> {
-        match self.local_source.fetch_node(identity) {
-            Ok(node) => return Ok(node),
-            Err(NodeRegistryError::NotFoundError(_)) => (),
-            Err(err) => return Err(err),
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        if let Some(node) = self.local_source.fetch_node(identity)? {
+            return Ok(Some(node));
         }
 
-        self.readable_sources
+        Ok(self
+            .readable_sources
             .iter()
             .map(|source| source.fetch_node(identity))
-            .filter(|res| match res {
-                Err(NodeRegistryError::NotFoundError(_)) => false,
-                _ => true,
-            })
-            .find(Result::is_ok)
-            .unwrap_or_else(|| Err(NodeRegistryError::NotFoundError(identity.to_string())))
+            .find_map(|res| match res {
+                Ok(opt) => opt,
+                _ => None,
+            }))
     }
 }
 
@@ -120,7 +117,7 @@ impl NodeRegistryWriter for UnifiedNodeRegistry {
         self.local_source.insert_node(node)
     }
 
-    fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         self.local_source.delete_node(identity)
     }
 }
@@ -166,7 +163,10 @@ mod test {
 
         let unified = UnifiedNodeRegistry::new(Box::new(writable), vec![Box::new(readable)]);
 
-        let retreived_node = unified.fetch_node("node1").expect("Unable to fetch node");
+        let retreived_node = unified
+            .fetch_node("node1")
+            .expect("Unable to fetch node")
+            .expect("Node not found");
 
         assert_eq!(node!("node1", "meta_a" => "a value"), retreived_node);
     }
@@ -184,7 +184,10 @@ mod test {
 
         let unified = UnifiedNodeRegistry::new(Box::new(writable), vec![Box::new(readable)]);
 
-        let retreived_node = unified.fetch_node("node1").expect("Unable to fetch node");
+        let retreived_node = unified
+            .fetch_node("node1")
+            .expect("Unable to fetch node")
+            .expect("Node not found");
 
         assert_eq!(node!("node1", "meta_b" => "b value"), retreived_node);
     }
@@ -205,7 +208,10 @@ mod test {
 
         let unified = UnifiedNodeRegistry::new(Box::new(writable), vec![Box::new(readable)]);
 
-        let retreived_node = unified.fetch_node("node1").expect("Unable to fetch node");
+        let retreived_node = unified
+            .fetch_node("node1")
+            .expect("Unable to fetch node")
+            .expect("Node not found");
 
         assert_eq!(node!("node1", "meta_b" => "b value"), retreived_node);
     }
@@ -305,13 +311,13 @@ mod test {
             self.list_nodes(predicates).map(|iter| iter.count() as u32)
         }
 
-        fn fetch_node(&self, identity: &str) -> Result<Node, NodeRegistryError> {
-            self.nodes
+        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+            Ok(self
+                .nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
                 .get(identity)
-                .cloned()
-                .ok_or_else(|| NodeRegistryError::NotFoundError(identity.to_string()))
+                .cloned())
         }
     }
 
@@ -324,12 +330,12 @@ mod test {
             Ok(())
         }
 
-        fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
-            self.nodes
+        fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+            Ok(self
+                .nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
-                .remove(identity);
-            Ok(())
+                .remove(identity))
         }
     }
 

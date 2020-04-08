@@ -141,14 +141,10 @@ pub trait NodeRegistryReader: Send + Sync {
     ///
     ///  * `identity` - The Splinter identity of the node.
     ///
-    fn fetch_node(&self, identity: &str) -> Result<Node, NodeRegistryError>;
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError>;
 
     fn has_node(&self, identity: &str) -> Result<bool, NodeRegistryError> {
-        match self.fetch_node(identity) {
-            Ok(_) => Ok(true),
-            Err(NodeRegistryError::NotFoundError(_)) => Ok(false),
-            Err(err) => Err(err),
-        }
+        self.fetch_node(identity).map(|opt| opt.is_some())
     }
 }
 
@@ -168,7 +164,7 @@ pub trait NodeRegistryWriter: Send + Sync {
     ///
     ///  * `identity` - The Splinter identity of the node.
     ///
-    fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError>;
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError>;
 }
 
 /// Provides a marker trait for a clonable, readable and writable Node Registry.
@@ -204,7 +200,7 @@ where
         (**self).count_nodes(predicates)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Node, NodeRegistryError> {
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         (**self).fetch_node(identity)
     }
 
@@ -221,7 +217,7 @@ where
         (**self).insert_node(node)
     }
 
-    fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         (**self).delete_node(identity)
     }
 }
