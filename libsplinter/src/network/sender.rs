@@ -17,7 +17,7 @@ use crate::network::Network;
 
 // Message to send to the network message sender with the recipient and payload
 #[derive(Clone, Debug, PartialEq)]
-enum SendRequest {
+pub(in crate::network) enum SendRequest {
     Shutdown,
     Message { recipient: String, payload: Vec<u8> },
 }
