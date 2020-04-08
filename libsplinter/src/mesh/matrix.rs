@@ -15,8 +15,9 @@ use std::time::Duration;
 
 use crate::matrix::{
     Envelope, MatrixAddError, MatrixLifeCycle, MatrixReceiver, MatrixRecvError,
-    MatrixRecvTimeoutError, MatrixRemoveError, MatrixSendError, MatrixSender,
+    MatrixRecvTimeoutError, MatrixRemoveError, MatrixSendError, MatrixSender, MatrixShutdown,
 };
+use crate::mesh::MeshShutdownSignaler;
 use crate::transport::Connection;
 
 use super::{Mesh, RecvError, RecvTimeoutError};
@@ -108,5 +109,22 @@ impl MatrixReceiver for MeshMatrixReceiver {
                 RecvTimeoutError::Shutdown => Err(MatrixRecvTimeoutError::Shutdown),
             },
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct MeshMatrixShutdown {
+    shutdown_signaler: MeshShutdownSignaler,
+}
+
+impl MeshMatrixShutdown {
+    pub fn new(shutdown_signaler: MeshShutdownSignaler) -> Self {
+        MeshMatrixShutdown { shutdown_signaler }
+    }
+}
+
+impl MatrixShutdown for MeshMatrixShutdown {
+    fn shutdown(&self) {
+        self.shutdown_signaler.shutdown();
     }
 }
