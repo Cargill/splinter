@@ -235,6 +235,14 @@ impl RwNodeRegistry for LocalYamlNodeRegistry {
     fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
         Box::new(self.clone())
     }
+
+    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        Box::new(Clone::clone(self))
+    }
+
+    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        Box::new(Clone::clone(self))
+    }
 }
 
 #[cfg(test)]

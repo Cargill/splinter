@@ -254,6 +254,12 @@ pub trait RwNodeRegistry: NodeRegistryWriter + NodeRegistryReader {
     ///  }
     ///```
     fn clone_box(&self) -> Box<dyn RwNodeRegistry>;
+
+    /// Clone the `RwNodeRegistry` as a `Box<dyn NodeRegistryReader>`.
+    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader>;
+
+    /// Clone the `RwNodeRegistry` as a `Box<dyn NodeRegistryWriter>`.
+    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter>;
 }
 
 impl Clone for Box<dyn RwNodeRegistry> {

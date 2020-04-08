@@ -195,6 +195,14 @@ impl RwNodeRegistry for UnifiedNodeRegistry {
     fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
         Box::new(self.clone())
     }
+
+    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        Box::new(self.clone())
+    }
+
+    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]
@@ -670,6 +678,14 @@ mod test {
 
     impl RwNodeRegistry for MemRegistry {
         fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+            Box::new(self.clone())
+        }
+
+        fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+            Box::new(self.clone())
+        }
+
+        fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
             Box::new(self.clone())
         }
     }
