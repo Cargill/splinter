@@ -950,7 +950,7 @@ fn set_up_circuit_dispatcher(
 fn create_node_registry(
     local_node_registry_location: &str,
     registries: &[String],
-) -> Result<Box<dyn RwNodeRegistry>, RestApiServerError> {
+) -> Result<Box<dyn RwNodeRegistry>, StartError> {
     debug!(
         "Creating local node registry with registry file: {:?}",
         local_node_registry_location
@@ -958,7 +958,7 @@ fn create_node_registry(
     let local_registry = Box::new(
         node_registry::yaml::YamlNodeRegistry::new(local_node_registry_location).map_err(
             |err| {
-                RestApiServerError::StartUpError(format!(
+                StartError::NodeRegistryError(format!(
                     "Failed to initialize local YamlNodeRegistry: {}",
                     err
                 ))
@@ -1026,6 +1026,7 @@ pub enum StartError {
     StorageError(String),
     ProtocolError(String),
     RestApiError(String),
+    NodeRegistryError(String),
     AdminServiceError(String),
     #[cfg(feature = "health")]
     HealthServiceError(String),
@@ -1044,6 +1045,9 @@ impl fmt::Display for StartError {
             StartError::StorageError(msg) => write!(f, "unable to set up storage: {}", msg),
             StartError::ProtocolError(msg) => write!(f, "unable to parse protocol: {}", msg),
             StartError::RestApiError(msg) => write!(f, "REST API encountered an error: {}", msg),
+            StartError::NodeRegistryError(msg) => {
+                write!(f, "unable to setup node registry: {}", msg)
+            }
             StartError::AdminServiceError(msg) => {
                 write!(f, "the admin service encountered an error: {}", msg)
             }
