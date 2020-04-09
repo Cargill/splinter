@@ -15,6 +15,7 @@
 use protobuf::Message;
 
 use crate::network::dispatch::{DispatchError, FromMessageBytes};
+use crate::protos::prelude::*;
 
 // Implements FromMessageBytes for all protobuf Message values.
 impl<M> FromMessageBytes for M
@@ -24,5 +25,16 @@ where
     fn from_message_bytes(message_bytes: &[u8]) -> Result<Self, DispatchError> {
         protobuf::parse_from_bytes(message_bytes)
             .map_err(|err| DispatchError::DeserializationError(err.to_string()))
+    }
+}
+
+impl From<ProtoConversionError> for DispatchError {
+    fn from(err: ProtoConversionError) -> DispatchError {
+        match err {
+            ProtoConversionError::DeserializationError(s) => DispatchError::DeserializationError(s),
+            ProtoConversionError::SerializationError(s) => DispatchError::SerializationError(s),
+            // This is detected due to a protobuf that does not properly have fields set correctly.
+            ProtoConversionError::InvalidTypeError(s) => DispatchError::DeserializationError(s),
+        }
     }
 }
