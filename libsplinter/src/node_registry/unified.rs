@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Unified NodeRegistry implementations.
+//! A node registry with multiple sources.
 //!
-//! This module provides a unified node registry which combines the node data from one or more
-//! read-only node registries with one local read-write node registry.  The data is merged from the
-//! local source into values from the read-only sources, allowing the user to replace values from
-//! the remove sources.
+//! This module contains the [`UnifiedNodeRegistry`], which provides an implementation of the
+//! [`RwNodeRegistry`] trait.
 //!
-//! This module is behind the `"node-registry-unified"` feature, and is considered experimental.
+//! [`UnifiedNodeRegistry`]: struct.UnifiedNodeRegistry.html
+//! [`RwNodeRegistry`]: ../trait.RwNodeRegistry.html
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,10 +28,45 @@ use super::{
     RwNodeRegistry,
 };
 
-/// Unifies a set of read-only node registries with a local, read-write node registry.
+/// A node registry with multiple sources.
 ///
-/// Nodes read from the unified registry utilize the read-only sources to fetch node definitions
-/// and any local changes as a replacement.
+/// The `UnifiedNodeRegistry` provides a unified view of multiple node registries. It has one local
+/// read-write registry and an arbitrary number of read-only registries.
+///
+/// # Writing
+///
+/// All write operations (provided by the implementation of the [`NodeRegistryWriter`] trait) affect
+/// only the local read-write registry.
+///
+/// # Reading
+///
+/// Read operations (provided by the [`NodeRegistryReader`] implementation) provide [`Node`] data
+/// from all source registries.
+///
+/// If a [`Node`] exists in more than one registry (nodes are considered duplicates if they have the
+/// same [`identity`]), then the definition of the [`Node`] from the registry with the highest
+/// precedence is used, with the exception of the node's [`metadata`] (see the
+/// [`Metadata Merging`] section below).
+///
+/// ## Registry Precedence
+///
+/// The local read-write registry has the highest precedence, followed by the read-only registries.
+/// The precedence of the read-only registries is based on the order they appear (the earlier in the
+/// list, the higher the priority).
+///
+/// ## Metadata Merging
+///
+/// When the same node exists in multiple registries, the [`metadata`] is merged from all sources.
+/// If the same metadata key is set for the node in different registires, the value for that key
+/// from the highest-precedence registry will be used.
+///
+/// [`NodeRegistryReader`]: ../trait.NodeRegistryReader.html
+/// [`NodeRegistryWriter`]: ../trait.NodeRegistryWriter.html
+/// [`RwNodeRegistry`]: ../trait.RwNodeRegistry.html
+/// [`Node`]: ../struct.Node.html
+/// [`identity`]: ../struct.Node.html#structfield.identity
+/// [`metadata`]: ../struct.Node.html#structfield.metadata
+/// [`Metadata Merging`]: #metadata-merging
 #[derive(Clone)]
 pub struct UnifiedNodeRegistry {
     local_source: Arc<dyn RwNodeRegistry>,
@@ -40,7 +74,7 @@ pub struct UnifiedNodeRegistry {
 }
 
 impl UnifiedNodeRegistry {
-    /// Constructs a new UnifiedNodeRegistry with a local, read-write node registry and a
+    /// Constructs a new `UnifiedNodeRegistry` with a local, read-write node registry and an
     /// arbitrary number of read-only node registries.
     pub fn new(
         local_source: Box<dyn RwNodeRegistry>,
@@ -73,7 +107,7 @@ impl UnifiedNodeRegistry {
     }
 }
 
-// Some type conveniences to cleanup some of the type requirements in the list_nodes implementation
+// A convenience type to cleanup the `NodeRegistryReader::list_nodes` implementation
 type NodeIter<'a> = Box<dyn Iterator<Item = Node> + Send + 'a>;
 
 impl NodeRegistryReader for UnifiedNodeRegistry {
