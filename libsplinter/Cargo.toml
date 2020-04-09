@@ -96,7 +96,6 @@ experimental = [
     "biome-key-management",
     "biome-notifications",
     "biome-refresh-tokens",
-    "biome-rest-api",
     "biome-user",
     "circuit-template",
     "connection-manager",
@@ -118,7 +117,6 @@ biome-credentials = ["biome", "biome-user", "bcrypt"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
 biome-refresh-tokens = []
-biome-rest-api = ["biome", "postgres", "jsonwebtoken"]
 biome-user = ["biome"]
 circuit-template = []
 connection-manager = ["matrix"]
@@ -135,6 +133,7 @@ rest-api = [
     "actix-web",
     "actix-web-actors",
     "futures",
+    "jsonwebtoken",
     "percent-encoding",
 ]
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]

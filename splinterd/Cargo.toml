@@ -62,7 +62,6 @@ experimental = [
     "biome-credentials",
     "biome-key-management",
     "biome-refresh-tokens",
-    "biome-rest-api",
     "health",
     "rest-api-cors",
     "scabbard-get-state",
@@ -74,7 +73,6 @@ biome = ["splinter/biome", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome-refresh-tokens", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome-refresh-tokens", "biome"]
 biome-refresh-tokens = ["splinter/biome-refresh-tokens"]
-biome-rest-api = ["splinter/biome-rest-api"]
 config-default = []
 config-command-line = []
 config-env-var = []

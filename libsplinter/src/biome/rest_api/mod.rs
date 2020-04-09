@@ -62,7 +62,10 @@ use self::actix::key_management::{
 #[cfg(feature = "biome-key-management")]
 use super::key_management::store::PostgresKeyStore;
 use super::user::store::diesel::DieselUserStore;
-use crate::rest_api::secrets::{AutoSecretManager, SecretManager};
+
+#[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
+use crate::rest_api::secrets::AutoSecretManager;
+use crate::rest_api::secrets::SecretManager;
 
 pub use config::{BiomeRestConfig, BiomeRestConfigBuilder};
 pub use error::BiomeRestResourceManagerBuilderError;
@@ -114,12 +117,13 @@ use crate::rest_api::sessions::AccessTokenIssuer;
 /// * `GET /biome/user/{id}` - Retrieve user with specified ID
 /// * `DELETE /biome/user/{id}` - Remove user with specified ID
 pub struct BiomeRestResourceManager {
-    #[cfg(feature = "biome-rest-api")]
+    #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
     user_store: DieselUserStore,
     #[cfg(feature = "biome-key-management")]
     key_store: Arc<PostgresKeyStore>,
-    #[cfg(feature = "biome-rest-api")]
+    #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
     rest_config: Arc<BiomeRestConfig>,
+    #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
     token_secret_manager: Arc<dyn SecretManager>,
     #[cfg(feature = "biome-refresh-tokens")]
     refresh_token_secret_manager: Arc<dyn SecretManager>,
@@ -129,7 +133,6 @@ pub struct BiomeRestResourceManager {
     credentials_store: Arc<DieselCredentialsStore>,
 }
 
-#[cfg(feature = "biome-rest-api")]
 impl RestResourceProvider for BiomeRestResourceManager {
     fn resources(&self) -> Vec<Resource> {
         // This needs to be mutable if biome-credentials feature is enable
@@ -147,7 +150,7 @@ impl RestResourceProvider for BiomeRestResourceManager {
             #[cfg(not(feature = "biome-refresh-tokens"))]
             {
                 resources.push(make_login_route(
-                    credentials_store.clone(),
+                    self.credentials_store.clone(),
                     self.rest_config.clone(),
                     Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
                 ));
@@ -336,6 +339,7 @@ impl BiomeRestResourceManagerBuilder {
 
     /// Consumes the builder and returns a BiomeRestResourceManager
     pub fn build(self) -> Result<BiomeRestResourceManager, BiomeRestResourceManagerBuilderError> {
+        #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
         let user_store = self.user_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
                 "Missing user store".to_string(),
@@ -347,6 +351,7 @@ impl BiomeRestResourceManagerBuilder {
                 "Missing key store".to_string(),
             )
         })?;
+        #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
         let rest_config = match self.rest_config {
             Some(config) => config,
             None => {
@@ -355,6 +360,7 @@ impl BiomeRestResourceManagerBuilder {
             }
         };
 
+        #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
         let token_secret_manager = self.token_secret_manager.unwrap_or_else(|| {
             debug!("Building BiomeRestResourceManager with default SecretManager.");
             Arc::new(AutoSecretManager::default())
@@ -381,10 +387,13 @@ impl BiomeRestResourceManagerBuilder {
         })?;
 
         Ok(BiomeRestResourceManager {
+            #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
             user_store,
             #[cfg(feature = "biome-key-management")]
             key_store: Arc::new(key_store),
+            #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
             rest_config: Arc::new(rest_config),
+            #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
             token_secret_manager,
             #[cfg(feature = "biome-refresh-tokens")]
             refresh_token_secret_manager,

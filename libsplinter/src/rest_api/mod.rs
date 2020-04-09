@@ -57,9 +57,7 @@ mod errors;
 mod events;
 pub mod paging;
 mod response_models;
-#[cfg(feature = "biome-rest-api")]
 pub mod secrets;
-#[cfg(feature = "biome-rest-api")]
 pub mod sessions;
 
 use actix_web::{
