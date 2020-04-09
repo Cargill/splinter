@@ -122,3 +122,8 @@ RUN rm \
     target/release/deps/splinter_cli* \
     target/release/deps/splinterd*
 
+# Clean up leftover files
+RUN find . -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; rm "$x" ' \;
+RUN rm /build/libsplinter/build.rs \
+    /build/libsplinter/protos/*
