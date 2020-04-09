@@ -53,21 +53,21 @@ pub trait UserStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `user` - The user to be added
-    fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
+    fn add_user(&self, user: User) -> Result<(), UserStoreError>;
 
     /// Updates a user information in the underling storage
     ///
     /// # Arguments
     ///
     ///  * `user` - The user with the updated information
-    fn update_user(&mut self, updated_user: User) -> Result<(), UserStoreError>;
+    fn update_user(&self, updated_user: User) -> Result<(), UserStoreError>;
 
     /// Removes a user from the underlying storage
     ///
     /// # Arguments
     ///
     ///  * `id` - The unique id of the user to be removed
-    fn remove_user(&mut self, id: &str) -> Result<(), UserStoreError>;
+    fn remove_user(&self, id: &str) -> Result<(), UserStoreError>;
 
     /// Fetches a user from the underlying storage
     ///

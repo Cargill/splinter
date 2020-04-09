@@ -21,9 +21,7 @@ use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
-use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError,
-};
+use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
@@ -36,7 +34,7 @@ use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 ///       "hashed_password": <hash of the user's existing password>
 ///   }
 pub fn make_login_route(
-    credentials_store: Arc<DieselCredentialsStore>,
+    credentials_store: Arc<dyn CredentialsStore>,
     #[cfg(feature = "biome-refresh-tokens")] refresh_token_store: Arc<dyn RefreshTokenStore>,
     rest_config: Arc<BiomeRestConfig>,
     token_issuer: Arc<AccessTokenIssuer>,

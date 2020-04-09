@@ -22,9 +22,7 @@ use crate::rest_api::{
     ProtocolVersionRangeGuard, Resource,
 };
 
-use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsStore, CredentialsStoreError,
-};
+use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::config::BiomeRestConfig;
 
 use super::super::resources::authorize::AuthorizationResult;
@@ -39,7 +37,7 @@ use super::authorize::authorize_user;
 ///       "hashed_password": <hash of the user's existing password>
 ///   }
 pub fn make_verify_route(
-    credentials_store: Arc<DieselCredentialsStore>,
+    credentials_store: Arc<dyn CredentialsStore>,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {

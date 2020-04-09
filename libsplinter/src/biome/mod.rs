@@ -42,3 +42,12 @@ pub mod refresh_tokens;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 mod user;
+
+#[cfg(all(feature = "biome-credentials", feature = "diesel"))]
+pub use credentials::store::diesel::DieselCredentialsStore;
+#[cfg(all(feature = "biome-key-management", feature = "diesel"))]
+pub use key_management::store::diesel::postgres::DieselKeyStore;
+#[cfg(all(feature = "biome-refresh-tokens", feature = "diesel"))]
+pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;
+#[cfg(feature = "diesel")]
+pub use user::store::diesel::DieselUserStore;

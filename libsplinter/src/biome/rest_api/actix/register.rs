@@ -17,11 +17,11 @@ use uuid::Uuid;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsBuilder, CredentialsStore, CredentialsStoreError,
+    CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
 use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
+use crate::biome::user::store::{User, UserStore};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
@@ -34,8 +34,8 @@ use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGua
 ///       "hashed_password": <hash of the password the user will use to log in>
 ///   }
 pub fn make_register_route(
-    credentials_store: Arc<DieselCredentialsStore>,
-    user_store: DieselUserStore,
+    credentials_store: Arc<dyn CredentialsStore>,
+    user_store: Arc<dyn UserStore>,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {
     Resource::build("/biome/register")
@@ -45,7 +45,7 @@ pub fn make_register_route(
         ))
         .add_method(Method::Post, move |_, payload| {
             let credentials_store = credentials_store.clone();
-            let mut user_store = user_store.clone();
+            let user_store = user_store.clone();
             let rest_config = rest_config.clone();
             Box::new(into_bytes(payload).and_then(move |bytes| {
                 let username_password = match serde_json::from_slice::<UsernamePassword>(&bytes) {
