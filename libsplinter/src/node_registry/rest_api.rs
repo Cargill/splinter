@@ -89,14 +89,9 @@ where
         .to_string();
     Box::new(
         web::block(move || registry.fetch_node(&identity)).then(|res| match res {
-            Ok(node) => Ok(HttpResponse::Ok().json(node)),
-            Err(err) => match err {
-                BlockingError::Error(err) => match err {
-                    NodeRegistryError::NotFoundError(err) => Ok(HttpResponse::NotFound().json(err)),
-                    _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
-                },
-                _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
-            },
+            Ok(Some(node)) => Ok(HttpResponse::Ok().json(node)),
+            Ok(None) => Ok(HttpResponse::NotFound().json("node not found")),
+            Err(err) => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
         }),
     )
 }
@@ -178,14 +173,9 @@ where
         .to_string();
     Box::new(
         web::block(move || registry.delete_node(&identity)).then(|res| match res {
-            Ok(_) => Ok(HttpResponse::Ok().finish()),
-            Err(err) => match err {
-                BlockingError::Error(err) => match err {
-                    NodeRegistryError::NotFoundError(err) => Ok(HttpResponse::NotFound().json(err)),
-                    _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
-                },
-                _ => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
-            },
+            Ok(Some(_)) => Ok(HttpResponse::Ok().finish()),
+            Ok(None) => Ok(HttpResponse::NotFound().json("node not found")),
+            Err(err) => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
         }),
     )
 }

@@ -75,19 +75,13 @@ impl YamlNodeRegistry {
 }
 
 impl NodeRegistryReader for YamlNodeRegistry {
-    fn fetch_node(&self, identity: &str) -> Result<Node, NodeRegistryError> {
-        match self
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        Ok(self
             .get_cached_nodes()
             .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?
             .iter()
             .find(|node| node.identity == identity)
-        {
-            Some(node) => Ok(node.clone()),
-            None => Err(NodeRegistryError::NotFoundError(format!(
-                "Could not find node with identity {}",
-                identity
-            ))),
-        }
+            .cloned())
     }
 
     fn list_nodes<'a, 'b: 'a>(
@@ -134,7 +128,7 @@ impl NodeRegistryWriter for YamlNodeRegistry {
             .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))
     }
 
-    fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         let mut nodes = self
             .get_cached_nodes()
             .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
@@ -145,18 +139,12 @@ impl NodeRegistryWriter for YamlNodeRegistry {
                 break;
             }
         }
-        match index {
-            Some(i) => nodes.remove(i),
-            None => {
-                return Err(NodeRegistryError::NotFoundError(format!(
-                    "Could not find node with identity: {}",
-                    identity
-                )))
-            }
-        };
+        let opt = index.map(|i| nodes.remove(i));
 
         self.write_nodes(&nodes)
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))
+            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
+
+        Ok(opt)
     }
 }
 
@@ -348,13 +336,14 @@ mod test {
 
             let node = registry
                 .fetch_node(&get_node_1().identity)
-                .expect("Failed to fetch node");
+                .expect("Failed to fetch node")
+                .expect("Node not found");
             assert_eq!(node, get_node_1());
         })
     }
 
     ///
-    /// Verifies that fetch_node with an invalid identity, returns NotFoundError
+    /// Verifies that fetch_node with an invalid identity returns Ok(None)
     ///
     #[test]
     fn test_fetch_node_not_found() {
@@ -366,9 +355,8 @@ mod test {
 
             let result = registry.fetch_node("NodeNotInRegistry");
             match result {
-                Ok(_) => panic!("Node is not in the Registry. Error should be returned"),
-                Err(NodeRegistryError::NotFoundError(_)) => (),
-                Err(err) => panic!("Should have gotten NotFoundError but got {}", err),
+                Ok(None) => {}
+                res => panic!("Should have gotten Ok(None) but got {:?}", res),
             }
         })
     }
@@ -667,7 +655,7 @@ mod test {
     }
 
     ///
-    /// Verifies that delete_node with a valid identity, deletes the correct node.
+    /// Verifies that delete_node with a valid identity deletes the correct node and returns it.
     ///
     #[test]
     fn test_delete_node_ok() {
@@ -677,7 +665,7 @@ mod test {
             let registry = YamlNodeRegistry::new(test_yaml_file_path)
                 .expect("Failed to create YamlNodeRegistry");
 
-            registry
+            let node = registry
                 .delete_node(&get_node_1().identity)
                 .expect("Failed to delete node");
 
@@ -689,11 +677,13 @@ mod test {
             assert_eq!(nodes.len(), 1);
 
             assert_eq!(nodes[0], get_node_2());
+
+            assert_eq!(node, Some(get_node_1()));
         })
     }
 
     ///
-    /// Verifies that delete_node with an invalid identity, returns NotFoundError
+    /// Verifies that delete_node with an invalid identity returns Ok(None)
     ///
     #[test]
     fn test_delete_node_not_found() {
@@ -705,9 +695,8 @@ mod test {
 
             let result = registry.delete_node("NodeNotInRegistry");
             match result {
-                Ok(_) => panic!("Node is not in the Registry. Error should be returned"),
-                Err(NodeRegistryError::NotFoundError(_)) => (),
-                Err(err) => panic!("Should have gotten NotFoundError but got {}", err),
+                Ok(None) => {}
+                res => panic!("Should have gotten Ok(None) but got {:?}", res),
             }
         })
     }

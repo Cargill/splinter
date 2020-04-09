@@ -33,8 +33,8 @@ impl NodeRegistryReader for NoOpNodeRegistry {
         Ok(Box::new(std::iter::empty()))
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Node, NodeRegistryError> {
-        Err(NodeRegistryError::NotFoundError(identity.to_string()))
+    fn fetch_node(&self, _identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        Ok(None)
     }
 
     fn count_nodes(&self, _predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
@@ -50,8 +50,8 @@ impl NodeRegistryWriter for NoOpNodeRegistry {
         ))
     }
 
-    fn delete_node(&self, identity: &str) -> Result<(), NodeRegistryError> {
-        Err(NodeRegistryError::NotFoundError(identity.to_string()))
+    fn delete_node(&self, _identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        Ok(None)
     }
 }
 
