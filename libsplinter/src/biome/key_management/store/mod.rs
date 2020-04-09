@@ -19,7 +19,7 @@ pub mod error;
 use super::Key;
 
 #[cfg(feature = "postgres")]
-pub use self::diesel::postgres::PostgresKeyStore;
+pub use self::diesel::postgres::DieselKeyStore;
 
 pub use error::KeyStoreError;
 

@@ -60,7 +60,7 @@ use self::actix::key_management::{
 };
 
 #[cfg(feature = "biome-key-management")]
-use super::key_management::store::PostgresKeyStore;
+use super::key_management::store::DieselKeyStore;
 use super::user::store::diesel::DieselUserStore;
 
 #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
@@ -120,7 +120,7 @@ pub struct BiomeRestResourceManager {
     #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
     user_store: DieselUserStore,
     #[cfg(feature = "biome-key-management")]
-    key_store: Arc<PostgresKeyStore>,
+    key_store: Arc<DieselKeyStore>,
     #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
     rest_config: Arc<BiomeRestConfig>,
     #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
@@ -235,7 +235,7 @@ impl RestResourceProvider for BiomeRestResourceManager {
 pub struct BiomeRestResourceManagerBuilder {
     user_store: Option<DieselUserStore>,
     #[cfg(feature = "biome-key-management")]
-    key_store: Option<PostgresKeyStore>,
+    key_store: Option<DieselKeyStore>,
     rest_config: Option<BiomeRestConfig>,
     token_secret_manager: Option<Arc<dyn SecretManager>>,
     #[cfg(feature = "biome-refresh-tokens")]
@@ -264,7 +264,7 @@ impl BiomeRestResourceManagerBuilder {
     /// * `pool`: ConnectionPool to database that will serve as backend for KeyStore
     #[cfg(feature = "biome-key-management")]
     pub fn with_key_store(mut self, pool: ConnectionPool) -> BiomeRestResourceManagerBuilder {
-        self.key_store = Some(PostgresKeyStore::new(pool));
+        self.key_store = Some(DieselKeyStore::new(pool));
         self
     }
 
