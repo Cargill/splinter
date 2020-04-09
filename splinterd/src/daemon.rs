@@ -16,7 +16,6 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -75,7 +74,6 @@ use splinter::transport::{
     ListenError, Listener, Transport,
 };
 
-use crate::registry_config::{RegistryConfig, RegistryConfigBuilder, RegistryConfigError};
 use crate::routes;
 
 // Recv timeout in secs
@@ -102,6 +100,7 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 pub struct SplinterDaemon {
     storage_location: String,
     key_registry_location: String,
+    local_node_registry_location: String,
     service_endpoint: String,
     network_endpoint: String,
     initial_peers: Vec<String>,
@@ -112,7 +111,6 @@ pub struct SplinterDaemon {
     db_url: Option<String>,
     #[cfg(feature = "biome")]
     biome_enabled: bool,
-    registry_config: RegistryConfig,
     registries: Vec<String>,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
@@ -398,7 +396,8 @@ impl SplinterDaemon {
         })?;
         let key_registry_manager = KeyRegistryManager::new(key_registry);
 
-        let node_registry = create_node_registry(&self.registry_config, &self.registries)?;
+        let node_registry =
+            create_node_registry(&self.local_node_registry_location, &self.registries)?;
 
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
@@ -688,6 +687,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 pub struct SplinterDaemonBuilder {
     storage_location: Option<String>,
     key_registry_location: Option<String>,
+    local_node_registry_location: Option<String>,
     service_endpoint: Option<String>,
     network_endpoint: Option<String>,
     initial_peers: Option<Vec<String>>,
@@ -697,8 +697,6 @@ pub struct SplinterDaemonBuilder {
     db_url: Option<String>,
     #[cfg(feature = "biome")]
     biome_enabled: bool,
-    registry_backend: Option<String>,
-    registry_file: Option<String>,
     registries: Vec<String>,
     storage_type: Option<String>,
     heartbeat_interval: Option<u64>,
@@ -717,6 +715,11 @@ impl SplinterDaemonBuilder {
 
     pub fn with_key_registry_location(mut self, value: String) -> Self {
         self.key_registry_location = Some(value);
+        self
+    }
+
+    pub fn with_local_node_registry_location(mut self, value: String) -> Self {
+        self.local_node_registry_location = Some(value);
         self
     }
 
@@ -757,16 +760,6 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_registry_backend(mut self, value: Option<String>) -> Self {
-        self.registry_backend = value;
-        self
-    }
-
-    pub fn with_registry_file(mut self, value: String) -> Self {
-        self.registry_file = Some(value);
-        self
-    }
-
     pub fn with_registries(mut self, registries: Vec<String>) -> Self {
         self.registries = registries;
         self
@@ -802,6 +795,12 @@ impl SplinterDaemonBuilder {
 
         let key_registry_location = self.key_registry_location.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: key_registry_location".to_string())
+        })?;
+
+        let local_node_registry_location = self.local_node_registry_location.ok_or_else(|| {
+            CreateError::MissingRequiredField(
+                "Missing field: local_node_registry_location".to_string(),
+            )
         })?;
 
         let service_endpoint = self.service_endpoint.ok_or_else(|| {
@@ -840,16 +839,6 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: storage_type".to_string())
         })?;
 
-        let mut registry_config_builder = RegistryConfigBuilder::default();
-        registry_config_builder =
-            registry_config_builder.with_registry_backend(self.registry_backend);
-
-        if let Some(value) = self.registry_file {
-            registry_config_builder = registry_config_builder.with_registry_file(value);
-        }
-
-        let registry_config = registry_config_builder.build()?;
-
         Ok(SplinterDaemon {
             storage_location,
             service_endpoint,
@@ -862,9 +851,9 @@ impl SplinterDaemonBuilder {
             db_url,
             #[cfg(feature = "biome")]
             biome_enabled: self.biome_enabled,
-            registry_config,
             registries: self.registries,
             key_registry_location,
+            local_node_registry_location,
             storage_type,
             admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
         })
@@ -959,26 +948,23 @@ fn set_up_circuit_dispatcher(
 }
 
 fn create_node_registry(
-    registry_config: &RegistryConfig,
+    local_node_registry_location: &str,
     registries: &[String],
 ) -> Result<Box<dyn RwNodeRegistry>, RestApiServerError> {
-    let local_registry: Box<dyn RwNodeRegistry> = match registry_config {
-        RegistryConfig::File { registry_file } => {
-            debug!(
-                "Creating local node registry with registry file: {:?}",
-                fs::canonicalize(&registry_file)?
-            );
-            Box::new(
-                node_registry::yaml::YamlNodeRegistry::new(&registry_file).map_err(|err| {
-                    RestApiServerError::StartUpError(format!(
-                        "Failed to initialize local YamlNodeRegistry: {}",
-                        err
-                    ))
-                })?,
-            )
-        }
-        RegistryConfig::NoOp => Box::new(node_registry::noop::NoOpNodeRegistry),
-    };
+    debug!(
+        "Creating local node registry with registry file: {:?}",
+        local_node_registry_location
+    );
+    let local_registry = Box::new(
+        node_registry::yaml::YamlNodeRegistry::new(local_node_registry_location).map_err(
+            |err| {
+                RestApiServerError::StartUpError(format!(
+                    "Failed to initialize local YamlNodeRegistry: {}",
+                    err
+                ))
+            },
+        )?,
+    );
 
     // Currently, only file-based read-only registries are supported
     let read_only_registries = registries
@@ -1019,7 +1005,6 @@ fn create_node_registry(
 #[derive(Debug)]
 pub enum CreateError {
     MissingRequiredField(String),
-    NodeRegistryError(String),
     NetworkError(String),
 }
 
@@ -1029,17 +1014,8 @@ impl fmt::Display for CreateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CreateError::MissingRequiredField(msg) => write!(f, "missing required field: {}", msg),
-            CreateError::NodeRegistryError(msg) => {
-                write!(f, "node registry raised an error: {}", msg)
-            }
             CreateError::NetworkError(msg) => write!(f, "network raised an error: {}", msg),
         }
-    }
-}
-
-impl From<RegistryConfigError> for CreateError {
-    fn from(err: RegistryConfigError) -> Self {
-        CreateError::NodeRegistryError(format!("Error configuring Node Registry: {}", err))
     }
 }
 

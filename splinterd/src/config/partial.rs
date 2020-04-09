@@ -45,8 +45,6 @@ pub struct PartialConfig {
     bind: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
-    registry_backend: Option<String>,
-    registry_file: Option<String>,
     registries: Option<Vec<String>>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
@@ -76,8 +74,6 @@ impl PartialConfig {
             bind: None,
             #[cfg(feature = "database")]
             database: None,
-            registry_backend: None,
-            registry_file: None,
             registries: None,
             heartbeat_interval: None,
             admin_service_coordinator_timeout: None,
@@ -147,14 +143,6 @@ impl PartialConfig {
     #[cfg(feature = "database")]
     pub fn database(&self) -> Option<String> {
         self.database.clone()
-    }
-
-    pub fn registry_backend(&self) -> Option<String> {
-        self.registry_backend.clone()
-    }
-
-    pub fn registry_file(&self) -> Option<String> {
-        self.registry_file.clone()
     }
 
     pub fn registries(&self) -> Option<Vec<String>> {
@@ -350,30 +338,6 @@ impl PartialConfig {
     ///
     pub fn with_database(mut self, database: Option<String>) -> Self {
         self.database = database;
-        self
-    }
-
-    #[allow(dead_code)]
-    /// Adds a `registry_backend` value to the PartialConfig object.
-    ///
-    /// # Arguments
-    ///
-    /// * `registry_backend` - Backend type for the node registry.
-    ///
-    pub fn with_registry_backend(mut self, registry_backend: Option<String>) -> Self {
-        self.registry_backend = registry_backend;
-        self
-    }
-
-    #[allow(dead_code)]
-    /// Adds a `registry_file` value to the PartialConfig object.
-    ///
-    /// # Arguments
-    ///
-    /// * `registry_file` - File path to the node registry file if registry-backend is FILE.
-    ///
-    pub fn with_registry_file(mut self, registry_file: Option<String>) -> Self {
-        self.registry_file = registry_file;
         self
     }
 

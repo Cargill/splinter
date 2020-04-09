@@ -57,8 +57,6 @@ pub struct Config {
     bind: (String, ConfigSource),
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
-    registry_backend: (String, ConfigSource),
-    registry_file: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
     heartbeat_interval: (u64, ConfigSource),
     admin_service_coordinator_timeout: (Duration, ConfigSource),
@@ -124,14 +122,6 @@ impl Config {
     #[cfg(feature = "database")]
     pub fn database(&self) -> &str {
         &self.database.0
-    }
-
-    pub fn registry_backend(&self) -> &str {
-        &self.registry_backend.0
-    }
-
-    pub fn registry_file(&self) -> &str {
-        &self.registry_file.0
     }
 
     pub fn registries(&self) -> &[String] {
@@ -214,14 +204,6 @@ impl Config {
     #[cfg(feature = "database")]
     fn database_source(&self) -> &ConfigSource {
         &self.database.1
-    }
-
-    fn registry_backend_source(&self) -> &ConfigSource {
-        &self.registry_backend.1
-    }
-
-    fn registry_file_source(&self) -> &ConfigSource {
-        &self.registry_file.1
     }
 
     fn registries_source(&self) -> &ConfigSource {
@@ -315,16 +297,6 @@ impl Config {
             "Config: bind: {} (source: {:?})",
             self.bind(),
             self.bind_source()
-        );
-        debug!(
-            "Config: registry_backend: {} (source: {:?})",
-            self.registry_backend(),
-            self.registry_backend_source()
-        );
-        debug!(
-            "Config: registry_file: {} (source: {:?})",
-            self.registry_file(),
-            self.registry_file_source()
         );
         debug!(
             "Config: registries: {:?} (source: {:?})",
@@ -450,8 +422,6 @@ mod tests {
         (@arg server_key:  --("server-key") +takes_value)
         (@arg client_key:  --("client-key") +takes_value)
         (@arg bind: --("bind") +takes_value)
-        (@arg registry_backend: --("registry-backend") +takes_value)
-        (@arg registry_file: --("registry-file") +takes_value)
         (@arg insecure: --("insecure"))
         (@arg biome_enabled: --("enable-biome")))
         .get_matches_from(args)
@@ -557,10 +527,6 @@ mod tests {
             EXAMPLE_SERVER_CERT,
             "--server-key",
             EXAMPLE_SERVER_KEY,
-            "--registry-backend",
-            "FILE",
-            "--registry-file",
-            "/etc/splinter/test.yaml",
             "--insecure",
             "--enable-biome",
         ];
@@ -605,13 +571,7 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object.
-        let args = vec![
-            "configtest",
-            "--node-id",
-            "123",
-            "--registry-file",
-            "/etc/splinter/test.yaml",
-        ];
+        let args = vec!["configtest", "--node-id", "123"];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.
@@ -803,26 +763,7 @@ mod tests {
             (final_config.database(), final_config.database_source()),
             ("127.0.0.1:5432", &ConfigSource::Default)
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for `registry_backend`
-        // (source should be Default).
-        assert_eq!(
-            (
-                final_config.registry_backend(),
-                final_config.registry_backend_source()
-            ),
-            ("FILE", &ConfigSource::Default)
-        );
-        // Both the DefaultPartialConfigBuilder and ClapPartialConfigBuilder had values for
-        // `registry_file`, but the ClapPartialConfigBuilder value should have precedence (source
-        // should be CommandLine).
-        assert_eq!(
-            (
-                final_config.registry_file(),
-                final_config.registry_file_source()
-            ),
-            ("/etc/splinter/test.yaml", &ConfigSource::CommandLine,)
-        );
-        // The DefaultPartialConfigBuilder is the only config with a value for `registry_backend`
+        // The DefaultPartialConfigBuilder is the only config with a value for `heartbeat_interval`
         // (source should be Default).
         assert_eq!(
             (
@@ -831,8 +772,8 @@ mod tests {
             ),
             (30, &ConfigSource::Default)
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for `registry_backend`
-        // (source should be Default).
+        // The DefaultPartialConfigBuilder is the only config with a value for
+        // `admin_service_coordinator_timeout` (source should be Default).
         assert_eq!(
             (
                 final_config.admin_service_coordinator_timeout(),
@@ -868,15 +809,7 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object, passing in a cert_dir.
-        let args = vec![
-            "configtest",
-            "--node-id",
-            "123",
-            "--cert-dir",
-            "/my_files/",
-            "--registry-file",
-            "/etc/splinter/test.yaml",
-        ];
+        let args = vec!["configtest", "--node-id", "123", "--cert-dir", "/my_files/"];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.

@@ -51,8 +51,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_network_endpoint(Some(String::from("127.0.0.1:8044")))
             .with_peers(Some(vec![]))
             .with_bind(Some(String::from("127.0.0.1:8080")))
-            .with_registry_backend(Some(String::from("FILE")))
-            .with_registry_file(Some(String::from("/etc/splinter/nodes.yaml")))
             .with_registries(Some(vec![]))
             .with_heartbeat_interval(Some(HEARTBEAT_DEFAULT))
             .with_admin_service_coordinator_timeout(Some(
@@ -104,11 +102,6 @@ mod tests {
         assert_eq!(config.bind(), Some(String::from("127.0.0.1:8080")));
         #[cfg(feature = "database")]
         assert_eq!(config.database(), Some(String::from("127.0.0.1:5432")));
-        assert_eq!(config.registry_backend(), Some(String::from("FILE")));
-        assert_eq!(
-            config.registry_file(),
-            Some(String::from("/etc/splinter/nodes.yaml"))
-        );
         assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.heartbeat_interval(), Some(HEARTBEAT_DEFAULT));
         assert_eq!(
