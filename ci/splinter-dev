@@ -100,6 +100,10 @@ COPY examples/private_xo/Cargo.toml /build/examples/private_xo/Cargo.toml
 RUN find . -name 'Cargo.toml' -exec \
     sh -c 'x="{}"; cargo build --release --manifest-path "$x" ' \;
 
+# Remove all Cargo.toml
+RUN find . -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; rm "$x" ' \;
+
 # Clean up built files
 RUN rm \
     target/release/gameroom-database* \
