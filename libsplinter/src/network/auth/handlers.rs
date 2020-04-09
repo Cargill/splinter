@@ -42,30 +42,15 @@ pub fn create_authorization_dispatcher(
 ) -> Dispatcher<AuthorizationMessageType> {
     let mut auth_dispatcher = Dispatcher::new(network_sender);
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::CONNECT_REQUEST,
-        Box::new(ConnectRequestHandler::new(auth_manager.clone())),
-    );
+    auth_dispatcher.set_handler(Box::new(ConnectRequestHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::CONNECT_RESPONSE,
-        Box::new(ConnectResponseHandler::new(auth_manager.clone())),
-    );
+    auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::TRUST_REQUEST,
-        Box::new(TrustRequestHandler::new(auth_manager.clone())),
-    );
+    auth_dispatcher.set_handler(Box::new(TrustRequestHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::AUTHORIZE,
-        Box::new(AuthorizedHandler),
-    );
+    auth_dispatcher.set_handler(Box::new(AuthorizedHandler));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::AUTHORIZATION_ERROR,
-        Box::new(AuthorizationErrorHandler::new(auth_manager)),
-    );
+    auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));
 
     auth_dispatcher
 }
@@ -93,6 +78,10 @@ impl Handler for AuthorizationMessageHandler {
     type MessageType = NetworkMessageType;
     type Message = AuthorizationMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::AUTHORIZATION
+    }
+
     fn handle(
         &self,
         mut msg: Self::Message,
@@ -118,6 +107,10 @@ impl Handler for AuthorizedHandler {
     type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = AuthorizedMessage;
+
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::AUTHORIZE
+    }
 
     fn handle(
         &self,
@@ -163,6 +156,10 @@ impl<M: FromMessageBytes> Handler for NetworkAuthGuardHandler<M> {
     type MessageType = NetworkMessageType;
     type Message = M;
 
+    fn match_type(&self) -> Self::MessageType {
+        self.handler.match_type()
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
@@ -197,6 +194,10 @@ impl Handler for ConnectRequestHandler {
     type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = ConnectRequest;
+
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::CONNECT_REQUEST
+    }
 
     fn handle(
         &self,
@@ -297,6 +298,10 @@ impl Handler for ConnectResponseHandler {
     type MessageType = AuthorizationMessageType;
     type Message = ConnectResponse;
 
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::CONNECT_RESPONSE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
@@ -346,6 +351,10 @@ impl Handler for TrustRequestHandler {
     type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = TrustRequest;
+
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::TRUST_REQUEST
+    }
 
     fn handle(
         &self,
@@ -404,6 +413,10 @@ impl Handler for AuthorizationErrorHandler {
     type Source = PeerId;
     type MessageType = AuthorizationMessageType;
     type Message = AuthorizationError;
+
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::AUTHORIZATION_ERROR
+    }
 
     fn handle(
         &self,

@@ -167,6 +167,9 @@ pub trait Handler: Send {
         message_context: &MessageContext<Self::Source, Self::MessageType>,
         network_sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError>;
+
+    /// Return the message type value that this handler requires to execute;
+    fn match_type(&self) -> Self::MessageType;
 }
 
 /// Converts bytes into a concrete message instance
@@ -308,18 +311,18 @@ where
 
     /// Set a handler for a given Message Type.
     ///
-    /// This sets a handler for a given message type.  Only one handler may exist per message type.
-    /// If a user wishes to run a series handlers, they must supply a single handler that composes
-    /// the series.
+    /// This sets a handler on the dispatcher that will trigger based on its `match_type` value.
+    /// Only one handler may exist for the value of the handler's `match_type` implementation.  If
+    /// a user wishes to run a series handlers, they must supply a single handler that composes the
+    /// series.
     pub fn set_handler<T>(
         &mut self,
-        message_type: MT,
         handler: Box<dyn Handler<Source = Source, MessageType = MT, Message = T>>,
     ) where
         T: FromMessageBytes,
     {
         self.handlers.insert(
-            message_type,
+            handler.match_type(),
             HandlerWrapper {
                 inner: Box::new(move |message_bytes, message_context, network_sender| {
                     let message = FromMessageBytes::from_message_bytes(message_bytes)?;
@@ -638,7 +641,7 @@ mod tests {
         let handler = NetworkEchoHandler::default();
         let echos = handler.echos.clone();
 
-        dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
+        dispatcher.set_handler(Box::new(handler));
 
         let mut outgoing_message = NetworkEcho::new();
         outgoing_message.set_payload(b"test_dispatcher".to_vec());
@@ -682,7 +685,7 @@ mod tests {
 
         let handler = NetworkEchoHandler::default();
         let echos = handler.echos.clone();
-        dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
+        dispatcher.set_handler(Box::new(handler));
 
         std::thread::spawn(move || {
             let mut outgoing_message = NetworkEcho::new();
@@ -716,6 +719,10 @@ mod tests {
         type Source = PeerId;
         type MessageType = NetworkMessageType;
         type Message = NetworkEcho;
+
+        fn match_type(&self) -> Self::MessageType {
+            NetworkMessageType::NETWORK_ECHO
+        }
 
         fn handle(
             &self,

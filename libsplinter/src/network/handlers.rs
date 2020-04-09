@@ -28,6 +28,10 @@ impl Handler for NetworkEchoHandler {
     type MessageType = NetworkMessageType;
     type Message = NetworkEcho;
 
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::NETWORK_ECHO
+    }
+
     fn handle(
         &self,
         mut msg: Self::Message,
@@ -81,6 +85,10 @@ impl Handler for NetworkHeartbeatHandler {
     type Source = PeerId;
     type MessageType = NetworkMessageType;
     type Message = NetworkHeartbeat;
+
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::NETWORK_HEARTBEAT
+    }
 
     fn handle(
         &self,
@@ -136,7 +144,7 @@ mod tests {
 
             let handler = NetworkEchoHandler::new("TestPeer".to_string());
 
-            dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
+            dispatcher.set_handler(Box::new(handler));
 
             let msg = {
                 let mut echo = NetworkEcho::new();

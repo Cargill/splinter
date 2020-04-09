@@ -34,6 +34,10 @@ impl Handler for AdminDirectMessageHandler {
     type MessageType = CircuitMessageType;
     type Message = AdminDirectMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::ADMIN_DIRECT_MESSAGE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
@@ -215,7 +219,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());
@@ -276,7 +280,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());
@@ -337,7 +341,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("alpha".into());
@@ -383,7 +387,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());
@@ -429,7 +433,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());

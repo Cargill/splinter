@@ -878,35 +878,23 @@ fn set_up_network_dispatcher(
     let mut dispatcher = Dispatcher::<NetworkMessageType>::new(network_sender);
 
     let network_echo_handler = NetworkEchoHandler::new(node_id.to_string());
-    dispatcher.set_handler(
-        NetworkMessageType::NETWORK_ECHO,
-        Box::new(NetworkAuthGuardHandler::new(
-            auth_manager.clone(),
-            Box::new(network_echo_handler),
-        )),
-    );
+    dispatcher.set_handler(Box::new(NetworkAuthGuardHandler::new(
+        auth_manager.clone(),
+        Box::new(network_echo_handler),
+    )));
 
     let network_heartbeat_handler = NetworkHeartbeatHandler::new();
     // do not add auth guard
-    dispatcher.set_handler(
-        NetworkMessageType::NETWORK_HEARTBEAT,
-        Box::new(network_heartbeat_handler),
-    );
+    dispatcher.set_handler(Box::new(network_heartbeat_handler));
 
     let circuit_message_handler = CircuitMessageHandler::new(circuit_sender);
-    dispatcher.set_handler(
-        NetworkMessageType::CIRCUIT,
-        Box::new(NetworkAuthGuardHandler::new(
-            auth_manager,
-            Box::new(circuit_message_handler),
-        )),
-    );
+    dispatcher.set_handler(Box::new(NetworkAuthGuardHandler::new(
+        auth_manager,
+        Box::new(circuit_message_handler),
+    )));
 
     let auth_message_handler = AuthorizationMessageHandler::new(auth_sender);
-    dispatcher.set_handler(
-        NetworkMessageType::AUTHORIZATION,
-        Box::new(auth_message_handler),
-    );
+    dispatcher.set_handler(Box::new(auth_message_handler));
 
     dispatcher
 }
@@ -921,36 +909,21 @@ fn set_up_circuit_dispatcher(
 
     let service_connect_request_handler =
         ServiceConnectRequestHandler::new(node_id.to_string(), endpoint.to_string(), state.clone());
-    dispatcher.set_handler(
-        CircuitMessageType::SERVICE_CONNECT_REQUEST,
-        Box::new(service_connect_request_handler),
-    );
+    dispatcher.set_handler(Box::new(service_connect_request_handler));
 
     let service_disconnect_request_handler = ServiceDisconnectRequestHandler::new(state.clone());
-    dispatcher.set_handler(
-        CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-        Box::new(service_disconnect_request_handler),
-    );
+    dispatcher.set_handler(Box::new(service_disconnect_request_handler));
 
     let direct_message_handler =
         CircuitDirectMessageHandler::new(node_id.to_string(), state.clone());
-    dispatcher.set_handler(
-        CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-        Box::new(direct_message_handler),
-    );
+    dispatcher.set_handler(Box::new(direct_message_handler));
 
     let circuit_error_handler = CircuitErrorHandler::new(node_id.to_string(), state.clone());
-    dispatcher.set_handler(
-        CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
-        Box::new(circuit_error_handler),
-    );
+    dispatcher.set_handler(Box::new(circuit_error_handler));
 
     // Circuit Admin handlers
     let admin_direct_message_handler = AdminDirectMessageHandler::new(node_id.to_string(), state);
-    dispatcher.set_handler(
-        CircuitMessageType::ADMIN_DIRECT_MESSAGE,
-        Box::new(admin_direct_message_handler),
-    );
+    dispatcher.set_handler(Box::new(admin_direct_message_handler));
 
     dispatcher
 }

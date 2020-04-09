@@ -32,6 +32,10 @@ impl Handler for CircuitErrorHandler {
     type MessageType = CircuitMessageType;
     type Message = CircuitError;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::CIRCUIT_ERROR_MESSAGE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
@@ -163,8 +167,7 @@ mod tests {
 
                 // Add circuit error handler to the the dispatcher
                 let handler = CircuitErrorHandler::new("123".to_string(), state);
-                dispatcher
-                    .set_handler(CircuitMessageType::CIRCUIT_ERROR_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 // Create the error message
                 let mut circuit_error = CircuitError::new();
@@ -246,8 +249,7 @@ mod tests {
 
                 // Add circuit error handler to the the dispatcher
                 let handler = CircuitErrorHandler::new("123".to_string(), state);
-                dispatcher
-                    .set_handler(CircuitMessageType::CIRCUIT_ERROR_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 // Create the error message
                 let mut circuit_error = CircuitError::new();
@@ -315,7 +317,7 @@ mod tests {
 
             // Add circuit error handler to the the dispatcher
             let handler = CircuitErrorHandler::new("123".to_string(), state);
-            dispatcher.set_handler(CircuitMessageType::CIRCUIT_ERROR_MESSAGE, Box::new(handler));
+            dispatcher.set_handler(Box::new(handler));
 
             // Create the circuit error message
             let mut circuit_error = CircuitError::new();

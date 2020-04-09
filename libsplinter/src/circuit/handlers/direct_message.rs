@@ -33,6 +33,10 @@ impl Handler for CircuitDirectMessageHandler {
     type MessageType = CircuitMessageType;
     type Message = CircuitDirectMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::CIRCUIT_DIRECT_MESSAGE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
@@ -270,10 +274,7 @@ mod tests {
 
                 // Add direct message handler to the the dispatcher
                 let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // Create the direct message
                 let mut direct_message = CircuitDirectMessage::new();
@@ -351,10 +352,7 @@ mod tests {
                 // Add direct message handler to dispatcher
                 let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
 
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // create dispatch message
                 let mut direct_message = CircuitDirectMessage::new();
@@ -426,10 +424,7 @@ mod tests {
                 // add direct message handler to the dispatcher
                 let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
 
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // create direct message
                 let mut direct_message = CircuitDirectMessage::new();
@@ -501,10 +496,7 @@ mod tests {
                 // add direct message handler to the dispatcher
                 let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
 
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // create direct message
                 let mut direct_message = CircuitDirectMessage::new();
@@ -574,10 +566,7 @@ mod tests {
 
                 // add handler to dispatcher
                 let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // create direct message
                 let mut direct_message = CircuitDirectMessage::new();
@@ -647,10 +636,7 @@ mod tests {
 
                 // add direct message handler
                 let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // create direct message
                 let mut direct_message = CircuitDirectMessage::new();
@@ -700,10 +686,7 @@ mod tests {
 
                 // add direct message handler to the dispatcher
                 let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-                dispatcher.set_handler(
-                    CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
 
                 // create direct message
                 let mut direct_message = CircuitDirectMessage::new();

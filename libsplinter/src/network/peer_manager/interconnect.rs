@@ -540,7 +540,7 @@ pub mod tests {
 
         let mut dispatcher = Dispatcher::default();
         let handler = NetworkTestHandler::new(send);
-        dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
+        dispatcher.set_handler(Box::new(handler));
         let interconnect = PeerInterconnectBuilder::new()
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh1.get_receiver())
@@ -609,6 +609,10 @@ pub mod tests {
         type Source = PeerId;
         type MessageType = NetworkMessageType;
         type Message = NetworkEcho;
+
+        fn match_type(&self) -> Self::MessageType {
+            NetworkMessageType::NETWORK_ECHO
+        }
 
         fn handle(
             &self,
