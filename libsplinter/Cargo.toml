@@ -103,7 +103,6 @@ experimental = [
     "matrix",
     "network-peer-manager",
     "network-ref-map",
-    "node-registry-unified",
     "rest-api-cors",
     "scabbard-client",
     "scabbard-get-state",
@@ -125,7 +124,6 @@ events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 matrix = []
 network-peer-manager = ["connection-manager", "network-ref-map"]
 network-ref-map = []
-node-registry-unified = []
 postgres = ["diesel/postgres", "diesel_migrations"]
 rest-api = [
     "actix",
