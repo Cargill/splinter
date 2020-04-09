@@ -67,7 +67,7 @@ pub fn make_user_routes(
     secret_manager: Arc<dyn SecretManager>,
     credentials_store: Arc<DieselCredentialsStore>,
     user_store: DieselUserStore,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
 ) -> Resource {
     Resource::build("/biome/users/{id}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
@@ -148,7 +148,7 @@ fn add_modify_user_method(
     credentials_store: Arc<DieselCredentialsStore>,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let credentials_store = credentials_store.clone();

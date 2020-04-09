@@ -42,7 +42,7 @@ impl PostgresKeyStore {
     }
 }
 
-impl KeyStore<Key> for PostgresKeyStore {
+impl KeyStore for PostgresKeyStore {
     fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).insert_key(key)
     }

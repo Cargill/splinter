@@ -16,6 +16,8 @@
 pub(in crate::biome) mod diesel;
 pub mod error;
 
+use super::Key;
+
 #[cfg(feature = "postgres")]
 pub use self::diesel::postgres::PostgresKeyStore;
 
@@ -23,13 +25,13 @@ pub use error::KeyStoreError;
 
 /// Defines methods for CRUD operations and fetching and listing keys
 /// without defining a storage strategy
-pub trait KeyStore<T>: Sync + Send {
+pub trait KeyStore: Sync + Send {
     /// Adds a key to the underlying storage
     ///
     /// # Arguments
     ///
     ///  * `key` - The key to be added
-    fn add_key(&self, key: T) -> Result<(), KeyStoreError>;
+    fn add_key(&self, key: Key) -> Result<(), KeyStoreError>;
 
     /// Updates a key information in the underling storage
     ///
@@ -51,7 +53,7 @@ pub trait KeyStore<T>: Sync + Send {
     ///
     /// * `public_key`: The public key of the key record to be removed.
     /// * `user_id`: The ID owner of the key record to be removed.
-    fn remove_key(&self, public_key: &str, user_id: &str) -> Result<T, KeyStoreError>;
+    fn remove_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError>;
 
     /// Fetches a key from the underlying storage
     ///
@@ -59,14 +61,14 @@ pub trait KeyStore<T>: Sync + Send {
     ///
     /// * `public_key`: The public key of the key record to be fetched.
     /// * `user_id`: The ID owner of the key record to be fetched.
-    fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<T, KeyStoreError>;
+    fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError>;
 
     /// List all keys from the underlying storage
     ///
     /// # Arguments
     ///
     /// * `user_id`: The ID owner of the key records to list.
-    fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<T>, KeyStoreError>;
+    fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<Key>, KeyStoreError>;
 
     #[cfg(feature = "biome-credentials")]
     /// Updates keys and the associated user's password in the underlying storage
@@ -81,6 +83,6 @@ pub trait KeyStore<T>: Sync + Send {
         &self,
         user_id: &str,
         updated_password: &str,
-        keys: &[T],
+        keys: &[Key],
     ) -> Result<(), KeyStoreError>;
 }
