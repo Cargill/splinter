@@ -59,6 +59,7 @@ pub struct Config {
     database: (String, ConfigSource),
     registry_backend: (String, ConfigSource),
     registry_file: (String, ConfigSource),
+    registries: (Vec<String>, ConfigSource),
     heartbeat_interval: (u64, ConfigSource),
     admin_service_coordinator_timeout: (Duration, ConfigSource),
     state_dir: (String, ConfigSource),
@@ -131,6 +132,10 @@ impl Config {
 
     pub fn registry_file(&self) -> &str {
         &self.registry_file.0
+    }
+
+    pub fn registries(&self) -> &[String] {
+        &self.registries.0
     }
 
     pub fn heartbeat_interval(&self) -> u64 {
@@ -217,6 +222,10 @@ impl Config {
 
     fn registry_file_source(&self) -> &ConfigSource {
         &self.registry_file.1
+    }
+
+    fn registries_source(&self) -> &ConfigSource {
+        &self.registries.1
     }
 
     fn heartbeat_interval_source(&self) -> &ConfigSource {
@@ -316,6 +325,11 @@ impl Config {
             "Config: registry_file: {} (source: {:?})",
             self.registry_file(),
             self.registry_file_source()
+        );
+        debug!(
+            "Config: registries: {:?} (source: {:?})",
+            self.registries(),
+            self.registries_source()
         );
         debug!(
             "Config: state_dir: {} (source: {:?})",

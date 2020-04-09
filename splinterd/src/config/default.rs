@@ -53,6 +53,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_bind(Some(String::from("127.0.0.1:8080")))
             .with_registry_backend(Some(String::from("FILE")))
             .with_registry_file(Some(String::from("/etc/splinter/nodes.yaml")))
+            .with_registries(Some(vec![]))
             .with_heartbeat_interval(Some(HEARTBEAT_DEFAULT))
             .with_admin_service_coordinator_timeout(Some(
                 DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT_MILLIS,
@@ -108,6 +109,7 @@ mod tests {
             config.registry_file(),
             Some(String::from("/etc/splinter/nodes.yaml"))
         );
+        assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.heartbeat_interval(), Some(HEARTBEAT_DEFAULT));
         assert_eq!(
             config.admin_service_coordinator_timeout(),

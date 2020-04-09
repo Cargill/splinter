@@ -151,6 +151,7 @@ fn main() {
           "Backend type for the node registry. Possible values: FILE.")
         (@arg registry_file: --("registry-file") +takes_value
           "File path to the node registry file if registry-backend is FILE.")
+        (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
         (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
             "The coordinator timeout for admin service proposals (in milliseconds); default is \
              30000 (30 seconds)")
@@ -266,6 +267,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_node_id(String::from(config.node_id()))
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
+        .with_registries(config.registries().to_vec())
         .with_heartbeat_interval(config.heartbeat_interval())
         .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
 

@@ -53,7 +53,7 @@ use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutEr
 use splinter::node_registry::{
     self,
     rest_api::{make_nodes_identity_resource, make_nodes_resource},
-    RwNodeRegistry, UnifiedNodeRegistry,
+    NodeRegistryReader, RwNodeRegistry, UnifiedNodeRegistry,
 };
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::protos::authorization::AuthorizationMessageType;
@@ -113,6 +113,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registry_config: RegistryConfig,
+    registries: Vec<String>,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
 }
@@ -397,7 +398,7 @@ impl SplinterDaemon {
         })?;
         let key_registry_manager = KeyRegistryManager::new(key_registry);
 
-        let node_registry = create_node_registry(&self.registry_config)?;
+        let node_registry = create_node_registry(&self.registry_config, &self.registries)?;
 
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
@@ -698,6 +699,7 @@ pub struct SplinterDaemonBuilder {
     biome_enabled: bool,
     registry_backend: Option<String>,
     registry_file: Option<String>,
+    registries: Vec<String>,
     storage_type: Option<String>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Duration,
@@ -762,6 +764,11 @@ impl SplinterDaemonBuilder {
 
     pub fn with_registry_file(mut self, value: String) -> Self {
         self.registry_file = Some(value);
+        self
+    }
+
+    pub fn with_registries(mut self, registries: Vec<String>) -> Self {
+        self.registries = registries;
         self
     }
 
@@ -856,6 +863,7 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "biome")]
             biome_enabled: self.biome_enabled,
             registry_config,
+            registries: self.registries,
             key_registry_location,
             storage_type,
             admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
@@ -952,6 +960,7 @@ fn set_up_circuit_dispatcher(
 
 fn create_node_registry(
     registry_config: &RegistryConfig,
+    registries: &[String],
 ) -> Result<Box<dyn RwNodeRegistry>, RestApiServerError> {
     let local_registry: Box<dyn RwNodeRegistry> = match registry_config {
         RegistryConfig::File { registry_file } => {
@@ -971,7 +980,40 @@ fn create_node_registry(
         RegistryConfig::NoOp => Box::new(node_registry::noop::NoOpNodeRegistry),
     };
 
-    Ok(Box::new(UnifiedNodeRegistry::new(local_registry, vec![])))
+    // Currently, only file-based read-only registries are supported
+    let read_only_registries = registries
+        .iter()
+        .filter_map(|registry| {
+            if registry.starts_with("file://") {
+                let registry_file = registry.trim_start_matches("file://");
+                debug!(
+                    "Attempting to add read-only node registry from file: {:?}",
+                    registry_file
+                );
+                match node_registry::yaml::YamlNodeRegistry::new(registry_file) {
+                    Ok(registry) => Some(Box::new(registry) as Box<dyn NodeRegistryReader>),
+                    Err(err) => {
+                        error!(
+                            "Failed to add read-only YamlNodeRegistry '{}': {}",
+                            registry, err
+                        );
+                        None
+                    }
+                }
+            } else {
+                error!(
+                    "Invalid registry provided ({}): must be valid 'file://' URI",
+                    registry
+                );
+                None
+            }
+        })
+        .collect();
+
+    Ok(Box::new(UnifiedNodeRegistry::new(
+        local_registry,
+        read_only_registries,
+    )))
 }
 
 #[derive(Debug)]

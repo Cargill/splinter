@@ -47,6 +47,7 @@ pub struct PartialConfig {
     database: Option<String>,
     registry_backend: Option<String>,
     registry_file: Option<String>,
+    registries: Option<Vec<String>>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
     state_dir: Option<String>,
@@ -77,6 +78,7 @@ impl PartialConfig {
             database: None,
             registry_backend: None,
             registry_file: None,
+            registries: None,
             heartbeat_interval: None,
             admin_service_coordinator_timeout: None,
             state_dir: None,
@@ -153,6 +155,10 @@ impl PartialConfig {
 
     pub fn registry_file(&self) -> Option<String> {
         self.registry_file.clone()
+    }
+
+    pub fn registries(&self) -> Option<Vec<String>> {
+        self.registries.clone()
     }
 
     pub fn heartbeat_interval(&self) -> Option<u64> {
@@ -368,6 +374,18 @@ impl PartialConfig {
     ///
     pub fn with_registry_file(mut self, registry_file: Option<String>) -> Self {
         self.registry_file = registry_file;
+        self
+    }
+
+    #[allow(dead_code)]
+    /// Adds a `registries` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `registries` - A list of read-only node registries.
+    ///
+    pub fn with_registries(mut self, registries: Option<Vec<String>>) -> Self {
+        self.registries = registries;
         self
     }
 
