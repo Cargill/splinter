@@ -119,7 +119,7 @@ use crate::rest_api::sessions::AccessTokenIssuer;
 /// * `GET /biome/user/{id}` - Retrieve user with specified ID
 /// * `DELETE /biome/user/{id}` - Remove user with specified ID
 pub struct BiomeRestResourceManager {
-    #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
+    #[cfg(feature = "biome-credentials")]
     user_store: Arc<dyn UserStore>,
     #[cfg(feature = "biome-key-management")]
     key_store: Arc<dyn KeyStore>,
@@ -347,7 +347,7 @@ impl BiomeRestResourceManagerBuilder {
 
     /// Consumes the builder and returns a BiomeRestResourceManager
     pub fn build(self) -> Result<BiomeRestResourceManager, BiomeRestResourceManagerBuilderError> {
-        #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
+        #[cfg(feature = "biome-credentials")]
         let user_store = self.user_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
                 "Missing user store".to_string(),
@@ -388,6 +388,7 @@ impl BiomeRestResourceManagerBuilder {
         })?;
 
         #[cfg(feature = "biome-credentials")]
+        #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
         let credentials_store = self.credentials_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
                 "Missing credentials store".to_string(),
@@ -395,7 +396,7 @@ impl BiomeRestResourceManagerBuilder {
         })?;
 
         Ok(BiomeRestResourceManager {
-            #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
+            #[cfg(feature = "biome-credentials")]
             user_store,
             #[cfg(feature = "biome-key-management")]
             key_store,
