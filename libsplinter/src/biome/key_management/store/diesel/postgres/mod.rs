@@ -26,23 +26,23 @@ use crate::biome::key_management::Key;
 use crate::database::ConnectionPool;
 
 /// Manages creating, updating and fetching keys from a PostgreSQL database.
-pub struct PostgresKeyStore {
+pub struct DieselKeyStore {
     pub connection_pool: ConnectionPool,
 }
 
-impl PostgresKeyStore {
-    /// Creates a new PostgresKeyStore
+impl DieselKeyStore {
+    /// Creates a new DieselKeyStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the PostgreSQL database
     ///
     pub fn new(connection_pool: ConnectionPool) -> Self {
-        PostgresKeyStore { connection_pool }
+        DieselKeyStore { connection_pool }
     }
 }
 
-impl KeyStore<Key> for PostgresKeyStore {
+impl KeyStore for DieselKeyStore {
     fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).insert_key(key)
     }

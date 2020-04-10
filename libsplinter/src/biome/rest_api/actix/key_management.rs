@@ -33,7 +33,7 @@ use crate::rest_api::{secrets::SecretManager, sessions::default_validation};
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
 pub fn make_key_management_route(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     Resource::build("/biome/keys")
@@ -66,7 +66,7 @@ pub fn make_key_management_route(
 /// Defines a REST endpoint for adding a key to the underlying storage
 fn handle_post(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
@@ -138,7 +138,7 @@ fn handle_post(
 /// Defines a REST endpoint for retrieving keys from the underlying storage
 fn handle_get(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
@@ -190,7 +190,7 @@ fn handle_get(
 /// Defines a REST endpoint for updating a key in the underlying storage
 fn handle_patch(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
@@ -256,7 +256,7 @@ fn handle_patch(
 /// Defines a REST endpoint for managing keys including fetching and deleting a user's key
 pub fn make_key_management_route_with_public_key(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     Resource::build("/biome/keys/{public_key}")
@@ -281,7 +281,7 @@ pub fn make_key_management_route_with_public_key(
 /// Defines a REST endpoint method to fetch a key from the underlying storage
 fn handle_fetch(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
@@ -351,7 +351,7 @@ fn handle_fetch(
 /// Defines a REST endpoint method to delete a key from the underlying storage
 fn handle_delete(
     rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore<Key>>,
+    key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
