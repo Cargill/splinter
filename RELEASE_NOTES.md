@@ -1,5 +1,189 @@
 # Release Notes
 
+## Changes in Splinter 0.3.15
+
+### Highlights
+
+* Command name change: Use `splinter circuit propose` to propose a new circuit
+  (instead of  `splinter circuit create`).
+* The `splinter node alias` subcommands have been removed.
+* Default values for the circuit management type and service type are now
+  configurable with the environment variables `SPLINTER_CIRCUIT_MANAGEMENT_TYPE`
+  and `SPLINTER_CIRCUIT_SERVICE_TYPE`.
+* Biome routes for user keys no longer require a user ID.
+* The splinterd REST API endpoints for reading and proposing circuits are now
+  in the default compilation target. Previously, this functionality required
+  the "experimental" feature flag during compilation.
+* The "biome" and "postgres" features are now available with the "stable"
+  feature flag (instead of "experimental") and will be included in the default
+  and stable Docker images published at
+  [splintercommunity](https://hub.docker.com/u/splintercommunity).
+* There is a new [splinter-ui](https://github.com/Cargill/splinter-ui)
+  repository for Canopy and saplings.
+
+### Deprecations and Breaking Changes
+
+* Biome routes for user keys no longer require a user ID.
+    - The endpoint `biome/users/{user_id}/keys` is now `biome/keys`
+    - The endpoint `biome/user/{user_id}/keys/{public_key}` is now
+      `biome/keys/{public_key}`
+* The `splinter circuit create` subcommand is now `splinter circuit propose`.
+* The `splinter node alias` subcommands have been removed. This functionality
+  will be replaced by `splinter circuit template` subcommands in an upcoming
+  release.
+
+For upgrade information, see [Upgrading to Splinter 0.3.15 from Splinter 0.3.14](https://github.com/Cargill/splinter-docs/blob/master/docs/upgrading/splinter-v0.3.15-from-v0.3.14.md).
+
+### libsplinter
+
+* Move the "biome" and "postgres" features from experimental to stable. They
+  can be enabled with the “stable” feature flag (instead of the “experimental”
+  feature flag), in addition to being enabled individually. These features
+  will be used by the default and stable Docker images published at
+  [splintercommunity](https://hub.docker.com/u/splintercommunity).
+* Remove the following features (no longer available as compilation options),
+  because the functionality is now available by default:
+    - `biome-rest-api`
+    - `circuit-read`
+    - `proposal-read`
+* Remove the following features (no longer available as compilation options):
+    - `database` - Redundant; its functionality can be accessed with the
+       "postgres" feature,
+    - `json-web-tokens` - Deemed unnecessary, because using authorization tokens
+       throughout the Biome REST API is always required,
+* Clean up and expand the transport module:
+    - Remove unused errors, PollError and StatusError, from the transport
+      module.
+    - Remove transport status enum.
+    - Implement `Display` for transport errors.
+* Refactor the database module:
+    - Refactor the constructor for `ConnectionPool` to `ConnectionPool::new_pg`
+      to support multiple backends.
+    - Replace `database::DatabaseError` with `database::ConnectionError`
+      because the only valid database errors were connection related.
+
+#### Testing
+
+* The REST API tests now shut down after the tests finish.
+
+#### Biome
+
+* Change two Biome routes so that the user ID is not required in the route. The
+  user ID is now derived from the provided access token.
+    - `biome/users/{USER-ID}/keys` has changed to to `biome/keys`
+    - `biome/users/{USER-ID}/keys/{public_key}` has changed to
+      `biome/keys/{public_key}`
+* Add a "refresh_token"  feature to the list of experimental features. When
+  this feature is enabled, `biome/login` now returns a refresh token. (Refresh
+  tokens are sent to the `POST /biome/token` endpoint to generate new access
+  tokens without having to collect credentials when the short-lived access
+  tokens expire.) Also, Biome has a new endpoint, called `/biome/tokens`, that
+  validates refresh tokens and returns a new access token to the API consumer.
+* Add a `/biome/logout` route.
+* Rename and update several Biome items:
+    - `SplinterUserStore` is now `DieselUserStore`
+    - `SplinterCredentialsStore` is now `DieselCredentialsStore`
+    - `SplinterUser` is now `User`.
+    - `UserCredentials` is now `Credentials`.
+    - `CredentialsStore` trait method `get_usernames` is now `list_usernames`.
+    - Remove the generic type definition from the `UserStore` trait and the
+      `CredentialsStore` trait.
+    - Add the `update_keys_and_password` method to `KeyStore` trait.
+* Add the `new_key_pairs` field to the `PUT /biome/users/{user_id}` payload.
+     ```
+     {
+       "username":"test@test1.com",
+       "hashed_password":"Admin2193!",
+       "new_password":"hello",
+       "new_key_pairs":[{
+           "display_name":"test",
+           "encrypted_private_key":"<encryped_private_key>",
+           "public_key":"<private_key>"
+       }],
+    }
+    ```
+* `BiomeRestResourceManager` now requires `CredentialsStore` to be created.
+
+#### Protobuf
+
+* Add `FromProto`, `FromNative`, `IntoBytes`, and `FromBytes` to the protobuf
+  module.
+* Add a `ViaProtocol` generic parameter to the `FromBytes` and `ToBytes` traits.
+  This allows for auto-implementations of the types for implementers of
+  FromNative and FromProto.
+* Add a `splinter::protos::prelude` module.
+
+### CLI
+
+* Change the following features from "experimental" to "stable". They can now
+  be enabled with the “stable” feature flag, in addition to being enabled
+  directly, and will be used by the default and stable Docker images published
+  at [splintercommunity](https://hub.docker.com/u/splintercommunity).
+    - `database-migrate-biome`
+    - `circuit`
+* Remove the following feature (no longer available as compilation options):
+    - `node-alias` - Replaced by the `circuit-template` feature
+* Remove the `splinter node alias` subcommands `add`, `delete`, `list`, and
+  `show`. This functionality will be replaced by the `splinter circuit template`
+  subcommands in an upcoming release.
+* Update `splinter circuit create` command to display the newly proposed
+  circuit after it is submitted.
+* Add the `--node-file` option to the `splinter circuit create` command. This
+  option loads a list of nodes from a YAML file, either on the local file
+  system or from a remote server with HTTP. You can use this option with (or
+  instead of) the `--node` option. This option supports the Splinter node file
+  types used by the node registry and the `splinter node alias` commands.
+* Update the `CreateCircuitMessageBuilder::add_node` method (which is used by
+  the `splinter circuit propose` command) to check for duplicate node IDs and
+  endpoints. If a duplicate is detected, an error is returned to the user.
+* Update the `splinter` CLI's `CreateCircuitMessageBuilder::add_service` method
+  (which is used for adding services specified with the `--service` argument),
+  to check for duplicate service IDs.
+* Remove the `node-alias` feature (the `splinter node alias` subcommands) from
+  the splinter CLI. This will be replaced by the `circuit-template` feature
+  (`splinter circuit template` subcommands) .
+* Simplify proposing a circuit with `splinter circuit propose` by automatically
+  setting the circuit metadata.
+* Update the `splinter circuit propose` command to check for duplicate service
+  arguments and return an error if one is found.
+* Remove the `splinter circuit default` subcommands and all associated code.
+  Default values for the circuit management type and service type are now
+  configurable with the environment variables `SPLINTER_CIRCUIT_MANAGEMENT_TYPE`
+  and `SPLINTER_CIRCUIT_SERVICE_TYPE`. This change simplifies circuit creation
+  and lets users set default values with environment variables.
+* Change the `splinter circuit show` command to require a circuit ID as an
+  argument.
+* Increase the paging limit for `splinter circuit list` to 1000.
+
+### Canopy
+
+* Remove Canopy from the splinter repository and move it to
+  https://github.com/Cargill/splinter-ui
+
+### Documentation
+
+* Add man pages for the `splinter circuit` subcommands and `splinter database migrate`.
+  To display a man page with the `man` command, use the dashed form of the name,
+  where each space is replaced by a dash.
+    - `splinter-circuit`
+    - `splinter-circuit-list`
+    - `splinter-circuit-proposals`
+    - `splinter-circuit-propose`
+    - `splinter-circuit-show`
+    - `splinter-circuit-template`
+    - `splinter-circuit-template-arguments`
+    - `splinter-circuit-template-list`
+    - `splinter-circuit-template-show`
+    - `splinter-circuit-vote`
+    - `splinter-database-migrate`
+
+### Miscellaneous
+
+* Update the examples
+  [private_counter](https://github.com/Cargill/splinter/tree/master/examples/private_counter)
+  and [private_xo](https://github.com/Cargill/splinter/tree/master/examples/private_xo)
+  to be compatible with Splinter version 0.3.15.
+
 ## Changes in Splinter 0.3.14
 
 ### Highlights
