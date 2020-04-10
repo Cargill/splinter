@@ -85,7 +85,7 @@ impl OpenProposals {
     }
 
     fn write_open_proposals(&self) -> Result<(), OpenProposalError> {
-        // Replace stored key_registry with the current key registry
+        // Replace stored proposal_registry with the current proposal registry
         let mut storage = get_storage(self.storage_location(), || self.proposal_registry.clone())
             .map_err(OpenProposalError::WriteError)?;
 
