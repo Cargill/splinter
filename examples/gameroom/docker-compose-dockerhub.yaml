@@ -91,6 +91,7 @@ services:
             gameroomd -vv --database-url postgres://gameroom:gameroom_example@db-acme:5432/gameroom \
               -b gameroomd-acme:8000 --splinterd-url http://splinterd-node-acme:8085
           "
+
     splinterd-node-acme:
       image: splintercommunity/splinterd:master
       container_name: splinterd-node-acme
