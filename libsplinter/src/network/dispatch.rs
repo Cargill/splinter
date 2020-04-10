@@ -25,26 +25,89 @@ use std::sync::mpsc::{channel, RecvError, Sender};
 
 use crate::network::sender::NetworkMessageSender;
 
+/// A wrapper for a PeerId.
+///
+/// This type constrains a dispatcher to peer-specific messages
+#[derive(Debug, Clone)]
+pub struct PeerId(String);
+
+impl std::ops::Deref for PeerId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for PeerId {
+    fn from(s: String) -> PeerId {
+        PeerId(s)
+    }
+}
+
+impl From<&str> for PeerId {
+    fn from(s: &str) -> PeerId {
+        PeerId(s.into())
+    }
+}
+
+impl From<PeerId> for String {
+    fn from(peer_id: PeerId) -> String {
+        peer_id.0
+    }
+}
+
+/// A wrapper for Connection Id
+///
+/// The type constrains a dispatcher to connection-specific messages
+#[derive(Debug, Clone)]
+pub struct ConnectionId(String);
+
+impl std::ops::Deref for ConnectionId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for ConnectionId {
+    fn from(s: String) -> ConnectionId {
+        ConnectionId(s)
+    }
+}
+
+impl From<&str> for ConnectionId {
+    fn from(s: &str) -> ConnectionId {
+        ConnectionId(s.into())
+    }
+}
+
+impl From<ConnectionId> for String {
+    fn from(connection_id: ConnectionId) -> String {
+        connection_id.0
+    }
+}
+
 /// The Message Context
 ///
 /// The message context provides information about an incoming message beyond its parsed bytes.  It
 /// includes the source peer id, the message type, the original bytes, and potentially other,
 /// future items.
 #[derive(Clone, Debug)]
-pub struct MessageContext<MT: Hash + Eq + Debug + Clone> {
-    source_peer_id: String,
+pub struct MessageContext<Source, MT>
+where
+    MT: Hash + Eq + Debug + Clone,
+{
+    source_id: Source,
     message_type: MT,
     message_bytes: Vec<u8>,
 }
 
-impl<MT: Hash + Eq + Debug + Clone> MessageContext<MT> {
-    /// The Source Peer ID.
-    ///
-    /// This is the peer id of the original sender of the message
-    pub fn source_peer_id(&self) -> &str {
-        &self.source_peer_id
-    }
-
+impl<Source, MT> MessageContext<Source, MT>
+where
+    MT: Hash + Eq + Debug + Clone,
+{
     /// The Message Type.
     ///
     /// This is the message type that determined which handler to execute on receipt of this
@@ -57,14 +120,42 @@ impl<MT: Hash + Eq + Debug + Clone> MessageContext<MT> {
     pub fn message_bytes(&self) -> &[u8] {
         &self.message_bytes
     }
+
+    pub fn source_id(&self) -> &Source {
+        &self.source_id
+    }
+}
+
+impl<MT> MessageContext<PeerId, MT>
+where
+    MT: Hash + Eq + Debug + Clone,
+{
+    /// The Source Peer ID.
+    ///
+    /// This is the peer id of the original sender of the message
+    pub fn source_peer_id(&self) -> &str {
+        &self.source_id
+    }
+}
+
+impl<MT> MessageContext<ConnectionId, MT>
+where
+    MT: Hash + Eq + Debug + Clone,
+{
+    /// The Source Connection ID.
+    ///
+    /// This is the connection id of the original sender of the message
+    pub fn source_connection_id(&self) -> &str {
+        &self.source_id
+    }
 }
 
 /// A Handler for a network message.
-pub trait Handler<MT, T>: Send
-where
-    MT: Hash + Eq + Debug + Clone,
-    T: FromMessageBytes,
-{
+pub trait Handler: Send {
+    type Source;
+    type MessageType: Hash + Eq + Debug + Clone;
+    type Message: FromMessageBytes;
+
     /// Handles a given message
     ///
     /// # Errors
@@ -72,26 +163,10 @@ where
     /// Any issues that occur during processing of the message will result in a DispatchError.
     fn handle(
         &self,
-        message: T,
-        message_context: &MessageContext<MT>,
+        message: Self::Message,
+        message_context: &MessageContext<Self::Source, Self::MessageType>,
         network_sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError>;
-}
-
-impl<MT, T, F> Handler<MT, T> for F
-where
-    MT: Hash + Eq + Debug + Clone,
-    T: FromMessageBytes,
-    F: Fn(T, &MessageContext<MT>, &NetworkMessageSender) -> Result<(), DispatchError> + Send,
-{
-    fn handle(
-        &self,
-        message: T,
-        message_context: &MessageContext<MT>,
-        network_sender: &NetworkMessageSender,
-    ) -> Result<(), DispatchError> {
-        (*self)(message, message_context, network_sender)
-    }
 }
 
 /// Converts bytes into a concrete message instance
@@ -202,12 +277,20 @@ impl std::fmt::Display for DispatchError {
 ///
 /// Message Types (MT) merely need to implement Hash, Eq and Debug (for unknown message type
 /// results). Beyond that, there are no other requirements.
-pub struct Dispatcher<MT: Any + Hash + Eq + Debug + Clone> {
-    handlers: HashMap<MT, HandlerWrapper<MT>>,
+pub struct Dispatcher<MT, Source = PeerId>
+where
+    Source: 'static,
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    handlers: HashMap<MT, HandlerWrapper<Source, MT>>,
     network_sender: NetworkMessageSender,
 }
 
-impl<MT: Any + Hash + Eq + Debug + Clone> Dispatcher<MT> {
+impl<MT, Source> Dispatcher<MT, Source>
+where
+    Source: 'static,
+    MT: Any + Hash + Eq + Debug + Clone,
+{
     /// Creates a Dispatcher
     ///
     /// Creates a dispatcher with a given `NetworkSender` to supply to handlers when they are
@@ -224,8 +307,11 @@ impl<MT: Any + Hash + Eq + Debug + Clone> Dispatcher<MT> {
     /// This sets a handler for a given message type.  Only one handler may exist per message type.
     /// If a user wishes to run a series handlers, they must supply a single handler that composes
     /// the series.
-    pub fn set_handler<T>(&mut self, message_type: MT, handler: Box<dyn Handler<MT, T>>)
-    where
+    pub fn set_handler<T>(
+        &mut self,
+        message_type: MT,
+        handler: Box<dyn Handler<Source = Source, MessageType = MT, Message = T>>,
+    ) where
         T: FromMessageBytes,
     {
         self.handlers.insert(
@@ -250,14 +336,14 @@ impl<MT: Any + Hash + Eq + Debug + Clone> Dispatcher<MT> {
     /// error occurs while handling the messages (e.g. the message cannot be deserialized).
     pub fn dispatch(
         &self,
-        source_peer_id: &str,
+        source_id: Source,
         message_type: &MT,
         message_bytes: Vec<u8>,
     ) -> Result<(), DispatchError> {
         let message_context = MessageContext {
             message_type: message_type.clone(),
             message_bytes,
-            source_peer_id: source_peer_id.into(),
+            source_id,
         };
         self.handlers
             .get(message_type)
@@ -275,20 +361,27 @@ impl<MT: Any + Hash + Eq + Debug + Clone> Dispatcher<MT> {
 }
 
 /// A function that handles inbound message bytes.
-type InnerHandler<MT> = Box<
-    dyn Fn(&[u8], &MessageContext<MT>, &NetworkMessageSender) -> Result<(), DispatchError> + Send,
+type InnerHandler<Source, MT> = Box<
+    dyn Fn(&[u8], &MessageContext<Source, MT>, &NetworkMessageSender) -> Result<(), DispatchError>
+        + Send,
 >;
 
 /// The HandlerWrapper provides a typeless wrapper for typed Handler instances.
-struct HandlerWrapper<MT: Hash + Eq + Debug + Clone> {
-    inner: InnerHandler<MT>,
+struct HandlerWrapper<Source, MT>
+where
+    MT: Hash + Eq + Debug + Clone,
+{
+    inner: InnerHandler<Source, MT>,
 }
 
-impl<MT: Hash + Eq + Debug + Clone> HandlerWrapper<MT> {
+impl<Source, MT> HandlerWrapper<Source, MT>
+where
+    MT: Hash + Eq + Debug + Clone,
+{
     fn handle(
         &self,
         message_bytes: &[u8],
-        message_context: &MessageContext<MT>,
+        message_context: &MessageContext<Source, MT>,
         network_sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         (*self.inner)(message_bytes, message_context, network_sender)
@@ -300,20 +393,29 @@ impl<MT: Hash + Eq + Debug + Clone> HandlerWrapper<MT> {
 /// This enum contains information about a message that will be passed to a `Dispatcher` instance
 /// via a `Sender<DispatchMessage>`.
 #[derive(Clone)]
-enum DispatchMessage<MT: Any + Hash + Eq + Debug + Clone> {
+enum DispatchMessage<MT, Source = PeerId>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
     Message {
         message_type: MT,
         message_bytes: Vec<u8>,
-        source_peer_id: String,
+        source_id: Source,
     },
     Shutdown,
 }
 
-pub struct DispatchLoopShutdownSignaler<MT: Any + Hash + Eq + Debug + Clone> {
-    sender: Sender<DispatchMessage<MT>>,
+pub struct DispatchLoopShutdownSignaler<MT, Source = PeerId>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    sender: Sender<DispatchMessage<MT, Source>>,
 }
 
-impl<MT: Any + Hash + Eq + Debug + Clone> DispatchLoopShutdownSignaler<MT> {
+impl<MT, Source> DispatchLoopShutdownSignaler<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
     pub fn shutdown(&self) {
         if self.sender.send(DispatchMessage::Shutdown).is_err() {
             error!("Unable to send shutdown signal to already shutdown dispatch loop");
@@ -334,12 +436,20 @@ impl fmt::Display for DispatchLoopError {
 }
 
 #[derive(Default)]
-pub struct DispatchLoopBuilder<MT: Any + Hash + Eq + Debug + Clone> {
-    dispatcher: Option<Dispatcher<MT>>,
+pub struct DispatchLoopBuilder<MT, Source = PeerId>
+where
+    Source: 'static,
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    dispatcher: Option<Dispatcher<MT, Source>>,
     thread_name: Option<String>,
 }
 
-impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
+impl<MT, Source> DispatchLoopBuilder<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone + Send,
+    Source: Send + 'static,
+{
     pub fn new() -> Self {
         DispatchLoopBuilder {
             dispatcher: None,
@@ -347,7 +457,7 @@ impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
         }
     }
 
-    pub fn with_dispatcher(mut self, dispatcher: Dispatcher<MT>) -> Self {
+    pub fn with_dispatcher(mut self, dispatcher: Dispatcher<MT, Source>) -> Self {
         self.dispatcher = Some(dispatcher);
         self
     }
@@ -357,7 +467,7 @@ impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
         self
     }
 
-    pub fn build(mut self) -> Result<DispatchLoop<MT>, String> {
+    pub fn build(mut self) -> Result<DispatchLoop<MT, Source>, String> {
         let (tx, rx) = channel();
 
         let dispatcher = self
@@ -367,18 +477,18 @@ impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
 
         let thread_name = self
             .thread_name
-            .unwrap_or_else(|| "DispatchLoop".to_string());
+            .unwrap_or_else(|| format!("DispatchLoop({})", std::any::type_name::<MT>()));
 
         let join_handle = std::thread::Builder::new()
             .name(thread_name)
             .spawn(move || loop {
                 loop {
-                    let (message_type, message_bytes, source_peer_id) = match rx.recv() {
+                    let (message_type, message_bytes, source_id) = match rx.recv() {
                         Ok(DispatchMessage::Message {
                             message_type,
                             message_bytes,
-                            source_peer_id,
-                        }) => (message_type, message_bytes, source_peer_id),
+                            source_id,
+                        }) => (message_type, message_bytes, source_id),
                         Ok(DispatchMessage::Shutdown) => {
                             debug!("Received shutdown signal");
                             break;
@@ -388,7 +498,7 @@ impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
                             break;
                         }
                     };
-                    match dispatcher.dispatch(&source_peer_id, &message_type, message_bytes) {
+                    match dispatcher.dispatch(source_id, &message_type, message_bytes) {
                         Ok(_) => (),
                         Err(err) => warn!("Unable to dispatch message: {:?}", err),
                     }
@@ -410,25 +520,31 @@ impl<MT: Any + Hash + Eq + Debug + Clone + Send> DispatchLoopBuilder<MT> {
 /// The dispatch loop processes messages that are pulled from a `Receiver<DispatchMessage>` and
 /// passes them to a Dispatcher.  The dispatch loop only processes messages from a specific message
 /// type.
-pub struct DispatchLoop<MT: Any + Hash + Eq + Debug + Clone> {
-    sender: Sender<DispatchMessage<MT>>,
+pub struct DispatchLoop<MT, Source = PeerId>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    sender: Sender<DispatchMessage<MT, Source>>,
     join_handle: std::thread::JoinHandle<()>,
 }
 
-impl<MT: Any + Hash + Eq + Debug + Clone> DispatchLoop<MT> {
+impl<MT, Source> DispatchLoop<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
     pub fn wait_for_shutdown(self) {
         if self.join_handle.join().is_err() {
             error!("Unable to cleanly wait for dispatch loop shutdown");
         }
     }
 
-    pub fn new_dispatcher_sender(&self) -> DispatchMessageSender<MT> {
+    pub fn new_dispatcher_sender(&self) -> DispatchMessageSender<MT, Source> {
         DispatchMessageSender {
             sender: self.sender.clone(),
         }
     }
 
-    pub fn shutdown_signaler(&self) -> DispatchLoopShutdownSignaler<MT> {
+    pub fn shutdown_signaler(&self) -> DispatchLoopShutdownSignaler<MT, Source> {
         DispatchLoopShutdownSignaler {
             sender: self.sender.clone(),
         }
@@ -436,29 +552,35 @@ impl<MT: Any + Hash + Eq + Debug + Clone> DispatchLoop<MT> {
 }
 
 #[derive(Clone)]
-pub struct DispatchMessageSender<MT: Any + Hash + Eq + Debug + Clone> {
-    sender: Sender<DispatchMessage<MT>>,
+pub struct DispatchMessageSender<MT, Source = PeerId>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    sender: Sender<DispatchMessage<MT, Source>>,
 }
 
-impl<MT: Any + Hash + Eq + Debug + Clone> DispatchMessageSender<MT> {
+impl<MT, Source> DispatchMessageSender<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
     pub fn send(
         &self,
         message_type: MT,
         message_bytes: Vec<u8>,
-        source_peer_id: String,
-    ) -> Result<(), (MT, Vec<u8>, String)> {
+        source_id: Source,
+    ) -> Result<(), (MT, Vec<u8>, Source)> {
         self.sender
             .send(DispatchMessage::Message {
                 message_type,
                 message_bytes,
-                source_peer_id,
+                source_id,
             })
             .map_err(|err| match err.0 {
                 DispatchMessage::Message {
                     message_type,
                     message_bytes,
-                    source_peer_id,
-                } => (message_type, message_bytes, source_peer_id),
+                    source_id,
+                } => (message_type, message_bytes, source_id),
                 DispatchMessage::Shutdown => unreachable!(), // we didn't send this
             })
     }
@@ -468,7 +590,6 @@ impl<MT: Any + Hash + Eq + Debug + Clone> DispatchMessageSender<MT> {
 mod tests {
     use super::*;
 
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
 
     use protobuf::Message;
@@ -477,58 +598,6 @@ mod tests {
     use crate::network::sender;
     use crate::network::Network;
     use crate::protos::network::{NetworkEcho, NetworkMessageType};
-    use crate::transport::inproc::InprocTransport;
-    use crate::transport::Transport;
-
-    /// Verify that messages can be dispatched to handlers implemented as closures.
-    ///
-    /// This test does the following:
-    ///
-    /// * Create a Dispatcher
-    /// * Add a handler implemented as a closure over an atomic Boolean
-    /// * Dispatch a message of an unknown type and verify the error result
-    /// * Dispatch a message of the expected type and verify that it was called
-    #[test]
-    fn dispatch_to_closure() {
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
-        let flag = Arc::new(AtomicBool::new(false));
-        let mut dispatcher = Dispatcher::new(network_sender);
-        let handler_flag = flag.clone();
-        dispatcher.set_handler(
-            NetworkMessageType::NETWORK_ECHO,
-            Box::new(
-                move |_: NetworkEcho,
-                      _: &MessageContext<NetworkMessageType>,
-                      _: &NetworkMessageSender| {
-                    handler_flag.store(true, Ordering::SeqCst);
-                    Ok(())
-                },
-            ),
-        );
-
-        assert_eq!(
-            Err(DispatchError::UnknownMessageType(format!(
-                "No handler for type {:?}",
-                NetworkMessageType::CIRCUIT
-            ))),
-            dispatcher.dispatch("TestPeer", &NetworkMessageType::CIRCUIT, Vec::new())
-        );
-        assert_eq!(false, flag.load(Ordering::SeqCst));
-
-        assert_eq!(
-            Ok(()),
-            dispatcher.dispatch("TestPeer", &NetworkMessageType::NETWORK_ECHO, Vec::new())
-        );
-        assert_eq!(true, flag.load(Ordering::SeqCst));
-    }
 
     /// Verify that messages can be dispatched to handlers via the trait.
     ///
@@ -562,7 +631,7 @@ mod tests {
         assert_eq!(
             Ok(()),
             dispatcher.dispatch(
-                "TestPeer",
+                "TestPeer".into(),
                 &NetworkMessageType::NETWORK_ECHO,
                 outgoing_message_bytes
             )
@@ -572,58 +641,6 @@ mod tests {
             vec!["test_dispatcher".to_string()],
             echos.lock().unwrap().clone()
         );
-    }
-
-    /// Verify that messages can be dispatched to handlers implemented as named function.
-    ///
-    /// This test does the following:
-    ///
-    /// * Create a sent message container for replies
-    /// * Create a Dispatcher with that sent container
-    /// * Add a handler implemented defined as a static, named function
-    /// * Dispatch a message of the expected type and verify that it was called by checking that it
-    ///   submitted the reply message
-    #[test]
-    fn dispatch_to_fn() {
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-        let mut inproc_transport = InprocTransport::default();
-        let mut dispatcher = Dispatcher::new(network_sender);
-        let mut listener = inproc_transport
-            .listen("inproc://dispatcher")
-            .expect("Cannot get listener");
-
-        std::thread::spawn(move || {
-            let connection = listener.accept().expect("Cannot accept connection");
-            network1
-                .add_peer("TestPeer".to_string(), connection)
-                .expect("Unable to add peer");
-
-            dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handle_echo));
-            assert_eq!(
-                Ok(()),
-                dispatcher.dispatch("TestPeer", &NetworkMessageType::NETWORK_ECHO, Vec::new())
-            );
-        });
-
-        let mesh2 = Mesh::new(1, 1);
-        let network2 = Network::new(mesh2.clone(), 0).unwrap();
-        let connection = inproc_transport
-            .connect("inproc://dispatcher")
-            .expect("Unable to connect to inproc");
-        network2
-            .add_peer("dispatch_peer".to_string(), connection)
-            .expect("Unable to add peer");
-
-        let _network_message_wrapper = network2
-            .recv()
-            .expect("Unable to receive message over the network");
     }
 
     /// Verify that a dispatcher can be moved to a thread.
@@ -659,7 +676,7 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 dispatcher.dispatch(
-                    "TestPeer",
+                    "TestPeer".into(),
                     &NetworkMessageType::NETWORK_ECHO,
                     outgoing_message_bytes
                 )
@@ -679,32 +696,20 @@ mod tests {
         echos: Arc<Mutex<Vec<String>>>,
     }
 
-    impl Handler<NetworkMessageType, NetworkEcho> for NetworkEchoHandler {
+    impl Handler for NetworkEchoHandler {
+        type Source = PeerId;
+        type MessageType = NetworkMessageType;
+        type Message = NetworkEcho;
+
         fn handle(
             &self,
             message: NetworkEcho,
-            _message_context: &MessageContext<NetworkMessageType>,
+            _message_context: &MessageContext<Self::Source, NetworkMessageType>,
             _: &NetworkMessageSender,
         ) -> Result<(), DispatchError> {
             let echo_string = String::from_utf8(message.get_payload().to_vec()).unwrap();
             self.echos.lock().unwrap().push(echo_string);
             Ok(())
         }
-    }
-
-    /// This test handler
-    fn handle_echo(
-        message: RawBytes,
-        message_context: &MessageContext<NetworkMessageType>,
-        network_sender: &NetworkMessageSender,
-    ) -> Result<(), DispatchError> {
-        let expected_message: Vec<u8> = vec![];
-        assert_eq!(expected_message, message.bytes());
-
-        network_sender
-            .send(message_context.source_peer_id().to_string(), vec![])
-            .map_err(|(peer_id, payload)| DispatchError::NetworkSendError((peer_id, payload)))?;
-
-        Ok(())
     }
 }

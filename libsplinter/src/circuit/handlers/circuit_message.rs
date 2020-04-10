@@ -11,7 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::network::dispatch::{DispatchError, DispatchMessageSender, Handler, MessageContext};
+use crate::network::dispatch::{
+    DispatchError, DispatchMessageSender, Handler, MessageContext, PeerId,
+};
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{CircuitMessage, CircuitMessageType};
 use crate::protos::network::NetworkMessageType;
@@ -21,11 +23,15 @@ pub struct CircuitMessageHandler {
     sender: DispatchMessageSender<CircuitMessageType>,
 }
 
-impl Handler<NetworkMessageType, CircuitMessage> for CircuitMessageHandler {
+impl Handler for CircuitMessageHandler {
+    type Source = PeerId;
+    type MessageType = NetworkMessageType;
+    type Message = CircuitMessage;
+
     fn handle(
         &self,
-        msg: CircuitMessage,
-        context: &MessageContext<NetworkMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         _: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(
@@ -44,7 +50,7 @@ impl Handler<NetworkMessageType, CircuitMessage> for CircuitMessageHandler {
             .send(
                 msg.get_message_type(),
                 msg.get_payload().to_vec(),
-                context.source_peer_id().to_string(),
+                context.source_id().clone(),
             )
             .map_err(|_| {
                 DispatchError::NetworkSendError((context.source_peer_id().to_string(), msg.payload))
@@ -119,7 +125,11 @@ mod tests {
 
         // Dispatch network message
         network_dispatcher
-            .dispatch("PEER", &NetworkMessageType::CIRCUIT, circuit_bytes.clone())
+            .dispatch(
+                "PEER".into(),
+                &NetworkMessageType::CIRCUIT,
+                circuit_bytes.clone(),
+            )
             .unwrap();
 
         let mut count = 0;
@@ -141,11 +151,15 @@ mod tests {
         echos: Arc<RwLock<Vec<String>>>,
     }
 
-    impl Handler<CircuitMessageType, ServiceConnectRequest> for ServiceConnectedTestHandler {
+    impl Handler for ServiceConnectedTestHandler {
+        type Source = PeerId;
+        type MessageType = CircuitMessageType;
+        type Message = ServiceConnectRequest;
+
         fn handle(
             &self,
-            message: ServiceConnectRequest,
-            _message_context: &MessageContext<CircuitMessageType>,
+            message: Self::Message,
+            _message_context: &MessageContext<Self::Source, Self::MessageType>,
             _: &NetworkMessageSender,
         ) -> Result<(), DispatchError> {
             self.echos

@@ -14,7 +14,7 @@
 
 use crate::circuit::handlers::create_message;
 use crate::circuit::{ServiceId, SplinterState};
-use crate::network::dispatch::{DispatchError, Handler, MessageContext};
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{
     CircuitDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
@@ -28,11 +28,15 @@ pub struct CircuitDirectMessageHandler {
     state: SplinterState,
 }
 
-impl Handler<CircuitMessageType, CircuitDirectMessage> for CircuitDirectMessageHandler {
+impl Handler for CircuitDirectMessageHandler {
+    type Source = PeerId;
+    type MessageType = CircuitMessageType;
+    type Message = CircuitDirectMessage;
+
     fn handle(
         &self,
-        msg: CircuitDirectMessage,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!(
@@ -283,7 +287,7 @@ mod tests {
                 // dispatch the direct message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )
@@ -364,7 +368,7 @@ mod tests {
                 // dispatch the message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )
@@ -439,7 +443,7 @@ mod tests {
                 // dispatcher message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )
@@ -514,7 +518,7 @@ mod tests {
                 // dispatcher message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )
@@ -587,7 +591,7 @@ mod tests {
                 // dispatch message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )
@@ -660,7 +664,7 @@ mod tests {
                 // dispatch message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )
@@ -713,7 +717,7 @@ mod tests {
                 // dispatch message
                 dispatcher
                     .dispatch(
-                        "def",
+                        "def".into(),
                         &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
                         direct_bytes.clone(),
                     )

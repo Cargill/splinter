@@ -14,7 +14,7 @@
 
 use crate::circuit::handlers::create_message;
 use crate::circuit::{ServiceId, SplinterState};
-use crate::network::dispatch::{DispatchError, Handler, MessageContext};
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{CircuitError, CircuitMessageType};
 
@@ -27,11 +27,15 @@ pub struct CircuitErrorHandler {
 // In most cases the error message will be returned directly back to service, but in the case
 // where it is returned back to a different node, this node will do its best effort to
 // return it back to the service or node who sent the original message.
-impl Handler<CircuitMessageType, CircuitError> for CircuitErrorHandler {
+impl Handler for CircuitErrorHandler {
+    type Source = PeerId;
+    type MessageType = CircuitMessageType;
+    type Message = CircuitError;
+
     fn handle(
         &self,
-        msg: CircuitError,
-        context: &MessageContext<CircuitMessageType>,
+        msg: Self::Message,
+        context: &MessageContext<Self::Source, Self::MessageType>,
         sender: &NetworkMessageSender,
     ) -> Result<(), DispatchError> {
         debug!("Handle Circuit Error Message {:?}", msg);
@@ -174,7 +178,7 @@ mod tests {
                 // dispatch the error message
                 dispatcher
                     .dispatch(
-                        "345",
+                        "345".into(),
                         &CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
                         error_bytes.clone(),
                     )
@@ -257,7 +261,7 @@ mod tests {
                 // dispatch the error message
                 dispatcher
                     .dispatch(
-                        "586",
+                        "586".into(),
                         &CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
                         error_bytes.clone(),
                     )
@@ -325,7 +329,7 @@ mod tests {
             // dispatch the error message
             dispatcher
                 .dispatch(
-                    "def",
+                    "def".into(),
                     &CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
                     error_bytes.clone(),
                 )

@@ -314,7 +314,7 @@ impl SplinterDaemon {
                             match network_dispatch_send.send(
                                 msg.get_message_type(),
                                 msg.take_payload(),
-                                message.peer_id().to_string(),
+                                message.peer_id().into(),
                             ) {
                                 Ok(()) => (),
                                 Err((message_type, _, _)) => {
