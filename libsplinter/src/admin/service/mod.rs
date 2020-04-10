@@ -32,11 +32,12 @@ use protobuf::{self, Message};
 use crate::circuit::SplinterState;
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
-use crate::keys::{KeyPermissionManager, KeyRegistry};
+use crate::keys::KeyPermissionManager;
 use crate::network::{
     auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
     peer::PeerConnector,
 };
+use crate::node_registry::NodeRegistryReader;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 use crate::protos::admin::{
@@ -129,7 +130,7 @@ impl AdminService {
         authorization_inquistor: Box<dyn AuthorizationInquisitor>,
         splinter_state: SplinterState,
         signature_verifier: Box<dyn SignatureVerifier + Send>,
-        key_registry: Box<dyn KeyRegistry>,
+        node_registry: Box<dyn NodeRegistryReader>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
         // The coordinator timeout for the two-phase commit consensus engine; if `None`, the
@@ -150,7 +151,7 @@ impl AdminService {
                 authorization_inquistor,
                 splinter_state,
                 signature_verifier,
-                key_registry,
+                node_registry,
                 key_permission_manager,
                 storage_type,
             )?)),
@@ -524,11 +525,12 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use crate::circuit::{directory::CircuitDirectory, SplinterState};
-    use crate::keys::{
-        insecure::AllowAllKeyPermissionManager, storage::StorageKeyRegistry, KeyInfo,
-    };
+    use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
     use crate::network::{auth::AuthorizationCallback, Network};
+    use crate::node_registry::{
+        MetadataPredicate, Node, NodeBuilder, NodeIter, NodeRegistryError, NodeRegistryReader,
+    };
     use crate::protos::{
         admin,
         authorization::{AuthorizationMessage, AuthorizationMessageType, AuthorizedMessage},
@@ -544,6 +546,11 @@ mod tests {
         ConnectError, Connection, DisconnectError, RecvError, SendError, Transport,
     };
 
+    const PUB_KEY: &[u8] = &[
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32,
+    ];
+
     /// Test that a circuit creation creates the correct connections and sends the appropriate
     /// messages.
     #[test]
@@ -556,12 +563,6 @@ mod tests {
         ]);
 
         let mut storage = get_storage("memory", CircuitDirectory::new).unwrap();
-
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "test_node".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let circuit_directory = storage.write().clone();
         let state = SplinterState::new("memory".to_string(), circuit_directory);
@@ -582,7 +583,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
             None,
@@ -618,7 +619,7 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-        header.set_requester(pub_key);
+        header.set_requester(PUB_KEY.into());
         header.set_requester_node_id("test_node".to_string());
 
         let mut payload = admin::CircuitManagementPayload::new();
@@ -929,6 +930,31 @@ mod tests {
             // The callback won't be called, as this test implementation indicates that all nodes
             // are peered.
             Ok(())
+        }
+    }
+
+    struct MockNodeRegistry;
+
+    impl NodeRegistryReader for MockNodeRegistry {
+        fn list_nodes<'a, 'b: 'a>(
+            &'b self,
+            _predicates: &'a [MetadataPredicate],
+        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+            unimplemented!()
+        }
+
+        fn count_nodes(&self, _predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+            unimplemented!()
+        }
+
+        fn fetch_node(&self, _identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+            Ok(Some(
+                NodeBuilder::new("test-node")
+                    .with_endpoint("tcp://someplace:8000")
+                    .with_key(to_hex(PUB_KEY))
+                    .build()
+                    .expect("Failed to build node"),
+            ))
         }
     }
 }

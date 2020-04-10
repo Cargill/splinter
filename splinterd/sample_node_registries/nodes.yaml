@@ -16,11 +16,16 @@
   endpoints:
     - "tcps://123.0.0.123:8080"
   display_name: "Bitwise IO - Node 1"
+  keys:
+    - "000000000000000000000000000000000"
+    - "111111111111111111111111111111111"
   metadata:
     company: "Bitwise IO"
 - identity: "Node-456"
   endpoints:
     - "tcps://456.0.0.456:8080"
   display_name: "Cargill - Node 1"
+  keys:
+    - "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   metadata:
     company: "Cargill"

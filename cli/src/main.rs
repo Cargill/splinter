@@ -91,21 +91,6 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                  "Name of the directory in which to create the keys; defaults to current working directory")
                 (@arg force: --force "Overwrite files if they exist")
             )
-            (@subcommand keyregistry =>
-                (about: "Generates a key registry yaml file and keys, based on a registry \
-                 specification")
-                (@arg target_dir: -d --("target-dir") +takes_value
-                 "Name of the directory in which to create the registry file and keys; \
-                 defaults to /var/lib/splinter or the value of SPLINTER_STATE_DIR environment \
-                 variable")
-                (@arg registry_file: -o --("registry-file") +takes_value
-                 "Name of the target registry file (in the target directory); \
-                 defaults to \"keys.yaml\"")
-                (@arg registry_spec_path: -i --("input-registry-spec") +takes_value
-                 "Name of the input key registry specification; \
-                 defaults to \"./key_registry_spec.yaml\"")
-                (@arg force: --force "Overwrite files if they exist")
-            )
         )
     );
 
@@ -597,9 +582,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     let mut subcommands = SubcommandActions::new()
         .with_command(
             "admin",
-            SubcommandActions::new()
-                .with_command("keygen", admin::AdminKeyGenAction)
-                .with_command("keyregistry", admin::KeyRegistryGenerationAction),
+            SubcommandActions::new().with_command("keygen", admin::AdminKeyGenAction),
         )
         .with_command(
             "cert",

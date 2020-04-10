@@ -30,11 +30,12 @@ use crate::circuit::{
 };
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::hex::to_hex;
-use crate::keys::{KeyPermissionManager, KeyRegistry};
+use crate::keys::KeyPermissionManager;
 use crate::network::{
     auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
     peer::PeerConnector,
 };
+use crate::node_registry::NodeRegistryReader;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator, ShutdownServiceError};
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 #[cfg(feature = "service-arg-validation")]
@@ -192,7 +193,7 @@ pub struct AdminServiceShared {
     splinter_state: SplinterState,
     // signature verifier
     signature_verifier: Box<dyn SignatureVerifier + Send>,
-    key_registry: Box<dyn KeyRegistry>,
+    node_registry: Box<dyn NodeRegistryReader>,
     key_permission_manager: Box<dyn KeyPermissionManager>,
     proposal_sender: Option<Sender<ProposalUpdate>>,
 }
@@ -210,7 +211,7 @@ impl AdminServiceShared {
         auth_inquisitor: Box<dyn AuthorizationInquisitor>,
         splinter_state: SplinterState,
         signature_verifier: Box<dyn SignatureVerifier + Send>,
-        key_registry: Box<dyn KeyRegistry>,
+        node_registry: Box<dyn NodeRegistryReader>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
     ) -> Result<Self, ServiceError> {
@@ -256,7 +257,7 @@ impl AdminServiceShared {
             event_mailbox,
             splinter_state,
             signature_verifier,
-            key_registry,
+            node_registry,
             key_permission_manager,
             proposal_sender: None,
         })
@@ -1207,23 +1208,29 @@ impl AdminServiceShared {
 
         self.validate_key(signer_public_key)?;
 
-        let key_info = self
-            .key_registry
-            .get_key(signer_public_key)
-            .map_err(|err| AdminSharedError::ValidationFailed(err.to_string()))?
+        let requester_node = self
+            .node_registry
+            .fetch_node(requester_node_id)
+            .map_err(|err| {
+                AdminSharedError::ValidationFailed(format!(
+                    "Failed to lookup requester node {} in node registry: {}",
+                    requester_node_id, err,
+                ))
+            })?
             .ok_or_else(|| {
                 AdminSharedError::ValidationFailed(format!(
-                    "{} is not registered for a node",
-                    to_hex(signer_public_key)
+                    "Requester node {} not found in node registry",
+                    requester_node_id,
                 ))
             })?;
 
-        if key_info.associated_node_id() != requester_node_id {
+        if !requester_node.has_key(&to_hex(signer_public_key)) {
             return Err(AdminSharedError::ValidationFailed(format!(
-                "{} is not registered for the node in header",
-                to_hex(signer_public_key)
+                "{} is not registered for the requester node {}",
+                to_hex(signer_public_key),
+                requester_node_id,
             )));
-        };
+        }
 
         self.key_permission_manager
             .is_permitted(signer_public_key, PROPOSER_ROLE)
@@ -1231,7 +1238,7 @@ impl AdminServiceShared {
                 AdminSharedError::ValidationFailed(format!(
                     "{} is not permitted to vote for node {}",
                     to_hex(signer_public_key),
-                    key_info.associated_node_id()
+                    requester_node_id
                 ))
             })?;
 
@@ -1450,28 +1457,31 @@ impl AdminServiceShared {
 
         self.validate_key(signer_public_key)?;
 
-        let key_info = self
-            .key_registry
-            .get_key(signer_public_key)
-            .map_err(|err| AdminSharedError::ValidationFailed(err.to_string()))?
+        let node = self
+            .node_registry
+            .fetch_node(node_id)
+            .map_err(|err| {
+                AdminSharedError::ValidationFailed(format!(
+                    "Failed to lookup voting node {} in node registry: {}",
+                    node_id, err,
+                ))
+            })?
             .ok_or_else(|| {
                 AdminSharedError::ValidationFailed(format!(
-                    "{} is not registered for a node",
-                    to_hex(signer_public_key)
+                    "Voting node {} not found in node registry",
+                    node_id,
                 ))
             })?;
 
-        let signer_node = key_info.associated_node_id().to_string();
-
-        if signer_node != node_id {
+        if !node.has_key(&to_hex(signer_public_key)) {
             return Err(AdminSharedError::ValidationFailed(format!(
-                "Payload requester {} is not registered to node {}",
-                to_hex(circuit_proposal.get_requester()),
-                node_id
+                "{} is not registered for voting node {}",
+                to_hex(signer_public_key),
+                node_id,
             )));
         }
 
-        if circuit_proposal.get_requester_node_id() == signer_node {
+        if circuit_proposal.get_requester_node_id() == node_id {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received vote from requester node: {}",
                 to_hex(circuit_proposal.get_requester())
@@ -1484,10 +1494,10 @@ impl AdminServiceShared {
             .map(|vote| vote.get_voter_node_id().to_string())
             .collect();
 
-        if voted_nodes.iter().any(|node| *node == signer_node) {
+        if voted_nodes.iter().any(|node| *node == node_id) {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received duplicate vote from {} for {}",
-                signer_node, proposal_vote.circuit_id
+                node_id, proposal_vote.circuit_id
             )));
         }
 
@@ -1497,7 +1507,7 @@ impl AdminServiceShared {
                 AdminSharedError::ValidationFailed(format!(
                     "{} is not permitted to vote for node {}",
                     to_hex(signer_public_key),
-                    signer_node
+                    node_id
                 ))
             })?;
 
@@ -1880,13 +1890,14 @@ mod tests {
     use protobuf::{Message, RepeatedField};
 
     use crate::circuit::directory::CircuitDirectory;
-    use crate::keys::{
-        insecure::AllowAllKeyPermissionManager, storage::StorageKeyRegistry, KeyInfo,
-    };
+    use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
     use crate::network::{
         auth::{AuthorizationCallback, AuthorizationCallbackError},
         Network,
+    };
+    use crate::node_registry::{
+        MetadataPredicate, Node, NodeBuilder, NodeIter, NodeRegistryError, NodeRegistryReader,
     };
     use crate::protos::admin;
     use crate::protos::admin::{SplinterNode, SplinterService};
@@ -1903,6 +1914,11 @@ mod tests {
     use crate::transport::{
         ConnectError, Connection, DisconnectError, RecvError, SendError, Transport,
     };
+
+    const PUB_KEY: &[u8] = &[
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32,
+    ];
 
     /// Test that the CircuitManagementPayload is moved to the pending payloads when the peers are
     /// fully authorized.
@@ -1922,7 +1938,6 @@ mod tests {
             .expect("failed to create orchestrator");
         let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
         let state = setup_splinter_state();
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             orchestrator,
@@ -1932,7 +1947,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2026,7 +2041,6 @@ mod tests {
             .expect("failed to create orchestrator");
         let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
         let state = setup_splinter_state();
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             orchestrator,
@@ -2036,7 +2050,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2105,11 +2119,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2120,26 +2129,25 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
         .unwrap();
         let circuit = setup_test_circuit();
 
-        if let Err(err) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Err(err) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been valid: {}", err);
         }
     }
 
     #[test]
-    // test that if a circuit is proposed by a signer key that is not registered the proposal is
+    // test that if a circuit is proposed by a node that is not registered the proposal is
     // invalid
-    fn test_validate_circuit_signer_key_not_registered() {
+    fn test_validate_circuit_signer_node_not_registered() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2150,16 +2158,47 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::new(None)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
         .unwrap();
         let circuit = setup_test_circuit();
 
-        let pub_key = (0u8..33).collect::<Vec<_>>();
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+            panic!("Should have been invalid due to requester node not being registered");
+        }
+    }
+
+    #[test]
+    // test that if a proposal is signed by a key that is not registered for the requester node the
+    // proposal is invalid
+    fn test_validate_circuit_signer_key_not_registered_for_requester_node() {
+        let state = setup_splinter_state();
+        let peer_connector = setup_peer_connector();
+        let orchestrator = setup_orchestrator();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            orchestrator,
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            Box::new(MockAuthInquisitor),
+            state,
+            Box::new(HashVerifier),
+            Box::new(MockNodeRegistry::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            "memory",
+        )
+        .unwrap();
+        let circuit = setup_test_circuit();
+
+        let pub_key = (33u8..66u8).collect::<Vec<_>>();
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
-            panic!("Should have been invalid due to signer not being registered to a node");
+            panic!(
+                "Should have been invalid due to signer not being registered for requester node"
+            );
         }
     }
 
@@ -2170,7 +2209,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2181,7 +2219,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2206,11 +2244,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2221,7 +2254,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2235,7 +2268,7 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_bad]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service having an allowed node not in members");
         }
     }
@@ -2246,11 +2279,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2261,7 +2289,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2278,7 +2306,7 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_bad]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service having too many allowed nodes");
         }
     }
@@ -2289,11 +2317,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2304,7 +2327,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2318,7 +2341,7 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service's id being empty");
         }
     }
@@ -2329,11 +2352,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2344,7 +2362,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2358,7 +2376,7 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service's id being empty");
         }
     }
@@ -2369,11 +2387,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2384,7 +2397,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2403,7 +2416,7 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_a, service_a2]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service's id being a duplicate");
         }
     }
@@ -2414,11 +2427,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2429,7 +2437,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2437,7 +2445,7 @@ mod tests {
         let mut circuit = setup_test_circuit();
         circuit.set_roster(RepeatedField::from_vec(vec![]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to empty roster");
         }
     }
@@ -2448,11 +2456,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2463,7 +2466,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2472,7 +2475,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid empty members");
         }
     }
@@ -2484,11 +2487,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2499,7 +2497,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2512,7 +2510,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because node_a is not in members");
         }
     }
@@ -2524,11 +2522,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2539,7 +2532,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2560,7 +2553,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b, node_]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because node_ is has an empty node id");
         }
     }
@@ -2571,11 +2564,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2586,7 +2574,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2607,7 +2595,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b, node_b2]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because there are duplicate members");
         }
     }
@@ -2618,11 +2606,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2633,7 +2616,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2642,7 +2625,7 @@ mod tests {
 
         circuit.set_circuit_id("".to_string());
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because the circuit ID is empty");
         }
     }
@@ -2653,11 +2636,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2668,7 +2646,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2677,7 +2655,7 @@ mod tests {
 
         circuit.set_circuit_id("invalid_circuit_id".to_string());
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because the circuit ID is invalid");
         }
     }
@@ -2688,11 +2666,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2703,7 +2676,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2720,7 +2693,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because a member has no endpoints");
         }
     }
@@ -2731,11 +2704,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2746,7 +2714,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2763,7 +2731,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because a member has an empty endpoint");
         }
     }
@@ -2774,11 +2742,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2789,7 +2752,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2806,7 +2769,7 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because a member has a duplicate endpoint");
         }
     }
@@ -2817,11 +2780,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2832,7 +2790,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2841,7 +2799,7 @@ mod tests {
 
         circuit.set_authorization_type(Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because authorizaiton type is unset");
         }
     }
@@ -2852,11 +2810,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2867,7 +2820,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2876,7 +2829,7 @@ mod tests {
 
         circuit.set_persistence(Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because persistence type is unset");
         }
     }
@@ -2887,11 +2840,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2902,7 +2850,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2911,7 +2859,7 @@ mod tests {
 
         circuit.set_durability(Circuit_DurabilityType::UNSET_DURABILITY_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because durabilty type is unset");
         }
     }
@@ -2922,11 +2870,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2937,7 +2880,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2946,7 +2889,7 @@ mod tests {
 
         circuit.set_routes(Circuit_RouteType::UNSET_ROUTE_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because route type is unset");
         }
     }
@@ -2957,11 +2900,6 @@ mod tests {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2972,7 +2910,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2981,7 +2919,7 @@ mod tests {
 
         circuit.set_circuit_management_type("".to_string());
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because route type is unset");
         }
     }
@@ -2993,12 +2931,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3008,7 +2940,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3017,20 +2949,48 @@ mod tests {
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
 
-        if let Err(err) = admin_shared.validate_circuit_vote(&vote, &pub_key, &proposal, "node_a") {
+        if let Err(err) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been valid: {}", err);
         }
     }
 
     #[test]
-    // test that if the signer of the vote is not registered to a node the vote is invalid
+    // test that if the vote is from a node that is not registered the vote is invalid
     fn test_validate_proposal_vote_node_not_registered() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            orchestrator,
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            Box::new(MockAuthInquisitor),
+            state,
+            Box::new(HashVerifier),
+            Box::new(MockNodeRegistry::new(None)),
+            Box::new(AllowAllKeyPermissionManager),
+            "memory",
+        )
+        .unwrap();
+        let circuit = setup_test_circuit();
+        let vote = setup_test_vote(&circuit);
+        let proposal = setup_test_proposal(&circuit);
+
+        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
+            panic!("Should have been invalid because voting node is not registered");
+        }
+    }
+
+    #[test]
+    // test that if the vote is signed by a key that is not registered for the voting node the vote
+    // is invalid
+    fn test_validate_proposal_vote_signer_key_not_registered_for_voting_node() {
+        let state = setup_splinter_state();
+        let peer_connector = setup_peer_connector();
+        let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3041,7 +3001,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3050,25 +3010,19 @@ mod tests {
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
 
-        let pub_key = (0u8..33).collect::<Vec<_>>();
+        let pub_key = (33u8..66u8).collect::<Vec<_>>();
         if let Ok(_) = admin_shared.validate_circuit_vote(&vote, &pub_key, &proposal, "node_a") {
-            panic!("Should have been invalid because signer is not registered for a node");
+            panic!("Should have been invalid because signer is not registered for voting node");
         }
     }
 
     #[test]
-    // test if the voter is registered to the original requester node the vote is invalid
+    // test if the voter is the original requester node the vote is invalid
     fn test_validate_proposal_vote_requester() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_b".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3078,7 +3032,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::new(Some("node_b"))),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3086,8 +3040,9 @@ mod tests {
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, &pub_key, &proposal, "node_a") {
-            panic!("Should have been invalid because signer registered for the requester node");
+
+        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_b") {
+            panic!("Should have been invalid because voter is the requester");
         }
     }
 
@@ -3098,12 +3053,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3113,7 +3062,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3129,7 +3078,7 @@ mod tests {
 
         proposal.set_votes(RepeatedField::from_vec(vec![vote_record]));
 
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, &pub_key, &proposal, "node_a") {
+        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been invalid because node as already submited a vote");
         }
     }
@@ -3142,12 +3091,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3157,7 +3100,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3168,7 +3111,7 @@ mod tests {
 
         proposal.set_circuit_hash("bad_hash".to_string());
 
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, &pub_key, &proposal, "node_a") {
+        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been invalid because the circuit hash does not match");
         }
     }
@@ -3181,12 +3124,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3196,7 +3133,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3209,7 +3146,7 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-        header.set_requester(pub_key);
+        header.set_requester(PUB_KEY.into());
         header.set_requester_node_id("node_b".to_string());
         let mut payload = admin::CircuitManagementPayload::new();
         payload.set_signature(Vec::new());
@@ -3235,12 +3172,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3250,7 +3181,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3263,7 +3194,7 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-        header.set_requester(pub_key);
+        header.set_requester(PUB_KEY.into());
         header.set_requester_node_id("node_b".to_string());
         let mut payload = admin::CircuitManagementPayload::new();
         payload.set_signature(HashSigner.sign(&payload.header).unwrap());
@@ -3291,12 +3222,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3306,7 +3231,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3333,7 +3258,7 @@ mod tests {
             _ => panic!("Should have been invalid because empty requester field"),
         }
 
-        header.set_requester(pub_key);
+        header.set_requester(PUB_KEY.into());
         payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
         // Asserting the payload passed through validation, and failed at a further step.
         if let Err(_) = shared.validate_circuit_management_payload(&payload, &header) {
@@ -3349,12 +3274,6 @@ mod tests {
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
 
-        // set up key registry
-        let pub_key = (0u8..33).collect::<Vec<_>>();
-        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
-        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
-        key_registry.save_key(key_info).unwrap();
-
         let shared = AdminServiceShared::new(
             "node_a".into(),
             orchestrator,
@@ -3364,7 +3283,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(key_registry),
+            Box::new(MockNodeRegistry::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3377,7 +3296,7 @@ mod tests {
 
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
-        header.set_requester(pub_key);
+        header.set_requester(PUB_KEY.into());
         let mut payload = admin::CircuitManagementPayload::new();
         payload.set_signature(HashSigner.sign(&payload.header).unwrap());
         payload.set_circuit_create_request(request);
@@ -3700,6 +3619,43 @@ mod tests {
 
         fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
             Box::new(self.clone())
+        }
+    }
+
+    struct MockNodeRegistry(Option<&'static str>);
+
+    impl MockNodeRegistry {
+        fn new(node_id: Option<&'static str>) -> Self {
+            Self(node_id)
+        }
+    }
+
+    impl NodeRegistryReader for MockNodeRegistry {
+        fn list_nodes<'a, 'b: 'a>(
+            &'b self,
+            _predicates: &'a [MetadataPredicate],
+        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+            unimplemented!()
+        }
+
+        fn count_nodes(&self, _predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+            unimplemented!()
+        }
+
+        fn fetch_node(&self, _identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+            Ok(self.0.map(|node_id| {
+                NodeBuilder::new(node_id)
+                    .with_endpoint("tcp://someplace:8000")
+                    .with_key(to_hex(PUB_KEY))
+                    .build()
+                    .expect("Failed to build node")
+            }))
+        }
+    }
+
+    impl Default for MockNodeRegistry {
+        fn default() -> Self {
+            Self::new(Some("node_a"))
         }
     }
 }

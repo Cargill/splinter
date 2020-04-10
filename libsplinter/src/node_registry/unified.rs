@@ -211,7 +211,9 @@ mod test {
     use super::*;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
-        let mut builder = NodeBuilder::new(id).with_endpoint(endpoint);
+        let mut builder = NodeBuilder::new(id)
+            .with_endpoint(endpoint)
+            .with_key("abcd");
         for (key, val) in metadata {
             builder = builder.with_metadata(*key, *val);
         }

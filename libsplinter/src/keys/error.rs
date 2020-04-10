@@ -15,34 +15,6 @@
 //! Key-related errors
 
 use std::error::Error;
-use std::fmt;
-
-/// An error that can occur in the underlying `KeyRegistry` implementation.
-#[derive(Debug)]
-pub struct KeyRegistryError {
-    pub context: String,
-    pub source: Option<Box<dyn Error + Send>>,
-}
-
-impl Error for KeyRegistryError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        if let Some(ref err) = self.source {
-            Some(&**err)
-        } else {
-            None
-        }
-    }
-}
-
-impl fmt::Display for KeyRegistryError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(ref err) = self.source {
-            write!(f, "{}: {}", self.context, err)
-        } else {
-            f.write_str(&self.context)
-        }
-    }
-}
 
 /// An error that can occur in the underlying `KeyPermissions` implementation.
 #[derive(Debug)]

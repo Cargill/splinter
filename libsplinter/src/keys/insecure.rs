@@ -13,7 +13,10 @@
 // limitations under the License.
 
 //! The insecure keys module provides an allow-all permissions implemenation.
-use super::{to_hex, KeyPermissionError, KeyPermissionManager};
+
+use crate::hex::to_hex;
+
+use super::{KeyPermissionError, KeyPermissionManager};
 
 /// A KeyPermissioManager that allows all keys access to the requested role.
 pub struct AllowAllKeyPermissionManager;

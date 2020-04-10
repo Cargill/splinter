@@ -389,6 +389,30 @@ mod test {
     }
 
     ///
+    /// Verifies that reading from a YAML file that contains a node with an empty string in its
+    /// keys returns InvalidNodeError::EmptyKey.
+    ///
+    #[test]
+    fn test_read_yaml_empty_key_error() {
+        run_test(|test_yaml_file_path| {
+            let mut node = get_node_1();
+            node.keys = vec!["".to_string()];
+
+            write_to_file(&vec![node], test_yaml_file_path);
+
+            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            match result {
+                Ok(_) => panic!("Node with empty key in YAML file. Error should be returned"),
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+                Err(err) => panic!(
+                    "Should have gotten InvalidNodeError::EmptyKey but got {}",
+                    err
+                ),
+            }
+        })
+    }
+
+    ///
     /// Verifies that reading from a YAML file that contains a node with no endpoints returns
     /// InvalidNodeError::MissingEndpoints.
     ///
@@ -406,6 +430,30 @@ mod test {
                 Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
+                    err
+                ),
+            }
+        })
+    }
+
+    ///
+    /// Verifies that reading from a YAML file that contains a node with no keys returns
+    /// InvalidNodeError::MissingKeys.
+    ///
+    #[test]
+    fn test_read_yaml_missing_keys_error() {
+        run_test(|test_yaml_file_path| {
+            let mut node = get_node_1();
+            node.keys = vec![];
+
+            write_to_file(&vec![node], test_yaml_file_path);
+
+            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            match result {
+                Ok(_) => panic!("Node with no keys in YAML file. Error should be returned"),
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+                Err(err) => panic!(
+                    "Should have gotten InvalidNodeError::MissingKeys but got {}",
                     err
                 ),
             }
@@ -744,6 +792,33 @@ mod test {
     }
 
     ///
+    /// Verifies that insert_node returns InvalidNodeError::EmptyKey when a node with
+    /// an empty string in its keys is added to the registry.
+    ///
+    #[test]
+    fn test_insert_node_empty_key_error() {
+        run_test(|test_yaml_file_path| {
+            write_to_file(&vec![], test_yaml_file_path);
+
+            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlNodeRegistry");
+
+            let mut node = get_node_1();
+            node.keys = vec!["".to_string()];
+            let result = registry.insert_node(node);
+
+            match result {
+                Ok(_) => panic!("Node key is empty. Error should be returned"),
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+                Err(err) => panic!(
+                    "Should have gotten InvalidNodeError::EmptyKey but got {}",
+                    err
+                ),
+            }
+        })
+    }
+
+    ///
     /// Verifies that insert_node returns InvalidNodeError::MissingEndpoints when a node with no
     /// endpoints is added to the registry.
     ///
@@ -764,6 +839,33 @@ mod test {
                 Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
+                    err
+                ),
+            }
+        })
+    }
+
+    ///
+    /// Verifies that insert_node returns InvalidNodeError::MissingKeys when a node with no
+    /// keys is added to the registry.
+    ///
+    #[test]
+    fn test_insert_node_missing_keys_error() {
+        run_test(|test_yaml_file_path| {
+            write_to_file(&vec![], test_yaml_file_path);
+
+            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlNodeRegistry");
+
+            let mut node = get_node_1();
+            node.keys = vec![];
+            let result = registry.insert_node(node);
+
+            match result {
+                Ok(_) => panic!("Node keys is empty. Error should be returned"),
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+                Err(err) => panic!(
+                    "Should have gotten InvalidNodeError::MissingKeys but got {}",
                     err
                 ),
             }
@@ -821,6 +923,7 @@ mod test {
         NodeBuilder::new("Node-123")
             .with_endpoint("tcps://12.0.0.123:8431")
             .with_display_name("Bitwise IO - Node 1")
+            .with_key("abcd")
             .with_metadata("company", "Bitwise IO")
             .with_metadata("admin", "Bob")
             .build()
@@ -831,6 +934,7 @@ mod test {
         NodeBuilder::new("Node-456")
             .with_endpoint("tcps://12.0.0.123:8434")
             .with_display_name("Cargill - Node 1")
+            .with_key("0123")
             .with_metadata("company", "Cargill")
             .with_metadata("admin", "Carol")
             .build()
@@ -841,6 +945,7 @@ mod test {
         NodeBuilder::new("Node-789")
             .with_endpoint("tcps://12.0.0.123:8435")
             .with_display_name("Cargill - Node 2")
+            .with_key("4567")
             .with_metadata("company", "Cargill")
             .with_metadata("admin", "Charlie")
             .build()

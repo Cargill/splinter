@@ -330,23 +330,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
-    let key_registry_location = match &config.storage() as &str {
-        "yaml" => state_dir
-            .join("keys.yaml")
-            .to_str()
-            .ok_or_else(|| {
-                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
-            })?
-            .to_string(),
-        "memory" => "memory".to_string(),
-        _ => {
-            return Err(UserError::InvalidArgument(format!(
-                "storage type is not supported: {}",
-                config.storage()
-            )))
-        }
-    };
-
     let node_registry_directory = state_dir
         .to_str()
         .ok_or_else(|| {
@@ -367,7 +350,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     daemon_builder = daemon_builder
         .with_storage_location(storage_location)
-        .with_key_registry_location(key_registry_location)
         .with_node_registry_directory(node_registry_directory)
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())

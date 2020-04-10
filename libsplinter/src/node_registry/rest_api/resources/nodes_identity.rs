@@ -21,6 +21,7 @@ pub struct NodeResponse<'a> {
     pub identity: &'a str,
     pub endpoints: &'a [String],
     pub display_name: &'a str,
+    pub keys: &'a [String],
     pub metadata: &'a HashMap<String, String>,
 }
 
@@ -30,6 +31,7 @@ impl<'a> From<&'a Node> for NodeResponse<'a> {
             identity: &node.identity,
             endpoints: &node.endpoints,
             display_name: &node.display_name,
+            keys: &node.keys,
             metadata: &node.metadata,
         }
     }
