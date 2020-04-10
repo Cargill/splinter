@@ -15,8 +15,7 @@
 use crate::circuit::handlers::create_message;
 use crate::circuit::service::{Service, ServiceId, SplinterNode};
 use crate::circuit::{ServiceDefinition, SplinterState};
-use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
-use crate::network::sender::NetworkMessageSender;
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::protos::circuit::{
     CircuitMessageType, ServiceConnectRequest, ServiceConnectResponse,
     ServiceConnectResponse_Status, ServiceDisconnectRequest, ServiceDisconnectResponse,
@@ -45,7 +44,7 @@ impl Handler for ServiceConnectRequestHandler {
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Connect Request {:?}", msg);
         let circuit_name = msg.get_circuit();
@@ -145,9 +144,9 @@ impl Handler for ServiceConnectRequestHandler {
         let recipient = context.source_peer_id().to_string();
 
         sender
-            .send(recipient, network_msg_bytes)
+            .send(recipient.into(), network_msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }
@@ -181,7 +180,7 @@ impl Handler for ServiceDisconnectRequestHandler {
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Disconnect Request {:?}", msg);
         let circuit_name = msg.get_circuit();
@@ -248,9 +247,9 @@ impl Handler for ServiceDisconnectRequestHandler {
 
         let recipient = context.source_peer_id().to_string();
         sender
-            .send(recipient, network_msg_bytes)
+            .send(recipient.into(), network_msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }

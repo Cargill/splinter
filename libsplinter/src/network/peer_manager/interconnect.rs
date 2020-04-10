@@ -431,8 +431,7 @@ pub mod tests {
 
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::ConnectionManager;
-    use crate::network::dispatch::PeerId;
-    use crate::network::dispatch::{DispatchError, Handler, MessageContext};
+    use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
     use crate::network::peer_manager::PeerManager;
     use crate::protos::network::NetworkEcho;
     use crate::transport::{inproc::InprocTransport, Transport};
@@ -618,7 +617,7 @@ pub mod tests {
             &self,
             message: NetworkEcho,
             message_context: &MessageContext<Self::Source, NetworkMessageType>,
-            network_sender: &NetworkMessageSender,
+            network_sender: &dyn MessageSender<Self::Source>,
         ) -> Result<(), DispatchError> {
             let echo_string = String::from_utf8(message.get_payload().to_vec()).unwrap();
             if &echo_string == "shutdown_string" {
@@ -635,10 +634,7 @@ pub mod tests {
                 let network_msg_bytes = network_msg.write_to_bytes().unwrap();
 
                 network_sender
-                    .send(
-                        message_context.source_peer_id().to_string(),
-                        network_msg_bytes,
-                    )
+                    .send(message_context.source_id().clone(), network_msg_bytes)
                     .expect("Cannot send message");
             }
 

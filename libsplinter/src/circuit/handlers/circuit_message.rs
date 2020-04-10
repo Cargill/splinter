@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::network::dispatch::{
-    DispatchError, DispatchMessageSender, Handler, MessageContext, PeerId,
+    DispatchError, DispatchMessageSender, Handler, MessageContext, MessageSender, PeerId,
 };
-use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{CircuitMessage, CircuitMessageType};
 use crate::protos::network::NetworkMessageType;
 
@@ -36,7 +35,7 @@ impl Handler for CircuitMessageHandler {
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _: &NetworkMessageSender,
+        _: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
             "Handle CircuitMessage {:?} from {} [{} byte{}]",
@@ -165,7 +164,7 @@ mod tests {
             &self,
             message: Self::Message,
             _message_context: &MessageContext<Self::Source, Self::MessageType>,
-            _: &NetworkMessageSender,
+            _: &dyn MessageSender<Self::Source>,
         ) -> Result<(), DispatchError> {
             self.echos
                 .write()

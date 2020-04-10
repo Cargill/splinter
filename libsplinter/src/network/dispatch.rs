@@ -15,15 +15,12 @@
 //! Methods for Dispatching and Handling Messages.
 //!
 use std::any::Any;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::mpsc::{channel, RecvError, Sender};
-
-use crate::network::sender::NetworkMessageSender;
 
 /// A wrapper for a PeerId.
 ///
@@ -165,7 +162,7 @@ pub trait Handler: Send {
         &self,
         message: Self::Message,
         message_context: &MessageContext<Self::Source, Self::MessageType>,
-        network_sender: &NetworkMessageSender,
+        network_sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError>;
 
     /// Return the message type value that this handler requires to execute;
@@ -269,6 +266,19 @@ impl std::fmt::Display for DispatchError {
     }
 }
 
+/// A sender for outgoing messages.
+///
+/// The message sender trait can used by Handlers to send messages based on the received messages.
+/// The handler can use this to send any number of messages.
+pub trait MessageSender<R>: Send {
+    /// Send the given message bytes to the specified recipient.
+    ///
+    /// # Error
+    ///
+    /// If an error occurs, return the intended recipient and message bytes.
+    fn send(&self, reciptient: R, message: Vec<u8>) -> Result<(), (R, Vec<u8>)>;
+}
+
 /// Dispatches messages to handlers.
 ///
 /// The dispatcher routes messages of a specific message type to one of a set of handlers that have
@@ -290,7 +300,7 @@ where
     MT: Any + Hash + Eq + Debug + Clone,
 {
     handlers: HashMap<MT, HandlerWrapper<Source, MT>>,
-    network_sender: Option<NetworkMessageSender>,
+    network_sender: Option<Box<dyn MessageSender<Source>>>,
 }
 
 impl<MT, Source> Dispatcher<MT, Source>
@@ -302,10 +312,13 @@ where
     ///
     /// Creates a dispatcher with a given `NetworkSender` to supply to handlers when they are
     /// executed.
-    pub fn new(network_sender: NetworkMessageSender) -> Self {
+    pub fn new<S>(network_sender: S) -> Self
+    where
+        S: Into<Box<dyn MessageSender<Source>>>,
+    {
         Dispatcher {
             handlers: HashMap::new(),
-            network_sender: Some(network_sender),
+            network_sender: Some(network_sender.into()),
         }
     }
 
@@ -332,8 +345,11 @@ where
         );
     }
 
-    pub fn set_network_sender(&mut self, network_sender: NetworkMessageSender) {
-        self.network_sender = Some(network_sender);
+    pub fn set_network_sender<S>(&mut self, network_sender: S)
+    where
+        S: Into<Box<dyn MessageSender<Source>>>,
+    {
+        self.network_sender = Some(network_sender.into());
     }
 
     /// Dispatch a message by type.
@@ -369,7 +385,7 @@ where
                     handler.handle(
                         &message_context.message_bytes,
                         &message_context,
-                        network_sender.borrow(),
+                        &**network_sender,
                     )
                 })
         } else {
@@ -380,7 +396,11 @@ where
 
 /// A function that handles inbound message bytes.
 type InnerHandler<Source, MT> = Box<
-    dyn Fn(&[u8], &MessageContext<Source, MT>, &NetworkMessageSender) -> Result<(), DispatchError>
+    dyn Fn(
+            &[u8],
+            &MessageContext<Source, MT>,
+            &dyn MessageSender<Source>,
+        ) -> Result<(), DispatchError>
         + Send,
 >;
 
@@ -400,7 +420,7 @@ where
         &self,
         message_bytes: &[u8],
         message_context: &MessageContext<Source, MT>,
-        network_sender: &NetworkMessageSender,
+        network_sender: &dyn MessageSender<Source>,
     ) -> Result<(), DispatchError> {
         (*self.inner)(message_bytes, message_context, network_sender)
     }
@@ -728,7 +748,7 @@ mod tests {
             &self,
             message: NetworkEcho,
             _message_context: &MessageContext<Self::Source, NetworkMessageType>,
-            _: &NetworkMessageSender,
+            _: &dyn MessageSender<Self::Source>,
         ) -> Result<(), DispatchError> {
             let echo_string = String::from_utf8(message.get_payload().to_vec()).unwrap();
             self.echos.lock().unwrap().push(echo_string);
