@@ -16,7 +16,9 @@
 //!
 //! This is an experimental feature.  To enable, use the feature `"rest-api-cors"`.
 use actix_web::dev::*;
-use actix_web::{http::header, http::header::HeaderValue, Error as ActixError, HttpResponse};
+use actix_web::{
+    http::header, http::header::HeaderValue, http::Method, Error as ActixError, HttpResponse,
+};
 use futures::{
     future::{ok, FutureResult},
     Future, IntoFuture, Poll,
@@ -99,7 +101,24 @@ where
                     .whitelist
                     .iter()
                     .any(|domain| domain == "*" || origin.contains(domain));
-                if allowed_origin {
+                // This verifies if a client is making a preflight check with the OPTIONS
+                // http request method and the origin is allowed, the preflight check responds
+                // with a 200 OK status.
+                if allowed_origin && req.method() == Method::OPTIONS {
+                    debug!("Preflight check passed");
+                    let mut res = req.into_response(HttpResponse::Ok().finish().into_body());
+                    let headers = res.headers_mut();
+                    headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin_header);
+                    headers.insert(
+                        header::ACCESS_CONTROL_ALLOW_METHODS,
+                        HeaderValue::from_static("*"),
+                    );
+                    headers.insert(
+                        header::ACCESS_CONTROL_ALLOW_HEADERS,
+                        request_headers.unwrap_or_else(|| HeaderValue::from_static("*")),
+                    );
+                    Box::new(res.into_future())
+                } else if allowed_origin {
                     Box::new(self.service.call(req).map(move |mut res| {
                         let headers = res.headers_mut();
                         headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin_header);
