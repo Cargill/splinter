@@ -15,6 +15,7 @@
 #[cfg(feature = "diesel")]
 pub(crate) mod diesel;
 mod error;
+pub(in crate::biome) mod memory;
 
 pub use error::RefreshTokenError;
 

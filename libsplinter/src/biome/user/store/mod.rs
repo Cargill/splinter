@@ -17,11 +17,12 @@
 #[cfg(feature = "diesel")]
 pub(in crate::biome) mod diesel;
 mod error;
+pub(in crate::biome) mod memory;
 
 pub use error::UserStoreError;
 
 /// Represents a user of a splinter application
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct User {
     id: String,
 }
