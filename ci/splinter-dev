@@ -132,3 +132,9 @@ RUN find . -name 'Cargo.toml' -exec \
     sh -c 'x="{}"; rm "$x" ' \;
 RUN rm /build/libsplinter/build.rs \
     /build/libsplinter/protos/*
+
+# Log the commit hash
+COPY .git/ /tmp/.git/
+WORKDIR /tmp
+RUN git rev-parse HEAD > /commit-hash
+WORKDIR /build
