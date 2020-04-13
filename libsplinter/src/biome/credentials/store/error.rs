@@ -36,8 +36,9 @@ pub enum CredentialsStoreError {
     /// Represents general failures in the database
     StorageError {
         context: String,
-        source: Box<dyn Error>,
+        source: Option<Box<dyn Error>>,
     },
+
     /// Represents an issue connecting to the database
     ConnectionError(Box<dyn Error>),
     /// Represents error occured when an attempt is made to add a new credential with a
@@ -52,7 +53,11 @@ impl Error for CredentialsStoreError {
         match self {
             CredentialsStoreError::OperationError { source, .. } => Some(&**source),
             CredentialsStoreError::QueryError { source, .. } => Some(&**source),
-            CredentialsStoreError::StorageError { source, .. } => Some(&**source),
+            CredentialsStoreError::StorageError {
+                source: Some(source),
+                ..
+            } => Some(&**source),
+            CredentialsStoreError::StorageError { source: None, .. } => None,
             CredentialsStoreError::ConnectionError(err) => Some(&**err),
             CredentialsStoreError::DuplicateError(_) => None,
             CredentialsStoreError::NotFoundError(_) => None,
@@ -68,11 +73,18 @@ impl fmt::Display for CredentialsStoreError {
             CredentialsStoreError::QueryError { context, source } => {
                 write!(f, "failed query: {}: {}", context, source)
             }
-            CredentialsStoreError::StorageError { context, source } => write!(
+            CredentialsStoreError::StorageError {
+                context,
+                source: Some(source),
+            } => write!(
                 f,
                 "the underlying storage returned an error: {}: {}",
                 context, source
             ),
+            CredentialsStoreError::StorageError {
+                context,
+                source: None,
+            } => write!(f, "the underlying storage returned an error: {}", context,),
             CredentialsStoreError::ConnectionError(ref s) => {
                 write!(f, "failed to connect to underlying storage: {}", s)
             }
