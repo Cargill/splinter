@@ -422,6 +422,7 @@ impl SplinterDaemon {
 
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
+        let network_endpoints = self.network_endpoints.clone();
 
         let circuit_resource_provider =
             CircuitResourceProvider::new(self.node_id.to_string(), state);
@@ -435,7 +436,11 @@ impl SplinterDaemon {
             )
             .add_resource(
                 Resource::build("/status").add_method(Method::Get, move |_, _| {
-                    routes::get_status(node_id.clone(), service_endpoint.clone())
+                    routes::get_status(
+                        node_id.clone(),
+                        service_endpoint.clone(),
+                        network_endpoints.clone(),
+                    )
                 }),
             )
             .add_resource(make_nodes_identity_resource(node_registry.clone()))

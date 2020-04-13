@@ -1574,9 +1574,15 @@ components:
           description: Node id
           type: string
           example: node-009
-        endpoint:
+        service_endpoint:
           description: The node's service endpoint
           example: tcp://foo.bar.biz
+        network_endpoints:
+          description: The node's network endpoints
+          type: array
+          items:
+            type: string
+            example: tcp://foo.bar.biz
       required:
         - version
 
