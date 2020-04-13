@@ -730,7 +730,7 @@ mod tests {
                 &ConfigSource::Default,
             )
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for `database` (source
+        // The DefaultPartialConfigBuilder is the only config with a value for `peers` (source
         // should be Default).
         assert_eq!(
             (final_config.peers(), final_config.peers_source()),
