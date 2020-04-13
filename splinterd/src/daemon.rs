@@ -122,6 +122,8 @@ pub struct SplinterDaemon {
     registries: Vec<String>,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 impl SplinterDaemon {
@@ -432,6 +434,14 @@ impl SplinterDaemon {
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
 
+        #[cfg(feature = "rest-api-cors")]
+        {
+            if let Some(list) = &self.whitelist {
+                debug!("Whitelisted domains added to CORS");
+                rest_api_builder = rest_api_builder.with_whitelist(list.to_vec());
+            }
+        }
+
         #[cfg(feature = "biome")]
         {
             if self.biome_enabled {
@@ -709,6 +719,8 @@ pub struct SplinterDaemonBuilder {
     storage_type: Option<String>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Duration,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 impl SplinterDaemonBuilder {
@@ -788,6 +800,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "rest-api-cors")]
+    pub fn with_whitelist(mut self, value: Option<Vec<String>>) -> Self {
+        self.whitelist = value;
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat_interval = self.heartbeat_interval.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat_interval".to_string())
@@ -864,6 +882,8 @@ impl SplinterDaemonBuilder {
             local_node_registry_location,
             storage_type,
             admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: self.whitelist,
         })
     }
 }
