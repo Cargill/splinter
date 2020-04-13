@@ -47,14 +47,14 @@ impl Action for CircuitProposeAction {
 
         if let Some(node_file) = args.value_of("node_file") {
             for node in load_nodes_from_file(node_file)? {
-                builder.add_node(&node.identity, &node.endpoint)?;
+                builder.add_node(&node.identity, &node.endpoints)?;
             }
         }
 
         if let Some(nodes) = args.values_of("node") {
             for node_argument in nodes {
-                let (node, endpoint) = parse_node_argument(node_argument)?;
-                builder.add_node(&node, &endpoint)?;
+                let (node, endpoints) = parse_node_argument(node_argument)?;
+                builder.add_node(&node, &endpoints)?;
             }
         }
 
@@ -187,7 +187,7 @@ impl Action for CircuitProposeAction {
 struct Node {
     #[serde(alias = "node_id")]
     identity: String,
-    endpoint: String,
+    endpoints: Vec<String>,
 }
 
 fn load_nodes_from_file(node_file: &str) -> Result<Vec<Node>, CliError> {
@@ -242,7 +242,7 @@ fn load_nodes_from_local(node_file: &str) -> Result<Vec<Node>, CliError> {
     })
 }
 
-fn parse_node_argument(node_argument: &str) -> Result<(String, String), CliError> {
+fn parse_node_argument(node_argument: &str) -> Result<(String, Vec<String>), CliError> {
     let mut iter = node_argument.split("::");
 
     let node_id = iter
@@ -255,18 +255,32 @@ fn parse_node_argument(node_argument: &str) -> Result<(String, String), CliError
         ));
     }
 
-    let endpoint = iter
+    let endpoints = iter
         .next()
-        .ok_or_else(|| CliError::ActionError(format!("Missing endpoint for node '{}'", node_id)))?
+        .ok_or_else(|| CliError::ActionError(format!("Missing endpoints for node '{}'", node_id)))?
         .to_string();
-    if endpoint.is_empty() {
+    if endpoints.is_empty() {
         return Err(CliError::ActionError(format!(
-            "Empty endpoint detected for node '{}'",
+            "No endpoints detected for node '{}'",
             node_id
         )));
     }
 
-    Ok((node_id, endpoint))
+    let endpoints = endpoints
+        .split(',')
+        .map(|endpoint| {
+            if endpoint.is_empty() {
+                Err(CliError::ActionError(format!(
+                    "Empty endpoints detected for node '{}'",
+                    node_id
+                )))
+            } else {
+                Ok(endpoint.to_string())
+            }
+        })
+        .collect::<Result<_, _>>()?;
+
+    Ok((node_id, endpoints))
 }
 
 fn parse_service(service: &str) -> Result<(String, Vec<String>), CliError> {

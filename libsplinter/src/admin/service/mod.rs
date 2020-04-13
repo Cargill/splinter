@@ -524,8 +524,8 @@ mod tests {
         proposed_circuit.set_comments("test circuit".into());
 
         proposed_circuit.set_members(protobuf::RepeatedField::from_vec(vec![
-            splinter_node("test-node", "tcp://someplace:8000"),
-            splinter_node("other-node", "tcp://otherplace:8000"),
+            splinter_node("test-node", &["tcp://someplace:8000".into()]),
+            splinter_node("other-node", &["tcp://otherplace:8000".into()]),
         ]));
         proposed_circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre", "test-node"),
@@ -594,10 +594,10 @@ mod tests {
         );
     }
 
-    fn splinter_node(node_id: &str, endpoint: &str) -> admin::SplinterNode {
+    fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {
         let mut node = admin::SplinterNode::new();
         node.set_node_id(node_id.into());
-        node.set_endpoint(endpoint.into());
+        node.set_endpoints(endpoints.into());
         node
     }
 

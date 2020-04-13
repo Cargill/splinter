@@ -33,7 +33,7 @@ struct TomlConfig {
     server_cert: Option<String>,
     server_key: Option<String>,
     service_endpoint: Option<String>,
-    network_endpoint: Option<String>,
+    network_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
     bind: Option<String>,
@@ -79,7 +79,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_server_cert(self.toml_config.server_cert)
             .with_server_key(self.toml_config.server_key)
             .with_service_endpoint(self.toml_config.service_endpoint)
-            .with_network_endpoint(self.toml_config.network_endpoint)
+            .with_network_endpoints(self.toml_config.network_endpoints)
             .with_peers(self.toml_config.peers)
             .with_node_id(self.toml_config.node_id)
             .with_bind(self.toml_config.bind)
@@ -116,7 +116,6 @@ mod tests {
     static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
-    static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_NODE_ID: &str = "012";
 
     /// Converts a list of tuples to a toml Table Value used to write a toml file.
@@ -132,10 +131,6 @@ mod tests {
             (
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
-            ),
-            (
-                "network_endpoint".to_string(),
-                EXAMPLE_NETWORK_ENDPOINT.to_string(),
             ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
         ];
@@ -161,10 +156,7 @@ mod tests {
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
         );
-        assert_eq!(
-            config.network_endpoint(),
-            Some(EXAMPLE_NETWORK_ENDPOINT.to_string())
-        );
+        assert_eq!(config.network_endpoints(), None);
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
         assert_eq!(config.bind(), None);

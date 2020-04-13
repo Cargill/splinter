@@ -19,8 +19,8 @@ message SplinterNode {
     // unique id of a splinter node
     string node_id = 1;
 
-    // The endpoint the splinter node is available on
-    string endpoint = 2;
+    // The endpoints the splinter node is available on
+    repeated string endpoints = 2;
 }
 
 message SplinterService {

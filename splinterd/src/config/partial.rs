@@ -39,7 +39,7 @@ pub struct PartialConfig {
     server_cert: Option<String>,
     server_key: Option<String>,
     service_endpoint: Option<String>,
-    network_endpoint: Option<String>,
+    network_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
     bind: Option<String>,
@@ -68,7 +68,7 @@ impl PartialConfig {
             server_cert: None,
             server_key: None,
             service_endpoint: None,
-            network_endpoint: None,
+            network_endpoints: None,
             peers: None,
             node_id: None,
             bind: None,
@@ -124,8 +124,8 @@ impl PartialConfig {
         self.service_endpoint.clone()
     }
 
-    pub fn network_endpoint(&self) -> Option<String> {
-        self.network_endpoint.clone()
+    pub fn network_endpoints(&self) -> Option<Vec<String>> {
+        self.network_endpoints.clone()
     }
 
     pub fn peers(&self) -> Option<Vec<String>> {
@@ -281,14 +281,14 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `network_endpoint` value to the PartialConfig object.
+    /// Adds a `network_endpoints` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `network_endpoint` - Endpoint used for daemon to daemon communication.
+    /// * `network_endpoints` - Endpoints used for daemon to daemon communication.
     ///
-    pub fn with_network_endpoint(mut self, network_endpoint: Option<String>) -> Self {
-        self.network_endpoint = network_endpoint;
+    pub fn with_network_endpoints(mut self, network_endpoints: Option<Vec<String>>) -> Self {
+        self.network_endpoints = network_endpoints;
         self
     }
 

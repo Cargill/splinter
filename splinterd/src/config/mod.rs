@@ -51,7 +51,7 @@ pub struct Config {
     server_cert: (String, ConfigSource),
     server_key: (String, ConfigSource),
     service_endpoint: (String, ConfigSource),
-    network_endpoint: (String, ConfigSource),
+    network_endpoints: (Vec<String>, ConfigSource),
     peers: (Vec<String>, ConfigSource),
     node_id: (String, ConfigSource),
     bind: (String, ConfigSource),
@@ -103,8 +103,8 @@ impl Config {
         &self.service_endpoint.0
     }
 
-    pub fn network_endpoint(&self) -> &str {
-        &self.network_endpoint.0
+    pub fn network_endpoints(&self) -> &[String] {
+        &self.network_endpoints.0
     }
 
     pub fn peers(&self) -> &[String] {
@@ -185,8 +185,8 @@ impl Config {
         &self.service_endpoint.1
     }
 
-    fn network_endpoint_source(&self) -> &ConfigSource {
-        &self.network_endpoint.1
+    fn network_endpoints_source(&self) -> &ConfigSource {
+        &self.network_endpoints.1
     }
 
     fn peers_source(&self) -> &ConfigSource {
@@ -279,9 +279,9 @@ impl Config {
             self.service_endpoint_source()
         );
         debug!(
-            "Config: network_endpoint: {} (source: {:?})",
-            self.network_endpoint(),
-            self.network_endpoint_source()
+            "Config: network_endpoints: {:?} (source: {:?})",
+            self.network_endpoints(),
+            self.network_endpoints_source()
         );
         debug!(
             "Config: peers: {:?} (source: {:?})",
@@ -389,10 +389,6 @@ mod tests {
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
             ),
-            (
-                "network_endpoint".to_string(),
-                EXAMPLE_NETWORK_ENDPOINT.to_string(),
-            ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
         ];
 
@@ -412,7 +408,7 @@ mod tests {
         (@arg node_id: --("node-id") +takes_value)
         (@arg storage: --("storage") +takes_value)
         (@arg transport: --("transport") +takes_value)
-        (@arg network_endpoint: -n --("network-endpoint") +takes_value)
+        (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
         (@arg service_endpoint: --("service-endpoint") +takes_value)
         (@arg peers: --peer +takes_value +multiple)
         (@arg ca_file: --("ca-file") +takes_value)
@@ -722,19 +718,16 @@ mod tests {
                 }
             )
         );
-        // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `network_endpoint`, but the TomlPartialConfigBuilder value should have precedence
-        // (source should be Toml).
+        // The DefaultPartialConfigBuilder is the only config with a value for `network_endpoints`
+        // (source should be Default).
         assert_eq!(
             (
-                final_config.network_endpoint(),
-                final_config.network_endpoint_source()
+                final_config.network_endpoints(),
+                final_config.network_endpoints_source()
             ),
             (
-                EXAMPLE_NETWORK_ENDPOINT,
-                &ConfigSource::Toml {
-                    file: TEST_TOML.to_string()
-                }
+                &[EXAMPLE_NETWORK_ENDPOINT.to_string()] as &[String],
+                &ConfigSource::Default,
             )
         );
         // The DefaultPartialConfigBuilder is the only config with a value for `database` (source

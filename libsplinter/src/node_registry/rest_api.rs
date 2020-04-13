@@ -477,7 +477,7 @@ mod tests {
 
             // Verify that updating an existing node gets an OK response and the fetched node has
             // the updated values
-            node.endpoint = "12.0.0.123:8432".to_string();
+            node.endpoints = vec!["12.0.0.123:8432".to_string()];
             node.metadata
                 .insert("location".to_string(), "Minneapolis".to_string());
 
@@ -732,7 +732,7 @@ mod tests {
         metadata.insert("company".to_string(), "Bitwise IO".to_string());
         Node {
             identity: "Node-123".to_string(),
-            endpoint: "12.0.0.123:8431".to_string(),
+            endpoints: vec!["12.0.0.123:8431".to_string()],
             display_name: "Bitwise IO - Node 1".to_string(),
             metadata,
         }
@@ -743,7 +743,7 @@ mod tests {
         metadata.insert("company".to_string(), "Cargill".to_string());
         Node {
             identity: "Node-456".to_string(),
-            endpoint: "13.0.0.123:8434".to_string(),
+            endpoints: vec!["13.0.0.123:8434".to_string()],
             display_name: "Cargill - Node 1".to_string(),
             metadata,
         }

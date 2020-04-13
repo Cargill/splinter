@@ -171,14 +171,14 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("service endpoint".to_string()))?,
-            network_endpoint: self
+            network_endpoints: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.network_endpoint() {
+                .find_map(|p| match p.network_endpoints() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("network endpoint".to_string()))?,
+                .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?,
             peers: self
                 .partial_configs
                 .iter()
@@ -299,8 +299,8 @@ mod tests {
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
         );
         assert_eq!(
-            config.network_endpoint(),
-            Some(EXAMPLE_NETWORK_ENDPOINT.to_string())
+            config.network_endpoints(),
+            Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()])
         );
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
@@ -335,7 +335,7 @@ mod tests {
             .with_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()))
             .with_server_key(Some(EXAMPLE_SERVER_KEY.to_string()))
             .with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()))
-            .with_network_endpoint(Some(EXAMPLE_NETWORK_ENDPOINT.to_string()))
+            .with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]))
             .with_peers(Some(vec![]))
             .with_node_id(Some(EXAMPLE_NODE_ID.to_string()))
             .with_bind(None)
@@ -370,7 +370,7 @@ mod tests {
         partial_config =
             partial_config.with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()));
         partial_config =
-            partial_config.with_network_endpoint(Some(EXAMPLE_NETWORK_ENDPOINT.to_string()));
+            partial_config.with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]));
         partial_config = partial_config.with_peers(Some(vec![]));
         partial_config = partial_config.with_node_id(Some(EXAMPLE_NODE_ID.to_string()));
         partial_config = partial_config.with_admin_service_coordinator_timeout(None);

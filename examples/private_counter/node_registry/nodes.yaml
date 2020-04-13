@@ -13,14 +13,17 @@
 # limitations under the License.
 
 - identity: "012"
-  endpoint: "tcp://splinter-node-0:8044"
+  endpoints:
+    - "tcp://splinter-node-0:8044"
   display_name: "Node 1"
   metadata: {}
 - identity: "345"
-  endpoint: "tcp://splinter-node-1:8046"
+  endpoints:
+    - "tcp://splinter-node-1:8046"
   display_name: "Node 2"
   metadata: {}
 - identity: "678"
-  endpoint: "tcp://splinter-node-2:8048"
+  endpoints:
+    - "tcp://splinter-node-2:8048"
   display_name: "Node 3"
   metadata: {}

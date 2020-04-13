@@ -615,7 +615,7 @@ fn parse_splinter_nodes(
         .map(|node| NewGameroomMember {
             circuit_id: circuit_id.to_string(),
             node_id: node.node_id.to_string(),
-            endpoint: node.endpoint.to_string(),
+            endpoints: node.endpoints.to_vec(),
             status: "Pending".to_string(),
             created_time: timestamp,
             updated_time: timestamp,
@@ -755,7 +755,7 @@ mod test {
         let expected_node = get_new_gameroom_member("01234-ABCDE", SystemTime::now());
 
         assert_eq!(node.node_id, expected_node.node_id);
-        assert_eq!(node.endpoint, expected_node.endpoint);
+        assert_eq!(node.endpoints, expected_node.endpoints);
     }
 
     #[test]
@@ -1204,7 +1204,7 @@ mod test {
             }],
             members: vec![SplinterNode {
                 node_id: "Node-123".to_string(),
-                endpoint: "127.0.0.1:8282".to_string(),
+                endpoints: vec!["127.0.0.1:8282".to_string()],
             }],
             authorization_type: AuthorizationType::Trust,
             persistence: PersistenceType::Any,
@@ -1345,7 +1345,7 @@ mod test {
         NewGameroomMember {
             circuit_id: circuit_id.to_string(),
             node_id: "Node-123".to_string(),
-            endpoint: "127.0.0.1:8282".to_string(),
+            endpoints: vec!["127.0.0.1:8282".to_string()],
             status: "Pending".to_string(),
             created_time: timestamp,
             updated_time: timestamp,

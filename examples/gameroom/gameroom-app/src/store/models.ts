@@ -43,7 +43,7 @@ export interface UserAuthResponse {
 
 export interface Node {
   identity: string;
-  endpoint: string;
+  endpoints: string[];
   display_name: string;
   metadata: {
     organization: string;
@@ -58,7 +58,7 @@ export interface NewGameroomProposal {
 export interface Member {
   node_id: string;
   organization: string;
-  endpoint: string;
+  endpoints: string[];
 }
 
 export interface GameroomProposal {

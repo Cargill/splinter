@@ -50,7 +50,11 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             .with_server_cert(self.matches.value_of("server_cert").map(String::from))
             .with_server_key(self.matches.value_of("server_key").map(String::from))
             .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
-            .with_network_endpoint(self.matches.value_of("network_endpoint").map(String::from))
+            .with_network_endpoints(
+                self.matches
+                    .values_of("network_endpoints")
+                    .map(|values| values.map(String::from).collect::<Vec<String>>()),
+            )
             .with_peers(
                 self.matches
                     .values_of("peers")
@@ -122,8 +126,8 @@ mod tests {
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
         );
         assert_eq!(
-            config.network_endpoint(),
-            Some(EXAMPLE_NETWORK_ENDPOINT.to_string())
+            config.network_endpoints(),
+            Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()])
         );
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
@@ -145,7 +149,7 @@ mod tests {
             (@arg node_id: --("node-id") +takes_value)
             (@arg storage: --("storage") +takes_value)
             (@arg transport: --("transport") +takes_value)
-            (@arg network_endpoint: -n --("network-endpoint") +takes_value)
+            (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
             (@arg peers: --peer +takes_value +multiple)
             (@arg ca_file: --("ca-file") +takes_value)

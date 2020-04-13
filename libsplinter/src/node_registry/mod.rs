@@ -28,8 +28,8 @@ pub use unified::UnifiedNodeRegistry;
 pub struct Node {
     /// The Splinter identity of the node; must be unique in the registry.
     pub identity: String,
-    /// The endpoint the node can be reached at; must be unique in the registry.
-    pub endpoint: String,
+    /// The endpoints the node can be reached at; each must be unique in the registry.
+    pub endpoints: Vec<String>,
     /// A human-readable name for the node.
     pub display_name: String,
     /// A map with node metadata.
@@ -37,13 +37,13 @@ pub struct Node {
 }
 
 impl Node {
-    /// Constructs a new node with the given identity and endpoint.
+    /// Constructs a new node with the given identity and endpoints.
     ///
     /// The display_name and metadata fields will be empty.
-    pub fn new<S: Into<String>>(identity: S, endpoint: S) -> Self {
+    pub fn new<S: Into<String>, V: Into<Vec<String>>>(identity: S, endpoints: V) -> Self {
         Self {
             identity: identity.into(),
-            endpoint: endpoint.into(),
+            endpoints: endpoints.into(),
             display_name: String::new(),
             metadata: Default::default(),
         }

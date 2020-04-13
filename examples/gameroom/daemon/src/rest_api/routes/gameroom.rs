@@ -78,14 +78,14 @@ impl ApiGameroom {
 #[derive(Debug, Serialize)]
 struct ApiGameroomMember {
     node_id: String,
-    endpoint: String,
+    endpoints: Vec<String>,
 }
 
 impl ApiGameroomMember {
     fn from(db_circuit_member: DbGameroomMember) -> Self {
         ApiGameroomMember {
             node_id: db_circuit_member.node_id.to_string(),
-            endpoint: db_circuit_member.endpoint,
+            endpoints: db_circuit_member.endpoints,
         }
     }
 }
@@ -117,13 +117,13 @@ pub async fn propose_gameroom(
         .iter()
         .map(|node| SplinterNode {
             node_id: node.identity.to_string(),
-            endpoint: node.endpoint.to_string(),
+            endpoints: node.endpoints.to_vec(),
         })
         .collect::<Vec<SplinterNode>>();
 
     members.push(SplinterNode {
         node_id: node_info.identity.to_string(),
-        endpoint: node_info.endpoint.to_string(),
+        endpoints: node_info.endpoints.to_vec(),
     });
 
     let scabbard_admin_keys = vec![gameroomd_data.get_ref().public_key.clone()];
