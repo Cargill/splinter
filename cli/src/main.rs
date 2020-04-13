@@ -531,8 +531,9 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .arg(
                             Arg::with_name("url")
                                 .short("U")
-                                .takes_value(true)
-                                .help("URL of node"),
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
                         ),
                 ),
         );
