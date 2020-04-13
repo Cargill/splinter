@@ -72,7 +72,7 @@ serial_test = "0.3"
 tempdir = "0.3"
 
 [build-dependencies]
-protoc-rust = "2"
+protoc-rust = "2.14"
 glob = "0.2"
 
 [features]

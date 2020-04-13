@@ -49,7 +49,7 @@ uuid = { version = "0.7", features = ["v4"] }
 
 [build-dependencies]
 glob = "0.2"
-protoc-rust = "2"
+protoc-rust = "2.14"
 
 [features]
 default = []
