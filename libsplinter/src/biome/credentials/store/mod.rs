@@ -140,7 +140,7 @@ impl CredentialsBuilder {
 
 /// Defines methods for CRUD operations and fetching a user’s
 /// credentials without defining a storage strategy
-pub trait CredentialsStore {
+pub trait CredentialsStore: Send + Sync {
     /// Adds a credential to the underlying storage
     ///
     /// # Arguments

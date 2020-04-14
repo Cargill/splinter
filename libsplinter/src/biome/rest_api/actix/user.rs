@@ -16,11 +16,11 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{
-    diesel::DieselCredentialsStore, CredentialsBuilder, CredentialsStore, CredentialsStoreError,
+    CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{diesel::DieselUserStore, UserStore, UserStoreError};
+use crate::biome::user::store::{UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
@@ -40,7 +40,7 @@ use crate::biome::rest_api::actix::authorize::authorize_user;
 use crate::biome::rest_api::resources::{key_management::ResponseKey, user::ModifyUser};
 
 /// Defines a REST endpoint to list users from the db
-pub fn make_list_route(credentials_store: Arc<DieselCredentialsStore>) -> Resource {
+pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource {
     Resource::build("/biome/users")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_LIST_USERS_PROTOCOL_MIN,
@@ -65,8 +65,8 @@ pub fn make_list_route(credentials_store: Arc<DieselCredentialsStore>) -> Resour
 pub fn make_user_routes(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
-    credentials_store: Arc<DieselCredentialsStore>,
-    user_store: DieselUserStore,
+    credentials_store: Arc<dyn CredentialsStore>,
+    user_store: Arc<dyn UserStore>,
     key_store: Arc<dyn KeyStore>,
 ) -> Resource {
     Resource::build("/biome/users/{id}")
@@ -92,7 +92,7 @@ pub fn make_user_routes(
 
 /// Defines a REST endpoint to fetch a user from the database
 /// returns the user's ID and username
-fn add_fetch_user_method(credentials_store: Arc<DieselCredentialsStore>) -> HandlerFunction {
+fn add_fetch_user_method(credentials_store: Arc<dyn CredentialsStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let credentials_store = credentials_store.clone();
         let user_id = if let Some(t) = request.match_info().get("id") {
@@ -145,7 +145,7 @@ fn add_fetch_user_method(credentials_store: Arc<DieselCredentialsStore>) -> Hand
 ///       ]
 ///   }
 fn add_modify_user_method(
-    credentials_store: Arc<DieselCredentialsStore>,
+    credentials_store: Arc<dyn CredentialsStore>,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     key_store: Arc<dyn KeyStore>,
@@ -291,10 +291,10 @@ fn add_modify_user_method(
 fn add_delete_user_method(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
-    user_store: DieselUserStore,
+    user_store: Arc<dyn UserStore>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
-        let mut user_store = user_store.clone();
+        let user_store = user_store.clone();
         let validation = default_validation(&rest_config.issuer());
         let user_id = match authorize_user(&request, &secret_manager, &validation) {
             AuthorizationResult::Authorized(claims) => claims.user_id(),
