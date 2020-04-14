@@ -18,9 +18,6 @@ pub mod error;
 
 use super::Key;
 
-#[cfg(feature = "postgres")]
-pub use self::diesel::postgres::DieselKeyStore;
-
 pub use error::KeyStoreError;
 
 /// Defines methods for CRUD operations and fetching and listing keys
