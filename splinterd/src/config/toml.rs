@@ -37,6 +37,7 @@ struct TomlConfig {
     advertised_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
+    display_name: Option<String>,
     bind: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
@@ -84,6 +85,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_advertised_endpoints(self.toml_config.advertised_endpoints)
             .with_peers(self.toml_config.peers)
             .with_node_id(self.toml_config.node_id)
+            .with_display_name(self.toml_config.display_name)
             .with_bind(self.toml_config.bind)
             .with_registries(self.toml_config.registries)
             .with_heartbeat_interval(self.toml_config.heartbeat_interval)
@@ -119,6 +121,7 @@ mod tests {
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NODE_ID: &str = "012";
+    static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
 
     /// Converts a list of tuples to a toml Table Value used to write a toml file.
     fn get_toml_value() -> Value {
@@ -135,6 +138,7 @@ mod tests {
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
             ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
+            ("display_name".to_string(), EXAMPLE_DISPLAY_NAME.to_string()),
         ];
 
         let mut config_values = Map::new();
@@ -162,6 +166,10 @@ mod tests {
         assert_eq!(config.advertised_endpoints(), None);
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
+        assert_eq!(
+            config.display_name(),
+            Some(EXAMPLE_DISPLAY_NAME.to_string())
+        );
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);

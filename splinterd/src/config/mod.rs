@@ -55,6 +55,7 @@ pub struct Config {
     advertised_endpoints: (Vec<String>, ConfigSource),
     peers: (Vec<String>, ConfigSource),
     node_id: (String, ConfigSource),
+    display_name: (String, ConfigSource),
     bind: (String, ConfigSource),
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
@@ -118,6 +119,10 @@ impl Config {
 
     pub fn node_id(&self) -> &str {
         &self.node_id.0
+    }
+
+    pub fn display_name(&self) -> &str {
+        &self.display_name.0
     }
 
     pub fn bind(&self) -> &str {
@@ -204,6 +209,10 @@ impl Config {
 
     fn node_id_source(&self) -> &ConfigSource {
         &self.node_id.1
+    }
+
+    fn display_name_source(&self) -> &ConfigSource {
+        &self.display_name.1
     }
 
     fn bind_source(&self) -> &ConfigSource {
@@ -308,6 +317,11 @@ impl Config {
             self.node_id_source()
         );
         debug!(
+            "Config: display_name: {} (source: {:?})",
+            self.display_name(),
+            self.display_name_source()
+        );
+        debug!(
             "Config: bind: {} (source: {:?})",
             self.bind(),
             self.bind_source()
@@ -383,6 +397,7 @@ mod tests {
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
+    static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
 
     static DEFAULT_CLIENT_CERT: &str = "client.crt";
     static DEFAULT_CLIENT_KEY: &str = "private/client.key";
@@ -405,6 +420,7 @@ mod tests {
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
             ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
+            ("display_name".to_string(), EXAMPLE_DISPLAY_NAME.to_string()),
         ];
 
         let mut config_values = Map::new();
@@ -421,6 +437,7 @@ mod tests {
         (about: "Config-Test")
         (@arg config: -c --config +takes_value)
         (@arg node_id: --("node-id") +takes_value)
+        (@arg display_name: --("display-name") +takes_value)
         (@arg storage: --("storage") +takes_value)
         (@arg transport: --("transport") +takes_value)
         (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
@@ -521,6 +538,8 @@ mod tests {
             "configtest",
             "--node-id",
             EXAMPLE_NODE_ID,
+            "--display-name",
+            EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
             "--transport",
@@ -585,7 +604,7 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object.
-        let args = vec!["configtest", "--node-id", "123"];
+        let args = vec!["configtest", "--node-id", "123", "--display-name", "Node 1"];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.
@@ -770,6 +789,16 @@ mod tests {
             (final_config.node_id(), final_config.node_id_source()),
             ("123", &ConfigSource::CommandLine)
         );
+        // The DefaultPartialConfigBuilder, TomlPartialConfigBuilder, and ClapPartialConfigBuilder
+        // had values for `display_name`, but the ClapPartialConfigBuilder value should have
+        // precedence (source should be CommandLine).
+        assert_eq!(
+            (
+                final_config.display_name(),
+                final_config.display_name_source()
+            ),
+            ("Node 1", &ConfigSource::CommandLine)
+        );
         // The DefaultPartialConfigBuilder is the only config with a value for `bind` (source
         // should be Default).
         assert_eq!(
@@ -829,7 +858,15 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object, passing in a cert_dir.
-        let args = vec!["configtest", "--node-id", "123", "--cert-dir", "/my_files/"];
+        let args = vec![
+            "configtest",
+            "--node-id",
+            "123",
+            "--display-name",
+            "Node 1",
+            "--cert-dir",
+            "/my_files/",
+        ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.

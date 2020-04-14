@@ -203,6 +203,14 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("node id".to_string()))?,
+            display_name: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.display_name() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                })
+                .ok_or_else(|| ConfigError::MissingValue("display name".to_string()))?,
             bind: self
                 .partial_configs
                 .iter()
@@ -292,6 +300,7 @@ mod tests {
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
+    static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
 
     /// Asserts the example configuration values.
     fn assert_config_values(config: PartialConfig) {
@@ -317,6 +326,10 @@ mod tests {
         );
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
+        assert_eq!(
+            config.display_name(),
+            Some(EXAMPLE_DISPLAY_NAME.to_string())
+        );
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
@@ -352,6 +365,7 @@ mod tests {
             .with_advertised_endpoints(Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()]))
             .with_peers(Some(vec![]))
             .with_node_id(Some(EXAMPLE_NODE_ID.to_string()))
+            .with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()))
             .with_bind(None)
             .with_registries(Some(vec![]))
             .with_heartbeat_interval(None)
@@ -389,6 +403,7 @@ mod tests {
             .with_advertised_endpoints(Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()]));
         partial_config = partial_config.with_peers(Some(vec![]));
         partial_config = partial_config.with_node_id(Some(EXAMPLE_NODE_ID.to_string()));
+        partial_config = partial_config.with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()));
         partial_config = partial_config.with_admin_service_coordinator_timeout(None);
         partial_config = partial_config.with_registries(Some(vec![]));
         // Compare the generated PartialConfig object against the expected values.

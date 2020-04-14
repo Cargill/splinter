@@ -120,6 +120,8 @@ fn main() {
         (@arg config: -c --config +takes_value)
         (@arg node_id: --("node-id") +takes_value
           "Unique ID for the node ")
+        (@arg display_name: --("display-name") +takes_value
+          "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
         (@arg transport: --("transport") +takes_value
@@ -296,6 +298,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
         .with_node_id(String::from(config.node_id()))
+        .with_display_name(String::from(config.display_name()))
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())

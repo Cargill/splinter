@@ -115,6 +115,7 @@ pub struct SplinterDaemon {
     initial_peers: Vec<String>,
     network: Network,
     node_id: String,
+    display_name: String,
     rest_api_endpoint: String,
     #[cfg(feature = "database")]
     db_url: Option<String>,
@@ -422,6 +423,7 @@ impl SplinterDaemon {
             create_node_registry(&self.local_node_registry_location, &self.registries)?;
 
         let node_id = self.node_id.clone();
+        let display_name = self.display_name.clone();
         let service_endpoint = self.service_endpoint.clone();
         let network_endpoints = self.network_endpoints.clone();
         let advertised_endpoints = self.advertised_endpoints.clone();
@@ -440,6 +442,7 @@ impl SplinterDaemon {
                 Resource::build("/status").add_method(Method::Get, move |_, _| {
                     routes::get_status(
                         node_id.clone(),
+                        display_name.clone(),
                         service_endpoint.clone(),
                         network_endpoints.clone(),
                         advertised_endpoints.clone(),
@@ -730,6 +733,7 @@ pub struct SplinterDaemonBuilder {
     advertised_endpoints: Option<Vec<String>>,
     initial_peers: Option<Vec<String>>,
     node_id: Option<String>,
+    display_name: Option<String>,
     rest_api_endpoint: Option<String>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
@@ -785,6 +789,11 @@ impl SplinterDaemonBuilder {
 
     pub fn with_node_id(mut self, value: String) -> Self {
         self.node_id = Some(value);
+        self
+    }
+
+    pub fn with_display_name(mut self, value: String) -> Self {
+        self.display_name = Some(value);
         self
     }
 
@@ -874,6 +883,10 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: node_id".to_string())
         })?;
 
+        let display_name = self.display_name.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: display_name".to_string())
+        })?;
+
         let rest_api_endpoint = self.rest_api_endpoint.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: rest_api_endpoint".to_string())
         })?;
@@ -902,6 +915,7 @@ impl SplinterDaemonBuilder {
             initial_peers,
             network,
             node_id,
+            display_name,
             rest_api_endpoint,
             #[cfg(feature = "database")]
             db_url,

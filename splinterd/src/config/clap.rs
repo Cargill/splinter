@@ -66,6 +66,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
             .with_node_id(self.matches.value_of("node_id").map(String::from))
+            .with_display_name(self.matches.value_of("display_name").map(String::from))
             .with_bind(self.matches.value_of("bind").map(String::from))
             .with_registries(
                 self.matches
@@ -116,6 +117,7 @@ mod tests {
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
+    static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
 
     /// Asserts config values based on the example values.
     fn assert_config_values(config: PartialConfig) {
@@ -141,6 +143,10 @@ mod tests {
         );
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
+        assert_eq!(
+            config.display_name(),
+            Some(EXAMPLE_DISPLAY_NAME.to_string())
+        );
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
@@ -157,6 +163,7 @@ mod tests {
             (about: "Config-Test")
             (@arg config: -c --config +takes_value)
             (@arg node_id: --("node-id") +takes_value)
+            (@arg display_name: --("display-name") +takes_value)
             (@arg storage: --("storage") +takes_value)
             (@arg transport: --("transport") +takes_value)
             (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
@@ -191,6 +198,8 @@ mod tests {
             "configtest",
             "--node-id",
             EXAMPLE_NODE_ID,
+            "--display-name",
+            EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
             "--transport",

@@ -43,6 +43,7 @@ pub struct PartialConfig {
     advertised_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
+    display_name: Option<String>,
     bind: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
@@ -73,6 +74,7 @@ impl PartialConfig {
             advertised_endpoints: None,
             peers: None,
             node_id: None,
+            display_name: None,
             bind: None,
             #[cfg(feature = "database")]
             database: None,
@@ -140,6 +142,10 @@ impl PartialConfig {
 
     pub fn node_id(&self) -> Option<String> {
         self.node_id.clone()
+    }
+
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     pub fn bind(&self) -> Option<String> {
@@ -331,6 +337,18 @@ impl PartialConfig {
     ///
     pub fn with_node_id(mut self, node_id: Option<String>) -> Self {
         self.node_id = node_id;
+        self
+    }
+
+    #[allow(dead_code)]
+    /// Adds a `display_name` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `display_name` - Human-readable name for the node.
+    ///
+    pub fn with_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
         self
     }
 
