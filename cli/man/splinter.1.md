@@ -47,9 +47,8 @@ SUBCOMMANDS
 `keygen`
 : Generates secp256k1 public/private keys
 
-`node`
-: Manages node information; for example, `node registry` provides
-  subcommands to create and manage a local node registry file.
+`registry`
+: Provides commands to create and manage node registry information.
 
 FLAGS
 =====

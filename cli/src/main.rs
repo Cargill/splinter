@@ -506,6 +506,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     app = app.subcommand(circuit_command);
 
+    app = app.subcommand(SubCommand::with_name("registry").about("Node registry commands"));
+
     #[cfg(feature = "health")]
     {
         app = app.subcommand(
@@ -607,6 +609,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     );
 
     subcommands = subcommands.with_command("circuit", circuit_command);
+
+    subcommands = subcommands.with_command("registry", SubcommandActions::new());
 
     #[cfg(feature = "health")]
     {

@@ -20,6 +20,7 @@ pub mod database;
 #[cfg(feature = "health")]
 pub mod health;
 pub mod keygen;
+pub mod registry;
 
 use std::collections::HashMap;
 use std::ffi::CString;
