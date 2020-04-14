@@ -20,57 +20,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::error::Result as JsonResult;
 use splinter::protocol::ADMIN_PROTOCOL_VERSION;
 
+use crate::action::api::{ServerError, SplinterRestClient};
 use crate::error::CliError;
 
 const PAGING_LIMIT: &str = "1000";
 
-/// A wrapper around the Splinter REST API.
-pub struct SplinterRestClient<'a> {
-    url: &'a str,
-}
-
 impl<'a> SplinterRestClient<'a> {
-    /// Constructs a new client for a Splinter node at the given URL.
-    pub fn new(url: &'a str) -> Self {
-        Self { url }
-    }
-
-    /// Fetches the node ID of this client's Splinter node.
-    pub fn fetch_node_id(&self) -> Result<String, CliError> {
-        Client::new()
-            .get(&format!("{}/status", self.url))
-            .send()
-            .map_err(|err| CliError::ActionError(format!("Failed to fetch node ID: {}", err)))
-            .and_then(|res| {
-                let status = res.status();
-                if status.is_success() {
-                    res.json::<ServerStatus>()
-                        .map(|server_status| server_status.node_id)
-                        .map_err(|_| {
-                            CliError::ActionError(
-                                "Request was successful, but received an invalid response".into(),
-                            )
-                        })
-                } else {
-                    let message = res
-                        .json::<ServerError>()
-                        .map_err(|_| {
-                            CliError::ActionError(format!(
-                                "Node ID fetch request failed with status code '{}', but error \
-                                 response was not valid",
-                                status
-                            ))
-                        })?
-                        .message;
-
-                    Err(CliError::ActionError(format!(
-                        "Failed to submit admin payload: {}",
-                        message
-                    )))
-                }
-            })
-    }
-
     /// Submits an admin payload to this client's Splinter node.
     pub fn submit_admin_payload(&self, payload: Vec<u8>) -> Result<(), CliError> {
         Client::new()
@@ -267,16 +222,6 @@ impl<'a> SplinterRestClient<'a> {
                 }
             })
     }
-}
-
-#[derive(Deserialize)]
-struct ServerStatus {
-    node_id: String,
-}
-
-#[derive(Deserialize)]
-struct ServerError {
-    message: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

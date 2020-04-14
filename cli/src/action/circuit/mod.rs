@@ -31,9 +31,10 @@ use crate::error::CliError;
 #[cfg(feature = "circuit-template")]
 use crate::template::CircuitTemplate;
 
+use super::api::SplinterRestClient;
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
-use api::{CircuitServiceSlice, CircuitSlice, SplinterRestClient};
+use api::{CircuitServiceSlice, CircuitSlice};
 use builder::CreateCircuitMessageBuilder;
 use payload::make_signed_payload;
 
@@ -167,7 +168,7 @@ impl Action for CircuitProposeAction {
             let key = args.value_of("key").unwrap_or("./splinter.priv");
 
             let client = SplinterRestClient::new(&url);
-            let requester_node = client.fetch_node_id()?;
+            let requester_node = client.get_node_status()?.node_id;
             let private_key_hex = read_private_key(key)?;
 
             let signed_payload =
@@ -593,7 +594,7 @@ fn vote_on_circuit_proposal(
     let client = SplinterRestClient::new(url);
     let private_key_hex = read_private_key(key)?;
 
-    let requester_node = client.fetch_node_id()?;
+    let requester_node = client.get_node_status()?.node_id;
     let proposal = client.fetch_proposal(circuit_id)?;
 
     if let Some(proposal) = proposal {
