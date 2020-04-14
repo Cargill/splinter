@@ -21,7 +21,6 @@ pub mod template;
 #[cfg(feature = "circuit-template")]
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Error as IoError, ErrorKind, Read};
 
 use clap::ArgMatches;
 use serde::Deserialize;
@@ -32,7 +31,10 @@ use crate::error::CliError;
 use crate::template::CircuitTemplate;
 
 use super::api::SplinterRestClient;
-use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
+use super::{
+    msg_from_io_error, read_private_key, Action, DEFAULT_SPLINTER_REST_API_URL,
+    SPLINTER_REST_API_URL_ENV,
+};
 
 use api::{CircuitServiceSlice, CircuitSlice};
 use builder::CreateCircuitMessageBuilder;
@@ -482,38 +484,6 @@ fn parse_service_type_argument(service_type: &str) -> Result<(String, String), C
     }
 
     Ok((service_id, service_type))
-}
-
-/// Reads a private key from the given file name.
-fn read_private_key(file_name: &str) -> Result<String, CliError> {
-    let mut file = File::open(file_name).map_err(|err| {
-        CliError::EnvironmentError(format!(
-            "Unable to open key file '{}': {}",
-            file_name,
-            msg_from_io_error(err)
-        ))
-    })?;
-
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).map_err(|err| {
-        CliError::EnvironmentError(format!(
-            "Unable to read key file '{}': {}",
-            file_name,
-            msg_from_io_error(err)
-        ))
-    })?;
-    let key = buf.trim().to_string();
-
-    Ok(key)
-}
-
-fn msg_from_io_error(err: IoError) -> String {
-    match err.kind() {
-        ErrorKind::NotFound => "File not found".into(),
-        ErrorKind::PermissionDenied => "Permission denied".into(),
-        ErrorKind::InvalidData => "Invalid data".into(),
-        _ => "Unknown I/O error".into(),
-    }
 }
 
 impl From<&CreateCircuit> for CircuitSlice {
