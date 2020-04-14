@@ -34,6 +34,7 @@ struct TomlConfig {
     server_key: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
+    advertised_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
     bind: Option<String>,
@@ -80,6 +81,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_server_key(self.toml_config.server_key)
             .with_service_endpoint(self.toml_config.service_endpoint)
             .with_network_endpoints(self.toml_config.network_endpoints)
+            .with_advertised_endpoints(self.toml_config.advertised_endpoints)
             .with_peers(self.toml_config.peers)
             .with_node_id(self.toml_config.node_id)
             .with_bind(self.toml_config.bind)
@@ -157,6 +159,7 @@ mod tests {
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
         );
         assert_eq!(config.network_endpoints(), None);
+        assert_eq!(config.advertised_endpoints(), None);
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
         assert_eq!(config.bind(), None);

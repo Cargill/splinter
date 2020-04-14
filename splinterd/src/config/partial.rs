@@ -40,6 +40,7 @@ pub struct PartialConfig {
     server_key: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
+    advertised_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
     bind: Option<String>,
@@ -69,6 +70,7 @@ impl PartialConfig {
             server_key: None,
             service_endpoint: None,
             network_endpoints: None,
+            advertised_endpoints: None,
             peers: None,
             node_id: None,
             bind: None,
@@ -126,6 +128,10 @@ impl PartialConfig {
 
     pub fn network_endpoints(&self) -> Option<Vec<String>> {
         self.network_endpoints.clone()
+    }
+
+    pub fn advertised_endpoints(&self) -> Option<Vec<String>> {
+        self.advertised_endpoints.clone()
     }
 
     pub fn peers(&self) -> Option<Vec<String>> {
@@ -289,6 +295,18 @@ impl PartialConfig {
     ///
     pub fn with_network_endpoints(mut self, network_endpoints: Option<Vec<String>>) -> Self {
         self.network_endpoints = network_endpoints;
+        self
+    }
+
+    #[allow(dead_code)]
+    /// Adds a `advertised_endpoints` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `advertised_endpoints` - Publicly visible network endpoints.
+    ///
+    pub fn with_advertised_endpoints(mut self, advertised_endpoints: Option<Vec<String>>) -> Self {
+        self.advertised_endpoints = advertised_endpoints;
         self
     }
 

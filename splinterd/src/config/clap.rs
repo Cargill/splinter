@@ -55,6 +55,11 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .values_of("network_endpoints")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
+            .with_advertised_endpoints(
+                self.matches
+                    .values_of("advertised_endpoints")
+                    .map(|values| values.map(String::from).collect::<Vec<String>>()),
+            )
             .with_peers(
                 self.matches
                     .values_of("peers")
@@ -109,6 +114,7 @@ mod tests {
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+    static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
 
     /// Asserts config values based on the example values.
@@ -128,6 +134,10 @@ mod tests {
         assert_eq!(
             config.network_endpoints(),
             Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()])
+        );
+        assert_eq!(
+            config.advertised_endpoints(),
+            Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()])
         );
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
@@ -150,6 +160,7 @@ mod tests {
             (@arg storage: --("storage") +takes_value)
             (@arg transport: --("transport") +takes_value)
             (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
+            (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
             (@arg peers: --peer +takes_value +multiple)
             (@arg ca_file: --("ca-file") +takes_value)
@@ -186,6 +197,8 @@ mod tests {
             EXAMPLE_TRANSPORT,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
+            "--advertised-endpoint",
+            EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,
             "--ca-file",

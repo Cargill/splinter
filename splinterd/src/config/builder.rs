@@ -179,6 +179,14 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?,
+            advertised_endpoints: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.advertised_endpoints() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                })
+                .ok_or_else(|| ConfigError::MissingValue("advertised endpoints".to_string()))?,
             peers: self
                 .partial_configs
                 .iter()
@@ -282,6 +290,7 @@ mod tests {
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+    static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
 
     /// Asserts the example configuration values.
@@ -301,6 +310,10 @@ mod tests {
         assert_eq!(
             config.network_endpoints(),
             Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()])
+        );
+        assert_eq!(
+            config.advertised_endpoints(),
+            Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()])
         );
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
@@ -336,6 +349,7 @@ mod tests {
             .with_server_key(Some(EXAMPLE_SERVER_KEY.to_string()))
             .with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()))
             .with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]))
+            .with_advertised_endpoints(Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()]))
             .with_peers(Some(vec![]))
             .with_node_id(Some(EXAMPLE_NODE_ID.to_string()))
             .with_bind(None)
@@ -371,6 +385,8 @@ mod tests {
             partial_config.with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()));
         partial_config =
             partial_config.with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]));
+        partial_config = partial_config
+            .with_advertised_endpoints(Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()]));
         partial_config = partial_config.with_peers(Some(vec![]));
         partial_config = partial_config.with_node_id(Some(EXAMPLE_NODE_ID.to_string()));
         partial_config = partial_config.with_admin_service_coordinator_timeout(None);

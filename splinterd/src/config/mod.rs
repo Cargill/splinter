@@ -52,6 +52,7 @@ pub struct Config {
     server_key: (String, ConfigSource),
     service_endpoint: (String, ConfigSource),
     network_endpoints: (Vec<String>, ConfigSource),
+    advertised_endpoints: (Vec<String>, ConfigSource),
     peers: (Vec<String>, ConfigSource),
     node_id: (String, ConfigSource),
     bind: (String, ConfigSource),
@@ -105,6 +106,10 @@ impl Config {
 
     pub fn network_endpoints(&self) -> &[String] {
         &self.network_endpoints.0
+    }
+
+    pub fn advertised_endpoints(&self) -> &[String] {
+        &self.advertised_endpoints.0
     }
 
     pub fn peers(&self) -> &[String] {
@@ -187,6 +192,10 @@ impl Config {
 
     fn network_endpoints_source(&self) -> &ConfigSource {
         &self.network_endpoints.1
+    }
+
+    fn advertised_endpoints_source(&self) -> &ConfigSource {
+        &self.advertised_endpoints.1
     }
 
     fn peers_source(&self) -> &ConfigSource {
@@ -284,6 +293,11 @@ impl Config {
             self.network_endpoints_source()
         );
         debug!(
+            "Config: advertised_endpoints: {:?} (source: {:?})",
+            self.advertised_endpoints(),
+            self.advertised_endpoints_source()
+        );
+        debug!(
             "Config: peers: {:?} (source: {:?})",
             self.peers(),
             self.peers_source()
@@ -367,6 +381,7 @@ mod tests {
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+    static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
 
     static DEFAULT_CLIENT_CERT: &str = "client.crt";
@@ -409,6 +424,7 @@ mod tests {
         (@arg storage: --("storage") +takes_value)
         (@arg transport: --("transport") +takes_value)
         (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
+        (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
         (@arg service_endpoint: --("service-endpoint") +takes_value)
         (@arg peers: --peer +takes_value +multiple)
         (@arg ca_file: --("ca-file") +takes_value)
@@ -511,6 +527,8 @@ mod tests {
             EXAMPLE_TRANSPORT,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
+            "--advertised-endpoint",
+            EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,
             "--ca-file",
@@ -729,6 +747,15 @@ mod tests {
                 &[EXAMPLE_NETWORK_ENDPOINT.to_string()] as &[String],
                 &ConfigSource::Default,
             )
+        );
+        // The DefaultPartialConfigBuilder is the only config with a value for
+        // `advertised_endpoints` (source should be Default).
+        assert_eq!(
+            (
+                final_config.advertised_endpoints(),
+                final_config.advertised_endpoints_source()
+            ),
+            (&[] as &[String], &ConfigSource::Default,)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for `peers` (source
         // should be Default).

@@ -111,6 +111,7 @@ pub struct SplinterDaemon {
     local_node_registry_location: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
+    advertised_endpoints: Vec<String>,
     initial_peers: Vec<String>,
     network: Network,
     node_id: String,
@@ -423,6 +424,7 @@ impl SplinterDaemon {
         let node_id = self.node_id.clone();
         let service_endpoint = self.service_endpoint.clone();
         let network_endpoints = self.network_endpoints.clone();
+        let advertised_endpoints = self.advertised_endpoints.clone();
 
         let circuit_resource_provider =
             CircuitResourceProvider::new(self.node_id.to_string(), state);
@@ -440,6 +442,7 @@ impl SplinterDaemon {
                         node_id.clone(),
                         service_endpoint.clone(),
                         network_endpoints.clone(),
+                        advertised_endpoints.clone(),
                     )
                 }),
             )
@@ -724,6 +727,7 @@ pub struct SplinterDaemonBuilder {
     local_node_registry_location: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
+    advertised_endpoints: Option<Vec<String>>,
     initial_peers: Option<Vec<String>>,
     node_id: Option<String>,
     rest_api_endpoint: Option<String>,
@@ -766,6 +770,11 @@ impl SplinterDaemonBuilder {
 
     pub fn with_network_endpoints(mut self, value: Vec<String>) -> Self {
         self.network_endpoints = Some(value);
+        self
+    }
+
+    pub fn with_advertised_endpoints(mut self, value: Vec<String>) -> Self {
+        self.advertised_endpoints = Some(value);
         self
     }
 
@@ -853,6 +862,10 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: network_endpoints".to_string())
         })?;
 
+        let advertised_endpoints = self.advertised_endpoints.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: advertised_endpoints".to_string())
+        })?;
+
         let initial_peers = self.initial_peers.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: initial_peers".to_string())
         })?;
@@ -885,6 +898,7 @@ impl SplinterDaemonBuilder {
             storage_location,
             service_endpoint,
             network_endpoints,
+            advertised_endpoints,
             initial_peers,
             network,
             node_id,

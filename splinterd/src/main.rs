@@ -126,6 +126,8 @@ fn main() {
           "Transport type for sockets, either raw or tls")
         (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple
           "Endpoints to connect to the network, tcp://ip:port")
+        (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple
+          "Publicly-visible network endpoints")
         (@arg service_endpoint: --("service-endpoint") +takes_value
           "Endpoint that service will connect to, tcp://ip:port")
         (@arg peers: --peer +takes_value +multiple
@@ -290,6 +292,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_key_registry_location(key_registry_location)
         .with_local_node_registry_location(local_node_registry_location)
         .with_network_endpoints(config.network_endpoints().to_vec())
+        .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
         .with_node_id(String::from(config.node_id()))
