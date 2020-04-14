@@ -39,8 +39,7 @@ struct TomlConfig {
     bind: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
-    registry_backend: Option<String>,
-    registry_file: Option<String>,
+    registries: Option<Vec<String>>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
 }
@@ -84,8 +83,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_peers(self.toml_config.peers)
             .with_node_id(self.toml_config.node_id)
             .with_bind(self.toml_config.bind)
-            .with_registry_backend(self.toml_config.registry_backend)
-            .with_registry_file(self.toml_config.registry_file)
+            .with_registries(self.toml_config.registries)
             .with_heartbeat_interval(self.toml_config.heartbeat_interval)
             .with_admin_service_coordinator_timeout(
                 self.toml_config.admin_service_coordinator_timeout,
@@ -172,8 +170,7 @@ mod tests {
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
-        assert_eq!(config.registry_backend(), None);
-        assert_eq!(config.registry_file(), None);
+        assert_eq!(config.registries(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }

@@ -34,10 +34,7 @@ storage = "memory"
 bind = "localhost:8085"
 
 # Node Registry file
-registry_file = "/etc/splinter/nodes.yaml"
-
-# Node registry type
-registry_backend = "FILE"
+registries = ["file:///etc/splinter/nodes.yaml"]
 
 # Which transport type this splinter node supports. Options are "raw" or "tls"
 transport = "tls"

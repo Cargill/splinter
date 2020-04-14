@@ -58,8 +58,11 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             )
             .with_node_id(self.matches.value_of("node_id").map(String::from))
             .with_bind(self.matches.value_of("bind").map(String::from))
-            .with_registry_backend(self.matches.value_of("registry_backend").map(String::from))
-            .with_registry_file(self.matches.value_of("registry_file").map(String::from))
+            .with_registries(
+                self.matches
+                    .values_of("registries")
+                    .map(|values| values.map(String::from).collect::<Vec<String>>()),
+            )
             .with_heartbeat_interval(parse_value(&self.matches)?)
             .with_insecure(if self.matches.is_present("insecure") {
                 Some(true)
@@ -127,8 +130,7 @@ mod tests {
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
-        assert_eq!(config.registry_backend(), None);
-        assert_eq!(config.registry_file(), None);
+        assert_eq!(config.registries(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
         assert_eq!(config.insecure(), Some(true));
@@ -153,8 +155,6 @@ mod tests {
             (@arg server_key:  --("server-key") +takes_value)
             (@arg client_key:  --("client-key") +takes_value)
             (@arg bind: --("bind") +takes_value)
-            (@arg registry_backend: --("registry-backend") +takes_value)
-            (@arg registry_file: --("registry-file") +takes_value)
             (@arg insecure: --("insecure")))
         .get_matches_from(args)
     }

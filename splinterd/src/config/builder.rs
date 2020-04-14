@@ -212,22 +212,14 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("database".to_string()))?,
-            registry_backend: self
+            registries: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_backend() {
+                .find_map(|p| match p.registries() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("registry backend".to_string()))?,
-            registry_file: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.registry_file() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("registry file".to_string()))?,
+                .ok_or_else(|| ConfigError::MissingValue("registries".to_string()))?,
             heartbeat_interval: self
                 .partial_configs
                 .iter()
@@ -315,8 +307,7 @@ mod tests {
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
-        assert_eq!(config.registry_backend(), None);
-        assert_eq!(config.registry_file(), None);
+        assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }
@@ -348,8 +339,7 @@ mod tests {
             .with_peers(Some(vec![]))
             .with_node_id(Some(EXAMPLE_NODE_ID.to_string()))
             .with_bind(None)
-            .with_registry_backend(None)
-            .with_registry_file(None)
+            .with_registries(Some(vec![]))
             .with_heartbeat_interval(None)
             .with_admin_service_coordinator_timeout(None);
         // Compare the generated PartialConfig object against the expected values.
@@ -384,6 +374,7 @@ mod tests {
         partial_config = partial_config.with_peers(Some(vec![]));
         partial_config = partial_config.with_node_id(Some(EXAMPLE_NODE_ID.to_string()));
         partial_config = partial_config.with_admin_service_coordinator_timeout(None);
+        partial_config = partial_config.with_registries(Some(vec![]));
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(partial_config);
     }

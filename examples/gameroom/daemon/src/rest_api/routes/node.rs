@@ -191,7 +191,9 @@ mod test {
         assert_eq!(resp.status(), StatusCode::OK);
         let nodes: SuccessResponse<Vec<Node>> =
             serde_json::from_slice(&test::read_body(resp).await).unwrap();
-        assert_eq!(nodes.data, vec![get_node_1(), get_node_2()]);
+        assert_eq!(nodes.data.len(), 2);
+        assert!(nodes.data.contains(&get_node_1()));
+        assert!(nodes.data.contains(&get_node_2()));
         assert_eq!(
             nodes.paging,
             Some(create_test_paging_response(

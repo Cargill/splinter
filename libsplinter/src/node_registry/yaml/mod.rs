@@ -15,6 +15,7 @@
 mod error;
 
 use std::fs::File;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use super::{
@@ -36,22 +37,37 @@ pub struct FileInternal {
 
 impl YamlNodeRegistry {
     pub fn new(file_path: &str) -> Result<YamlNodeRegistry, YamlNodeRegistryError> {
-        let file = File::open(file_path)?;
-        let cached_nodes: Vec<Node> = serde_yaml::from_reader(&file)?;
+        // If file already exists, read and verify its contents; otherwise create it and initialize
+        // the nodes list.
+        if PathBuf::from(file_path).is_file() {
+            let file = File::open(file_path)?;
+            let cached_nodes: Vec<Node> = serde_yaml::from_reader(&file)?;
 
-        for (idx, node) in cached_nodes.iter().enumerate() {
-            check_node_required_fields_are_not_empty(node)?;
-            check_if_node_is_duplicate(node, &cached_nodes[idx + 1..])?;
+            for (idx, node) in cached_nodes.iter().enumerate() {
+                check_node_required_fields_are_not_empty(node)?;
+                check_if_node_is_duplicate(node, &cached_nodes[idx + 1..])?;
+            }
+
+            Ok(YamlNodeRegistry {
+                file_internal: Arc::new(Mutex::new(FileInternal {
+                    file_path: file_path.into(),
+                    cached_nodes,
+                })),
+            })
+        } else {
+            File::create(file_path)?;
+
+            let registry = YamlNodeRegistry {
+                file_internal: Arc::new(Mutex::new(FileInternal {
+                    file_path: file_path.into(),
+                    cached_nodes: vec![],
+                })),
+            };
+
+            registry.write_nodes(&[])?;
+
+            Ok(registry)
         }
-
-        let file_internal = FileInternal {
-            file_path: file_path.into(),
-            cached_nodes,
-        };
-
-        Ok(YamlNodeRegistry {
-            file_internal: Arc::new(Mutex::new(file_internal)),
-        })
     }
 
     fn get_cached_nodes(&self) -> Result<Vec<Node>, YamlNodeRegistryError> {

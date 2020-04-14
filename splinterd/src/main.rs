@@ -23,7 +23,6 @@ extern crate clap;
 mod config;
 mod daemon;
 mod error;
-mod registry_config;
 mod routes;
 mod transport;
 
@@ -147,10 +146,7 @@ fn main() {
           "If set to tls, should accept all peer certificates")
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
-        (@arg registry_backend: --("registry-backend") +takes_value
-          "Backend type for the node registry. Possible values: FILE.")
-        (@arg registry_file: --("registry-file") +takes_value
-          "File path to the node registry file if registry-backend is FILE.")
+        (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
         (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
             "The coordinator timeout for admin service proposals (in milliseconds); default is \
              30000 (30 seconds)")
@@ -224,8 +220,16 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let transport = get_transport(&config)?;
 
+    let state_dir = Path::new(config.state_dir());
+
     let storage_location = match &config.storage() as &str {
-        "yaml" => format!("{}{}", config.state_dir(), "circuits.yaml"),
+        "yaml" => state_dir
+            .join("circuits.yaml")
+            .to_str()
+            .ok_or_else(|| {
+                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+            })?
+            .to_string(),
         "memory" => "memory".to_string(),
         _ => {
             return Err(UserError::InvalidArgument(format!(
@@ -236,7 +240,13 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     };
 
     let key_registry_location = match &config.storage() as &str {
-        "yaml" => format!("{}{}", config.state_dir(), "keys.yaml"),
+        "yaml" => state_dir
+            .join("keys.yaml")
+            .to_str()
+            .ok_or_else(|| {
+                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+            })?
+            .to_string(),
         "memory" => "memory".to_string(),
         _ => {
             return Err(UserError::InvalidArgument(format!(
@@ -246,26 +256,36 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
+    let local_node_registry_location = state_dir
+        .join("nodes.yaml")
+        .to_str()
+        .ok_or_else(|| {
+            UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+        })?
+        .to_string();
+
     let rest_api_endpoint = config.bind();
 
     #[cfg(feature = "database")]
     let db_url = config.database();
 
-    let registry_backend = config.registry_backend();
-
     let admin_service_coordinator_timeout = config.admin_service_coordinator_timeout();
 
     config.log_as_debug();
 
-    let mut daemon_builder = SplinterDaemonBuilder::new()
+    let mut daemon_builder = SplinterDaemonBuilder::new();
+
+    daemon_builder = daemon_builder
         .with_storage_location(storage_location)
         .with_key_registry_location(key_registry_location)
+        .with_local_node_registry_location(local_node_registry_location)
         .with_network_endpoint(String::from(config.network_endpoint()))
         .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
         .with_node_id(String::from(config.node_id()))
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
+        .with_registries(config.registries().to_vec())
         .with_heartbeat_interval(config.heartbeat_interval())
         .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
 
@@ -277,18 +297,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "biome")]
     {
         daemon_builder = daemon_builder.enable_biome(config.biome_enabled());
-    }
-
-    if Path::new(&config.registry_file()).is_file() && registry_backend == "FILE" {
-        debug!(
-            "Using registry file: {:?}",
-            fs::canonicalize(&config.registry_file())?
-        );
-        daemon_builder = daemon_builder
-            .with_registry_backend(Some(String::from(registry_backend)))
-            .with_registry_file(String::from(config.registry_file()));
-    } else {
-        daemon_builder = daemon_builder.with_registry_backend(None);
     }
 
     let mut node = daemon_builder.build().map_err(|err| {
