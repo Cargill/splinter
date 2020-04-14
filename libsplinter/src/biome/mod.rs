@@ -46,7 +46,7 @@ mod user;
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use credentials::store::diesel::DieselCredentialsStore;
 #[cfg(all(feature = "biome-key-management", feature = "diesel"))]
-pub use key_management::store::diesel::postgres::DieselKeyStore;
+pub use key_management::store::diesel::DieselKeyStore;
 #[cfg(all(feature = "biome-refresh-tokens", feature = "diesel"))]
 pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;
 #[cfg(feature = "diesel")]
