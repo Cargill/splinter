@@ -17,7 +17,7 @@ use crate::network::Network;
 
 // Message to send to the network message sender with the recipient and payload
 #[derive(Clone, Debug, PartialEq)]
-enum SendRequest {
+pub(in crate::network) enum SendRequest {
     Shutdown,
     Message { recipient: String, payload: Vec<u8> },
 }
@@ -28,6 +28,11 @@ pub struct NetworkMessageSender {
 }
 
 impl NetworkMessageSender {
+    #[cfg(feature = "network-peer-manager")]
+    pub(in crate::network) fn new(sender: Sender<SendRequest>) -> Self {
+        NetworkMessageSender { sender }
+    }
+
     pub fn send(&self, recipient: String, payload: Vec<u8>) -> Result<(), (String, Vec<u8>)> {
         self.sender
             .send(SendRequest::Message { recipient, payload })

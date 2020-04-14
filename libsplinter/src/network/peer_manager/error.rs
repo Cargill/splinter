@@ -156,3 +156,20 @@ impl fmt::Display for PeerUpdateError {
         write!(f, "Unable to update peer, {}", self.0)
     }
 }
+
+#[derive(Debug, PartialEq)]
+pub enum PeerInterconnectError {
+    StartUpError(String),
+}
+
+impl error::Error for PeerInterconnectError {}
+
+impl fmt::Display for PeerInterconnectError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PeerInterconnectError::StartUpError(msg) => {
+                write!(f, "Unable to start peer interconnect: {}", msg)
+            }
+        }
+    }
+}

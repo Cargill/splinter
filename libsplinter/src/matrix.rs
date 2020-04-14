@@ -59,6 +59,10 @@ pub trait MatrixReceiver: Clone + Send {
     fn recv_timeout(&self, timeout: Duration) -> Result<Envelope, MatrixRecvTimeoutError>;
 }
 
+pub trait MatrixShutdown: Clone + Send {
+    fn shutdown(&self);
+}
+
 #[derive(Debug)]
 pub struct MatrixAddError {
     pub context: String,

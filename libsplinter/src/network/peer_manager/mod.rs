@@ -14,6 +14,7 @@
 
 mod connector;
 mod error;
+pub mod interconnect;
 mod notification;
 mod peer_map;
 
@@ -260,7 +261,7 @@ pub struct ShutdownHandle {
 impl ShutdownHandle {
     pub fn shutdown(&self) {
         if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
-            warn!("Connection manager is no longer running");
+            warn!("PeerManager is no longer running");
         }
     }
 }

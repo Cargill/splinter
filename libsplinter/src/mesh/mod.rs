@@ -69,7 +69,9 @@ use crate::mesh::control::Control;
 pub use crate::mesh::control::{AddError, RemoveError};
 use crate::mesh::incoming::Incoming;
 #[cfg(feature = "matrix")]
-pub use crate::mesh::matrix::{MeshLifeCycle, MeshMatrixSender};
+pub use crate::mesh::matrix::{
+    MeshLifeCycle, MeshMatrixReceiver, MeshMatrixSender, MeshMatrixShutdown,
+};
 use crate::mesh::outgoing::Outgoing;
 
 pub use crate::collections::BiHashMap;
@@ -124,6 +126,7 @@ impl MeshState {
     }
 }
 
+#[derive(Clone)]
 pub struct MeshShutdownSignaler {
     ctrl: Control,
 }
@@ -272,6 +275,17 @@ impl Mesh {
     pub fn get_sender(&self) -> MeshMatrixSender {
         let mesh = self.clone();
         MeshMatrixSender::new(mesh)
+    }
+
+    #[cfg(feature = "matrix")]
+    pub fn get_receiver(&self) -> MeshMatrixReceiver {
+        let mesh = self.clone();
+        MeshMatrixReceiver::new(mesh)
+    }
+
+    #[cfg(feature = "matrix")]
+    pub fn get_matrix_shutdown(&self) -> MeshMatrixShutdown {
+        MeshMatrixShutdown::new(self.shutdown_signaler())
     }
 }
 
