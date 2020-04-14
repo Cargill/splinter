@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::network::dispatch::{
-    DispatchError, DispatchMessageSender, Handler, MessageContext, PeerId,
+    DispatchError, DispatchMessageSender, Handler, MessageContext, MessageSender, PeerId,
 };
-use crate::network::sender::NetworkMessageSender;
 use crate::protos::circuit::{CircuitMessage, CircuitMessageType};
 use crate::protos::network::NetworkMessageType;
 
@@ -28,11 +27,15 @@ impl Handler for CircuitMessageHandler {
     type MessageType = NetworkMessageType;
     type Message = CircuitMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::CIRCUIT
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _: &NetworkMessageSender,
+        _: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
             "Handle CircuitMessage {:?} from {} [{} byte{}]",
@@ -99,10 +102,7 @@ mod tests {
         let mut circuit_dispatcher = Dispatcher::new(network_sender);
         let handler = ServiceConnectedTestHandler::default();
         let echos = handler.echos.clone();
-        circuit_dispatcher.set_handler(
-            CircuitMessageType::SERVICE_CONNECT_REQUEST,
-            Box::new(handler),
-        );
+        circuit_dispatcher.set_handler(Box::new(handler));
 
         let circuit_dispatcher_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -111,7 +111,7 @@ mod tests {
         let circuit_dispatcher_message_sender = circuit_dispatcher_loop.new_dispatcher_sender();
 
         let handler = CircuitMessageHandler::new(circuit_dispatcher_message_sender);
-        network_dispatcher.set_handler(NetworkMessageType::CIRCUIT, Box::new(handler));
+        network_dispatcher.set_handler(Box::new(handler));
 
         // Create ServiceConnectRequest
         let mut service_request = ServiceConnectRequest::new();
@@ -156,11 +156,15 @@ mod tests {
         type MessageType = CircuitMessageType;
         type Message = ServiceConnectRequest;
 
+        fn match_type(&self) -> Self::MessageType {
+            CircuitMessageType::SERVICE_CONNECT_REQUEST
+        }
+
         fn handle(
             &self,
             message: Self::Message,
             _message_context: &MessageContext<Self::Source, Self::MessageType>,
-            _: &NetworkMessageSender,
+            _: &dyn MessageSender<Self::Source>,
         ) -> Result<(), DispatchError> {
             self.echos
                 .write()

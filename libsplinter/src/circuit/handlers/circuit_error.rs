@@ -14,8 +14,7 @@
 
 use crate::circuit::handlers::create_message;
 use crate::circuit::{ServiceId, SplinterState};
-use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
-use crate::network::sender::NetworkMessageSender;
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::protos::circuit::{CircuitError, CircuitMessageType};
 
 // Implements a handler that handles CircuitError messages
@@ -32,11 +31,15 @@ impl Handler for CircuitErrorHandler {
     type MessageType = CircuitMessageType;
     type Message = CircuitError;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::CIRCUIT_ERROR_MESSAGE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("Handle Circuit Error Message {:?}", msg);
         let circuit_name = msg.get_circuit_name();
@@ -85,9 +88,9 @@ impl Handler for CircuitErrorHandler {
 
         // forward error message
         sender
-            .send(recipient, network_msg_bytes)
+            .send(recipient.into(), network_msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }
@@ -163,8 +166,7 @@ mod tests {
 
                 // Add circuit error handler to the the dispatcher
                 let handler = CircuitErrorHandler::new("123".to_string(), state);
-                dispatcher
-                    .set_handler(CircuitMessageType::CIRCUIT_ERROR_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 // Create the error message
                 let mut circuit_error = CircuitError::new();
@@ -246,8 +248,7 @@ mod tests {
 
                 // Add circuit error handler to the the dispatcher
                 let handler = CircuitErrorHandler::new("123".to_string(), state);
-                dispatcher
-                    .set_handler(CircuitMessageType::CIRCUIT_ERROR_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 // Create the error message
                 let mut circuit_error = CircuitError::new();
@@ -315,7 +316,7 @@ mod tests {
 
             // Add circuit error handler to the the dispatcher
             let handler = CircuitErrorHandler::new("123".to_string(), state);
-            dispatcher.set_handler(CircuitMessageType::CIRCUIT_ERROR_MESSAGE, Box::new(handler));
+            dispatcher.set_handler(Box::new(handler));
 
             // Create the circuit error message
             let mut circuit_error = CircuitError::new();

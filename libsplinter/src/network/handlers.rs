@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
-use crate::network::sender::NetworkMessageSender;
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::protos::network::{NetworkEcho, NetworkHeartbeat, NetworkMessage, NetworkMessageType};
 
 use protobuf::Message;
@@ -28,11 +27,15 @@ impl Handler for NetworkEchoHandler {
     type MessageType = NetworkMessageType;
     type Message = NetworkEcho;
 
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::NETWORK_ECHO
+    }
+
     fn handle(
         &self,
         mut msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("ECHO: {:?}", msg);
 
@@ -59,9 +62,9 @@ impl Handler for NetworkEchoHandler {
         let network_msg_bytes = network_msg.write_to_bytes().unwrap();
 
         sender
-            .send(recipient, network_msg_bytes)
+            .send(recipient.into(), network_msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }
@@ -82,11 +85,15 @@ impl Handler for NetworkHeartbeatHandler {
     type MessageType = NetworkMessageType;
     type Message = NetworkHeartbeat;
 
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::NETWORK_HEARTBEAT
+    }
+
     fn handle(
         &self,
         _msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _sender: &NetworkMessageSender,
+        _sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         trace!("Received Heartbeat from {}", context.source_peer_id());
         Ok(())
@@ -136,7 +143,7 @@ mod tests {
 
             let handler = NetworkEchoHandler::new("TestPeer".to_string());
 
-            dispatcher.set_handler(NetworkMessageType::NETWORK_ECHO, Box::new(handler));
+            dispatcher.set_handler(Box::new(handler));
 
             let msg = {
                 let mut echo = NetworkEcho::new();

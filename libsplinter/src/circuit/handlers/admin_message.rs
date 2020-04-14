@@ -14,8 +14,7 @@
 
 use crate::circuit::handlers::create_message;
 use crate::circuit::SplinterState;
-use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
-use crate::network::sender::NetworkMessageSender;
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
 };
@@ -34,11 +33,15 @@ impl Handler for AdminDirectMessageHandler {
     type MessageType = CircuitMessageType;
     type Message = AdminDirectMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::ADMIN_DIRECT_MESSAGE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
             "Handle Admin Direct Message {} on {} ({} => {}) [{} byte{}]",
@@ -60,9 +63,9 @@ impl Handler for AdminDirectMessageHandler {
         let (msg_bytes, msg_recipient) = self.create_response(msg, context)?;
         // either forward the direct message or send back an error message.
         sender
-            .send(msg_recipient, msg_bytes)
+            .send(msg_recipient.into(), msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }
@@ -215,7 +218,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());
@@ -276,7 +279,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());
@@ -337,7 +340,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("alpha".into());
@@ -383,7 +386,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());
@@ -429,7 +432,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
 
                 let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(CircuitMessageType::ADMIN_DIRECT_MESSAGE, Box::new(handler));
+                dispatcher.set_handler(Box::new(handler));
 
                 let mut direct_message = AdminDirectMessage::new();
                 direct_message.set_circuit("admin".into());

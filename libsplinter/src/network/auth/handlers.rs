@@ -19,7 +19,7 @@ use crate::network::auth::{
 };
 use crate::network::dispatch::{
     DispatchError, DispatchMessageSender, Dispatcher, FromMessageBytes, Handler, MessageContext,
-    PeerId,
+    MessageSender, PeerId,
 };
 use crate::network::sender::NetworkMessageSender;
 use crate::protos::authorization::{
@@ -42,30 +42,15 @@ pub fn create_authorization_dispatcher(
 ) -> Dispatcher<AuthorizationMessageType> {
     let mut auth_dispatcher = Dispatcher::new(network_sender);
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::CONNECT_REQUEST,
-        Box::new(ConnectRequestHandler::new(auth_manager.clone())),
-    );
+    auth_dispatcher.set_handler(Box::new(ConnectRequestHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::CONNECT_RESPONSE,
-        Box::new(ConnectResponseHandler::new(auth_manager.clone())),
-    );
+    auth_dispatcher.set_handler(Box::new(ConnectResponseHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::TRUST_REQUEST,
-        Box::new(TrustRequestHandler::new(auth_manager.clone())),
-    );
+    auth_dispatcher.set_handler(Box::new(TrustRequestHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::AUTHORIZE,
-        Box::new(AuthorizedHandler),
-    );
+    auth_dispatcher.set_handler(Box::new(AuthorizedHandler));
 
-    auth_dispatcher.set_handler(
-        AuthorizationMessageType::AUTHORIZATION_ERROR,
-        Box::new(AuthorizationErrorHandler::new(auth_manager)),
-    );
+    auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));
 
     auth_dispatcher
 }
@@ -93,11 +78,15 @@ impl Handler for AuthorizationMessageHandler {
     type MessageType = NetworkMessageType;
     type Message = AuthorizationMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        NetworkMessageType::AUTHORIZATION
+    }
+
     fn handle(
         &self,
         mut msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _sender: &NetworkMessageSender,
+        _sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         self.sender
             .send(
@@ -119,11 +108,15 @@ impl Handler for AuthorizedHandler {
     type MessageType = AuthorizationMessageType;
     type Message = AuthorizedMessage;
 
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::AUTHORIZE
+    }
+
     fn handle(
         &self,
         _: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _sender: &NetworkMessageSender,
+        _sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         info!(
             "Connection authorized with peer {}",
@@ -163,11 +156,15 @@ impl<M: FromMessageBytes> Handler for NetworkAuthGuardHandler<M> {
     type MessageType = NetworkMessageType;
     type Message = M;
 
+    fn match_type(&self) -> Self::MessageType {
+        self.handler.match_type()
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         if self.auth_manager.is_authorized(context.source_peer_id()) {
             self.handler.handle(msg, context, sender)
@@ -198,11 +195,15 @@ impl Handler for ConnectRequestHandler {
     type MessageType = AuthorizationMessageType;
     type Message = ConnectRequest;
 
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::CONNECT_REQUEST
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         match self
             .auth_manager
@@ -224,14 +225,14 @@ impl Handler for ConnectRequestHandler {
                     connect_req.set_handshake_mode(ConnectRequest_HandshakeMode::UNIDIRECTIONAL);
                     sender
                         .send(
-                            context.source_peer_id().to_string(),
+                            context.source_id().clone(),
                             wrap_in_network_auth_envelopes(
                                 AuthorizationMessageType::CONNECT_REQUEST,
                                 connect_req,
                             )?,
                         )
                         .map_err(|(recipient, payload)| {
-                            DispatchError::NetworkSendError((recipient, payload))
+                            DispatchError::NetworkSendError((recipient.into(), payload))
                         })?;
 
                     debug!(
@@ -246,14 +247,14 @@ impl Handler for ConnectRequestHandler {
                 ]);
                 sender
                     .send(
-                        context.source_peer_id().to_string(),
+                        context.source_id().clone(),
                         wrap_in_network_auth_envelopes(
                             AuthorizationMessageType::CONNECT_RESPONSE,
                             response,
                         )?,
                     )
                     .map_err(|(recipient, payload)| {
-                        DispatchError::NetworkSendError((recipient, payload))
+                        DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
             Ok(AuthorizationState::Internal) => {
@@ -264,14 +265,14 @@ impl Handler for ConnectRequestHandler {
                 let auth_msg = AuthorizedMessage::new();
                 sender
                     .send(
-                        context.source_peer_id().to_string(),
+                        context.source_id().clone(),
                         wrap_in_network_auth_envelopes(
                             AuthorizationMessageType::AUTHORIZE,
                             auth_msg,
                         )?,
                     )
                     .map_err(|(recipient, payload)| {
-                        DispatchError::NetworkSendError((recipient, payload))
+                        DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
             Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
@@ -297,11 +298,15 @@ impl Handler for ConnectResponseHandler {
     type MessageType = AuthorizationMessageType;
     type Message = ConnectResponse;
 
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::CONNECT_RESPONSE
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
             "Receive connect response from peer {}: {:?}",
@@ -317,14 +322,14 @@ impl Handler for ConnectResponseHandler {
             trust_request.set_identity(self.auth_manager.identity.clone());
             sender
                 .send(
-                    context.source_peer_id().to_string(),
+                    context.source_id().clone(),
                     wrap_in_network_auth_envelopes(
                         AuthorizationMessageType::TRUST_REQUEST,
                         trust_request,
                     )?,
                 )
                 .map_err(|(recipient, payload)| {
-                    DispatchError::NetworkSendError((recipient, payload))
+                    DispatchError::NetworkSendError((recipient.into(), payload))
                 })?;
         }
         Ok(())
@@ -347,11 +352,15 @@ impl Handler for TrustRequestHandler {
     type MessageType = AuthorizationMessageType;
     type Message = TrustRequest;
 
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::TRUST_REQUEST
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         match self.auth_manager.next_state(
             context.source_peer_id(),
@@ -373,14 +382,14 @@ impl Handler for TrustRequestHandler {
                 let auth_msg = AuthorizedMessage::new();
                 sender
                     .send(
-                        msg.get_identity().to_string(),
+                        msg.get_identity().into(),
                         wrap_in_network_auth_envelopes(
                             AuthorizationMessageType::AUTHORIZE,
                             auth_msg,
                         )?,
                     )
                     .map_err(|(recipient, payload)| {
-                        DispatchError::NetworkSendError((recipient, payload))
+                        DispatchError::NetworkSendError((recipient.into(), payload))
                     })?;
             }
             Ok(next_state) => panic!("Should not have been able to transition to {}", next_state),
@@ -405,11 +414,15 @@ impl Handler for AuthorizationErrorHandler {
     type MessageType = AuthorizationMessageType;
     type Message = AuthorizationError;
 
+    fn match_type(&self) -> Self::MessageType {
+        AuthorizationMessageType::AUTHORIZATION_ERROR
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        _: &NetworkMessageSender,
+        _: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         match self
             .auth_manager

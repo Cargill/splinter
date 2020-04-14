@@ -15,8 +15,7 @@
 use crate::circuit::handlers::create_message;
 use crate::circuit::service::{Service, ServiceId, SplinterNode};
 use crate::circuit::{ServiceDefinition, SplinterState};
-use crate::network::dispatch::{DispatchError, Handler, MessageContext, PeerId};
-use crate::network::sender::NetworkMessageSender;
+use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::protos::circuit::{
     CircuitMessageType, ServiceConnectRequest, ServiceConnectResponse,
     ServiceConnectResponse_Status, ServiceDisconnectRequest, ServiceDisconnectResponse,
@@ -37,11 +36,15 @@ impl Handler for ServiceConnectRequestHandler {
     type MessageType = CircuitMessageType;
     type Message = ServiceConnectRequest;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::SERVICE_CONNECT_REQUEST
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Connect Request {:?}", msg);
         let circuit_name = msg.get_circuit();
@@ -141,9 +144,9 @@ impl Handler for ServiceConnectRequestHandler {
         let recipient = context.source_peer_id().to_string();
 
         sender
-            .send(recipient, network_msg_bytes)
+            .send(recipient.into(), network_msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }
@@ -169,11 +172,15 @@ impl Handler for ServiceDisconnectRequestHandler {
     type MessageType = CircuitMessageType;
     type Message = ServiceDisconnectRequest;
 
+    fn match_type(&self) -> Self::MessageType {
+        CircuitMessageType::SERVICE_DISCONNECT_REQUEST
+    }
+
     fn handle(
         &self,
         msg: Self::Message,
         context: &MessageContext<Self::Source, Self::MessageType>,
-        sender: &NetworkMessageSender,
+        sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!("Handle Service Disconnect Request {:?}", msg);
         let circuit_name = msg.get_circuit();
@@ -240,9 +247,9 @@ impl Handler for ServiceDisconnectRequestHandler {
 
         let recipient = context.source_peer_id().to_string();
         sender
-            .send(recipient, network_msg_bytes)
+            .send(recipient.into(), network_msg_bytes)
             .map_err(|(recipient, payload)| {
-                DispatchError::NetworkSendError((recipient, payload))
+                DispatchError::NetworkSendError((recipient.into(), payload))
             })?;
         Ok(())
     }
@@ -296,10 +303,7 @@ mod tests {
                     state,
                 );
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut connect_request = ServiceConnectRequest::new();
                 connect_request.set_circuit("alpha".into());
                 connect_request.set_service_id("abc".into());
@@ -349,10 +353,7 @@ mod tests {
                     state,
                 );
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut connect_request = ServiceConnectRequest::new();
                 connect_request.set_circuit("alpha".into());
                 connect_request.set_service_id("BAD".into());
@@ -402,10 +403,7 @@ mod tests {
                     state.clone(),
                 );
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut connect_request = ServiceConnectRequest::new();
                 connect_request.set_circuit("alpha".into());
                 connect_request.set_service_id("abc".into());
@@ -461,10 +459,7 @@ mod tests {
                     state,
                 );
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut connect_request = ServiceConnectRequest::new();
                 connect_request.set_circuit("alpha".into());
                 connect_request.set_service_id("abc".into());
@@ -507,10 +502,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
                 let handler = ServiceDisconnectRequestHandler::new(state);
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut disconnect_request = ServiceDisconnectRequest::new();
                 disconnect_request.set_circuit("alpha".into());
                 disconnect_request.set_service_id("abc".into());
@@ -556,10 +548,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
                 let handler = ServiceDisconnectRequestHandler::new(state);
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut disconnect_request = ServiceDisconnectRequest::new();
                 disconnect_request.set_circuit("alpha".into());
                 disconnect_request.set_service_id("BAD".into());
@@ -612,10 +601,7 @@ mod tests {
 
                 let handler = ServiceDisconnectRequestHandler::new(state.clone());
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut disconnect_request = ServiceDisconnectRequest::new();
                 disconnect_request.set_circuit("alpha".into());
                 disconnect_request.set_service_id("abc".into());
@@ -659,10 +645,7 @@ mod tests {
 
                 let handler = ServiceDisconnectRequestHandler::new(state);
 
-                dispatcher.set_handler(
-                    CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                    Box::new(handler),
-                );
+                dispatcher.set_handler(Box::new(handler));
                 let mut disconnect_request = ServiceDisconnectRequest::new();
                 disconnect_request.set_circuit("alpha".into());
                 disconnect_request.set_service_id("abc".into());
