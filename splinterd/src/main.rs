@@ -220,8 +220,16 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let transport = get_transport(&config)?;
 
+    let state_dir = Path::new(config.state_dir());
+
     let storage_location = match &config.storage() as &str {
-        "yaml" => format!("{}{}", config.state_dir(), "circuits.yaml"),
+        "yaml" => state_dir
+            .join("circuits.yaml")
+            .to_str()
+            .ok_or_else(|| {
+                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+            })?
+            .to_string(),
         "memory" => "memory".to_string(),
         _ => {
             return Err(UserError::InvalidArgument(format!(
@@ -232,7 +240,13 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     };
 
     let key_registry_location = match &config.storage() as &str {
-        "yaml" => format!("{}{}", config.state_dir(), "keys.yaml"),
+        "yaml" => state_dir
+            .join("keys.yaml")
+            .to_str()
+            .ok_or_else(|| {
+                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+            })?
+            .to_string(),
         "memory" => "memory".to_string(),
         _ => {
             return Err(UserError::InvalidArgument(format!(
@@ -242,7 +256,13 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
-    let local_node_registry_location = format!("{}{}", config.state_dir(), "nodes.yaml");
+    let local_node_registry_location = state_dir
+        .join("nodes.yaml")
+        .to_str()
+        .ok_or_else(|| {
+            UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+        })?
+        .to_string();
 
     let rest_api_endpoint = config.bind();
 
