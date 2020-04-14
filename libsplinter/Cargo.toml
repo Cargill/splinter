@@ -80,6 +80,7 @@ default = []
 
 stable = [
     "biome",
+    "biome-credentials",
     "biome-key-management",
     "default",
     "events",
@@ -93,7 +94,6 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "biome-credentials",
     "biome-notifications",
     "biome-refresh-tokens",
     "biome-user",
