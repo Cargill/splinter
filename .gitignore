@@ -17,6 +17,7 @@
 
 /splinterd/target
 /splinterd/Cargo.lock
+/splinterd/packaging/man/*.1
 
 /messaging/src/protos
 /messaging/target
