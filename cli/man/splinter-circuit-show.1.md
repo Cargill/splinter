@@ -57,9 +57,9 @@ formatting, which intends to use indentation and labels to make the circuit
 information understandable.
 
 * The proposing node has ID `alpha001` and endpoint
-  `tls://splinterd-node-alpha001:8044`, and a service ID of `AA01`.
+  `tcps://splinterd-node-alpha001:8044`, and a service ID of `AA01`.
 * The proposed member node has ID `beta001` and endpoint
-  `tls://splinterd-node-beta001:8044`, and a service ID of `BB01`.
+  `tcps://splinterd-node-beta001:8044`, and a service ID of `BB01`.
 * The command shows a circuit that was proposed by node alpha001 but has yet to
   be voted on by beta001, with a circuit ID of `01234-ABCDE`.
 
@@ -75,7 +75,7 @@ $ splinter circuit show 01234-ABCDE \
 Proposal to create: 01234-ABCDE
     Management Type: mgmt001
 
-    alpha-001 (tls://splinterd-node-alpha001:8044)
+    alpha-001 (tcps://splinterd-node-alpha001:8044)
         Vote: ACCEPT (implied as requester):
             ALPHA-PUBLIC-KEY
         Service: AA01
@@ -84,7 +84,7 @@ Proposal to create: 01234-ABCDE
             peer_services:
                 BB01
 
-    beta-001 (tls://splinterd-node-beta001:8044)
+    beta-001 (tcps://splinterd-node-beta001:8044)
         Vote: PENDING
         Service: AA01
             admin_keys:

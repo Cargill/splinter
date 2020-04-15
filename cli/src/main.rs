@@ -47,9 +47,9 @@ const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
     where each node has an 'identity' or 'node_id' field, as well as an 'endpoint' field. Example:
         ---
         - identity: 'node-1'
-          endpoint: tls://node-1-endpoint:8044
+          endpoint: tcps://node-1-endpoint:8044
         - node_id: 'node-2'
-          endpoint: tls://node-2-endpoint:8045
+          endpoint: tcps://node-2-endpoint:8045
 
     For the --service-arg, --service-peer-group, and --service-type options, service IDs can be
     wildcarded with '*' to match multiple services. For example, '--service-type *::scabbard' match

@@ -170,6 +170,7 @@ mod tests {
         assert!(transport.accepts("tcp://somewhere.example.com:4000"));
 
         assert!(!transport.accepts("tls://somewhere.example.com:4000"));
+        assert!(!transport.accepts("tcps://somewhere.example.com:4000"));
     }
 
     #[test]

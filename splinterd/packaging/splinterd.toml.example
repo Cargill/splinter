@@ -16,14 +16,14 @@
 node_id = "acme-node-000"
 
 # Endpoint used for service to daemon communication
-service_endpoint = "tls://localhost:8043"
+service_endpoint = "tcps://localhost:8043"
 
 # Endpoint used for daemon to daemon communication
-network_endpoint = "tls://localhost:8044"
+network_endpoint = "tcps://localhost:8044"
 
 # A comma separated list of splinter nodes the daemon will automatically
 # attempt to connect to on start up
-# example: peers = ["tls://acme-node-001:8044", "tls://acme-node-002:8044"]
+# example: peers = ["tcps://acme-node-001:8044", "tcps://acme-node-002:8044"]
 peers = []
 
 # The type of storage that should be used to store circuit state. Options are

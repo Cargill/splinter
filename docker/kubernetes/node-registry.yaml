@@ -14,13 +14,13 @@
 
 ---
 - identity: "acme"
-  endpoint: "tls://acme.default.svc.cluster.local:8044"
+  endpoint: "tcps://acme.default.svc.cluster.local:8044"
   display_name: "Acme"
   metadata:
     organization: "Acme Corporation"
 
 - identity: "bubba"
-  endpoint: "tls://bubba.default.svc.cluster.local:8044"
+  endpoint: "tcps://bubba.default.svc.cluster.local:8044"
   display_name: "Bubba Bakery"
   metadata:
     organization: "Bubba Bakery"

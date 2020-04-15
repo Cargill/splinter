@@ -34,7 +34,9 @@ use crate::transport::{
 
 use super::frame::{Frame, FrameError, FrameNegotiation, FrameRef, FrameVersion};
 
-const PROTOCOL_PREFIX: &str = "tls://";
+/// tls:// is deprecated, tcps:// should be used instead
+const DEPRECATED_PROTOCOL_PREFIX: &str = "tls://";
+const PROTOCOL_PREFIX: &str = "tcps://";
 
 pub struct TlsTransport {
     connector: SslConnector,
@@ -106,7 +108,9 @@ fn endpoint_to_dns_name(endpoint: &str) -> Result<String, ParseError> {
 
 impl Transport for TlsTransport {
     fn accepts(&self, address: &str) -> bool {
-        address.starts_with(PROTOCOL_PREFIX) || !address.contains("://")
+        address.starts_with(PROTOCOL_PREFIX)
+            || address.starts_with(DEPRECATED_PROTOCOL_PREFIX)
+            || !address.contains("://")
     }
 
     fn connect(&mut self, endpoint: &str) -> Result<Box<dyn Connection>, ConnectError> {
@@ -119,6 +123,8 @@ impl Transport for TlsTransport {
 
         let address = if endpoint.starts_with(PROTOCOL_PREFIX) {
             &endpoint[PROTOCOL_PREFIX.len()..]
+        } else if endpoint.starts_with(DEPRECATED_PROTOCOL_PREFIX) {
+            &endpoint[DEPRECATED_PROTOCOL_PREFIX.len()..]
         } else {
             endpoint
         };
@@ -156,6 +162,8 @@ impl Transport for TlsTransport {
 
         let address = if bind.starts_with(PROTOCOL_PREFIX) {
             &bind[PROTOCOL_PREFIX.len()..]
+        } else if bind.starts_with(DEPRECATED_PROTOCOL_PREFIX) {
+            &bind[DEPRECATED_PROTOCOL_PREFIX.len()..]
         } else {
             bind
         };
@@ -196,7 +204,7 @@ impl Listener for TlsListener {
     }
 
     fn endpoint(&self) -> String {
-        format!("tls://{}", self.listener.local_addr().unwrap())
+        format!("tcps://{}", self.listener.local_addr().unwrap())
     }
 }
 
@@ -223,11 +231,11 @@ impl Connection for TlsConnection {
     }
 
     fn remote_endpoint(&self) -> String {
-        format!("tls://{}", self.stream.get_ref().peer_addr().unwrap())
+        format!("tcps://{}", self.stream.get_ref().peer_addr().unwrap())
     }
 
     fn local_endpoint(&self) -> String {
-        format!("tls://{}", self.stream.get_ref().local_addr().unwrap())
+        format!("tcps://{}", self.stream.get_ref().local_addr().unwrap())
     }
 
     fn disconnect(&mut self) -> Result<(), DisconnectError> {
@@ -507,6 +515,12 @@ pub(crate) mod tests {
 
     #[test]
     fn test_transport_explicit_protocol() {
+        let transport = create_test_tls_transport(true);
+        tests::test_transport(transport, "tcps://127.0.0.1:0");
+    }
+
+    #[test]
+    fn test_transport_deprecated_explicit_protocol() {
         let transport = create_test_tls_transport(true);
         tests::test_transport(transport, "tls://127.0.0.1:0");
     }

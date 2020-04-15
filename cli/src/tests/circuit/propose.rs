@@ -39,8 +39,8 @@ fn propose_successful_basic() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -118,8 +118,8 @@ fn propose_successful_with_individual_service_types() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type sc00::scabbard \
@@ -159,8 +159,8 @@ fn propose_successful_with_individual_service_args() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -201,8 +201,8 @@ fn propose_successful_with_json_metadata() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -264,8 +264,8 @@ fn propose_too_few_services() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service-type *::scabbard \
          --management custom \
          --service-arg *::admin_keys={} \
@@ -282,8 +282,8 @@ fn propose_too_few_services() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service-type *::scabbard \
          --management custom \
@@ -308,8 +308,8 @@ fn propose_multiple_string_metadata() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -336,8 +336,8 @@ fn propose_metadata_encoding_without_metadata() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \

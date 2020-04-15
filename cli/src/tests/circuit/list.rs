@@ -39,8 +39,8 @@ fn list_successful() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -56,8 +56,8 @@ fn list_successful() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -133,8 +133,8 @@ fn list_format_human() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -189,8 +189,8 @@ fn list_format_csv() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
