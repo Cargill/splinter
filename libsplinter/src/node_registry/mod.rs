@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod error;
+mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
-pub mod unified;
-pub mod yaml;
+mod unified;
+mod yaml;
 
 use std::collections::HashMap;
 
 pub use error::{InvalidNodeError, NodeRegistryError};
 pub use unified::UnifiedNodeRegistry;
+pub use yaml::LocalYamlNodeRegistry;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Node {

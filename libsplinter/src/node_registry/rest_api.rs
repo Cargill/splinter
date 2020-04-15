@@ -391,10 +391,10 @@ mod tests {
         http::{header, StatusCode},
         test, web, App,
     };
-    use crate::node_registry::yaml::YamlNodeRegistry;
+    use crate::node_registry::LocalYamlNodeRegistry;
 
-    fn new_yaml_node_registry(file_path: &str) -> YamlNodeRegistry {
-        YamlNodeRegistry::new(file_path).expect("Error creating YamlNodeRegistry")
+    fn new_yaml_node_registry(file_path: &str) -> LocalYamlNodeRegistry {
+        LocalYamlNodeRegistry::new(file_path).expect("Error creating LocalYamlNodeRegistry")
     }
 
     #[test]
@@ -408,7 +408,7 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes/{identity}")
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
+                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -435,7 +435,7 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes/{identity}")
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
+                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -461,8 +461,8 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes/{identity}")
-                        .route(web::patch().to_async(put_node::<YamlNodeRegistry>))
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
+                        .route(web::patch().to_async(put_node::<LocalYamlNodeRegistry>))
+                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -528,7 +528,7 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes/{identity}")
-                        .route(web::delete().to_async(delete_node::<YamlNodeRegistry>)),
+                        .route(web::delete().to_async(delete_node::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -563,7 +563,7 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes")
-                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
+                        .route(web::get().to_async(list_nodes::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -592,7 +592,7 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes")
-                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
+                        .route(web::get().to_async(list_nodes::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -627,7 +627,7 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes")
-                        .route(web::get().to_async(list_nodes::<YamlNodeRegistry>)),
+                        .route(web::get().to_async(list_nodes::<LocalYamlNodeRegistry>)),
                 ),
             );
 
@@ -655,8 +655,8 @@ mod tests {
             let mut app = test::init_service(
                 App::new().data(node_registry.clone()).service(
                     web::resource("/admin/nodes")
-                        .route(web::post().to_async(add_node::<YamlNodeRegistry>))
-                        .route(web::get().to_async(fetch_node::<YamlNodeRegistry>)),
+                        .route(web::post().to_async(add_node::<LocalYamlNodeRegistry>))
+                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
                 ),
             );
 
