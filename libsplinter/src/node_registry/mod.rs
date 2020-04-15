@@ -13,7 +13,6 @@
 // limitations under the License.
 
 pub mod error;
-pub mod noop;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod unified;
