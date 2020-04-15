@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod error;
-
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -22,8 +20,6 @@ use super::{
     InvalidNodeError, MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader,
     NodeRegistryWriter, RwNodeRegistry,
 };
-
-use error::YamlNodeRegistryError;
 
 #[derive(Clone)]
 pub struct YamlNodeRegistry {
@@ -36,12 +32,22 @@ pub struct FileInternal {
 }
 
 impl YamlNodeRegistry {
-    pub fn new(file_path: &str) -> Result<YamlNodeRegistry, YamlNodeRegistryError> {
+    pub fn new(file_path: &str) -> Result<YamlNodeRegistry, NodeRegistryError> {
         // If file already exists, read and verify its contents; otherwise create it and initialize
         // the nodes list.
         if PathBuf::from(file_path).is_file() {
-            let file = File::open(file_path)?;
-            let cached_nodes: Vec<Node> = serde_yaml::from_reader(&file)?;
+            let file = File::open(file_path).map_err(|err| {
+                NodeRegistryError::general_error_with_source(
+                    "Failed to open YAML registry file",
+                    Box::new(err),
+                )
+            })?;
+            let cached_nodes: Vec<Node> = serde_yaml::from_reader(&file).map_err(|err| {
+                NodeRegistryError::general_error_with_source(
+                    "Failed to read YAML registry file",
+                    Box::new(err),
+                )
+            })?;
 
             for (idx, node) in cached_nodes.iter().enumerate() {
                 check_node_required_fields_are_not_empty(node)?;
@@ -55,7 +61,12 @@ impl YamlNodeRegistry {
                 })),
             })
         } else {
-            File::create(file_path)?;
+            File::create(file_path).map_err(|err| {
+                NodeRegistryError::general_error_with_source(
+                    "Failed to create YAML registry file",
+                    Box::new(err),
+                )
+            })?;
 
             let registry = YamlNodeRegistry {
                 file_internal: Arc::new(Mutex::new(FileInternal {
@@ -70,21 +81,32 @@ impl YamlNodeRegistry {
         }
     }
 
-    fn get_cached_nodes(&self) -> Result<Vec<Node>, YamlNodeRegistryError> {
-        let file_backend = self
-            .file_internal
-            .lock()
-            .map_err(|err| YamlNodeRegistryError::PoisonLockError(format!("{}", err)))?;
+    fn get_cached_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
+        let file_backend = self.file_internal.lock().map_err(|_| {
+            NodeRegistryError::general_error("YAML registry's internal lock poisoned")
+        })?;
         Ok(file_backend.cached_nodes.clone())
     }
 
-    fn write_nodes(&self, data: &[Node]) -> Result<(), YamlNodeRegistryError> {
-        let mut file_backend = self
-            .file_internal
-            .lock()
-            .map_err(|err| YamlNodeRegistryError::PoisonLockError(format!("{}", err)))?;
-        let output = serde_yaml::to_vec(&data)?;
-        std::fs::write(&file_backend.file_path, &output)?;
+    fn write_nodes(&self, data: &[Node]) -> Result<(), NodeRegistryError> {
+        let mut file_backend = self.file_internal.lock().map_err(|_| {
+            NodeRegistryError::general_error("YAML registry's internal lock poisoned")
+        })?;
+        let output = serde_yaml::to_vec(&data).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                "Failed to write nodes to YAML",
+                Box::new(err),
+            )
+        })?;
+        std::fs::write(&file_backend.file_path, &output).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                &format!(
+                    "Failed to write to YAML registry file '{}'",
+                    file_backend.file_path
+                ),
+                Box::new(err),
+            )
+        })?;
         file_backend.cached_nodes = data.to_vec();
         Ok(())
     }
@@ -93,8 +115,7 @@ impl YamlNodeRegistry {
 impl NodeRegistryReader for YamlNodeRegistry {
     fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         Ok(self
-            .get_cached_nodes()
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?
+            .get_cached_nodes()?
             .iter()
             .find(|node| node.identity == identity)
             .cloned())
@@ -104,9 +125,7 @@ impl NodeRegistryReader for YamlNodeRegistry {
         &'b self,
         predicates: &'a [MetadataPredicate],
     ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
-        let nodes = self
-            .get_cached_nodes()
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
+        let nodes = self.get_cached_nodes()?;
 
         Ok(Box::new(nodes.into_iter().filter(move |node| {
             predicates.iter().all(|predicate| predicate.apply(node))
@@ -114,9 +133,7 @@ impl NodeRegistryReader for YamlNodeRegistry {
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
-        let nodes = self
-            .get_cached_nodes()
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
+        let nodes = self.get_cached_nodes()?;
 
         Ok(nodes
             .iter()
@@ -127,9 +144,7 @@ impl NodeRegistryReader for YamlNodeRegistry {
 
 impl NodeRegistryWriter for YamlNodeRegistry {
     fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
-        let mut nodes = self
-            .get_cached_nodes()
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
+        let mut nodes = self.get_cached_nodes()?;
 
         check_node_required_fields_are_not_empty(&node)?;
 
@@ -141,13 +156,10 @@ impl NodeRegistryWriter for YamlNodeRegistry {
         nodes.push(node);
 
         self.write_nodes(&nodes)
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
-        let mut nodes = self
-            .get_cached_nodes()
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
+        let mut nodes = self.get_cached_nodes()?;
         let mut index = None;
         for (i, node) in nodes.iter().enumerate() {
             if node.identity == identity {
@@ -157,8 +169,7 @@ impl NodeRegistryWriter for YamlNodeRegistry {
         }
         let opt = index.map(|i| nodes.remove(i));
 
-        self.write_nodes(&nodes)
-            .map_err(|err| NodeRegistryError::InternalError(Box::new(err)))?;
+        self.write_nodes(&nodes)?;
 
         Ok(opt)
     }
@@ -231,9 +242,9 @@ mod test {
                 Ok(_) => {
                     panic!("Two nodes with same identity in YAML file. Error should be returned")
                 }
-                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::DuplicateIdentity(
-                    id,
-                ))) => assert_eq!(id, node1.identity),
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::DuplicateIdentity(id))) => {
+                    assert_eq!(id, node1.identity)
+                }
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::DuplicateIdentity but got {}",
                     err
@@ -260,7 +271,7 @@ mod test {
                 Ok(_) => {
                     panic!("Two nodes with same endpoint in YAML file. Error should be returned")
                 }
-                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(
                     endpoint,
                 ))) => assert!(node1.endpoints.contains(&endpoint)),
                 Err(err) => panic!(
@@ -286,7 +297,7 @@ mod test {
             let result = YamlNodeRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with empty identity in YAML file. Error should be returned"),
-                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
                     err
@@ -310,7 +321,7 @@ mod test {
             let result = YamlNodeRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with empty endpoint in YAML file. Error should be returned"),
-                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
                     err
@@ -336,7 +347,7 @@ mod test {
                 Ok(_) => {
                     panic!("Node with empty display_name in YAML file. Error should be returned")
                 }
-                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
                     err
@@ -360,7 +371,7 @@ mod test {
             let result = YamlNodeRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with no endpoint in YAML file. Error should be returned"),
-                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
                     err
