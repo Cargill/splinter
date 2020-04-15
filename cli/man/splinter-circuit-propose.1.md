@@ -122,15 +122,15 @@ EXAMPLES
 ========
 This command proposes a simple circuit with one other node.
 
-* The proposing node has ID `alpha001` and endpoint `tls://splinterd-node-acme001:8044`.
-* The other node has ID `beta001` and endpoint `tls://splinterd-node-beta001:8044`.
+* The proposing node has ID `alpha001` and endpoint `tcps://splinterd-node-acme001:8044`.
+* The other node has ID `beta001` and endpoint `tcps://splinterd-node-beta001:8044`.
 * There is one service with ID `AA01`. This service has no service
   arguments, service type, or service group.
 
 ```
 $ splinter circuit propose \
-  --node alpha001::tls://splinterd-node-alpha001:8044 \
-  --node beta001::tls://splinterd-node-beta001:8044 \
+  --node alpha001::tcps://splinterd-node-alpha001:8044 \
+  --node beta001::tcps://splinterd-node-beta001:8044 \
   --service AA01::alpha001 \
   --key PRIVATE-KEY-FILE
   --url URL-of-splinterd-REST-API
@@ -139,8 +139,8 @@ $ splinter circuit propose \
 The next command proposes a circuit with one other node, with multiple services
 and multiple service-args.
 
-* The proposing node has ID `alpha001` and endpoint `tls://splinterd-node-alpha001:8044`.
-* The other node has ID `beta001` and endpoint `tls://splinterd-node-beta001:8044`.
+* The proposing node has ID `alpha001` and endpoint `tcps://splinterd-node-alpha001:8044`.
+* The other node has ID `beta001` and endpoint `tcps://splinterd-node-beta001:8044`.
 * There are two services for each member node with a `service-type` of `scabbard`
   for each. The service ID for the alpha node service is `AA01` and the
   beta node service ID is `BB01`. Each of these services are specified
@@ -152,8 +152,8 @@ and multiple service-args.
 splinter circuit propose \
   --key PRIVATE-KEY-FILE \
   --url URL-of-splinterd-REST-API \
-  --node alpha001::tls://splinterd-node-alpha001:8044 \
-  --node beta001::tls://splinterd-node-beta001:8044 \
+  --node alpha001::tcps://splinterd-node-alpha001:8044 \
+  --node beta001::tcps://splinterd-node-beta001:8044 \
   --service AA01::alpha-node-001 \
   --service BB01::beta-node-001 \
   --service-type AA01::scabbard \

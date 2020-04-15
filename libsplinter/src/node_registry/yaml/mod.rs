@@ -723,7 +723,7 @@ mod test {
         metadata.insert("admin".to_string(), "Bob".to_string());
         Node {
             identity: "Node-123".to_string(),
-            endpoint: "tls://12.0.0.123:8431".to_string(),
+            endpoint: "tcps://12.0.0.123:8431".to_string(),
             display_name: "Bitwise IO - Node 1".to_string(),
             metadata,
         }
@@ -735,7 +735,7 @@ mod test {
         metadata.insert("admin".to_string(), "Carol".to_string());
         Node {
             identity: "Node-456".to_string(),
-            endpoint: "tls://12.0.0.123:8434".to_string(),
+            endpoint: "tcps://12.0.0.123:8434".to_string(),
             display_name: "Cargill - Node 1".to_string(),
             metadata,
         }
@@ -747,7 +747,7 @@ mod test {
         metadata.insert("admin".to_string(), "Charlie".to_string());
         Node {
             identity: "Node-789".to_string(),
-            endpoint: "tls://12.0.0.123:8435".to_string(),
+            endpoint: "tcps://12.0.0.123:8435".to_string(),
             display_name: "Cargill - Node 2".to_string(),
             metadata,
         }

@@ -89,7 +89,7 @@ impl SplinterClient {
 
         Ok(SplinterClient {
             socket: transport
-                .connect(&format!("tls://{}:{}", hostname, port))
+                .connect(&format!("tcps://{}:{}", hostname, port))
                 .map_err(|err| {
                     SplinterError::TLSError(format!(
                         "Unable to connect to \"{}:{}\":h  {}",

@@ -906,7 +906,7 @@ components:
           example: acme-node-000
         endpoint:
           type: string
-          example: tls://127.0.0.1:8080
+          example: tcps://127.0.0.1:8080
 
     ApiGameroom:
       type: object
@@ -962,7 +962,7 @@ components:
           type: object
       example:
         identity: node-123123-asdf
-        endpoint: tls://12.0.0.123:8431
+        endpoint: tcps://12.0.0.123:8431
         display_name: Cargill - Node 1
         metadata:
           company: Cargill

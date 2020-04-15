@@ -119,13 +119,13 @@ walkthrough. For installation instructions, see the
     ----
     ---
     - identity: "acme"
-      endpoint: "tls://acme.default.svc.cluster.local:8044"
+      endpoint: "tcps://acme.default.svc.cluster.local:8044"
       display_name: "Acme"
       metadata:
         organization: "Acme Corporation"
 
     - identity: "bubba"
-      endpoint: "tls://bubba.default.svc.cluster.local:8044"
+      endpoint: "tcps://bubba.default.svc.cluster.local:8044"
       display_name: "Bubba Bakery"
       metadata:
         organization: "Bubba Bakery"
@@ -139,7 +139,7 @@ walkthrough. For installation instructions, see the
 
    ```
    $ kubectl apply -f https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/arcade.yaml
-   
+
    deployment.apps/acme created
    service/acme-splinterd created
    service/acme-http created

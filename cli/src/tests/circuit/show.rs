@@ -40,8 +40,8 @@ fn show_successful() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -97,8 +97,8 @@ fn show_format_json() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
@@ -178,8 +178,8 @@ fn show_format_yaml() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node acme-node-000::tls://splinterd-node-acme:8044 \
-         --node bubba-node-000::tls://splinterd-node-bubba:8044 \
+         --node acme-node-000::tcps://splinterd-node-acme:8044 \
+         --node bubba-node-000::tcps://splinterd-node-bubba:8044 \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \
