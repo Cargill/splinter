@@ -599,8 +599,8 @@ mod tests {
     /// asserting each expected value.
     fn test_final_config_precedence() {
         // Set the environment variables to populate the EnvPartialConfigBuilder object.
-        env::set_var("SPLINTER_STATE_DIR", "/state/test/config/");
-        env::set_var("SPLINTER_CERT_DIR", "/cert/test/config/");
+        env::set_var("SPLINTER_STATE_DIR", "state/test/config");
+        env::set_var("SPLINTER_CERT_DIR", "cert/test/config");
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object.
@@ -672,7 +672,7 @@ mod tests {
         // Environment).
         assert_eq!(
             (final_config.cert_dir(), final_config.cert_dir_source()),
-            ("/cert/test/config/", &ConfigSource::Environment)
+            ("cert/test/config", &ConfigSource::Environment)
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
         // `ca_certs`, but the TomlPartialConfigBuilder value should have precedence (source should
@@ -837,7 +837,7 @@ mod tests {
         // be EnvVarConfig).
         assert_eq!(
             (final_config.state_dir(), final_config.state_dir_source()),
-            ("/state/test/config/", &ConfigSource::Environment)
+            ("state/test/config", &ConfigSource::Environment)
         );
     }
 
