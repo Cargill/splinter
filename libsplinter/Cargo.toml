@@ -80,6 +80,7 @@ default = []
 
 stable = [
     "biome",
+    "biome-key-management",
     "default",
     "events",
     "postgres",
@@ -93,7 +94,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "biome-credentials",
-    "biome-key-management",
     "biome-notifications",
     "biome-refresh-tokens",
     "biome-user",
