@@ -457,6 +457,8 @@ impl RequestGuard for ProtocolVersionRangeGuard {
 pub struct RestApi {
     resources: Vec<Resource>,
     bind: String,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 impl RestApi {
@@ -467,6 +469,8 @@ impl RestApi {
 
         let bind_url = self.bind.to_owned();
         let resources = self.resources.to_owned();
+        #[cfg(feature = "rest-api-cors")]
+        let whitelist = self.whitelist.to_owned();
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -475,9 +479,12 @@ impl RestApi {
                     // Actix's type definitions require this to be chained, otherwise, the generic
                     // type of App is changed as the values are returned.
                     #[cfg(feature = "rest-api-cors")]
-                    let mut app = App::new()
-                        .wrap(middleware::Logger::default())
-                        .wrap(cors::Cors::new_allow_any());
+                    let cors = match &whitelist {
+                        Some(list) => cors::Cors::new(list.to_vec()),
+                        None => cors::Cors::new_allow_any(),
+                    };
+                    #[cfg(feature = "rest-api-cors")]
+                    let mut app = App::new().wrap(middleware::Logger::default()).wrap(cors);
 
                     #[cfg(not(feature = "rest-api-cors"))]
                     let mut app = App::new().wrap(middleware::Logger::default());
@@ -543,6 +550,8 @@ impl RestApi {
 pub struct RestApiBuilder {
     resources: Vec<Resource>,
     bind: Option<String>,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 impl Default for RestApiBuilder {
@@ -550,6 +559,8 @@ impl Default for RestApiBuilder {
         Self {
             resources: Vec::new(),
             bind: None,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: None,
         }
     }
 }
@@ -574,6 +585,12 @@ impl RestApiBuilder {
         self
     }
 
+    #[cfg(feature = "rest-api-cors")]
+    pub fn with_whitelist(mut self, values: Vec<String>) -> Self {
+        self.whitelist = Some(values);
+        self
+    }
+
     pub fn build(self) -> Result<RestApi, RestApiServerError> {
         let bind = self
             .bind
@@ -582,6 +599,8 @@ impl RestApiBuilder {
         Ok(RestApi {
             bind,
             resources: self.resources,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: self.whitelist,
         })
     }
 }

@@ -33,11 +33,13 @@ pub struct Cors {
 impl Cors {
     /// Initialize the CORS preflight check with a set of allowed domains.
     pub fn new(whitelist: Vec<String>) -> Self {
+        debug!("Creating CORS with whitelist: {:?}", whitelist);
         Cors { whitelist }
     }
 
     /// Initialize the CORS preflight check with "*" domains.
     pub fn new_allow_any() -> Self {
+        debug!("Creating CORS with whitelist: '*'");
         Cors::new(vec!["*".into()])
     }
 }

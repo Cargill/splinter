@@ -178,6 +178,16 @@ fn main() {
             .long_help("Enable the biome subsystem"),
     );
 
+    #[cfg(feature = "rest-api-cors")]
+    let app = app.arg(
+        Arg::with_name("whitelist")
+            .long("whitelist")
+            .multiple(true)
+            .required(false)
+            .takes_value(true)
+            .help("Whitelisted domains"),
+    );
+
     let matches = app.get_matches();
 
     let log_level = match matches.occurrences_of("verbose") {
@@ -297,6 +307,15 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "biome")]
     {
         daemon_builder = daemon_builder.enable_biome(config.biome_enabled());
+    }
+
+    #[cfg(feature = "rest-api-cors")]
+    {
+        daemon_builder = daemon_builder.with_whitelist(
+            matches
+                .values_of("whitelist")
+                .map(|values| values.map(String::from).collect::<Vec<String>>()),
+        );
     }
 
     let mut node = daemon_builder.build().map_err(|err| {
