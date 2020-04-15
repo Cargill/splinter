@@ -103,6 +103,7 @@ experimental = [
     "matrix",
     "network-peer-manager",
     "network-ref-map",
+    "registry-remote",
     "rest-api-cors",
     "scabbard-client",
     "scabbard-get-state",
@@ -125,6 +126,7 @@ matrix = []
 network-peer-manager = ["connection-manager", "network-ref-map"]
 network-ref-map = []
 postgres = ["diesel/postgres", "diesel_migrations"]
+registry-remote = ["reqwest"]
 rest-api = [
     "actix",
     "actix-http",

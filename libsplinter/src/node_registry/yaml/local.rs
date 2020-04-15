@@ -21,7 +21,7 @@ use crate::node_registry::{
     RwNodeRegistry,
 };
 
-use super::{check_if_node_is_duplicate, check_node_required_fields_are_not_empty};
+use super::{check_if_node_is_duplicate, check_node_required_fields_are_not_empty, validate_nodes};
 
 #[derive(Clone)]
 pub struct LocalYamlNodeRegistry {
@@ -51,10 +51,7 @@ impl LocalYamlNodeRegistry {
                 )
             })?;
 
-            for (idx, node) in cached_nodes.iter().enumerate() {
-                check_node_required_fields_are_not_empty(node)?;
-                check_if_node_is_duplicate(node, &cached_nodes[idx + 1..])?;
-            }
+            validate_nodes(&cached_nodes)?;
 
             Ok(LocalYamlNodeRegistry {
                 file_internal: Arc::new(Mutex::new(FileInternal {
@@ -83,14 +80,14 @@ impl LocalYamlNodeRegistry {
         }
     }
 
-    fn get_cached_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
+    pub(super) fn get_cached_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
         let file_backend = self.file_internal.lock().map_err(|_| {
             NodeRegistryError::general_error("YAML registry's internal lock poisoned")
         })?;
         Ok(file_backend.cached_nodes.clone())
     }
 
-    fn write_nodes(&self, data: &[Node]) -> Result<(), NodeRegistryError> {
+    pub(super) fn write_nodes(&self, data: &[Node]) -> Result<(), NodeRegistryError> {
         let mut file_backend = self.file_internal.lock().map_err(|_| {
             NodeRegistryError::general_error("YAML registry's internal lock poisoned")
         })?;

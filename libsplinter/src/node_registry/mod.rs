@@ -23,6 +23,8 @@ use std::collections::HashMap;
 pub use error::{InvalidNodeError, NodeRegistryError};
 pub use unified::UnifiedNodeRegistry;
 pub use yaml::LocalYamlNodeRegistry;
+#[cfg(feature = "registry-remote")]
+pub use yaml::{RemoteYamlNodeRegistry, RemoteYamlShutdownHandle};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Node {

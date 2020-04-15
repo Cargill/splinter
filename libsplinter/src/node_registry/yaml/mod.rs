@@ -13,10 +13,22 @@
 // limitations under the License.
 
 mod local;
+#[cfg(feature = "registry-remote")]
+mod remote;
 
 use super::{InvalidNodeError, Node};
 
 pub use local::LocalYamlNodeRegistry;
+#[cfg(feature = "registry-remote")]
+pub use remote::{RemoteYamlNodeRegistry, ShutdownHandle as RemoteYamlShutdownHandle};
+
+fn validate_nodes(nodes: &[Node]) -> Result<(), InvalidNodeError> {
+    for (idx, node) in nodes.iter().enumerate() {
+        check_node_required_fields_are_not_empty(node)?;
+        check_if_node_is_duplicate(node, &nodes[idx + 1..])?;
+    }
+    Ok(())
+}
 
 fn check_node_required_fields_are_not_empty(node: &Node) -> Result<(), InvalidNodeError> {
     if node.identity.is_empty() {
