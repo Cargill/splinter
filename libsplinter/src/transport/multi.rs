@@ -18,7 +18,7 @@ type SendableTransport = Box<dyn Transport + Send>;
 /// A MultiTransport holds a collection of transports, referenced by protocol.
 ///
 /// Endpoints and bind strings are specified using standard url-style strings.  For example,
-/// connecting over TLS would be handled with the connect string `"tls://<some-address>:<port>"`
+/// connecting over TLS would be handled with the connect string `"tcps://<some-address>:<port>"`
 ///
 /// Endpoints and bind strings provided without a protocol will use the provided default transport
 /// protocol type.
@@ -80,6 +80,8 @@ mod tests {
         let transport = MultiTransport::new(vec![raw_transport, tls_transport]);
         assert!(transport.accepts("127.0.0.1:0"));
         assert!(transport.accepts("tcp://127.0.0.1:0"));
+        assert!(transport.accepts("tcps://127.0.0.1:0"));
+        // test deprecated
         assert!(transport.accepts("tls://127.0.0.1:0"));
         assert!(!transport.accepts("foo://127.0.0.1:0"));
     }
