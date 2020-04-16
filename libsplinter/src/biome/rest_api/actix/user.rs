@@ -83,10 +83,13 @@ pub fn make_user_routes(
                 key_store,
             ),
         )
-        .add_method(Method::Get, add_fetch_user_method(credentials_store))
+        .add_method(
+            Method::Get,
+            add_fetch_user_method(credentials_store.clone()),
+        )
         .add_method(
             Method::Delete,
-            add_delete_user_method(rest_config, secret_manager, user_store),
+            add_delete_user_method(rest_config, secret_manager, user_store, credentials_store),
         )
 }
 
@@ -292,6 +295,7 @@ fn add_delete_user_method(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     user_store: Arc<dyn UserStore>,
+    credentials_store: Arc<dyn CredentialsStore>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let user_store = user_store.clone();
@@ -314,27 +318,43 @@ fn add_delete_user_method(
             }
         };
 
-        Box::new(match user_store.remove_user(&user_id) {
-            Ok(()) => HttpResponse::Ok()
-                .json(json!({ "message": "User deleted sucessfully" }))
-                .into_future(),
-            Err(err) => match err {
-                UserStoreError::NotFoundError(msg) => {
-                    debug!("User not found: {}", msg);
+        match user_store.remove_user(&user_id) {
+            Ok(()) => (),
+            Err(UserStoreError::NotFoundError(msg)) => {
+                debug!("User not found: {}", msg);
+                return Box::new(
                     HttpResponse::NotFound()
                         .json(ErrorResponse::not_found(&format!(
                             "User ID not found: {}",
                             &user_id
                         )))
-                        .into_future()
-                }
-                _ => {
-                    error!("Failed to delete user in database {}", err);
+                        .into_future(),
+                );
+            }
+            Err(err) => {
+                error!("Failed to delete user in database {}", err);
+                return Box::new(
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
-                        .into_future()
-                }
-            },
-        })
+                        .into_future(),
+                );
+            }
+        };
+
+        match credentials_store.remove_credentials(&user_id) {
+            Ok(()) => Box::new(
+                HttpResponse::Ok()
+                    .json(json!({ "message": "User deleted sucessfully" }))
+                    .into_future(),
+            ),
+            Err(err) => {
+                error!("Failed to delete credentials in database {}", err);
+                Box::new(
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future(),
+                )
+            }
+        }
     })
 }
