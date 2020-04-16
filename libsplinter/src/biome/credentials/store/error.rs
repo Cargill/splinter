@@ -155,7 +155,7 @@ impl fmt::Display for CredentialsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CredentialsError::VerificationError(ref s) => {
-                write!(f, "failed to build verify password: {}", s)
+                write!(f, "failed to verify password: {}", s)
             }
         }
     }
