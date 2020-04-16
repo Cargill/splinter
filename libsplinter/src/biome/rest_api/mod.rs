@@ -100,16 +100,16 @@ use crate::rest_api::sessions::AccessTokenIssuer;
 ///
 /// The following endponts are provided
 ///
-/// * `GET /biome/users/keys` - Get all keys for authorized user
-/// * `POST /biome/users/keys` - Create a new key for authorized user
-/// * `PATCH /biome/users/keys` - Update the display name associated with a key for
+/// * `GET /biome/keys` - Get all keys for authorized user
+/// * `POST /biome/keys` - Create a new key for authorized user
+/// * `PATCH /biome/keys` - Update the display name associated with a key for
 ///    an authorized user.
-/// * `GET /biome/users/keys/{public_key}` - Retrieve a key for an authroized user that has
+/// * `GET /biome/keys/{public_key}` - Retrieve a key for an authroized user that has
 ///    `public_key`
-/// * `DELETE /biome/users/keys/{public_key}` - delete a  key for an authorized user that has
+/// * `DELETE /biome/keys/{public_key}` - delete a  key for an authorized user that has
 ///    `public key`
 /// * `POST /biome/login` - Login enpoint for getting access tokens and refresh tokens
-/// * `PATCH /biome/login` - Login endpoint for removing refresh tokens
+/// * `PATCH /biome/logout` - Login endpoint for removing refresh tokens
 /// * `POST /biome/register - Creates credentials for a user
 /// * `POST /biome/token` - Creates a new access token for the authorized user
 /// * `POST /biome/verify` - Verify a users password
