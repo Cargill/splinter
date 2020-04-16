@@ -421,6 +421,7 @@ mod tests {
             ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
             ("display_name".to_string(), EXAMPLE_DISPLAY_NAME.to_string()),
+            ("version".to_string(), "1".to_string()),
         ];
 
         let mut config_values = Map::new();
