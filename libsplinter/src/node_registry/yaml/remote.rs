@@ -236,7 +236,7 @@ impl Internal {
     /// Attempt to refresh the internal cache and update state accordingly.
     fn refresh_cache(&mut self) -> Result<(), NodeRegistryError> {
         fetch_nodes_from_remote(&self.url)
-            .and_then(|nodes| self.cache.write_nodes(&nodes))
+            .and_then(|nodes| self.cache.write_nodes(nodes))
             .map_err(|err| {
                 self.last_refresh_successful = false;
                 err

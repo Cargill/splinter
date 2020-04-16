@@ -25,12 +25,12 @@ use super::{check_if_node_is_duplicate, check_node_required_fields_are_not_empty
 
 #[derive(Clone)]
 pub struct LocalYamlNodeRegistry {
-    file_internal: Arc<Mutex<FileInternal>>,
+    internal: Arc<Mutex<Internal>>,
 }
 
-pub struct FileInternal {
-    pub file_path: String,
-    pub cached_nodes: Vec<Node>,
+struct Internal {
+    file_path: String,
+    cached_nodes: Vec<Node>,
 }
 
 impl LocalYamlNodeRegistry {
@@ -54,7 +54,7 @@ impl LocalYamlNodeRegistry {
             validate_nodes(&cached_nodes)?;
 
             Ok(LocalYamlNodeRegistry {
-                file_internal: Arc::new(Mutex::new(FileInternal {
+                internal: Arc::new(Mutex::new(Internal {
                     file_path: file_path.into(),
                     cached_nodes,
                 })),
@@ -68,30 +68,34 @@ impl LocalYamlNodeRegistry {
             })?;
 
             let registry = LocalYamlNodeRegistry {
-                file_internal: Arc::new(Mutex::new(FileInternal {
+                internal: Arc::new(Mutex::new(Internal {
                     file_path: file_path.into(),
                     cached_nodes: vec![],
                 })),
             };
 
-            registry.write_nodes(&[])?;
+            registry.write_nodes(vec![])?;
 
             Ok(registry)
         }
     }
 
     pub(super) fn get_cached_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
-        let file_backend = self.file_internal.lock().map_err(|_| {
-            NodeRegistryError::general_error("YAML registry's internal lock poisoned")
-        })?;
-        Ok(file_backend.cached_nodes.clone())
+        Ok(self
+            .internal
+            .lock()
+            .map_err(|_| {
+                NodeRegistryError::general_error("YAML registry's internal lock poisoned")
+            })?
+            .cached_nodes
+            .clone())
     }
 
-    pub(super) fn write_nodes(&self, data: &[Node]) -> Result<(), NodeRegistryError> {
-        let mut file_backend = self.file_internal.lock().map_err(|_| {
+    pub(super) fn write_nodes(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+        let mut file_backend = self.internal.lock().map_err(|_| {
             NodeRegistryError::general_error("YAML registry's internal lock poisoned")
         })?;
-        let output = serde_yaml::to_vec(&data).map_err(|err| {
+        let output = serde_yaml::to_vec(&nodes).map_err(|err| {
             NodeRegistryError::general_error_with_source(
                 "Failed to write nodes to YAML",
                 Box::new(err),
@@ -106,7 +110,7 @@ impl LocalYamlNodeRegistry {
                 Box::new(err),
             )
         })?;
-        file_backend.cached_nodes = data.to_vec();
+        file_backend.cached_nodes = nodes;
         Ok(())
     }
 }
@@ -124,17 +128,14 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
         &'b self,
         predicates: &'a [MetadataPredicate],
     ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
-        let nodes = self.get_cached_nodes()?;
-
-        Ok(Box::new(nodes.into_iter().filter(move |node| {
-            predicates.iter().all(|predicate| predicate.apply(node))
-        })))
+        Ok(Box::new(self.get_cached_nodes()?.into_iter().filter(
+            move |node| predicates.iter().all(|predicate| predicate.apply(node)),
+        )))
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
-        let nodes = self.get_cached_nodes()?;
-
-        Ok(nodes
+        Ok(self
+            .get_cached_nodes()?
             .iter()
             .filter(move |node| predicates.iter().all(|predicate| predicate.apply(node)))
             .count() as u32)
@@ -154,7 +155,7 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
 
         nodes.push(node);
 
-        self.write_nodes(&nodes)
+        self.write_nodes(nodes)
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
@@ -168,7 +169,7 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
         }
         let opt = index.map(|i| nodes.remove(i));
 
-        self.write_nodes(&nodes)?;
+        self.write_nodes(nodes)?;
 
         Ok(opt)
     }
@@ -176,7 +177,7 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
 
 impl RwNodeRegistry for LocalYamlNodeRegistry {
     fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
-        Box::new(Clone::clone(self))
+        Box::new(self.clone())
     }
 }
 
