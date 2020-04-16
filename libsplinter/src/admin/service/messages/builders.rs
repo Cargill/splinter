@@ -302,7 +302,7 @@ impl SplinterServiceBuilder {
 #[derive(Default, Clone)]
 pub struct SplinterNodeBuilder {
     node_id: Option<String>,
-    endpoint: Option<String>,
+    endpoints: Option<Vec<String>>,
 }
 
 impl SplinterNodeBuilder {
@@ -314,8 +314,8 @@ impl SplinterNodeBuilder {
         self.node_id.clone()
     }
 
-    pub fn endpoint(&self) -> Option<String> {
-        self.endpoint.clone()
+    pub fn endpoints(&self) -> Option<Vec<String>> {
+        self.endpoints.clone()
     }
 
     pub fn with_node_id(mut self, node_id: &str) -> SplinterNodeBuilder {
@@ -323,8 +323,8 @@ impl SplinterNodeBuilder {
         self
     }
 
-    pub fn with_endpoint(mut self, endpoint: &str) -> SplinterNodeBuilder {
-        self.endpoint = Some(endpoint.into());
+    pub fn with_endpoints(mut self, endpoints: &[String]) -> SplinterNodeBuilder {
+        self.endpoints = Some(endpoints.into());
         self
     }
 
@@ -333,11 +333,11 @@ impl SplinterNodeBuilder {
             .node_id
             .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
 
-        let endpoint = self
-            .endpoint
-            .ok_or_else(|| BuilderError::MissingField("endpoint".to_string()))?;
+        let endpoints = self
+            .endpoints
+            .ok_or_else(|| BuilderError::MissingField("endpoints".to_string()))?;
 
-        let node = SplinterNode { node_id, endpoint };
+        let node = SplinterNode { node_id, endpoints };
 
         Ok(node)
     }
@@ -387,7 +387,7 @@ mod tests {
             .expect("failed to build service");
         let node = SplinterNodeBuilder::new()
             .with_node_id("node_id")
-            .with_endpoint("endpoint")
+            .with_endpoints(&["endpoint".into()])
             .build()
             .expect("failed to build node");
         builder = builder
@@ -437,7 +437,7 @@ mod tests {
             .expect("failed to build service");
         let node = SplinterNodeBuilder::new()
             .with_node_id("node_id")
-            .with_endpoint("endpoint")
+            .with_endpoints(&["endpoint".into()])
             .build()
             .expect("failed to build node");
         let circuit = CreateCircuitBuilder::new()
@@ -477,7 +477,7 @@ mod tests {
             .expect("failed to build service");
         let node = SplinterNodeBuilder::new()
             .with_node_id("node_id")
-            .with_endpoint("endpoint")
+            .with_endpoints(&["endpoint".into()])
             .build()
             .expect("failed to build node");
         let builder = CreateCircuitBuilder::new()
@@ -526,7 +526,7 @@ mod tests {
     fn circuit_builder_unset_roster() {
         let node = SplinterNodeBuilder::new()
             .with_node_id("node_id")
-            .with_endpoint("endpoint")
+            .with_endpoints(&["endpoint".into()])
             .build()
             .expect("failed to build node");
         let builder = CreateCircuitBuilder::new()
@@ -568,7 +568,7 @@ mod tests {
             .expect("failed to build service");
         let node = SplinterNodeBuilder::new()
             .with_node_id("node_id")
-            .with_endpoint("endpoint")
+            .with_endpoints(&["endpoint".into()])
             .build()
             .expect("failed to build node");
         let builder = CreateCircuitBuilder::new()
@@ -699,30 +699,35 @@ mod tests {
     fn node_builder_success() {
         let mut builder = SplinterNodeBuilder::new();
         assert!(builder.node_id().is_none());
-        assert!(builder.endpoint().is_none());
+        assert!(builder.endpoints().is_none());
 
-        builder = builder.with_node_id("node_id").with_endpoint("endpoint");
+        builder = builder
+            .with_node_id("node_id")
+            .with_endpoints(&["endpoint".into()]);
         assert_eq!(builder.node_id(), Some("node_id".into()));
-        assert_eq!(builder.endpoint(), Some("endpoint".into()));
+        assert_eq!(builder.endpoints(), Some(vec!["endpoint".into()]));
 
         let node = builder.build().expect("failed to build node");
         assert_eq!(&node.node_id, "node_id");
-        assert_eq!(&node.endpoint, "endpoint");
+        assert_eq!(&node.endpoints, &["endpoint".to_string()]);
     }
 
     /// Verify that the `SplinterNodeBuilder` fails to build when `node_id` is not set.
     #[test]
     fn node_builder_unset_node_id() {
-        match SplinterNodeBuilder::new().with_endpoint("endpoint").build() {
+        match SplinterNodeBuilder::new()
+            .with_endpoints(&["endpoint".into()])
+            .build()
+        {
             Ok(node) => panic!("Build did not fail; got node: {:?}", node),
             Err(BuilderError::MissingField(_)) => {}
             Err(err) => panic!("Got unexpected error: {}", err),
         }
     }
 
-    /// Verify that the `SplinterNodeBuilder` fails to build when `endpoint` is not set.
+    /// Verify that the `SplinterNodeBuilder` fails to build when `endpoints` is not set.
     #[test]
-    fn node_builder_unset_endpoint() {
+    fn node_builder_unset_endpoints() {
         match SplinterNodeBuilder::new().with_node_id("node_id").build() {
             Ok(node) => panic!("Build did not fail; got node: {:?}", node),
             Err(BuilderError::MissingField(_)) => {}

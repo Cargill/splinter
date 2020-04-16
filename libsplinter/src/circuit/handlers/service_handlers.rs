@@ -27,7 +27,7 @@ use protobuf::Message;
 // Implements a handler that handles ServiceConnectRequest
 pub struct ServiceConnectRequestHandler {
     node_id: String,
-    endpoint: String,
+    endpoints: Vec<String>,
     state: SplinterState,
 }
 
@@ -93,10 +93,7 @@ impl Handler for ServiceConnectRequestHandler {
                     response.set_status(ServiceConnectResponse_Status::ERROR_NOT_AN_ALLOWED_NODE);
                     response.set_error_message(format!("{} is not allowed on this node", unique_id))
                 } else {
-                    let node = SplinterNode::new(
-                        self.node_id.to_string(),
-                        vec![self.endpoint.to_string()],
-                    );
+                    let node = SplinterNode::new(self.node_id.to_string(), self.endpoints.to_vec());
                     let service = Service::new(
                         service_id.to_string(),
                         Some(context.source_peer_id().to_string()),
@@ -153,10 +150,10 @@ impl Handler for ServiceConnectRequestHandler {
 }
 
 impl ServiceConnectRequestHandler {
-    pub fn new(node_id: String, endpoint: String, state: SplinterState) -> Self {
+    pub fn new(node_id: String, endpoints: Vec<String>, state: SplinterState) -> Self {
         ServiceConnectRequestHandler {
             node_id,
-            endpoint,
+            endpoints,
             state,
         }
     }
@@ -299,7 +296,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
                 let handler = ServiceConnectRequestHandler::new(
                     "123".to_string(),
-                    "127.0.0.1:0".to_string(),
+                    vec!["127.0.0.1:0".to_string()],
                     state,
                 );
 
@@ -349,7 +346,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
                 let handler = ServiceConnectRequestHandler::new(
                     "123".to_string(),
-                    "127.0.0.1:0".to_string(),
+                    vec!["127.0.0.1:0".to_string()],
                     state,
                 );
 
@@ -399,7 +396,7 @@ mod tests {
                 let state = SplinterState::new("memory".to_string(), circuit_directory);
                 let handler = ServiceConnectRequestHandler::new(
                     "123".to_string(),
-                    "127.0.0.1:0".to_string(),
+                    vec!["127.0.0.1:0".to_string()],
                     state.clone(),
                 );
 
@@ -455,7 +452,7 @@ mod tests {
                 state.add_service(id.clone(), service).unwrap();
                 let handler = ServiceConnectRequestHandler::new(
                     "123".to_string(),
-                    "127.0.0.1:0".to_string(),
+                    vec!["127.0.0.1:0".to_string()],
                     state,
                 );
 

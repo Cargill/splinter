@@ -110,10 +110,12 @@ pub struct SplinterDaemon {
     key_registry_location: String,
     local_node_registry_location: String,
     service_endpoint: String,
-    network_endpoint: String,
+    network_endpoints: Vec<String>,
+    advertised_endpoints: Vec<String>,
     initial_peers: Vec<String>,
     network: Network,
     node_id: String,
+    display_name: String,
     rest_api_endpoint: String,
     #[cfg(feature = "database")]
     db_url: Option<String>,
@@ -156,10 +158,17 @@ impl SplinterDaemon {
         let state = SplinterState::new(self.storage_location.to_string(), circuit_directory);
 
         // set up the listeners on the transport
-        let mut network_listener = transport.listen(&self.network_endpoint)?;
+        let network_listeners = self
+            .network_endpoints
+            .iter()
+            .map(|endpoint| transport.listen(endpoint))
+            .collect::<Result<Vec<_>, _>>()?;
         debug!(
-            "Listening for peer connections on {}",
-            network_listener.endpoint()
+            "Listening for peer connections on {:?}",
+            network_listeners
+                .iter()
+                .map(|listener| listener.endpoint())
+                .collect::<Vec<_>>(),
         );
         let service_listener = transport.listen(&self.service_endpoint)?;
         debug!(
@@ -202,7 +211,7 @@ impl SplinterDaemon {
         let circuit_dispatcher = set_up_circuit_dispatcher(
             network_sender.clone(),
             &self.node_id,
-            &self.network_endpoint,
+            &self.network_endpoints,
             state.clone(),
         );
         let circuit_dispatch_loop = DispatchLoopBuilder::new()
@@ -249,34 +258,38 @@ impl SplinterDaemon {
         let network_dispatch_send = network_dispatch_loop.new_dispatcher_sender();
         let network_dispatcher_shutdown = network_dispatch_loop.shutdown_signaler();
 
-        // setup a thread to listen on the network port and add incoming connection to the network
-        let network_clone = self.network.clone();
-
-        // this thread will just be dropped on shutdown
-        let _ = thread::spawn(move || {
-            for connection_result in network_listener.incoming() {
-                let connection = match connection_result {
-                    Ok(connection) => connection,
-                    Err(AcceptError::ProtocolError(msg)) => {
-                        warn!("Failed to accept connection due to {}", msg);
-                        continue;
+        // setup threads to listen on the network ports and add incoming connections to the network
+        // these threads will just be dropped on shutdown
+        let _ = network_listeners
+            .into_iter()
+            .map(|mut network_listener| {
+                let network_clone = self.network.clone();
+                thread::spawn(move || {
+                    for connection_result in network_listener.incoming() {
+                        let connection = match connection_result {
+                            Ok(connection) => connection,
+                            Err(AcceptError::ProtocolError(msg)) => {
+                                warn!("Failed to accept connection due to {}", msg);
+                                continue;
+                            }
+                            Err(AcceptError::IoError(err)) => {
+                                error!("Unable to receive new connections; exiting: {:?}", err);
+                                return Err(StartError::TransportError(format!(
+                                    "Accept Error: {:?}",
+                                    err
+                                )));
+                            }
+                        };
+                        debug!("Received connection from {}", connection.remote_endpoint());
+                        match network_clone.add_connection(connection) {
+                            Ok(peer_id) => debug!("Added connection with ID {}", peer_id),
+                            Err(err) => error!("Failed to add connection to network: {}", err),
+                        };
                     }
-                    Err(AcceptError::IoError(err)) => {
-                        error!("Unable to receive new connections; exiting: {:?}", err);
-                        return Err(StartError::TransportError(format!(
-                            "Accept Error: {:?}",
-                            err
-                        )));
-                    }
-                };
-                debug!("Received connection from {}", connection.remote_endpoint());
-                match network_clone.add_connection(connection) {
-                    Ok(peer_id) => debug!("Added connection with ID {}", peer_id),
-                    Err(err) => error!("Failed to add connection to network: {}", err),
-                };
-            }
-            Ok(())
-        });
+                    Ok(())
+                })
+            })
+            .collect::<Vec<_>>();
 
         // For provided initial peers, try to connect to them
         for peer in self.initial_peers.iter() {
@@ -288,8 +301,8 @@ impl SplinterDaemon {
         // For each node in the circuit_directory, try to connect and add them to the network
         for (node_id, node) in state.nodes()?.iter() {
             if node_id != &self.node_id {
-                if let Some(endpoint) = node.endpoints().get(0) {
-                    if let Err(err) = peer_connector.connect_peer(node_id, endpoint) {
+                if !node.endpoints().is_empty() {
+                    if let Err(err) = peer_connector.connect_peer(node_id, node.endpoints()) {
                         debug!("Unable to connect to node: {} Error: {:?}", node_id, err);
                     }
                 } else {
@@ -410,7 +423,10 @@ impl SplinterDaemon {
             create_node_registry(&self.local_node_registry_location, &self.registries)?;
 
         let node_id = self.node_id.clone();
+        let display_name = self.display_name.clone();
         let service_endpoint = self.service_endpoint.clone();
+        let network_endpoints = self.network_endpoints.clone();
+        let advertised_endpoints = self.advertised_endpoints.clone();
 
         let circuit_resource_provider =
             CircuitResourceProvider::new(self.node_id.to_string(), state);
@@ -424,7 +440,13 @@ impl SplinterDaemon {
             )
             .add_resource(
                 Resource::build("/status").add_method(Method::Get, move |_, _| {
-                    routes::get_status(node_id.clone(), service_endpoint.clone())
+                    routes::get_status(
+                        node_id.clone(),
+                        display_name.clone(),
+                        service_endpoint.clone(),
+                        network_endpoints.clone(),
+                        advertised_endpoints.clone(),
+                    )
                 }),
             )
             .add_resource(make_nodes_identity_resource(node_registry.clone()))
@@ -707,9 +729,11 @@ pub struct SplinterDaemonBuilder {
     key_registry_location: Option<String>,
     local_node_registry_location: Option<String>,
     service_endpoint: Option<String>,
-    network_endpoint: Option<String>,
+    network_endpoints: Option<Vec<String>>,
+    advertised_endpoints: Option<Vec<String>>,
     initial_peers: Option<Vec<String>>,
     node_id: Option<String>,
+    display_name: Option<String>,
     rest_api_endpoint: Option<String>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
@@ -748,8 +772,13 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_network_endpoint(mut self, value: String) -> Self {
-        self.network_endpoint = Some(value);
+    pub fn with_network_endpoints(mut self, value: Vec<String>) -> Self {
+        self.network_endpoints = Some(value);
+        self
+    }
+
+    pub fn with_advertised_endpoints(mut self, value: Vec<String>) -> Self {
+        self.advertised_endpoints = Some(value);
         self
     }
 
@@ -760,6 +789,11 @@ impl SplinterDaemonBuilder {
 
     pub fn with_node_id(mut self, value: String) -> Self {
         self.node_id = Some(value);
+        self
+    }
+
+    pub fn with_display_name(mut self, value: String) -> Self {
+        self.display_name = Some(value);
         self
     }
 
@@ -833,8 +867,12 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: service_location".to_string())
         })?;
 
-        let network_endpoint = self.network_endpoint.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: network_endpoint".to_string())
+        let network_endpoints = self.network_endpoints.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: network_endpoints".to_string())
+        })?;
+
+        let advertised_endpoints = self.advertised_endpoints.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: advertised_endpoints".to_string())
         })?;
 
         let initial_peers = self.initial_peers.ok_or_else(|| {
@@ -843,6 +881,10 @@ impl SplinterDaemonBuilder {
 
         let node_id = self.node_id.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: node_id".to_string())
+        })?;
+
+        let display_name = self.display_name.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: display_name".to_string())
         })?;
 
         let rest_api_endpoint = self.rest_api_endpoint.ok_or_else(|| {
@@ -868,10 +910,12 @@ impl SplinterDaemonBuilder {
         Ok(SplinterDaemon {
             storage_location,
             service_endpoint,
-            network_endpoint,
+            network_endpoints,
+            advertised_endpoints,
             initial_peers,
             network,
             node_id,
+            display_name,
             rest_api_endpoint,
             #[cfg(feature = "database")]
             db_url,
@@ -922,13 +966,13 @@ fn set_up_network_dispatcher(
 fn set_up_circuit_dispatcher(
     network_sender: NetworkMessageSender,
     node_id: &str,
-    endpoint: &str,
+    endpoints: &[String],
     state: SplinterState,
 ) -> Dispatcher<CircuitMessageType> {
     let mut dispatcher = Dispatcher::<CircuitMessageType>::new(network_sender);
 
     let service_connect_request_handler =
-        ServiceConnectRequestHandler::new(node_id.to_string(), endpoint.to_string(), state.clone());
+        ServiceConnectRequestHandler::new(node_id.to_string(), endpoints.to_vec(), state.clone());
     dispatcher.set_handler(Box::new(service_connect_request_handler));
 
     let service_disconnect_request_handler = ServiceDisconnectRequestHandler::new(state.clone());

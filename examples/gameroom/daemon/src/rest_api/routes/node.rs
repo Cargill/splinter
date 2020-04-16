@@ -269,7 +269,7 @@ mod test {
         metadata.insert("company".to_string(), "Bitwise IO".to_string());
         Node {
             identity: "Node-123".to_string(),
-            endpoint: "tcps://127.0.0.1:8080".to_string(),
+            endpoints: vec!["tcps://127.0.0.1:8080".to_string()],
             display_name: "Bitwise IO - Node 1".to_string(),
             metadata,
         }
@@ -280,7 +280,7 @@ mod test {
         metadata.insert("company".to_string(), "Cargill".to_string());
         Node {
             identity: "Node-456".to_string(),
-            endpoint: "tcps://127.0.0.1:8082".to_string(),
+            endpoints: vec!["tcps://127.0.0.1:8082".to_string()],
             display_name: "Cargill - Node 1".to_string(),
             metadata,
         }

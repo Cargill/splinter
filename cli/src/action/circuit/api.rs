@@ -361,7 +361,7 @@ impl fmt::Display for ProposalSlice {
         );
 
         for member in self.circuit.members.iter() {
-            display_string += &format!("\n    {} ({})\n", member.node_id, member.endpoint);
+            display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
             if member.node_id == self.requester_node_id {
                 display_string += &"        Vote: ACCEPT (implied as requester):\n".to_string();
                 display_string += &format!("            {}\n", self.requester);
@@ -420,7 +420,7 @@ pub struct ProposalCircuitSlice {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct CircuitMembers {
     pub node_id: String,
-    pub endpoint: String,
+    pub endpoints: Vec<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

@@ -51,9 +51,11 @@ pub struct Config {
     server_cert: (String, ConfigSource),
     server_key: (String, ConfigSource),
     service_endpoint: (String, ConfigSource),
-    network_endpoint: (String, ConfigSource),
+    network_endpoints: (Vec<String>, ConfigSource),
+    advertised_endpoints: (Vec<String>, ConfigSource),
     peers: (Vec<String>, ConfigSource),
     node_id: (String, ConfigSource),
+    display_name: (String, ConfigSource),
     bind: (String, ConfigSource),
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
@@ -103,8 +105,12 @@ impl Config {
         &self.service_endpoint.0
     }
 
-    pub fn network_endpoint(&self) -> &str {
-        &self.network_endpoint.0
+    pub fn network_endpoints(&self) -> &[String] {
+        &self.network_endpoints.0
+    }
+
+    pub fn advertised_endpoints(&self) -> &[String] {
+        &self.advertised_endpoints.0
     }
 
     pub fn peers(&self) -> &[String] {
@@ -113,6 +119,10 @@ impl Config {
 
     pub fn node_id(&self) -> &str {
         &self.node_id.0
+    }
+
+    pub fn display_name(&self) -> &str {
+        &self.display_name.0
     }
 
     pub fn bind(&self) -> &str {
@@ -185,8 +195,12 @@ impl Config {
         &self.service_endpoint.1
     }
 
-    fn network_endpoint_source(&self) -> &ConfigSource {
-        &self.network_endpoint.1
+    fn network_endpoints_source(&self) -> &ConfigSource {
+        &self.network_endpoints.1
+    }
+
+    fn advertised_endpoints_source(&self) -> &ConfigSource {
+        &self.advertised_endpoints.1
     }
 
     fn peers_source(&self) -> &ConfigSource {
@@ -195,6 +209,10 @@ impl Config {
 
     fn node_id_source(&self) -> &ConfigSource {
         &self.node_id.1
+    }
+
+    fn display_name_source(&self) -> &ConfigSource {
+        &self.display_name.1
     }
 
     fn bind_source(&self) -> &ConfigSource {
@@ -279,9 +297,14 @@ impl Config {
             self.service_endpoint_source()
         );
         debug!(
-            "Config: network_endpoint: {} (source: {:?})",
-            self.network_endpoint(),
-            self.network_endpoint_source()
+            "Config: network_endpoints: {:?} (source: {:?})",
+            self.network_endpoints(),
+            self.network_endpoints_source()
+        );
+        debug!(
+            "Config: advertised_endpoints: {:?} (source: {:?})",
+            self.advertised_endpoints(),
+            self.advertised_endpoints_source()
         );
         debug!(
             "Config: peers: {:?} (source: {:?})",
@@ -292,6 +315,11 @@ impl Config {
             "Config: node_id: {} (source: {:?})",
             self.node_id(),
             self.node_id_source()
+        );
+        debug!(
+            "Config: display_name: {} (source: {:?})",
+            self.display_name(),
+            self.display_name_source()
         );
         debug!(
             "Config: bind: {} (source: {:?})",
@@ -367,7 +395,9 @@ mod tests {
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+    static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
+    static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
 
     static DEFAULT_CLIENT_CERT: &str = "client.crt";
     static DEFAULT_CLIENT_KEY: &str = "private/client.key";
@@ -389,11 +419,8 @@ mod tests {
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
             ),
-            (
-                "network_endpoint".to_string(),
-                EXAMPLE_NETWORK_ENDPOINT.to_string(),
-            ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
+            ("display_name".to_string(), EXAMPLE_DISPLAY_NAME.to_string()),
         ];
 
         let mut config_values = Map::new();
@@ -410,9 +437,11 @@ mod tests {
         (about: "Config-Test")
         (@arg config: -c --config +takes_value)
         (@arg node_id: --("node-id") +takes_value)
+        (@arg display_name: --("display-name") +takes_value)
         (@arg storage: --("storage") +takes_value)
         (@arg transport: --("transport") +takes_value)
-        (@arg network_endpoint: -n --("network-endpoint") +takes_value)
+        (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
+        (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
         (@arg service_endpoint: --("service-endpoint") +takes_value)
         (@arg peers: --peer +takes_value +multiple)
         (@arg ca_file: --("ca-file") +takes_value)
@@ -509,12 +538,16 @@ mod tests {
             "configtest",
             "--node-id",
             EXAMPLE_NODE_ID,
+            "--display-name",
+            EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
             "--transport",
             EXAMPLE_TRANSPORT,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
+            "--advertised-endpoint",
+            EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,
             "--ca-file",
@@ -571,7 +604,7 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object.
-        let args = vec!["configtest", "--node-id", "123"];
+        let args = vec!["configtest", "--node-id", "123", "--display-name", "Node 1"];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.
@@ -722,22 +755,28 @@ mod tests {
                 }
             )
         );
-        // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `network_endpoint`, but the TomlPartialConfigBuilder value should have precedence
-        // (source should be Toml).
+        // The DefaultPartialConfigBuilder is the only config with a value for `network_endpoints`
+        // (source should be Default).
         assert_eq!(
             (
-                final_config.network_endpoint(),
-                final_config.network_endpoint_source()
+                final_config.network_endpoints(),
+                final_config.network_endpoints_source()
             ),
             (
-                EXAMPLE_NETWORK_ENDPOINT,
-                &ConfigSource::Toml {
-                    file: TEST_TOML.to_string()
-                }
+                &[EXAMPLE_NETWORK_ENDPOINT.to_string()] as &[String],
+                &ConfigSource::Default,
             )
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for `database` (source
+        // The DefaultPartialConfigBuilder is the only config with a value for
+        // `advertised_endpoints` (source should be Default).
+        assert_eq!(
+            (
+                final_config.advertised_endpoints(),
+                final_config.advertised_endpoints_source()
+            ),
+            (&[] as &[String], &ConfigSource::Default,)
+        );
+        // The DefaultPartialConfigBuilder is the only config with a value for `peers` (source
         // should be Default).
         assert_eq!(
             (final_config.peers(), final_config.peers_source()),
@@ -749,6 +788,16 @@ mod tests {
         assert_eq!(
             (final_config.node_id(), final_config.node_id_source()),
             ("123", &ConfigSource::CommandLine)
+        );
+        // The DefaultPartialConfigBuilder, TomlPartialConfigBuilder, and ClapPartialConfigBuilder
+        // had values for `display_name`, but the ClapPartialConfigBuilder value should have
+        // precedence (source should be CommandLine).
+        assert_eq!(
+            (
+                final_config.display_name(),
+                final_config.display_name_source()
+            ),
+            ("Node 1", &ConfigSource::CommandLine)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for `bind` (source
         // should be Default).
@@ -809,7 +858,15 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object, passing in a cert_dir.
-        let args = vec!["configtest", "--node-id", "123", "--cert-dir", "/my_files/"];
+        let args = vec![
+            "configtest",
+            "--node-id",
+            "123",
+            "--display-name",
+            "Node 1",
+            "--cert-dir",
+            "/my_files/",
+        ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.

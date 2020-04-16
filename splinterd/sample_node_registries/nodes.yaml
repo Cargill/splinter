@@ -13,12 +13,14 @@
 # limitations under the License.
 
 - identity: "Node-123"
-  endpoint: "tcps://123.0.0.123:8080"
+  endpoints:
+    - "tcps://123.0.0.123:8080"
   display_name: "Bitwise IO - Node 1"
   metadata:
     company: "Bitwise IO"
 - identity: "Node-456"
-  endpoint: "tcps://456.0.0.456:8080"
+  endpoints:
+    - "tcps://456.0.0.456:8080"
   display_name: "Cargill - Node 1"
   metadata:
     company: "Cargill"

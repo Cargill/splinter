@@ -77,14 +77,14 @@ impl ApiGameroomProposal {
 #[derive(Debug, Serialize)]
 struct ApiGameroomMember {
     node_id: String,
-    endpoint: String,
+    endpoints: Vec<String>,
 }
 
 impl ApiGameroomMember {
     fn from(db_circuit_member: GameroomMember) -> Self {
         ApiGameroomMember {
             node_id: db_circuit_member.node_id.to_string(),
-            endpoint: db_circuit_member.endpoint,
+            endpoints: db_circuit_member.endpoints,
         }
     }
 }

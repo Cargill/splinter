@@ -48,8 +48,10 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_server_cert(Some(String::from(SERVER_CERT)))
             .with_server_key(Some(String::from(SERVER_KEY)))
             .with_service_endpoint(Some(String::from("127.0.0.1:8043")))
-            .with_network_endpoint(Some(String::from("127.0.0.1:8044")))
+            .with_network_endpoints(Some(vec![String::from("127.0.0.1:8044")]))
+            .with_advertised_endpoints(Some(vec![]))
             .with_peers(Some(vec![]))
+            .with_display_name(Some(String::new()))
             .with_bind(Some(String::from("127.0.0.1:8080")))
             .with_registries(Some(vec![]))
             .with_heartbeat_interval(Some(HEARTBEAT_DEFAULT))
@@ -94,11 +96,13 @@ mod tests {
             Some(String::from("127.0.0.1:8043"))
         );
         assert_eq!(
-            config.network_endpoint(),
-            Some(String::from("127.0.0.1:8044"))
+            config.network_endpoints(),
+            Some(vec![String::from("127.0.0.1:8044")])
         );
+        assert_eq!(config.advertised_endpoints(), Some(vec![]));
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), None);
+        assert_eq!(config.display_name(), Some(String::new()));
         assert_eq!(config.bind(), Some(String::from("127.0.0.1:8080")));
         #[cfg(feature = "database")]
         assert_eq!(config.database(), Some(String::from("127.0.0.1:5432")));

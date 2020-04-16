@@ -100,7 +100,7 @@ pub struct GameroomMember {
     pub id: i64,
     pub circuit_id: String,
     pub node_id: String,
-    pub endpoint: String,
+    pub endpoints: Vec<String>,
     pub status: String,
     pub created_time: SystemTime,
     pub updated_time: SystemTime,
@@ -111,7 +111,7 @@ pub struct GameroomMember {
 pub struct NewGameroomMember {
     pub circuit_id: String,
     pub node_id: String,
-    pub endpoint: String,
+    pub endpoints: Vec<String>,
     pub status: String,
     pub created_time: SystemTime,
     pub updated_time: SystemTime,

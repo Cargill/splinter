@@ -166,13 +166,13 @@ export default class Dashboard extends Vue {
   }
 
   getMemberLabel(node: Node) {
-    let endpoint = node.endpoint;
+    let endpoints = node.endpoints;
     if (process.env.VUE_APP_BRAND
-     && node.endpoint.includes(process.env.VUE_APP_BRAND)) {
-      endpoint = 'local';
+     && node.identity.includes(process.env.VUE_APP_BRAND)) {
+      endpoints = ['local'];
     }
 
-    return `${node.metadata.organization} (${endpoint})`;
+    return `${node.metadata.organization} (${endpoints})`;
   }
 
   showNewGameroomModal() {

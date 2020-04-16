@@ -617,7 +617,7 @@ impl AdminServiceShared {
 
                 debug!("Connecting to node {:?}", node);
                 self.peer_connector
-                    .connect_peer(node.get_node_id(), node.get_endpoint())
+                    .connect_peer(node.get_node_id(), node.get_endpoints())
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
                 unauthorized_peers.push(node.get_node_id().into());
@@ -735,7 +735,7 @@ impl AdminServiceShared {
 
                 debug!("Connecting to node {:?}", node);
                 self.peer_connector
-                    .connect_peer(node.get_node_id(), node.get_endpoint())
+                    .connect_peer(node.get_node_id(), node.get_endpoints())
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
                 unauthorized_peers.push(node.get_node_id().into());
@@ -1136,7 +1136,7 @@ impl AdminServiceShared {
         }
 
         let mut members: Vec<String> = Vec::new();
-        let mut endpoints: Vec<String> = Vec::new();
+        let mut all_endpoints: Vec<String> = Vec::new();
         for member in circuit.get_members() {
             let node_id = member.get_node_id().to_string();
             if node_id.is_empty() {
@@ -1151,17 +1151,24 @@ impl AdminServiceShared {
                 members.push(node_id);
             }
 
-            let endpoint = member.get_endpoint().to_string();
-            if endpoint.is_empty() {
+            let mut endpoints = member.get_endpoints().to_vec();
+            if endpoints.is_empty() {
                 return Err(AdminSharedError::ValidationFailed(
-                    "Member endpoint cannot be empty".to_string(),
+                    "Member endpoints cannot be empty".to_string(),
                 ));
-            } else if endpoints.contains(&endpoint) {
+            } else if endpoints.iter().any(|endpoint| endpoint.is_empty()) {
+                return Err(AdminSharedError::ValidationFailed(
+                    "Member cannot have an empty endpoint".to_string(),
+                ));
+            } else if endpoints
+                .iter()
+                .any(|endpoint| all_endpoints.contains(endpoint))
+            {
                 return Err(AdminSharedError::ValidationFailed(
                     "Every member endpoint must be unique in the circuit.".to_string(),
                 ));
             } else {
-                endpoints.push(endpoint);
+                all_endpoints.append(&mut endpoints);
             }
         }
 
@@ -1515,7 +1522,7 @@ impl AdminServiceShared {
             .map(|node| {
                 StateNode::new(
                     node.get_node_id().to_string(),
-                    vec![node.get_endpoint().to_string()],
+                    node.get_endpoints().to_vec(),
                 )
             })
             .collect();
@@ -1750,8 +1757,8 @@ mod tests {
         circuit.set_comments("test circuit".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
-            splinter_node("test-node", "tcp://someplace:8000"),
-            splinter_node("other-node", "tcp://otherplace:8000"),
+            splinter_node("test-node", &["tcp://someplace:8000".to_string()]),
+            splinter_node("other-node", &["tcp://otherplace:8000".to_string()]),
         ]));
         circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre"),
@@ -1832,8 +1839,8 @@ mod tests {
         circuit.set_comments("test circuit".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
-            splinter_node("test-node", "tcp://someplace:8000"),
-            splinter_node("other-node", "tcp://otherplace:8000"),
+            splinter_node("test-node", &["tcp://someplace:8000".to_string()]),
+            splinter_node("other-node", &["tcp://otherplace:8000".to_string()]),
         ]));
         circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre"),
@@ -2277,7 +2284,7 @@ mod tests {
 
         let mut node_b = SplinterNode::new();
         node_b.set_node_id("node_b".to_string());
-        node_b.set_endpoint("test://endpoint_b:0".to_string());
+        node_b.set_endpoints(vec!["test://endpoint_b:0".to_string()].into());
 
         circuit.set_members(RepeatedField::from_vec(vec![node_b]));
 
@@ -2317,15 +2324,15 @@ mod tests {
 
         let mut node_a = SplinterNode::new();
         node_a.set_node_id("node_a".to_string());
-        node_a.set_endpoint("test://endpoint_a:0".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
 
         let mut node_b = SplinterNode::new();
         node_b.set_node_id("node_b".to_string());
-        node_b.set_endpoint("test://endpoint_b:0".to_string());
+        node_b.set_endpoints(vec!["test://endpoint_b:0".to_string()].into());
 
         let mut node_ = SplinterNode::new();
         node_.set_node_id("".to_string());
-        node_.set_endpoint("test://endpoint_:0".to_string());
+        node_.set_endpoints(vec!["test://endpoint_:0".to_string()].into());
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b, node_]));
 
@@ -2364,15 +2371,15 @@ mod tests {
 
         let mut node_a = SplinterNode::new();
         node_a.set_node_id("node_a".to_string());
-        node_a.set_endpoint("test://endpoint_a:0".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
 
         let mut node_b = SplinterNode::new();
         node_b.set_node_id("node_b".to_string());
-        node_b.set_endpoint("test://endpoint_b:0".to_string());
+        node_b.set_endpoints(vec!["test://endpoint_b:0".to_string()].into());
 
         let mut node_b2 = SplinterNode::new();
         node_b2.set_node_id("node_b".to_string());
-        node_b2.set_endpoint("test://endpoint_b2:0".to_string());
+        node_b2.set_endpoints(vec!["test://endpoint_b2:0".to_string()].into());
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b, node_b2]));
 
@@ -2452,6 +2459,49 @@ mod tests {
     }
 
     #[test]
+    // test that if a circuit has a member with no endpoints an error is returned
+    fn test_validate_circuit_no_endpoints() {
+        let state = setup_splinter_state();
+        let peer_connector = setup_peer_connector();
+        let orchestrator = setup_orchestrator();
+        // set up key registry
+        let pub_key = (0u8..33).collect::<Vec<_>>();
+        let mut key_registry = StorageKeyRegistry::new("memory".to_string()).unwrap();
+        let key_info = KeyInfo::builder(pub_key.clone(), "node_a".to_string()).build();
+        key_registry.save_key(key_info).unwrap();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            orchestrator,
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            Box::new(MockAuthInquisitor),
+            state,
+            Box::new(HashVerifier),
+            Box::new(key_registry),
+            Box::new(AllowAllKeyPermissionManager),
+            "memory",
+        )
+        .unwrap();
+        let mut circuit = setup_test_circuit();
+
+        let mut node_a = SplinterNode::new();
+        node_a.set_node_id("node_a".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
+
+        let mut node_b = SplinterNode::new();
+        node_b.set_node_id("node_b".to_string());
+        node_b.set_endpoints(vec![].into());
+
+        circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
+
+        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+            panic!("Should have been invalid because a member has no endpoints");
+        }
+    }
+
+    #[test]
     // test that if a circuit has a member with an empty endpoint an error is returned
     fn test_validate_circuit_empty_endpoint() {
         let state = setup_splinter_state();
@@ -2481,11 +2531,11 @@ mod tests {
 
         let mut node_a = SplinterNode::new();
         node_a.set_node_id("node_a".to_string());
-        node_a.set_endpoint("test://endpoint_a:0".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
 
         let mut node_b = SplinterNode::new();
         node_b.set_node_id("node_b".to_string());
-        node_b.set_endpoint("".to_string());
+        node_b.set_endpoints(vec!["".to_string()].into());
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
@@ -2524,11 +2574,11 @@ mod tests {
 
         let mut node_a = SplinterNode::new();
         node_a.set_node_id("node_a".to_string());
-        node_a.set_endpoint("test://endpoint_a:0".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
 
         let mut node_b = SplinterNode::new();
         node_b.set_node_id("node_b".to_string());
-        node_b.set_endpoint("test://endpoint_a:0".to_string());
+        node_b.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
@@ -3138,11 +3188,11 @@ mod tests {
 
         let mut node_a = SplinterNode::new();
         node_a.set_node_id("node_a".to_string());
-        node_a.set_endpoint("test://endpoint_a:0".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
 
         let mut node_b = SplinterNode::new();
         node_b.set_node_id("node_b".to_string());
-        node_b.set_endpoint("test://endpoint_b:0".to_string());
+        node_b.set_endpoints(vec!["test://endpoint_b:0".to_string()].into());
 
         let mut circuit = Circuit::new();
         circuit.set_circuit_id("01234-ABCDE".to_string());
@@ -3209,10 +3259,10 @@ mod tests {
             .expect("failed to create orchestrator")
     }
 
-    fn splinter_node(node_id: &str, endpoint: &str) -> admin::SplinterNode {
+    fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {
         let mut node = admin::SplinterNode::new();
         node.set_node_id(node_id.into());
-        node.set_endpoint(endpoint.into());
+        node.set_endpoints(endpoints.into());
         node
     }
 

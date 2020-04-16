@@ -181,7 +181,7 @@ impl CreateCircuitMessageBuilder {
         Ok(())
     }
 
-    pub fn add_node(&mut self, node_id: &str, node_endpoint: &str) -> Result<(), CliError> {
+    pub fn add_node(&mut self, node_id: &str, node_endpoints: &[String]) -> Result<(), CliError> {
         for node in &self.nodes {
             if node.node_id == node_id {
                 return Err(CliError::ActionError(format!(
@@ -189,15 +189,19 @@ impl CreateCircuitMessageBuilder {
                     node_id
                 )));
             }
-            if node.endpoint == node_endpoint {
+            if let Some(endpoint) = node_endpoints
+                .iter()
+                .find(|endpoint| node.endpoints.contains(endpoint))
+            {
                 return Err(CliError::ActionError(format!(
                     "Duplicate node endpoint detected: {}",
-                    node_endpoint
+                    endpoint
                 )));
             }
         }
 
-        self.nodes.push(make_splinter_node(node_id, node_endpoint)?);
+        self.nodes
+            .push(make_splinter_node(node_id, node_endpoints)?);
         Ok(())
     }
 
@@ -328,10 +332,10 @@ fn is_match(service_id_match: &str, service_id: &str) -> bool {
     })
 }
 
-fn make_splinter_node(node_id: &str, endpoint: &str) -> Result<SplinterNode, CliError> {
+fn make_splinter_node(node_id: &str, endpoints: &[String]) -> Result<SplinterNode, CliError> {
     let node = SplinterNodeBuilder::new()
         .with_node_id(&node_id)
-        .with_endpoint(&endpoint)
+        .with_endpoints(endpoints)
         .build()
         .map_err(|err| {
             CliError::ActionError(format!(

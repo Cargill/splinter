@@ -108,14 +108,14 @@ impl<'a> From<&'a CreateCircuit> for CircuitResponse<'a> {
 #[derive(Debug, Serialize, Clone, PartialEq)]
 pub(crate) struct NodeResponse<'a> {
     pub node_id: &'a str,
-    pub endpoint: &'a str,
+    pub endpoints: &'a [String],
 }
 
 impl<'a> From<&'a SplinterNode> for NodeResponse<'a> {
     fn from(node: &'a SplinterNode) -> Self {
         Self {
             node_id: &node.node_id,
-            endpoint: &node.endpoint,
+            endpoints: &node.endpoints,
         }
     }
 }

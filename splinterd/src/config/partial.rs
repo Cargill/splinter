@@ -39,9 +39,11 @@ pub struct PartialConfig {
     server_cert: Option<String>,
     server_key: Option<String>,
     service_endpoint: Option<String>,
-    network_endpoint: Option<String>,
+    network_endpoints: Option<Vec<String>>,
+    advertised_endpoints: Option<Vec<String>>,
     peers: Option<Vec<String>>,
     node_id: Option<String>,
+    display_name: Option<String>,
     bind: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
@@ -68,9 +70,11 @@ impl PartialConfig {
             server_cert: None,
             server_key: None,
             service_endpoint: None,
-            network_endpoint: None,
+            network_endpoints: None,
+            advertised_endpoints: None,
             peers: None,
             node_id: None,
+            display_name: None,
             bind: None,
             #[cfg(feature = "database")]
             database: None,
@@ -124,8 +128,12 @@ impl PartialConfig {
         self.service_endpoint.clone()
     }
 
-    pub fn network_endpoint(&self) -> Option<String> {
-        self.network_endpoint.clone()
+    pub fn network_endpoints(&self) -> Option<Vec<String>> {
+        self.network_endpoints.clone()
+    }
+
+    pub fn advertised_endpoints(&self) -> Option<Vec<String>> {
+        self.advertised_endpoints.clone()
     }
 
     pub fn peers(&self) -> Option<Vec<String>> {
@@ -134,6 +142,10 @@ impl PartialConfig {
 
     pub fn node_id(&self) -> Option<String> {
         self.node_id.clone()
+    }
+
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     pub fn bind(&self) -> Option<String> {
@@ -281,14 +293,26 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `network_endpoint` value to the PartialConfig object.
+    /// Adds a `network_endpoints` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `network_endpoint` - Endpoint used for daemon to daemon communication.
+    /// * `network_endpoints` - Endpoints used for daemon to daemon communication.
     ///
-    pub fn with_network_endpoint(mut self, network_endpoint: Option<String>) -> Self {
-        self.network_endpoint = network_endpoint;
+    pub fn with_network_endpoints(mut self, network_endpoints: Option<Vec<String>>) -> Self {
+        self.network_endpoints = network_endpoints;
+        self
+    }
+
+    #[allow(dead_code)]
+    /// Adds a `advertised_endpoints` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `advertised_endpoints` - Publicly visible network endpoints.
+    ///
+    pub fn with_advertised_endpoints(mut self, advertised_endpoints: Option<Vec<String>>) -> Self {
+        self.advertised_endpoints = advertised_endpoints;
         self
     }
 
@@ -313,6 +337,18 @@ impl PartialConfig {
     ///
     pub fn with_node_id(mut self, node_id: Option<String>) -> Self {
         self.node_id = node_id;
+        self
+    }
+
+    #[allow(dead_code)]
+    /// Adds a `display_name` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `display_name` - Human-readable name for the node.
+    ///
+    pub fn with_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
         self
     }
 

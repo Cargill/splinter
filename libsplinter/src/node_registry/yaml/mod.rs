@@ -173,7 +173,9 @@ impl RwNodeRegistry for YamlNodeRegistry {
 fn check_node_required_fields_are_not_empty(node: &Node) -> Result<(), InvalidNodeError> {
     if node.identity.is_empty() {
         Err(InvalidNodeError::EmptyIdentity)
-    } else if node.endpoint.is_empty() {
+    } else if node.endpoints.is_empty() {
+        Err(InvalidNodeError::MissingEndpoints)
+    } else if node.endpoints.iter().any(|endpoint| endpoint.is_empty()) {
         Err(InvalidNodeError::EmptyEndpoint)
     } else if node.display_name.is_empty() {
         Err(InvalidNodeError::EmptyDisplayName)
@@ -189,8 +191,12 @@ fn check_if_node_is_duplicate(
     existing_nodes.iter().try_for_each(|existing_node| {
         if existing_node.identity == node.identity {
             Err(InvalidNodeError::DuplicateIdentity(node.identity.clone()))
-        } else if existing_node.endpoint == node.endpoint {
-            Err(InvalidNodeError::DuplicateEndpoint(node.endpoint.clone()))
+        } else if let Some(endpoint) = existing_node
+            .endpoints
+            .iter()
+            .find(|endpoint| node.endpoints.contains(endpoint))
+        {
+            Err(InvalidNodeError::DuplicateEndpoint(endpoint.clone()))
         } else {
             Ok(())
         }
@@ -245,7 +251,7 @@ mod test {
         run_test(|test_yaml_file_path| {
             let node1 = get_node_1();
             let mut node2 = get_node_2();
-            node2.endpoint = node1.endpoint.clone();
+            node2.endpoints = node1.endpoints.clone();
 
             write_to_file(&vec![node1.clone(), node2], test_yaml_file_path);
 
@@ -255,8 +261,8 @@ mod test {
                     panic!("Two nodes with same endpoint in YAML file. Error should be returned")
                 }
                 Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(
-                    id,
-                ))) => assert_eq!(id, node1.endpoint),
+                    endpoint,
+                ))) => assert!(node1.endpoints.contains(&endpoint)),
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
                     err
@@ -290,14 +296,14 @@ mod test {
     }
 
     ///
-    /// Verifies that reading from a YAML file that contains a node with an empty string as its
-    /// endpoint returns InvalidNodeError::EmptyEndpoint.
+    /// Verifies that reading from a YAML file that contains a node with an empty string in its
+    /// endpoints returns InvalidNodeError::EmptyEndpoint.
     ///
     #[test]
     fn test_read_yaml_empty_endpoint_error() {
         run_test(|test_yaml_file_path| {
             let mut node = get_node_1();
-            node.endpoint = "".to_string();
+            node.endpoints = vec!["".to_string()];
 
             write_to_file(&vec![node], test_yaml_file_path);
 
@@ -333,6 +339,30 @@ mod test {
                 Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
+                    err
+                ),
+            }
+        })
+    }
+
+    ///
+    /// Verifies that reading from a YAML file that contains a node with no endpoints returns
+    /// InvalidNodeError::MissingEndpoints.
+    ///
+    #[test]
+    fn test_read_yaml_missing_endpoints_error() {
+        run_test(|test_yaml_file_path| {
+            let mut node = get_node_1();
+            node.endpoints = vec![];
+
+            write_to_file(&vec![node], test_yaml_file_path);
+
+            let result = YamlNodeRegistry::new(test_yaml_file_path);
+            match result {
+                Ok(_) => panic!("Node with no endpoint in YAML file. Error should be returned"),
+                Err(YamlNodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+                Err(err) => panic!(
+                    "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
                     err
                 ),
             }
@@ -573,14 +603,14 @@ mod test {
                 .expect("Failed to create YamlNodeRegistry");
 
             let mut node = get_node_2();
-            node.endpoint = node1.endpoint.clone();
+            node.endpoints = node1.endpoints.clone();
             let result = registry.insert_node(node);
 
             match result {
                 Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
                 Err(NodeRegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(
                     endpoint,
-                ))) => assert_eq!(endpoint, node1.endpoint),
+                ))) => assert!(node1.endpoints.contains(&endpoint)),
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
                     err
@@ -618,7 +648,7 @@ mod test {
 
     ///
     /// Verifies that insert_node returns InvalidNodeError::EmptyEndpoint when a node with
-    /// an empty string as its endpoint is added to the registry.
+    /// an empty string in its endpoints is added to the registry.
     ///
     #[test]
     fn test_insert_node_empty_endpoint_error() {
@@ -629,7 +659,7 @@ mod test {
                 .expect("Failed to create YamlNodeRegistry");
 
             let mut node = get_node_1();
-            node.endpoint = "".to_string();
+            node.endpoints = vec!["".to_string()];
             let result = registry.insert_node(node);
 
             match result {
@@ -664,6 +694,33 @@ mod test {
                 Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
+                    err
+                ),
+            }
+        })
+    }
+
+    ///
+    /// Verifies that insert_node returns InvalidNodeError::MissingEndpoints when a node with no
+    /// endpoints is added to the registry.
+    ///
+    #[test]
+    fn test_insert_node_missing_endpoints_error() {
+        run_test(|test_yaml_file_path| {
+            write_to_file(&vec![], test_yaml_file_path);
+
+            let registry = YamlNodeRegistry::new(test_yaml_file_path)
+                .expect("Failed to create YamlNodeRegistry");
+
+            let mut node = get_node_1();
+            node.endpoints = vec![];
+            let result = registry.insert_node(node);
+
+            match result {
+                Ok(_) => panic!("Node endpoints is empty. Error should be returned"),
+                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+                Err(err) => panic!(
+                    "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
                     err
                 ),
             }
@@ -723,7 +780,7 @@ mod test {
         metadata.insert("admin".to_string(), "Bob".to_string());
         Node {
             identity: "Node-123".to_string(),
-            endpoint: "tcps://12.0.0.123:8431".to_string(),
+            endpoints: vec!["tcps://12.0.0.123:8431".to_string()],
             display_name: "Bitwise IO - Node 1".to_string(),
             metadata,
         }
@@ -735,7 +792,7 @@ mod test {
         metadata.insert("admin".to_string(), "Carol".to_string());
         Node {
             identity: "Node-456".to_string(),
-            endpoint: "tcps://12.0.0.123:8434".to_string(),
+            endpoints: vec!["tcps://12.0.0.123:8434".to_string()],
             display_name: "Cargill - Node 1".to_string(),
             metadata,
         }
@@ -747,7 +804,7 @@ mod test {
         metadata.insert("admin".to_string(), "Charlie".to_string());
         Node {
             identity: "Node-789".to_string(),
-            endpoint: "tcps://12.0.0.123:8435".to_string(),
+            endpoints: vec!["tcps://12.0.0.123:8435".to_string()],
             display_name: "Cargill - Node 2".to_string(),
             metadata,
         }

@@ -50,13 +50,23 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             .with_server_cert(self.matches.value_of("server_cert").map(String::from))
             .with_server_key(self.matches.value_of("server_key").map(String::from))
             .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
-            .with_network_endpoint(self.matches.value_of("network_endpoint").map(String::from))
+            .with_network_endpoints(
+                self.matches
+                    .values_of("network_endpoints")
+                    .map(|values| values.map(String::from).collect::<Vec<String>>()),
+            )
+            .with_advertised_endpoints(
+                self.matches
+                    .values_of("advertised_endpoints")
+                    .map(|values| values.map(String::from).collect::<Vec<String>>()),
+            )
             .with_peers(
                 self.matches
                     .values_of("peers")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
             .with_node_id(self.matches.value_of("node_id").map(String::from))
+            .with_display_name(self.matches.value_of("display_name").map(String::from))
             .with_bind(self.matches.value_of("bind").map(String::from))
             .with_registries(
                 self.matches
@@ -105,7 +115,9 @@ mod tests {
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+    static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
+    static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
 
     /// Asserts config values based on the example values.
     fn assert_config_values(config: PartialConfig) {
@@ -122,11 +134,19 @@ mod tests {
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
         );
         assert_eq!(
-            config.network_endpoint(),
-            Some(EXAMPLE_NETWORK_ENDPOINT.to_string())
+            config.network_endpoints(),
+            Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()])
+        );
+        assert_eq!(
+            config.advertised_endpoints(),
+            Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()])
         );
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), Some(EXAMPLE_NODE_ID.to_string()));
+        assert_eq!(
+            config.display_name(),
+            Some(EXAMPLE_DISPLAY_NAME.to_string())
+        );
         assert_eq!(config.bind(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
@@ -143,9 +163,11 @@ mod tests {
             (about: "Config-Test")
             (@arg config: -c --config +takes_value)
             (@arg node_id: --("node-id") +takes_value)
+            (@arg display_name: --("display-name") +takes_value)
             (@arg storage: --("storage") +takes_value)
             (@arg transport: --("transport") +takes_value)
-            (@arg network_endpoint: -n --("network-endpoint") +takes_value)
+            (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
+            (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
             (@arg peers: --peer +takes_value +multiple)
             (@arg ca_file: --("ca-file") +takes_value)
@@ -176,12 +198,16 @@ mod tests {
             "configtest",
             "--node-id",
             EXAMPLE_NODE_ID,
+            "--display-name",
+            EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
             "--transport",
             EXAMPLE_TRANSPORT,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
+            "--advertised-endpoint",
+            EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,
             "--ca-file",

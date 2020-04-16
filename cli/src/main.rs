@@ -44,12 +44,14 @@ const CIRCUIT_PROPOSE_AFTER_HELP: &str = r"DETAILS:
     arguments can be used on their own or together, but at least one of them is required.
 
     The --node-file argument must be a valid YAML file. A valid YAML file will be a list of nodes,
-    where each node has an 'identity' or 'node_id' field, as well as an 'endpoint' field. Example:
+    where each node has an 'identity' or 'node_id' field, as well as an 'endpoints' field. Example:
         ---
         - identity: 'node-1'
-          endpoint: tcps://node-1-endpoint:8044
+          endpoints:
+            - tcps://node-1-endpoint:8044
         - node_id: 'node-2'
-          endpoint: tcps://node-2-endpoint:8045
+          endpoints:
+            - tcps://node-2-endpoint:8045
 
     For the --service-arg, --service-peer-group, and --service-type options, service IDs can be
     wildcarded with '*' to match multiple services. For example, '--service-type *::scabbard' match
@@ -210,7 +212,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .multiple(true)
                 .help(
                     "Node that is part of a circuit \
-                     (<node_id>::<endpoint>)",
+                     (<node_id>::<endpoint1>,<endpoint2>)",
                 ),
         )
         .arg(

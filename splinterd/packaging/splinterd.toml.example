@@ -18,8 +18,8 @@ node_id = "acme-node-000"
 # Endpoint used for service to daemon communication
 service_endpoint = "tcps://localhost:8043"
 
-# Endpoint used for daemon to daemon communication
-network_endpoint = "tcps://localhost:8044"
+# Endpoints used for daemon to daemon communication
+network_endpoints = ["tcps://localhost:8044"]
 
 # A comma separated list of splinter nodes the daemon will automatically
 # attempt to connect to on start up

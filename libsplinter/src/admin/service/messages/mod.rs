@@ -197,7 +197,7 @@ impl Default for RouteType {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct SplinterNode {
     pub node_id: String,
-    pub endpoint: String,
+    pub endpoints: Vec<String>,
 }
 
 impl SplinterNode {
@@ -205,7 +205,7 @@ impl SplinterNode {
         let mut proto = admin::SplinterNode::new();
 
         proto.set_node_id(self.node_id);
-        proto.set_endpoint(self.endpoint);
+        proto.set_endpoints(self.endpoints.into());
 
         proto
     }
@@ -213,7 +213,7 @@ impl SplinterNode {
     pub fn from_proto(mut proto: admin::SplinterNode) -> Result<Self, MarshallingError> {
         Ok(Self {
             node_id: proto.take_node_id(),
-            endpoint: proto.take_endpoint(),
+            endpoints: proto.take_endpoints().into(),
         })
     }
 }

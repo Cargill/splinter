@@ -197,7 +197,7 @@ mod test {
     use super::*;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
-        let mut node = Node::new(id, endpoint);
+        let mut node = Node::new(id, vec![endpoint.into()]);
         for (key, val) in metadata {
             node.metadata.insert(key.to_string(), val.to_string());
         }
@@ -382,7 +382,7 @@ mod test {
     /// 1. Add the same node to the local registry and two read-only registries with different
     ///    endpoints and metadata.
     /// 2. Add the registries to a unified registry.
-    /// 3. Fetch the node and verify that it has the correct data (endpoint from local registry,
+    /// 3. Fetch the node and verify that it has the correct data (endpoints from local registry,
     ///    metadata merged from all sources).
     #[test]
     fn fetch_node_local_precedence() {

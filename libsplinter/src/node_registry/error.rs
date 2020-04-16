@@ -67,6 +67,7 @@ pub enum InvalidNodeError {
     EmptyIdentity,
     EmptyDisplayName,
     InvalidIdentity(String, String), // (identity, message)
+    MissingEndpoints,
 }
 
 impl Error for InvalidNodeError {
@@ -78,6 +79,7 @@ impl Error for InvalidNodeError {
             InvalidNodeError::EmptyIdentity => None,
             InvalidNodeError::EmptyDisplayName => None,
             InvalidNodeError::InvalidIdentity(..) => None,
+            InvalidNodeError::MissingEndpoints => None,
         }
     }
 }
@@ -91,7 +93,7 @@ impl fmt::Display for InvalidNodeError {
             InvalidNodeError::DuplicateIdentity(identity) => {
                 write!(f, "another node with identity {} exists", identity)
             }
-            InvalidNodeError::EmptyEndpoint => write!(f, "node must have non-empty endpoint"),
+            InvalidNodeError::EmptyEndpoint => write!(f, "node endpoint cannot be empty"),
             InvalidNodeError::EmptyIdentity => write!(f, "node must have non-empty identity"),
             InvalidNodeError::EmptyDisplayName => {
                 write!(f, "node must have non-empty display_name")
@@ -99,6 +101,7 @@ impl fmt::Display for InvalidNodeError {
             InvalidNodeError::InvalidIdentity(identity, msg) => {
                 write!(f, "identity {} is invalid: {}", identity, msg)
             }
+            InvalidNodeError::MissingEndpoints => write!(f, "node must have one or more endpoints"),
         }
     }
 }

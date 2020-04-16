@@ -88,11 +88,20 @@ impl PeerConnector {
         }
     }
 
-    pub fn connect_peer(&self, node_id: &str, endpoint: &str) -> Result<(), PeerConnectorError> {
+    pub fn connect_peer(
+        &self,
+        node_id: &str,
+        endpoints: &[String],
+    ) -> Result<(), PeerConnectorError> {
         let mut transport = self
             .transport
             .lock()
             .map_err(|err| PeerConnectorError::PoisonedLock(err.to_string()))?;
+
+        // Currently, only one endpoint is supported, so we just use the first one in the list here
+        let endpoint = endpoints.get(0).ok_or_else(|| {
+            PeerConnectorError::connection_failed(node_id, "no endpoints provided".into())
+        })?;
 
         if self.network.get_peer_by_endpoint(endpoint).is_some() {
             return Ok(());
@@ -260,7 +269,7 @@ mod tests {
 
         assert_eq!(
             Ok(()),
-            peer_connector.connect_peer("test_node_id", "MockConnection")
+            peer_connector.connect_peer("test_node_id", &["MockConnection".to_string()])
         );
         assert!(!network.peer_ids().is_empty());
         assert_eq!(Some(&"test_node_id".to_string()), network.peer_ids().get(0));
@@ -279,7 +288,7 @@ mod tests {
 
         assert!(network.peer_ids().is_empty());
 
-        let result = peer_connector.connect_peer("test_node_id", "MockConnection");
+        let result = peer_connector.connect_peer("test_node_id", &["MockConnection".to_string()]);
         assert!(result.is_err());
         assert!(network.peer_ids().is_empty());
     }

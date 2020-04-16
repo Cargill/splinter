@@ -120,12 +120,16 @@ fn main() {
         (@arg config: -c --config +takes_value)
         (@arg node_id: --("node-id") +takes_value
           "Unique ID for the node ")
+        (@arg display_name: --("display-name") +takes_value
+          "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
         (@arg transport: --("transport") +takes_value
           "Transport type for sockets, either raw or tls")
-        (@arg network_endpoint: -n --("network-endpoint") +takes_value
-          "Endpoint to connect to the network, tcp://ip:port")
+        (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple
+          "Endpoints to connect to the network, tcp://ip:port")
+        (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple
+          "Publicly-visible network endpoints")
         (@arg service_endpoint: --("service-endpoint") +takes_value
           "Endpoint that service will connect to, tcp://ip:port")
         (@arg peers: --peer +takes_value +multiple
@@ -289,10 +293,12 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_storage_location(storage_location)
         .with_key_registry_location(key_registry_location)
         .with_local_node_registry_location(local_node_registry_location)
-        .with_network_endpoint(String::from(config.network_endpoint()))
+        .with_network_endpoints(config.network_endpoints().to_vec())
+        .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
         .with_node_id(String::from(config.node_id()))
+        .with_display_name(String::from(config.display_name()))
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())

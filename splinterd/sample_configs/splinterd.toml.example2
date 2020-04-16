@@ -18,8 +18,8 @@ node_id = "345"
 # Endpoint used for service to daemon communication.
 service_endpoint = "127.0.0.1:8045"
 
-# Endpoint used for daemon to daemon communication.
-network_endpoint = "127.0.0.1:8046"
+# Endpoints used for daemon to daemon communication.
+network_endpoints = ["127.0.0.1:8046"]
 
 # A list of splinter nodes the daemon will automatically
 # connect to on start up.

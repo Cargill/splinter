@@ -65,8 +65,8 @@ OPTIONS
 
 `--node NODE-STRING` ...
 : Specifies a node that should be part of the circuit, using the format
-  `NODE-ID::ENDPOINT`. This node ID must match the node ID and endpoint entry
-  in the node registry. The proposer must also specify its own node, if it is to
+  `NODE-ID::ENDPOINT1,ENDPOINT2`. All endpoints must be in the node's entry in
+  the node registry. The proposer must also specify its own node, if it is to
   be included on the circuit proposal. Repeat this option to specify multiple
   nodes.
 
@@ -123,14 +123,15 @@ EXAMPLES
 This command proposes a simple circuit with one other node.
 
 * The proposing node has ID `alpha001` and endpoint `tcps://splinterd-node-acme001:8044`.
-* The other node has ID `beta001` and endpoint `tcps://splinterd-node-beta001:8044`.
+* The other node has ID `beta001` and endpoint `tcps://splinterd-node-beta001:8044`
+  and `tcp://splinterd-node-beta001:8045`.
 * There is one service with ID `AA01`. This service has no service
   arguments, service type, or service group.
 
 ```
 $ splinter circuit propose \
   --node alpha001::tcps://splinterd-node-alpha001:8044 \
-  --node beta001::tcps://splinterd-node-beta001:8044 \
+  --node beta001::tcps://splinterd-node-beta001:8044,tcp://splinterd-node-beta001:8045 \
   --service AA01::alpha001 \
   --key PRIVATE-KEY-FILE
   --url URL-of-splinterd-REST-API

@@ -18,17 +18,26 @@ use splinter::futures::{Future, IntoFuture};
 #[derive(Debug, Serialize, Deserialize)]
 struct Status {
     node_id: String,
-    endpoint: String,
+    display_name: String,
+    service_endpoint: String,
+    network_endpoints: Vec<String>,
+    advertised_endpoints: Vec<String>,
     version: String,
 }
 
 pub fn get_status(
     node_id: String,
-    endpoint: String,
+    display_name: String,
+    service_endpoint: String,
+    network_endpoints: Vec<String>,
+    advertised_endpoints: Vec<String>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let status = Status {
         node_id,
-        endpoint,
+        display_name,
+        service_endpoint,
+        network_endpoints,
+        advertised_endpoints,
         version: get_version(),
     };
 

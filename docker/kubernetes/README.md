@@ -119,13 +119,15 @@ walkthrough. For installation instructions, see the
     ----
     ---
     - identity: "acme"
-      endpoint: "tcps://acme.default.svc.cluster.local:8044"
+      endpoints:
+        - "tcps://acme.default.svc.cluster.local:8044"
       display_name: "Acme"
       metadata:
         organization: "Acme Corporation"
 
     - identity: "bubba"
-      endpoint: "tcps://bubba.default.svc.cluster.local:8044"
+      endpoints:
+        - "tcps://bubba.default.svc.cluster.local:8044"
       display_name: "Bubba Bakery"
       metadata:
         organization: "Bubba Bakery"

@@ -533,7 +533,7 @@ mod tests {
                 roster: vec![],
                 members: vec![SplinterNode {
                     node_id: "node_id".into(),
-                    endpoint: "".into(),
+                    endpoints: vec!["".into()],
                 }],
                 authorization_type: AuthorizationType::Trust,
                 persistence: PersistenceType::Any,
@@ -582,7 +582,7 @@ mod tests {
                 roster: vec![],
                 members: vec![SplinterNode {
                     node_id: "node_id".into(),
-                    endpoint: "".into(),
+                    endpoints: vec!["".into()],
                 }],
                 authorization_type: AuthorizationType::Trust,
                 persistence: PersistenceType::Any,

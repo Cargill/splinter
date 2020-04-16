@@ -904,9 +904,11 @@ components:
         node_id:
           type: string
           example: acme-node-000
-        endpoint:
-          type: string
-          example: tcps://127.0.0.1:8080
+        endpoints:
+          type: array
+          items:
+            type: string
+            example: tcps://127.0.0.1:8080
 
     ApiGameroom:
       type: object
@@ -954,15 +956,18 @@ components:
       properties:
         identity:
           type: string
-        endpoint:
-          type: string
+        endpoints:
+          type: array
+          items:
+            type: string
         display_name:
           type: string
         metadata:
           type: object
       example:
         identity: node-123123-asdf
-        endpoint: tcps://12.0.0.123:8431
+        endpoints:
+          - tcps://12.0.0.123:8431
         display_name: Cargill - Node 1
         metadata:
           company: Cargill
