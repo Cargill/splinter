@@ -48,6 +48,8 @@ use super::{
 /// precedence is used, with the exception of the node's [`metadata`] (see the
 /// [`Metadata Merging`] section below).
 ///
+/// If reading a source registry fails, the error will be logged and the registry will be ignored.
+///
 /// ## Registry Precedence
 ///
 /// The local read-write registry has the highest precedence, followed by the read-only registries.
@@ -87,23 +89,24 @@ impl UnifiedNodeRegistry {
     }
 
     /// Gets all nodes from all sources (in ascending order of precedence) without deduplication.
-    fn all_nodes<'a>(&'a self) -> Result<NodeIter<'a>, NodeRegistryError> {
-        // Get node iterators from all read-only sources
-        self.readable_sources
-            .iter()
-            .map(|registry| registry.list_nodes(&[]))
-            // Reverse the sources, so lowest precedence is first
-            .rev()
-            // Add the local source's node iterator to the end, since it has highest precedence
-            .chain(std::iter::once(self.local_source.list_nodes(&[])))
-            // Flatten into a single iterator, returning any errors from the `list_nodes` calls
-            .try_fold(
-                Box::new(std::iter::empty()) as NodeIter<'a>,
-                |chain, nodes_res| {
-                    let v = nodes_res?.collect::<Vec<_>>();
-                    Ok(Box::new(chain.chain(v.into_iter())) as NodeIter<'a>)
-                },
-            )
+    fn all_nodes(&self) -> NodeIter<'_> {
+        Box::new(
+            // Get node iterators from all read-only sources
+            self.readable_sources
+                .iter()
+                .map(|registry| registry.list_nodes(&[]))
+                // Reverse the sources, so lowest precedence is first
+                .rev()
+                // Add the local source's node iterator to the end, since it has highest precedence
+                .chain(std::iter::once(self.local_source.list_nodes(&[])))
+                // Log any errors from the `list_nodes` calls and ignore the failing registries
+                .filter_map(|res| {
+                    res.map_err(|err| debug!("Failed to list nodes in source registry: {}", err))
+                        .ok()
+                })
+                // Flatten into a single iterator
+                .flatten(),
+        )
     }
 }
 
@@ -117,7 +120,7 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
     ) -> Result<NodeIter<'a>, NodeRegistryError> {
         Ok(Box::new(
             // Get all nodes from all sources
-            self.all_nodes()?
+            self.all_nodes()
                 // Deduplicate and merge metadata
                 .fold(HashMap::<String, Node>::new(), |mut acc, mut node| {
                     // If the node is already present, merge metadata
@@ -145,16 +148,22 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
 
     fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         // Get node from all read-only sources
-        self.readable_sources
+        Ok(self
+            .readable_sources
             .iter()
             .map(|registry| registry.fetch_node(identity))
             // Reverse the sources, so lowest precedence is first
             .rev()
             // Get node from the local source and add it to the end, since it has highest precedence
             .chain(std::iter::once(self.local_source.fetch_node(identity)))
+            // Log any errors from the `fetch_node` calls and ignore the failing registries
+            .filter_map(|res| {
+                res.map_err(|err| debug!("Failed to fetch node from source registry: {}", err))
+                    .ok()
+            })
             // Merge metadata and get the highest-precedence definition of the node if it exists
-            .try_fold(None, |final_opt: Option<Node>, fetch_res| {
-                fetch_res.map(|fetch_opt| match fetch_opt {
+            .fold(None, |final_opt, fetch_opt| {
+                match fetch_opt {
                     Some(mut node) => {
                         // If the node was already found at a lower precedence, merge metadata
                         if let Some(existing) = final_opt {
@@ -167,8 +176,8 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
                         Some(node)
                     }
                     None => final_opt,
-                })
-            })
+                }
+            }))
     }
 }
 
