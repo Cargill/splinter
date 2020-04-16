@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A local, read/write node registry.
+//!
+//! This module contains the [`LocalYamlNodeRegistry`], which provides an implementation of the
+//! [`RwNodeRegistry`] trait.
+//!
+//! [`LocalYamlNodeRegistry`]: struct.LocalYamlNodeRegistry.html
+//! [`RwNodeRegistry`]: ../../trait.RwNodeRegistry.html
+
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -23,20 +31,45 @@ use crate::node_registry::{
 
 use super::{check_if_node_is_duplicate, check_node_required_fields_are_not_empty, validate_nodes};
 
+/// A local, read/write node registry.
+///
+/// The `LocalYamlNodeRegistry` provides access to and modification of a local node registry YAML
+/// file. The local registry file must be a YAML sequence of nodes, where each node is valid (see
+/// [`Node`] for validity criteria).
+///
+/// The contents of the YAML file are cached in-memory by the registry so that a disk operation is
+/// not necessary when reading from the registry. This means that the YAML file is only read on
+/// initialization, so it should not be modified directly while in use by the
+/// `LocalYamlNodeRegistry`.
+///
+/// On initializaion, the registry will check if its backing file already exists. If the backing
+/// file already exists, the registry will attempt to load, parse, and validate it. If the backing
+/// file does not already exist, the registry will attempt to create it.
+///
+/// [`Node`]: struct.Node.html
 #[derive(Clone)]
 pub struct LocalYamlNodeRegistry {
     internal: Arc<Mutex<Internal>>,
 }
 
+/// Internal state of the registry
 struct Internal {
     file_path: String,
     cached_nodes: Vec<Node>,
 }
 
 impl LocalYamlNodeRegistry {
+    /// Construct a new `LocalYamlNodeRegistry`. If the backing file already exists, it will be
+    /// loaded, parsed, and validated; if any of these steps fails, the error will be returned. If
+    /// the backing file doesn't already exist, it will be created and initialized; if file creation
+    /// fails, the error will be returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_path` - The path of the backing YAML file.
     pub fn new(file_path: &str) -> Result<LocalYamlNodeRegistry, NodeRegistryError> {
-        // If file already exists, read and verify its contents; otherwise create it and initialize
-        // the nodes list.
+        // If file already exists, read, verify and cache its contents; otherwise create it and
+        // initialize the nodes list.
         if PathBuf::from(file_path).is_file() {
             let file = File::open(file_path).map_err(|err| {
                 NodeRegistryError::general_error_with_source(
@@ -80,6 +113,7 @@ impl LocalYamlNodeRegistry {
         }
     }
 
+    /// Get the list of nodes from the in-memory cache.
     pub(super) fn get_cached_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
         Ok(self
             .internal
@@ -91,6 +125,7 @@ impl LocalYamlNodeRegistry {
             .clone())
     }
 
+    /// Write the given list of nodes to the backing YAML file.
     pub(super) fn write_nodes(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
         let mut file_backend = self.internal.lock().map_err(|_| {
             NodeRegistryError::general_error("YAML registry's internal lock poisoned")

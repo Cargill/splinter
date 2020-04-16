@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! YAML file-backed node registry implementations.
+
 mod local;
 #[cfg(feature = "registry-remote")]
 mod remote;
@@ -22,6 +24,7 @@ pub use local::LocalYamlNodeRegistry;
 #[cfg(feature = "registry-remote")]
 pub use remote::{RemoteYamlNodeRegistry, ShutdownHandle as RemoteYamlShutdownHandle};
 
+/// Returns `Err` if not all `nodes` are valid.
 fn validate_nodes(nodes: &[Node]) -> Result<(), InvalidNodeError> {
     for (idx, node) in nodes.iter().enumerate() {
         check_node_required_fields_are_not_empty(node)?;
@@ -30,6 +33,7 @@ fn validate_nodes(nodes: &[Node]) -> Result<(), InvalidNodeError> {
     Ok(())
 }
 
+/// Checks emptiness properties of all fields on the given `node`.
 fn check_node_required_fields_are_not_empty(node: &Node) -> Result<(), InvalidNodeError> {
     if node.identity.is_empty() {
         Err(InvalidNodeError::EmptyIdentity)
@@ -44,6 +48,7 @@ fn check_node_required_fields_are_not_empty(node: &Node) -> Result<(), InvalidNo
     }
 }
 
+/// Checks if the given `node` is a duplicate of any in the slice of `existing_nodes`.
 fn check_if_node_is_duplicate(
     node: &Node,
     existing_nodes: &[Node],
