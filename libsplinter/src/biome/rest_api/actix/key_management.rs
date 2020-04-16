@@ -230,8 +230,8 @@ fn handle_patch(
             };
 
             match key_store.update_key(
-                &user_id,
                 &updated_key.public_key,
+                &user_id,
                 &updated_key.new_display_name,
             ) {
                 Ok(()) => HttpResponse::Ok()
@@ -320,7 +320,7 @@ fn handle_fetch(
             }
         };
 
-        match key_store.fetch_key(&user_id, &public_key) {
+        match key_store.fetch_key(&public_key, &user_id) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
                     .json(json!({ "data": ResponseKey::from(&key) }))
@@ -390,7 +390,7 @@ fn handle_delete(
             }
         };
 
-        match key_store.remove_key(&user_id, &public_key) {
+        match key_store.remove_key(&public_key, &user_id) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
                     .json(json!(
