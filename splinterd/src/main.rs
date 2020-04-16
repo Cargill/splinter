@@ -269,8 +269,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
-    let local_node_registry_location = state_dir
-        .join("nodes.yaml")
+    let node_registry_directory = state_dir
         .to_str()
         .ok_or_else(|| {
             UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
@@ -291,7 +290,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     daemon_builder = daemon_builder
         .with_storage_location(storage_location)
         .with_key_registry_location(key_registry_location)
-        .with_local_node_registry_location(local_node_registry_location)
+        .with_node_registry_directory(node_registry_directory)
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))

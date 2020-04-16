@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -107,7 +108,7 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 pub struct SplinterDaemon {
     storage_location: String,
     key_registry_location: String,
-    local_node_registry_location: String,
+    node_registry_directory: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
@@ -423,7 +424,7 @@ impl SplinterDaemon {
         let key_registry_manager = KeyRegistryManager::new(key_registry);
 
         let node_registry =
-            create_node_registry(&self.local_node_registry_location, &self.registries)?;
+            create_node_registry(&self.node_registry_directory, &self.registries)?;
 
         let node_id = self.node_id.clone();
         let display_name = self.display_name.clone();
@@ -712,7 +713,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 pub struct SplinterDaemonBuilder {
     storage_location: Option<String>,
     key_registry_location: Option<String>,
-    local_node_registry_location: Option<String>,
+    node_registry_directory: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -747,8 +748,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_local_node_registry_location(mut self, value: String) -> Self {
-        self.local_node_registry_location = Some(value);
+    pub fn with_node_registry_directory(mut self, value: String) -> Self {
+        self.node_registry_directory = Some(value);
         self
     }
 
@@ -842,10 +843,8 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: key_registry_location".to_string())
         })?;
 
-        let local_node_registry_location = self.local_node_registry_location.ok_or_else(|| {
-            CreateError::MissingRequiredField(
-                "Missing field: local_node_registry_location".to_string(),
-            )
+        let node_registry_directory = self.node_registry_directory.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: node_registry_directory".to_string())
         })?;
 
         let service_endpoint = self.service_endpoint.ok_or_else(|| {
@@ -908,7 +907,7 @@ impl SplinterDaemonBuilder {
             biome_enabled: self.biome_enabled,
             registries: self.registries,
             key_registry_location,
-            local_node_registry_location,
+            node_registry_directory,
             storage_type,
             admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
             #[cfg(feature = "rest-api-cors")]
@@ -978,21 +977,26 @@ fn set_up_circuit_dispatcher(
 }
 
 fn create_node_registry(
-    local_node_registry_location: &str,
+    node_registry_directory: &str,
     registries: &[String],
 ) -> Result<Box<dyn RwNodeRegistry>, StartError> {
+    let local_registry_path = Path::new(node_registry_directory)
+        .join("local_registry.yaml")
+        .to_str()
+        .expect("path built from &str cannot be invalid")
+        .to_string();
     debug!(
         "Creating local node registry with registry file: {:?}",
-        local_node_registry_location
+        local_registry_path
     );
-    let local_registry = Box::new(
-        LocalYamlNodeRegistry::new(local_node_registry_location).map_err(|err| {
+    let local_registry = Box::new(LocalYamlNodeRegistry::new(&local_registry_path).map_err(
+        |err| {
             StartError::NodeRegistryError(format!(
                 "Failed to initialize local LocalYamlNodeRegistry: {}",
                 err
             ))
-        })?,
-    );
+        },
+    )?);
 
     // Currently, only file-based read-only registries are supported
     let read_only_registries = registries
