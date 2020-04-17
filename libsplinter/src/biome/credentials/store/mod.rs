@@ -250,7 +250,7 @@ impl Into<NewCredentialsModel> for Credentials {
 
 /// Cost to encrypt password. The recommended value is HIGH. Values LOW and MEDIUM may be used for
 /// development and testing as hashing and verifying passwords will be completed faster.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Copy, Clone)]
 pub enum PasswordEncryptionCost {
     High,
     Medium,
@@ -274,7 +274,7 @@ impl FromStr for PasswordEncryptionCost {
 }
 
 impl PasswordEncryptionCost {
-    fn to_value(&self) -> u32 {
+    fn to_value(self) -> u32 {
         match self {
             PasswordEncryptionCost::High => DEFAULT_COST,
             PasswordEncryptionCost::Medium => MEDIUM_COST,

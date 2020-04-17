@@ -38,7 +38,7 @@ use crate::rest_api::{
 ///
 /// The payload should be in the JSON format:
 ///   {
-///       "refresh_token": <refresh token for requesting a auth token>
+///       "token": <refresh token for requesting a auth token>
 ///   }
 ///
 /// Endpoint returns a payload containing a new auth token

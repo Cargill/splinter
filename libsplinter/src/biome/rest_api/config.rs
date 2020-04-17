@@ -62,7 +62,7 @@ impl BiomeRestConfig {
     /// being salted. Defaults to 12 rounds of hashing or "high".
     #[cfg(feature = "biome-credentials")]
     pub fn password_encryption_cost(&self) -> PasswordEncryptionCost {
-        self.password_encryption_cost.clone()
+        self.password_encryption_cost
     }
 }
 
