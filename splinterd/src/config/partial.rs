@@ -47,6 +47,10 @@ pub struct PartialConfig {
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
+    #[cfg(feature = "registry-remote")]
+    registry_auto_refresh_interval: Option<u64>,
+    #[cfg(feature = "registry-remote")]
+    registry_forced_refresh_interval: Option<u64>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
     state_dir: Option<String>,
@@ -78,6 +82,10 @@ impl PartialConfig {
             #[cfg(feature = "database")]
             database: None,
             registries: None,
+            #[cfg(feature = "registry-remote")]
+            registry_auto_refresh_interval: None,
+            #[cfg(feature = "registry-remote")]
+            registry_forced_refresh_interval: None,
             heartbeat_interval: None,
             admin_service_coordinator_timeout: None,
             state_dir: None,
@@ -155,6 +163,16 @@ impl PartialConfig {
 
     pub fn registries(&self) -> Option<Vec<String>> {
         self.registries.clone()
+    }
+
+    #[cfg(feature = "registry-remote")]
+    pub fn registry_auto_refresh_interval(&self) -> Option<u64> {
+        self.registry_auto_refresh_interval
+    }
+
+    #[cfg(feature = "registry-remote")]
+    pub fn registry_forced_refresh_interval(&self) -> Option<u64> {
+        self.registry_forced_refresh_interval
     }
 
     pub fn heartbeat_interval(&self) -> Option<u64> {
@@ -374,6 +392,38 @@ impl PartialConfig {
     ///
     pub fn with_registries(mut self, registries: Option<Vec<String>>) -> Self {
         self.registries = registries;
+        self
+    }
+
+    #[cfg(feature = "registry-remote")]
+    /// Adds a `registry_auto_refresh_interval` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `registry_auto_refresh_interval` - How often remote registries should be refreshed in the
+    ///   background.
+    ///
+    pub fn with_registry_auto_refresh_interval(
+        mut self,
+        registry_auto_refresh_interval: Option<u64>,
+    ) -> Self {
+        self.registry_auto_refresh_interval = registry_auto_refresh_interval;
+        self
+    }
+
+    #[cfg(feature = "registry-remote")]
+    /// Adds a `registry_forced_refresh_interval` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `registry_forced_refresh_interval` - How long before remote registries should be
+    ///   refreshed on read.
+    ///
+    pub fn with_registry_forced_refresh_interval(
+        mut self,
+        registry_forced_refresh_interval: Option<u64>,
+    ) -> Self {
+        self.registry_forced_refresh_interval = registry_forced_refresh_interval;
         self
     }
 

@@ -63,6 +63,7 @@ experimental = [
     "biome-key-management",
     "biome-refresh-tokens",
     "health",
+    "registry-remote",
     "rest-api-cors",
     "scabbard-get-state",
     "service-arg-validation",
@@ -78,6 +79,7 @@ config-command-line = []
 config-env-var = []
 config-toml = []
 database = ["splinter/postgres"]
+registry-remote = ["splinter/registry-remote"]
 rest-api-cors = ["splinter/rest-api-cors"]
 scabbard-get-state = ["splinter/scabbard-get-state"]
 service-arg-validation = ["splinter/service-arg-validation"]
