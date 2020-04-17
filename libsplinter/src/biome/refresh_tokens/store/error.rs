@@ -33,7 +33,7 @@ pub enum RefreshTokenError {
     /// Represents general failures in the database
     StorageError {
         context: String,
-        source: Box<dyn Error>,
+        source: Option<Box<dyn Error>>,
     },
     /// Represents an issue connecting to the database
     ConnectionError(Box<dyn Error>),
@@ -47,7 +47,11 @@ impl Error for RefreshTokenError {
         match self {
             RefreshTokenError::OperationError { source, .. } => Some(&**source),
             RefreshTokenError::QueryError { source, .. } => Some(&**source),
-            RefreshTokenError::StorageError { source, .. } => Some(&**source),
+            RefreshTokenError::StorageError {
+                source: Some(source),
+                ..
+            } => Some(&**source),
+            RefreshTokenError::StorageError { source: None, .. } => None,
             RefreshTokenError::ConnectionError(err) => Some(&**err),
             RefreshTokenError::NotFoundError(_) => None,
         }
@@ -62,11 +66,18 @@ impl fmt::Display for RefreshTokenError {
             RefreshTokenError::QueryError { context, source } => {
                 write!(f, "failed query: {}: {}", context, source)
             }
-            RefreshTokenError::StorageError { context, source } => write!(
+            RefreshTokenError::StorageError {
+                context,
+                source: Some(source),
+            } => write!(
                 f,
                 "the underlying storage returned an error: {}: {}",
                 context, source
             ),
+            RefreshTokenError::StorageError {
+                context,
+                source: None,
+            } => write!(f, "the underlying storage returned an error: {}", context),
             RefreshTokenError::ConnectionError(ref s) => {
                 write!(f, "failed to connect to underlying storage: {}", s)
             }

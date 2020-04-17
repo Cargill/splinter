@@ -16,6 +16,7 @@
 
 #[cfg(feature = "diesel")]
 pub(in crate::biome) mod diesel;
+pub(in crate::biome) mod memory;
 use std::str::FromStr;
 mod error;
 
@@ -31,6 +32,7 @@ const MEDIUM_COST: u32 = 8;
 const LOW_COST: u32 = 4;
 
 /// Represents crendentials used to authenticate a user
+#[derive(Clone)]
 pub struct Credentials {
     pub user_id: String,
     pub username: String,

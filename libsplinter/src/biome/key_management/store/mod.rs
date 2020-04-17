@@ -15,6 +15,7 @@
 #[cfg(feature = "diesel")]
 pub(in crate::biome) mod diesel;
 pub mod error;
+pub(in crate::biome) mod memory;
 
 use super::Key;
 

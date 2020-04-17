@@ -34,7 +34,7 @@ pub enum KeyStoreError {
     /// Represents general failures in the database
     StorageError {
         context: String,
-        source: Box<dyn Error>,
+        source: Option<Box<dyn Error>>,
     },
     /// Represents an issue connecting to the database
     ConnectionError(Box<dyn Error>),
@@ -51,7 +51,11 @@ impl Error for KeyStoreError {
         match self {
             KeyStoreError::OperationError { source, .. } => Some(&**source),
             KeyStoreError::QueryError { source, .. } => Some(&**source),
-            KeyStoreError::StorageError { source, .. } => Some(&**source),
+            KeyStoreError::StorageError {
+                source: Some(source),
+                ..
+            } => Some(&**source),
+            KeyStoreError::StorageError { source: None, .. } => None,
             KeyStoreError::ConnectionError(err) => Some(&**err),
             KeyStoreError::NotFoundError(_) => None,
             KeyStoreError::DuplicateKeyError(_) => None,
@@ -69,11 +73,18 @@ impl fmt::Display for KeyStoreError {
             KeyStoreError::QueryError { context, source } => {
                 write!(f, "failed query: {}: {}", context, source)
             }
-            KeyStoreError::StorageError { context, source } => write!(
+            KeyStoreError::StorageError {
+                context,
+                source: Some(source),
+            } => write!(
                 f,
                 "the underlying storage returned an error: {}: {}",
                 context, source
             ),
+            KeyStoreError::StorageError {
+                context,
+                source: None,
+            } => write!(f, "the underlying storage returned an error: {}", context),
             KeyStoreError::ConnectionError(err) => {
                 write!(f, "failed to connect to underlying storage: {}", err)
             }

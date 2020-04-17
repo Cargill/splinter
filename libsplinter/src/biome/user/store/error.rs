@@ -34,7 +34,7 @@ pub enum UserStoreError {
     /// Represents general failures in the database
     StorageError {
         context: String,
-        source: Box<dyn Error>,
+        source: Option<Box<dyn Error>>,
     },
     /// Represents an issue connecting to the database
     ConnectionError(Box<dyn Error>),
@@ -46,7 +46,11 @@ impl Error for UserStoreError {
         match self {
             UserStoreError::OperationError { source, .. } => Some(&**source),
             UserStoreError::QueryError { source, .. } => Some(&**source),
-            UserStoreError::StorageError { source, .. } => Some(&**source),
+            UserStoreError::StorageError {
+                source: Some(source),
+                ..
+            } => Some(&**source),
+            UserStoreError::StorageError { source: None, .. } => None,
             UserStoreError::ConnectionError(err) => Some(&**err),
             UserStoreError::NotFoundError(_) => None,
         }
@@ -62,11 +66,18 @@ impl fmt::Display for UserStoreError {
             UserStoreError::QueryError { context, source } => {
                 write!(f, "failed query: {}: {}", context, source)
             }
-            UserStoreError::StorageError { context, source } => write!(
+            UserStoreError::StorageError {
+                context,
+                source: Some(source),
+            } => write!(
                 f,
                 "the underlying storage returned an error: {}: {}",
                 context, source
             ),
+            UserStoreError::StorageError {
+                context,
+                source: None,
+            } => write!(f, "the underlying storage returned an error: {}", context),
             UserStoreError::ConnectionError(err) => {
                 write!(f, "failed to connect to underlying storage: {}", err)
             }
