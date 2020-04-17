@@ -149,14 +149,6 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("storage".to_string()))?,
-            transport: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.transport() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("transport".to_string()))?,
             cert_dir,
             ca_certs,
             client_cert,
@@ -271,6 +263,14 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("insecure".to_string()))?,
+            no_tls: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.no_tls() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                })
+                .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
             #[cfg(feature = "biome")]
             biome_enabled: self
                 .partial_configs
@@ -290,7 +290,6 @@ mod tests {
 
     /// Example configuration values.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_TRANSPORT: &str = "tls";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
@@ -305,7 +304,6 @@ mod tests {
     /// Asserts the example configuration values.
     fn assert_config_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
-        assert_eq!(config.transport(), Some(EXAMPLE_TRANSPORT.to_string()));
         assert_eq!(config.cert_dir(), None);
         assert_eq!(config.ca_certs(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(config.client_cert(), Some(EXAMPLE_CLIENT_CERT.to_string()));
@@ -353,7 +351,6 @@ mod tests {
         // Populate the PartialConfig fields by chaining the builder methods.
         partial_config = partial_config
             .with_storage(Some(EXAMPLE_STORAGE.to_string()))
-            .with_transport(Some(EXAMPLE_TRANSPORT.to_string()))
             .with_cert_dir(None)
             .with_ca_certs(Some(EXAMPLE_CA_CERTS.to_string()))
             .with_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()))
@@ -389,7 +386,6 @@ mod tests {
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
         // Populate the PartialConfig fields by separately applying the builder methods.
         partial_config = partial_config.with_storage(Some(EXAMPLE_STORAGE.to_string()));
-        partial_config = partial_config.with_transport(Some(EXAMPLE_TRANSPORT.to_string()));
         partial_config = partial_config.with_ca_certs(Some(EXAMPLE_CA_CERTS.to_string()));
         partial_config = partial_config.with_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()));
         partial_config = partial_config.with_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()));

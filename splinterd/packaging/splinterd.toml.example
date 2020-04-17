@@ -16,9 +16,11 @@
 node_id = "acme-node-000"
 
 # Endpoint used for service to daemon communication
-service_endpoint = "tcps://localhost:8043"
+service_endpoint = "tcp://localhost:8043"
 
-# Endpoints used for daemon to daemon communication
+# Endpoints used for daemon to daemon communication. Transport type is
+# determined by the protocol prefix. Use tcp:// for TCP connections and tcps://
+# for TLS connections
 network_endpoints = ["tcps://localhost:8044"]
 
 # A comma separated list of splinter nodes the daemon will automatically
@@ -35,9 +37,6 @@ bind = "localhost:8085"
 
 # Node Registry file
 registries = ["file:///etc/splinter/nodes.yaml"]
-
-# Which transport type this splinter node supports. Options are "raw" or "tls"
-transport = "tls"
 
 # List of certificate authority certificates (*.pem files).
 ca_certs = "/etc/splinter/certs/ca.pem"

@@ -31,7 +31,6 @@ pub enum ConfigSource {
 pub struct PartialConfig {
     source: ConfigSource,
     storage: Option<String>,
-    transport: Option<String>,
     cert_dir: Option<String>,
     ca_certs: Option<String>,
     client_cert: Option<String>,
@@ -52,6 +51,7 @@ pub struct PartialConfig {
     admin_service_coordinator_timeout: Option<Duration>,
     state_dir: Option<String>,
     insecure: Option<bool>,
+    no_tls: Option<bool>,
     #[cfg(feature = "biome")]
     biome_enabled: Option<bool>,
 }
@@ -62,7 +62,6 @@ impl PartialConfig {
         PartialConfig {
             source,
             storage: None,
-            transport: None,
             cert_dir: None,
             ca_certs: None,
             client_cert: None,
@@ -83,6 +82,7 @@ impl PartialConfig {
             admin_service_coordinator_timeout: None,
             state_dir: None,
             insecure: None,
+            no_tls: None,
             #[cfg(feature = "biome")]
             biome_enabled: None,
         }
@@ -94,10 +94,6 @@ impl PartialConfig {
 
     pub fn storage(&self) -> Option<String> {
         self.storage.clone()
-    }
-
-    pub fn transport(&self) -> Option<String> {
-        self.transport.clone()
     }
 
     pub fn cert_dir(&self) -> Option<String> {
@@ -177,6 +173,10 @@ impl PartialConfig {
         self.insecure
     }
 
+    pub fn no_tls(&self) -> Option<bool> {
+        self.no_tls
+    }
+
     #[cfg(feature = "biome")]
     pub fn biome_enabled(&self) -> Option<bool> {
         self.biome_enabled
@@ -191,18 +191,6 @@ impl PartialConfig {
     ///
     pub fn with_storage(mut self, storage: Option<String>) -> Self {
         self.storage = storage;
-        self
-    }
-
-    #[allow(dead_code)]
-    /// Adds a `transport` value to the PartialConfig object.
-    ///
-    /// # Arguments
-    ///
-    /// * `transport` -  Which transport type this splinterd node supports.
-    ///
-    pub fn with_transport(mut self, transport: Option<String>) -> Self {
-        self.transport = transport;
         self
     }
 
@@ -438,6 +426,18 @@ impl PartialConfig {
     ///
     pub fn with_insecure(mut self, insecure: Option<bool>) -> Self {
         self.insecure = insecure;
+        self
+    }
+
+    #[allow(dead_code)]
+    /// Adds a `no-tls` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `no-tls` - Do not configure TLS Transport
+    ///
+    pub fn with_no_tls(mut self, no_tls: Option<bool>) -> Self {
+        self.no_tls = no_tls;
         self
     }
 

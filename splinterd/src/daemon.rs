@@ -78,15 +78,15 @@ use splinter::service::{self, ServiceProcessor, ShutdownHandle};
 use splinter::signing::sawtooth::SawtoothSecp256k1SignatureVerifier;
 use splinter::storage::get_storage;
 use splinter::transport::{
-    inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Incoming,
-    ListenError, Listener, Transport,
+    multi::MultiTransport, AcceptError, ConnectError, Connection, Incoming, ListenError, Listener,
+    Transport,
 };
 
 use crate::routes;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
-const ADMIN_SERVICE_ADDRESS: &str = "inproc://admin-service";
+const INTERNAL_SERVICE_ADDRESS: &str = "inproc://internal-service";
 
 const ORCHESTRATOR_INCOMING_CAPACITY: usize = 8;
 const ORCHESTRATOR_OUTGOING_CAPACITY: usize = 8;
@@ -129,23 +129,7 @@ pub struct SplinterDaemon {
 }
 
 impl SplinterDaemon {
-    pub fn start(&mut self, transport: Box<dyn Transport + Send>) -> Result<(), StartError> {
-        let mut inproc_transport = InprocTransport::default();
-        let mut transports = vec![transport, Box::new(inproc_transport.clone())];
-
-        // Allowing unused_variable because health_inproc must be available later if feature
-        // health is enabled
-        #[allow(unused_variables)]
-        let health_inproc = if cfg!(feature = "health") {
-            let inproc_transport = InprocTransport::default();
-            transports.push(Box::new(inproc_transport.clone()));
-            Some(inproc_transport)
-        } else {
-            None
-        };
-
-        let mut transport = MultiTransport::new(transports);
-
+    pub fn start(&mut self, mut transport: MultiTransport) -> Result<(), StartError> {
         // Setup up ctrlc handling
         let running = Arc::new(AtomicBool::new(true));
 
@@ -157,12 +141,16 @@ impl SplinterDaemon {
         let circuit_directory = storage.read().clone();
         let state = SplinterState::new(self.storage_location.to_string(), circuit_directory);
 
-        // set up the listeners on the transport
+        // set up the listeners on the transport. This will set up listeners for different
+        // transports based on the protocol prefix of the endpoint.
         let network_listeners = self
             .network_endpoints
             .iter()
             .map(|endpoint| transport.listen(endpoint))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| {
+                StartError::TransportError(format!("Cannot create listener for endpoint: {}", err))
+            })?;
         debug!(
             "Listening for peer connections on {:?}",
             network_listeners
@@ -175,18 +163,43 @@ impl SplinterDaemon {
             "Listening for service connections on {}",
             service_listener.endpoint()
         );
-        let admin_service_listener = transport.listen(ADMIN_SERVICE_ADDRESS)?;
+        let internal_service_listener = transport.listen(INTERNAL_SERVICE_ADDRESS)?;
 
         // Listen for services
         Self::listen_for_services(
             self.network.clone(),
-            admin_service_listener,
+            internal_service_listener,
             vec![
                 format!("orchestator::{}", &self.node_id),
                 admin_service_id(&self.node_id),
+                format!("health::{}", &self.node_id),
             ],
             service_listener,
         );
+
+        let orchestrator_connection =
+            transport.connect(INTERNAL_SERVICE_ADDRESS).map_err(|err| {
+                StartError::TransportError(format!(
+                    "unable to initiate orchestrator connection: {:?}",
+                    err
+                ))
+            })?;
+
+        // set up inproc connections
+        let admin_connection = transport.connect(INTERNAL_SERVICE_ADDRESS).map_err(|err| {
+            StartError::AdminServiceError(format!(
+                "unable to initiate admin service connection: {:?}",
+                err
+            ))
+        })?;
+
+        #[cfg(feature = "health")]
+        let health_connection = transport.connect(INTERNAL_SERVICE_ADDRESS).map_err(|err| {
+            StartError::HealthServiceError(format!(
+                "unable to initiate health service connection: {:?}",
+                err
+            ))
+        })?;
 
         let peer_connector = PeerConnector::new(self.network.clone(), Box::new(transport));
         let auth_manager = AuthorizationManager::new(self.network.clone(), self.node_id.clone());
@@ -364,15 +377,6 @@ impl SplinterDaemon {
             })
             .map_err(|_| StartError::ThreadError("Unable to spawn main loop".into()))?;
 
-        let orchestrator_connection =
-            inproc_transport
-                .connect(ADMIN_SERVICE_ADDRESS)
-                .map_err(|err| {
-                    StartError::TransportError(format!(
-                        "unable to initiate orchestrator connection: {:?}",
-                        err
-                    ))
-                })?;
         let orchestrator = ServiceOrchestrator::new(
             vec![Box::new(ScabbardFactory::new(
                 None,
@@ -480,7 +484,7 @@ impl SplinterDaemon {
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
         let (admin_shutdown_handle, service_processor_join_handle) =
-            Self::start_admin_service(inproc_transport, admin_service, Arc::clone(&running))?;
+            Self::start_admin_service(admin_connection, admin_service, Arc::clone(&running))?;
 
         // Allowing possibly redundant clone of `running` since it will be needed again if the
         // `health` feature is enabled
@@ -506,18 +510,18 @@ impl SplinterDaemon {
         })
         .expect("Error setting Ctrl-C handler");
 
-        main_loop_join_handle
-            .join()
-            .map_err(|_| StartError::ThreadError("Unable to join main loop".into()))?;
-
         #[cfg(feature = "health")]
         {
             let health_service = HealthService::new(&self.node_id);
             let health_service_processor_join_handle =
-                start_health_service(health_inproc.unwrap(), health_service, Arc::clone(&running))?;
+                start_health_service(health_connection, health_service, Arc::clone(&running))?;
 
             let _ = health_service_processor_join_handle.join_all();
         }
+
+        main_loop_join_handle
+            .join()
+            .map_err(|_| StartError::ThreadError("Unable to join main loop".into()))?;
 
         // Join network sender and dispatcher threads
         let _ = rest_api_join_handle.join();
@@ -534,7 +538,7 @@ impl SplinterDaemon {
     ) {
         // this thread will just be dropped on shutdown
         let _ = thread::spawn(move || {
-            // accept the admin service's connection
+            // accept the internal service connections
             for service_peer_id in internal_service_peer_ids.into_iter() {
                 match internal_service_listener.incoming().next() {
                     Some(Ok(connection)) => {
@@ -575,22 +579,13 @@ impl SplinterDaemon {
     }
 
     fn start_admin_service(
-        transport: InprocTransport,
+        connection: Box<dyn Connection>,
         admin_service: AdminService,
         running: Arc<AtomicBool>,
     ) -> Result<(ShutdownHandle, ServiceJoinHandle), StartError> {
         let start_admin: std::thread::JoinHandle<
             Result<(ShutdownHandle, ServiceJoinHandle), StartError>,
         > = thread::spawn(move || {
-            let mut transport = transport;
-
-            // use a match statement here, to inform
-            let connection = transport.connect(ADMIN_SERVICE_ADDRESS).map_err(|err| {
-                StartError::AdminServiceError(format!(
-                    "unable to initiate admin service connection: {:?}",
-                    err
-                ))
-            })?;
             let mut admin_service_processor = ServiceProcessor::new(
                 connection,
                 "admin".into(),
@@ -630,22 +625,13 @@ impl SplinterDaemon {
 
 #[cfg(feature = "health")]
 fn start_health_service(
-    mut transport: InprocTransport,
+    connection: Box<dyn Connection>,
     health_service: HealthService,
     running: Arc<AtomicBool>,
 ) -> Result<service::JoinHandles<Result<(), service::error::ServiceProcessorError>>, StartError> {
     let start_health_service: std::thread::JoinHandle<
         Result<service::JoinHandles<Result<(), service::error::ServiceProcessorError>>, StartError>,
     > = thread::spawn(move || {
-        // use a match statement here, to inform
-        let connection = transport
-            .connect("inproc://health-service")
-            .map_err(|err| {
-                StartError::HealthServiceError(format!(
-                    "unable to initiate health service connection: {:?}",
-                    err
-                ))
-            })?;
         let mut health_service_processor = ServiceProcessor::new(
             connection,
             "health".into(),

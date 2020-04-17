@@ -40,7 +40,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         partial_config = partial_config
             .with_storage(Some(String::from("yaml")))
-            .with_transport(Some(String::from("raw")))
             .with_cert_dir(Some(String::from(DEFAULT_CERT_DIR)))
             .with_ca_certs(Some(String::from(CA_PEM)))
             .with_client_cert(Some(String::from(CLIENT_CERT)))
@@ -59,7 +58,8 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT_MILLIS,
             ))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
-            .with_insecure(Some(false));
+            .with_insecure(Some(false))
+            .with_no_tls(Some(false));
 
         #[cfg(feature = "biome")]
         {
@@ -84,7 +84,6 @@ mod tests {
     /// Asserts config values based on the default values.
     fn assert_default_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(String::from("yaml")));
-        assert_eq!(config.transport(), Some(String::from("raw")));
         assert_eq!(config.cert_dir(), Some(String::from(DEFAULT_CERT_DIR)));
         assert_eq!(config.ca_certs(), Some(String::from(CA_PEM)));
         assert_eq!(config.client_cert(), Some(String::from(CLIENT_CERT)));
@@ -116,6 +115,7 @@ mod tests {
         );
         assert_eq!(config.state_dir(), Some(String::from(DEFAULT_STATE_DIR)));
         assert_eq!(config.insecure(), Some(false));
+        assert_eq!(config.no_tls(), Some(false));
         #[cfg(feature = "biome")]
         assert_eq!(config.biome_enabled(), Some(false));
         // Assert the source is correctly identified for this PartialConfig object.

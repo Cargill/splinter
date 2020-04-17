@@ -246,7 +246,7 @@ impl Into<NewCredentialsModel> for Credentials {
     }
 }
 
-/// Cost to encrypt password. The recommneded value is HIGH. Values LOW and MEDIUM may be used for
+/// Cost to encrypt password. The recommended value is HIGH. Values LOW and MEDIUM may be used for
 /// development and testing as hashing and verifying passwords will be completed faster.
 #[derive(Debug, Deserialize, Clone)]
 pub enum PasswordEncryptionCost {

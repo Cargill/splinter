@@ -110,7 +110,6 @@ impl From<ConfigError> for UserError {
 #[derive(Debug)]
 pub enum GetTransportError {
     CertError(String),
-    NotSupportedError(String),
     TlsTransportError(TlsInitError),
     IoError(io::Error),
 }
@@ -119,7 +118,6 @@ impl Error for GetTransportError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             GetTransportError::CertError(_) => None,
-            GetTransportError::NotSupportedError(_) => None,
             GetTransportError::TlsTransportError(err) => Some(err),
             GetTransportError::IoError(err) => Some(err),
         }
@@ -131,9 +129,6 @@ impl fmt::Display for GetTransportError {
         match self {
             GetTransportError::CertError(msg) => {
                 write!(f, "unable to retrieve certificate: {}", msg)
-            }
-            GetTransportError::NotSupportedError(msg) => {
-                write!(f, "received transport type that is not supported: {}", msg)
             }
             GetTransportError::TlsTransportError(err) => {
                 write!(f, "unable to create TLS transport: {}", err)

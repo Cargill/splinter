@@ -50,7 +50,7 @@ use std::path::Path;
 use std::thread;
 
 use error::UserError;
-use transport::get_transport;
+use transport::build_transport;
 
 fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Config, UserError> {
     #[cfg(feature = "default")]
@@ -124,10 +124,8 @@ fn main() {
           "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
-        (@arg transport: --("transport") +takes_value
-          "Transport type for sockets, either raw or tls")
         (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple
-          "Endpoints to connect to the network, tcp://ip:port")
+          "Endpoints to connect to the network, protocol-prefix://ip:port")
         (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple
           "Publicly-visible network endpoints")
         (@arg service_endpoint: --("service-endpoint") +takes_value
@@ -148,6 +146,7 @@ fn main() {
           "File path to the key for the node when connecting to a node as client")
         (@arg insecure:  --("insecure")
           "If set to tls, should accept all peer certificates")
+        (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
         (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
@@ -232,7 +231,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let config = create_config(config_file_path, matches.clone())?;
 
-    let transport = get_transport(&config)?;
+    let transport = build_transport(&config)?;
 
     let state_dir = Path::new(config.state_dir());
 
