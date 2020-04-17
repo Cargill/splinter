@@ -15,6 +15,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "biome-credentials")]
+use crate::biome::credentials::store::{memory::MemoryCredentialsStore, CredentialsStore};
 use crate::biome::user::store::{error::UserStoreError, User, UserStore};
 
 ///Implementation of UserStore that stores Users in memory. Useful for when
@@ -22,9 +24,20 @@ use crate::biome::user::store::{error::UserStoreError, User, UserStore};
 #[derive(Clone, Default)]
 pub struct MemoryUserStore {
     inner: Arc<Mutex<HashMap<String, User>>>,
+    #[cfg(feature = "biome-credentials")]
+    credentials_store: MemoryCredentialsStore,
 }
 
 impl MemoryUserStore {
+    #[cfg(feature = "biome-credentials")]
+    pub fn new(credentials_store: MemoryCredentialsStore) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            credentials_store,
+        }
+    }
+
+    #[cfg(not(feature = "biome-credentials"))]
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
@@ -76,6 +89,14 @@ impl UserStore for MemoryUserStore {
             })?;
 
         if inner.remove(id).is_some() {
+            #[cfg(feature = "biome-credentials")]
+            self.credentials_store
+                .remove_credentials(id)
+                .map_err(|err| UserStoreError::QueryError {
+                    context: format!("Cannot delete user {} from credentials store", id),
+                    source: Box::new(err),
+                })?;
+
             Ok(())
         } else {
             Err(UserStoreError::NotFoundError(format!(
