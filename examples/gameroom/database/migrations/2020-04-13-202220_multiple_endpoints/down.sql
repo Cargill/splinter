@@ -17,3 +17,4 @@ ALTER TABLE gameroom_member ALTER COLUMN endpoints DROP DEFAULT;
 ALTER TABLE gameroom_member ALTER COLUMN endpoints
   TYPE TEXT USING coalesce(endpoints[1],'');
 ALTER TABLE gameroom_member ALTER COLUMN endpoints SET DEFAULT '';
+ALTER TABLE gameroom_member RENAME COLUMN endpoints TO endpoint;

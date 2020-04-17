@@ -13,6 +13,7 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
+ALTER TABLE gameroom_member RENAME COLUMN endpoint TO endpoints;
 ALTER TABLE gameroom_member ALTER COLUMN endpoints DROP DEFAULT;
 ALTER TABLE gameroom_member ALTER COLUMN endpoints
   TYPE TEXT[] USING array[endpoints];
