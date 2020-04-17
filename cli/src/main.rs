@@ -33,7 +33,7 @@ use flexi_logger::FlexiLoggerError;
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 
-use action::{admin, certs, circuit, keygen, Action, SubcommandActions};
+use action::{admin, certs, circuit, keygen, registry, Action, SubcommandActions};
 use error::CliError;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -506,7 +506,43 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     app = app.subcommand(circuit_command);
 
-    app = app.subcommand(SubCommand::with_name("registry").about("Node registry commands"));
+    app = app.subcommand(
+        SubCommand::with_name("registry")
+            .about("Node registry commands")
+            .subcommand(
+                SubCommand::with_name("build")
+                    .about("Add a node to a YAML file")
+                    .arg(Arg::with_name("file").long("file").takes_value(true).help(
+                        "Path of registry file to add node to; defaults to \
+                                './nodes.yaml'",
+                    ))
+                    .arg(
+                        Arg::with_name("force")
+                            .long("force")
+                            .help("Overwrite node if it already exists"),
+                    )
+                    .arg(
+                        Arg::with_name("status_url")
+                            .takes_value(true)
+                            .help("URL of splinter REST API to query for node data"),
+                    )
+                    .arg(
+                        Arg::with_name("key_files")
+                            .long("key-file")
+                            .takes_value(true)
+                            .multiple(true)
+                            .required(true)
+                            .help("Path of public key file to include with node"),
+                    )
+                    .arg(
+                        Arg::with_name("metadata")
+                            .long("metadata")
+                            .takes_value(true)
+                            .multiple(true)
+                            .help("Metadata to include with node (<key>=<value>)"),
+                    ),
+            ),
+    );
 
     #[cfg(feature = "health")]
     {
@@ -610,7 +646,10 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     subcommands = subcommands.with_command("circuit", circuit_command);
 
-    subcommands = subcommands.with_command("registry", SubcommandActions::new());
+    subcommands = subcommands.with_command(
+        "registry",
+        SubcommandActions::new().with_command("build", registry::RegistryGenerateAction),
+    );
 
     #[cfg(feature = "health")]
     {
