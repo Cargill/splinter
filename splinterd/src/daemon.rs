@@ -27,14 +27,12 @@ use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
-#[cfg(feature = "biome-credentials")]
-use splinter::biome::DieselCredentialsStore;
 #[cfg(feature = "biome-key-management")]
 use splinter::biome::DieselKeyStore;
-#[cfg(feature = "biome-refresh-tokens")]
-use splinter::biome::DieselRefreshTokenStore;
 #[cfg(feature = "biome")]
 use splinter::biome::DieselUserStore;
+#[cfg(feature = "biome-credentials")]
+use splinter::biome::{DieselCredentialsStore, DieselRefreshTokenStore};
 use splinter::circuit::directory::CircuitDirectory;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -704,17 +702,14 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
     #[cfg(feature = "biome-credentials")]
     {
         biome_rest_provider_builder = biome_rest_provider_builder
+            .with_refresh_token_store(DieselRefreshTokenStore::new(connection_pool.clone()));
+        biome_rest_provider_builder = biome_rest_provider_builder
             .with_credentials_store(DieselCredentialsStore::new(connection_pool.clone()));
     }
     #[cfg(feature = "biome-key-management")]
     {
         biome_rest_provider_builder =
-            biome_rest_provider_builder.with_key_store(DieselKeyStore::new(connection_pool.clone()))
-    }
-    #[cfg(feature = "biome-refresh-tokens")]
-    {
-        biome_rest_provider_builder = biome_rest_provider_builder
-            .with_refresh_token_store(DieselRefreshTokenStore::new(connection_pool));
+            biome_rest_provider_builder.with_key_store(DieselKeyStore::new(connection_pool))
     }
     let biome_rest_provider = biome_rest_provider_builder.build().map_err(|err| {
         StartError::RestApiError(format!("Unable to build Biome REST routes: {}", err))

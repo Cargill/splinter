@@ -24,7 +24,7 @@ use crate::rest_api::secrets::SecretManager;
 /// Issues JWT access tokens
 pub struct AccessTokenIssuer {
     secret_manager: Arc<dyn SecretManager>,
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_secret_manager: Arc<dyn SecretManager>,
 }
 
@@ -32,11 +32,11 @@ impl AccessTokenIssuer {
     /// Creates a new AccessTokenIssuer that will use the given secret manager for issuing tokens
     pub fn new(
         secret_manager: Arc<dyn SecretManager>,
-        #[cfg(feature = "biome-refresh-tokens")] refresh_secret_manager: Arc<dyn SecretManager>,
+        #[cfg(feature = "biome-credentials")] refresh_secret_manager: Arc<dyn SecretManager>,
     ) -> AccessTokenIssuer {
         AccessTokenIssuer {
             secret_manager,
-            #[cfg(feature = "biome-refresh-tokens")]
+            #[cfg(feature = "biome-credentials")]
             refresh_secret_manager,
         }
     }
@@ -52,7 +52,7 @@ impl TokenIssuer<Claims> for AccessTokenIssuer {
         Ok(token)
     }
 
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     fn issue_refresh_token_with_claims(&self, claims: Claims) -> Result<String, TokenIssuerError> {
         let token = encode(
             &Header::default(),

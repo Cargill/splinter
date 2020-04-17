@@ -36,7 +36,7 @@ pub mod migrations;
 #[cfg(feature = "biome-notifications")]
 pub mod notifications;
 
-#[cfg(feature = "biome-refresh-tokens")]
+#[cfg(feature = "biome-credentials")]
 pub mod refresh_tokens;
 
 #[cfg(feature = "rest-api")]
@@ -47,7 +47,7 @@ mod user;
 pub use credentials::store::{diesel::DieselCredentialsStore, memory::MemoryCredentialsStore};
 #[cfg(all(feature = "biome-key-management", feature = "diesel"))]
 pub use key_management::store::{diesel::DieselKeyStore, memory::MemoryKeyStore};
-#[cfg(all(feature = "biome-refresh-tokens", feature = "diesel"))]
+#[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use refresh_tokens::store::{diesel::DieselRefreshTokenStore, memory::MemoryRefreshTokenStore};
 #[cfg(feature = "diesel")]
 pub use user::store::{diesel::DieselUserStore, memory::MemoryUserStore};
