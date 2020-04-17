@@ -45,10 +45,7 @@ where
                     ))
                 } else {
                     RefreshTokenError::OperationError {
-                        context: format!(
-                            "Failed to update retrieve refresh token for user {}",
-                            user_id
-                        ),
+                        context: format!("Failed to retrieve refresh token for user {}", user_id),
                         source: Box::new(err),
                     }
                 }
