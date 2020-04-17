@@ -49,7 +49,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_server_key(Some(String::from(SERVER_KEY)))
             .with_service_endpoint(Some(String::from("127.0.0.1:8043")))
             .with_network_endpoints(Some(vec![String::from("127.0.0.1:8044")]))
-            .with_advertised_endpoints(Some(vec![]))
             .with_peers(Some(vec![]))
             .with_display_name(Some(String::new()))
             .with_bind(Some(String::from("127.0.0.1:8080")))
@@ -99,7 +98,6 @@ mod tests {
             config.network_endpoints(),
             Some(vec![String::from("127.0.0.1:8044")])
         );
-        assert_eq!(config.advertised_endpoints(), Some(vec![]));
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), None);
         assert_eq!(config.display_name(), Some(String::new()));
