@@ -138,6 +138,14 @@ impl ConfigBuilder {
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("server key".to_string()))?;
+        let network_endpoints = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.network_endpoints() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?;
         // Iterates over the list of PartialConfig objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
@@ -171,14 +179,6 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("service endpoint".to_string()))?,
-            network_endpoints: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.network_endpoints() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?,
             advertised_endpoints: self
                 .partial_configs
                 .iter()
@@ -186,7 +186,9 @@ impl ConfigBuilder {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("advertised endpoints".to_string()))?,
+                // Default to whatever `network_endpoints` is set to
+                .unwrap_or((network_endpoints.0.clone(), ConfigSource::Default)),
+            network_endpoints,
             peers: self
                 .partial_configs
                 .iter()

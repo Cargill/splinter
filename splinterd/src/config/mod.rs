@@ -767,14 +767,16 @@ mod tests {
                 &ConfigSource::Default,
             )
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for
-        // `advertised_endpoints` (source should be Default).
+        // `advertised_endpoints` defaults to `network_endpoints` (source should be Default).
         assert_eq!(
             (
                 final_config.advertised_endpoints(),
                 final_config.advertised_endpoints_source()
             ),
-            (&[] as &[String], &ConfigSource::Default,)
+            (
+                &[EXAMPLE_NETWORK_ENDPOINT.to_string()] as &[String],
+                &ConfigSource::Default,
+            )
         );
         // The DefaultPartialConfigBuilder is the only config with a value for `peers` (source
         // should be Default).
