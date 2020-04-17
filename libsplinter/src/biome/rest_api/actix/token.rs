@@ -34,11 +34,11 @@ use crate::rest_api::{
     ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
 };
 
-/// Defines a REST endpoint for request a new authorization token
+/// Defines a REST endpoint for requesting a new authorization token
 ///
 /// The payload should be in the JSON format:
 ///   {
-///       "token": <refresh token for requesting a auth token>
+///       "token": <refresh token for requesting a new auth token>
 ///   }
 ///
 /// Endpoint returns a payload containing a new auth token
