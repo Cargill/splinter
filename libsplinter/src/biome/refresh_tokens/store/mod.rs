@@ -21,7 +21,7 @@ pub use error::RefreshTokenError;
 
 /// Defines methods for CRUD operations for handling refresh tokens
 pub trait RefreshTokenStore: Send + Sync {
-    /// Adds a refresh to token to underlying storage
+    /// Adds a refresh token to underlying storage
     ///
     /// # Arguments
     ///
@@ -36,7 +36,7 @@ pub trait RefreshTokenStore: Send + Sync {
     ///   * `user_id` - The user whom which the token is for
     fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError>;
 
-    /// Update a refresh to token to underlying storage
+    /// Update a refresh token to underlying storage
     ///
     /// # Arguments
     ///
