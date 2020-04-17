@@ -62,7 +62,7 @@ impl Transport for InprocTransport {
             }
             None => Err(ConnectError::IoError(io::Error::new(
                 ErrorKind::ConnectionRefused,
-                "No Listener",
+                format!("No InprocListener for {}", endpoint),
             ))),
         }
     }
