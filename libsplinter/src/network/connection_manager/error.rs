@@ -27,35 +27,21 @@ pub enum ConnectionManagerError {
     StatePoisoned,
 }
 
-impl error::Error for ConnectionManagerError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            ConnectionManagerError::StartUpError(_) => None,
-            ConnectionManagerError::HeartbeatError(_) => None,
-            ConnectionManagerError::CreateConnectionError(_) => None,
-            ConnectionManagerError::SendMessageError(_) => None,
-            ConnectionManagerError::SendTimeoutError(_) => None,
-            ConnectionManagerError::ConnectionCreationError(_) => None,
-            ConnectionManagerError::ConnectionRemovalError(_) => None,
-            ConnectionManagerError::ConnectionReconnectError(_) => None,
-            ConnectionManagerError::StatePoisoned => None,
-        }
-    }
-}
+impl error::Error for ConnectionManagerError {}
 
 impl fmt::Display for ConnectionManagerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ConnectionManagerError::StartUpError(err) => write!(f, "{}", err),
-            ConnectionManagerError::HeartbeatError(ref s) => write!(f, "{}", s),
-            ConnectionManagerError::CreateConnectionError(ref s) => write!(f, "{}", s),
-            ConnectionManagerError::SendMessageError(ref s) => write!(f, "{}", s),
-            ConnectionManagerError::SendTimeoutError(ref s) => write!(f, "{}", s),
-            ConnectionManagerError::ConnectionCreationError(ref s) => write!(f, "{}", s),
-            ConnectionManagerError::ConnectionRemovalError(ref s) => write!(f, "{}", s),
-            ConnectionManagerError::ConnectionReconnectError(ref s) => write!(f, "{}", s),
+            ConnectionManagerError::StartUpError(err) => f.write_str(err),
+            ConnectionManagerError::HeartbeatError(ref s) => f.write_str(s),
+            ConnectionManagerError::CreateConnectionError(ref s) => f.write_str(s),
+            ConnectionManagerError::SendMessageError(ref s) => f.write_str(s),
+            ConnectionManagerError::SendTimeoutError(ref s) => f.write_str(s),
+            ConnectionManagerError::ConnectionCreationError(ref s) => f.write_str(s),
+            ConnectionManagerError::ConnectionRemovalError(ref s) => f.write_str(s),
+            ConnectionManagerError::ConnectionReconnectError(ref s) => f.write_str(s),
             ConnectionManagerError::StatePoisoned => {
-                write!(f, "Connection state has been poisoned")
+                f.write_str("Connection state has been poisoned")
             }
         }
     }
