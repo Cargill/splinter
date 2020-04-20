@@ -14,6 +14,8 @@
 
 //! Protocol versions for various endpoints provided by splinter.
 
+pub mod authorization;
+
 pub const ADMIN_PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(feature = "rest-api")]
