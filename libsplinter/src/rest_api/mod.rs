@@ -108,11 +108,16 @@ pub type HandlerFunction = Box<
 /// gracefully.
 pub struct RestApiShutdownHandle {
     do_shutdown: Box<dyn Fn() -> Result<(), RestApiServerError> + Send>,
+    port_numbers: Vec<u16>,
 }
 
 impl RestApiShutdownHandle {
     pub fn shutdown(&self) -> Result<(), RestApiServerError> {
         (*self.do_shutdown)()
+    }
+
+    pub fn port_numbers(&self) -> Vec<u16> {
+        self.port_numbers.clone()
     }
 }
 
@@ -506,10 +511,11 @@ impl RestApi {
                         return;
                     }
                 };
+                let port_numbers = server.addrs().iter().map(|addrs| addrs.port()).collect();
 
                 let addr = server.disable_signals().system_exit().start();
 
-                if let Err(err) = tx.send(Ok(addr)) {
+                if let Err(err) = tx.send(Ok((addr, port_numbers))) {
                     error!("Unable to send Server Addr: {}", err);
                 }
 
@@ -520,7 +526,7 @@ impl RestApi {
                 info!("Rest API terminating");
             })?;
 
-        let addr = rx
+        let (addr, port_numbers) = rx
             .recv()
             .map_err(|err| {
                 RestApiServerError::StartUpError(format!("Unable to receive Server Addr: {}", err))
@@ -542,7 +548,13 @@ impl RestApi {
             Ok(())
         });
 
-        Ok((RestApiShutdownHandle { do_shutdown }, join_handle))
+        Ok((
+            RestApiShutdownHandle {
+                do_shutdown,
+                port_numbers,
+            },
+            join_handle,
+        ))
     }
 }
 
