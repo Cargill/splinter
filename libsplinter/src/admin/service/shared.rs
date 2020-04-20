@@ -1438,7 +1438,14 @@ impl AdminServiceShared {
                 .collect();
 
             self.orchestrator
-                .initialize_service(service_definition.clone(), service_arguments)?;
+                .initialize_service(service_definition.clone(), service_arguments)
+                .map_err(|err| AdminSharedError::ServiceInitializationFailed {
+                    context: format!(
+                        "Unable to start service {} on circuit {}",
+                        service.service_id, circuit.circuit_id
+                    ),
+                    source: Some(err),
+                })?;
 
             self.running_services.insert(service_definition);
         }
@@ -1507,7 +1514,15 @@ impl AdminServiceShared {
                     .collect();
 
                 self.orchestrator
-                    .initialize_service(service_definition.clone(), service_arguments)?;
+                    .initialize_service(service_definition.clone(), service_arguments)
+                    .map_err(|err| AdminSharedError::ServiceInitializationFailed {
+                        context: format!(
+                            "Unable to start service {} on circuit {}",
+                            service.service_id(),
+                            circuit_name
+                        ),
+                        source: Some(err),
+                    })?;
 
                 self.running_services.insert(service_definition);
             }
