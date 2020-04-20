@@ -73,3 +73,57 @@ impl Iterator for NotificationIter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::mpsc;
+    use std::thread;
+
+    #[test]
+    /// Tests that notifier iterator correctly exists when sender
+    /// is dropped.
+    ///
+    /// Procedure:
+    ///
+    /// The test creates a sync channel and a notifier, then it
+    /// creates a thread that send Connected notifications to
+    /// the notifier.
+    ///
+    /// Asserts:
+    ///
+    /// The notifications sent are received by the NotificationIter
+    /// correctly
+    ///
+    /// That the total number of notifications sent equals 5
+    fn test_notifications_handler_iterator() {
+        let (send, recv) = mpsc::channel();
+
+        let nh = NotificationIter { recv };
+
+        let join_handle = thread::spawn(move || {
+            for _ in 0..5 {
+                send.send(ConnectionManagerNotification::Connected {
+                    endpoint: "tcp://localhost:3030".to_string(),
+                })
+                .unwrap();
+            }
+        });
+
+        let mut notifications_sent = 0;
+        for n in nh {
+            assert_eq!(
+                n,
+                ConnectionManagerNotification::Connected {
+                    endpoint: "tcp://localhost:3030".to_string()
+                }
+            );
+            notifications_sent += 1;
+        }
+
+        assert_eq!(notifications_sent, 5);
+
+        join_handle.join().unwrap();
+    }
+}
