@@ -42,7 +42,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
 
         partial_config = partial_config
             .with_storage(self.matches.value_of("storage").map(String::from))
-            .with_transport(self.matches.value_of("transport").map(String::from))
             .with_cert_dir(self.matches.value_of("cert_dir").map(String::from))
             .with_ca_certs(self.matches.value_of("ca_file").map(String::from))
             .with_client_cert(self.matches.value_of("client_cert").map(String::from))
@@ -78,6 +77,11 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 Some(true)
             } else {
                 None
+            })
+            .with_no_tls(if self.matches.is_present("no_tls") {
+                Some(true)
+            } else {
+                None
             });
 
         #[cfg(feature = "biome")]
@@ -107,7 +111,6 @@ mod tests {
 
     /// Example configuration values.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_TRANSPORT: &str = "tls";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
@@ -122,7 +125,6 @@ mod tests {
     /// Asserts config values based on the example values.
     fn assert_config_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
-        assert_eq!(config.transport(), Some(EXAMPLE_TRANSPORT.to_string()));
         assert_eq!(config.cert_dir(), None);
         assert_eq!(config.ca_certs(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(config.client_cert(), Some(EXAMPLE_CLIENT_CERT.to_string()));
@@ -154,6 +156,7 @@ mod tests {
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
         assert_eq!(config.insecure(), Some(true));
+        assert_eq!(config.no_tls(), Some(true));
     }
 
     /// Creates an ArgMatches object to be used to construct a ClapPartialConfigBuilder object.
@@ -165,7 +168,6 @@ mod tests {
             (@arg node_id: --("node-id") +takes_value)
             (@arg display_name: --("display-name") +takes_value)
             (@arg storage: --("storage") +takes_value)
-            (@arg transport: --("transport") +takes_value)
             (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
             (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
@@ -177,7 +179,8 @@ mod tests {
             (@arg server_key:  --("server-key") +takes_value)
             (@arg client_key:  --("client-key") +takes_value)
             (@arg bind: --("bind") +takes_value)
-            (@arg insecure: --("insecure")))
+            (@arg insecure: --("insecure"))
+            (@arg no_tls: --("no-tls")))
         .get_matches_from(args)
     }
 
@@ -202,8 +205,6 @@ mod tests {
             EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
-            "--transport",
-            EXAMPLE_TRANSPORT,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoint",
@@ -221,6 +222,7 @@ mod tests {
             "--server-key",
             EXAMPLE_SERVER_KEY,
             "--insecure",
+            "--no-tls",
         ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);

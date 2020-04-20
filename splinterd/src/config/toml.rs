@@ -25,7 +25,6 @@ use toml;
 #[derive(Deserialize, Default, Debug)]
 struct TomlConfig {
     storage: Option<String>,
-    transport: Option<String>,
     cert_dir: Option<String>,
     ca_certs: Option<String>,
     client_cert: Option<String>,
@@ -73,7 +72,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
 
         partial_config = partial_config
             .with_storage(self.toml_config.storage)
-            .with_transport(self.toml_config.transport)
             .with_cert_dir(self.toml_config.cert_dir)
             .with_ca_certs(self.toml_config.ca_certs)
             .with_client_cert(self.toml_config.client_cert)
@@ -113,7 +111,6 @@ mod tests {
 
     /// Example configuration values.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_TRANSPORT: &str = "tls";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
@@ -127,7 +124,6 @@ mod tests {
     fn get_toml_value() -> Value {
         let values = vec![
             ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
-            ("transport".to_string(), EXAMPLE_TRANSPORT.to_string()),
             ("ca_certs".to_string(), EXAMPLE_CA_CERTS.to_string()),
             ("client_cert".to_string(), EXAMPLE_CLIENT_CERT.to_string()),
             ("client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
@@ -151,7 +147,6 @@ mod tests {
     /// Asserts config values based on the example configuration values.
     fn assert_config_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
-        assert_eq!(config.transport(), Some(EXAMPLE_TRANSPORT.to_string()));
         assert_eq!(config.cert_dir(), None);
         assert_eq!(config.ca_certs(), Some(EXAMPLE_CA_CERTS.to_string()));
         assert_eq!(config.client_cert(), Some(EXAMPLE_CLIENT_CERT.to_string()));

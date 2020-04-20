@@ -43,7 +43,6 @@ pub use partial::{ConfigSource, PartialConfig};
 #[derive(Debug)]
 pub struct Config {
     storage: (String, ConfigSource),
-    transport: (String, ConfigSource),
     cert_dir: (String, ConfigSource),
     ca_certs: (String, ConfigSource),
     client_cert: (String, ConfigSource),
@@ -64,6 +63,7 @@ pub struct Config {
     admin_service_coordinator_timeout: (Duration, ConfigSource),
     state_dir: (String, ConfigSource),
     insecure: (bool, ConfigSource),
+    no_tls: (bool, ConfigSource),
     #[cfg(feature = "biome")]
     biome_enabled: (bool, ConfigSource),
 }
@@ -71,10 +71,6 @@ pub struct Config {
 impl Config {
     pub fn storage(&self) -> &str {
         &self.storage.0
-    }
-
-    pub fn transport(&self) -> &str {
-        &self.transport.0
     }
 
     pub fn cert_dir(&self) -> &str {
@@ -154,6 +150,10 @@ impl Config {
         self.insecure.0
     }
 
+    pub fn no_tls(&self) -> bool {
+        self.no_tls.0
+    }
+
     #[cfg(feature = "biome")]
     pub fn biome_enabled(&self) -> bool {
         self.biome_enabled.0
@@ -161,10 +161,6 @@ impl Config {
 
     fn storage_source(&self) -> &ConfigSource {
         &self.storage.1
-    }
-
-    fn transport_source(&self) -> &ConfigSource {
-        &self.transport.1
     }
 
     fn cert_dir_source(&self) -> &ConfigSource {
@@ -244,6 +240,10 @@ impl Config {
         &self.insecure.1
     }
 
+    fn no_tls_source(&self) -> &ConfigSource {
+        &self.no_tls.1
+    }
+
     #[cfg(feature = "biome")]
     fn biome_enabled_source(&self) -> &ConfigSource {
         &self.biome_enabled.1
@@ -255,11 +255,6 @@ impl Config {
             "Config: storage: {} (source: {:?})",
             self.storage(),
             self.storage_source()
-        );
-        debug!(
-            "Config: transport: {} (source: {:?})",
-            self.transport(),
-            self.transport_source()
         );
         debug!(
             "Config: ca_certs: {} (source: {:?})",
@@ -357,6 +352,11 @@ impl Config {
             self.insecure(),
             self.insecure_source()
         );
+        debug!(
+            "Config: no_tls: {:?} (source: {:?})",
+            self.no_tls(),
+            self.no_tls_source()
+        );
         #[cfg(feature = "biome")]
         debug!(
             "Config: biome_enabled: {:?} (source: {:?})",
@@ -387,7 +387,6 @@ mod tests {
 
     /// Values present in the example config TEST_TOML file.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_TRANSPORT: &str = "tls";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
@@ -409,7 +408,6 @@ mod tests {
     pub fn get_toml_value() -> Value {
         let values = vec![
             ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
-            ("transport".to_string(), EXAMPLE_TRANSPORT.to_string()),
             ("ca_certs".to_string(), EXAMPLE_CA_CERTS.to_string()),
             ("client_cert".to_string(), EXAMPLE_CLIENT_CERT.to_string()),
             ("client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
@@ -439,7 +437,6 @@ mod tests {
         (@arg node_id: --("node-id") +takes_value)
         (@arg display_name: --("display-name") +takes_value)
         (@arg storage: --("storage") +takes_value)
-        (@arg transport: --("transport") +takes_value)
         (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
         (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
         (@arg service_endpoint: --("service-endpoint") +takes_value)
@@ -452,6 +449,7 @@ mod tests {
         (@arg client_key:  --("client-key") +takes_value)
         (@arg bind: --("bind") +takes_value)
         (@arg insecure: --("insecure"))
+        (@arg no_tls: --("no-tls"))
         (@arg biome_enabled: --("enable-biome")))
         .get_matches_from(args)
     }
@@ -542,8 +540,6 @@ mod tests {
             EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
-            "--transport",
-            EXAMPLE_TRANSPORT,
             "--network-endpoint",
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoint",
@@ -561,6 +557,7 @@ mod tests {
             "--server-key",
             EXAMPLE_SERVER_KEY,
             "--insecure",
+            "--no-tls",
             "--enable-biome",
         ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
@@ -604,7 +601,14 @@ mod tests {
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object.
-        let args = vec!["configtest", "--node-id", "123", "--display-name", "Node 1"];
+        let args = vec![
+            "configtest",
+            "--node-id",
+            "123",
+            "--display-name",
+            "Node 1",
+            "--no-tls",
+        ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);
         // Create a new CommandLine object from the arg matches.
@@ -655,18 +659,15 @@ mod tests {
                 }
             )
         );
-        // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `transport`, but the TomlPartialConfigBuilder value should have precedence (source
-        // should be Toml).
+
+        // Both the DefaultPartialConfigBuilder and  ClapPartialConfigBuilder had values for
+        // `no-tls`, but the  ClapPartialConfigBuilder value should have precedence (source
+        // should be ).
         assert_eq!(
-            (final_config.transport(), final_config.transport_source()),
-            (
-                EXAMPLE_TRANSPORT,
-                &ConfigSource::Toml {
-                    file: TEST_TOML.to_string()
-                }
-            )
+            (final_config.no_tls(), final_config.no_tls_source()),
+            (true, &ConfigSource::CommandLine)
         );
+
         // The DefaultPartialConfigBuilder and EnvPartialConfigBuilder had values for `cert_dir`,
         // but the EnvPartialConfigBuilder value should have precedence (source should be
         // Environment).

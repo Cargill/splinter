@@ -19,7 +19,7 @@ node_id = "345"
 service_endpoint = "127.0.0.1:8045"
 
 # Endpoints used for daemon to daemon communication.
-network_endpoints = ["127.0.0.1:8046"]
+network_endpoints = ["tcps://127.0.0.1:8046"]
 
 # A list of splinter nodes the daemon will automatically
 # connect to on start up.
@@ -30,9 +30,6 @@ peers = [
 # The type of storage that should be used to store circuit state. Option are
 # currently "yaml" or "memory"
 storage = "yaml"
-
-# Which transport type this splinterd node supports. Options are "raw" or "tls"
-transport = "tls"
 
 # List of certificate authority certificates (*.pem files).
 ca_certs = "certs/ca.pem"

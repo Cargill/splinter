@@ -125,11 +125,10 @@ items:
                 splinterd -vv \
                 --registry file:///etc/splinter/nodes.yaml \
                 --bind $HOSTNAME:8085 \
-                --network-endpoint $HOSTNAME:8044 \
+                --network-endpoint tcps://$HOSTNAME:8044 \
                 --node-id acme \
-                --service-endpoint $HOSTNAME:8043 \
+                --service-endpoint tcp://$HOSTNAME:8043 \
                 --storage yaml \
-                --transport tls \
                 --insecure
             volumeMounts:
               - name: node-registry-volume
@@ -298,11 +297,10 @@ items:
                 splinterd -vv \
                 --registry file:///etc/splinter/nodes.yaml \
                 --bind $HOSTNAME:8085 \
-                --network-endpoint $HOSTNAME:8044 \
+                --network-endpoint tcps://$HOSTNAME:8044 \
                 --node-id bubba \
-                --service-endpoint $HOSTNAME:8043 \
+                --service-endpoint tcp://$HOSTNAME:8043 \
                 --storage yaml \
-                --transport tls \
                 --insecure
             volumeMounts:
               - name: node-registry-volume
