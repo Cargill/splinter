@@ -19,6 +19,8 @@ use serde_derive::Deserialize;
 
 use toml;
 
+const TOML_VERSION: &str = "1";
+
 /// Holds configuration values defined in a toml file. This struct must be
 /// treated as part of the external API of splinter because changes here
 /// will impact the valid format of the config file.
@@ -43,6 +45,7 @@ struct TomlConfig {
     registries: Option<Vec<String>>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
+    version: Option<String>,
 }
 
 pub struct TomlPartialConfigBuilder {
@@ -67,6 +70,21 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 file: String::from(""),
             },
         };
+
+        if let Some(version) = self.toml_config.version {
+            if version != TOML_VERSION {
+                let file_path = match &source {
+                    ConfigSource::Toml { file } => file.clone(),
+                    _ => String::from(""),
+                };
+                return Err(ConfigError::InvalidVersion(format!(
+                    "Config file {} has incompatible version {}, supported version is {}",
+                    file_path, version, TOML_VERSION,
+                )));
+            }
+        } else {
+            return Err(ConfigError::MissingValue(format!("{:?} version", &source)));
+        }
 
         let mut partial_config = PartialConfig::new(source);
 
@@ -135,6 +153,7 @@ mod tests {
             ),
             ("node_id".to_string(), EXAMPLE_NODE_ID.to_string()),
             ("display_name".to_string(), EXAMPLE_DISPLAY_NAME.to_string()),
+            ("version".to_string(), TOML_VERSION.to_string()),
         ];
 
         let mut config_values = Map::new();

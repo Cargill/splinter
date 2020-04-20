@@ -13,6 +13,9 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
+# Config file format version
+version = "1"
+
 node_id = "acme-node-000"
 
 # Endpoint used for service to daemon communication.
