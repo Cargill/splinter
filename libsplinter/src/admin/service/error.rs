@@ -116,7 +116,10 @@ pub enum AdminSharedError {
     HashError(Sha256Error),
     InvalidMessageFormat(MarshallingError),
     NoPendingChanges,
-    ServiceInitializationFailed(InitializeServiceError),
+    ServiceInitializationFailed {
+        context: String,
+        source: Option<InitializeServiceError>,
+    },
     ServiceShutdownFailed(Vec<ShutdownServiceError>),
     ServiceSendError(ServiceSendError),
     UnknownAction(String),
@@ -140,7 +143,13 @@ impl Error for AdminSharedError {
             AdminSharedError::HashError(err) => Some(err),
             AdminSharedError::InvalidMessageFormat(err) => Some(err),
             AdminSharedError::NoPendingChanges => None,
-            AdminSharedError::ServiceInitializationFailed(err) => Some(err),
+            AdminSharedError::ServiceInitializationFailed { source, .. } => {
+                if let Some(ref err) = source {
+                    Some(err)
+                } else {
+                    None
+                }
+            }
             AdminSharedError::ServiceShutdownFailed(_) => None,
             AdminSharedError::ServiceSendError(err) => Some(err),
             AdminSharedError::UnknownAction(_) => None,
@@ -164,8 +173,12 @@ impl fmt::Display for AdminSharedError {
             AdminSharedError::NoPendingChanges => {
                 write!(f, "tried to commit without pending changes")
             }
-            AdminSharedError::ServiceInitializationFailed(err) => {
-                write!(f, "failed to initialize service: {}", err)
+            AdminSharedError::ServiceInitializationFailed { context, source } => {
+                if let Some(ref err) = source {
+                    write!(f, "{}: {}", context, err)
+                } else {
+                    f.write_str(&context)
+                }
             }
             AdminSharedError::ServiceShutdownFailed(err) => {
                 let err_message = err
@@ -194,11 +207,6 @@ impl fmt::Display for AdminSharedError {
     }
 }
 
-impl From<InitializeServiceError> for AdminSharedError {
-    fn from(err: InitializeServiceError) -> Self {
-        AdminSharedError::ServiceInitializationFailed(err)
-    }
-}
 impl From<ServiceSendError> for AdminSharedError {
     fn from(err: ServiceSendError) -> Self {
         AdminSharedError::ServiceSendError(err)
