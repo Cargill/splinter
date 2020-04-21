@@ -341,11 +341,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     #[cfg(feature = "rest-api-cors")]
     {
-        daemon_builder = daemon_builder.with_whitelist(
-            matches
-                .values_of("whitelist")
-                .map(|values| values.map(String::from).collect::<Vec<String>>()),
-        );
+        daemon_builder = daemon_builder.with_whitelist(config.whitelist().map(ToOwned::to_owned));
     }
 
     let mut node = daemon_builder.build().map_err(|err| {

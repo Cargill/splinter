@@ -307,6 +307,14 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("biome_enabled".to_string()))?,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.whitelist() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }),
         })
     }
 }

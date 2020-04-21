@@ -58,6 +58,8 @@ pub struct PartialConfig {
     no_tls: Option<bool>,
     #[cfg(feature = "biome")]
     biome_enabled: Option<bool>,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 impl PartialConfig {
@@ -93,6 +95,8 @@ impl PartialConfig {
             no_tls: None,
             #[cfg(feature = "biome")]
             biome_enabled: None,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: None,
         }
     }
 
@@ -198,6 +202,11 @@ impl PartialConfig {
     #[cfg(feature = "biome")]
     pub fn biome_enabled(&self) -> Option<bool> {
         self.biome_enabled
+    }
+
+    #[cfg(feature = "rest-api-cors")]
+    pub fn whitelist(&self) -> Option<Vec<String>> {
+        self.whitelist.clone()
     }
 
     #[allow(dead_code)]
@@ -500,6 +509,18 @@ impl PartialConfig {
     ///
     pub fn with_biome_enabled(mut self, biome_enabled: Option<bool>) -> Self {
         self.biome_enabled = biome_enabled;
+        self
+    }
+
+    #[cfg(feature = "rest-api-cors")]
+    /// Adds a `whitelist` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `whitelist` - Add whitelist to the REST API CORS configuration
+    ///
+    pub fn with_whitelist(mut self, whitelist: Option<Vec<String>>) -> Self {
+        self.whitelist = whitelist;
         self
     }
 }
