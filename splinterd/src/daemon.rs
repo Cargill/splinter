@@ -58,9 +58,8 @@ use splinter::network::peer::PeerConnector;
 use splinter::network::{sender, sender::NetworkMessageSender};
 use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
 use splinter::node_registry::{
-    self,
     rest_api::{make_nodes_identity_resource, make_nodes_resource},
-    NodeRegistryReader, RwNodeRegistry, UnifiedNodeRegistry,
+    LocalYamlNodeRegistry, NodeRegistryReader, RwNodeRegistry, UnifiedNodeRegistry,
 };
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::protos::authorization::AuthorizationMessageType;
@@ -987,14 +986,12 @@ fn create_node_registry(
         local_node_registry_location
     );
     let local_registry = Box::new(
-        node_registry::yaml::YamlNodeRegistry::new(local_node_registry_location).map_err(
-            |err| {
-                StartError::NodeRegistryError(format!(
-                    "Failed to initialize local YamlNodeRegistry: {}",
-                    err
-                ))
-            },
-        )?,
+        LocalYamlNodeRegistry::new(local_node_registry_location).map_err(|err| {
+            StartError::NodeRegistryError(format!(
+                "Failed to initialize local LocalYamlNodeRegistry: {}",
+                err
+            ))
+        })?,
     );
 
     // Currently, only file-based read-only registries are supported
@@ -1007,11 +1004,11 @@ fn create_node_registry(
                     "Attempting to add read-only node registry from file: {:?}",
                     registry_file
                 );
-                match node_registry::yaml::YamlNodeRegistry::new(registry_file) {
+                match LocalYamlNodeRegistry::new(registry_file) {
                     Ok(registry) => Some(Box::new(registry) as Box<dyn NodeRegistryReader>),
                     Err(err) => {
                         error!(
-                            "Failed to add read-only YamlNodeRegistry '{}': {}",
+                            "Failed to add read-only LocalYamlNodeRegistry '{}': {}",
                             registry, err
                         );
                         None

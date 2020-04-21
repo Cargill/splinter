@@ -18,20 +18,39 @@ use std::fmt;
 #[derive(Debug)]
 pub enum NodeRegistryError {
     InvalidNode(InvalidNodeError),
-    /// This error is returned when an internal error occurred
-    InternalError(Box<dyn Error + Send>),
-    /// This error is returned when the user cannot create a node in the registry
-    UnableToAddNode(String, Option<Box<dyn Error + Send>>),
+    GeneralError {
+        context: String,
+        source: Option<Box<dyn Error + Send>>,
+    },
+}
+
+impl NodeRegistryError {
+    pub fn general_error(context: &str) -> Self {
+        NodeRegistryError::GeneralError {
+            context: context.into(),
+            source: None,
+        }
+    }
+
+    pub fn general_error_with_source(context: &str, err: Box<dyn Error + Send>) -> Self {
+        NodeRegistryError::GeneralError {
+            context: context.into(),
+            source: Some(err),
+        }
+    }
 }
 
 impl Error for NodeRegistryError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             NodeRegistryError::InvalidNode(err) => Some(err),
-            NodeRegistryError::InternalError(err) => Some(err.as_ref()),
-            // Unfortunately, have to match on both arms to return the expected result
-            NodeRegistryError::UnableToAddNode(_, Some(err)) => Some(err.as_ref()),
-            NodeRegistryError::UnableToAddNode(_, None) => None,
+            NodeRegistryError::GeneralError { source, .. } => {
+                if let Some(ref err) = source {
+                    Some(&**err)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -39,16 +58,14 @@ impl Error for NodeRegistryError {
 impl fmt::Display for NodeRegistryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NodeRegistryError::InvalidNode(e) => write!(f, "Invalid node: {}", e),
-            NodeRegistryError::InternalError(e) => write!(f, "Internal error: {}", e),
-            NodeRegistryError::UnableToAddNode(msg, err) => write!(
-                f,
-                "unable to add node: {}{}",
-                msg,
-                err.as_ref()
-                    .map(|e| format!("; {}", e))
-                    .unwrap_or_else(|| "".to_string())
-            ),
+            NodeRegistryError::InvalidNode(err) => write!(f, "Invalid node detected: {}", err),
+            NodeRegistryError::GeneralError { context, source } => {
+                if let Some(ref err) = source {
+                    write!(f, "{}: {}", context, err)
+                } else {
+                    f.write_str(&context)
+                }
+            }
         }
     }
 }

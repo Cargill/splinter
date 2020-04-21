@@ -12,25 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod error;
-pub mod noop;
+//! Data structures, traits, and implementations for tracking and managing known Splinter nodes.
+//!
+//! The public node registry interface is defined primarily by the [`Node`] data structure, and the
+//! node registry traits: [`NodeRegistryReader`], [`NodeRegistryWriter`], and [`RwNodeRegistry`].
+//!
+//! The following node registry implementations are provided by this module:
+//!
+//! * [`LocalYamlNodeRegistry`] - A read/write registry that is backed by a local YAML file.
+//! * [`UnifiedNodeRegistry`] - A read/write registry with a single read/write sub-registry and an
+//!   arbitrary number of read-only sub-registries.
+//!
+//! [`Node`]: struct.Node.html
+//! [`NodeRegistryReader`]: trait.NodeRegistryReader.html
+//! [`NodeRegistryWriter`]: trait.NodeRegistryWriter.html
+//! [`RwNodeRegistry`]: trait.RwNodeRegistry.html
+//! [`LocalYamlNodeRegistry`]: struct.LocalYamlNodeRegistry.html
+//! [`UnifiedNodeRegistry`]: struct.UnifiedNodeRegistry.html
+
+mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
-pub mod unified;
-pub mod yaml;
+mod unified;
+mod yaml;
 
 use std::collections::HashMap;
 
 pub use error::{InvalidNodeError, NodeRegistryError};
 pub use unified::UnifiedNodeRegistry;
+pub use yaml::LocalYamlNodeRegistry;
+#[cfg(feature = "registry-remote")]
+pub use yaml::{RemoteYamlNodeRegistry, RemoteYamlShutdownHandle};
 
+/// Native representation of a node in a registry.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Node {
-    /// The Splinter identity of the node; must be unique in the registry.
+    /// The Splinter identity of the node; must be non-empty and unique in the registry.
     pub identity: String,
-    /// The endpoints the node can be reached at; each must be unique in the registry.
+    /// The endpoints the node can be reached at; at least one endpoint must be provided, and each
+    /// endpoint must be non-empty and unique in the registry.
     pub endpoints: Vec<String>,
-    /// A human-readable name for the node.
+    /// A human-readable name for the node; must be non-empty.
     pub display_name: String,
     /// A map with node metadata.
     pub metadata: HashMap<String, String>,
@@ -56,7 +78,8 @@ impl Node {
 /// by the comparison operator on the value found at the given key (the first item in the tuple)
 /// against the predicate's value (the second item in the tuple).
 ///
-/// If the item is missing in a node's metadata table, the predicate returns false.
+/// If the item is missing in a node's metadata table, the predicate returns false (with the
+/// exception of the `Ne` variant).
 #[derive(Clone)]
 pub enum MetadataPredicate {
     /// Applies the `==` operator.
@@ -99,18 +122,18 @@ impl MetadataPredicate {
         }
     }
 
-    /// Returns the Eq predicate for the given key and value
+    /// Returns the `Eq` predicate for the given key and value
     pub fn eq<S: Into<String>>(key: S, value: S) -> MetadataPredicate {
         MetadataPredicate::Eq(key.into(), value.into())
     }
 
-    /// Returns the Ne predicate for the given key and value
+    /// Returns the `Ne` predicate for the given key and value
     pub fn ne<S: Into<String>>(key: S, value: S) -> MetadataPredicate {
         MetadataPredicate::Ne(key.into(), value.into())
     }
 }
 
-/// Provides Node Registry read capabilities.
+/// Defines node registry read capabilities.
 pub trait NodeRegistryReader: Send + Sync {
     /// Returns an iterator over the nodes in the registry.
     ///
@@ -133,20 +156,24 @@ pub trait NodeRegistryReader: Send + Sync {
     /// no predicates (i.e. return all).
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError>;
 
-    /// Returns a node with the given identity.
+    /// Returns the node with the given identity, if it exists in the registry.
     ///
     /// # Arguments
     ///
-    ///  * `identity` - The Splinter identity of the node.
-    ///
+    ///  * `identity` - The identity of the node.
     fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError>;
 
+    /// Determines whether or not the node exists in the registry.
+    ///
+    /// # Arguments
+    ///
+    ///  * `identity` - The identity of the node.
     fn has_node(&self, identity: &str) -> Result<bool, NodeRegistryError> {
         self.fetch_node(identity).map(|opt| opt.is_some())
     }
 }
 
-/// Provides Node Registry write capabilities.
+/// Defines node registry write capabilities.
 pub trait NodeRegistryWriter: Send + Sync {
     /// Adds a new node to the registry, or replaces an existing node with the same identity.
     ///
@@ -156,24 +183,25 @@ pub trait NodeRegistryWriter: Send + Sync {
     ///
     fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError>;
 
-    /// Deletes a node with the given identity.
+    /// Deletes a node with the given identity and returns the node if it was in the registry.
     ///
     /// # Arguments
     ///
     ///  * `identity` - The Splinter identity of the node.
-    ///
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError>;
 }
 
-/// Provides a marker trait for a clonable, readable and writable Node Registry.
+/// Provides a marker trait for a clonable, readable and writable node registry.
 pub trait RwNodeRegistry: NodeRegistryWriter + NodeRegistryReader {
-    /// Clone implementation for Box<NodeRegistry>.
-    /// The implementation of Clone for NodeRegistry calls this method.
+    /// Clone implementation for `RwNodeRegistry`. The implementation of the `Clone` trait for
+    /// `Box<RwNodeRegistry>` calls this method.
     ///
     /// # Example
-    ///  fn clone_box(&self) -> Box<NodeRegistry> {
-    ///     Box::new(Clone::clone(self))
+    ///```ignore
+    ///  fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+    ///     Box::new(self.clone())
     ///  }
+    ///```
     fn clone_box(&self) -> Box<dyn RwNodeRegistry>;
 }
 
