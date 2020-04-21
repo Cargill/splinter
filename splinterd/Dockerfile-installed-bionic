@@ -14,10 +14,35 @@
 
 # -------------=== splinterd docker build ===-------------
 
-FROM splintercommunity/splinter-dev:v2 as BUILDER
+FROM splintercommunity/splinter-dev:v3 as BUILDER
 
 ENV SPLINTER_FORCE_PANDOC=true
 
+# Copy over splinter files
+COPY Cargo.toml /build/Cargo.toml
+COPY cli/Cargo.toml /build/cli/Cargo.toml
+COPY client/Cargo.toml /build/client/Cargo.toml
+COPY libsplinter/build.rs /build/libsplinter/build.rs
+COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
+COPY libsplinter/protos /build/libsplinter/protos
+COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
+COPY services/health/Cargo.toml /build/services/health/Cargo.toml
+COPY services/scabbard/Cargo.toml /build/services/scabbard/Cargo.toml
+
+# Copy over example Cargo.toml files
+COPY examples/gameroom/cli/Cargo.toml \
+     /build/examples/gameroom/cli/Cargo.toml
+COPY examples/gameroom/daemon/Cargo.toml \
+     /build/examples/gameroom/daemon/Cargo.toml
+COPY examples/gameroom/database/Cargo.toml \
+     /build/examples/gameroom/database/Cargo.toml
+COPY examples/private_counter/cli/Cargo.toml \
+     /build/examples/private_counter/cli/Cargo.toml
+COPY examples/private_counter/service/Cargo.toml \
+     /build/examples/private_counter/service/Cargo.toml
+COPY examples/private_xo/Cargo.toml /build/examples/private_xo/Cargo.toml
+
+# Copy over source files
 COPY cli /build/cli
 COPY libsplinter /build/libsplinter
 COPY services/health /build/services/health
