@@ -150,7 +150,7 @@ services:
               --service-endpoint tcp://0.0.0.0:8043 \
               --network-endpoint tcps://0.0.0.0:8044 \
               --bind 0.0.0.0:8085 \
-              --insecure
+              --tls-insecure
         "
 
     db-bubba:
@@ -260,5 +260,5 @@ services:
               --service-endpoint tcp://0.0.0.0:8043 \
               --network-endpoint tcps://0.0.0.0:8044 \
               --bind 0.0.0.0:8085 \
-              --insecure
+              --tls-insecure
         "

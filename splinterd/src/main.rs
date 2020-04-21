@@ -132,20 +132,6 @@ fn main() {
           "Endpoint that service will connect to, tcp://ip:port")
         (@arg peers: --peer +takes_value +multiple
           "Endpoint that service will connect to, ip:port")
-        (@arg ca_file: --("ca-file") +takes_value
-          "File path to the trusted CA certificate")
-        (@arg cert_dir: --("cert-dir") +takes_value
-          "Path to the directory where the certificates and keys are")
-        (@arg client_cert: --("client-cert") +takes_value
-          "File path to the certificate for the node when connecting to a node")
-        (@arg server_cert: --("server-cert") +takes_value
-          "File path to the certificate for the node when connecting to a node")
-        (@arg server_key:  --("server-key") +takes_value
-          "File path to the key for the node when connecting to a node as server")
-        (@arg client_key:  --("client-key") +takes_value
-          "File path to the key for the node when connecting to a node as client")
-        (@arg insecure:  --("insecure")
-          "If set to tls, should accept all peer certificates")
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
@@ -156,15 +142,64 @@ fn main() {
         (@arg verbose: -v --verbose +multiple
           "Increase output verbosity"));
 
-    let app = app.arg(
-        Arg::with_name("heartbeat_interval")
-            .long("heartbeat")
-            .long_help(
-                "How often heartbeat should be sent, in seconds; defaults to 30 seconds,\
+    let app = app
+        .arg(
+            Arg::with_name("heartbeat_interval")
+                .long("heartbeat")
+                .long_help(
+                    "How often heartbeat should be sent, in seconds; defaults to 30 seconds,\
                  0 means off",
-            )
-            .takes_value(true),
-    );
+                )
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("tls_cert_dir")
+                .long("tls-cert-dir")
+                .help("Path to the directory where the certificates and keys are")
+                .takes_value(true)
+                .alias("cert-dir"),
+        )
+        .arg(
+            Arg::with_name("tls_ca_file")
+                .long("tls-ca-file")
+                .help("File path to the trusted CA certificate")
+                .takes_value(true)
+                .alias("ca-file"),
+        )
+        .arg(
+            Arg::with_name("tls_client_cert")
+                .long("tls-client-cert")
+                .help("File path to the certificate for the node when connecting to a node")
+                .takes_value(true)
+                .alias("client-cert"),
+        )
+        .arg(
+            Arg::with_name("tls_client_key")
+                .long("tls-client-key")
+                .help("File path to the key for the node when connecting to a node as client")
+                .takes_value(true)
+                .alias("client-key"),
+        )
+        .arg(
+            Arg::with_name("tls_server_cert")
+                .long("tls-server-cert")
+                .help("File path to the certificate for the node when connecting to a node")
+                .takes_value(true)
+                .alias("server-cert"),
+        )
+        .arg(
+            Arg::with_name("tls_server_key")
+                .long("tls-server-key")
+                .help("File path to the key for the node when connecting to a node as server")
+                .takes_value(true)
+                .alias("server-key"),
+        )
+        .arg(
+            Arg::with_name("tls_insecure")
+                .long("tls-insecure")
+                .help("If set to tls, should accept all peer certificates")
+                .alias("insecure"),
+        );
 
     #[cfg(feature = "database")]
     let app = app.arg(

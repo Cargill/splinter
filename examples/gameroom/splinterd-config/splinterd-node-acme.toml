@@ -37,6 +37,3 @@ bind = "localhost:8085"
 
 # Node Registry file
 registries = ["file:///node_registry/nodes.yaml"]
-
-# List of certificate authority certificates (*.pem files).
-ca_certs = "/etc/splinter/certs/generated_ca.pem"

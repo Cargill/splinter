@@ -35,20 +35,20 @@ peers = [
 storage = "yaml"
 
 # List of certificate authority certificates (*.pem files).
-ca_certs = "certs/ca.pem"
+tls_ca_file = "certs/ca.pem"
 
 # A certificate signed by a certificate authority.
 # Used by the daemon when it is acting as a client
 # (sending messages).
-client_cert = "certs/client.crt"
+tls_client_cert = "certs/client.crt"
 
 # Private key used by daemon when it is acting as a client.
-client_key = "certs/client.key"
+tls_client_key = "certs/client.key"
 
 # A certificate signed by a certificate authority.
 # Used by the daemon when it is acting as a server
 # (receiving messages).
-server_cert = "certs/server.crt"
+tls_server_cert = "certs/server.crt"
 
 # Private key used by daemon when it is acting as a server.
-server_key = "certs/server.key"
+tls_server_key = "certs/server.key"

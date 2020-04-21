@@ -43,12 +43,12 @@ pub use partial::{ConfigSource, PartialConfig};
 #[derive(Debug)]
 pub struct Config {
     storage: (String, ConfigSource),
-    cert_dir: (String, ConfigSource),
-    ca_certs: (String, ConfigSource),
-    client_cert: (String, ConfigSource),
-    client_key: (String, ConfigSource),
-    server_cert: (String, ConfigSource),
-    server_key: (String, ConfigSource),
+    tls_cert_dir: (String, ConfigSource),
+    tls_ca_file: (String, ConfigSource),
+    tls_client_cert: (String, ConfigSource),
+    tls_client_key: (String, ConfigSource),
+    tls_server_cert: (String, ConfigSource),
+    tls_server_key: (String, ConfigSource),
     service_endpoint: (String, ConfigSource),
     network_endpoints: (Vec<String>, ConfigSource),
     advertised_endpoints: (Vec<String>, ConfigSource),
@@ -66,7 +66,7 @@ pub struct Config {
     heartbeat_interval: (u64, ConfigSource),
     admin_service_coordinator_timeout: (Duration, ConfigSource),
     state_dir: (String, ConfigSource),
-    insecure: (bool, ConfigSource),
+    tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
     #[cfg(feature = "biome")]
     biome_enabled: (bool, ConfigSource),
@@ -79,28 +79,28 @@ impl Config {
         &self.storage.0
     }
 
-    pub fn cert_dir(&self) -> &str {
-        &self.cert_dir.0
+    pub fn tls_cert_dir(&self) -> &str {
+        &self.tls_cert_dir.0
     }
 
-    pub fn ca_certs(&self) -> &str {
-        &self.ca_certs.0
+    pub fn tls_ca_file(&self) -> &str {
+        &self.tls_ca_file.0
     }
 
-    pub fn client_cert(&self) -> &str {
-        &self.client_cert.0
+    pub fn tls_client_cert(&self) -> &str {
+        &self.tls_client_cert.0
     }
 
-    pub fn client_key(&self) -> &str {
-        &self.client_key.0
+    pub fn tls_client_key(&self) -> &str {
+        &self.tls_client_key.0
     }
 
-    pub fn server_cert(&self) -> &str {
-        &self.server_cert.0
+    pub fn tls_server_cert(&self) -> &str {
+        &self.tls_server_cert.0
     }
 
-    pub fn server_key(&self) -> &str {
-        &self.server_key.0
+    pub fn tls_server_key(&self) -> &str {
+        &self.tls_server_key.0
     }
 
     pub fn service_endpoint(&self) -> &str {
@@ -162,8 +162,8 @@ impl Config {
         &self.state_dir.0
     }
 
-    pub fn insecure(&self) -> bool {
-        self.insecure.0
+    pub fn tls_insecure(&self) -> bool {
+        self.tls_insecure.0
     }
 
     pub fn no_tls(&self) -> bool {
@@ -188,28 +188,28 @@ impl Config {
         &self.storage.1
     }
 
-    fn cert_dir_source(&self) -> &ConfigSource {
-        &self.cert_dir.1
+    fn tls_cert_dir_source(&self) -> &ConfigSource {
+        &self.tls_cert_dir.1
     }
 
-    fn ca_certs_source(&self) -> &ConfigSource {
-        &self.ca_certs.1
+    fn tls_ca_file_source(&self) -> &ConfigSource {
+        &self.tls_ca_file.1
     }
 
-    fn client_cert_source(&self) -> &ConfigSource {
-        &self.client_cert.1
+    fn tls_client_cert_source(&self) -> &ConfigSource {
+        &self.tls_client_cert.1
     }
 
-    fn client_key_source(&self) -> &ConfigSource {
-        &self.client_key.1
+    fn tls_client_key_source(&self) -> &ConfigSource {
+        &self.tls_client_key.1
     }
 
-    fn server_cert_source(&self) -> &ConfigSource {
-        &self.server_cert.1
+    fn tls_server_cert_source(&self) -> &ConfigSource {
+        &self.tls_server_cert.1
     }
 
-    fn server_key_source(&self) -> &ConfigSource {
-        &self.server_key.1
+    fn tls_server_key_source(&self) -> &ConfigSource {
+        &self.tls_server_key.1
     }
 
     fn service_endpoint_source(&self) -> &ConfigSource {
@@ -271,8 +271,8 @@ impl Config {
         &self.state_dir.1
     }
 
-    fn insecure_source(&self) -> &ConfigSource {
-        &self.insecure.1
+    fn tls_insecure_source(&self) -> &ConfigSource {
+        &self.tls_insecure.1
     }
 
     fn no_tls_source(&self) -> &ConfigSource {
@@ -301,34 +301,34 @@ impl Config {
             self.storage_source()
         );
         debug!(
-            "Config: ca_certs: {} (source: {:?})",
-            self.ca_certs(),
-            self.ca_certs_source()
+            "Config: tls_ca_file: {} (source: {:?})",
+            self.tls_ca_file(),
+            self.tls_ca_file_source()
         );
         debug!(
-            "Config: cert_dir: {} (source: {:?})",
-            self.cert_dir(),
-            self.cert_dir_source()
+            "Config: tls_cert_dir: {} (source: {:?})",
+            self.tls_cert_dir(),
+            self.tls_cert_dir_source()
         );
         debug!(
-            "Config: client_cert: {} (source: {:?})",
-            self.client_cert(),
-            self.client_cert_source()
+            "Config: tls_client_cert: {} (source: {:?})",
+            self.tls_client_cert(),
+            self.tls_client_cert_source()
         );
         debug!(
-            "Config: client_key: {} (source: {:?})",
-            self.client_key(),
-            self.client_key_source()
+            "Config: tls_client_key: {} (source: {:?})",
+            self.tls_client_key(),
+            self.tls_client_key_source()
         );
         debug!(
-            "Config: server_cert: {} (source: {:?})",
-            self.server_cert(),
-            self.server_cert_source()
+            "Config: tls_server_cert: {} (source: {:?})",
+            self.tls_server_cert(),
+            self.tls_server_cert_source()
         );
         debug!(
-            "Config: server_key: {} (source: {:?})",
-            self.server_key(),
-            self.server_key_source()
+            "Config: tls_server_key: {} (source: {:?})",
+            self.tls_server_key(),
+            self.tls_server_key_source()
         );
         debug!(
             "Config: service_endpoint: {} (source: {:?})",
@@ -404,9 +404,9 @@ impl Config {
             self.database_source(),
         );
         debug!(
-            "Config: insecure: {:?} (source: {:?})",
-            self.insecure(),
-            self.insecure_source()
+            "Config: tls_insecure: {:?} (source: {:?})",
+            self.tls_insecure(),
+            self.tls_insecure_source()
         );
         debug!(
             "Config: no_tls: {:?} (source: {:?})",
@@ -477,11 +477,17 @@ mod tests {
     pub fn get_toml_value() -> Value {
         let values = vec![
             ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
-            ("ca_certs".to_string(), EXAMPLE_CA_CERTS.to_string()),
-            ("client_cert".to_string(), EXAMPLE_CLIENT_CERT.to_string()),
-            ("client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
-            ("server_cert".to_string(), EXAMPLE_SERVER_CERT.to_string()),
-            ("server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
+            ("tls_ca_file".to_string(), EXAMPLE_CA_CERTS.to_string()),
+            (
+                "tls_client_cert".to_string(),
+                EXAMPLE_CLIENT_CERT.to_string(),
+            ),
+            ("tls_client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
+            (
+                "tls_server_cert".to_string(),
+                EXAMPLE_SERVER_CERT.to_string(),
+            ),
+            ("tls_server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
             (
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
@@ -511,14 +517,14 @@ mod tests {
         (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
         (@arg service_endpoint: --("service-endpoint") +takes_value)
         (@arg peers: --peer +takes_value +multiple)
-        (@arg ca_file: --("ca-file") +takes_value)
-        (@arg cert_dir: --("cert-dir") +takes_value)
-        (@arg client_cert: --("client-cert") +takes_value)
-        (@arg server_cert: --("server-cert") +takes_value)
-        (@arg server_key:  --("server-key") +takes_value)
-        (@arg client_key:  --("client-key") +takes_value)
+        (@arg tls_ca_file: --("tls-ca-file") +takes_value)
+        (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
+        (@arg tls_client_cert: --("tls-client-cert") +takes_value)
+        (@arg tls_server_cert: --("tls-server-cert") +takes_value)
+        (@arg tls_server_key:  --("tls-server-key") +takes_value)
+        (@arg tls_client_key:  --("tls-client-key") +takes_value)
         (@arg bind: --("bind") +takes_value)
-        (@arg insecure: --("insecure"))
+        (@arg tls_insecure: --("tls-insecure"))
         (@arg no_tls: --("no-tls"))
         (@arg biome_enabled: --("enable-biome")))
         .get_matches_from(args)
@@ -616,17 +622,17 @@ mod tests {
             EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,
-            "--ca-file",
+            "--tls-ca-file",
             EXAMPLE_CA_CERTS,
-            "--client-cert",
+            "--tls-client-cert",
             EXAMPLE_CLIENT_CERT,
-            "--client-key",
+            "--tls-client-key",
             EXAMPLE_CLIENT_KEY,
-            "--server-cert",
+            "--tls-server-cert",
             EXAMPLE_SERVER_CERT,
-            "--server-key",
+            "--tls-server-key",
             EXAMPLE_SERVER_KEY,
-            "--insecure",
+            "--tls-insecure",
             "--no-tls",
             "--enable-biome",
         ];
@@ -738,18 +744,24 @@ mod tests {
             (true, &ConfigSource::CommandLine)
         );
 
-        // The DefaultPartialConfigBuilder and EnvPartialConfigBuilder had values for `cert_dir`,
-        // but the EnvPartialConfigBuilder value should have precedence (source should be
-        // Environment).
+        // The DefaultPartialConfigBuilder and EnvPartialConfigBuilder had values for
+        // `tls_cert_dir`, but the EnvPartialConfigBuilder value should have precedence (source
+        // should be Environment).
         assert_eq!(
-            (final_config.cert_dir(), final_config.cert_dir_source()),
+            (
+                final_config.tls_cert_dir(),
+                final_config.tls_cert_dir_source()
+            ),
             ("cert/test/config", &ConfigSource::Environment)
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `ca_certs`, but the TomlPartialConfigBuilder value should have precedence (source should
-        // be Toml).
+        // `tls_ca_file`, but the TomlPartialConfigBuilder value should have precedence (source
+        // should be Toml).
         assert_eq!(
-            (final_config.ca_certs(), final_config.ca_certs_source()),
+            (
+                final_config.tls_ca_file(),
+                final_config.tls_ca_file_source()
+            ),
             (
                 EXAMPLE_CA_CERTS,
                 &ConfigSource::Toml {
@@ -758,12 +770,12 @@ mod tests {
             )
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `client_cert`, but the TomlPartialConfigBuilder value should have precedence (source
+        // `tls_client_cert`, but the TomlPartialConfigBuilder value should have precedence (source
         // should be Toml).
         assert_eq!(
             (
-                final_config.client_cert(),
-                final_config.client_cert_source()
+                final_config.tls_client_cert(),
+                final_config.tls_client_cert_source()
             ),
             (
                 EXAMPLE_CLIENT_CERT,
@@ -773,10 +785,13 @@ mod tests {
             )
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `client_key`, but the TomlPartialConfigBuilder value should have precedence (source
+        // `tls_client_key`, but the TomlPartialConfigBuilder value should have precedence (source
         // should be Toml).
         assert_eq!(
-            (final_config.client_key(), final_config.client_key_source()),
+            (
+                final_config.tls_client_key(),
+                final_config.tls_client_key_source()
+            ),
             (
                 EXAMPLE_CLIENT_KEY,
                 &ConfigSource::Toml {
@@ -785,12 +800,12 @@ mod tests {
             )
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `server_cert`, but the TomlPartialConfigBuilder value should have precedence (source
+        // `tls_server_cert`, but the TomlPartialConfigBuilder value should have precedence (source
         // should be Toml).
         assert_eq!(
             (
-                final_config.server_cert(),
-                final_config.server_cert_source()
+                final_config.tls_server_cert(),
+                final_config.tls_server_cert_source()
             ),
             (
                 EXAMPLE_SERVER_CERT,
@@ -800,10 +815,13 @@ mod tests {
             )
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
-        // `server_key`, but the TomlPartialConfigBuilder value should have precedence (source
+        // `tls_server_key`, but the TomlPartialConfigBuilder value should have precedence (source
         // should be Toml).
         assert_eq!(
-            (final_config.server_key(), final_config.server_key_source()),
+            (
+                final_config.tls_server_key(),
+                final_config.tls_server_key_source()
+            ),
             (
                 EXAMPLE_SERVER_KEY,
                 &ConfigSource::Toml {
@@ -957,7 +975,7 @@ mod tests {
             "123",
             "--display-name",
             "Node 1",
-            "--cert-dir",
+            "--tls-cert-dir",
             "/my_files/",
         ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
@@ -983,14 +1001,20 @@ mod tests {
         // but the EnvPartialConfigBuilder value should have precedence (source should be
         // Environment).
         assert_eq!(
-            (final_config.cert_dir(), final_config.cert_dir_source()),
+            (
+                final_config.tls_cert_dir(),
+                final_config.tls_cert_dir_source()
+            ),
             ("/my_files/", &ConfigSource::CommandLine)
         );
-        // The DefaultPartialConfigBuilder had a value for the ca_certs, and since the cert_dir
+        // The DefaultPartialConfigBuilder had a value for the ca_file, and since the cert_dir
         // value was provided to the ClapPartialConfigBuilder, the cert_dir value should be
         // appended to the default file name.
         assert_eq!(
-            (final_config.ca_certs(), final_config.ca_certs_source()),
+            (
+                final_config.tls_ca_file(),
+                final_config.tls_ca_file_source()
+            ),
             (
                 format!("{}{}", "/my_files/", DEFAULT_CA_CERT).as_str(),
                 &ConfigSource::Default,
@@ -1001,8 +1025,8 @@ mod tests {
         // appended to the default file name.
         assert_eq!(
             (
-                final_config.client_cert(),
-                final_config.client_cert_source()
+                final_config.tls_client_cert(),
+                final_config.tls_client_cert_source()
             ),
             (
                 format!("{}{}", "/my_files/", DEFAULT_CLIENT_CERT).as_str(),
@@ -1013,7 +1037,10 @@ mod tests {
         // value was provided to the ClapPartialConfigBuilder, the cert_dir value should be
         // appended to the default file name.
         assert_eq!(
-            (final_config.client_key(), final_config.client_key_source()),
+            (
+                final_config.tls_client_key(),
+                final_config.tls_client_key_source()
+            ),
             (
                 format!("{}{}", "/my_files/", DEFAULT_CLIENT_KEY).as_str(),
                 &ConfigSource::Default,
@@ -1024,8 +1051,8 @@ mod tests {
         // appended to the default file name.
         assert_eq!(
             (
-                final_config.server_cert(),
-                final_config.server_cert_source()
+                final_config.tls_server_cert(),
+                final_config.tls_server_cert_source()
             ),
             (
                 format!("{}{}", "/my_files/", DEFAULT_SERVER_CERT).as_str(),
@@ -1036,7 +1063,10 @@ mod tests {
         // value was provided to the ClapPartialConfigBuilder, the cert_dir value should be
         // appended to the default file name.
         assert_eq!(
-            (final_config.server_key(), final_config.server_key_source()),
+            (
+                final_config.tls_server_key(),
+                final_config.tls_server_key_source()
+            ),
             (
                 format!("{}{}", "/my_files/", DEFAULT_SERVER_KEY).as_str(),
                 &ConfigSource::Default,

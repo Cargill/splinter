@@ -27,12 +27,12 @@ const TOML_VERSION: &str = "1";
 #[derive(Deserialize, Default, Debug)]
 struct TomlConfig {
     storage: Option<String>,
-    cert_dir: Option<String>,
-    ca_certs: Option<String>,
-    client_cert: Option<String>,
-    client_key: Option<String>,
-    server_cert: Option<String>,
-    server_key: Option<String>,
+    tls_cert_dir: Option<String>,
+    tls_ca_file: Option<String>,
+    tls_client_cert: Option<String>,
+    tls_client_key: Option<String>,
+    tls_server_cert: Option<String>,
+    tls_server_key: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -52,6 +52,14 @@ struct TomlConfig {
     version: Option<String>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+
+    // Deprecated values
+    cert_dir: Option<String>,
+    ca_certs: Option<String>,
+    client_cert: Option<String>,
+    client_key: Option<String>,
+    server_cert: Option<String>,
+    server_key: Option<String>,
 }
 
 pub struct TomlPartialConfigBuilder {
@@ -95,13 +103,14 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         let mut partial_config = PartialConfig::new(source);
 
         partial_config = partial_config
+            // with current values
             .with_storage(self.toml_config.storage)
-            .with_cert_dir(self.toml_config.cert_dir)
-            .with_ca_certs(self.toml_config.ca_certs)
-            .with_client_cert(self.toml_config.client_cert)
-            .with_client_key(self.toml_config.client_key)
-            .with_server_cert(self.toml_config.server_cert)
-            .with_server_key(self.toml_config.server_key)
+            .with_tls_cert_dir(self.toml_config.tls_cert_dir)
+            .with_tls_ca_file(self.toml_config.tls_ca_file)
+            .with_tls_client_cert(self.toml_config.tls_client_cert)
+            .with_tls_client_key(self.toml_config.tls_client_key)
+            .with_tls_server_cert(self.toml_config.tls_server_cert)
+            .with_tls_server_key(self.toml_config.tls_server_key)
             .with_service_endpoint(self.toml_config.service_endpoint)
             .with_network_endpoints(self.toml_config.network_endpoints)
             .with_advertised_endpoints(self.toml_config.advertised_endpoints)
@@ -136,6 +145,26 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             partial_config = partial_config.with_whitelist(self.toml_config.whitelist);
         }
 
+        // deprecated values, only set if the current value was not set
+        if partial_config.tls_cert_dir().is_none() {
+            partial_config = partial_config.with_tls_cert_dir(self.toml_config.cert_dir)
+        }
+        if partial_config.tls_ca_file().is_none() {
+            partial_config = partial_config.with_tls_ca_file(self.toml_config.ca_certs)
+        }
+        if partial_config.tls_client_cert().is_none() {
+            partial_config = partial_config.with_tls_client_cert(self.toml_config.client_cert)
+        }
+        if partial_config.tls_client_key().is_none() {
+            partial_config = partial_config.with_tls_client_key(self.toml_config.client_key)
+        }
+        if partial_config.tls_server_cert().is_none() {
+            partial_config = partial_config.with_tls_server_cert(self.toml_config.server_cert)
+        }
+        if partial_config.tls_server_key().is_none() {
+            partial_config = partial_config.with_tls_server_key(self.toml_config.server_key)
+        }
+
         Ok(partial_config)
     }
 }
@@ -151,6 +180,7 @@ mod tests {
 
     /// Example configuration values.
     static EXAMPLE_STORAGE: &str = "yaml";
+    static EXAMPLE_CERT_DIR: &str = "/cert_dir";
     static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
     static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
@@ -164,11 +194,17 @@ mod tests {
     fn get_toml_value() -> Value {
         let values = vec![
             ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
-            ("ca_certs".to_string(), EXAMPLE_CA_CERTS.to_string()),
-            ("client_cert".to_string(), EXAMPLE_CLIENT_CERT.to_string()),
-            ("client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
-            ("server_cert".to_string(), EXAMPLE_SERVER_CERT.to_string()),
-            ("server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
+            ("tls_ca_file".to_string(), EXAMPLE_CA_CERTS.to_string()),
+            (
+                "tls_client_cert".to_string(),
+                EXAMPLE_CLIENT_CERT.to_string(),
+            ),
+            ("tls_client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
+            (
+                "tls_server_cert".to_string(),
+                EXAMPLE_SERVER_CERT.to_string(),
+            ),
+            ("tls_server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
             (
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
@@ -185,15 +221,46 @@ mod tests {
         Value::Table(config_values)
     }
 
+    /// Converts a list of tuples to a toml Table Value used to write a toml file.
+    fn get_deprecated_toml_value() -> Value {
+        let values = vec![
+            ("cert_dir".to_string(), EXAMPLE_CERT_DIR.to_string()),
+            ("ca_certs".to_string(), EXAMPLE_CA_CERTS.to_string()),
+            ("client_cert".to_string(), EXAMPLE_CLIENT_CERT.to_string()),
+            ("client_key".to_string(), EXAMPLE_CLIENT_KEY.to_string()),
+            ("server_cert".to_string(), EXAMPLE_SERVER_CERT.to_string()),
+            ("server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
+            ("version".to_string(), TOML_VERSION.to_string()),
+        ];
+
+        let mut config_values = Map::new();
+        values.iter().for_each(|v| {
+            config_values.insert(v.0.clone(), Value::String(v.1.clone()));
+        });
+        Value::Table(config_values)
+    }
+
     /// Asserts config values based on the example configuration values.
     fn assert_config_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
-        assert_eq!(config.cert_dir(), None);
-        assert_eq!(config.ca_certs(), Some(EXAMPLE_CA_CERTS.to_string()));
-        assert_eq!(config.client_cert(), Some(EXAMPLE_CLIENT_CERT.to_string()));
-        assert_eq!(config.client_key(), Some(EXAMPLE_CLIENT_KEY.to_string()));
-        assert_eq!(config.server_cert(), Some(EXAMPLE_SERVER_CERT.to_string()));
-        assert_eq!(config.server_key(), Some(EXAMPLE_SERVER_KEY.to_string()));
+        assert_eq!(config.tls_cert_dir(), None);
+        assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
+        assert_eq!(
+            config.tls_client_cert(),
+            Some(EXAMPLE_CLIENT_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_client_key(),
+            Some(EXAMPLE_CLIENT_KEY.to_string())
+        );
+        assert_eq!(
+            config.tls_server_cert(),
+            Some(EXAMPLE_SERVER_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_server_key(),
+            Some(EXAMPLE_SERVER_KEY.to_string())
+        );
         assert_eq!(
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
@@ -214,6 +281,41 @@ mod tests {
         assert_eq!(config.registry_auto_refresh_interval(), None);
         #[cfg(feature = "registry-remote")]
         assert_eq!(config.registry_forced_refresh_interval(), None);
+        assert_eq!(config.heartbeat_interval(), None);
+        assert_eq!(config.admin_service_coordinator_timeout(), None);
+    }
+
+    /// Asserts config values based on the example configuration values.
+    fn assert_deprecated_config_values(config: PartialConfig) {
+        assert_eq!(config.storage(), None);
+        assert_eq!(config.tls_cert_dir(), Some(EXAMPLE_CERT_DIR.to_string()));
+        assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
+        assert_eq!(
+            config.tls_client_cert(),
+            Some(EXAMPLE_CLIENT_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_client_key(),
+            Some(EXAMPLE_CLIENT_KEY.to_string())
+        );
+        assert_eq!(
+            config.tls_server_cert(),
+            Some(EXAMPLE_SERVER_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_server_key(),
+            Some(EXAMPLE_SERVER_KEY.to_string())
+        );
+        assert_eq!(config.service_endpoint(), None);
+        assert_eq!(config.network_endpoints(), None);
+        assert_eq!(config.advertised_endpoints(), None);
+        assert_eq!(config.peers(), None);
+        assert_eq!(config.node_id(), None);
+        assert_eq!(config.display_name(), None);
+        assert_eq!(config.bind(), None);
+        #[cfg(feature = "database")]
+        assert_eq!(config.database(), None);
+        assert_eq!(config.registries(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }
@@ -245,5 +347,35 @@ mod tests {
             .expect("Unable to build TomlPartialConfigBuilder");
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(built_config);
+    }
+
+    #[test]
+    /// This test verifies that a PartialConfig object, constructed from the
+    /// TomlPartialConfigBuilder module, contains the correct values when using deprecated values:
+    ///
+    /// 1. An example config toml string is created that is only made up of deprecated tls values
+    /// 2. A TomlPartialConfigBuilder object is constructed by passing in the toml string created
+    ///    in the previous step.
+    /// 3. The TomlPartialConfigBuilder object is transformed to a PartialConfig object using the
+    ///    `build` method.
+    ///
+    /// This test then verifies the PartialConfig object built from the TomlPartialConfigBuilder
+    /// object by asserting each expected tls value was properly set from deprecated values
+    fn test_deprecated_toml_build() {
+        // Create an example toml string.
+        let toml_string =
+            toml::to_string(&get_deprecated_toml_value()).expect("Could not encode TOML value");
+        // Create a TomlPartialConfigBuilder object from the toml string.
+        let toml_builder = TomlPartialConfigBuilder::new(toml_string, TEST_TOML.to_string())
+            .expect(&format!(
+                "Unable to create TomlPartialConfigBuilder from: {}",
+                TEST_TOML
+            ));
+        // Build a PartialConfig from the TomlPartialConfigBuilder object created.
+        let built_config = toml_builder
+            .build()
+            .expect("Unable to build TomlPartialConfigBuilder");
+        // Compare the generated PartialConfig object against the expected values.
+        assert_deprecated_config_values(built_config);
     }
 }

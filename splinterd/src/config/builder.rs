@@ -63,79 +63,79 @@ impl ConfigBuilder {
     /// Builds a Config object by incorporating the values from each PartialConfig object.
     ///
     pub fn build(self) -> Result<Config, ConfigError> {
-        let cert_dir = self
+        let tls_cert_dir = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.cert_dir() {
+            .find_map(|p| match p.tls_cert_dir() {
                 Some(v) => Some((v, p.source())),
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("certificate directory".to_string()))?;
-        let ca_certs = self
+        let tls_ca_file = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.ca_certs() {
+            .find_map(|p| match p.tls_ca_file() {
                 Some(v) => {
                     if p.source() != ConfigSource::Default {
                         Some((v, p.source()))
                     } else {
-                        Some((get_file_path(&cert_dir.0, &v), p.source()))
+                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
                     }
                 }
                 None => None,
             })
-            .ok_or_else(|| ConfigError::MissingValue("ca certs".to_string()))?;
-        let client_cert = self
+            .ok_or_else(|| ConfigError::MissingValue("ca file".to_string()))?;
+        let tls_client_cert = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.client_cert() {
+            .find_map(|p| match p.tls_client_cert() {
                 Some(v) => {
                     if p.source() != ConfigSource::Default {
                         Some((v, p.source()))
                     } else {
-                        Some((get_file_path(&cert_dir.0, &v), p.source()))
+                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
                     }
                 }
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("client certificate".to_string()))?;
-        let client_key = self
+        let tls_client_key = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.client_key() {
+            .find_map(|p| match p.tls_client_key() {
                 Some(v) => {
                     if p.source() != ConfigSource::Default {
                         Some((v, p.source()))
                     } else {
-                        Some((get_file_path(&cert_dir.0, &v), p.source()))
+                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
                     }
                 }
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("client key".to_string()))?;
-        let server_cert = self
+        let tls_server_cert = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.server_cert() {
+            .find_map(|p| match p.tls_server_cert() {
                 Some(v) => {
                     if p.source() != ConfigSource::Default {
                         Some((v, p.source()))
                     } else {
-                        Some((get_file_path(&cert_dir.0, &v), p.source()))
+                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
                     }
                 }
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("server certificate".to_string()))?;
-        let server_key = self
+        let tls_server_key = self
             .partial_configs
             .iter()
-            .find_map(|p| match p.server_key() {
+            .find_map(|p| match p.tls_server_key() {
                 Some(v) => {
                     if p.source() != ConfigSource::Default {
                         Some((v, p.source()))
                     } else {
-                        Some((get_file_path(&cert_dir.0, &v), p.source()))
+                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
                     }
                 }
                 None => None,
@@ -160,12 +160,12 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("storage".to_string()))?,
-            cert_dir,
-            ca_certs,
-            client_cert,
-            client_key,
-            server_cert,
-            server_key,
+            tls_cert_dir,
+            tls_ca_file,
+            tls_client_cert,
+            tls_client_key,
+            tls_server_cert,
+            tls_server_key,
             service_endpoint: self
                 .partial_configs
                 .iter()
@@ -282,10 +282,10 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("state directory".to_string()))?,
-            insecure: self
+            tls_insecure: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.insecure() {
+                .find_map(|p| match p.tls_insecure() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
@@ -339,12 +339,24 @@ mod tests {
     /// Asserts the example configuration values.
     fn assert_config_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
-        assert_eq!(config.cert_dir(), None);
-        assert_eq!(config.ca_certs(), Some(EXAMPLE_CA_CERTS.to_string()));
-        assert_eq!(config.client_cert(), Some(EXAMPLE_CLIENT_CERT.to_string()));
-        assert_eq!(config.client_key(), Some(EXAMPLE_CLIENT_KEY.to_string()));
-        assert_eq!(config.server_cert(), Some(EXAMPLE_SERVER_CERT.to_string()));
-        assert_eq!(config.server_key(), Some(EXAMPLE_SERVER_KEY.to_string()));
+        assert_eq!(config.tls_cert_dir(), None);
+        assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
+        assert_eq!(
+            config.tls_client_cert(),
+            Some(EXAMPLE_CLIENT_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_client_key(),
+            Some(EXAMPLE_CLIENT_KEY.to_string())
+        );
+        assert_eq!(
+            config.tls_server_cert(),
+            Some(EXAMPLE_SERVER_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_server_key(),
+            Some(EXAMPLE_SERVER_KEY.to_string())
+        );
         assert_eq!(
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
@@ -386,12 +398,12 @@ mod tests {
         // Populate the PartialConfig fields by chaining the builder methods.
         partial_config = partial_config
             .with_storage(Some(EXAMPLE_STORAGE.to_string()))
-            .with_cert_dir(None)
-            .with_ca_certs(Some(EXAMPLE_CA_CERTS.to_string()))
-            .with_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()))
-            .with_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()))
-            .with_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()))
-            .with_server_key(Some(EXAMPLE_SERVER_KEY.to_string()))
+            .with_tls_cert_dir(None)
+            .with_tls_ca_file(Some(EXAMPLE_CA_CERTS.to_string()))
+            .with_tls_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()))
+            .with_tls_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()))
+            .with_tls_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()))
+            .with_tls_server_key(Some(EXAMPLE_SERVER_KEY.to_string()))
             .with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()))
             .with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]))
             .with_advertised_endpoints(Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()]))
@@ -421,11 +433,11 @@ mod tests {
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
         // Populate the PartialConfig fields by separately applying the builder methods.
         partial_config = partial_config.with_storage(Some(EXAMPLE_STORAGE.to_string()));
-        partial_config = partial_config.with_ca_certs(Some(EXAMPLE_CA_CERTS.to_string()));
-        partial_config = partial_config.with_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()));
-        partial_config = partial_config.with_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()));
-        partial_config = partial_config.with_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()));
-        partial_config = partial_config.with_server_key(Some(EXAMPLE_SERVER_KEY.to_string()));
+        partial_config = partial_config.with_tls_ca_file(Some(EXAMPLE_CA_CERTS.to_string()));
+        partial_config = partial_config.with_tls_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()));
+        partial_config = partial_config.with_tls_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()));
+        partial_config = partial_config.with_tls_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()));
+        partial_config = partial_config.with_tls_server_key(Some(EXAMPLE_SERVER_KEY.to_string()));
         partial_config =
             partial_config.with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()));
         partial_config =

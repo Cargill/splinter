@@ -31,7 +31,7 @@ impl EnvPartialConfigBuilder {
 impl PartialConfigBuilder for EnvPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         Ok(PartialConfig::new(ConfigSource::Environment)
-            .with_cert_dir(env::var(CERT_DIR_ENV).ok())
+            .with_tls_cert_dir(env::var(CERT_DIR_ENV).ok())
             .with_state_dir(env::var(STATE_DIR_ENV).ok()))
     }
 }
@@ -71,7 +71,7 @@ mod tests {
         assert_eq!(unset_config.source(), ConfigSource::Environment);
         // Compare the generated PartialConfig object against the expected values.
         assert_eq!(unset_config.state_dir(), None);
-        assert_eq!(unset_config.cert_dir(), None);
+        assert_eq!(unset_config.tls_cert_dir(), None);
 
         // Set the environment variables.
         env::set_var(STATE_DIR_ENV, "state/test/config");
@@ -89,7 +89,7 @@ mod tests {
             Some(String::from("state/test/config"))
         );
         assert_eq!(
-            set_config.cert_dir(),
+            set_config.tls_cert_dir(),
             Some(String::from("cert/test/config"))
         );
     }
