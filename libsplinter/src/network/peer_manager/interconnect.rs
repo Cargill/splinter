@@ -430,11 +430,13 @@ pub mod tests {
     use std::sync::mpsc::Sender;
 
     use crate::mesh::{Envelope, Mesh};
-    use crate::network::connection_manager::ConnectionManager;
+    use crate::network::connection_manager::{
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+    };
     use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
     use crate::network::peer_manager::PeerManager;
     use crate::protos::network::NetworkEcho;
-    use crate::transport::{inproc::InprocTransport, Transport};
+    use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
     // Verify that the PeerInterconnect properly receives messages from peers, passes them to
     // the dispatcher, and sends messages from the handlers to other peers.
@@ -521,6 +523,7 @@ pub mod tests {
         });
 
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -567,6 +570,7 @@ pub mod tests {
         let mesh = Mesh::new(512, 128);
 
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -651,5 +655,35 @@ pub mod tests {
         network_message.set_message_type(NetworkMessageType::NETWORK_ECHO);
         network_message.set_payload(echo_message_bytes);
         network_message.write_to_bytes().unwrap()
+    }
+
+    struct NoopAuthorizer {
+        authorized_id: String,
+    }
+
+    impl NoopAuthorizer {
+        fn new(id: &str) -> Self {
+            Self {
+                authorized_id: id.to_string(),
+            }
+        }
+    }
+
+    impl Authorizer for NoopAuthorizer {
+        fn authorize_connection(
+            &self,
+            connection_id: String,
+            connection: Box<dyn Connection>,
+            callback: Box<
+                dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
+            >,
+        ) -> Result<(), AuthorizerError> {
+            (*callback)(AuthorizationResult::Authorized {
+                connection_id,
+                connection,
+                identity: self.authorized_id.clone(),
+            })
+            .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
+        }
     }
 }

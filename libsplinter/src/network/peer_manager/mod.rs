@@ -561,11 +561,13 @@ fn handle_notifications(
 pub mod tests {
     use super::*;
     use crate::mesh::Mesh;
-    use crate::network::connection_manager::ConnectionManager;
+    use crate::network::connection_manager::{
+        AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+    };
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::transport::inproc::InprocTransport;
     use crate::transport::raw::RawTransport;
-    use crate::transport::Transport;
+    use crate::transport::{Connection, Transport};
 
     // Test that a call to add_peer_ref returns the correct PeerRef
     //
@@ -582,6 +584,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -617,6 +620,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -656,6 +660,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -702,6 +707,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -759,6 +765,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -808,6 +815,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -856,6 +864,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -915,6 +924,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1039,6 +1049,7 @@ pub mod tests {
         });
 
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -1089,6 +1100,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1100,5 +1112,35 @@ pub mod tests {
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_and_wait();
+    }
+
+    struct NoopAuthorizer {
+        authorized_id: String,
+    }
+
+    impl NoopAuthorizer {
+        fn new(id: &str) -> Self {
+            Self {
+                authorized_id: id.to_string(),
+            }
+        }
+    }
+
+    impl Authorizer for NoopAuthorizer {
+        fn authorize_connection(
+            &self,
+            connection_id: String,
+            connection: Box<dyn Connection>,
+            callback: Box<
+                dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
+            >,
+        ) -> Result<(), AuthorizerError> {
+            (*callback)(AuthorizationResult::Authorized {
+                connection_id,
+                connection,
+                identity: self.authorized_id.clone(),
+            })
+            .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
+        }
     }
 }

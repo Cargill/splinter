@@ -119,6 +119,7 @@ impl SubscriberMap {
 enum CmMessage {
     Shutdown,
     Request(CmRequest),
+    AuthResult(AuthResult),
     SendHeartbeats,
 }
 
@@ -149,6 +150,17 @@ enum CmRequest {
     },
 }
 
+enum AuthResult {
+    Outbound(AuthResultPayload),
+    Inbound(AuthResultPayload),
+}
+
+struct AuthResultPayload {
+    endpoint: String,
+    sender: Sender<Result<(), ConnectionManagerError>>,
+    auth_result: AuthorizationResult,
+}
+
 pub struct ConnectionManager<T: 'static, U: 'static>
 where
     T: MatrixLifeCycle,
@@ -156,6 +168,7 @@ where
 {
     pacemaker: Pacemaker,
     connection_state: Option<ConnectionState<T, U>>,
+    authorizer: Option<Box<dyn Authorizer + Send>>,
     join_handle: Option<thread::JoinHandle<()>>,
     sender: Option<Sender<CmMessage>>,
     shutdown_handle: Option<ShutdownHandle>,
@@ -167,6 +180,7 @@ where
     U: MatrixSender,
 {
     pub fn new(
+        authorizer: Box<dyn Authorizer + Send>,
         life_cycle: T,
         matrix_sender: U,
         transport: Box<dyn Transport + Send>,
@@ -184,6 +198,7 @@ where
         let pacemaker = Pacemaker::new(heartbeat);
 
         Self {
+            authorizer: Some(authorizer),
             pacemaker,
             connection_state,
             join_handle: None,
@@ -198,6 +213,11 @@ where
             ConnectionManagerError::StartUpError("Service has already started".into())
         })?;
 
+        let authorizer = self.authorizer.take().ok_or_else(|| {
+            ConnectionManagerError::StartUpError("Service has already started".into())
+        })?;
+
+        let resender = sender.clone();
         let join_handle = thread::Builder::new()
             .name("Connection Manager".into())
             .spawn(move || {
@@ -206,7 +226,16 @@ where
                     match recv.recv() {
                         Ok(CmMessage::Shutdown) => break,
                         Ok(CmMessage::Request(req)) => {
-                            handle_request(req, &mut state, &mut subscribers);
+                            handle_request(
+                                req,
+                                &mut state,
+                                &mut subscribers,
+                                &*authorizer,
+                                resender.clone(),
+                            );
+                        }
+                        Ok(CmMessage::AuthResult(auth_result)) => {
+                            handle_auth_result(auth_result, &mut state, &mut subscribers);
                         }
                         Ok(CmMessage::SendHeartbeats) => {
                             send_heartbeats(&mut state, &mut subscribers)
@@ -291,13 +320,13 @@ impl Connector {
             }))
             .map_err(|_| {
                 ConnectionManagerError::SendMessageError(
-                    "The connection manager is no longer running".into(),
+                    "The connection manager is no longer running: unable to send request".into(),
                 )
             })?;
 
         recv.recv().map_err(|_| {
             ConnectionManagerError::SendMessageError(
-                "The connection manager is no longer running".into(),
+                "The connection manager is no longer running: could not receive response".into(),
             )
         })?
     }
@@ -562,57 +591,212 @@ where
     fn add_inbound_connection(
         &mut self,
         connection: Box<dyn Connection>,
-    ) -> Result<String, ConnectionManagerError> {
+        reply_sender: Sender<Result<(), ConnectionManagerError>>,
+        internal_sender: Sender<CmMessage>,
+        authorizer: &dyn Authorizer,
+        subscribers: &mut SubscriberMap,
+    ) {
         let endpoint = connection.remote_endpoint();
-
         let id = Uuid::new_v4().to_string();
 
+        if endpoint.contains("inproc") {
+            if reply_sender
+                .send(self.complete_inbound_connection(endpoint, id, connection, subscribers))
+                .is_err()
+            {
+                warn!("connector dropped before receiving result of add connection");
+            }
+        } else {
+            // add the connection to the authorization pool
+            let auth_endpoint = endpoint;
+            let auth_sender = reply_sender.clone();
+            if let Err(err) = authorizer.authorize_connection(
+                id,
+                connection,
+                Box::new(move |auth_result| {
+                    internal_sender
+                        .send(CmMessage::AuthResult(AuthResult::Inbound(
+                            AuthResultPayload {
+                                endpoint: auth_endpoint.clone(),
+                                sender: auth_sender.clone(),
+                                auth_result,
+                            },
+                        )))
+                        .map_err(Box::from)
+                }),
+            ) {
+                if reply_sender
+                    .send(Err(ConnectionManagerError::ConnectionCreationError(
+                        err.to_string(),
+                    )))
+                    .is_err()
+                {
+                    warn!("connector dropped before receiving result of add connection");
+                }
+            }
+        }
+    }
+
+    fn add_connection(
+        &mut self,
+        endpoint: &str,
+        id: String,
+        reply_sender: Sender<Result<(), ConnectionManagerError>>,
+        internal_sender: Sender<CmMessage>,
+        authorizer: &dyn Authorizer,
+    ) {
+        if self.connections.get_mut(endpoint).is_some() {
+            if reply_sender.send(Ok(())).is_err() {
+                warn!("connector dropped before receiving result of add connection");
+            }
+        } else {
+            match self.transport.connect(endpoint) {
+                Ok(connection) => {
+                    // No need to authorize inproc connections
+                    if endpoint.contains("inproc") {
+                        if reply_sender
+                            .send(self.complete_outbound_connection(
+                                endpoint.to_string(),
+                                id,
+                                connection,
+                            ))
+                            .is_err()
+                        {
+                            warn!("connector dropped before receiving result of add connection");
+                        }
+                    } else {
+                        // add the connection to the authorization pool
+                        let auth_endpoint = endpoint.to_string();
+                        let auth_sender = reply_sender.clone();
+                        if let Err(err) = authorizer.authorize_connection(
+                            id,
+                            connection,
+                            Box::new(move |auth_result| {
+                                internal_sender
+                                    .send(CmMessage::AuthResult(AuthResult::Outbound(
+                                        AuthResultPayload {
+                                            endpoint: auth_endpoint.clone(),
+                                            sender: auth_sender.clone(),
+                                            auth_result,
+                                        },
+                                    )))
+                                    .map_err(Box::from)
+                            }),
+                        ) {
+                            if reply_sender
+                                .send(Err(ConnectionManagerError::ConnectionCreationError(
+                                    err.to_string(),
+                                )))
+                                .is_err()
+                            {
+                                warn!(
+                                    "connector dropped before receiving result of add connection"
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    if reply_sender
+                        .send(Err(ConnectionManagerError::ConnectionCreationError(
+                            err.to_string(),
+                        )))
+                        .is_err()
+                    {
+                        warn!("connector dropped before receiving result of add connection");
+                    }
+                }
+            }
+        }
+    }
+
+    fn outbound_authorization_complete(
+        &mut self,
+        endpoint: String,
+        auth_result: AuthorizationResult,
+    ) -> Result<(), ConnectionManagerError> {
+        match auth_result {
+            AuthorizationResult::Authorized {
+                connection_id,
+                connection,
+                ..
+            } => self.complete_outbound_connection(endpoint, connection_id, connection),
+            AuthorizationResult::Unauthorized { connection_id, .. } => {
+                Err(ConnectionManagerError::Unauthorized(connection_id))
+            }
+        }
+    }
+
+    fn inbound_authorization_complete(
+        &mut self,
+        endpoint: String,
+        auth_result: AuthorizationResult,
+        subscribers: &mut SubscriberMap,
+    ) -> Result<(), ConnectionManagerError> {
+        match auth_result {
+            AuthorizationResult::Authorized {
+                connection_id,
+                connection,
+                ..
+            } => self.complete_inbound_connection(endpoint, connection_id, connection, subscribers),
+            AuthorizationResult::Unauthorized { connection_id, .. } => {
+                Err(ConnectionManagerError::Unauthorized(connection_id))
+            }
+        }
+    }
+
+    fn complete_outbound_connection(
+        &mut self,
+        endpoint: String,
+        connection_id: String,
+        connection: Box<dyn Connection>,
+    ) -> Result<(), ConnectionManagerError> {
         self.life_cycle
-            .add(connection, id.clone())
+            .add(connection, connection_id.clone())
+            .map_err(|err| ConnectionManagerError::ConnectionCreationError(format!("{:?}", err)))?;
+
+        self.connections.insert(
+            endpoint.clone(),
+            ConnectionMetadata::Outbound {
+                id: connection_id,
+                outbound: OutboundConnection {
+                    endpoint,
+                    reconnecting: false,
+                    retry_frequency: INITIAL_RETRY_FREQUENCY,
+                    last_connection_attempt: Instant::now(),
+                    reconnection_attempts: 0,
+                },
+            },
+        );
+
+        Ok(())
+    }
+    fn complete_inbound_connection(
+        &mut self,
+        endpoint: String,
+        connection_id: String,
+        connection: Box<dyn Connection>,
+        subscribers: &mut SubscriberMap,
+    ) -> Result<(), ConnectionManagerError> {
+        self.life_cycle
+            .add(connection, connection_id.clone())
             .map_err(|err| ConnectionManagerError::ConnectionCreationError(format!("{:?}", err)))?;
 
         self.connections.insert(
             endpoint.clone(),
             ConnectionMetadata::Inbound {
-                id: id.clone(),
+                id: connection_id.clone(),
                 inbound: InboundConnection {
-                    endpoint,
+                    endpoint: endpoint.clone(),
                     disconnected: false,
                 },
             },
         );
 
-        Ok(id)
-    }
-
-    fn add_connection(&mut self, endpoint: &str, id: String) -> Result<(), ConnectionManagerError> {
-        if self.connections.get_mut(endpoint).is_some() {
-            return Ok(());
-        } else {
-            let connection = self.transport.connect(endpoint).map_err(|err| {
-                ConnectionManagerError::ConnectionCreationError(format!("{:?}", err))
-            })?;
-
-            self.life_cycle
-                .add(connection, id.to_string())
-                .map_err(|err| {
-                    ConnectionManagerError::ConnectionCreationError(format!("{:?}", err))
-                })?;
-
-            self.connections.insert(
-                endpoint.to_string(),
-                ConnectionMetadata::Outbound {
-                    id,
-                    outbound: OutboundConnection {
-                        endpoint: endpoint.to_string(),
-                        reconnecting: false,
-                        retry_frequency: INITIAL_RETRY_FREQUENCY,
-                        last_connection_attempt: Instant::now(),
-                        reconnection_attempts: 0,
-                    },
-                },
-            );
-        };
+        subscribers.broadcast(ConnectionManagerNotification::InboundConnection {
+            endpoint,
+            connection_id,
+        });
 
         Ok(())
     }
@@ -738,20 +922,21 @@ fn handle_request<T: MatrixLifeCycle, U: MatrixSender>(
     req: CmRequest,
     state: &mut ConnectionState<T, U>,
     subscribers: &mut SubscriberMap,
+    authorizer: &dyn Authorizer,
+    internal_sender: Sender<CmMessage>,
 ) {
     match req {
         CmRequest::RequestOutboundConnection {
             endpoint,
             sender,
             connection_id,
-        } => {
-            if sender
-                .send(state.add_connection(&endpoint, connection_id))
-                .is_err()
-            {
-                warn!("connector dropped before receiving result of add connection");
-            }
-        }
+        } => state.add_connection(
+            &endpoint,
+            connection_id,
+            sender,
+            internal_sender,
+            authorizer,
+        ),
         CmRequest::RemoveConnection { endpoint, sender } => {
             let response = state
                 .remove_connection(&endpoint)
@@ -773,22 +958,13 @@ fn handle_request<T: MatrixLifeCycle, U: MatrixSender>(
                 warn!("connector dropped before receiving result of list connections");
             }
         }
-        CmRequest::AddInboundConnection { sender, connection } => {
-            let endpoint = connection.remote_endpoint();
-            let res = state
-                .add_inbound_connection(connection)
-                .and_then(|connection_id| {
-                    subscribers.broadcast(ConnectionManagerNotification::InboundConnection {
-                        endpoint,
-                        connection_id,
-                    });
-                    Ok(())
-                });
-
-            if sender.send(res).is_err() {
-                warn!("connector dropped before receiving result of add inbound callback");
-            }
-        }
+        CmRequest::AddInboundConnection { sender, connection } => state.add_inbound_connection(
+            connection,
+            sender,
+            internal_sender,
+            authorizer,
+            subscribers,
+        ),
         CmRequest::Subscribe { sender, callback } => {
             let subscriber_id = subscribers.add_subscriber(callback);
             if sender.send(Ok(subscriber_id)).is_err() {
@@ -805,6 +981,35 @@ fn handle_request<T: MatrixLifeCycle, U: MatrixSender>(
             }
         }
     };
+}
+
+fn handle_auth_result<T: MatrixLifeCycle, U: MatrixSender>(
+    auth_result: AuthResult,
+    state: &mut ConnectionState<T, U>,
+    subscribers: &mut SubscriberMap,
+) {
+    match auth_result {
+        AuthResult::Outbound(AuthResultPayload {
+            endpoint,
+            sender,
+            auth_result,
+        }) => {
+            let res = state.outbound_authorization_complete(endpoint, auth_result);
+            if sender.send(res).is_err() {
+                warn!("connector dropped before receiving result of connection authorization");
+            }
+        }
+        AuthResult::Inbound(AuthResultPayload {
+            endpoint,
+            sender,
+            auth_result,
+        }) => {
+            let res = state.inbound_authorization_complete(endpoint, auth_result, subscribers);
+            if sender.send(res).is_err() {
+                warn!("connector dropped before receiving result of connection authorization");
+            }
+        }
+    }
 }
 
 fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
@@ -892,12 +1097,14 @@ fn create_heartbeat() -> Result<Vec<u8>, ConnectionManagerError> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     use std::sync::mpsc;
 
     use crate::mesh::Mesh;
+    use crate::network::auth2::tests::negotiation_connection_auth;
+    use crate::network::auth2::AuthorizationPool;
     use crate::transport::inproc::InprocTransport;
     use crate::transport::socket::TcpTransport;
 
@@ -908,6 +1115,7 @@ pub mod tests {
         let mesh = Mesh::new(512, 128);
 
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -930,6 +1138,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -957,6 +1166,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -976,9 +1186,7 @@ pub mod tests {
         cm.shutdown_and_wait();
     }
 
-    /// test_heartbeat_inproc
-    ///
-    /// Test that heartbeats are correctly sent to connections
+    /// Test that heartbeats are correctly sent to inproc connections
     #[test]
     fn test_heartbeat_inproc() {
         let mut transport = Box::new(InprocTransport::default());
@@ -992,6 +1200,7 @@ pub mod tests {
         });
 
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1016,9 +1225,7 @@ pub mod tests {
         cm.shutdown_and_wait();
     }
 
-    // test_heartbeat_raw_tcp
-    ///
-    /// Test that heartbeats are correctly sent to connections
+    /// Test that heartbeats are correctly sent to tcp connections
     #[test]
     fn test_heartbeat_raw_tcp() {
         let mut transport = Box::new(TcpTransport::default());
@@ -1026,14 +1233,34 @@ pub mod tests {
         let endpoint = listener.endpoint();
 
         let mesh = Mesh::new(512, 128);
-        let mesh_clone = mesh.clone();
 
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
+            let mesh = Mesh::new(512, 128);
             let conn = listener.accept().unwrap();
-            mesh_clone.add(conn, "test_id".to_string()).unwrap();
+            mesh.add(conn, "test_id".to_string()).unwrap();
+
+            negotiation_connection_auth(&mesh, "test_id");
+
+            // Verify mesh received heartbeat
+
+            let envelope = mesh.recv().unwrap();
+            let heartbeat: NetworkMessage =
+                protobuf::parse_from_bytes(&envelope.payload()).unwrap();
+            assert_eq!(
+                heartbeat.get_message_type(),
+                NetworkMessageType::NETWORK_HEARTBEAT
+            );
+
+            tx.send(()).expect("Could not send completion signal");
+
+            mesh.shutdown_signaler().shutdown();
         });
 
+        let authorization_pool = AuthorizationPool::new("test_identity".into())
+            .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
+            Box::new(authorization_pool.pool_authorizer()),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1046,15 +1273,11 @@ pub mod tests {
             .request_connection(&endpoint, "test_id")
             .expect("A connection could not be created");
 
-        // Verify mesh received heartbeat
+        // wait for completion
+        rx.recv().expect("Did not receive completion signal");
 
-        let envelope = mesh.recv().unwrap();
-        let heartbeat: NetworkMessage = protobuf::parse_from_bytes(&envelope.payload()).unwrap();
-        assert_eq!(
-            heartbeat.get_message_type(),
-            NetworkMessageType::NETWORK_HEARTBEAT
-        );
         cm.shutdown_and_wait();
+        authorization_pool.shutdown_and_await();
     }
 
     #[test]
@@ -1063,14 +1286,24 @@ pub mod tests {
         let mut listener = transport.listen("tcp://localhost:0").unwrap();
         let endpoint = listener.endpoint();
         let mesh = Mesh::new(512, 128);
-        let mesh_clone = mesh.clone();
 
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
+            let mesh = Mesh::new(512, 128);
             let conn = listener.accept().unwrap();
-            mesh_clone.add(conn, "test_id".to_string()).unwrap();
+            mesh.add(conn, "test_id".to_string()).unwrap();
+            negotiation_connection_auth(&mesh, "test_id");
+
+            // wait for completion
+            rx.recv().expect("Did not receive completion signal");
+
+            mesh.shutdown_signaler().shutdown();
         });
 
+        let authorization_pool = AuthorizationPool::new("test_identity".into())
+            .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
+            Box::new(authorization_pool.pool_authorizer()),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1101,23 +1334,19 @@ pub mod tests {
             .expect("Unable to list connections")
             .is_empty());
 
+        tx.send(()).expect("Could not send completion signal");
+
         cm.shutdown_and_wait();
+        authorization_pool.shutdown_and_await();
     }
 
     #[test]
     fn test_remove_nonexistent_connection() {
-        let mut transport = Box::new(TcpTransport::default());
-        let mut listener = transport.listen("tcp://localhost:0").unwrap();
-        let endpoint = listener.endpoint();
+        let transport = Box::new(TcpTransport::default());
         let mesh = Mesh::new(512, 128);
-        let mesh_clone = mesh.clone();
-
-        thread::spawn(move || {
-            let conn = listener.accept().unwrap();
-            mesh_clone.add(conn, "test_id".to_string()).unwrap();
-        });
 
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1127,7 +1356,7 @@ pub mod tests {
         let connector = cm.start().unwrap();
 
         let endpoint_removed = connector
-            .remove_connection(&endpoint)
+            .remove_connection("tcp://localhost:5000")
             .expect("Unable to remove connection");
 
         assert_eq!(None, endpoint_removed);
@@ -1147,14 +1376,17 @@ pub mod tests {
             .expect("Cannot listen for connections");
         let endpoint = listener.endpoint();
         let mesh1 = Mesh::new(512, 128);
-        let mesh2 = Mesh::new(512, 128);
 
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
             // accept incoming connection and add it to mesh2
+            let mesh2 = Mesh::new(512, 128);
             let conn = listener.accept().expect("Cannot accept connection");
             mesh2
                 .add(conn, "test_id".to_string())
                 .expect("Cannot add connection to mesh");
+
+            negotiation_connection_auth(&mesh2, "test_id");
 
             // Verify mesh received heartbeat
             let envelope = mesh2.recv().expect("Cannot receive message");
@@ -1175,9 +1407,17 @@ pub mod tests {
 
             // wait for reconnection attempt
             listener.accept().expect("Unable to accept connection");
+
+            // wait for completion
+            rx.recv().expect("Did not receive completion signal");
+
+            mesh2.shutdown_signaler().shutdown();
         });
 
+        let authorization_pool = AuthorizationPool::new("test_identity".into())
+            .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
+            Box::new(authorization_pool.pool_authorizer()),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -1215,7 +1455,11 @@ pub mod tests {
                     endpoint: endpoint.clone(),
                 }
         );
+
+        tx.send(()).expect("Could not send completion signal");
+
         cm.shutdown_and_wait();
+        authorization_pool.shutdown_and_await();
     }
 
     /// Test that an inbound connection may be added to the connection manager
@@ -1232,6 +1476,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_identity")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             Box::new(transport.clone()),
@@ -1285,5 +1530,103 @@ pub mod tests {
         jh.join().unwrap();
 
         cm.shutdown_and_wait();
+    }
+
+    /// Test that an inbound tcp connection can be add and removed from the network.o
+    ///
+    /// This connection requires negotiating the connection authorization handshake.
+    #[test]
+    fn test_inbound_tcp_connection() {
+        let mut transport = Box::new(TcpTransport::default());
+        let mut listener = transport
+            .listen("tcp://localhost:0")
+            .expect("Cannot listen for tcp connections");
+        let endpoint = listener.endpoint();
+
+        let mesh = Mesh::new(512, 128);
+        let authorization_pool = AuthorizationPool::new("test_identity".into())
+            .expect("Unable to create authorization pool");
+        let mut cm = ConnectionManager::new(
+            Box::new(authorization_pool.pool_authorizer()),
+            mesh.get_life_cycle(),
+            mesh.get_sender(),
+            // The transport on this end doesn't matter for this test
+            Box::new(InprocTransport::default()),
+            Some(1),
+            None,
+        );
+
+        let (conn_tx, conn_rx) = mpsc::channel();
+        let server_endpoint = endpoint.clone();
+        let jh = thread::spawn(move || {
+            let mesh = Mesh::new(512, 128);
+            let connection = transport.connect(&server_endpoint).unwrap();
+
+            mesh.add(connection, "test_id".into())
+                .expect("Unable to add to remote mesh");
+
+            negotiation_connection_auth(&mesh, "test_id");
+
+            // block until done
+            conn_rx.recv().unwrap();
+            mesh.shutdown_signaler().shutdown();
+        });
+        let connector = cm.start().expect("Unable to start ConnectionManager");
+
+        let mut subscriber = connector
+            .subscription_iter()
+            .expect("Cannot get subscriber");
+
+        let connection = listener.accept().unwrap();
+        let remote_endpoint = connection.remote_endpoint();
+        connector
+            .add_inbound_connection(connection)
+            .expect("Unable to add inbound connection");
+
+        let notification = subscriber
+            .next()
+            .expect("Cannot get message from subscriber");
+        assert!(matches!(notification, ConnectionManagerNotification::InboundConnection { ..  }));
+
+        let connection_endpoints = connector.list_connections().unwrap();
+        assert_eq!(vec![remote_endpoint.clone()], connection_endpoints);
+
+        connector.remove_connection(&remote_endpoint).unwrap();
+        let connection_endpoints = connector.list_connections().unwrap();
+        assert!(connection_endpoints.is_empty());
+
+        conn_tx.send(()).unwrap();
+        jh.join().unwrap();
+
+        cm.shutdown_and_wait();
+        authorization_pool.shutdown_and_await();
+    }
+
+    struct NoopAuthorizer {
+        authorized_id: String,
+    }
+
+    impl NoopAuthorizer {
+        fn new(id: &str) -> Self {
+            Self {
+                authorized_id: id.to_string(),
+            }
+        }
+    }
+
+    impl Authorizer for NoopAuthorizer {
+        fn authorize_connection(
+            &self,
+            connection_id: String,
+            connection: Box<dyn Connection>,
+            callback: AuthorizerCallback,
+        ) -> Result<(), AuthorizerError> {
+            (*callback)(AuthorizationResult::Authorized {
+                connection_id,
+                connection,
+                identity: self.authorized_id.clone(),
+            })
+            .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
+        }
     }
 }
