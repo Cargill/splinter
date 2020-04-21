@@ -328,10 +328,15 @@ fn automatic_refresh_loop(
     running: Arc<AtomicBool>,
 ) {
     loop {
-        thread::sleep(refresh_period);
-
-        if !running.load(Ordering::SeqCst) {
-            break;
+        // Wait the `refresh_period`, checking for shutdown every second
+        let refresh_time = Instant::now() + refresh_period;
+        while Instant::now() < refresh_time {
+            if !running.load(Ordering::SeqCst) {
+                return;
+            }
+            if let Some(time_left) = refresh_time.checked_duration_since(Instant::now()) {
+                thread::sleep(std::cmp::min(time_left, Duration::from_secs(1)));
+            }
         }
 
         let mut internal = match internal.lock() {
