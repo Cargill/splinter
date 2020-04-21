@@ -233,6 +233,28 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("registries".to_string()))?,
+            #[cfg(feature = "registry-remote")]
+            registry_auto_refresh_interval: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.registry_auto_refresh_interval() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                })
+                .ok_or_else(|| {
+                    ConfigError::MissingValue("registry auto refresh interval".to_string())
+                })?,
+            #[cfg(feature = "registry-remote")]
+            registry_forced_refresh_interval: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.registry_forced_refresh_interval() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                })
+                .ok_or_else(|| {
+                    ConfigError::MissingValue("registry forced refresh interval".to_string())
+                })?,
             heartbeat_interval: self
                 .partial_configs
                 .iter()

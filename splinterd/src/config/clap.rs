@@ -20,8 +20,8 @@ pub struct ClapPartialConfigBuilder<'a> {
     matches: ArgMatches<'a>,
 }
 
-fn parse_value(matches: &ArgMatches) -> Result<Option<u64>, ConfigError> {
-    match value_t!(matches.value_of("heartbeat_interval"), u64) {
+fn parse_value(matches: &ArgMatches, arg: &str) -> Result<Option<u64>, ConfigError> {
+    match value_t!(matches.value_of(arg), u64) {
         Ok(v) => Ok(Some(v)),
         Err(e) => match e.kind {
             ErrorKind::ValueValidation => Err(ConfigError::InvalidArgument(e)),
@@ -72,7 +72,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .values_of("registries")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
-            .with_heartbeat_interval(parse_value(&self.matches)?)
+            .with_heartbeat_interval(parse_value(&self.matches, "heartbeat_interval")?)
             .with_insecure(if self.matches.is_present("insecure") {
                 Some(true)
             } else {
@@ -98,6 +98,19 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         {
             partial_config =
                 partial_config.with_database(self.matches.value_of("database").map(String::from))
+        }
+
+        #[cfg(feature = "registry-remote")]
+        {
+            partial_config = partial_config
+                .with_registry_auto_refresh_interval(parse_value(
+                    &self.matches,
+                    "registry_auto_refresh_interval",
+                )?)
+                .with_registry_forced_refresh_interval(parse_value(
+                    &self.matches,
+                    "registry_forced_refresh_interval",
+                )?)
         }
 
         Ok(partial_config)
@@ -153,6 +166,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
+        #[cfg(feature = "registry-remote")]
+        assert_eq!(config.registry_auto_refresh_interval(), None);
+        #[cfg(feature = "registry-remote")]
+        assert_eq!(config.registry_forced_refresh_interval(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
         assert_eq!(config.insecure(), Some(true));

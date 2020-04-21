@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -59,6 +60,8 @@ use splinter::node_registry::{
     rest_api::{make_nodes_identity_resource, make_nodes_resource},
     LocalYamlNodeRegistry, NodeRegistryReader, RwNodeRegistry, UnifiedNodeRegistry,
 };
+#[cfg(feature = "registry-remote")]
+use splinter::node_registry::{RemoteYamlNodeRegistry, RemoteYamlShutdownHandle};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::protos::authorization::AuthorizationMessageType;
 use splinter::protos::circuit::CircuitMessageType;
@@ -105,7 +108,7 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 pub struct SplinterDaemon {
     storage_location: String,
     key_registry_location: String,
-    local_node_registry_location: String,
+    node_registry_directory: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
@@ -119,6 +122,10 @@ pub struct SplinterDaemon {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registries: Vec<String>,
+    #[cfg(feature = "registry-remote")]
+    registry_auto_refresh_interval: u64,
+    #[cfg(feature = "registry-remote")]
+    registry_forced_refresh_interval: u64,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
@@ -420,8 +427,14 @@ impl SplinterDaemon {
         })?;
         let key_registry_manager = KeyRegistryManager::new(key_registry);
 
-        let node_registry =
-            create_node_registry(&self.local_node_registry_location, &self.registries)?;
+        let (node_registry, registry_shutdown) = create_node_registry(
+            &self.node_registry_directory,
+            &self.registries,
+            #[cfg(feature = "registry-remote")]
+            self.registry_auto_refresh_interval,
+            #[cfg(feature = "registry-remote")]
+            self.registry_forced_refresh_interval,
+        )?;
 
         let node_id = self.node_id.clone();
         let display_name = self.display_name.clone();
@@ -504,6 +517,7 @@ impl SplinterDaemon {
             network_dispatcher_shutdown.shutdown();
             network_shutdown.shutdown();
             sender_shutdown_signaler.shutdown();
+            registry_shutdown.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
 
@@ -707,7 +721,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 pub struct SplinterDaemonBuilder {
     storage_location: Option<String>,
     key_registry_location: Option<String>,
-    local_node_registry_location: Option<String>,
+    node_registry_directory: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -720,6 +734,10 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registries: Vec<String>,
+    #[cfg(feature = "registry-remote")]
+    registry_auto_refresh_interval: Option<u64>,
+    #[cfg(feature = "registry-remote")]
+    registry_forced_refresh_interval: Option<u64>,
     storage_type: Option<String>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Duration,
@@ -742,8 +760,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_local_node_registry_location(mut self, value: String) -> Self {
-        self.local_node_registry_location = Some(value);
+    pub fn with_node_registry_directory(mut self, value: String) -> Self {
+        self.node_registry_directory = Some(value);
         self
     }
 
@@ -799,6 +817,18 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "registry-remote")]
+    pub fn with_registry_auto_refresh_interval(mut self, value: u64) -> Self {
+        self.registry_auto_refresh_interval = Some(value);
+        self
+    }
+
+    #[cfg(feature = "registry-remote")]
+    pub fn with_registry_forced_refresh_interval(mut self, value: u64) -> Self {
+        self.registry_forced_refresh_interval = Some(value);
+        self
+    }
+
     pub fn with_storage_type(mut self, value: String) -> Self {
         self.storage_type = Some(value);
         self
@@ -837,10 +867,8 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: key_registry_location".to_string())
         })?;
 
-        let local_node_registry_location = self.local_node_registry_location.ok_or_else(|| {
-            CreateError::MissingRequiredField(
-                "Missing field: local_node_registry_location".to_string(),
-            )
+        let node_registry_directory = self.node_registry_directory.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: node_registry_directory".to_string())
         })?;
 
         let service_endpoint = self.service_endpoint.ok_or_else(|| {
@@ -883,6 +911,22 @@ impl SplinterDaemonBuilder {
             }
         }
 
+        #[cfg(feature = "registry-remote")]
+        let registry_auto_refresh_interval =
+            self.registry_auto_refresh_interval.ok_or_else(|| {
+                CreateError::MissingRequiredField(
+                    "Missing field: registry_auto_refresh_interval".to_string(),
+                )
+            })?;
+
+        #[cfg(feature = "registry-remote")]
+        let registry_forced_refresh_interval =
+            self.registry_forced_refresh_interval.ok_or_else(|| {
+                CreateError::MissingRequiredField(
+                    "Missing field: registry_forced_refresh_interval".to_string(),
+                )
+            })?;
+
         let storage_type = self.storage_type.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: storage_type".to_string())
         })?;
@@ -902,8 +946,12 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "biome")]
             biome_enabled: self.biome_enabled,
             registries: self.registries,
+            #[cfg(feature = "registry-remote")]
+            registry_auto_refresh_interval,
+            #[cfg(feature = "registry-remote")]
+            registry_forced_refresh_interval,
             key_registry_location,
-            local_node_registry_location,
+            node_registry_directory,
             storage_type,
             admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
             #[cfg(feature = "rest-api-cors")]
@@ -973,41 +1021,99 @@ fn set_up_circuit_dispatcher(
 }
 
 fn create_node_registry(
-    local_node_registry_location: &str,
+    node_registry_directory: &str,
     registries: &[String],
-) -> Result<Box<dyn RwNodeRegistry>, StartError> {
+    #[cfg(feature = "registry-remote")] auto_refresh_interval: u64,
+    #[cfg(feature = "registry-remote")] forced_refresh_interval: u64,
+) -> Result<(Box<dyn RwNodeRegistry>, RegistryShutdownHandle), StartError> {
+    // This only needs to be mutable for the `registry-remote` feature
+    #[allow(unused_mut)]
+    let mut registry_shutdown_handle = RegistryShutdownHandle::new();
+
+    let local_registry_path = Path::new(node_registry_directory)
+        .join("local_registry.yaml")
+        .to_str()
+        .expect("path built from &str cannot be invalid")
+        .to_string();
     debug!(
         "Creating local node registry with registry file: {:?}",
-        local_node_registry_location
+        local_registry_path
     );
-    let local_registry = Box::new(
-        LocalYamlNodeRegistry::new(local_node_registry_location).map_err(|err| {
+    let local_registry = Box::new(LocalYamlNodeRegistry::new(&local_registry_path).map_err(
+        |err| {
             StartError::NodeRegistryError(format!(
                 "Failed to initialize local LocalYamlNodeRegistry: {}",
                 err
             ))
-        })?,
-    );
+        },
+    )?);
 
-    // Currently, only file-based read-only registries are supported
     let read_only_registries = registries
         .iter()
         .filter_map(|registry| {
-            if registry.starts_with("file://") {
-                let registry_file = registry.trim_start_matches("file://");
+            let (scheme, path) = parse_registry_arg(registry)
+                .map_err(|err| error!("Failed to parse registry argument: {}", err))
+                .ok()?;
+
+            if scheme == "file" {
                 debug!(
-                    "Attempting to add read-only node registry from file: {:?}",
-                    registry_file
+                    "Attempting to add local read-only node registry from file: {}",
+                    path
                 );
-                match LocalYamlNodeRegistry::new(registry_file) {
+                match LocalYamlNodeRegistry::new(path) {
                     Ok(registry) => Some(Box::new(registry) as Box<dyn NodeRegistryReader>),
                     Err(err) => {
                         error!(
                             "Failed to add read-only LocalYamlNodeRegistry '{}': {}",
-                            registry, err
+                            path, err
                         );
                         None
                     }
+                }
+            } else if scheme == "http" || scheme == "https" {
+                #[cfg(feature = "registry-remote")]
+                {
+                    debug!(
+                        "Attempting to add remote read-only node registry from URL: {}",
+                        registry
+                    );
+                    let auto_refresh_interval = if auto_refresh_interval != 0 {
+                        Some(Duration::from_secs(auto_refresh_interval))
+                    } else {
+                        None
+                    };
+                    let forced_refresh_interval = if forced_refresh_interval != 0 {
+                        Some(Duration::from_secs(forced_refresh_interval))
+                    } else {
+                        None
+                    };
+                    match RemoteYamlNodeRegistry::new(
+                        registry,
+                        node_registry_directory,
+                        auto_refresh_interval,
+                        forced_refresh_interval,
+                    ) {
+                        Ok(registry) => {
+                            registry_shutdown_handle
+                                .add_remote_yaml_shutdown_handle(registry.shutdown_handle());
+                            Some(Box::new(registry) as Box<dyn NodeRegistryReader>)
+                        }
+                        Err(err) => {
+                            error!(
+                                "Failed to add read-only RemoteYamlNodeRegistry '{}': {}",
+                                registry, err
+                            );
+                            None
+                        }
+                    }
+                }
+                #[cfg(not(feature = "registry-remote"))]
+                {
+                    error!(
+                        "The 'registry-remote' feature must be enabled to use remote YAML \
+                         registries"
+                    );
+                    None
                 }
             } else {
                 error!(
@@ -1019,10 +1125,47 @@ fn create_node_registry(
         })
         .collect();
 
-    Ok(Box::new(UnifiedNodeRegistry::new(
+    let unified_registry = Box::new(UnifiedNodeRegistry::new(
         local_registry,
         read_only_registries,
-    )))
+    ));
+
+    Ok((unified_registry, registry_shutdown_handle))
+}
+
+fn parse_registry_arg(registry: &str) -> Result<(&str, &str), &str> {
+    let mut iter = registry.splitn(2, "://");
+    let scheme = iter
+        .next()
+        .expect("str::split cannot return an empty iterator");
+    let path = iter.next().ok_or_else(|| "No URI scheme provided")?;
+    Ok((scheme, path))
+}
+
+#[derive(Default)]
+struct RegistryShutdownHandle {
+    #[cfg(feature = "registry-remote")]
+    remote_yaml_shutdown_handles: Vec<RemoteYamlShutdownHandle>,
+}
+
+impl RegistryShutdownHandle {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    #[cfg(feature = "registry-remote")]
+    fn add_remote_yaml_shutdown_handle(&mut self, handle: RemoteYamlShutdownHandle) {
+        self.remote_yaml_shutdown_handles.push(handle);
+    }
+
+    fn shutdown(&self) {
+        #[cfg(feature = "registry-remote")]
+        {
+            self.remote_yaml_shutdown_handles
+                .iter()
+                .for_each(|handle| handle.shutdown());
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -181,6 +181,25 @@ fn main() {
             .long_help("Enable the biome subsystem"),
     );
 
+    #[cfg(feature = "registry-remote")]
+    let app = app.arg(
+        Arg::with_name("registry_auto_refresh_interval")
+            .long("registry-auto-refresh")
+            .long_help(
+                "How often remote node registries should attempt to fetch upstream changes in the \
+                 background (in seconds); default is 600 (10 minutes), 0 means off",
+            )
+            .takes_value(true),
+    ).arg(
+        Arg::with_name("registry_forced_refresh_interval")
+            .long("registry-forced-refresh")
+            .long_help(
+                "How long before remote node registries should fetch upstream changes when read \
+                 (in seconds); default is 10, 0 means off"
+            )
+            .takes_value(true),
+    );
+
     #[cfg(feature = "rest-api-cors")]
     let app = app.arg(
         Arg::with_name("whitelist")
@@ -269,8 +288,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
-    let local_node_registry_location = state_dir
-        .join("nodes.yaml")
+    let node_registry_directory = state_dir
         .to_str()
         .ok_or_else(|| {
             UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
@@ -291,7 +309,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     daemon_builder = daemon_builder
         .with_storage_location(storage_location)
         .with_key_registry_location(key_registry_location)
-        .with_local_node_registry_location(local_node_registry_location)
+        .with_node_registry_directory(node_registry_directory)
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))
@@ -312,6 +330,13 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "biome")]
     {
         daemon_builder = daemon_builder.enable_biome(config.biome_enabled());
+    }
+
+    #[cfg(feature = "registry-remote")]
+    {
+        daemon_builder = daemon_builder
+            .with_registry_auto_refresh_interval(config.registry_auto_refresh_interval())
+            .with_registry_forced_refresh_interval(config.registry_forced_refresh_interval());
     }
 
     #[cfg(feature = "rest-api-cors")]

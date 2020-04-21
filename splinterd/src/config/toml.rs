@@ -43,6 +43,10 @@ struct TomlConfig {
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
+    #[cfg(feature = "registry-remote")]
+    registry_auto_refresh_interval: Option<u64>,
+    #[cfg(feature = "registry-remote")]
+    registry_forced_refresh_interval: Option<u64>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
     version: Option<String>,
@@ -112,6 +116,17 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         #[cfg(feature = "database")]
         {
             partial_config = partial_config.with_database(self.toml_config.database);
+        }
+
+        #[cfg(feature = "registry-remote")]
+        {
+            partial_config = partial_config
+                .with_registry_auto_refresh_interval(
+                    self.toml_config.registry_auto_refresh_interval,
+                )
+                .with_registry_forced_refresh_interval(
+                    self.toml_config.registry_forced_refresh_interval,
+                );
         }
 
         Ok(partial_config)
@@ -188,6 +203,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
+        #[cfg(feature = "registry-remote")]
+        assert_eq!(config.registry_auto_refresh_interval(), None);
+        #[cfg(feature = "registry-remote")]
+        assert_eq!(config.registry_forced_refresh_interval(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }
