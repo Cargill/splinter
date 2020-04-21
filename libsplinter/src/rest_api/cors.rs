@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //! Provides CORS support for the REST API
-//!
-//! This is an experimental feature.  To enable, use the feature `"rest-api-cors"`.
 use actix_web::dev::*;
 use actix_web::{
     http::header, http::header::HeaderValue, http::Method, Error as ActixError, HttpResponse,

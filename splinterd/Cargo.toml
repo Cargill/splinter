@@ -52,7 +52,10 @@ default = [
     "config-toml",
 ]
 
-stable = ["default"]
+stable = [
+    "default",
+    "rest-api-cors",
+]
 
 experimental = [
     # The experimental feature extends stable:
@@ -63,7 +66,6 @@ experimental = [
     "biome-key-management",
     "health",
     "registry-remote",
-    "rest-api-cors",
     "scabbard-get-state",
     "service-arg-validation",
     "ws-transport",
