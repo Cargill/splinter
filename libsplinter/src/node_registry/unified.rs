@@ -203,14 +203,16 @@ mod test {
     use std::iter::FromIterator;
     use std::sync::{Arc, Mutex};
 
+    use crate::node_registry::NodeBuilder;
+
     use super::*;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
-        let mut node = Node::new(id, vec![endpoint.into()]);
+        let mut builder = NodeBuilder::new(id).with_endpoint(endpoint);
         for (key, val) in metadata {
-            node.metadata.insert(key.to_string(), val.to_string());
+            builder = builder.with_metadata(*key, *val);
         }
-        node
+        builder.build().expect("Failed to build node")
     }
 
     /// Verify that the number of nodes is correctly reported when all registries are empty.

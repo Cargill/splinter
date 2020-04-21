@@ -219,13 +219,12 @@ impl RwNodeRegistry for LocalYamlNodeRegistry {
 mod test {
     use super::*;
 
-    use std::collections::HashMap;
     use std::env;
     use std::fs::{remove_file, File};
     use std::panic;
     use std::thread;
 
-    use crate::node_registry::InvalidNodeError;
+    use crate::node_registry::{InvalidNodeError, NodeBuilder};
 
     ///
     /// Verifies that reading from a YAML file that contains two nodes with the same identity
@@ -789,39 +788,33 @@ mod test {
     }
 
     fn get_node_1() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Bitwise IO".to_string());
-        metadata.insert("admin".to_string(), "Bob".to_string());
-        Node {
-            identity: "Node-123".to_string(),
-            endpoints: vec!["tcps://12.0.0.123:8431".to_string()],
-            display_name: "Bitwise IO - Node 1".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-123")
+            .with_endpoint("tcps://12.0.0.123:8431")
+            .with_display_name("Bitwise IO - Node 1")
+            .with_metadata("company", "Bitwise IO")
+            .with_metadata("admin", "Bob")
+            .build()
+            .expect("Failed to build node1")
     }
 
     fn get_node_2() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Cargill".to_string());
-        metadata.insert("admin".to_string(), "Carol".to_string());
-        Node {
-            identity: "Node-456".to_string(),
-            endpoints: vec!["tcps://12.0.0.123:8434".to_string()],
-            display_name: "Cargill - Node 1".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-456")
+            .with_endpoint("tcps://12.0.0.123:8434")
+            .with_display_name("Cargill - Node 1")
+            .with_metadata("company", "Cargill")
+            .with_metadata("admin", "Carol")
+            .build()
+            .expect("Failed to build node2")
     }
 
     fn get_node_3() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Cargill".to_string());
-        metadata.insert("admin".to_string(), "Charlie".to_string());
-        Node {
-            identity: "Node-789".to_string(),
-            endpoints: vec!["tcps://12.0.0.123:8435".to_string()],
-            display_name: "Cargill - Node 2".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-789")
+            .with_endpoint("tcps://12.0.0.123:8435")
+            .with_display_name("Cargill - Node 2")
+            .with_metadata("company", "Cargill")
+            .with_metadata("admin", "Charlie")
+            .build()
+            .expect("Failed to build node3")
     }
 
     fn write_to_file(data: &[Node], file_path: &str) {
