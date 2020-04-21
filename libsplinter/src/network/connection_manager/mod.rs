@@ -37,6 +37,41 @@ const DEFAULT_HEARTBEAT_INTERVAL: u64 = 10;
 const INITIAL_RETRY_FREQUENCY: u64 = 10;
 const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
 
+pub type AuthorizerCallback =
+    Box<dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send>;
+
+pub trait Authorizer {
+    fn authorize_connection(
+        &self,
+        connection_id: String,
+        connection: Box<dyn Connection>,
+        on_complete: AuthorizerCallback,
+    ) -> Result<(), AuthorizerError>;
+}
+
+pub enum AuthorizationResult {
+    Authorized {
+        connection_id: String,
+        identity: String,
+        connection: Box<dyn Connection>,
+    },
+    Unauthorized {
+        connection_id: String,
+        connection: Box<dyn Connection>,
+    },
+}
+
+#[derive(Debug)]
+pub struct AuthorizerError(pub String);
+
+impl std::error::Error for AuthorizerError {}
+
+impl std::fmt::Display for AuthorizerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 pub type SubscriberId = usize;
 type Subscriber =
     Box<dyn Fn(ConnectionManagerNotification) -> Result<(), Box<dyn std::error::Error>> + Send>;
