@@ -43,7 +43,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
 splinter = { path = "../libsplinter", features = ["sawtooth-signing-compat"] }
-whoami = { version = "0.7.0", optional = true }
+whoami = "0.7.0"
 
 [dev-dependencies]
 gag = "0.1"
@@ -65,7 +65,6 @@ experimental = [
     "health",
     "database",
     "postgres",
-    "keygen",
     "circuit-auth-type",
 ]
 
@@ -74,7 +73,6 @@ circuit-template = ["splinter/circuit-template"]
 database-migrate-biome = ["splinter/biome"]
 
 health = []
-keygen = ["whoami"]
 
 database = ["splinter/postgres", "diesel", "postgres"]
 postgres = [
