@@ -24,12 +24,15 @@ pub trait PartialConfigBuilder {
 }
 
 fn get_file_path(cert_dir: &str, file: &str) -> String {
-    let cert_dir_path = Path::new(&cert_dir);
-    let cert_file_path = cert_dir_path.join(file);
-    cert_file_path
-        .to_str()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| String::from(file))
+    if file.starts_with("./") || file.starts_with("../") {
+        String::from(file)
+    } else {
+        Path::new(cert_dir)
+            .join(file)
+            .to_str()
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| String::from(file))
+    }
 }
 
 /// ConfigBuilder collects PartialConfig objects from various sources to be used to generate a
