@@ -16,7 +16,6 @@ mod error;
 mod notification;
 mod pacemaker;
 
-use std;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
