@@ -95,7 +95,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "biome-notifications",
-    "biome-refresh-tokens",
     "biome-user",
     "circuit-template",
     "connection-manager",
@@ -116,7 +115,6 @@ biome = []
 biome-credentials = ["biome", "biome-user", "bcrypt"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
-biome-refresh-tokens = []
 biome-user = ["biome"]
 circuit-template = []
 connection-manager = ["matrix"]

@@ -52,7 +52,7 @@ mod resources;
 
 use std::sync::Arc;
 
-#[cfg(feature = "biome-refresh-tokens")]
+#[cfg(feature = "biome-credentials")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::rest_api::{Resource, RestResourceProvider};
 
@@ -72,15 +72,11 @@ use crate::rest_api::secrets::SecretManager;
 pub use config::{BiomeRestConfig, BiomeRestConfigBuilder};
 pub use error::BiomeRestResourceManagerBuilderError;
 
-#[cfg(all(feature = "rest-api-actix", feature = "biome-refresh-tokens"))]
+#[cfg(all(feature = "rest-api-actix", feature = "biome-credentials"))]
 use self::actix::logout::make_logout_route;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
 use self::actix::register::make_register_route;
-#[cfg(all(
-    feature = "biome-credentials",
-    feature = "biome-refresh-tokens",
-    feature = "rest-api-actix"
-))]
+#[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
 use self::actix::token::make_token_route;
 #[cfg(all(
     feature = "biome-credentials",
@@ -127,9 +123,9 @@ pub struct BiomeRestResourceManager {
     rest_config: Arc<BiomeRestConfig>,
     #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
     token_secret_manager: Arc<dyn SecretManager>,
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_token_secret_manager: Arc<dyn SecretManager>,
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Arc<dyn CredentialsStore>,
@@ -141,23 +137,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
         #[allow(unused_mut)]
         let mut resources = Vec::new();
 
-        #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
-        {
-            resources.push(make_list_route(self.credentials_store.clone()));
-            resources.push(make_verify_route(
-                self.credentials_store.clone(),
-                self.rest_config.clone(),
-                self.token_secret_manager.clone(),
-            ));
-            #[cfg(not(feature = "biome-refresh-tokens"))]
-            {
-                resources.push(make_login_route(
-                    self.credentials_store.clone(),
-                    self.rest_config.clone(),
-                    Arc::new(AccessTokenIssuer::new(self.token_secret_manager.clone())),
-                ));
-            }
-        }
         #[cfg(all(
             feature = "biome-credentials",
             feature = "biome-key-management",
@@ -172,12 +151,15 @@ impl RestResourceProvider for BiomeRestResourceManager {
                 self.key_store.clone(),
             ));
         }
-        #[cfg(all(
-            feature = "biome-credentials",
-            feature = "biome-refresh-tokens",
-            feature = "rest-api-actix",
-        ))]
+
+        #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
         {
+            resources.push(make_list_route(self.credentials_store.clone()));
+            resources.push(make_verify_route(
+                self.credentials_store.clone(),
+                self.rest_config.clone(),
+                self.token_secret_manager.clone(),
+            ));
             resources.push(make_login_route(
                 self.credentials_store.clone(),
                 self.refresh_token_store.clone(),
@@ -197,24 +179,19 @@ impl RestResourceProvider for BiomeRestResourceManager {
                 )),
                 self.rest_config.clone(),
             ));
-        }
-        #[cfg(all(feature = "biome-refresh-tokens", feature = "rest-api-actix",))]
-        {
             resources.push(make_logout_route(
                 self.refresh_token_store.clone(),
                 self.token_secret_manager.clone(),
                 self.rest_config.clone(),
             ));
-        }
 
-        #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
-        {
             resources.push(make_register_route(
                 self.credentials_store.clone(),
                 self.user_store.clone(),
                 self.rest_config.clone(),
             ));
         }
+
         #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
         {
             resources.push(make_key_management_route(
@@ -240,9 +217,9 @@ pub struct BiomeRestResourceManagerBuilder {
     key_store: Option<Arc<dyn KeyStore>>,
     rest_config: Option<BiomeRestConfig>,
     token_secret_manager: Option<Arc<dyn SecretManager>>,
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_token_secret_manager: Option<Arc<dyn SecretManager>>,
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_token_store: Option<Arc<dyn RefreshTokenStore>>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Option<Arc<dyn CredentialsStore>>,
@@ -320,7 +297,7 @@ impl BiomeRestResourceManagerBuilder {
     ///
     /// * `secret_manager`: the SecretManager to be used for fetching and generating secrets to
     ///   sign and verify JWT tokens
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     pub fn with_refresh_token_secret_manager(
         mut self,
         secret_manager: impl SecretManager + 'static,
@@ -336,7 +313,7 @@ impl BiomeRestResourceManagerBuilder {
     /// * `store`: the RefreshTokenStore to be used for performing CRUD operation on a
     ///   serialized refresh token.
     ///
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     pub fn with_refresh_token_store(
         mut self,
         store: impl RefreshTokenStore + 'static,
@@ -374,13 +351,13 @@ impl BiomeRestResourceManagerBuilder {
             Arc::new(AutoSecretManager::default())
         });
 
-        #[cfg(feature = "biome-refresh-tokens")]
+        #[cfg(feature = "biome-credentials")]
         let refresh_token_secret_manager = self.refresh_token_secret_manager.unwrap_or_else(|| {
             debug!("Building BiomeRestResourceManager with default token SecretManager.");
             Arc::new(AutoSecretManager::default())
         });
 
-        #[cfg(feature = "biome-refresh-tokens")]
+        #[cfg(feature = "biome-credentials")]
         let refresh_token_store = self.refresh_token_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
                 "Missing refresh token store".to_string(),
@@ -404,9 +381,9 @@ impl BiomeRestResourceManagerBuilder {
             rest_config: Arc::new(rest_config),
             #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
             token_secret_manager,
-            #[cfg(feature = "biome-refresh-tokens")]
+            #[cfg(feature = "biome-credentials")]
             refresh_token_secret_manager,
-            #[cfg(feature = "biome-refresh-tokens")]
+            #[cfg(feature = "biome-credentials")]
             refresh_token_store,
             #[cfg(feature = "biome-credentials")]
             credentials_store,

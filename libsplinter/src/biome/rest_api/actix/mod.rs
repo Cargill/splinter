@@ -18,11 +18,11 @@ pub(crate) mod authorize;
 pub(super) mod key_management;
 #[cfg(feature = "biome-credentials")]
 pub(super) mod login;
-#[cfg(feature = "biome-refresh-tokens")]
+#[cfg(feature = "biome-credentials")]
 pub(super) mod logout;
 #[cfg(feature = "biome-credentials")]
 pub(super) mod register;
-#[cfg(all(feature = "biome-credentials", feature = "biome-refresh-tokens",))]
+#[cfg(feature = "biome-credentials")]
 pub(super) mod token;
 #[cfg(feature = "biome-credentials")]
 pub(super) mod user;

@@ -20,7 +20,7 @@ use crate::biome::credentials::store::PasswordEncryptionCost;
 
 const DEFAULT_ISSUER: &str = "self-issued";
 const DEFAULT_DURATION: u64 = 5400; // in seconds = 90 minutes
-#[cfg(feature = "biome-refresh-tokens")]
+#[cfg(feature = "biome-credentials")]
 const DEFAULT_REFRESH_DURATION: u64 = 5_184_000; // in seconds = 60 days
 
 /// Configuration for Biome REST resources
@@ -31,7 +31,7 @@ pub struct BiomeRestConfig {
     /// Duration of JWT tokens issued by this service
     access_token_duration: Duration,
     /// Duration of refresh tokens issued by this service
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_token_duration: Duration,
     #[cfg(feature = "biome-credentials")]
     /// Cost for encrypting user's password
@@ -52,7 +52,7 @@ impl BiomeRestConfig {
 
     /// Returns durations the refresh token is valid.
     /// Defaults to 60 days.
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     pub fn refresh_token_duration(&self) -> Duration {
         self.refresh_token_duration.to_owned()
     }
@@ -70,7 +70,7 @@ impl BiomeRestConfig {
 pub struct BiomeRestConfigBuilder {
     issuer: Option<String>,
     access_token_duration: Option<Duration>,
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     refresh_token_duration: Option<Duration>,
     #[cfg(feature = "biome-credentials")]
     password_encryption_cost: Option<String>,
@@ -81,7 +81,7 @@ impl Default for BiomeRestConfigBuilder {
         BiomeRestConfigBuilder {
             issuer: Some(DEFAULT_ISSUER.to_string()),
             access_token_duration: Some(Duration::from_secs(DEFAULT_DURATION)),
-            #[cfg(feature = "biome-refresh-tokens")]
+            #[cfg(feature = "biome-credentials")]
             refresh_token_duration: Some(Duration::from_secs(DEFAULT_REFRESH_DURATION)),
             #[cfg(feature = "biome-credentials")]
             password_encryption_cost: Some("high".to_string()),
@@ -95,7 +95,7 @@ impl BiomeRestConfigBuilder {
         BiomeRestConfigBuilder {
             issuer: None,
             access_token_duration: None,
-            #[cfg(feature = "biome-refresh-tokens")]
+            #[cfg(feature = "biome-credentials")]
             refresh_token_duration: None,
             #[cfg(feature = "biome-credentials")]
             password_encryption_cost: None,
@@ -115,7 +115,7 @@ impl BiomeRestConfigBuilder {
     }
 
     /// Adds a refresh token duration in seconds.
-    #[cfg(feature = "biome-refresh-tokens")]
+    #[cfg(feature = "biome-credentials")]
     pub fn with_refresh_token_duration_in_secs(mut self, duration: u64) -> Self {
         self.refresh_token_duration = Some(Duration::from_secs(duration));
         self
@@ -140,7 +140,7 @@ impl BiomeRestConfigBuilder {
             debug!("Using default value for access_token_duration");
             Duration::from_secs(DEFAULT_DURATION)
         });
-        #[cfg(feature = "biome-refresh-tokens")]
+        #[cfg(feature = "biome-credentials")]
         let refresh_token_duration = self
             .refresh_token_duration
             .unwrap_or_else(|| Duration::from_secs(DEFAULT_REFRESH_DURATION));
@@ -155,7 +155,7 @@ impl BiomeRestConfigBuilder {
         Ok(BiomeRestConfig {
             issuer,
             access_token_duration,
-            #[cfg(feature = "biome-refresh-tokens")]
+            #[cfg(feature = "biome-credentials")]
             refresh_token_duration,
             #[cfg(feature = "biome-credentials")]
             password_encryption_cost,
