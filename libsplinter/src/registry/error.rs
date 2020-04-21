@@ -15,9 +15,12 @@
 use std::error::Error;
 use std::fmt;
 
+/// Represents errors that occur with node registry operations
 #[derive(Debug)]
 pub enum RegistryError {
+    /// A node was found to be invalid
     InvalidNode(InvalidNodeError),
+    /// A general error occurred in the node registry
     GeneralError {
         context: String,
         source: Option<Box<dyn Error + Send>>,
@@ -25,6 +28,7 @@ pub enum RegistryError {
 }
 
 impl RegistryError {
+    /// Create a new `NodeRegistryError::GeneralError` with just a context string (no source error).
     pub fn general_error(context: &str) -> Self {
         RegistryError::GeneralError {
             context: context.into(),
@@ -32,6 +36,7 @@ impl RegistryError {
         }
     }
 
+    /// Create a new `NodeRegistryError::GeneralError` with a context string and a source error.
     pub fn general_error_with_source(context: &str, err: Box<dyn Error + Send>) -> Self {
         RegistryError::GeneralError {
             context: context.into(),
@@ -76,16 +81,26 @@ impl From<InvalidNodeError> for RegistryError {
     }
 }
 
+/// Represents the reason that a node was found to be invalid
 #[derive(Debug)]
 pub enum InvalidNodeError {
+    /// One of the node's endpoints is already in use by another node
     DuplicateEndpoint(String),
+    /// The node's identity is already in use by another node
     DuplicateIdentity(String),
+    /// One of the node's endpoints is an empty string
     EmptyEndpoint,
+    /// The node's identity is an empty string
     EmptyIdentity,
+    /// The node's display name is an empty string
     EmptyDisplayName,
+    /// One of the node's keys is an empty string
     EmptyKey,
-    InvalidIdentity(String, String), // (identity, message)
+    /// The node's identity is invalid (identity, message)
+    InvalidIdentity(String, String),
+    /// The node's list of endpoints is empty
     MissingEndpoints,
+    /// The node's list of keys is empty
     MissingKeys,
 }
 
