@@ -31,9 +31,11 @@ use std::time::{Duration, Instant};
 use openssl::hash::{hash, MessageDigest};
 
 use crate::hex::to_hex;
-use crate::node_registry::{MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader};
+use crate::node_registry::{
+    validate_nodes, MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader,
+};
 
-use super::{validate_nodes, LocalYamlNodeRegistry};
+use super::LocalYamlNodeRegistry;
 
 /// A remote, read-only node registry.
 ///

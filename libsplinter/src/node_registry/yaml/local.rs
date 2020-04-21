@@ -25,11 +25,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::node_registry::{
+    check_if_node_is_duplicate, check_node_required_fields_are_not_empty, validate_nodes,
     MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
     RwNodeRegistry,
 };
-
-use super::{check_if_node_is_duplicate, check_node_required_fields_are_not_empty, validate_nodes};
 
 /// A local, read/write node registry.
 ///
