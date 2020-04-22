@@ -31,12 +31,16 @@ impl Action for MigrateAction {
             "postgres://admin:admin@localhost:5432/splinterd"
         };
 
-        let connection =
-            PgConnection::establish(url).map_err(|err| CliError::DatabaseError(err.to_string()))?;
+        let connection = PgConnection::establish(url).map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to establish database connection to '{}': {}",
+                url, err
+            ))
+        })?;
 
         #[cfg(feature = "database-migrate-biome")]
         run_postgres_migrations(&connection).map_err(|err| {
-            CliError::DatabaseError(format!("Unable to run Biome migrations: {}", err))
+            CliError::ActionError(format!("Unable to run Biome migrations: {}", err))
         })?;
 
         Ok(())
