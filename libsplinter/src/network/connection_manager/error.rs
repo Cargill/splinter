@@ -24,6 +24,7 @@ pub enum ConnectionManagerError {
     ConnectionCreationError(String),
     ConnectionRemovalError(String),
     ConnectionReconnectError(String),
+    Unauthorized(String),
     StatePoisoned,
 }
 
@@ -40,6 +41,9 @@ impl fmt::Display for ConnectionManagerError {
             ConnectionManagerError::ConnectionCreationError(ref s) => f.write_str(s),
             ConnectionManagerError::ConnectionRemovalError(ref s) => f.write_str(s),
             ConnectionManagerError::ConnectionReconnectError(ref s) => f.write_str(s),
+            ConnectionManagerError::Unauthorized(ref connection_id) => {
+                write!(f, "Connection {} failed authorization", connection_id)
+            }
             ConnectionManagerError::StatePoisoned => {
                 f.write_str("Connection state has been poisoned")
             }
