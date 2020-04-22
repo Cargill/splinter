@@ -1574,11 +1574,21 @@ components:
           description: Node id
           type: string
           example: node-009
+        display_name:
+          description: Human-readable name for the node
+          type: string
+          example: Cargill Node 009
         service_endpoint:
           description: The node's service endpoint
           example: tcp://foo.bar.biz
         network_endpoints:
-          description: The node's network endpoints
+          description: The node's locally-bound network endpoints
+          type: array
+          items:
+            type: string
+            example: tcp://foo.bar.biz
+        advertised_endpoints:
+          description: The node's network endpoints that are publicly accessible
           type: array
           items:
             type: string
