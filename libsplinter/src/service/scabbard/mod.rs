@@ -60,7 +60,7 @@ use state::{ScabbardState, StateSubscriber};
 
 const SERVICE_TYPE: &str = "scabbard";
 
-const DEFAULT_COORDINATOR_TIMEOUT_MILLIS: u64 = 30000; // 30 seconds
+const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 /// A service for running Sawtooth Sabre smart contracts with two-phase commit consensus.
 #[derive(Clone)]
@@ -116,8 +116,8 @@ impl Scabbard {
         )
         .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
 
-        let coordinator_timeout = coordinator_timeout
-            .unwrap_or_else(|| Duration::from_millis(DEFAULT_COORDINATOR_TIMEOUT_MILLIS));
+        let coordinator_timeout =
+            coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
 
         Ok(Scabbard {
             circuit_id: circuit_id.to_string(),

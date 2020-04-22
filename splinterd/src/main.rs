@@ -137,8 +137,8 @@ fn main() {
           "Connection endpoint for REST API")
         (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
         (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
-            "The coordinator timeout for admin service proposals (in milliseconds); default is \
-             30000 (30 seconds)")
+            "The coordinator timeout for admin service proposals (in seconds); default is \
+             30 seconds")
         (@arg verbose: -v --verbose +multiple
           "Increase output verbosity"));
 

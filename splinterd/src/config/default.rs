@@ -27,7 +27,7 @@ const REGISTRY_AUTO_REFRESH_DEFAULT: u64 = 600; // 600 seconds = 10 minutes
 #[cfg(feature = "registry-remote")]
 const REGISTRY_FORCED_REFRESH_DEFAULT: u64 = 10; // 10 seconds
 const HEARTBEAT_DEFAULT: u64 = 30;
-const DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT_MILLIS: u64 = 30000;
+const DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 /// Holds the default configuration values.
 pub struct DefaultPartialConfigBuilder;
@@ -56,9 +56,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_bind(Some(String::from("127.0.0.1:8080")))
             .with_registries(Some(vec![]))
             .with_heartbeat_interval(Some(HEARTBEAT_DEFAULT))
-            .with_admin_service_coordinator_timeout(Some(
-                DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT_MILLIS,
-            ))
+            .with_admin_service_coordinator_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
             .with_tls_insecure(Some(false))
             .with_no_tls(Some(false));
@@ -127,8 +125,8 @@ mod tests {
         assert_eq!(config.heartbeat_interval(), Some(HEARTBEAT_DEFAULT));
         assert_eq!(
             config.admin_service_coordinator_timeout(),
-            Some(Duration::from_millis(
-                DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT_MILLIS
+            Some(Duration::from_secs(
+                DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT
             ))
         );
         assert_eq!(config.state_dir(), Some(String::from(DEFAULT_STATE_DIR)));

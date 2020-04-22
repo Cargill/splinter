@@ -457,7 +457,7 @@ impl PartialConfig {
     ///
     pub fn with_admin_service_coordinator_timeout(mut self, timeout: Option<u64>) -> Self {
         let duration: Option<Duration> = match timeout {
-            Some(t) => Some(Duration::from_millis(t)),
+            Some(t) => Some(Duration::from_secs(t)),
             _ => None,
         };
         self.admin_service_coordinator_timeout = duration;
