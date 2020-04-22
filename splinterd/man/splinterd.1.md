@@ -84,8 +84,8 @@ OPTIONS
 =======
 
 `--admin-timeout TIMEOUT`
-: Sets the coordinator timeout, in milliseconds, for admin service proposals.
-  (Default: 30000 ms (30 seconds).)
+: Sets the coordinator timeout, in seconds, for admin service proposals.
+  (Default: 30 seconds.)
 
   This setting affects consensus-related activities for pending circuit changes
   (functions that use the two-phase commit agreement protocol in the Scabbard
