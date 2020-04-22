@@ -494,16 +494,22 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     {
         app = app.subcommand(
             SubCommand::with_name("keygen")
-                .about(
-                    "Generates secp256k1 keys. By default, keys are stored in\n\
-                     the user's home directory, $HOME/splinter/keys. The --system\n\
-                     option generates keys for the Splinter daemon (splinterd) that\n\
-                     are stored in /etc/splinter/keys.",
-                )
+                .about("Generates secp256k1 keys")
                 .arg(
                     Arg::with_name("key-name")
                         .takes_value(true)
                         .help("Name of keys generated; defaults to user name"),
+                )
+                .arg(
+                    Arg::with_name("output_dir")
+                        .short("o")
+                        .long("output-dir")
+                        .takes_value(true)
+                        .conflicts_with("system")
+                        .help(
+                            "Name of the directory in which to create the keys; defaults to \
+                             $HOME/splinter/keys",
+                        ),
                 )
                 .arg(
                     Arg::with_name("force")
