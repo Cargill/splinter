@@ -25,6 +25,9 @@ is used.
 FLAGS
 =====
 
+`-f`, `--force`
+: Overwrites key files if they already exist.
+
 `-h`, `--help`
 : Prints help information
 
@@ -74,4 +77,3 @@ SEE ALSO
 ========
 
 | Splinter documentation: https://github.com/Cargill/splinter-docs/blob/master/docs/index.md
-
