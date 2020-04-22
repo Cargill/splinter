@@ -87,6 +87,7 @@ stable = [
     "postgres",
     "rest-api",
     "rest-api-actix",
+    "rest-api-cors",
     "sawtooth-signing-compat",
 ]
 
@@ -103,7 +104,6 @@ experimental = [
     "network-peer-manager",
     "network-ref-map",
     "registry-remote",
-    "rest-api-cors",
     "scabbard-client",
     "scabbard-get-state",
     "service-arg-validation",
