@@ -31,8 +31,7 @@ limitations under the License.
              person
            </i>
            <div v-if="game.player_1" class="player-data-wrapper">
-             <span>{{game.player_1.name}}</span>
-             <span>{{game.player_1.organization}}</span>
+             <span>{{game.player_1.substring(0,6)}}</span>
           </div>
          </div>
          <div  class="vs-wrapper">
@@ -45,8 +44,7 @@ limitations under the License.
              person
            </i>
            <div v-if="game.player_2"  class="player-data-wrapper">
-             <span>{{game.player_2.name}}</span>
-             <span>{{game.player_2.organization}}</span>
+             <span>{{game.player_2.substring(0,6)}}</span>
           </div>
          </div>
        </div>
@@ -88,8 +86,8 @@ export default class GameCard extends Vue {
     } else if (!userIsInGame(this.game, publicKey) && userCanJoinGame(this.game, publicKey)) {
       return 'join game';
     } else if (userIsInGame(this.game, publicKey)) {
-      if ((this.game.game_status === 'P1-NEXT' && this.game.player_1.publicKey === publicKey)
-          || (this.game.game_status === 'P2-NEXT' && this.game.player_2.publicKey === publicKey)) {
+      if ((this.game.game_status === 'P1-NEXT' && this.game.player_1 === publicKey)
+          || (this.game.game_status === 'P2-NEXT' && this.game.player_2 === publicKey)) {
         return 'your turn';
       } else if (this.game.game_status === 'P2-NEXT' && !this.game.player_2) {
         return 'waiting for player to join';
@@ -108,8 +106,8 @@ export default class GameCard extends Vue {
       return 'Tie';
     }
     if (userIsInGame(this.game, this.publicKey)) {
-      if ((this.game.player_1.publicKey === this.publicKey && this.game.game_status === 'P1-WIN') ||
-          (this.game.player_2.publicKey === this.publicKey && this.game.game_status === 'P2-WIN')
+      if ((this.game.player_1 === this.publicKey && this.game.game_status === 'P1-WIN') ||
+          (this.game.player_2 === this.publicKey && this.game.game_status === 'P2-WIN')
     ) {
         return 'You won';
       } else {
@@ -118,20 +116,20 @@ export default class GameCard extends Vue {
     }
 
     if (this.game.game_status === 'P1-WIN') {
-      return `${this.game.player_1.name} won`;
+      return `${this.game.player_1.substring(0,6)} won`;
     }
     if (this.game.game_status === 'P2-WIN') {
-      return `${this.game.player_2.name} won`;
+      return `${this.game.player_2.substring(0,6)} won`;
     }
     return 'Archived';
   }
 
   processWatchStatus(): string {
     if (this.game.game_status === 'P1-NEXT') {
-      return `${this.game.player_1.name}\'s turn`;
+      return `${this.game.player_1.substring(0,6)}\'s turn`;
     }
     if (this.game.game_status === 'P2-NEXT') {
-      return `${this.game.player_2.name}\'s turn`;
+      return `${this.game.player_2.substring(0,6)}\'s turn`;
     }
     return 'Watch';
   }

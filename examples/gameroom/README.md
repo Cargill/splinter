@@ -42,12 +42,12 @@ below.
     `unset CARGO_ARGS`
 
 1. To extract private keys to use in the web application, run bash using the
-   `generate-key-registry` image and read the private key.  For example, to get
+   `generate-registry` image and read the private key.  For example, to get
    Alice's private key:
 
     ```
-    $ docker-compose -f examples/gameroom/docker-compose.yaml run generate-key-registry bash
-    root@<container-id>:/# cat /key_registry/alice.priv
+    $ docker-compose -f examples/gameroom/docker-compose.yaml run generate-registry bash
+    root@<container-id>:/# cat /registry/alice.priv
     <the private key value>
     root@<container-id>:/#
     ```
@@ -65,4 +65,3 @@ below.
      ```
      docker-compose -f examples/gameroom/docker-compose.yaml down
      ```
-

@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# The `keys` field must be non-empty and valid hex, but the tests don't require
+# them to be valid keys.
+
 - identity: "Node-123"
   endpoints:
     - "tcps://127.0.0.1:8080"
   display_name: "Bitwise IO - Node 1"
+  keys:
+    - "0123"
   metadata:
     company: "Bitwise IO"
 - identity: "Node-456"
   endpoints:
     - "tcps://127.0.0.1:8082"
   display_name: "Cargill - Node 1"
+  keys:
+    - "abcd"
   metadata:
     company: "Cargill"

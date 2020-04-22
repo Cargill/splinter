@@ -12,8 +12,8 @@ demonstate the Kubernetes primitives.
 
 This procedure walks you through:
 
-* Generating keys and updating the key registry
-* Creating ConfigMaps for the key registry and node registry
+* Generating keys and updating the node registry
+* Creating a ConfigMap for the node registry
 * Starting Gameroom
 * Creating users and logging in to the web app
 * Playing tic-tac-toe
@@ -51,13 +51,13 @@ walkthrough. For installation instructions, see the
 1. Copy these values to a scratchpad or keep them available in your terminal,
    because you'll be using them a few times in the walkthrough.
 
-### Step 2: Update the key registry template
+### Step 2: Update the node registry template
 
-1. Download the key registry template, [key-registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/key-registry.yaml).
+1. Download the node registry template, [node-registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/node-registry.yaml).
 
-1. Edit `key-registry.yaml` to add the public key values created above.
+1. Edit `node-registry.yaml` to add the public key values created above.
 
-   `$ vim key-registry.yaml`
+   `$ vim node-registry.yaml`
 
 1. Replace the lines that say `alice.pub` with the corresponding key data generated
    from the job run in the previous step.
@@ -68,42 +68,40 @@ walkthrough. For installation instructions, see the
 
    ```
    ---
-   031bc8f3a326766ce628295ad6f01c49fd416306a0cf55cca42a6b87e3eccc3c8f:
-     public_key: 031bc8f3a326766ce628295ad6f01c49fd416306a0cf55cca42a6b87e3eccc3c8f
-     associated_node_id: acme
+   - identity: "acme"
+     endpoints:
+       - "tcps://acme.default.svc.cluster.local:8044"
+     display_name: "Acme"
+     keys:
+       - "031bc8f3a326766ce628295ad6f01c49fd416306a0cf55cca42a6b87e3eccc3c8f"
      metadata:
-       gameroom/first-name: alice
-       gameroom/organization: Acme
-   029d011c4c4f058b2b5a4cdff1dbe1749809cb121eb45dc766292a26d3a9b84fcd:
-     public_key: 029d011c4c4f058b2b5a4cdff1dbe1749809cb121eb45dc766292a26d3a9b84fcd
-     associated_node_id: bubba
+       organization: "Acme Corporation"
+
+   - identity: "bubba"
+     endpoints:
+       - "tcps://bubba.default.svc.cluster.local:8044"
+     display_name: "Bubba Bakery"
+     keys:
+       - "029d011c4c4f058b2b5a4cdff1dbe1749809cb121eb45dc766292a26d3a9b84fcd"
      metadata:
-       gameroom/first-name: bob
-       gameroom/organization: Bubba Bakery
+       organization: "Bubba Bakery"
    ```
 
-### Step 3: Create ConfigMaps for the key registry and node registry
-
-1. Generate a ConfigMap for the key registry.
-
-    `$ kubectl create configmap key-registry --from-file key-registry.yaml`
-
-1. Download the node registry file: [node-registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/node-registry.yaml).
+### Step 3: Create a ConfigMap for the node registry
 
 1. Generate a ConfigMap for the node registry.
 
     `$ kubectl create configmap node-registry --from-file node-registry.yaml`
 
-1. Verify that the ConfigMaps were created.
+1. Verify that the ConfigMap was created.
 
     ```
     $ kubectl get cm
     NAME            DATA   AGE
-    key-registry    1      30s
-    node-registry   1      2m43s
+    node-registry   1      30s
     ```
 
-1. You can inspect the values of the ConfigMaps by running
+1. You can inspect the values of the ConfigMap by running
     `kubectl describe cm <configmapname>`. For example:
 
     ```
@@ -122,6 +120,8 @@ walkthrough. For installation instructions, see the
       endpoints:
         - "tcps://acme.default.svc.cluster.local:8044"
       display_name: "Acme"
+      keys:
+        - "031bc8f3a326766ce628295ad6f01c49fd416306a0cf55cca42a6b87e3eccc3c8f"
       metadata:
         organization: "Acme Corporation"
 
@@ -129,6 +129,8 @@ walkthrough. For installation instructions, see the
       endpoints:
         - "tcps://bubba.default.svc.cluster.local:8044"
       display_name: "Bubba Bakery"
+      keys:
+        - "029d011c4c4f058b2b5a4cdff1dbe1749809cb121eb45dc766292a26d3a9b84fcd"
       metadata:
         organization: "Bubba Bakery"
 

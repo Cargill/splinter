@@ -21,11 +21,11 @@ export function gameIsOver(gameStatus: string) {
   }
 
 export function userIsInGame(game: Game, publicKey: string) {
-   return game.player_1.publicKey === publicKey || game.player_2.publicKey === publicKey;
+   return game.player_1 === publicKey || game.player_2 === publicKey;
  }
 
 export function userCanJoinGame(game: Game, publicKey: string) {
-    return !game.player_1 || (!game.player_2 && game.player_1.publicKey !== publicKey);
+    return !game.player_1 || (!game.player_2 && game.player_1 !== publicKey);
 }
 
 export function hashGameName(gameName: string) {
@@ -34,8 +34,8 @@ export function hashGameName(gameName: string) {
 
 export function isUserTurn(game: Game, publicKey: string): boolean {
   if (userIsInGame(game, publicKey)) {
-    if ((game.game_status === 'P1-NEXT' && game.player_1.publicKey === publicKey)
-        || (game.game_status === 'P2-NEXT' && game.player_2.publicKey === publicKey)) {
+    if ((game.game_status === 'P1-NEXT' && game.player_1 === publicKey)
+        || (game.game_status === 'P2-NEXT' && game.player_2 === publicKey)) {
       return true;
     }
   }

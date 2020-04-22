@@ -117,16 +117,16 @@ export default class XOBoard extends Vue {
     const publicKey = this.$store.getters['user/getPublicKey'];
 
     if (cell === 'O') {
-      if (this.game.player_2.publicKey === publicKey) {
+      if (this.game.player_2 === publicKey) {
         return true;
       }
     } else if (cell === 'X') {
-      if (this.game.player_1.publicKey === publicKey) {
+      if (this.game.player_1 === publicKey) {
         return true;
       }
 
       if (this.game.player_2) {
-        if (this.game.player_2.publicKey !== publicKey) {
+        if (this.game.player_2 !== publicKey) {
           return true;
         }
       }
@@ -151,16 +151,16 @@ export default class XOBoard extends Vue {
     }
 
     const publicKey = this.$store.getters['user/getPublicKey'];
-    if (!this.game.player_2 && this.game.player_1.publicKey === publicKey) {
+    if (!this.game.player_2 && this.game.player_1 === publicKey) {
       return false;
     }
     if (cell === '-') {
       if (this.game.game_status === 'P1-NEXT') {
-        if ((this.game.player_1.publicKey === publicKey) || (!this.game.player_1)) {
+        if ((this.game.player_1 === publicKey) || (!this.game.player_1)) {
           return true;
         }
       } else if (this.game.game_status === 'P2-NEXT') {
-        if ((this.game.player_2.publicKey === publicKey) || (!this.game.player_2)) {
+        if ((this.game.player_2 === publicKey) || (!this.game.player_2)) {
           return true;
         }
       }

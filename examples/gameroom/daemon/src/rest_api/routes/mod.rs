@@ -15,7 +15,6 @@
 mod authenticate;
 mod gameroom;
 mod gameroom_websocket;
-mod key;
 mod node;
 mod notification;
 mod proposal;
@@ -25,7 +24,6 @@ mod xo_games;
 pub use authenticate::*;
 pub use gameroom::*;
 pub use gameroom_websocket::*;
-pub use key::*;
 pub use node::*;
 pub use notification::*;
 pub use proposal::*;

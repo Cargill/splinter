@@ -16,11 +16,15 @@
   endpoints:
     - 'tcps://acme-node-000:8044'
   display_name: 'acme-node-000'
+  keys:
+    - '02381b606ac2bbe3bd374654cb7cb467ffb0225eb46038a5ec37b43e0c2f085dcb'
   metadata:
     organization: 'ACME Corporation'
 - identity: 'acme-node-001'
   endpoints:
     - 'tcps://acme-node-001:8044'
+  keys:
+    - '026c889058c2d22558ead2c61b321634b74e705c42f890e6b7bc2c80abb4713118'
   display_name: 'acme-node-001'
   metadata:
     organization: 'ACME Corporation'
@@ -28,5 +32,7 @@
   endpoints:
     - 'tcps://acme-node-002:8044'
   display_name: 'acme-node-002'
+  keys:
+    - '03a29bd5a5a3eb6bc826576b50937b0e770c77df939e5aab8d1486165e3c78088e'
   metadata:
     organization: 'ACME Corporation'

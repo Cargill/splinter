@@ -120,10 +120,8 @@ items:
                   done
                   cp -R /config/certs/ /etc/splinter/
                 fi && \
-                cp /config/nodes.yaml /etc/splinter/nodes.yaml && \
-                cp /config/key-registry.yaml /var/lib/splinter/keys.yaml && \
                 splinterd -vv \
-                --registries file:///etc/splinter/nodes.yaml \
+                --registries file:///config/node-registry/node-registry.yaml \
                 --bind $HOSTNAME:8085 \
                 --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id acme \
@@ -132,11 +130,7 @@ items:
                 --tls-insecure
             volumeMounts:
               - name: node-registry-volume
-                mountPath: /config/nodes.yaml
-                subPath: node-registry.yaml
-              - name: key-registry-volume
-                mountPath: /config/key-registry.yaml
-                subPath: key-registry.yaml
+                mountPath: /config/node-registry
               - name: certificate-volume
                 mountPath: /config/certs
             ports:
@@ -147,9 +141,6 @@ items:
         - name: node-registry-volume
           configMap:
             name: node-registry
-        - name: key-registry-volume
-          configMap:
-            name: key-registry
         - name: certificate-volume
           emptyDir: {}
 
@@ -292,10 +283,8 @@ items:
                   done
                   cp -R /config/certs/ /etc/splinter/
                 fi && \
-                cp /config/nodes.yaml /etc/splinter/nodes.yaml && \
-                cp /config/key-registry.yaml /var/lib/splinter/keys.yaml && \
                 splinterd -vv \
-                --registries file:///etc/splinter/nodes.yaml \
+                --registries file:///config/node-registry/node-registry.yaml \
                 --bind $HOSTNAME:8085 \
                 --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id bubba \
@@ -304,11 +293,7 @@ items:
                 --tls-insecure
             volumeMounts:
               - name: node-registry-volume
-                mountPath: /config/nodes.yaml
-                subPath: node-registry.yaml
-              - name: key-registry-volume
-                mountPath: /config/key-registry.yaml
-                subPath: key-registry.yaml
+                mountPath: /config/node-registry
               - name: certificate-volume
                 mountPath: /config/certs
             ports:
@@ -319,9 +304,6 @@ items:
         - name: node-registry-volume
           configMap:
             name: node-registry
-        - name: key-registry-volume
-          configMap:
-            name: key-registry
         - name: certificate-volume
           emptyDir: {}
 

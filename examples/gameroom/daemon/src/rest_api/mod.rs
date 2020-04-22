@@ -165,9 +165,6 @@ pub fn run(
                                 .service(web::resource("").route(web::get().to(routes::list_xo))),
                         ),
                     )
-                    .service(web::scope("/keys").service(
-                        web::resource("/{public_key}").route(web::get().to(routes::fetch_key_info)),
-                    ))
             })
             .bind(bind_url)?
             .disable_signals()

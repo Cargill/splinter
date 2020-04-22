@@ -33,11 +33,11 @@ limitations under the License.
       <div class="players">
         <div class="player" :class="{active: playerOneActive}">
           <i class="icon material-icons-round">{{ playerOneIcon }}</i>
-          {{ formatPlayerName(gameInfo.playerOne) }}
+          {{ gameInfo.playerOne.substring(0,6) }}
         </div>
         <div class="player" :class="{active: playerTwoActive}">
           <i class="icon material-icons-round">{{ playerTwoIcon }}</i>
-          {{ formatPlayerName(gameInfo.playerTwo) }}
+          {{ gameInfo.playerTwo.substring(0,6) }}
         </div>
       </div>
       <div class="status">
@@ -50,7 +50,6 @@ limitations under the License.
 <script lang="ts">
 import { Vue, Component, Prop } from 'vue-property-decorator';
 import * as moment from 'moment';
-import { Player } from '@/store/models';
 
 export enum GameStatus {
   PlayerOneNext,
@@ -62,8 +61,8 @@ export enum GameStatus {
 
 export interface GameInfo {
   gameType: string;
-  playerOne: Player;
-  playerTwo: Player;
+  playerOne: string;
+  playerTwo: string;
   status: GameStatus;
   createdTimestamp: number;
   lastTurnTimestamp: number;
@@ -78,7 +77,7 @@ export default class GameInfoPanel extends Vue {
     if (!this.gameInfo.playerOne) {
       return 'Take a space to join the game as X';
     } else if (!this.gameInfo.playerTwo) {
-      if (publicKey === this.gameInfo.playerOne.publicKey) {
+      if (publicKey === this.gameInfo.playerOne) {
         return 'Waiting for another player';
       }
       return 'Take a space to join the game as O';
@@ -87,28 +86,28 @@ export default class GameInfoPanel extends Vue {
 
     switch (this.gameInfo.status) {
       case(GameStatus.PlayerOneNext):
-        if (publicKey === this.gameInfo.playerOne.publicKey) {
+        if (publicKey === this.gameInfo.playerOne) {
           return 'Your turn';
         } else {
-          return `${this.gameInfo.playerOne.name}'s turn`;
+          return `${this.gameInfo.playerOne.substring(0,6)}'s turn`;
         }
       case(GameStatus.PlayerTwoNext):
-        if (publicKey === this.gameInfo.playerTwo.publicKey) {
+        if (publicKey === this.gameInfo.playerTwo) {
           return 'Your turn';
         } else {
-          return `${this.gameInfo.playerTwo.name}'s turn`;
+          return `${this.gameInfo.playerTwo.substring(0,6)}'s turn`;
         }
       case(GameStatus.PlayerOneWin):
-        if (publicKey === this.gameInfo.playerOne.publicKey) {
+        if (publicKey === this.gameInfo.playerOne) {
           return 'You won';
         } else {
-          return `${this.gameInfo.playerOne.name} won`;
+          return `${this.gameInfo.playerOne.substring(0,6)} won`;
         }
       case(GameStatus.PlayerTwoWin):
-        if (publicKey === this.gameInfo.playerTwo.publicKey) {
+        if (publicKey === this.gameInfo.playerTwo) {
           return 'You won';
         } else {
-          return `${this.gameInfo.playerTwo.name} won`;
+          return `${this.gameInfo.playerTwo.substring(0,6)} won`;
         }
       case(GameStatus.Tie): return 'Game resulted in a draw';
     }
@@ -136,13 +135,6 @@ export default class GameInfoPanel extends Vue {
 
   fromNow(timestamp: number): string {
     return moment.unix(timestamp).fromNow();
-  }
-
-  formatPlayerName(player: Player) {
-    if (!player) {
-      return '';
-    }
-    return `${player.name} (${player.organization})`;
   }
 }
 
