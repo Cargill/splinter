@@ -19,13 +19,16 @@ use clap::Error as ClapError;
 
 #[derive(Debug)]
 pub enum CliError {
+    /// A subcommand requires one or more arguments, but none were provided.
     RequiresArgs,
+    /// A non-existent subcommand was specified.
     InvalidSubcommand,
+    /// An error was detected by `clap`.
     ClapError(ClapError),
+    /// A general error encountered by a subcommand.
     ActionError(String),
+    /// The environment is not in the correct state to execute the subcommand as requested.
     EnvironmentError(String),
-    #[cfg(feature = "database")]
-    DatabaseError(String),
 }
 
 impl Error for CliError {}
@@ -33,15 +36,16 @@ impl Error for CliError {}
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CliError::RequiresArgs => write!(f, "action requires arguments"),
-            CliError::InvalidSubcommand => write!(f, "received invalid subcommand"),
+            CliError::RequiresArgs => write!(
+                f,
+                "The specified subcommand requires arguments, but none were provided"
+            ),
+            CliError::InvalidSubcommand => write!(f, "An invalid subcommand was specified"),
             CliError::ClapError(err) => f.write_str(&err.message),
-            CliError::ActionError(msg) => write!(f, "action encountered an error: {}", msg),
+            CliError::ActionError(msg) => write!(f, "Subcommand encountered an error: {}", msg),
             CliError::EnvironmentError(msg) => {
-                write!(f, "action encountered an environment error: {}", msg)
+                write!(f, "Environment not valid for subcommand: {}", msg)
             }
-            #[cfg(feature = "database")]
-            CliError::DatabaseError(msg) => write!(f, "database error: {}", msg),
         }
     }
 }

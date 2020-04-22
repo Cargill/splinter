@@ -85,30 +85,36 @@ pub fn create_key_pair(
     if !force_create {
         if private_key_path.exists() {
             return Err(CliError::EnvironmentError(format!(
-                "file exists: {:?}",
+                "File already exists: {:?}",
                 private_key_path
             )));
         }
         if public_key_path.exists() {
             return Err(CliError::EnvironmentError(format!(
-                "file exists: {:?}",
+                "File already exists: {:?}",
                 public_key_path
             )));
         }
     }
 
-    let context = signing::create_context("secp256k1")
-        .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+    let context = signing::create_context("secp256k1").map_err(|err| {
+        CliError::ActionError(format!("Failed to create signing context: {}", err))
+    })?;
 
-    let private_key = context
-        .new_random_private_key()
-        .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+    let private_key = context.new_random_private_key().map_err(|err| {
+        CliError::ActionError(format!("Failed to generate new private key: {}", err))
+    })?;
     let public_key = context
         .get_public_key(&*private_key)
-        .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+        .map_err(|err| CliError::ActionError(format!("Failed to get public key: {}", err)))?;
 
-    let key_dir_info =
-        metadata(key_dir).map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+    let key_dir_info = metadata(key_dir).map_err(|err| {
+        CliError::EnvironmentError(format!(
+            "Failed to read key directory '{}': {}",
+            key_dir.display(),
+            err
+        ))
+    })?;
 
     #[cfg(not(target_os = "linux"))]
     let (key_dir_uid, key_dir_gid) = (key_dir_info.uid(), key_dir_info.gid());
@@ -117,9 +123,12 @@ pub fn create_key_pair(
 
     {
         if private_key_path.exists() {
-            info!("overwriting file: {:?}", private_key_path);
+            info!(
+                "Overwriting private key file: {}",
+                private_key_path.display()
+            );
         } else {
-            info!("writing file: {:?}", private_key_path);
+            info!("Writing private key file: {}", private_key_path.display());
         }
 
         let private_key_file = OpenOptions::new()
@@ -127,17 +136,28 @@ pub fn create_key_pair(
             .create(true)
             .mode(0o640)
             .open(private_key_path.as_path())
-            .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+            .map_err(|err| {
+                CliError::EnvironmentError(format!(
+                    "Failed to open private key file '{}': {}",
+                    private_key_path.display(),
+                    err
+                ))
+            })?;
 
-        writeln!(&private_key_file, "{}", private_key.as_hex())
-            .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+        writeln!(&private_key_file, "{}", private_key.as_hex()).map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to write to private key file '{}': {}",
+                private_key_path.display(),
+                err
+            ))
+        })?;
     }
 
     {
         if public_key_path.exists() {
-            info!("overwriting file: {:?}", public_key_path);
+            info!("Overwriting public key file: {}", public_key_path.display());
         } else {
-            info!("writing file: {:?}", public_key_path);
+            info!("writing public key file: {}", public_key_path.display());
         }
 
         let public_key_file = OpenOptions::new()
@@ -145,10 +165,21 @@ pub fn create_key_pair(
             .create(true)
             .mode(0o644)
             .open(public_key_path.as_path())
-            .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+            .map_err(|err| {
+                CliError::EnvironmentError(format!(
+                    "Failed to open public key file '{}': {}",
+                    public_key_path.display(),
+                    err
+                ))
+            })?;
 
-        writeln!(&public_key_file, "{}", public_key.as_hex())
-            .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+        writeln!(&public_key_file, "{}", public_key.as_hex()).map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to write to public key file '{}': {}",
+                public_key_path.display(),
+                err
+            ))
+        })?;
     }
     if change_permissions {
         chown(private_key_path.as_path(), key_dir_uid, key_dir_gid)?;
