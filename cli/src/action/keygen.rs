@@ -43,7 +43,7 @@ impl Action for KeyGenAction {
             .map(String::from)
             .unwrap_or_else(whoami::username);
 
-        let key_dir = if let Some(dir) = args.value_of("output_dir") {
+        let key_dir = if let Some(dir) = args.value_of("key_dir") {
             PathBuf::from(dir)
         } else if args.is_present("system") {
             PathBuf::from(SYSTEM_KEY_PATH)
