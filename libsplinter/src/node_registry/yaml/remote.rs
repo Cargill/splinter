@@ -84,7 +84,7 @@ impl RemoteYamlNodeRegistry {
     /// * `automatic_refresh_period` - Amount of time between attempts to automatically fetch and
     ///   cache the remote YAML file in the background. If `None`, background refreshes will be
     ///   disabled.
-    /// * `forced_refresh_period` - Amount of time since the last succesful cache refresh before
+    /// * `forced_refresh_period` - Amount of time since the last successful cache refresh before
     ///   attempting to refresh on every read operation. If `None`, forced refreshes will be
     ///   disabled.
     pub fn new(
