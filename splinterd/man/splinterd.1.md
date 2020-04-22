@@ -112,6 +112,9 @@ OPTIONS
   Any options on the command line will override the settings in the
   configuration file.
 
+`--display-name DISPLAY-NAME`
+: Specifies a human-readable name for the node (Default: "Node NODE-ID")
+
 `--database DB-URL`
 : Specifies the URL for the PostgreSQL database used for Biome. (Default:
   127.0.0.1:5432.) This option is required when `--enable-biome` is used.
