@@ -50,6 +50,8 @@ struct TomlConfig {
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
     version: Option<String>,
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<Vec<String>>,
 }
 
 pub struct TomlPartialConfigBuilder {
@@ -127,6 +129,11 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_registry_forced_refresh_interval(
                     self.toml_config.registry_forced_refresh_interval,
                 );
+        }
+
+        #[cfg(feature = "rest-api-cors")]
+        {
+            partial_config = partial_config.with_whitelist(self.toml_config.whitelist);
         }
 
         Ok(partial_config)

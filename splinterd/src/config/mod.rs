@@ -70,6 +70,8 @@ pub struct Config {
     no_tls: (bool, ConfigSource),
     #[cfg(feature = "biome")]
     biome_enabled: (bool, ConfigSource),
+    #[cfg(feature = "rest-api-cors")]
+    whitelist: Option<(Vec<String>, ConfigSource)>,
 }
 
 impl Config {
@@ -173,6 +175,15 @@ impl Config {
         self.biome_enabled.0
     }
 
+    #[cfg(feature = "rest-api-cors")]
+    pub fn whitelist(&self) -> Option<&[String]> {
+        if let Some((list, _)) = &self.whitelist {
+            Some(list)
+        } else {
+            None
+        }
+    }
+
     fn storage_source(&self) -> &ConfigSource {
         &self.storage.1
     }
@@ -271,6 +282,15 @@ impl Config {
     #[cfg(feature = "biome")]
     fn biome_enabled_source(&self) -> &ConfigSource {
         &self.biome_enabled.1
+    }
+
+    #[cfg(feature = "rest-api-cors")]
+    pub fn whitelist_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.whitelist {
+            Some(source)
+        } else {
+            None
+        }
     }
 
     /// Displays the configuration value along with where the value was sourced from.
@@ -399,6 +419,19 @@ impl Config {
             self.biome_enabled(),
             self.biome_enabled_source()
         );
+        #[cfg(feature = "rest-api-cors")]
+        self.log_whitelist();
+    }
+
+    #[cfg(feature = "rest-api-cors")]
+    fn log_whitelist(&self) {
+        if let Some(list) = self.whitelist() {
+            debug!(
+                "Config: whitelist: {:?} (source: {:?})",
+                list,
+                self.whitelist_source()
+            );
+        }
     }
 }
 
