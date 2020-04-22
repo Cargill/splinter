@@ -501,6 +501,17 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .help("Name of keys generated; defaults to user name"),
                 )
                 .arg(
+                    Arg::with_name("output_dir")
+                        .short("o")
+                        .long("output-dir")
+                        .takes_value(true)
+                        .conflicts_with("system")
+                        .help(
+                            "Name of the directory in which to create the keys; defaults to \
+                             $HOME/splinter/keys",
+                        ),
+                )
+                .arg(
                     Arg::with_name("force")
                         .short("f")
                         .long("force")
