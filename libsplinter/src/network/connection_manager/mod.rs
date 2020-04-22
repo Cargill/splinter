@@ -127,7 +127,7 @@ enum CmRequest {
     RequestOutboundConnection {
         endpoint: String,
         connection_id: String,
-        sender: Sender<Result<(), ConnectionManagerError>>,
+        sender: Sender<Result<String, ConnectionManagerError>>,
     },
     RemoveConnection {
         endpoint: String,
@@ -151,14 +151,16 @@ enum CmRequest {
 }
 
 enum AuthResult {
-    Outbound(AuthResultPayload),
-    Inbound(AuthResultPayload),
-}
-
-struct AuthResultPayload {
-    endpoint: String,
-    sender: Sender<Result<(), ConnectionManagerError>>,
-    auth_result: AuthorizationResult,
+    Outbound {
+        endpoint: String,
+        sender: Sender<Result<String, ConnectionManagerError>>,
+        auth_result: AuthorizationResult,
+    },
+    Inbound {
+        endpoint: String,
+        sender: Sender<Result<(), ConnectionManagerError>>,
+        auth_result: AuthorizationResult,
+    },
 }
 
 pub struct ConnectionManager<T: 'static, U: 'static>
@@ -301,7 +303,8 @@ impl Connector {
     /// Request a connection to the given endpoint.
     ///
     /// This operation is idempotent: if a connection to that endpoint already exists, a new
-    /// connection is not created.
+    /// connection is not created. On successful connection, the authorized identity of the
+    /// connection is returned.
     ///
     /// # Errors
     ///
@@ -310,7 +313,7 @@ impl Connector {
         &self,
         endpoint: &str,
         id: &str,
-    ) -> Result<(), ConnectionManagerError> {
+    ) -> Result<String, ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
             .send(CmMessage::Request(CmRequest::RequestOutboundConnection {
@@ -539,6 +542,13 @@ impl ConnectionMetadata {
             ConnectionMetadata::Inbound { inbound, .. } => &inbound.endpoint,
         }
     }
+
+    fn identity(&self) -> &str {
+        match self {
+            ConnectionMetadata::Outbound { outbound, .. } => &outbound.identity,
+            ConnectionMetadata::Inbound { inbound, .. } => &inbound.identity,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -548,12 +558,14 @@ struct OutboundConnection {
     retry_frequency: u64,
     last_connection_attempt: Instant,
     reconnection_attempts: u64,
+    identity: String,
 }
 
 #[derive(Clone, Debug)]
 struct InboundConnection {
     endpoint: String,
     disconnected: bool,
+    identity: String,
 }
 
 struct ConnectionState<T, U>
@@ -600,8 +612,15 @@ where
         let id = Uuid::new_v4().to_string();
 
         if endpoint.contains("inproc") {
+            let inbound_connection_identity = format!("connection-{}", Uuid::new_v4());
             if reply_sender
-                .send(self.complete_inbound_connection(endpoint, id, connection, subscribers))
+                .send(self.complete_inbound_connection(
+                    endpoint,
+                    id,
+                    connection,
+                    inbound_connection_identity,
+                    subscribers,
+                ))
                 .is_err()
             {
                 warn!("connector dropped before receiving result of add connection");
@@ -615,13 +634,11 @@ where
                 connection,
                 Box::new(move |auth_result| {
                     internal_sender
-                        .send(CmMessage::AuthResult(AuthResult::Inbound(
-                            AuthResultPayload {
-                                endpoint: auth_endpoint.clone(),
-                                sender: auth_sender.clone(),
-                                auth_result,
-                            },
-                        )))
+                        .send(CmMessage::AuthResult(AuthResult::Inbound {
+                            endpoint: auth_endpoint.clone(),
+                            sender: auth_sender.clone(),
+                            auth_result,
+                        }))
                         .map_err(Box::from)
                 }),
             ) {
@@ -641,12 +658,13 @@ where
         &mut self,
         endpoint: &str,
         id: String,
-        reply_sender: Sender<Result<(), ConnectionManagerError>>,
+        reply_sender: Sender<Result<String, ConnectionManagerError>>,
         internal_sender: Sender<CmMessage>,
         authorizer: &dyn Authorizer,
     ) {
-        if self.connections.get_mut(endpoint).is_some() {
-            if reply_sender.send(Ok(())).is_err() {
+        if let Some(connection) = self.connections.get(endpoint) {
+            let identity = connection.identity().to_string();
+            if reply_sender.send(Ok(identity)).is_err() {
                 warn!("connector dropped before receiving result of add connection");
             }
         } else {
@@ -654,11 +672,13 @@ where
                 Ok(connection) => {
                     // No need to authorize inproc connections
                     if endpoint.contains("inproc") {
+                        let outbound_connection_identity = format!("connection-{}", Uuid::new_v4());
                         if reply_sender
                             .send(self.complete_outbound_connection(
                                 endpoint.to_string(),
                                 id,
                                 connection,
+                                outbound_connection_identity,
                             ))
                             .is_err()
                         {
@@ -673,13 +693,11 @@ where
                             connection,
                             Box::new(move |auth_result| {
                                 internal_sender
-                                    .send(CmMessage::AuthResult(AuthResult::Outbound(
-                                        AuthResultPayload {
-                                            endpoint: auth_endpoint.clone(),
-                                            sender: auth_sender.clone(),
-                                            auth_result,
-                                        },
-                                    )))
+                                    .send(CmMessage::AuthResult(AuthResult::Outbound {
+                                        endpoint: auth_endpoint.clone(),
+                                        sender: auth_sender.clone(),
+                                        auth_result,
+                                    }))
                                     .map_err(Box::from)
                             }),
                         ) {
@@ -714,13 +732,13 @@ where
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
-    ) -> Result<(), ConnectionManagerError> {
+    ) -> Result<String, ConnectionManagerError> {
         match auth_result {
             AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                ..
-            } => self.complete_outbound_connection(endpoint, connection_id, connection),
+                identity,
+            } => self.complete_outbound_connection(endpoint, connection_id, connection, identity),
             AuthorizationResult::Unauthorized { connection_id, .. } => {
                 Err(ConnectionManagerError::Unauthorized(connection_id))
             }
@@ -737,8 +755,14 @@ where
             AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                ..
-            } => self.complete_inbound_connection(endpoint, connection_id, connection, subscribers),
+                identity,
+            } => self.complete_inbound_connection(
+                endpoint,
+                connection_id,
+                connection,
+                identity,
+                subscribers,
+            ),
             AuthorizationResult::Unauthorized { connection_id, .. } => {
                 Err(ConnectionManagerError::Unauthorized(connection_id))
             }
@@ -750,7 +774,8 @@ where
         endpoint: String,
         connection_id: String,
         connection: Box<dyn Connection>,
-    ) -> Result<(), ConnectionManagerError> {
+        identity: String,
+    ) -> Result<String, ConnectionManagerError> {
         self.life_cycle
             .add(connection, connection_id.clone())
             .map_err(|err| ConnectionManagerError::ConnectionCreationError(format!("{:?}", err)))?;
@@ -760,6 +785,7 @@ where
             ConnectionMetadata::Outbound {
                 id: connection_id,
                 outbound: OutboundConnection {
+                    identity: identity.clone(),
                     endpoint,
                     reconnecting: false,
                     retry_frequency: INITIAL_RETRY_FREQUENCY,
@@ -769,13 +795,14 @@ where
             },
         );
 
-        Ok(())
+        Ok(identity)
     }
     fn complete_inbound_connection(
         &mut self,
         endpoint: String,
         connection_id: String,
         connection: Box<dyn Connection>,
+        identity: String,
         subscribers: &mut SubscriberMap,
     ) -> Result<(), ConnectionManagerError> {
         self.life_cycle
@@ -788,6 +815,7 @@ where
                 id: connection_id.clone(),
                 inbound: InboundConnection {
                     endpoint: endpoint.clone(),
+                    identity: identity.clone(),
                     disconnected: false,
                 },
             },
@@ -796,6 +824,7 @@ where
         subscribers.broadcast(ConnectionManagerNotification::InboundConnection {
             endpoint,
             connection_id,
+            identity,
         });
 
         Ok(())
@@ -989,21 +1018,21 @@ fn handle_auth_result<T: MatrixLifeCycle, U: MatrixSender>(
     subscribers: &mut SubscriberMap,
 ) {
     match auth_result {
-        AuthResult::Outbound(AuthResultPayload {
+        AuthResult::Outbound {
             endpoint,
             sender,
             auth_result,
-        }) => {
+        } => {
             let res = state.outbound_authorization_complete(endpoint, auth_result);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
             }
         }
-        AuthResult::Inbound(AuthResultPayload {
+        AuthResult::Inbound {
             endpoint,
             sender,
             auth_result,
-        }) => {
+        } => {
             let res = state.inbound_authorization_complete(endpoint, auth_result, subscribers);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
