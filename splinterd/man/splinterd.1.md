@@ -64,10 +64,6 @@ FLAGS
   and keys that TLS requires. Without `--no-tls`, if `splinterd` cannot find the
   certificates and keys required by TLS, it exits with an error.
 
-`-q`, `--quiet`
-: Decreases verbosity (the opposite of `-v`). When specified, only errors or
-  warnings will be displayed.
-
 `--tls-insecure`
 : Turns off certificate authority validation for TLS connections; all peer
   certificates are accepted. This flag is intended for development environments
@@ -77,8 +73,7 @@ FLAGS
 : Prints version information.
 
 `-v`
-: Increases verbosity (the opposite of -q). Specify multiple times for more
-  output.
+: Increases verbosity. Specify multiple times for more output.
 
 OPTIONS
 =======
@@ -96,6 +91,9 @@ OPTIONS
   between Splinter nodes, if the network endpoint is not public. Use the format
   `tcp://ip:port`. (Default: Same as the network endpoint; see
   `-n`, `--network-endpoint`.)
+
+  Specify multiple endpoints in a comma-separated list or with separate
+  `--advertised-endpoint` options.
 
 `--bind BIND-ENDPOINT`
 : Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
@@ -129,6 +127,9 @@ OPTIONS
 `-n`, `--network-endpoint` `NETWORK-ENDPOINT`
 : Specifies the endpoint for daemon-to-daemon communication between Splinter
   nodes, using the format `tcp://ip:port`. (Default: 127.0.0.1:8044.)
+
+  Specify multiple endpoints in a comma-separated list or with separate
+  `-n` or `--network-endpoint` options.
 
   `--node-id NODE-ID`
 : (Required) Sets a new ID for the node. The node ID must be unique across the
