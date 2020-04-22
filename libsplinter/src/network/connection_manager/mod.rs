@@ -312,14 +312,14 @@ impl Connector {
     pub fn request_connection(
         &self,
         endpoint: &str,
-        id: &str,
+        connection_id: &str,
     ) -> Result<String, ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
             .send(CmMessage::Request(CmRequest::RequestOutboundConnection {
                 sender,
                 endpoint: endpoint.to_string(),
-                connection_id: id.to_string(),
+                connection_id: connection_id.into(),
             }))
             .map_err(|_| {
                 ConnectionManagerError::SendMessageError(
@@ -511,12 +511,12 @@ impl ShutdownHandle {
 #[derive(Clone, Debug)]
 enum ConnectionMetadata {
     Outbound {
-        id: String,
+        connection_id: String,
         outbound: OutboundConnection,
     },
 
     Inbound {
-        id: String,
+        connection_id: String,
         inbound: InboundConnection,
     },
 }
@@ -529,10 +529,10 @@ impl ConnectionMetadata {
         }
     }
 
-    fn id(&self) -> &str {
+    fn connection_id(&self) -> &str {
         match self {
-            ConnectionMetadata::Outbound { id, .. } => id,
-            ConnectionMetadata::Inbound { id, .. } => id,
+            ConnectionMetadata::Outbound { connection_id, .. } => connection_id,
+            ConnectionMetadata::Inbound { connection_id, .. } => connection_id,
         }
     }
 
@@ -657,7 +657,7 @@ where
     fn add_connection(
         &mut self,
         endpoint: &str,
-        id: String,
+        connection_id: String,
         reply_sender: Sender<Result<String, ConnectionManagerError>>,
         internal_sender: Sender<CmMessage>,
         authorizer: &dyn Authorizer,
@@ -676,7 +676,7 @@ where
                         if reply_sender
                             .send(self.complete_outbound_connection(
                                 endpoint.to_string(),
-                                id,
+                                connection_id,
                                 connection,
                                 outbound_connection_identity,
                             ))
@@ -689,7 +689,7 @@ where
                         let auth_endpoint = endpoint.to_string();
                         let auth_sender = reply_sender.clone();
                         if let Err(err) = authorizer.authorize_connection(
-                            id,
+                            connection_id,
                             connection,
                             Box::new(move |auth_result| {
                                 internal_sender
@@ -783,7 +783,7 @@ where
         self.connections.insert(
             endpoint.clone(),
             ConnectionMetadata::Outbound {
-                id: connection_id,
+                connection_id: connection_id,
                 outbound: OutboundConnection {
                     identity: identity.clone(),
                     endpoint,
@@ -812,7 +812,7 @@ where
         self.connections.insert(
             endpoint.clone(),
             ConnectionMetadata::Inbound {
-                id: connection_id.clone(),
+                connection_id: connection_id.clone(),
                 inbound: InboundConnection {
                     endpoint: endpoint.clone(),
                     identity: identity.clone(),
@@ -842,12 +842,14 @@ where
 
         self.connections.remove(endpoint);
         // remove mesh id, this may happen before reconnection is attempted
-        self.life_cycle.remove(meta.id()).map_err(|err| {
-            ConnectionManagerError::ConnectionRemovalError(format!(
-                "Cannot remove connection {} from life cycle: {}",
-                endpoint, err
-            ))
-        })?;
+        self.life_cycle
+            .remove(meta.connection_id())
+            .map_err(|err| {
+                ConnectionManagerError::ConnectionRemovalError(format!(
+                    "Cannot remove connection {} from life cycle: {}",
+                    endpoint, err
+                ))
+            })?;
 
         Ok(Some(meta))
     }
@@ -872,16 +874,18 @@ where
 
         if let Ok(connection) = self.transport.connect(endpoint) {
             // remove old mesh id, this may happen before reconnection is attempted
-            self.life_cycle.remove(meta.id()).map_err(|err| {
-                ConnectionManagerError::ConnectionRemovalError(format!(
-                    "Cannot remove connection {} from life cycle: {}",
-                    endpoint, err
-                ))
-            })?;
+            self.life_cycle
+                .remove(meta.connection_id())
+                .map_err(|err| {
+                    ConnectionManagerError::ConnectionRemovalError(format!(
+                        "Cannot remove connection {} from life cycle: {}",
+                        endpoint, err
+                    ))
+                })?;
 
             // add new connection to mesh
             self.life_cycle
-                .add(connection, meta.id().to_string())
+                .add(connection, meta.connection_id().to_string())
                 .map_err(|err| {
                     ConnectionManagerError::ConnectionReconnectError(format!("{:?}", err))
                 })?;
@@ -1057,7 +1061,10 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
     let mut reconnections = vec![];
     for (endpoint, metadata) in state.connection_metadata_mut().iter_mut() {
         match metadata {
-            ConnectionMetadata::Outbound { id, outbound } => {
+            ConnectionMetadata::Outbound {
+                connection_id,
+                outbound,
+            } => {
                 // if connection is already attempting reconnection, call reconnect
                 if outbound.reconnecting {
                     if outbound.last_connection_attempt.elapsed().as_secs()
@@ -1068,7 +1075,7 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
                 } else {
                     info!("Sending heartbeat to {}", endpoint);
                     if let Err(err) =
-                        matrix_sender.send((*id).to_string(), heartbeat_message.clone())
+                        matrix_sender.send((*connection_id).to_string(), heartbeat_message.clone())
                     {
                         error!(
                             "failed to send heartbeat: {:?} attempting reconnection",
@@ -1083,11 +1090,13 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
                 }
             }
             ConnectionMetadata::Inbound {
-                id,
+                connection_id,
                 ref mut inbound,
             } => {
                 info!("Sending heartbeat to {}", endpoint);
-                if let Err(err) = matrix_sender.send((*id).to_string(), heartbeat_message.clone()) {
+                if let Err(err) =
+                    matrix_sender.send((*connection_id).to_string(), heartbeat_message.clone())
+                {
                     error!(
                         "failed to send heartbeat: {:?} attempting reconnection",
                         err
