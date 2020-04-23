@@ -939,7 +939,7 @@ mod tests {
                 final_config.admin_service_coordinator_timeout(),
                 final_config.admin_service_coordinator_timeout_source()
             ),
-            (Duration::from_millis(30000), &ConfigSource::Default)
+            (Duration::from_secs(30), &ConfigSource::Default)
         );
         // Both the DefaultPartialConfigBuilder and EnvPartialConfigBuilder had values for
         // `state_dir`, but the EnvPartialConfigBuilder value should have precedence (source should

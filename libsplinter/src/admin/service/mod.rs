@@ -55,7 +55,7 @@ use self::shared::AdminServiceShared;
 pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
 
-const DEFAULT_COORDINATOR_TIMEOUT_MILLIS: u64 = 30000; // 30 seconds
+const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 pub trait AdminServiceEventSubscriber: Send {
     fn handle_event(
@@ -133,8 +133,8 @@ impl AdminService {
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
     ) -> Result<Self, ServiceError> {
-        let coordinator_timeout = coordinator_timeout
-            .unwrap_or_else(|| Duration::from_millis(DEFAULT_COORDINATOR_TIMEOUT_MILLIS));
+        let coordinator_timeout =
+            coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
 
         let new_service = Self {
             service_id: admin_service_id(node_id),
