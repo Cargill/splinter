@@ -17,8 +17,6 @@ use crate::config::{ConfigError, ConfigSource, PartialConfig};
 
 use serde_derive::Deserialize;
 
-use toml;
-
 const TOML_VERSION: &str = "1";
 
 /// Holds configuration values defined in a toml file. This struct must be

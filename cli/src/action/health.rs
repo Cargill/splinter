@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use clap::ArgMatches;
-use reqwest;
 use serde_json::Value;
 
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};

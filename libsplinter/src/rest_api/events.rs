@@ -22,7 +22,6 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use serde::ser::Serialize;
-use serde_json;
 
 use crate::rest_api::{errors::ResponseError, Request, Response};
 

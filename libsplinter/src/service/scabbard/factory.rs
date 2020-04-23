@@ -17,8 +17,6 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::time::Duration;
 
-use serde_json;
-
 #[cfg(feature = "service-arg-validation")]
 use crate::hex;
 #[cfg(feature = "service-arg-validation")]

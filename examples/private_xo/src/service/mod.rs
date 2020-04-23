@@ -22,7 +22,6 @@ use std::sync::{Arc, Mutex};
 use std::thread::Builder;
 use std::time::Duration;
 
-use crossbeam_channel;
 use protobuf::Message;
 
 use splinter::consensus::{ConsensusMessage, Proposal, ProposalUpdate};
