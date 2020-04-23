@@ -149,6 +149,14 @@ impl ConfigBuilder {
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?;
+        let node_id = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.node_id() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("node id".to_string()))?;
         // Iterates over the list of PartialConfig objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
@@ -192,14 +200,6 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("peers".to_string()))?,
-            node_id: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.node_id() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("node id".to_string()))?,
             display_name: self
                 .partial_configs
                 .iter()
@@ -207,7 +207,8 @@ impl ConfigBuilder {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("display name".to_string()))?,
+                .unwrap_or((format!("Node {}", node_id.0), ConfigSource::Default)),
+            node_id,
             bind: self
                 .partial_configs
                 .iter()

@@ -14,8 +14,9 @@
 
 //! Data structures, traits, and implementations for tracking and managing known Splinter nodes.
 //!
-//! The public node registry interface is defined primarily by the [`Node`] data structure, and the
-//! node registry traits: [`NodeRegistryReader`], [`NodeRegistryWriter`], and [`RwNodeRegistry`].
+//! The public node registry interface is defined primarily by the [`Node`] data structure (along
+//! with its builder, [`NodeBuilder`]), and the node registry traits: [`NodeRegistryReader`],
+//! [`NodeRegistryWriter`], and [`RwNodeRegistry`].
 //!
 //! The following node registry implementations are provided by this module:
 //!
@@ -24,6 +25,7 @@
 //!   arbitrary number of read-only sub-registries.
 //!
 //! [`Node`]: struct.Node.html
+//! [`NodeBuilder`]: struct.NodeBuilder.html
 //! [`NodeRegistryReader`]: trait.NodeRegistryReader.html
 //! [`NodeRegistryWriter`]: trait.NodeRegistryWriter.html
 //! [`RwNodeRegistry`]: trait.RwNodeRegistry.html
@@ -58,17 +60,66 @@ pub struct Node {
     pub metadata: HashMap<String, String>,
 }
 
-impl Node {
-    /// Constructs a new node with the given identity and endpoints.
-    ///
-    /// The display_name and metadata fields will be empty.
-    pub fn new<S: Into<String>, V: Into<Vec<String>>>(identity: S, endpoints: V) -> Self {
+/// A builder for creating new nodes.
+pub struct NodeBuilder {
+    identity: String,
+    endpoints: Vec<String>,
+    display_name: Option<String>,
+    metadata: HashMap<String, String>,
+}
+
+impl NodeBuilder {
+    /// Create a new `NodeBuilder` with the node's `identity`.
+    pub fn new<S: Into<String>>(identity: S) -> Self {
         Self {
             identity: identity.into(),
-            endpoints: endpoints.into(),
-            display_name: String::new(),
-            metadata: Default::default(),
+            endpoints: vec![],
+            display_name: None,
+            metadata: HashMap::new(),
         }
+    }
+
+    /// Add the `endpoint` to the builder.
+    pub fn with_endpoint<S: Into<String>>(mut self, endpoint: S) -> Self {
+        self.endpoints.push(endpoint.into());
+        self
+    }
+
+    /// Add all of the `endpoints` to the builder.
+    pub fn with_endpoints<V: Into<Vec<String>>>(mut self, endpoints: V) -> Self {
+        self.endpoints.append(&mut endpoints.into());
+        self
+    }
+
+    /// Set the node's `display_name`.
+    pub fn with_display_name<S: Into<String>>(mut self, display_name: S) -> Self {
+        self.display_name = Some(display_name.into());
+        self
+    }
+
+    /// Add the `key`/`value` pair to the node's metadata.
+    pub fn with_metadata<S: Into<String>>(mut self, key: S, value: S) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// Attempt to build the `Node`.
+    pub fn build(self) -> Result<Node, InvalidNodeError> {
+        let identity = self.identity;
+        let display_name = self
+            .display_name
+            .unwrap_or_else(|| format!("Node {}", identity));
+
+        let node = Node {
+            identity,
+            endpoints: self.endpoints,
+            display_name,
+            metadata: self.metadata,
+        };
+
+        check_node_required_fields_are_not_empty(&node)?;
+
+        Ok(node)
     }
 }
 
@@ -246,4 +297,48 @@ where
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         (**self).delete_node(identity)
     }
+}
+
+/// Returns `Err` if not all `nodes` are valid.
+fn validate_nodes(nodes: &[Node]) -> Result<(), InvalidNodeError> {
+    for (idx, node) in nodes.iter().enumerate() {
+        check_node_required_fields_are_not_empty(node)?;
+        check_if_node_is_duplicate(node, &nodes[idx + 1..])?;
+    }
+    Ok(())
+}
+
+/// Checks emptiness properties of all fields on the given `node`.
+fn check_node_required_fields_are_not_empty(node: &Node) -> Result<(), InvalidNodeError> {
+    if node.identity.is_empty() {
+        Err(InvalidNodeError::EmptyIdentity)
+    } else if node.endpoints.is_empty() {
+        Err(InvalidNodeError::MissingEndpoints)
+    } else if node.endpoints.iter().any(|endpoint| endpoint.is_empty()) {
+        Err(InvalidNodeError::EmptyEndpoint)
+    } else if node.display_name.is_empty() {
+        Err(InvalidNodeError::EmptyDisplayName)
+    } else {
+        Ok(())
+    }
+}
+
+/// Checks if the given `node` is a duplicate of any in the slice of `existing_nodes`.
+fn check_if_node_is_duplicate(
+    node: &Node,
+    existing_nodes: &[Node],
+) -> Result<(), InvalidNodeError> {
+    existing_nodes.iter().try_for_each(|existing_node| {
+        if existing_node.identity == node.identity {
+            Err(InvalidNodeError::DuplicateIdentity(node.identity.clone()))
+        } else if let Some(endpoint) = existing_node
+            .endpoints
+            .iter()
+            .find(|endpoint| node.endpoints.contains(endpoint))
+        {
+            Err(InvalidNodeError::DuplicateEndpoint(endpoint.clone()))
+        } else {
+            Ok(())
+        }
+    })
 }

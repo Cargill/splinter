@@ -127,6 +127,7 @@ mod test {
         http::{header, StatusCode},
         test, web, App,
     };
+    use splinter::node_registry::NodeBuilder;
 
     static SPLINTERD_URL: &str = "http://splinterd-node:8085";
 
@@ -265,25 +266,21 @@ mod test {
     }
 
     fn get_node_1() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Bitwise IO".to_string());
-        Node {
-            identity: "Node-123".to_string(),
-            endpoints: vec!["tcps://127.0.0.1:8080".to_string()],
-            display_name: "Bitwise IO - Node 1".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-123")
+            .with_endpoint("tcps://127.0.0.1:8080")
+            .with_display_name("Bitwise IO - Node 1")
+            .with_metadata("company", "Bitwise IO")
+            .build()
+            .expect("Failed to build node1")
     }
 
     fn get_node_2() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Cargill".to_string());
-        Node {
-            identity: "Node-456".to_string(),
-            endpoints: vec!["tcps://127.0.0.1:8082".to_string()],
-            display_name: "Cargill - Node 1".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-456")
+            .with_endpoint("tcps://127.0.0.1:8082")
+            .with_display_name("Cargill - Node 1")
+            .with_metadata("company", "Cargill")
+            .build()
+            .expect("Failed to build node2")
     }
 
     fn create_test_paging_response(

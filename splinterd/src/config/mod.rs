@@ -862,9 +862,9 @@ mod tests {
             (final_config.node_id(), final_config.node_id_source()),
             ("123", &ConfigSource::CommandLine)
         );
-        // The DefaultPartialConfigBuilder, TomlPartialConfigBuilder, and ClapPartialConfigBuilder
-        // had values for `display_name`, but the ClapPartialConfigBuilder value should have
-        // precedence (source should be CommandLine).
+        // The TomlPartialConfigBuilder and ClapPartialConfigBuilder had values for `display_name`,
+        // but the ClapPartialConfigBuilder value should have precedence (source should be
+        // CommandLine).
         assert_eq!(
             (
                 final_config.display_name(),

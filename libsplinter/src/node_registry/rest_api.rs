@@ -391,7 +391,7 @@ mod tests {
         http::{header, StatusCode},
         test, web, App,
     };
-    use crate::node_registry::LocalYamlNodeRegistry;
+    use crate::node_registry::{LocalYamlNodeRegistry, NodeBuilder};
 
     fn new_yaml_node_registry(file_path: &str) -> LocalYamlNodeRegistry {
         LocalYamlNodeRegistry::new(file_path).expect("Error creating LocalYamlNodeRegistry")
@@ -728,25 +728,21 @@ mod tests {
     }
 
     fn get_node_1() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Bitwise IO".to_string());
-        Node {
-            identity: "Node-123".to_string(),
-            endpoints: vec!["12.0.0.123:8431".to_string()],
-            display_name: "Bitwise IO - Node 1".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-123")
+            .with_endpoint("12.0.0.123:8431")
+            .with_display_name("Bitwise IO - Node 1")
+            .with_metadata("company", "Bitwise IO")
+            .build()
+            .expect("Failed to build node1")
     }
 
     fn get_node_2() -> Node {
-        let mut metadata = HashMap::new();
-        metadata.insert("company".to_string(), "Cargill".to_string());
-        Node {
-            identity: "Node-456".to_string(),
-            endpoints: vec!["13.0.0.123:8434".to_string()],
-            display_name: "Cargill - Node 1".to_string(),
-            metadata,
-        }
+        NodeBuilder::new("Node-456")
+            .with_endpoint("13.0.0.123:8434")
+            .with_display_name("Cargill - Node 1")
+            .with_metadata("company", "Cargill")
+            .build()
+            .expect("Failed to build node2")
     }
 
     fn run_test<T>(test: T) -> ()
