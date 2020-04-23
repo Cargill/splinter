@@ -39,6 +39,7 @@ mod unified;
 mod yaml;
 
 use std::collections::HashMap;
+use std::iter::ExactSizeIterator;
 
 pub use error::{InvalidNodeError, NodeRegistryError};
 pub use unified::UnifiedNodeRegistry;
@@ -184,6 +185,9 @@ impl MetadataPredicate {
     }
 }
 
+/// Type returned by the `NodeRegistryReader::list_nodes` method
+pub type NodeIter<'a> = Box<dyn ExactSizeIterator<Item = Node> + Send + 'a>;
+
 /// Defines node registry read capabilities.
 pub trait NodeRegistryReader: Send + Sync {
     /// Returns an iterator over the nodes in the registry.
@@ -196,7 +200,7 @@ pub trait NodeRegistryReader: Send + Sync {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError>;
+    ) -> Result<NodeIter<'a>, NodeRegistryError>;
 
     /// Returns the count of nodes in the registry.
     ///
@@ -275,7 +279,7 @@ where
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
+    ) -> Result<NodeIter<'a>, NodeRegistryError> {
         (**self).list_nodes(predicates)
     }
 

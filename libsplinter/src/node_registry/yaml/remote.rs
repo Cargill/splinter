@@ -32,7 +32,7 @@ use openssl::hash::{hash, MessageDigest};
 
 use crate::hex::to_hex;
 use crate::node_registry::{
-    validate_nodes, MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader,
+    validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
 };
 
 use super::LocalYamlNodeRegistry;
@@ -163,10 +163,10 @@ impl NodeRegistryReader for RemoteYamlNodeRegistry {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
-        Ok(Box::new(self.get_nodes()?.into_iter().filter(
-            move |node| predicates.iter().all(|predicate| predicate.apply(node)),
-        )))
+    ) -> Result<NodeIter<'a>, NodeRegistryError> {
+        let mut nodes = self.get_nodes()?;
+        nodes.retain(|node| predicates.iter().all(|predicate| predicate.apply(node)));
+        Ok(Box::new(nodes.into_iter()))
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
