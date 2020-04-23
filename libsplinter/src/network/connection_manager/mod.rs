@@ -509,63 +509,42 @@ impl ShutdownHandle {
 }
 
 #[derive(Clone, Debug)]
-enum ConnectionMetadata {
-    Outbound {
-        connection_id: String,
-        outbound: OutboundConnection,
-    },
-
-    Inbound {
-        connection_id: String,
-        inbound: InboundConnection,
-    },
+struct ConnectionMetadata {
+    connection_id: String,
+    endpoint: String,
+    identity: String,
+    extended_metadata: ConnectionMetadataExt,
 }
 
 impl ConnectionMetadata {
     fn is_outbound(&self) -> bool {
-        match self {
-            ConnectionMetadata::Outbound { .. } => true,
-            _ => false,
-        }
+        matches!(self.extended_metadata, ConnectionMetadataExt::Outbound { .. })
     }
 
     fn connection_id(&self) -> &str {
-        match self {
-            ConnectionMetadata::Outbound { connection_id, .. } => connection_id,
-            ConnectionMetadata::Inbound { connection_id, .. } => connection_id,
-        }
+        &self.connection_id
     }
 
     fn endpoint(&self) -> &str {
-        match self {
-            ConnectionMetadata::Outbound { outbound, .. } => &outbound.endpoint,
-            ConnectionMetadata::Inbound { inbound, .. } => &inbound.endpoint,
-        }
+        &self.endpoint
     }
 
     fn identity(&self) -> &str {
-        match self {
-            ConnectionMetadata::Outbound { outbound, .. } => &outbound.identity,
-            ConnectionMetadata::Inbound { inbound, .. } => &inbound.identity,
-        }
+        &self.identity
     }
 }
 
 #[derive(Clone, Debug)]
-struct OutboundConnection {
-    endpoint: String,
-    reconnecting: bool,
-    retry_frequency: u64,
-    last_connection_attempt: Instant,
-    reconnection_attempts: u64,
-    identity: String,
-}
-
-#[derive(Clone, Debug)]
-struct InboundConnection {
-    endpoint: String,
-    disconnected: bool,
-    identity: String,
+enum ConnectionMetadataExt {
+    Outbound {
+        reconnecting: bool,
+        retry_frequency: u64,
+        last_connection_attempt: Instant,
+        reconnection_attempts: u64,
+    },
+    Inbound {
+        disconnected: bool,
+    },
 }
 
 struct ConnectionState<T, U>
@@ -782,11 +761,11 @@ where
 
         self.connections.insert(
             endpoint.clone(),
-            ConnectionMetadata::Outbound {
-                connection_id: connection_id,
-                outbound: OutboundConnection {
-                    identity: identity.clone(),
-                    endpoint,
+            ConnectionMetadata {
+                connection_id,
+                identity: identity.clone(),
+                endpoint,
+                extended_metadata: ConnectionMetadataExt::Outbound {
                     reconnecting: false,
                     retry_frequency: INITIAL_RETRY_FREQUENCY,
                     last_connection_attempt: Instant::now(),
@@ -811,11 +790,11 @@ where
 
         self.connections.insert(
             endpoint.clone(),
-            ConnectionMetadata::Inbound {
+            ConnectionMetadata {
                 connection_id: connection_id.clone(),
-                inbound: InboundConnection {
-                    endpoint: endpoint.clone(),
-                    identity: identity.clone(),
+                endpoint: endpoint.clone(),
+                identity: identity.clone(),
+                extended_metadata: ConnectionMetadataExt::Inbound {
                     disconnected: false,
                 },
             },
@@ -891,14 +870,17 @@ where
                 })?;
 
             // replace mesh id and reset reconnecting fields
-            match meta {
-                ConnectionMetadata::Outbound {
-                    ref mut outbound, ..
+            match meta.extended_metadata {
+                ConnectionMetadataExt::Outbound {
+                    ref mut reconnecting,
+                    ref mut retry_frequency,
+                    ref mut last_connection_attempt,
+                    ref mut reconnection_attempts,
                 } => {
-                    outbound.reconnecting = false;
-                    outbound.retry_frequency = INITIAL_RETRY_FREQUENCY;
-                    outbound.last_connection_attempt = Instant::now();
-                    outbound.reconnection_attempts = 0;
+                    *reconnecting = false;
+                    *retry_frequency = INITIAL_RETRY_FREQUENCY;
+                    *last_connection_attempt = Instant::now();
+                    *reconnection_attempts = 0;
                 }
                 // We checked earlier that this was an outbound connection
                 _ => unreachable!(),
@@ -911,17 +893,19 @@ where
                 endpoint: endpoint.to_string(),
             });
         } else {
-            let reconnection_attempts = match meta {
-                ConnectionMetadata::Outbound {
-                    ref mut outbound, ..
+            let reconnection_attempts = match meta.extended_metadata {
+                ConnectionMetadataExt::Outbound {
+                    ref mut reconnecting,
+                    ref mut retry_frequency,
+                    ref mut last_connection_attempt,
+                    ref mut reconnection_attempts,
                 } => {
-                    outbound.reconnecting = true;
-                    outbound.retry_frequency =
-                        min(outbound.retry_frequency * 2, self.maximum_retry_frequency);
-                    outbound.last_connection_attempt = Instant::now();
-                    outbound.reconnection_attempts += 1;
+                    *reconnecting = true;
+                    *retry_frequency = min(*retry_frequency * 2, self.maximum_retry_frequency);
+                    *last_connection_attempt = Instant::now();
+                    *reconnection_attempts += 1;
 
-                    outbound.reconnection_attempts
+                    *reconnection_attempts
                 }
                 // We checked earlier that this was an outbound connection
                 _ => unreachable!(),
@@ -1060,22 +1044,22 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
     let matrix_sender = state.matrix_sender();
     let mut reconnections = vec![];
     for (endpoint, metadata) in state.connection_metadata_mut().iter_mut() {
-        match metadata {
-            ConnectionMetadata::Outbound {
-                connection_id,
-                outbound,
+        match metadata.extended_metadata {
+            ConnectionMetadataExt::Outbound {
+                reconnecting,
+                retry_frequency,
+                last_connection_attempt,
+                ..
             } => {
                 // if connection is already attempting reconnection, call reconnect
-                if outbound.reconnecting {
-                    if outbound.last_connection_attempt.elapsed().as_secs()
-                        > outbound.retry_frequency
-                    {
+                if reconnecting {
+                    if last_connection_attempt.elapsed().as_secs() > retry_frequency {
                         reconnections.push(endpoint.to_string());
                     }
                 } else {
                     info!("Sending heartbeat to {}", endpoint);
-                    if let Err(err) =
-                        matrix_sender.send((*connection_id).to_string(), heartbeat_message.clone())
+                    if let Err(err) = matrix_sender
+                        .send(metadata.connection_id.clone(), heartbeat_message.clone())
                     {
                         error!(
                             "failed to send heartbeat: {:?} attempting reconnection",
@@ -1089,27 +1073,26 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
                     }
                 }
             }
-            ConnectionMetadata::Inbound {
-                connection_id,
-                ref mut inbound,
+            ConnectionMetadataExt::Inbound {
+                ref mut disconnected,
             } => {
                 info!("Sending heartbeat to {}", endpoint);
                 if let Err(err) =
-                    matrix_sender.send((*connection_id).to_string(), heartbeat_message.clone())
+                    matrix_sender.send(metadata.connection_id.clone(), heartbeat_message.clone())
                 {
                     error!(
                         "failed to send heartbeat: {:?} attempting reconnection",
                         err
                     );
 
-                    if !inbound.disconnected {
-                        inbound.disconnected = true;
+                    if !*disconnected {
+                        *disconnected = true;
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
                             endpoint: endpoint.clone(),
                         });
                     }
                 }
-                inbound.disconnected = false;
+                *.disconnected = false;
             }
         }
     }
