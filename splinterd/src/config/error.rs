@@ -16,7 +16,6 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-use clap;
 use toml::de::Error as TomlError;
 
 #[derive(Debug)]

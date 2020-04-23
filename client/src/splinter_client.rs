@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf;
 use splinter::protos::network::NetworkMessage;
 use splinter::transport::socket::TlsTransport;
 use splinter::transport::{Connection, Transport};
-use url;
 
 use crate::error::SplinterError;
 

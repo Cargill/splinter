@@ -26,7 +26,6 @@ use std::ffi::CString;
 use std::path::Path;
 
 use clap::ArgMatches;
-use libc;
 
 use super::error::CliError;
 

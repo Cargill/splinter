@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc::Sender,
@@ -64,7 +63,7 @@ impl Pacemaker {
                     thread::sleep(Duration::from_secs(interval));
                     if let Err(err) = cm_sender.send(new_message()) {
                         error!(
-                            "Connection manager has disconnected before 
+                            "Connection manager has disconnected before
                             shutting down heartbeat monitor {:?}",
                             err
                         );

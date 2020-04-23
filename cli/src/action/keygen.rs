@@ -24,7 +24,6 @@ use std::os::unix::fs::MetadataExt;
 
 use clap::ArgMatches;
 use sawtooth_sdk::signing;
-use whoami;
 
 use crate::error::CliError;
 

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use bcrypt::BcryptError;
-use diesel;
 use std::error::Error;
 use std::fmt;
 
