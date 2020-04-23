@@ -128,7 +128,7 @@ impl PeerManagerConnector {
             .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
     }
 
-    // Request the map of currently connected peers to connection id
+    /// Request the map of currently connected peers to connection id
     ///
     /// Returns a map of peer id to connection id
     pub fn connection_ids(&self) -> Result<BiHashMap<String, String>, PeerConnectionIdError> {
