@@ -44,12 +44,12 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         partial_config = partial_config
             .with_storage(Some(String::from("yaml")))
-            .with_cert_dir(Some(String::from(DEFAULT_CERT_DIR)))
-            .with_ca_certs(Some(String::from(CA_PEM)))
-            .with_client_cert(Some(String::from(CLIENT_CERT)))
-            .with_client_key(Some(String::from(CLIENT_KEY)))
-            .with_server_cert(Some(String::from(SERVER_CERT)))
-            .with_server_key(Some(String::from(SERVER_KEY)))
+            .with_tls_cert_dir(Some(String::from(DEFAULT_CERT_DIR)))
+            .with_tls_ca_file(Some(String::from(CA_PEM)))
+            .with_tls_client_cert(Some(String::from(CLIENT_CERT)))
+            .with_tls_client_key(Some(String::from(CLIENT_KEY)))
+            .with_tls_server_cert(Some(String::from(SERVER_CERT)))
+            .with_tls_server_key(Some(String::from(SERVER_KEY)))
             .with_service_endpoint(Some(String::from("127.0.0.1:8043")))
             .with_network_endpoints(Some(vec![String::from("127.0.0.1:8044")]))
             .with_peers(Some(vec![]))
@@ -60,7 +60,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT_MILLIS,
             ))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
-            .with_insecure(Some(false))
+            .with_tls_insecure(Some(false))
             .with_no_tls(Some(false));
 
         #[cfg(feature = "biome")]
@@ -93,12 +93,12 @@ mod tests {
     /// Asserts config values based on the default values.
     fn assert_default_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(String::from("yaml")));
-        assert_eq!(config.cert_dir(), Some(String::from(DEFAULT_CERT_DIR)));
-        assert_eq!(config.ca_certs(), Some(String::from(CA_PEM)));
-        assert_eq!(config.client_cert(), Some(String::from(CLIENT_CERT)));
-        assert_eq!(config.client_key(), Some(String::from(CLIENT_KEY)));
-        assert_eq!(config.server_cert(), Some(String::from(SERVER_CERT)));
-        assert_eq!(config.server_key(), Some(String::from(SERVER_KEY)));
+        assert_eq!(config.tls_cert_dir(), Some(String::from(DEFAULT_CERT_DIR)));
+        assert_eq!(config.tls_ca_file(), Some(String::from(CA_PEM)));
+        assert_eq!(config.tls_client_cert(), Some(String::from(CLIENT_CERT)));
+        assert_eq!(config.tls_client_key(), Some(String::from(CLIENT_KEY)));
+        assert_eq!(config.tls_server_cert(), Some(String::from(SERVER_CERT)));
+        assert_eq!(config.tls_server_key(), Some(String::from(SERVER_KEY)));
         assert_eq!(
             config.service_endpoint(),
             Some(String::from("127.0.0.1:8043"))
@@ -132,7 +132,7 @@ mod tests {
             ))
         );
         assert_eq!(config.state_dir(), Some(String::from(DEFAULT_STATE_DIR)));
-        assert_eq!(config.insecure(), Some(false));
+        assert_eq!(config.tls_insecure(), Some(false));
         assert_eq!(config.no_tls(), Some(false));
         #[cfg(feature = "biome")]
         assert_eq!(config.biome_enabled(), Some(false));

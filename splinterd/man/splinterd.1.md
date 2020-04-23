@@ -58,11 +58,6 @@ FLAGS
 `-h`, `--help`
 : Prints help information.
 
-`--insecure`
-: Turns off certificate authority validation for TLS connections; all peer
-  certificates are accepted. This flag is intended for development environments
-  using self-signed certificates.
-
 `--no-tls`
 : Turns off TLS configuration and restricts `splinterd` to TCP (`raw`)
   connections. This flag allows `splinterd` to start without the certificates
@@ -72,6 +67,11 @@ FLAGS
 `-q`, `--quiet`
 : Decreases verbosity (the opposite of `-v`). When specified, only errors or
   warnings will be displayed.
+
+`--tls-insecure`
+: Turns off certificate authority validation for TLS connections; all peer
+  certificates are accepted. This flag is intended for development environments
+  using self-signed certificates.
 
 `-V`, `--version`
 : Prints version information.
@@ -99,28 +99,6 @@ OPTIONS
 
 `--bind BIND-ENDPOINT`
 : Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
-
-`--ca-file CERT-FILE`
-: Specifies the path and file name for the trusted CA certificate.
-  (Default: `/etc/splinter/certs/ca_pem`.)
-
-  Do not use this option with the `--insecure` flag.
-
-`--cert-dir CERT-DIR`
-: Specifies the directory that contains the trusted CA certificates and
-  associated key files. (Default: `/etc/splinter/certs/`.)
-
-  This option overrides the `SPLINTER_CERT_DIR` environment variable, if set,
-  and any setting in the `splinterd` configuration file.
-
-`--client-cert CERT-FILE`
-: Specifies the path and file name for the client certificate, which is
-  used by `splinterd` when it is sending messages over TLS. (Default:
-  `/etc/splinter/certs/client.crt`.)
-
-`--client-key CLIENT-KEY`
-: Specifies the path and file name for the client key.
-  (Default: `/etc/splinter/certs/client.key`.)
 
 `-c`, `--config` `CONFIG-FILE`
 : Specifies the path and file name for a `splinterd` configuration file, which
@@ -164,15 +142,6 @@ OPTIONS
 `--registry REGISTRY-FILE` `[,...]`
 : Specifies one or more read-only node registry files.
 
-`--server-cert SERVER-CERT`
-: Specifies the path and file name for the server certificate, which is used by
-  `splinterd` when it is receiving messages over TLS.
-  (Default: `/etc/splinter/certs/server.crt`.)
-
-`--server-key SERVER-KEY`
-: Specifies the path and file name for the server key.
-  (Default: `/etc/splinter/certs/server.key`.)
-
 `--service-endpoint SERVICE-ENDPOINT`
 : Specifies the endpoint for service-to-daemon communication, using the format
   `tcp://ip:port`. (Default: `127.0.0.1:8043`.)
@@ -185,6 +154,37 @@ OPTIONS
 
   Using `memory` for storage means that circuits will not persist when
   `splinterd` restarts.
+
+`--tls-ca-file CERT-FILE`
+: Specifies the path and file name for the trusted CA certificate.
+  (Default: `/etc/splinter/certs/ca_pem`.)
+
+  Do not use this option with the `--tls-insecure` flag.
+
+`--tls-cert-dir CERT-DIR`
+: Specifies the directory that contains the trusted CA certificates and
+  associated key files. (Default: `/etc/splinter/certs/`.)
+
+  This option overrides the `SPLINTER_CERT_DIR` environment variable, if set,
+  and any setting in the `splinterd` configuration file.
+
+`--tls-client-cert CERT-FILE`
+: Specifies the path and file name for the client certificate, which is
+  used by `splinterd` when it is sending messages over TLS. (Default:
+  `/etc/splinter/certs/client.crt`.)
+
+`--tls-client-key CLIENT-KEY`
+: Specifies the path and file name for the client key.
+  (Default: `/etc/splinter/certs/client.key`.)
+
+`--tls-server-cert SERVER-CERT`
+: Specifies the path and file name for the server certificate, which is used by
+  `splinterd` when it is receiving messages over TLS.
+  (Default: `/etc/splinter/certs/server.crt`.)
+
+`--tls-server-key SERVER-KEY`
+: Specifies the path and file name for the server key.
+  (Default: `/etc/splinter/certs/server.key`.)
 
 `--whitelist WHITELIST` `[,...]`
 : Lists one or more trusted domains for cross-origin resource sharing (CORS).
@@ -202,7 +202,7 @@ When the Splinter daemon runs in TLS mode (using `tcps` connections at the
 transport layer), it requires certificate authority (CA) certificates and
 associated keys that are stored in `/etc/splinter/certs/` by default.
 
-You can change the certificate directory by using the `--cert-dir` option,
+You can change the certificate directory by using the `--tls-cert-dir` option,
 setting the `SPLINTER_CERT_DIR` environment variable, or specifying the
 location in a `splinterd` configuration file.
 
@@ -215,11 +215,11 @@ associated keys:
 * `server.crt`
 * `server.key`
 
-You can specify different paths and file names with the `--ca-file`,
-`--client-cert`, `--client-key`, `--server-cert`, and `--server-key`
-options (or related settings in the configuration file).
+You can specify different paths and file names with the `--tls-ca-file`,
+`--tls-client-cert`, `--tls-client-key`, `--tls-server-cert`, and
+`--tls-server-key` options (or related settings in the configuration file).
 
-In a development environment, you can use the `--insecure` flag to use
+In a development environment, you can use the `--tls-insecure` flag to use
 self-signed certificates and keys (which can be generated by the
 `splinter cert generate` command). For more information, see
 "[Generating Insecure Certificates for
@@ -231,7 +231,7 @@ ENVIRONMENT VARIABLES
 
 **SPLINTER_CERT_DIR**
 : Specifies the directory containing certificate and associated key files.
-  (See `--cert-dir`.)
+  (See `--tls-cert-dir`.)
 
 **SPLINTER_STATE_DIR**
 : Specifies where to store the circuit state YAML file, if `--storage` is
@@ -279,6 +279,5 @@ SEE ALSO
 ========
 | `splinter-circuit-propose(1)`
 | `splinter-cert-generate(1)`
-| 
+|
 | Splinter documentation: https://github.com/Cargill/splinter-docs/blob/master/docs/index.md
-

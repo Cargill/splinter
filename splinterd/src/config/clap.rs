@@ -42,12 +42,12 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
 
         partial_config = partial_config
             .with_storage(self.matches.value_of("storage").map(String::from))
-            .with_cert_dir(self.matches.value_of("cert_dir").map(String::from))
-            .with_ca_certs(self.matches.value_of("ca_file").map(String::from))
-            .with_client_cert(self.matches.value_of("client_cert").map(String::from))
-            .with_client_key(self.matches.value_of("client_key").map(String::from))
-            .with_server_cert(self.matches.value_of("server_cert").map(String::from))
-            .with_server_key(self.matches.value_of("server_key").map(String::from))
+            .with_tls_cert_dir(self.matches.value_of("tls_cert_dir").map(String::from))
+            .with_tls_ca_file(self.matches.value_of("tls_ca_file").map(String::from))
+            .with_tls_client_cert(self.matches.value_of("tls_client_cert").map(String::from))
+            .with_tls_client_key(self.matches.value_of("tls_client_key").map(String::from))
+            .with_tls_server_cert(self.matches.value_of("tls_server_cert").map(String::from))
+            .with_tls_server_key(self.matches.value_of("tls_server_key").map(String::from))
             .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
             .with_network_endpoints(
                 self.matches
@@ -73,7 +73,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
             .with_heartbeat_interval(parse_value(&self.matches, "heartbeat_interval")?)
-            .with_insecure(if self.matches.is_present("insecure") {
+            .with_tls_insecure(if self.matches.is_present("tls_insecure") {
                 Some(true)
             } else {
                 None
@@ -147,12 +147,24 @@ mod tests {
     /// Asserts config values based on the example values.
     fn assert_config_values(config: PartialConfig) {
         assert_eq!(config.storage(), Some(EXAMPLE_STORAGE.to_string()));
-        assert_eq!(config.cert_dir(), None);
-        assert_eq!(config.ca_certs(), Some(EXAMPLE_CA_CERTS.to_string()));
-        assert_eq!(config.client_cert(), Some(EXAMPLE_CLIENT_CERT.to_string()));
-        assert_eq!(config.client_key(), Some(EXAMPLE_CLIENT_KEY.to_string()));
-        assert_eq!(config.server_cert(), Some(EXAMPLE_SERVER_CERT.to_string()));
-        assert_eq!(config.server_key(), Some(EXAMPLE_SERVER_KEY.to_string()));
+        assert_eq!(config.tls_cert_dir(), None);
+        assert_eq!(config.tls_ca_file(), Some(EXAMPLE_CA_CERTS.to_string()));
+        assert_eq!(
+            config.tls_client_cert(),
+            Some(EXAMPLE_CLIENT_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_client_key(),
+            Some(EXAMPLE_CLIENT_KEY.to_string())
+        );
+        assert_eq!(
+            config.tls_server_cert(),
+            Some(EXAMPLE_SERVER_CERT.to_string())
+        );
+        assert_eq!(
+            config.tls_server_key(),
+            Some(EXAMPLE_SERVER_KEY.to_string())
+        );
         assert_eq!(
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
@@ -181,7 +193,7 @@ mod tests {
         assert_eq!(config.registry_forced_refresh_interval(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
-        assert_eq!(config.insecure(), Some(true));
+        assert_eq!(config.tls_insecure(), Some(true));
         assert_eq!(config.no_tls(), Some(true));
     }
 
@@ -198,14 +210,14 @@ mod tests {
             (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
             (@arg peers: --peer +takes_value +multiple)
-            (@arg ca_file: --("ca-file") +takes_value)
-            (@arg cert_dir: --("cert-dir") +takes_value)
-            (@arg client_cert: --("client-cert") +takes_value)
-            (@arg server_cert: --("server-cert") +takes_value)
-            (@arg server_key:  --("server-key") +takes_value)
-            (@arg client_key:  --("client-key") +takes_value)
+            (@arg tls_ca_file: --("tls-ca-file") +takes_value)
+            (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
+            (@arg tls_client_cert: --("tls-client-cert") +takes_value)
+            (@arg tls_server_cert: --("tls-server-cert") +takes_value)
+            (@arg tls_server_key:  --("tls-server-key") +takes_value)
+            (@arg tls_client_key:  --("tls-client-key") +takes_value)
             (@arg bind: --("bind") +takes_value)
-            (@arg insecure: --("insecure"))
+            (@arg tls_insecure: --("tls-insecure"))
             (@arg no_tls: --("no-tls")))
         .get_matches_from(args)
     }
@@ -237,17 +249,17 @@ mod tests {
             EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,
-            "--ca-file",
+            "--tls-ca-file",
             EXAMPLE_CA_CERTS,
-            "--client-cert",
+            "--tls-client-cert",
             EXAMPLE_CLIENT_CERT,
-            "--client-key",
+            "--tls-client-key",
             EXAMPLE_CLIENT_KEY,
-            "--server-cert",
+            "--tls-server-cert",
             EXAMPLE_SERVER_CERT,
-            "--server-key",
+            "--tls-server-key",
             EXAMPLE_SERVER_KEY,
-            "--insecure",
+            "--tls-insecure",
             "--no-tls",
         ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.

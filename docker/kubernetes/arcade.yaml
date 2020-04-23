@@ -129,7 +129,7 @@ items:
                 --node-id acme \
                 --service-endpoint tcp://$HOSTNAME:8043 \
                 --storage yaml \
-                --insecure
+                --tls-insecure
             volumeMounts:
               - name: node-registry-volume
                 mountPath: /config/nodes.yaml
@@ -301,7 +301,7 @@ items:
                 --node-id bubba \
                 --service-endpoint tcp://$HOSTNAME:8043 \
                 --storage yaml \
-                --insecure
+                --tls-insecure
             volumeMounts:
               - name: node-registry-volume
                 mountPath: /config/nodes.yaml

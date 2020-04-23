@@ -31,12 +31,12 @@ pub enum ConfigSource {
 pub struct PartialConfig {
     source: ConfigSource,
     storage: Option<String>,
-    cert_dir: Option<String>,
-    ca_certs: Option<String>,
-    client_cert: Option<String>,
-    client_key: Option<String>,
-    server_cert: Option<String>,
-    server_key: Option<String>,
+    tls_cert_dir: Option<String>,
+    tls_ca_file: Option<String>,
+    tls_client_cert: Option<String>,
+    tls_client_key: Option<String>,
+    tls_server_cert: Option<String>,
+    tls_server_key: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -54,7 +54,7 @@ pub struct PartialConfig {
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
     state_dir: Option<String>,
-    insecure: Option<bool>,
+    tls_insecure: Option<bool>,
     no_tls: Option<bool>,
     #[cfg(feature = "biome")]
     biome_enabled: Option<bool>,
@@ -68,12 +68,12 @@ impl PartialConfig {
         PartialConfig {
             source,
             storage: None,
-            cert_dir: None,
-            ca_certs: None,
-            client_cert: None,
-            client_key: None,
-            server_cert: None,
-            server_key: None,
+            tls_cert_dir: None,
+            tls_ca_file: None,
+            tls_client_cert: None,
+            tls_client_key: None,
+            tls_server_cert: None,
+            tls_server_key: None,
             service_endpoint: None,
             network_endpoints: None,
             advertised_endpoints: None,
@@ -91,7 +91,7 @@ impl PartialConfig {
             heartbeat_interval: None,
             admin_service_coordinator_timeout: None,
             state_dir: None,
-            insecure: None,
+            tls_insecure: None,
             no_tls: None,
             #[cfg(feature = "biome")]
             biome_enabled: None,
@@ -108,28 +108,28 @@ impl PartialConfig {
         self.storage.clone()
     }
 
-    pub fn cert_dir(&self) -> Option<String> {
-        self.cert_dir.clone()
+    pub fn tls_cert_dir(&self) -> Option<String> {
+        self.tls_cert_dir.clone()
     }
 
-    pub fn ca_certs(&self) -> Option<String> {
-        self.ca_certs.clone()
+    pub fn tls_ca_file(&self) -> Option<String> {
+        self.tls_ca_file.clone()
     }
 
-    pub fn client_cert(&self) -> Option<String> {
-        self.client_cert.clone()
+    pub fn tls_client_cert(&self) -> Option<String> {
+        self.tls_client_cert.clone()
     }
 
-    pub fn client_key(&self) -> Option<String> {
-        self.client_key.clone()
+    pub fn tls_client_key(&self) -> Option<String> {
+        self.tls_client_key.clone()
     }
 
-    pub fn server_cert(&self) -> Option<String> {
-        self.server_cert.clone()
+    pub fn tls_server_cert(&self) -> Option<String> {
+        self.tls_server_cert.clone()
     }
 
-    pub fn server_key(&self) -> Option<String> {
-        self.server_key.clone()
+    pub fn tls_server_key(&self) -> Option<String> {
+        self.tls_server_key.clone()
     }
 
     pub fn service_endpoint(&self) -> Option<String> {
@@ -191,8 +191,8 @@ impl PartialConfig {
         self.state_dir.clone()
     }
 
-    pub fn insecure(&self) -> Option<bool> {
-        self.insecure
+    pub fn tls_insecure(&self) -> Option<bool> {
+        self.tls_insecure
     }
 
     pub fn no_tls(&self) -> Option<bool> {
@@ -222,76 +222,76 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `cert_dir` value to the PartialConfig object.
+    /// Adds a `tls_cert_dir` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `cert_dir` - Directory containing any certificates and keys to be used.
+    /// * `tls_cert_dir` - Directory containing any certificates and keys to be used.
     ///
-    pub fn with_cert_dir(mut self, cert_dir: Option<String>) -> Self {
-        self.cert_dir = cert_dir;
+    pub fn with_tls_cert_dir(mut self, tls_cert_dir: Option<String>) -> Self {
+        self.tls_cert_dir = tls_cert_dir;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `ca_certs` value to the  PartialConfig object.
+    /// Adds a `tls_ca_file` value to the  PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `ca_certs` - List of certificate authority certificates (*.pem files).
+    /// * `tls_ca_file` - List of certificate authority certificates (*.pem files).
     ///
-    pub fn with_ca_certs(mut self, ca_certs: Option<String>) -> Self {
-        self.ca_certs = ca_certs;
+    pub fn with_tls_ca_file(mut self, tls_ca_file: Option<String>) -> Self {
+        self.tls_ca_file = tls_ca_file;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `client_cert` value to the PartialConfig object.
+    /// Adds a `tls_client_cert` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `client_cert` - A certificate signed by a certificate authority. Used by the daemon when
-    ///                   it is acting as a client, sending messages.
+    /// * `tls_client_cert` - A certificate signed by a certificate authority. Used by the daemon
+    ///                   when it is acting as a client, sending messages.
     ///
-    pub fn with_client_cert(mut self, client_cert: Option<String>) -> Self {
-        self.client_cert = client_cert;
+    pub fn with_tls_client_cert(mut self, tls_client_cert: Option<String>) -> Self {
+        self.tls_client_cert = tls_client_cert;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `client_key` value to the PartialConfig object.
+    /// Adds a `tls_client_key` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `client_key` - Private key used by daemon when it is acting as a client.
+    /// * `tls_client_key` - Private key used by daemon when it is acting as a client.
     ///
-    pub fn with_client_key(mut self, client_key: Option<String>) -> Self {
-        self.client_key = client_key;
+    pub fn with_tls_client_key(mut self, tls_client_key: Option<String>) -> Self {
+        self.tls_client_key = tls_client_key;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `server_cert` value to the PartialConfig object.
+    /// Adds a `tls_server_cert` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `server_cert` - A certificate signed by a certificate authority. Used by the daemon when
-    ///                   it is acting as a server, receiving messages.
+    /// * `tls_server_cert` - A certificate signed by a certificate authority. Used by the daemon
+    ///                   when it is acting as a server, receiving messages.
     ///
-    pub fn with_server_cert(mut self, server_cert: Option<String>) -> Self {
-        self.server_cert = server_cert;
+    pub fn with_tls_server_cert(mut self, tls_server_cert: Option<String>) -> Self {
+        self.tls_server_cert = tls_server_cert;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `server_key` value to the PartialConfig object.
+    /// Adds a `tls_server_key` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `server_key` - Private key used by daemon when it is acting as a server.
+    /// * `tls_server_key` - Private key used by daemon when it is acting as a server.
     ///
-    pub fn with_server_key(mut self, server_key: Option<String>) -> Self {
-        self.server_key = server_key;
+    pub fn with_tls_server_key(mut self, tls_server_key: Option<String>) -> Self {
+        self.tls_server_key = tls_server_key;
         self
     }
 
@@ -477,14 +477,14 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `insecure` value to the PartialConfig object.
+    /// Adds a `tls_insecure` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `insecure` - Accept all peer certificates, ignoring TLS verification.
+    /// * `tls_insecure` - Accept all peer certificates, ignoring TLS verification.
     ///
-    pub fn with_insecure(mut self, insecure: Option<bool>) -> Self {
-        self.insecure = insecure;
+    pub fn with_tls_insecure(mut self, tls_insecure: Option<bool>) -> Self {
+        self.tls_insecure = tls_insecure;
         self
     }
 

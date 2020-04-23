@@ -51,7 +51,7 @@ pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportEr
 }
 
 fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, GetTransportError> {
-    let client_cert = config.client_cert();
+    let client_cert = config.tls_client_cert();
     if !Path::new(&client_cert).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid client certificate: {}",
@@ -63,7 +63,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
         fs::canonicalize(&client_cert)?
     );
 
-    let server_cert = config.server_cert();
+    let server_cert = config.tls_server_cert();
     if !Path::new(&server_cert).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid server certificate: {}",
@@ -75,7 +75,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
         fs::canonicalize(&server_cert)?
     );
 
-    let server_key_file = config.server_key();
+    let server_key_file = config.tls_server_key();
     if !Path::new(&server_key_file).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid server key path: {}",
@@ -87,7 +87,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
         fs::canonicalize(&server_key_file)?
     );
 
-    let client_key_file = config.client_key();
+    let client_key_file = config.tls_client_key();
     if !Path::new(&client_key_file).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid client key path: {}",
@@ -99,7 +99,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
         fs::canonicalize(&client_key_file)?
     );
 
-    let insecure = config.insecure();
+    let insecure = config.tls_insecure();
     if insecure {
         warn!("Starting TlsTransport in insecure mode");
     }
@@ -107,7 +107,7 @@ fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, Get
         if insecure {
             None
         } else {
-            let ca_file = config.ca_certs();
+            let ca_file = config.tls_ca_file();
             if !Path::new(&ca_file).is_file() {
                 return Err(GetTransportError::CertError(format!(
                     "Must provide a valid file containing ca certs: {}",

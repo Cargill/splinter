@@ -101,7 +101,7 @@ services:
     entrypoint: |
       bash -c "
         splinter cert generate --skip && \
-        splinterd -c ./project/tests/splinterd-node-0-docker.toml --insecure -vv
+        splinterd -c ./project/tests/splinterd-node-0-docker.toml --tls-insecure -vv
       "
 
   db-cypress-test:
