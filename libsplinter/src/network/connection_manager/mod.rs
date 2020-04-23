@@ -1091,8 +1091,9 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
                             endpoint: endpoint.clone(),
                         });
                     }
+                } else {
+                    *disconnected = false;
                 }
-                *.disconnected = false;
             }
         }
     }
