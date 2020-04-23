@@ -150,6 +150,12 @@ fn main() {
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
         (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
+        (@arg registry_auto_refresh_interval: --("registry-auto-refresh") +takes_value
+            "How often remote node registries should attempt to fetch upstream changes in the \
+             background (in seconds); default is 600 (10 minutes), 0 means off")
+        (@arg registry_forced_refresh_interval: --("registry-forced-refresh") +takes_value
+            "How long before remote node registries should fetch upstream changes when read \
+             (in seconds); default is 10, 0 means off")
         (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
             "The coordinator timeout for admin service proposals (in milliseconds); default is \
              30000 (30 seconds)")
@@ -179,25 +185,6 @@ fn main() {
         Arg::with_name("biome_enabled")
             .long("enable-biome")
             .long_help("Enable the biome subsystem"),
-    );
-
-    #[cfg(feature = "registry-remote")]
-    let app = app.arg(
-        Arg::with_name("registry_auto_refresh_interval")
-            .long("registry-auto-refresh")
-            .long_help(
-                "How often remote node registries should attempt to fetch upstream changes in the \
-                 background (in seconds); default is 600 (10 minutes), 0 means off",
-            )
-            .takes_value(true),
-    ).arg(
-        Arg::with_name("registry_forced_refresh_interval")
-            .long("registry-forced-refresh")
-            .long_help(
-                "How long before remote node registries should fetch upstream changes when read \
-                 (in seconds); default is 10, 0 means off"
-            )
-            .takes_value(true),
     );
 
     #[cfg(feature = "rest-api-cors")]
@@ -319,6 +306,8 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())
+        .with_registry_auto_refresh_interval(config.registry_auto_refresh_interval())
+        .with_registry_forced_refresh_interval(config.registry_forced_refresh_interval())
         .with_heartbeat_interval(config.heartbeat_interval())
         .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
 
@@ -330,13 +319,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "biome")]
     {
         daemon_builder = daemon_builder.enable_biome(config.biome_enabled());
-    }
-
-    #[cfg(feature = "registry-remote")]
-    {
-        daemon_builder = daemon_builder
-            .with_registry_auto_refresh_interval(config.registry_auto_refresh_interval())
-            .with_registry_forced_refresh_interval(config.registry_forced_refresh_interval());
     }
 
     #[cfg(feature = "rest-api-cors")]

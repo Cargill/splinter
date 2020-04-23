@@ -59,9 +59,7 @@ pub struct Config {
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
-    #[cfg(feature = "registry-remote")]
     registry_auto_refresh_interval: (u64, ConfigSource),
-    #[cfg(feature = "registry-remote")]
     registry_forced_refresh_interval: (u64, ConfigSource),
     heartbeat_interval: (u64, ConfigSource),
     admin_service_coordinator_timeout: (Duration, ConfigSource),
@@ -140,12 +138,10 @@ impl Config {
         &self.registries.0
     }
 
-    #[cfg(feature = "registry-remote")]
     pub fn registry_auto_refresh_interval(&self) -> u64 {
         self.registry_auto_refresh_interval.0
     }
 
-    #[cfg(feature = "registry-remote")]
     pub fn registry_forced_refresh_interval(&self) -> u64 {
         self.registry_forced_refresh_interval.0
     }
@@ -249,12 +245,10 @@ impl Config {
         &self.registries.1
     }
 
-    #[cfg(feature = "registry-remote")]
     fn registry_auto_refresh_interval_source(&self) -> &ConfigSource {
         &self.registry_auto_refresh_interval.1
     }
 
-    #[cfg(feature = "registry-remote")]
     fn registry_forced_refresh_interval_source(&self) -> &ConfigSource {
         &self.registry_forced_refresh_interval.1
     }
@@ -370,13 +364,11 @@ impl Config {
             self.registries(),
             self.registries_source()
         );
-        #[cfg(feature = "registry-remote")]
         debug!(
             "Config: registry_auto_refresh_interval: {} (source: {:?})",
             self.registry_auto_refresh_interval(),
             self.registry_auto_refresh_interval_source()
         );
-        #[cfg(feature = "registry-remote")]
         debug!(
             "Config: registry_forced_refresh_interval: {} (source: {:?})",
             self.registry_forced_refresh_interval(),
@@ -885,7 +877,6 @@ mod tests {
             (final_config.database(), final_config.database_source()),
             ("127.0.0.1:5432", &ConfigSource::Default)
         );
-        #[cfg(feature = "registry-remote")]
         // The DefaultPartialConfigBuilder is the only config with a value for
         // `registry_auto_refresh_interval` (source should be Default).
         assert_eq!(
@@ -895,7 +886,6 @@ mod tests {
             ),
             (600, &ConfigSource::Default)
         );
-        #[cfg(feature = "registry-remote")]
         // The DefaultPartialConfigBuilder is the only config with a value for
         // `registry_forced_refresh_interval` (source should be Default).
         assert_eq!(
