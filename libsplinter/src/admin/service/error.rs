@@ -134,6 +134,8 @@ pub enum AdminSharedError {
     // Returned if a circuit cannot be added to splinter state
     CommitError(String),
     UpdateProposalsError(OpenProposalError),
+    // An error occured while trying to negotiated protocol versions
+    ServiceProtocolError(String),
 }
 
 impl Error for AdminSharedError {
@@ -158,6 +160,7 @@ impl Error for AdminSharedError {
             AdminSharedError::CommitError(_) => None,
             AdminSharedError::UpdateProposalsError(err) => Some(err),
             AdminSharedError::UnableToAddSubscriber(_) => None,
+            AdminSharedError::ServiceProtocolError(_) => None,
         }
     }
 }
@@ -203,6 +206,11 @@ impl fmt::Display for AdminSharedError {
             AdminSharedError::UnableToAddSubscriber(msg) => {
                 write!(f, "unable to add admin service event subscriber: {}", msg)
             }
+            AdminSharedError::ServiceProtocolError(msg) => write!(
+                f,
+                "error occured while trying to agree on protocol: {}",
+                msg
+            ),
         }
     }
 }
