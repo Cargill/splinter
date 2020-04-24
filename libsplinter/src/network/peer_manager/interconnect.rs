@@ -523,7 +523,7 @@ pub mod tests {
         });
 
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -570,7 +570,7 @@ pub mod tests {
         let mesh = Mesh::new(512, 128);
 
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,

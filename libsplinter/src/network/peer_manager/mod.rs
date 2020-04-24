@@ -347,7 +347,19 @@ fn add_peer(
     // If new, try to create a connection
     for endpoint in endpoints.iter() {
         match connector.request_connection(&endpoint, &connection_id) {
-            Ok(_identity) => {
+            Ok(identity) => {
+                if peer_id != identity {
+                    if let Err(err) = connector.remove_connection(&endpoint) {
+                        error!("Unable to clean up mismatched identity connection: {}", err);
+                    }
+                    // remove the reference created above
+                    ref_map.remove_ref(&peer_id);
+                    return Err(PeerRefAddError::AddError(format!(
+                        "Peer {} (via {}) presented a mismatched identity {}",
+                        peer_id, endpoint, identity
+                    )));
+                }
+
                 debug!("Peer {} connected via {}", peer_id, endpoint);
                 peers.insert(
                     peer_id.clone(),
@@ -560,6 +572,9 @@ fn handle_notifications(
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    use std::collections::VecDeque;
+
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
@@ -584,7 +599,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -599,6 +614,47 @@ pub mod tests {
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
+        peer_manager.shutdown_and_wait();
+        cm.shutdown_and_wait();
+    }
+
+    // Test that a call to add_peer_ref, where the authorizer returns an different id than
+    // requested, the connector returns an error.
+    //
+    // 1. add test_peer, whose identity is different_peer
+    // 2. verify that an AddPeer error is returned.
+    // 3. verify that the connection is removed.
+    #[test]
+    fn test_peer_manager_add_peer_identity_mismatch() {
+        let mut transport = Box::new(InprocTransport::default());
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mesh = Mesh::new(512, 128);
+        let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("different_peer")),
+            mesh.get_life_cycle(),
+            mesh.get_sender(),
+            transport,
+            None,
+            None,
+        );
+        let connector = cm.start().unwrap();
+        let mut peer_manager = PeerManager::new(connector.clone(), None);
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_res =
+            peer_connector.add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()]);
+
+        assert!(matches!(peer_res, Err(PeerRefAddError::AddError(_))));
+
+        assert!(connector
+            .list_connections()
+            .expect("Unable to list connections")
+            .is_empty());
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
     }
@@ -620,7 +676,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -660,7 +716,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -707,7 +763,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new_multiple(&["test_peer", "next_peer"])),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -765,7 +821,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new_multiple(&["test_peer", "next_peer"])),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -864,7 +920,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1049,7 +1105,7 @@ pub mod tests {
         });
 
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -1100,7 +1156,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1115,13 +1171,23 @@ pub mod tests {
     }
 
     struct NoopAuthorizer {
-        authorized_id: String,
+        ids: std::cell::RefCell<VecDeque<String>>,
     }
 
     impl NoopAuthorizer {
         fn new(id: &str) -> Self {
+            let mut ids = VecDeque::new();
+            ids.push_back(id.into());
             Self {
-                authorized_id: id.to_string(),
+                ids: std::cell::RefCell::new(ids),
+            }
+        }
+
+        fn new_multiple(ids: &[&str]) -> Self {
+            Self {
+                ids: std::cell::RefCell::new(
+                    ids.iter().map(std::string::ToString::to_string).collect(),
+                ),
             }
         }
     }
@@ -1135,10 +1201,15 @@ pub mod tests {
                 dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
             >,
         ) -> Result<(), AuthorizerError> {
+            let identity = self
+                .ids
+                .borrow_mut()
+                .pop_front()
+                .expect("No more identities to provide");
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: self.authorized_id.clone(),
+                identity,
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }
