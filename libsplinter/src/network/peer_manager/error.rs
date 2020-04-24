@@ -80,27 +80,6 @@ impl fmt::Display for PeerRefRemoveError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum PeerRefUpdateError {
-    InternalError(String),
-    ReceiveError(String),
-    UpdateError(String),
-}
-
-impl error::Error for PeerRefUpdateError {}
-
-impl fmt::Display for PeerRefUpdateError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            PeerRefUpdateError::InternalError(msg) => write!(f, "Received internal error: {}", msg),
-            PeerRefUpdateError::ReceiveError(msg) => {
-                write!(f, "Unable to receive response from PeerManager: {}", msg)
-            }
-            PeerRefUpdateError::UpdateError(msg) => write!(f, "Unable to update peer: {}", msg),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
 pub enum PeerListError {
     InternalError(String),
     ReceiveError(String),

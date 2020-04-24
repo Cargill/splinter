@@ -23,7 +23,6 @@ use std::thread;
 
 use self::error::{
     PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
-    PeerRefUpdateError,
 };
 use crate::collections::BiHashMap;
 use crate::network::connection_manager::ConnectionManagerNotification;
@@ -62,11 +61,6 @@ pub(crate) enum PeerManagerRequest {
         peer_id: String,
         endpoints: Vec<String>,
         sender: Sender<Result<PeerRef, PeerRefAddError>>,
-    },
-    UpdatePeer {
-        old_peer_id: String,
-        new_peer_id: String,
-        sender: Sender<Result<(), PeerRefUpdateError>>,
     },
     RemovePeer {
         peer_id: String,
@@ -293,18 +287,6 @@ fn handle_request(
                 warn!("connector dropped before receiving result of adding peer");
             }
         }
-        PeerManagerRequest::UpdatePeer {
-            old_peer_id,
-            new_peer_id,
-            sender,
-        } => {
-            if sender
-                .send(update_peer(old_peer_id, new_peer_id, peers, ref_map))
-                .is_err()
-            {
-                warn!("connector dropped before receiving result of updating peer");
-            }
-        }
         PeerManagerRequest::RemovePeer { peer_id, sender } => {
             if sender
                 .send(remove_peer(peer_id, connector, peers, ref_map))
@@ -385,36 +367,6 @@ fn add_peer(
         "Unable to connect any endpoint that was provided for peer {}",
         peer_id
     )))
-}
-
-fn update_peer(
-    peer_id: String,
-    new_peer_id: String,
-    peers: &mut PeerMap,
-    ref_map: &mut RefMap,
-) -> Result<(), PeerRefUpdateError> {
-    // update the ref_map, so old PeerRef can still be used to drop references
-    if ref_map
-        .update_ref(peer_id.clone(), new_peer_id.clone())
-        .is_err()
-    {
-        return Err(PeerRefUpdateError::UpdateError(format!(
-            "Unable to update peer, {} does not exist",
-            peer_id
-        )));
-    }
-
-    // update the peer in the peer map
-    match peers.update_peer_id(peer_id.clone(), new_peer_id.clone()) {
-        Ok(()) => {
-            debug!("Updated peer id from {} to {}", peer_id, new_peer_id);
-            Ok(())
-        }
-        Err(_) => Err(PeerRefUpdateError::UpdateError(format!(
-            "Unable to update peer, {} does not exist",
-            peer_id
-        ))),
-    }
 }
 
 fn remove_peer(
@@ -854,52 +806,6 @@ pub mod tests {
         cm.shutdown_and_wait();
     }
 
-    // Test that if a peer is updated, it is properly put in the list_peer list
-    //
-    // 1. add test_peer
-    // 2. update test_peer to have a new id, new_peer
-    // 3. call list_peers
-    // 4. verify that list peers contains only new_peer
-    #[test]
-    fn test_peer_manager_update_peer() {
-        let mut transport = Box::new(InprocTransport::default());
-        let mut listener = transport.listen("inproc://test").unwrap();
-
-        thread::spawn(move || {
-            listener.accept().unwrap();
-        });
-
-        let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
-        let mut peer_manager = PeerManager::new(connector, None);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
-        let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
-            .expect("Unable to add peer");
-
-        assert_eq!(peer_ref.peer_id, "test_peer");
-
-        peer_connector
-            .update_peer_ref("test_peer", "new_peer")
-            .expect("Unable to update peer id");
-
-        let peer_list = peer_connector
-            .list_peers()
-            .expect("Unable to get peer list");
-
-        assert_eq!(peer_list, vec!["new_peer".to_string()]);
-        peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
-    }
-
     // Test that when a PeerRef is dropped, a remove peer request is properly sent and the peer
     // is removed
     //
@@ -947,97 +853,6 @@ pub mod tests {
         }
         // drop peer_ref
 
-        let peer_list = peer_connector
-            .list_peers()
-            .expect("Unable to get peer list");
-
-        assert_eq!(peer_list, Vec::<String>::new());
-        peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
-    }
-
-    // Test that if a peer is updated, an old peer_ref (with the old peer id) can still remove
-    // a reference for that peer.
-    //
-    // 1. add test_peer
-    // 2. update test_peer id to new_peer
-    // 3. call list peers
-    // 4. verify that the peer list contains new_peer
-    // 5. Add reference to new_peer, and verify new_peer is the only peer in the peer lst
-    // 6. drop the PeerRef for new_peer
-    // 7. call list peers
-    // 8. verify that the peer list still contains new_peer
-    // 9. drop the originally PeerREf for test_peer
-    // 10. call list peers and verify that it is empty
-    #[test]
-    fn test_peer_manager_drop_updated_peer_ref() {
-        let mut transport = Box::new(InprocTransport::default());
-        let mut listener = transport.listen("inproc://test").unwrap();
-
-        thread::spawn(move || {
-            listener.accept().unwrap();
-        });
-
-        let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
-        let mut peer_manager = PeerManager::new(connector, None);
-
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
-
-        {
-            // create peer_ref with peer_id test_peer
-            let peer_ref = peer_connector
-                .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
-                .expect("Unable to add peer");
-
-            assert_eq!(peer_ref.peer_id, "test_peer");
-
-            // update peer id
-            peer_connector
-                .update_peer_ref("test_peer", "new_peer")
-                .expect("Unable to update peer id");
-
-            let peer_list = peer_connector
-                .list_peers()
-                .expect("Unable to get peer list");
-
-            assert_eq!(peer_list, vec!["new_peer".to_string()]);
-
-            {
-                // add another reference to new_peer
-                let peer_ref_2 = peer_connector
-                    .add_peer_ref("new_peer".to_string(), vec!["inproc://test".to_string()])
-                    .expect("Unable to add peer");
-
-                assert_eq!(peer_ref_2.peer_id, "new_peer");
-
-                // verify that only 1 peer is listed
-                let peer_list = peer_connector
-                    .list_peers()
-                    .expect("Unable to get peer list");
-
-                assert_eq!(peer_list, vec!["new_peer".to_string()]);
-            }
-            // drop peer ref 2, reference has peer id "new_peer"
-
-            // verify that new_peer has not been removed
-            let peer_list = peer_connector
-                .list_peers()
-                .expect("Unable to get peer list");
-
-            assert_eq!(peer_list, vec!["new_peer".to_string()]);
-        }
-        // drop peer ref with old peer id test_peer
-
-        // verify that the peer has been removed
         let peer_list = peer_connector
             .list_peers()
             .expect("Unable to get peer list");

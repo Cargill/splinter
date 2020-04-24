@@ -18,7 +18,6 @@ use crate::collections::BiHashMap;
 
 use super::error::{
     PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
-    PeerRefUpdateError,
 };
 use super::notification::PeerNotificationIter;
 use super::PeerRef;
@@ -73,39 +72,6 @@ impl PeerManagerConnector {
 
         recv.recv()
             .map_err(|err| PeerRefAddError::ReceiveError(format!("{:?}", err)))?
-    }
-
-    /// Request that a peer is updated. If a peer already exists, update a peer id. Redirections
-    /// will be added to the peer map and reference count so the old PeerRef will still work.
-    ///
-    /// # Arguments
-    ///
-    /// * `old_peer_id` -  The old peer_id of the peer.
-    /// * `new_peer_id` -  The new peer_id of the peer.
-    pub fn update_peer_ref(
-        &self,
-        old_peer_id: &str,
-        new_peer_id: &str,
-    ) -> Result<(), PeerRefUpdateError> {
-        let (sender, recv) = channel();
-
-        let message = PeerManagerMessage::Request(PeerManagerRequest::UpdatePeer {
-            old_peer_id: old_peer_id.to_string(),
-            new_peer_id: new_peer_id.to_string(),
-            sender,
-        });
-
-        match self.sender.send(message) {
-            Ok(()) => (),
-            Err(_) => {
-                return Err(PeerRefUpdateError::InternalError(
-                    "Unable to send message to PeerManager, receiver dropped".to_string(),
-                ))
-            }
-        };
-
-        recv.recv()
-            .map_err(|err| PeerRefUpdateError::ReceiveError(format!("{:?}", err)))?
     }
 
     /// Request the list of currently connected peers.
