@@ -21,6 +21,7 @@ mod key;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[cfg(any(
     feature = "contract",
@@ -786,7 +787,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("list", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -947,7 +948,7 @@ fn run() -> Result<(), CliError> {
                 .into_batch_builder(&signer)?
                 .build(&signer)?;
 
-            Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+            Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
         }
         ("ns", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
@@ -989,7 +990,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("update", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -1030,7 +1031,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("delete", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -1065,7 +1066,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             _ => Err(CliError::InvalidSubcommand),
         },
@@ -1119,7 +1120,7 @@ fn run() -> Result<(), CliError> {
                 .into_batch_builder(&signer)?
                 .build(&signer)?;
 
-            Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+            Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
         }
         ("cr", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
@@ -1161,7 +1162,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("update", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -1202,7 +1203,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("delete", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -1237,7 +1238,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             _ => Err(CliError::InvalidSubcommand),
         },
@@ -1284,7 +1285,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("update", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -1328,7 +1329,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             ("delete", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
@@ -1367,7 +1368,7 @@ fn run() -> Result<(), CliError> {
                     .into_batch_builder(&signer)?
                     .build(&signer)?;
 
-                Ok(client.submit(&service_id, vec![batch], Some(wait))?)
+                Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
             }
             _ => Err(CliError::InvalidSubcommand),
         },

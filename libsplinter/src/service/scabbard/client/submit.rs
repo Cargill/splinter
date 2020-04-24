@@ -58,7 +58,7 @@ pub fn submit_batches(
 pub fn wait_for_batches(
     base_url: &str,
     batch_link: &str,
-    wait: u64,
+    wait: Duration,
 ) -> Result<(), ScabbardClientError> {
     let url = if batch_link.starts_with("http") || batch_link.starts_with("https") {
         parse_http_url(batch_link)
@@ -67,12 +67,11 @@ pub fn wait_for_batches(
     }?;
 
     let end_time = Instant::now()
-        .checked_add(Duration::from_secs(wait))
+        .checked_add(wait)
         .ok_or_else(|| ScabbardClientError::new("failed to schedule timeout"))?;
 
     loop {
-        let time_left = Duration::from_secs(wait);
-        let wait_query = format!("wait={}", time_left.as_secs());
+        let wait_query = format!("wait={}", wait.as_secs());
         let query_string = if let Some(existing_query) = url.query() {
             format!("{}&{}", existing_query, wait_query)
         } else {

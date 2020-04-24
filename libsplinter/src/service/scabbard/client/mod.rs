@@ -15,6 +15,8 @@
 mod error;
 mod submit;
 
+use std::time::Duration;
+
 use reqwest::{blocking::Client, Url};
 use transact::protocol::batch::Batch;
 
@@ -44,7 +46,7 @@ impl ScabbardClient {
         &self,
         service_id: &ServiceId,
         batches: Vec<Batch>,
-        wait: Option<u64>,
+        wait: Option<Duration>,
     ) -> Result<(), ScabbardClientError> {
         let batch_link = submit_batches(
             &self.url,
@@ -52,8 +54,8 @@ impl ScabbardClient {
             service_id.service_id(),
             batches,
         )?;
-        if let Some(wait_secs) = wait {
-            wait_for_batches(&self.url, &batch_link, wait_secs)
+        if let Some(wait) = wait {
+            wait_for_batches(&self.url, &batch_link, wait)
         } else {
             Ok(())
         }
