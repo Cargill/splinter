@@ -281,6 +281,9 @@ message AdminMessage {
         CONSENSUS_MESSAGE = 1;
         PROPOSED_CIRCUIT = 2;
         MEMBER_READY = 3;
+
+        SERVICE_PROTOCOL_VERSION_REQUEST = 100;
+        SERVICE_PROTOCOL_VERSION_RESPONSE = 101;
     }
 
     Type message_type = 1;
@@ -288,6 +291,10 @@ message AdminMessage {
     bytes consensus_message = 2;
     ProposedCircuit proposed_circuit = 3;
     MemberReady member_ready = 4;
+
+    // Messages to agree on protocol version
+    ServiceProtocolVersionRequest protocol_request = 100;
+    ServiceProtocolVersionResponse protocol_response = 101;
 }
 
 message ProposedCircuit {
@@ -304,4 +311,21 @@ message ProposedCircuit {
 message MemberReady {
     string circuit_id = 1;
     string member_node_id = 2;
+}
+
+// This message is sent to a connection AdminService to agree upon prtocol
+// version.
+//
+// The sending service will provide the min and max protocol versions they
+// support.
+message ServiceProtocolVersionRequest {
+    uint32 protocol_min = 1;
+    uint32 protocol_max = 2;
+}
+
+// This message is a response ServiceProtocolVersionRequest. It contains the
+// protocol version that the responder can support. If no matching protocol can
+// be supported 0 is returned.
+message ServiceProtocolVersionResponse {
+    uint32 protocol = 1;
 }
