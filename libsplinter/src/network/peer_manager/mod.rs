@@ -633,6 +633,7 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that a call to add_peer_ref, where the authorizer returns an different id than
@@ -674,6 +675,7 @@ pub mod tests {
 
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that a call to add_peer_ref with a peer with multiple endpoints is successful, even if
@@ -716,6 +718,7 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that the same peer can be added multiple times.
@@ -756,6 +759,7 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that list_peer returns the correct list of peers
@@ -814,6 +818,7 @@ pub mod tests {
         );
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that list_peer returns the correct list of peers
@@ -869,6 +874,7 @@ pub mod tests {
         assert!(peers.get_by_key("test_peer").is_some());
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that when a PeerRef is dropped, a remove peer request is properly sent and the peer
@@ -925,6 +931,7 @@ pub mod tests {
         assert_eq!(peer_list, Vec::<String>::new());
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that if a peer's endpoint disconnects and does not reconnect during a set timeout, the
@@ -953,6 +960,7 @@ pub mod tests {
             .expect("Cannot listen for connections");
         let endpoint2 = listener2.endpoint();
 
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
             // accept incoming connection and add it to mesh2
             let conn = listener.accept().expect("Cannot accept connection");
@@ -982,6 +990,10 @@ pub mod tests {
                 .add(conn, "test_id".to_string())
                 .expect("Cannot add connection to mesh");
             mesh2.recv().expect("Cannot receive message");
+
+            rx.recv().unwrap();
+
+            mesh2.shutdown_signaler().shutdown();
         });
 
         let mut cm = ConnectionManager::new(
@@ -1025,8 +1037,11 @@ pub mod tests {
                 }
         );
 
+        tx.send(()).unwrap();
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh1.shutdown_signaler().shutdown();
     }
 
     // Test that the PeerManager can be started and stopped
@@ -1048,6 +1063,7 @@ pub mod tests {
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that the PeerManager can receive incoming peer requests and handle them appropriately.
