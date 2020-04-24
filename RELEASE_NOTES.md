@@ -1,5 +1,233 @@
 # Release Notes
 
+## Changes in Splinter 0.3.16
+
+### Highlights
+
+* The Splinter daemon, `splinterd`, can be configured with multiple read-only
+  node registry files (in YAML format). Specify registries with file paths
+  (prefixed with `file://`) or HTTP(S) URLs (prefixed with `http://` or
+  `https://`).
+
+### Deprecations and Breaking Changes
+
+* The `--transport` option has been removed from the `splinterd` command. The
+  `splinterd` `transport` configuration setting was also removed.
+
+* The protocol prefix for TLS transport has been changed to `tcps://`. The old
+  prefix, `tls://`, is still supported but is considered deprecated.
+
+* The TLS options and configuration settings for `splinterd` are now prefixed
+  with `tls`.
+
+  Changed configuration settings:
+
+    ```
+    cert_dir  -> tls_cert_dir
+    ca_cert -> tls_ca_file
+    client_cert -> tls_client_cert
+    client_key -> tls_client_key
+    server_cert -> tls_server_cert
+    server_key -> tls_server_key
+    insecure -> tls_insecure
+    ```
+
+  Changed `splinterd` command options:
+
+    ```
+    --cert-dir  -> --tls-cert-dir
+   --ca-file -> --tls-ca-file
+   --client-cert -> --tls-client-cert
+   --client-key -> --tls-client-key
+    --server-cert -> --tls-server-cert
+    --server-key -> --tls-server-key
+    --insecure -> --tls-insecure
+    ```
+
+* A required `version` field has been added to all config objects. TOML
+  configuration files should have a `version = 1` added at the beginning of the
+  file.
+
+* The `splinterd` configuration settings `registry_backend` and `registry_file`
+  are no longer available. The related `splinterd` command options
+  `--registry-backend` and `--registry-file` are also gone. Instead, use the
+  `registries` configuration file setting or the `--registry` option with the
+  `splinterd` command.
+
+* Nodes may now have multiple network endpoints. The `splinterd` configuration
+  setting `network_endpoint`, which was previously a single value, has been
+  changed to `network_endpoints` and now takes an array of values. The
+  `splinterd` command line option `--network-endpoint` remains the same, but can
+  be specified multiple times. This change also affects node registry files,
+  circuit proposals, and REST API responses; see the upgrade document below for
+  more details.
+
+For upgrade information, see
+[Upgrading to Splinter 0.3.16 from Splinter 0.3.15](https://github.com/Cargill/splinter-docs/blob/master/docs/upgrading/splinter-v0.3.16-from-v0.3.15.md).
+
+### libsplinter
+
+* Change the following features from experimental to stable. They can be enabled
+  with the “stable” feature flag (instead of the “experimental” feature flag),
+  in addition to being enabled individually. These features will be used by the
+  default and stable Docker images published at
+  [splintercommunity](https://hub.docker.com/u/splintercommunity).
+
+    - `biome-key-management`
+    - `biome-credentials`
+    - `registry-remote`
+    - `rest-api-cors`
+
+* Remove the following features (no longer available as compilation options),
+because the functionality is now available by default:
+
+    - `node-registry-unified`
+
+* Update the `Dispatcher` code:
+
+    - Add `From` implementation for `ProtoConversionError` in the
+    `dispatch_proto` module.  This will allow for uses of the various proto
+    conversion traits to be used with the `?` operator in handlers.
+    - Add a function to the `Handler` trait for `match_type`, which more tightly
+    couples the message type to the handler.  This change greatly reduces the
+    possibility that the handler and the type it is registered to could get out
+    of sync.
+    - Add a trait for message sending that can be coupled to the Source via
+    generics.  A new module, `dispatch_peer`, implements this new trait
+    specifically on `PeerId` for `NetworkMessageSender`, which supports the
+    existing usages.
+
+* Switch the dispatch `Handler` trait from using generics to using associated
+  types.
+
+* Add a new generic parameter on dispatcher-related structs, `Source`, that can
+  be either `ConnectionId` or `PeerId`.  The generic type defaults to `PeerId`
+  for backwards compatibility.
+
+* Add a step to check if a request has method `OPTIONS` if `CORS` is enabled.
+
+* Allow adding a NetworkMessageSender after a Dispatcher has been created.
+
+* Add an optional whitelist to the RestApi object used to instantiate CORS
+  middleware.
+
+* Improve the `InprocTransport` `ConnectionRefused` error when there's no
+  `Listener`.
+
+* Improve the error message when a service cannot be initialized.
+
+* Add the method `port_numbers` to `RestApiShutdownHandle`, which returns a list
+  of ports that the REST API was bound to when it was created.
+
+* Simplify the connection manager error implementation.
+
+* Improve the node registry:
+
+  - Remove the no-op node registry since it is no longer used.
+  - Update node registry errors to match the standard pattern used elsewhere in
+    Splinter.
+  - Rename `YamlNodeRegistry` to `LocalYamlNodeRegistry` to prevent confusion
+    with the `RemoteYamlNodeRegistry`.
+  - Add the `RemoteYamlNodeRegistry` for reading node registry files over
+    HTTP(S).
+  - Improve node registry documentation.
+  - Replace the `Node` constructor with the `NodeBuilder`
+  - Add a newline to the end of local YAML node registry files.
+
+* Switch two phase coordinator timeout from milliseconds to seconds.
+
+#### Testing
+
+* Re-enable two mesh tests
+
+#### Biome
+
+* Remove the use of concrete stores from the Biome REST API. This makes it
+  possible to test `BiomeRestResourceManager`.
+
+* Add a `CredentialsStore`, `RefreshTokenStore`, `UserStore`, and `KeyStore`
+  implementation that uses `Arc<Mutex<HashMap>>>` to store objects in memory.
+
+* Change the source field for `<store_error>::StorageError` to
+  `Option<Box<dyn Error>>`. This makes it easier to handle cases where the
+  underlying error isn't interesting or important to surface, or if the error
+  doesn't implement the `Error` trait.
+
+* Fix a bug in the route handler for `GET /biome/key/{public_key}`,
+  `PATCH /biome/key/{public_key}` and `DELETE /biome/key/{public_key}`.
+
+* Fix a performance issue when updating a user's password.
+
+* Add initial unit tests for the Biome REST API.
+
+
+### splinterd
+
+* Update the response for splinterd's `GET /status` endpoint to include the
+  node's list of network endpoints.
+
+* Add the `advertised_endpoints` configuration setting and
+  `--advertised-endpoints` command option to `splinterd`. This value is used to
+  define the node's publicly accessible network endpoints if they differ from
+  the node's bound network endpoints. The `advertised_endpoints` setting is
+  exposed via `GET /status` REST API endpoint.
+
+* Add the `display_name` configuration setting to `splinterd`. This value is
+  used to give the node a human-readable name. The `display_name` setting is
+  exposed via splinterd's  `GET /status` REST API endpoint.
+
+* Update the `splinterd` `main` method to use the `Path` struct for building
+  file paths.
+
+* Remove the `--transport` option from the `splinterd` command.
+
+* Add a required `version` field to all config objects and check that each
+  config object added to the final `ConfigBuilder` object has the correct
+  version
+
+* Add support for './' and '../' in file paths for files necessary for
+  `splinterd` configuration.
+
+* Remove `registry_backend` and `registry_file` config options
+
+* Add the configuration options `registries`, `registry_auto_refresh_interval`,
+  and `registry_forced_refresh_interval`.
+
+* Refactor the `splinterd` local registry location configuration.
+
+### CLI
+
+* Remove the `keygen` feature (no longer available as compilation option); the
+  `splinter keygen` subcommand is now available by default.
+
+* Add the long option `--url` to `splinter health status`.
+
+### Documentation
+
+* Add man pages for the following commands: `splinter`, `splinterd`,
+  `splinter cert`, `splinter database`, and `splinter keygen`.
+
+  To display a man page with the `man` command, use the dashed form of the name,
+  where each space is replaced by a dash. For example, `man splinter-cert`.
+
+### Gameroom
+
+* Fix a non-deterministic failure in a gameroom integration test.
+
+* Update code to support change to multiple endpoints for each node
+
+* Add a database migration for the change from `endpoint` to `endpoints` for the
+  `gameroom_member` table.
+
+### Miscellaneous
+
+* Add a justfile to support using `just` for simple cross-repo building,
+  linting, and testing.
+* Log a commit hash in the `splinter-dev` image.
+* Add additional cleanup to the `splinter-dev` image.
+* Update the `protoc-rust` dependency to version 2.14.
+
+
 ## Changes in Splinter 0.3.15
 
 ### Highlights
