@@ -34,7 +34,7 @@
 
 mod error;
 #[cfg(feature = "rest-api")]
-pub mod rest_api;
+mod rest_api;
 mod unified;
 mod yaml;
 

@@ -13,3 +13,4 @@
 // limitations under the License.
 
 pub(super) mod nodes;
+pub(super) mod nodes_identity;

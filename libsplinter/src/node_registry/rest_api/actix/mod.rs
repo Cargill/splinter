@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod nodes;
-pub mod nodes_identity;
+pub(super) mod nodes;
+pub(super) mod nodes_identity;

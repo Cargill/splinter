@@ -57,7 +57,6 @@ use splinter::network::peer::PeerConnector;
 use splinter::network::{sender, sender::NetworkMessageSender};
 use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
 use splinter::node_registry::{
-    rest_api::actix::{nodes::make_nodes_resource, nodes_identity::make_nodes_identity_resource},
     LocalYamlNodeRegistry, NodeRegistryReader, RemoteYamlNodeRegistry, RemoteYamlShutdownHandle,
     RwNodeRegistry, UnifiedNodeRegistry,
 };
@@ -458,8 +457,7 @@ impl SplinterDaemon {
                     )
                 }),
             )
-            .add_resource(make_nodes_identity_resource(node_registry.clone()))
-            .add_resource(make_nodes_resource(node_registry.clone()))
+            .add_resources(node_registry.resources())
             .add_resources(key_registry_manager.resources())
             .add_resources(admin_service.resources())
             .add_resources(orchestrator_resources)

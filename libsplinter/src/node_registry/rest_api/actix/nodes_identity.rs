@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! This module provides the following endpoints:
+//!
+//! * `GET /admin/nodes/{identity}` for fetching a node in the registry
+//! * `PUT /admin/nodes/{identity}` for replacing a node in the registry
+//! * `DELETE /admin/nodes/{identity}` for deleting a node from the registry
+
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::node_registry::{
-    error::{InvalidNodeError, NodeRegistryError},
-    Node, NodeRegistryReader, NodeRegistryWriter,
+    rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, NodeRegistryError,
+    NodeRegistryReader, NodeRegistryWriter, RwNodeRegistry,
 };
 use crate::protocol;
-use crate::rest_api::{Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
-pub fn make_nodes_identity_resource<N>(registry: N) -> Resource
-where
-    N: NodeRegistryReader + NodeRegistryWriter + Clone + 'static,
-{
+pub fn make_nodes_identity_resource(registry: Box<dyn RwNodeRegistry>) -> Resource {
     let registry1 = registry.clone();
     let registry2 = registry.clone();
     Resource::build("/admin/nodes/{identity}")
@@ -33,45 +36,46 @@ where
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
-            fetch_node(r, web::Data::new(registry.clone()))
+            fetch_node(r, web::Data::new(registry.clone_box_as_reader()))
         })
         .add_method(Method::Put, move |r, p| {
-            put_node(r, p, web::Data::new(registry1.clone()))
+            put_node(r, p, web::Data::new(registry1.clone_box_as_writer()))
         })
         .add_method(Method::Delete, move |r, _| {
-            delete_node(r, web::Data::new(registry2.clone()))
+            delete_node(r, web::Data::new(registry2.clone_box_as_writer()))
         })
 }
 
-fn fetch_node<NR>(
+fn fetch_node(
     request: HttpRequest,
-    registry: web::Data<NR>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
-where
-    NR: NodeRegistryReader + 'static,
-{
+    registry: web::Data<Box<dyn NodeRegistryReader>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let identity = request
         .match_info()
         .get("identity")
         .unwrap_or("")
         .to_string();
     Box::new(
-        web::block(move || registry.fetch_node(&identity)).then(|res| match res {
-            Ok(Some(node)) => Ok(HttpResponse::Ok().json(node)),
-            Ok(None) => Ok(HttpResponse::NotFound().json("node not found")),
-            Err(err) => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+        web::block(move || registry.fetch_node(&identity)).then(|res| {
+            Ok(match res {
+                Ok(Some(node)) => HttpResponse::Ok().json(NodeResponse::from(&node)),
+                Ok(None) => {
+                    HttpResponse::NotFound().json(ErrorResponse::not_found("Node not found"))
+                }
+                Err(err) => {
+                    error!("Unable to fetch node: {}", err);
+                    HttpResponse::InternalServerError().json(ErrorResponse::internal_error())
+                }
+            })
         }),
     )
 }
 
-fn put_node<NW>(
+fn put_node(
     request: HttpRequest,
     payload: web::Payload,
-    registry: web::Data<NW>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
-where
-    NW: NodeRegistryWriter + 'static,
-{
+    registry: web::Data<Box<dyn NodeRegistryWriter>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let path_identity = request
         .match_info()
         .get("identity")
@@ -92,7 +96,7 @@ where
                             Err(NodeRegistryError::InvalidNode(
                                 InvalidNodeError::InvalidIdentity(
                                     node.identity,
-                                    "node identity cannot be changed".into(),
+                                    "Node identity cannot be changed".into(),
                                 ),
                             ))
                         } else {
@@ -102,48 +106,53 @@ where
                     .then(|res| {
                         Ok(match res {
                             Ok(_) => HttpResponse::Ok().finish(),
-                            Err(err) => match err {
-                                BlockingError::Error(err) => match err {
-                                    NodeRegistryError::InvalidNode(err) => {
-                                        HttpResponse::Forbidden()
-                                            .json(format!("node is invalid: {}", err))
-                                    }
-                                    _ => {
-                                        HttpResponse::InternalServerError().json(format!("{}", err))
-                                    }
-                                },
-                                _ => HttpResponse::InternalServerError().json(format!("{}", err)),
-                            },
+                            Err(BlockingError::Error(NodeRegistryError::InvalidNode(err))) => {
+                                HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                                    &format!("Invalid node: {}", err),
+                                ))
+                            }
+                            Err(err) => {
+                                error!("Unable to put node: {}", err);
+                                HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
+                            }
                         })
                     }),
                 )
                     as Box<dyn Future<Item = HttpResponse, Error = Error>>,
                 Err(err) => Box::new(
                     HttpResponse::BadRequest()
-                        .json(format!("invalid node: {}", err))
+                        .json(ErrorResponse::bad_request(&format!(
+                            "Invalid node: {}",
+                            err
+                        )))
                         .into_future(),
                 ),
             }),
     )
 }
 
-fn delete_node<NW>(
+fn delete_node(
     request: HttpRequest,
-    registry: web::Data<NW>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>>
-where
-    NW: NodeRegistryWriter + 'static,
-{
+    registry: web::Data<Box<dyn NodeRegistryWriter>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let identity = request
         .match_info()
         .get("identity")
         .unwrap_or("")
         .to_string();
     Box::new(
-        web::block(move || registry.delete_node(&identity)).then(|res| match res {
-            Ok(Some(_)) => Ok(HttpResponse::Ok().finish()),
-            Ok(None) => Ok(HttpResponse::NotFound().json("node not found")),
-            Err(err) => Ok(HttpResponse::InternalServerError().json(format!("{}", err))),
+        web::block(move || registry.delete_node(&identity)).then(|res| {
+            Ok(match res {
+                Ok(Some(_)) => HttpResponse::Ok().finish(),
+                Ok(None) => {
+                    HttpResponse::NotFound().json(ErrorResponse::not_found("Node not found"))
+                }
+                Err(err) => {
+                    error!("Unable to delete node: {}", err);
+                    HttpResponse::InternalServerError().json(ErrorResponse::internal_error())
+                }
+            })
         }),
     )
 }
@@ -151,180 +160,204 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::collections::HashMap;
-    use std::env;
-    use std::fs::{remove_file, File};
-    use std::panic;
-    use std::thread;
+    use std::sync::{Arc, Mutex};
 
-    use crate::actix_web::{
-        http::{header, StatusCode},
-        test, web, App,
-    };
-    use crate::node_registry::{LocalYamlNodeRegistry, NodeBuilder};
+    use reqwest::{blocking::Client, StatusCode, Url};
 
-    fn new_yaml_node_registry(file_path: &str) -> LocalYamlNodeRegistry {
-        LocalYamlNodeRegistry::new(file_path).expect("Error creating LocalYamlNodeRegistry")
-    }
+    use crate::node_registry::{MetadataPredicate, NodeBuilder, NodeIter};
+    use crate::rest_api::{RestApiBuilder, RestApiServerError, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /admin/nodes/{identity} request returns the expected node.
     fn test_fetch_node_ok() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_nodes_identity_resource(Box::new(
+                MemRegistry::new(vec![get_node_1(), get_node_2()]),
+            ))]);
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let url = Url::parse(&format!(
+            "http://{}/admin/nodes/{}",
+            bind_url,
+            get_node_1().identity
+        ))
+        .expect("Failed to parse URL");
+        let resp = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .send()
+            .expect("Failed to perform request");
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
-                ),
-            );
+        assert_eq!(resp.status(), StatusCode::OK);
+        let node: Node = resp.json().expect("Failed to deserialize body");
+        assert_eq!(node, get_node_1());
 
-            let req = test::TestRequest::get()
-                .uri(&format!("/admin/nodes/{}", get_node_1().identity))
-                .to_request();
-
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::OK);
-            let node: Node = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
-            assert_eq!(node, get_node_1())
-        })
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
-    /// Tests a GET /admin/nodes/{identity} request returns NotFound when an invalid identity is passed
+    /// Tests a GET /admin/nodes/{identity} request returns NotFound when an invalid identity is
+    /// passed.
     fn test_fetch_node_not_found() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1(), get_node_2()]);
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_nodes_identity_resource(Box::new(
+                MemRegistry::new(vec![get_node_1(), get_node_2()]),
+            ))]);
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        let url = Url::parse(&format!("http://{}/admin/nodes/Node-not-valid", bind_url))
+            .expect("Failed to parse URL");
+        let resp = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .send()
+            .expect("Failed to perform request");
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
-                ),
-            );
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
-            let req = test::TestRequest::get()
-                .uri("/admin/nodes/Node-not-valid")
-                .to_request();
-
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        })
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Test the PUT /admin/nodes/{identity} route for adding or updating a node in the registry.
     fn test_put_node() {
-        run_test(|test_yaml_file_path| {
-            let mut node = get_node_1();
-            write_to_file(&test_yaml_file_path, &[node.clone()]);
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_nodes_identity_resource(Box::new(
+                MemRegistry::new(vec![get_node_1()]),
+            ))]);
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        // Verify no body (i.e. no updated Node) gets a BAD_REQUEST response
+        let url = Url::parse(&format!(
+            "http://{}/admin/nodes/{}",
+            bind_url,
+            get_node_1().identity
+        ))
+        .expect("Failed to parse URL");
+        let resp = Client::new()
+            .put(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .send()
+            .expect("Failed to perform request");
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::patch().to_async(put_node::<LocalYamlNodeRegistry>))
-                        .route(web::get().to_async(fetch_node::<LocalYamlNodeRegistry>)),
-                ),
-            );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
-            // Verify no body (e.g. no updated Node) gets a BAD_REQUEST response
-            let req = test::TestRequest::patch()
-                .uri(&format!("/admin/nodes/{}", &node.identity))
-                .to_request();
+        // Verify that updating an existing node gets an OK response and the fetched node has
+        // the updated values
+        let mut node = get_node_1();
+        node.endpoints = vec!["12.0.0.123:8432".to_string()];
+        node.metadata
+            .insert("location".to_string(), "Minneapolis".to_string());
 
-            let resp = test::call_service(&mut app, req);
+        let url = Url::parse(&format!(
+            "http://{}/admin/nodes/{}",
+            bind_url, &node.identity
+        ))
+        .expect("Failed to parse URL");
+        let resp = Client::new()
+            .put(url.clone())
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .json(&node)
+            .send()
+            .expect("Failed to perform request");
 
-            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(resp.status(), StatusCode::OK);
 
-            // Verify that updating an existing node gets an OK response and the fetched node has
-            // the updated values
-            node.endpoints = vec!["12.0.0.123:8432".to_string()];
-            node.metadata
-                .insert("location".to_string(), "Minneapolis".to_string());
+        let resp = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .send()
+            .expect("Failed to perform request");
 
-            let req = test::TestRequest::patch()
-                .uri(&format!("/admin/nodes/{}", &node.identity))
-                .header(header::CONTENT_TYPE, "application/json")
-                .set_json(&node)
-                .to_request();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let updated_node: Node = resp.json().expect("Failed to deserialize body");
+        assert_eq!(updated_node, node);
 
-            let resp = test::call_service(&mut app, req);
+        // Verify that attempting to change the node identity gets a FORBIDDEN response
+        let old_identity = node.identity.clone();
+        node.identity = "Node-789".into();
 
-            assert_eq!(resp.status(), StatusCode::OK);
+        let url = Url::parse(&format!("http://{}/admin/nodes/{}", bind_url, old_identity))
+            .expect("Failed to parse URL");
+        let resp = Client::new()
+            .put(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .json(&node)
+            .send()
+            .expect("Failed to perform request");
 
-            let req = test::TestRequest::get()
-                .uri(&format!("/admin/nodes/{}", &node.identity))
-                .to_request();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::OK);
-            let updated_node: Node = serde_yaml::from_slice(&test::read_body(resp)).unwrap();
-            assert_eq!(updated_node, node);
-
-            // Verify that attempting to change the node identity gets a FORBIDDEN response
-            let old_identity = node.identity.clone();
-            node.identity = "Node-789".into();
-
-            let req = test::TestRequest::patch()
-                .uri(&format!("/admin/nodes/{}", &old_identity))
-                .header(header::CONTENT_TYPE, "application/json")
-                .set_json(&node)
-                .to_request();
-
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
-        })
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
     #[test]
     /// Test the DELETE /admin/nodes/{identity} route for deleting a node from the registry.
     fn test_delete_node() {
-        run_test(|test_yaml_file_path| {
-            write_to_file(&test_yaml_file_path, &[get_node_1()]);
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_nodes_identity_resource(Box::new(
+                MemRegistry::new(vec![get_node_1()]),
+            ))]);
 
-            let node_registry = new_yaml_node_registry(test_yaml_file_path);
+        // Verify that an existing node gets an OK response
+        let url = Url::parse(&format!(
+            "http://{}/admin/nodes/{}",
+            bind_url,
+            get_node_1().identity
+        ))
+        .expect("Failed to parse URL");
+        let resp = Client::new()
+            .delete(url.clone())
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .send()
+            .expect("Failed to perform request");
 
-            let mut app = test::init_service(
-                App::new().data(node_registry.clone()).service(
-                    web::resource("/admin/nodes/{identity}")
-                        .route(web::delete().to_async(delete_node::<LocalYamlNodeRegistry>)),
-                ),
-            );
+        assert_eq!(resp.status(), StatusCode::OK);
 
-            // Verify that an existing node gets an OK response
-            let req = test::TestRequest::delete()
-                .uri(&format!("/admin/nodes/{}", get_node_1().identity))
-                .to_request();
+        // Verify that a non-existent node gets a NOT_FOUND response
+        let resp = Client::new()
+            .delete(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .send()
+            .expect("Failed to perform request");
 
-            let resp = test::call_service(&mut app, req);
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
-            assert_eq!(resp.status(), StatusCode::OK);
-
-            // Verify that a non-existent node gets a NOT_FOUND response
-            let req = test::TestRequest::delete()
-                .uri(&format!("/admin/nodes/{}", get_node_1().identity))
-                .to_request();
-
-            let resp = test::call_service(&mut app, req);
-
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        })
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
     }
 
-    fn write_to_file(file_path: &str, nodes: &[Node]) {
-        let file = File::create(file_path).expect("Error creating test nodes yaml file.");
-        serde_yaml::to_writer(file, nodes).expect("Error writing nodes to file.");
+    fn run_rest_api_on_open_port(
+        resources: Vec<Resource>,
+    ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
+        (10000..20000)
+            .find_map(|port| {
+                let bind_url = format!("127.0.0.1:{}", port);
+                let result = RestApiBuilder::new()
+                    .with_bind(&bind_url)
+                    .add_resources(resources.clone())
+                    .build()
+                    .expect("Failed to build REST API")
+                    .run();
+                match result {
+                    Ok((shutdown_handle, join_handle)) => {
+                        Some((shutdown_handle, join_handle, bind_url))
+                    }
+                    Err(RestApiServerError::BindError(_)) => None,
+                    Err(err) => panic!("Failed to run REST API: {}", err),
+                }
+            })
+            .expect("No port available")
     }
 
     fn get_node_1() -> Node {
@@ -345,25 +378,80 @@ mod tests {
             .expect("Failed to build node2")
     }
 
-    fn run_test<T>(test: T) -> ()
-    where
-        T: FnOnce(&str) -> () + panic::UnwindSafe,
-    {
-        let test_yaml_file = temp_yaml_file_path();
-
-        let test_path = test_yaml_file.clone();
-        let result = panic::catch_unwind(move || test(&test_path));
-
-        remove_file(test_yaml_file).unwrap();
-
-        assert!(result.is_ok())
+    #[derive(Clone, Default)]
+    struct MemRegistry {
+        nodes: Arc<Mutex<HashMap<String, Node>>>,
     }
 
-    fn temp_yaml_file_path() -> String {
-        let mut temp_dir = env::temp_dir();
+    impl MemRegistry {
+        fn new(nodes: Vec<Node>) -> Self {
+            let mut nodes_map = HashMap::new();
+            for node in nodes {
+                nodes_map.insert(node.identity.clone(), node);
+            }
+            Self {
+                nodes: Arc::new(Mutex::new(nodes_map)),
+            }
+        }
+    }
 
-        let thread_id = thread::current().id();
-        temp_dir.push(format!("test_node_endpoint-{:?}.yaml", thread_id));
-        temp_dir.to_str().unwrap().to_string()
+    impl NodeRegistryReader for MemRegistry {
+        fn list_nodes<'a, 'b: 'a>(
+            &'b self,
+            predicates: &'a [MetadataPredicate],
+        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+            let mut nodes = self
+                .nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .clone();
+            nodes.retain(|_, node| predicates.iter().all(|predicate| predicate.apply(node)));
+            Ok(Box::new(nodes.into_iter().map(|(_, node)| node)))
+        }
+
+        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+            self.list_nodes(predicates).map(|iter| iter.count() as u32)
+        }
+
+        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+            Ok(self
+                .nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .get(identity)
+                .cloned())
+        }
+    }
+
+    impl NodeRegistryWriter for MemRegistry {
+        fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
+            self.nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .insert(node.identity.clone(), node);
+            Ok(())
+        }
+
+        fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+            Ok(self
+                .nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .remove(identity))
+        }
+    }
+
+    impl RwNodeRegistry for MemRegistry {
+        fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+            Box::new(self.clone())
+        }
+
+        fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+            Box::new(self.clone())
+        }
+
+        fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+            Box::new(self.clone())
+        }
     }
 }

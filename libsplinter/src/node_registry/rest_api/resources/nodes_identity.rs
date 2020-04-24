@@ -15,13 +15,6 @@
 use std::collections::HashMap;
 
 use crate::node_registry::Node;
-use crate::rest_api::paging::Paging;
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ListNodesResponse<'a> {
-    pub data: Vec<NodeResponse<'a>>,
-    pub paging: Paging,
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NodeResponse<'a> {
