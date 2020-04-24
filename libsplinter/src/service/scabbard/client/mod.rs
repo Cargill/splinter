@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A convenient client for interacting with scabbard services on a Splinter node.
+
 mod error;
 
 use std::time::{Duration, Instant};
@@ -29,20 +31,29 @@ use super::{BatchInfo, BatchStatus, SERVICE_TYPE};
 
 pub use error::ScabbardClientError;
 
-/// A client that can be used to submit transactions to scabbard services on a Splinter node.
+/// A client that can be used to interact with scabbard services on a Splinter node.
 pub struct ScabbardClient {
     url: String,
 }
 
 impl ScabbardClient {
-    /// Create a new `ScabbardClient` with the given base `url`. The `url` should be the endpoint
-    /// of the Splinter node; it should not include the endpoint of the scabbard service itself.
+    /// Create a new `ScabbardClient` with the given base `url`. The URL should be the bind endpoint
+    /// of the Splinter REST API; it should not include the path to the scabbard service itself.
     pub fn new(url: &str) -> Self {
         Self { url: url.into() }
     }
 
-    /// Submit the given batches to the scabbard service specified by the circuit and service IDs.
-    /// Optionally wait the given number of seconds for batches to commit.
+    /// Submit the given `batches` to the scabbard service with the given `service_id`. If a `wait`
+    /// time is specified, wait the given amount of time for the batches to commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * The client's URL was invalid
+    /// * A REST API request failed
+    /// * An internal server error occurred in the scabbard service
+    /// * One or more batches were invalid (if `wait` provided)
+    /// * The `wait` time has elapsed and the batches have not been committed (if `wait` provided)
     pub fn submit(
         &self,
         service_id: &ServiceId,
@@ -78,7 +89,15 @@ impl ScabbardClient {
     }
 
     /// Get the value at the given `address` in state for the Scabbard instance with the given
-    /// `service_id`.
+    /// `service_id`. Returns `None` if there is no entry at the given address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * The client's URL was invalid
+    /// * The given address is not a valid hex address
+    /// * The REST API request failed
+    /// * An internal server error occurred in the scabbard service
     pub fn get_state_at_address(
         &self,
         service_id: &ServiceId,
@@ -127,6 +146,16 @@ impl ScabbardClient {
         }
     }
 
+    /// Get all entries under the given address `prefix` in state for the Scabbard instance with
+    /// the given `service_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * The client's URL was invalid
+    /// * The given `prefix` is not a valid hex address prefix
+    /// * The REST API request failed
+    /// * An internal server error occurred in the scabbard service
     pub fn get_state_with_prefix(
         &self,
         service_id: &ServiceId,
@@ -181,6 +210,16 @@ impl ScabbardClient {
     }
 }
 
+/// Using the given `base_url` and `batch_link` to check batch statuses, `wait` the given duration
+/// for the batches (encoded in `batch_link`) to commit.
+///
+/// # Errors
+///
+/// Returns an error in any of the following cases:
+/// * A batch status request failed
+/// * An internal server error occurred in the scabbard service
+/// * One or more batches were invalid
+/// * The `wait` time has elapsed and the batches have not been committed
 fn wait_for_batches(
     base_url: &str,
     batch_link: &str,
@@ -256,6 +295,7 @@ fn wait_for_batches(
     }
 }
 
+/// Parses the given `url`, returning an error if it is invalid.
 fn parse_http_url(url: &str) -> Result<Url, ScabbardClientError> {
     let url = Url::parse(url)
         .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
@@ -270,6 +310,8 @@ fn parse_http_url(url: &str) -> Result<Url, ScabbardClientError> {
     }
 }
 
+/// Performs the given `request`, returning an error if the request fails or an error status code
+/// is received.
 fn perform_request(request: RequestBuilder) -> Result<Response, ScabbardClientError> {
     request
         .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
@@ -288,6 +330,7 @@ pub struct ServiceId {
 }
 
 impl ServiceId {
+    /// Create a new `ServiceId` from separate `circuit` and `service_id` strings.
     pub fn new(circuit: &str, service_id: &str) -> Self {
         Self {
             circuit: circuit.into(),
@@ -295,7 +338,7 @@ impl ServiceId {
         }
     }
 
-    /// Parse a fully-qualified service ID string ("circuit::service_id").
+    /// Parse a fully-qualified service ID string (in the form "circuit::service_id").
     pub fn from_string(full_id: &str) -> Result<Self, ScabbardClientError> {
         let ids = full_id.splitn(2, "::").collect::<Vec<_>>();
 
@@ -327,15 +370,18 @@ impl ServiceId {
         })
     }
 
+    /// Get the circuit ID.
     pub fn circuit(&self) -> &str {
         &self.circuit
     }
 
+    /// Get the service ID.
     pub fn service_id(&self) -> &str {
         &self.service_id
     }
 }
 
+/// Represents an entry in a Scabbard service's state.
 #[derive(Deserialize, Debug)]
 pub struct StateEntry {
     address: String,
@@ -343,10 +389,12 @@ pub struct StateEntry {
 }
 
 impl StateEntry {
+    /// Get the address of the entry.
     pub fn address(&self) -> &str {
         &self.address
     }
 
+    /// Get the value of the entry.
     pub fn value(&self) -> &[u8] {
         &self.value
     }
@@ -364,6 +412,7 @@ impl std::fmt::Display for Link {
     }
 }
 
+/// Used for deserializing error responses from the Scabbard REST API.
 #[derive(Deserialize, Debug)]
 struct ErrorResponse {
     message: String,

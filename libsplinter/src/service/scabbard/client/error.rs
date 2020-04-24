@@ -15,6 +15,7 @@
 use std::error::Error;
 use transact::protos::ProtoConversionError;
 
+/// General error type used by the scabbard client.
 #[derive(Debug)]
 pub struct ScabbardClientError {
     context: String,
