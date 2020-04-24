@@ -21,6 +21,7 @@
 //! [`RwNodeRegistry`]: ../../trait.RwNodeRegistry.html
 
 use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -135,7 +136,17 @@ impl LocalYamlNodeRegistry {
                 Box::new(err),
             )
         })?;
-        std::fs::write(&file_backend.file_path, &output).map_err(|err| {
+
+        let mut file = File::create(&file_backend.file_path).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                &format!(
+                    "Failed to open YAML registry file '{}'",
+                    file_backend.file_path
+                ),
+                Box::new(err),
+            )
+        })?;
+        file.write_all(&output).map_err(|err| {
             NodeRegistryError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML registry file '{}'",
@@ -144,6 +155,17 @@ impl LocalYamlNodeRegistry {
                 Box::new(err),
             )
         })?;
+        // Append newline to file
+        writeln!(file).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                &format!(
+                    "Failed to write to YAML registry file '{}'",
+                    file_backend.file_path
+                ),
+                Box::new(err),
+            )
+        })?;
+
         file_backend.cached_nodes = nodes;
         Ok(())
     }
