@@ -34,7 +34,6 @@ Vue.use(VueNativeSock, `${protocol}://${window.location.host}/ws/subscribe`, {
   store,
   format: 'json',
   reconnection: true,
-  reconnectionAttempts: 30,
   reconnectionDelay: 10,
 });
 
