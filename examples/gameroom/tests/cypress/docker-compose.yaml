@@ -77,6 +77,8 @@ services:
            sleep 1
         done
 
+        gameroom -vv database migrate --database-url postgres://gameroom_test:gameroom_test@db-cypress-test:5432/gameroom_test
+
         gameroomd -vv --database-url postgres://gameroom_test:gameroom_test@db-cypress-test:5432/gameroom_test \
           -b gameroomd-acme:8000 --splinterd-url http://splinterd-node:8085
       "
