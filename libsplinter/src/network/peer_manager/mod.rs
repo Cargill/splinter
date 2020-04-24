@@ -18,6 +18,7 @@ pub mod interconnect;
 mod notification;
 mod peer_map;
 
+use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
@@ -69,6 +70,9 @@ pub(crate) enum PeerManagerRequest {
     ListPeers {
         sender: Sender<Result<Vec<String>, PeerListError>>,
     },
+    ListTemporaryPeers {
+        sender: Sender<Result<Vec<String>, PeerListError>>,
+    },
     ConnectionIds {
         sender: Sender<Result<BiHashMap<String, String>, PeerConnectionIdError>>,
     },
@@ -107,6 +111,12 @@ impl Drop for PeerRef {
             ),
         }
     }
+}
+
+/// An entry of temporary peers, that may connected externally, but not yet requested locally.
+struct TemporaryPeer {
+    endpoint: String,
+    connection_id: String,
 }
 
 /// The PeerManager is in charge of keeping track of peers and their ref count, as well as
@@ -160,6 +170,8 @@ impl PeerManager {
             .name("Peer Manager".into())
             .spawn(move || {
                 let mut peers = PeerMap::new();
+                // a map of identities to temporary peers.
+                let mut temporary_peers = HashMap::new();
                 let mut ref_map = RefMap::new();
                 let mut subscribers = Vec::new();
                 loop {
@@ -169,6 +181,7 @@ impl PeerManager {
                             handle_request(
                                 request,
                                 connector.clone(),
+                                &mut temporary_peers,
                                 &mut peers,
                                 &peer_remover,
                                 &mut ref_map,
@@ -180,6 +193,7 @@ impl PeerManager {
                         Ok(PeerManagerMessage::InternalNotification(notification)) => {
                             handle_notifications(
                                 notification,
+                                &mut temporary_peers,
                                 &mut peers,
                                 connector.clone(),
                                 &mut subscribers,
@@ -263,6 +277,7 @@ impl ShutdownHandle {
 fn handle_request(
     request: PeerManagerRequest,
     connector: Connector,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
@@ -278,6 +293,7 @@ fn handle_request(
                     peer_id,
                     endpoints,
                     connector,
+                    temporary_peers,
                     peers,
                     peer_remover,
                     ref_map,
@@ -289,7 +305,13 @@ fn handle_request(
         }
         PeerManagerRequest::RemovePeer { peer_id, sender } => {
             if sender
-                .send(remove_peer(peer_id, connector, peers, ref_map))
+                .send(remove_peer(
+                    peer_id,
+                    connector,
+                    temporary_peers,
+                    peers,
+                    ref_map,
+                ))
                 .is_err()
             {
                 warn!("connector dropped before receiving result of removing peer");
@@ -298,6 +320,13 @@ fn handle_request(
         PeerManagerRequest::ListPeers { sender } => {
             if sender.send(Ok(peers.peer_ids())).is_err() {
                 warn!("connector dropped before receiving result of list peers");
+            }
+        }
+
+        PeerManagerRequest::ListTemporaryPeers { sender } => {
+            let peer_ids = temporary_peers.keys().map(|s| s.to_owned()).collect();
+            if sender.send(Ok(peer_ids)).is_err() {
+                warn!("connector dropped before receiving result of list temporary peers");
             }
         }
         PeerManagerRequest::ConnectionIds { sender } => {
@@ -312,6 +341,7 @@ fn add_peer(
     peer_id: String,
     endpoints: Vec<String>,
     connector: Connector,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
@@ -323,6 +353,18 @@ fn add_peer(
         let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
         return Ok(peer_ref);
     };
+
+    // if it is a temporary peer, promote it to a fully-referenced peer
+    if let Some(TemporaryPeer {
+        connection_id,
+        endpoint,
+    }) = temporary_peers.remove(&peer_id)
+    {
+        peers.insert(peer_id.clone(), connection_id, endpoints, endpoint);
+
+        let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+        return Ok(peer_ref);
+    }
 
     debug!("Attempting to peer with {}", peer_id);
     let connection_id = format!("{}", Uuid::new_v4());
@@ -372,10 +414,15 @@ fn add_peer(
 fn remove_peer(
     peer_id: String,
     connector: Connector,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     ref_map: &mut RefMap,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
+
+    // remove from the temporary peers, if it is there.
+    temporary_peers.remove(&peer_id);
+
     // remove the reference
     let removed_peer = ref_map.remove_ref(&peer_id);
     if let Some(removed_peer) = removed_peer {
@@ -449,6 +496,7 @@ fn retry_endpoints(
 
 fn handle_notifications(
     notification: ConnectionManagerNotification,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
@@ -517,7 +565,23 @@ fn handle_notifications(
                 }
             }
         }
-        ConnectionManagerNotification::InboundConnection { .. } => (),
+        ConnectionManagerNotification::InboundConnection {
+            endpoint,
+            connection_id,
+            identity,
+        } => {
+            info!(
+                "Received peer connection from {} (remote endpoint: {})",
+                identity, endpoint
+            );
+            temporary_peers.insert(
+                identity,
+                TemporaryPeer {
+                    connection_id,
+                    endpoint,
+                },
+            );
+        }
     }
 }
 
@@ -526,6 +590,7 @@ pub mod tests {
     use super::*;
 
     use std::collections::VecDeque;
+    use std::sync::mpsc;
 
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
@@ -983,6 +1048,67 @@ pub mod tests {
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_and_wait();
+    }
+
+    // Test that the PeerManager can receive incoming peer requests and handle them appropriately.
+    //
+    // 1. Add a connection
+    // 2. Verify that it has been added as a temporary peer
+    // 3. Verify that it can be promoted to a proper peer
+    #[test]
+    fn test_incoming_peer_request() {
+        let mut transport = InprocTransport::default();
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        let mesh = Mesh::new(512, 128);
+        let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_peer")),
+            mesh.get_life_cycle(),
+            mesh.get_sender(),
+            Box::new(transport.clone()),
+            None,
+            None,
+        );
+
+        let connector = cm.start().unwrap();
+
+        let recv_connector = connector.clone();
+        let jh = thread::spawn(move || {
+            let connection = listener.accept().unwrap();
+
+            recv_connector.add_inbound_connection(connection).unwrap();
+        });
+
+        let mut peer_manager = PeerManager::new(connector, None);
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+
+        let _conn = transport.connect("inproc://test").unwrap();
+
+        jh.join().unwrap();
+
+        // The peer is not part of the set of active peers
+        assert!(peer_connector.list_peers().unwrap().is_empty());
+
+        assert_eq!(
+            vec!["test_peer".to_string()],
+            peer_connector.list_unreferenced_peers().unwrap()
+        );
+
+        let peer_ref = peer_connector
+            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .expect("Unable to add peer");
+
+        assert_eq!(peer_ref.peer_id, "test_peer");
+
+        let peer_list = peer_connector
+            .list_peers()
+            .expect("Unable to get peer list");
+
+        assert_eq!(peer_list, vec!["test_peer".to_string()]);
+
+        peer_manager.shutdown_and_wait();
+        cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     struct NoopAuthorizer {

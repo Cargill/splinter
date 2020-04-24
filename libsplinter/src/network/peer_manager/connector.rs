@@ -94,6 +94,29 @@ impl PeerManagerConnector {
             .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
     }
 
+    /// Request the list of unreferenced peers.
+    ///
+    /// Unreferenced peers are those peers that have successfully connected from a remote node, but
+    /// have not yet be referenced by a circuit.  These peers are available to be promoted to fully
+    /// refrerenced peers.
+    pub fn list_unreferenced_peers(&self) -> Result<Vec<String>, PeerListError> {
+        let (sender, recv) = channel();
+        let message =
+            PeerManagerMessage::Request(PeerManagerRequest::ListTemporaryPeers { sender });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerListError::InternalError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
+    }
+
     /// Request the map of currently connected peers to connection id
     ///
     /// Returns a map of peer id to connection id
