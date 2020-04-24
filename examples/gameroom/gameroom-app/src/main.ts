@@ -34,7 +34,7 @@ Vue.use(VueNativeSock, `${protocol}://${window.location.host}/ws/subscribe`, {
   store,
   format: 'json',
   reconnection: true,
-  reconnectionDelay: 10,
+  reconnectionDelay: 5000,
 });
 
 // When the page loads, the element with this directive gains focus.
