@@ -58,10 +58,9 @@ use splinter::network::{sender, sender::NetworkMessageSender};
 use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
 use splinter::node_registry::{
     rest_api::{make_nodes_identity_resource, make_nodes_resource},
-    LocalYamlNodeRegistry, NodeRegistryReader, RwNodeRegistry, UnifiedNodeRegistry,
+    LocalYamlNodeRegistry, NodeRegistryReader, RemoteYamlNodeRegistry, RemoteYamlShutdownHandle,
+    RwNodeRegistry, UnifiedNodeRegistry,
 };
-#[cfg(feature = "registry-remote")]
-use splinter::node_registry::{RemoteYamlNodeRegistry, RemoteYamlShutdownHandle};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::protos::authorization::AuthorizationMessageType;
 use splinter::protos::circuit::CircuitMessageType;
@@ -122,9 +121,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registries: Vec<String>,
-    #[cfg(feature = "registry-remote")]
     registry_auto_refresh_interval: u64,
-    #[cfg(feature = "registry-remote")]
     registry_forced_refresh_interval: u64,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
@@ -430,9 +427,7 @@ impl SplinterDaemon {
         let (node_registry, registry_shutdown) = create_node_registry(
             &self.node_registry_directory,
             &self.registries,
-            #[cfg(feature = "registry-remote")]
             self.registry_auto_refresh_interval,
-            #[cfg(feature = "registry-remote")]
             self.registry_forced_refresh_interval,
         )?;
 
@@ -734,9 +729,7 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registries: Vec<String>,
-    #[cfg(feature = "registry-remote")]
     registry_auto_refresh_interval: Option<u64>,
-    #[cfg(feature = "registry-remote")]
     registry_forced_refresh_interval: Option<u64>,
     storage_type: Option<String>,
     heartbeat_interval: Option<u64>,
@@ -817,13 +810,11 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    #[cfg(feature = "registry-remote")]
     pub fn with_registry_auto_refresh_interval(mut self, value: u64) -> Self {
         self.registry_auto_refresh_interval = Some(value);
         self
     }
 
-    #[cfg(feature = "registry-remote")]
     pub fn with_registry_forced_refresh_interval(mut self, value: u64) -> Self {
         self.registry_forced_refresh_interval = Some(value);
         self
@@ -911,7 +902,6 @@ impl SplinterDaemonBuilder {
             }
         }
 
-        #[cfg(feature = "registry-remote")]
         let registry_auto_refresh_interval =
             self.registry_auto_refresh_interval.ok_or_else(|| {
                 CreateError::MissingRequiredField(
@@ -919,7 +909,6 @@ impl SplinterDaemonBuilder {
                 )
             })?;
 
-        #[cfg(feature = "registry-remote")]
         let registry_forced_refresh_interval =
             self.registry_forced_refresh_interval.ok_or_else(|| {
                 CreateError::MissingRequiredField(
@@ -946,9 +935,7 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "biome")]
             biome_enabled: self.biome_enabled,
             registries: self.registries,
-            #[cfg(feature = "registry-remote")]
             registry_auto_refresh_interval,
-            #[cfg(feature = "registry-remote")]
             registry_forced_refresh_interval,
             key_registry_location,
             node_registry_directory,
@@ -1023,11 +1010,9 @@ fn set_up_circuit_dispatcher(
 fn create_node_registry(
     node_registry_directory: &str,
     registries: &[String],
-    #[cfg(feature = "registry-remote")] auto_refresh_interval: u64,
-    #[cfg(feature = "registry-remote")] forced_refresh_interval: u64,
+    auto_refresh_interval: u64,
+    forced_refresh_interval: u64,
 ) -> Result<(Box<dyn RwNodeRegistry>, RegistryShutdownHandle), StartError> {
-    // This only needs to be mutable for the `registry-remote` feature
-    #[allow(unused_mut)]
     let mut registry_shutdown_handle = RegistryShutdownHandle::new();
 
     let local_registry_path = Path::new(node_registry_directory)
@@ -1071,49 +1056,38 @@ fn create_node_registry(
                     }
                 }
             } else if scheme == "http" || scheme == "https" {
-                #[cfg(feature = "registry-remote")]
-                {
-                    debug!(
-                        "Attempting to add remote read-only node registry from URL: {}",
-                        registry
-                    );
-                    let auto_refresh_interval = if auto_refresh_interval != 0 {
-                        Some(Duration::from_secs(auto_refresh_interval))
-                    } else {
-                        None
-                    };
-                    let forced_refresh_interval = if forced_refresh_interval != 0 {
-                        Some(Duration::from_secs(forced_refresh_interval))
-                    } else {
-                        None
-                    };
-                    match RemoteYamlNodeRegistry::new(
-                        registry,
-                        node_registry_directory,
-                        auto_refresh_interval,
-                        forced_refresh_interval,
-                    ) {
-                        Ok(registry) => {
-                            registry_shutdown_handle
-                                .add_remote_yaml_shutdown_handle(registry.shutdown_handle());
-                            Some(Box::new(registry) as Box<dyn NodeRegistryReader>)
-                        }
-                        Err(err) => {
-                            error!(
-                                "Failed to add read-only RemoteYamlNodeRegistry '{}': {}",
-                                registry, err
-                            );
-                            None
-                        }
-                    }
-                }
-                #[cfg(not(feature = "registry-remote"))]
-                {
-                    error!(
-                        "The 'registry-remote' feature must be enabled to use remote YAML \
-                         registries"
-                    );
+                debug!(
+                    "Attempting to add remote read-only node registry from URL: {}",
+                    registry
+                );
+                let auto_refresh_interval = if auto_refresh_interval != 0 {
+                    Some(Duration::from_secs(auto_refresh_interval))
+                } else {
                     None
+                };
+                let forced_refresh_interval = if forced_refresh_interval != 0 {
+                    Some(Duration::from_secs(forced_refresh_interval))
+                } else {
+                    None
+                };
+                match RemoteYamlNodeRegistry::new(
+                    registry,
+                    node_registry_directory,
+                    auto_refresh_interval,
+                    forced_refresh_interval,
+                ) {
+                    Ok(registry) => {
+                        registry_shutdown_handle
+                            .add_remote_yaml_shutdown_handle(registry.shutdown_handle());
+                        Some(Box::new(registry) as Box<dyn NodeRegistryReader>)
+                    }
+                    Err(err) => {
+                        error!(
+                            "Failed to add read-only RemoteYamlNodeRegistry '{}': {}",
+                            registry, err
+                        );
+                        None
+                    }
                 }
             } else {
                 error!(
@@ -1144,7 +1118,6 @@ fn parse_registry_arg(registry: &str) -> Result<(&str, &str), &str> {
 
 #[derive(Default)]
 struct RegistryShutdownHandle {
-    #[cfg(feature = "registry-remote")]
     remote_yaml_shutdown_handles: Vec<RemoteYamlShutdownHandle>,
 }
 
@@ -1153,18 +1126,14 @@ impl RegistryShutdownHandle {
         Self::default()
     }
 
-    #[cfg(feature = "registry-remote")]
     fn add_remote_yaml_shutdown_handle(&mut self, handle: RemoteYamlShutdownHandle) {
         self.remote_yaml_shutdown_handles.push(handle);
     }
 
     fn shutdown(&self) {
-        #[cfg(feature = "registry-remote")]
-        {
-            self.remote_yaml_shutdown_handles
-                .iter()
-                .for_each(|handle| handle.shutdown());
-        }
+        self.remote_yaml_shutdown_handles
+            .iter()
+            .for_each(|handle| handle.shutdown());
     }
 }
 

@@ -40,9 +40,17 @@ openssl = { version = "0.10", optional = true }
 protobuf = "2"
 serde = "1.0.80"
 serde_derive = "1.0.80"
-splinter = { path = "../libsplinter", features = ["rest-api", "rest-api-actix", "sawtooth-signing-compat"] }
 tempdir = "0.3"
 toml = "0.5"
+
+[dependencies.splinter]
+path = "../libsplinter"
+features = [
+  "registry-remote",
+  "rest-api",
+  "rest-api-actix",
+  "sawtooth-signing-compat",
+]
 
 [features]
 default = [
@@ -65,7 +73,6 @@ experimental = [
     "biome-credentials",
     "biome-key-management",
     "health",
-    "registry-remote",
     "scabbard-get-state",
     "service-arg-validation",
     "ws-transport",
@@ -79,7 +86,6 @@ config-command-line = []
 config-env-var = []
 config-toml = []
 database = ["splinter/postgres"]
-registry-remote = ["splinter/registry-remote"]
 rest-api-cors = ["splinter/rest-api-cors"]
 scabbard-get-state = ["splinter/scabbard-get-state"]
 service-arg-validation = ["splinter/service-arg-validation"]

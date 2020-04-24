@@ -72,6 +72,14 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .values_of("registries")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
+            .with_registry_auto_refresh_interval(parse_value(
+                &self.matches,
+                "registry_auto_refresh_interval",
+            )?)
+            .with_registry_forced_refresh_interval(parse_value(
+                &self.matches,
+                "registry_forced_refresh_interval",
+            )?)
             .with_heartbeat_interval(parse_value(&self.matches, "heartbeat_interval")?)
             .with_tls_insecure(if self.matches.is_present("tls_insecure") {
                 Some(true)
@@ -98,19 +106,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         {
             partial_config =
                 partial_config.with_database(self.matches.value_of("database").map(String::from))
-        }
-
-        #[cfg(feature = "registry-remote")]
-        {
-            partial_config = partial_config
-                .with_registry_auto_refresh_interval(parse_value(
-                    &self.matches,
-                    "registry_auto_refresh_interval",
-                )?)
-                .with_registry_forced_refresh_interval(parse_value(
-                    &self.matches,
-                    "registry_forced_refresh_interval",
-                )?)
         }
 
         #[cfg(feature = "rest-api-cors")]
@@ -187,9 +182,7 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        #[cfg(feature = "registry-remote")]
         assert_eq!(config.registry_auto_refresh_interval(), None);
-        #[cfg(feature = "registry-remote")]
         assert_eq!(config.registry_forced_refresh_interval(), None);
         assert_eq!(config.heartbeat_interval(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);

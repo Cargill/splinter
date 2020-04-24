@@ -22,9 +22,7 @@ const CLIENT_KEY: &str = "private/client.key";
 const SERVER_CERT: &str = "server.crt";
 const SERVER_KEY: &str = "private/server.key";
 const CA_PEM: &str = "ca.pem";
-#[cfg(feature = "registry-remote")]
 const REGISTRY_AUTO_REFRESH_DEFAULT: u64 = 600; // 600 seconds = 10 minutes
-#[cfg(feature = "registry-remote")]
 const REGISTRY_FORCED_REFRESH_DEFAULT: u64 = 10; // 10 seconds
 const HEARTBEAT_DEFAULT: u64 = 30;
 const DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
@@ -55,6 +53,8 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_peers(Some(vec![]))
             .with_bind(Some(String::from("127.0.0.1:8080")))
             .with_registries(Some(vec![]))
+            .with_registry_auto_refresh_interval(Some(REGISTRY_AUTO_REFRESH_DEFAULT))
+            .with_registry_forced_refresh_interval(Some(REGISTRY_FORCED_REFRESH_DEFAULT))
             .with_heartbeat_interval(Some(HEARTBEAT_DEFAULT))
             .with_admin_service_coordinator_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
@@ -69,13 +69,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         #[cfg(feature = "database")]
         {
             partial_config = partial_config.with_database(Some(String::from("127.0.0.1:5432")));
-        }
-
-        #[cfg(feature = "registry-remote")]
-        {
-            partial_config = partial_config
-                .with_registry_auto_refresh_interval(Some(REGISTRY_AUTO_REFRESH_DEFAULT))
-                .with_registry_forced_refresh_interval(Some(REGISTRY_FORCED_REFRESH_DEFAULT));
         }
 
         Ok(partial_config)
@@ -112,12 +105,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), Some(String::from("127.0.0.1:5432")));
         assert_eq!(config.registries(), Some(vec![]));
-        #[cfg(feature = "registry-remote")]
         assert_eq!(
             config.registry_auto_refresh_interval(),
             Some(REGISTRY_AUTO_REFRESH_DEFAULT)
         );
-        #[cfg(feature = "registry-remote")]
         assert_eq!(
             config.registry_forced_refresh_interval(),
             Some(REGISTRY_FORCED_REFRESH_DEFAULT)

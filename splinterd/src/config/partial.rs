@@ -47,9 +47,7 @@ pub struct PartialConfig {
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
-    #[cfg(feature = "registry-remote")]
     registry_auto_refresh_interval: Option<u64>,
-    #[cfg(feature = "registry-remote")]
     registry_forced_refresh_interval: Option<u64>,
     heartbeat_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
@@ -84,9 +82,7 @@ impl PartialConfig {
             #[cfg(feature = "database")]
             database: None,
             registries: None,
-            #[cfg(feature = "registry-remote")]
             registry_auto_refresh_interval: None,
-            #[cfg(feature = "registry-remote")]
             registry_forced_refresh_interval: None,
             heartbeat_interval: None,
             admin_service_coordinator_timeout: None,
@@ -169,12 +165,10 @@ impl PartialConfig {
         self.registries.clone()
     }
 
-    #[cfg(feature = "registry-remote")]
     pub fn registry_auto_refresh_interval(&self) -> Option<u64> {
         self.registry_auto_refresh_interval
     }
 
-    #[cfg(feature = "registry-remote")]
     pub fn registry_forced_refresh_interval(&self) -> Option<u64> {
         self.registry_forced_refresh_interval
     }
@@ -404,7 +398,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "registry-remote")]
     /// Adds a `registry_auto_refresh_interval` value to the PartialConfig object.
     ///
     /// # Arguments
@@ -420,7 +413,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "registry-remote")]
     /// Adds a `registry_forced_refresh_interval` value to the PartialConfig object.
     ///
     /// # Arguments
