@@ -45,7 +45,7 @@ impl ScabbardClient {
         service_id: &ServiceId,
         batches: Vec<Batch>,
         wait: Option<u64>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ScabbardClientError> {
         let batch_link = submit_batches(
             &self.url,
             service_id.circuit(),
@@ -59,12 +59,15 @@ impl ScabbardClient {
         }
     }
 
+    /// Get the value at the given `address` in state for the Scabbard instance with the given
+    /// `service_id`.
     pub fn get_state_at_address(
         &self,
         service_id: &ServiceId,
         address: &str,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        parse_hex(address).map_err(|err| Error::new_with_source("invalid address", err.into()))?;
+    ) -> Result<Option<Vec<u8>>, ScabbardClientError> {
+        parse_hex(address)
+            .map_err(|err| ScabbardClientError::new_with_source("invalid address", err.into()))?;
 
         let url = Url::parse(&format!(
             "{}/{}/{}/{}/state/{}",
@@ -74,26 +77,32 @@ impl ScabbardClient {
             service_id.service_id(),
             address
         ))
-        .map_err(|err| Error::new_with_source("invalid URL", err.into()))?;
+        .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
 
         let request = Client::new().get(url);
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| Error::new_with_source("request failed", err.into()))?;
+            .map_err(|err| ScabbardClientError::new_with_source("request failed", err.into()))?;
 
         if response.status().is_success() {
             Ok(Some(response.json().map_err(|err| {
-                Error::new_with_source("failed to deserialize response body", err.into())
+                ScabbardClientError::new_with_source(
+                    "failed to deserialize response body",
+                    err.into(),
+                )
             })?))
         } else if response.status().as_u16() == 404 {
             Ok(None)
         } else {
             let status = response.status();
             let msg: ErrorResponse = response.json().map_err(|err| {
-                Error::new_with_source("failed to deserialize error response body", err.into())
+                ScabbardClientError::new_with_source(
+                    "failed to deserialize error response body",
+                    err.into(),
+                )
             })?;
-            Err(Error::new(&format!(
+            Err(ScabbardClientError::new(&format!(
                 "failed to get state at address: {}: {}",
                 status, msg
             )))
@@ -104,7 +113,7 @@ impl ScabbardClient {
         &self,
         service_id: &ServiceId,
         prefix: Option<&str>,
-    ) -> Result<Vec<StateEntry>, Error> {
+    ) -> Result<Vec<StateEntry>, ScabbardClientError> {
         let mut url = Url::parse(&format!(
             "{}/{}/{}/{}/state",
             &self.url,
@@ -112,12 +121,15 @@ impl ScabbardClient {
             service_id.circuit(),
             service_id.service_id()
         ))
-        .map_err(|err| Error::new_with_source("invalid URL", err.into()))?;
+        .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
         if let Some(prefix) = prefix {
-            parse_hex(prefix)
-                .map_err(|err| Error::new_with_source("invalid prefix", err.into()))?;
+            parse_hex(prefix).map_err(|err| {
+                ScabbardClientError::new_with_source("invalid prefix", err.into())
+            })?;
             if prefix.len() > 70 {
-                return Err(Error::new("prefix must be less than 70 characters"));
+                return Err(ScabbardClientError::new(
+                    "prefix must be less than 70 characters",
+                ));
             }
             url.set_query(Some(&format!("prefix={}", prefix)))
         }
@@ -126,18 +138,24 @@ impl ScabbardClient {
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
-            .map_err(|err| Error::new_with_source("request failed", err.into()))?;
+            .map_err(|err| ScabbardClientError::new_with_source("request failed", err.into()))?;
 
         if response.status().is_success() {
             response.json().map_err(|err| {
-                Error::new_with_source("failed to deserialize response body", err.into())
+                ScabbardClientError::new_with_source(
+                    "failed to deserialize response body",
+                    err.into(),
+                )
             })
         } else {
             let status = response.status();
             let msg: ErrorResponse = response.json().map_err(|err| {
-                Error::new_with_source("failed to deserialize error response body", err.into())
+                ScabbardClientError::new_with_source(
+                    "failed to deserialize error response body",
+                    err.into(),
+                )
             })?;
-            Err(Error::new(&format!(
+            Err(ScabbardClientError::new(&format!(
                 "failed to get state with prefix: {}: {}",
                 status, msg
             )))
@@ -160,23 +178,29 @@ impl ServiceId {
     }
 
     /// Parse a fully-qualified service ID string ("circuit::service_id").
-    pub fn from_string(full_id: &str) -> Result<Self, Error> {
+    pub fn from_string(full_id: &str) -> Result<Self, ScabbardClientError> {
         let ids = full_id.splitn(2, "::").collect::<Vec<_>>();
 
         let circuit = (*ids
             .get(0)
-            .ok_or_else(|| Error::new("service ID invalid: cannot be empty"))?)
+            .ok_or_else(|| ScabbardClientError::new("service ID invalid: cannot be empty"))?)
         .to_string();
         if circuit.is_empty() {
-            return Err(Error::new("service ID invalid: circuit ID cannot be empty"));
+            return Err(ScabbardClientError::new(
+                "service ID invalid: circuit ID cannot be empty",
+            ));
         }
 
         let service_id = (*ids.get(1).ok_or_else(|| {
-            Error::new("service ID invalid: must be of the form 'circuit_id::service_id'")
+            ScabbardClientError::new(
+                "service ID invalid: must be of the form 'circuit_id::service_id'",
+            )
         })?)
         .to_string();
         if service_id.is_empty() {
-            return Err(Error::new("service ID invalid: service ID cannot be empty"));
+            return Err(ScabbardClientError::new(
+                "service ID invalid: service ID cannot be empty",
+            ));
         }
 
         Ok(Self {

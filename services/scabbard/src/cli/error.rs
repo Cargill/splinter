@@ -24,7 +24,7 @@ use sabre_sdk::{
     protos::ProtoConversionError,
 };
 use sawtooth_sdk::signing::Error as SigningError;
-use splinter::service::scabbard::client::Error as ClientError;
+use splinter::service::scabbard::client::ScabbardClientError;
 use transact::{
     contract::archive::Error as ContractArchiveError,
     protocol::{batch::BatchBuildError, transaction::TransactionBuildError},
@@ -114,8 +114,8 @@ impl From<SigningError> for CliError {
     }
 }
 
-impl From<ClientError> for CliError {
-    fn from(err: ClientError) -> Self {
+impl From<ScabbardClientError> for CliError {
+    fn from(err: ScabbardClientError) -> Self {
         Self::action_error_with_source("scabbard client encountered an error", err.into())
     }
 }

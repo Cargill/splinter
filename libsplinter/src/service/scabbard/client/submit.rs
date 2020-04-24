@@ -29,14 +29,14 @@ use transact::{protocol::batch::Batch, protos::IntoBytes};
 use crate::protocol::SCABBARD_PROTOCOL_VERSION;
 use crate::service::scabbard::{BatchInfo, BatchStatus, SERVICE_TYPE};
 
-use super::Error;
+use super::ScabbardClientError;
 
 pub fn submit_batches(
     base_url: &str,
     circuit_id: &str,
     service_id: &str,
     batches: Vec<Batch>,
-) -> Result<String, Error> {
+) -> Result<String, ScabbardClientError> {
     let url = parse_http_url(&format!(
         "{}/{}/{}/{}/batches",
         base_url, SERVICE_TYPE, circuit_id, service_id
@@ -49,13 +49,17 @@ pub fn submit_batches(
     let response = perform_request(request)?;
 
     let batch_link: Link = response.json().map_err(|err| {
-        Error::new_with_source("failed to parse response as batch link", err.into())
+        ScabbardClientError::new_with_source("failed to parse response as batch link", err.into())
     })?;
 
     Ok(batch_link.link)
 }
 
-pub fn wait_for_batches(base_url: &str, batch_link: &str, wait: u64) -> Result<(), Error> {
+pub fn wait_for_batches(
+    base_url: &str,
+    batch_link: &str,
+    wait: u64,
+) -> Result<(), ScabbardClientError> {
     let url = if batch_link.starts_with("http") || batch_link.starts_with("https") {
         parse_http_url(batch_link)
     } else {
@@ -64,7 +68,7 @@ pub fn wait_for_batches(base_url: &str, batch_link: &str, wait: u64) -> Result<(
 
     let end_time = Instant::now()
         .checked_add(Duration::from_secs(wait))
-        .ok_or_else(|| Error::new("failed to schedule timeout"))?;
+        .ok_or_else(|| ScabbardClientError::new("failed to schedule timeout"))?;
 
     loop {
         let time_left = Duration::from_secs(wait);
@@ -83,7 +87,10 @@ pub fn wait_for_batches(base_url: &str, batch_link: &str, wait: u64) -> Result<(
         let response = perform_request(request)?;
 
         let batch_infos: Vec<BatchInfo> = response.json().map_err(|err| {
-            Error::new_with_source("failed to parse response as batch statuses", err.into())
+            ScabbardClientError::new_with_source(
+                "failed to parse response as batch statuses",
+                err.into(),
+            )
         })?;
 
         let any_pending_batches = batch_infos.iter().any(|info| {
@@ -98,7 +105,7 @@ pub fn wait_for_batches(base_url: &str, batch_link: &str, wait: u64) -> Result<(
             if Instant::now() < end_time {
                 continue;
             } else {
-                return Err(Error::new(&format!(
+                return Err(ScabbardClientError::new(&format!(
                     "one or more batches are still pending after timeout: {:?}",
                     batch_infos
                 )));
@@ -113,7 +120,7 @@ pub fn wait_for_batches(base_url: &str, batch_link: &str, wait: u64) -> Result<(
             });
 
             if any_invalid_batches {
-                return Err(Error::new(&format!(
+                return Err(ScabbardClientError::new(&format!(
                     "one or more batches were invalid: {:?}",
                     batch_infos
                 )));
@@ -124,10 +131,11 @@ pub fn wait_for_batches(base_url: &str, batch_link: &str, wait: u64) -> Result<(
     }
 }
 
-fn parse_http_url(url: &str) -> Result<Url, Error> {
-    let url = Url::parse(url).map_err(|err| Error::new_with_source("invalid URL", err.into()))?;
+fn parse_http_url(url: &str) -> Result<Url, ScabbardClientError> {
+    let url = Url::parse(url)
+        .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
     if url.scheme() != "http" {
-        Err(Error::new(&format!(
+        Err(ScabbardClientError::new(&format!(
             "unsupported scheme ({}) in URL: {}",
             url.scheme(),
             url
@@ -137,13 +145,15 @@ fn parse_http_url(url: &str) -> Result<Url, Error> {
     }
 }
 
-fn perform_request(request: RequestBuilder) -> Result<Response, Error> {
+fn perform_request(request: RequestBuilder) -> Result<Response, ScabbardClientError> {
     request
         .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
         .send()
-        .map_err(|err| Error::new_with_source("request failed", err.into()))?
+        .map_err(|err| ScabbardClientError::new_with_source("request failed", err.into()))?
         .error_for_status()
-        .map_err(|err| Error::new_with_source("received error status code", err.into()))
+        .map_err(|err| {
+            ScabbardClientError::new_with_source("received error status code", err.into())
+        })
 }
 
 #[derive(Deserialize, Debug)]
