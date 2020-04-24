@@ -57,7 +57,7 @@ use splinter::network::peer::PeerConnector;
 use splinter::network::{sender, sender::NetworkMessageSender};
 use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
 use splinter::node_registry::{
-    rest_api::{make_nodes_identity_resource, make_nodes_resource},
+    rest_api::actix::{nodes::make_nodes_resource, nodes_identity::make_nodes_identity_resource},
     LocalYamlNodeRegistry, NodeRegistryReader, RemoteYamlNodeRegistry, RemoteYamlShutdownHandle,
     RwNodeRegistry, UnifiedNodeRegistry,
 };
