@@ -13,20 +13,21 @@
 // limitations under the License.
 
 mod error;
-mod submit;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use reqwest::{blocking::Client, Url};
-use transact::protocol::batch::Batch;
+use reqwest::{
+    blocking::{Client, RequestBuilder, Response},
+    Url,
+};
+use transact::{protocol::batch::Batch, protos::IntoBytes};
 
 use crate::hex::parse_hex;
 use crate::protocol::SCABBARD_PROTOCOL_VERSION;
 
-use super::SERVICE_TYPE;
+use super::{BatchInfo, BatchStatus, SERVICE_TYPE};
 
-pub use error::Error;
-use submit::{submit_batches, wait_for_batches};
+pub use error::ScabbardClientError;
 
 /// A client that can be used to submit transactions to scabbard services on a Splinter node.
 pub struct ScabbardClient {
@@ -48,14 +49,29 @@ impl ScabbardClient {
         batches: Vec<Batch>,
         wait: Option<Duration>,
     ) -> Result<(), ScabbardClientError> {
-        let batch_link = submit_batches(
-            &self.url,
+        let url = parse_http_url(&format!(
+            "{}/{}/{}/{}/batches",
+            self.url,
+            SERVICE_TYPE,
             service_id.circuit(),
-            service_id.service_id(),
-            batches,
-        )?;
+            service_id.service_id()
+        ))?;
+
+        let body = batches.into_bytes()?;
+
+        debug!("Submitting batches via {}", url);
+        let request = Client::new().post(url).body(body);
+        let response = perform_request(request)?;
+
+        let batch_link: Link = response.json().map_err(|err| {
+            ScabbardClientError::new_with_source(
+                "failed to parse response as batch link",
+                err.into(),
+            )
+        })?;
+
         if let Some(wait) = wait {
-            wait_for_batches(&self.url, &batch_link, wait)
+            wait_for_batches(&self.url, &batch_link.link, wait)
         } else {
             Ok(())
         }
@@ -165,6 +181,106 @@ impl ScabbardClient {
     }
 }
 
+fn wait_for_batches(
+    base_url: &str,
+    batch_link: &str,
+    wait: Duration,
+) -> Result<(), ScabbardClientError> {
+    let url = if batch_link.starts_with("http") || batch_link.starts_with("https") {
+        parse_http_url(batch_link)
+    } else {
+        parse_http_url(&format!("{}{}", base_url, batch_link))
+    }?;
+
+    let end_time = Instant::now()
+        .checked_add(wait)
+        .ok_or_else(|| ScabbardClientError::new("failed to schedule timeout"))?;
+
+    loop {
+        let wait_query = format!("wait={}", wait.as_secs());
+        let query_string = if let Some(existing_query) = url.query() {
+            format!("{}&{}", existing_query, wait_query)
+        } else {
+            wait_query
+        };
+
+        let mut url_with_query = url.clone();
+        url_with_query.set_query(Some(&query_string));
+
+        debug!("Checking batches via {}", url);
+        let request = Client::new().get(url.clone());
+        let response = perform_request(request)?;
+
+        let batch_infos: Vec<BatchInfo> = response.json().map_err(|err| {
+            ScabbardClientError::new_with_source(
+                "failed to parse response as batch statuses",
+                err.into(),
+            )
+        })?;
+
+        let any_pending_batches = batch_infos.iter().any(|info| {
+            match info.status {
+                // `Valid` is still technically pending until it's `Committed`
+                BatchStatus::Pending | BatchStatus::Valid(_) => true,
+                _ => false,
+            }
+        });
+
+        if any_pending_batches {
+            if Instant::now() < end_time {
+                continue;
+            } else {
+                return Err(ScabbardClientError::new(&format!(
+                    "one or more batches are still pending after timeout: {:?}",
+                    batch_infos
+                )));
+            }
+        } else {
+            let any_invalid_batches = batch_infos.iter().any(|info| {
+                if let BatchStatus::Invalid(_) = info.status {
+                    true
+                } else {
+                    false
+                }
+            });
+
+            if any_invalid_batches {
+                return Err(ScabbardClientError::new(&format!(
+                    "one or more batches were invalid: {:?}",
+                    batch_infos
+                )));
+            } else {
+                return Ok(());
+            }
+        }
+    }
+}
+
+fn parse_http_url(url: &str) -> Result<Url, ScabbardClientError> {
+    let url = Url::parse(url)
+        .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
+    if url.scheme() != "http" {
+        Err(ScabbardClientError::new(&format!(
+            "unsupported scheme ({}) in URL: {}",
+            url.scheme(),
+            url
+        )))
+    } else {
+        Ok(url)
+    }
+}
+
+fn perform_request(request: RequestBuilder) -> Result<Response, ScabbardClientError> {
+    request
+        .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
+        .send()
+        .map_err(|err| ScabbardClientError::new_with_source("request failed", err.into()))?
+        .error_for_status()
+        .map_err(|err| {
+            ScabbardClientError::new_with_source("received error status code", err.into())
+        })
+}
+
 /// A fully-qualified service ID (circuit and service ID)
 pub struct ServiceId {
     circuit: String,
@@ -233,6 +349,18 @@ impl StateEntry {
 
     pub fn value(&self) -> &[u8] {
         &self.value
+    }
+}
+
+/// Used for deserializing the batch link provided by the Scabbard REST API.
+#[derive(Deserialize, Debug)]
+struct Link {
+    link: String,
+}
+
+impl std::fmt::Display for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{{\"link\": {}}}", self.link)
     }
 }
 
