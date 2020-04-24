@@ -347,7 +347,7 @@ fn add_peer(
     // If new, try to create a connection
     for endpoint in endpoints.iter() {
         match connector.request_connection(&endpoint, &connection_id) {
-            Ok(()) => {
+            Ok(_identity) => {
                 debug!("Peer {} connected via {}", peer_id, endpoint);
                 peers.insert(
                     peer_id.clone(),
@@ -450,7 +450,7 @@ fn retry_endpoints(
     debug!("Trying to find active endpoint for {}", peer_metadata.id);
     for endpoint in peer_metadata.endpoints.iter() {
         match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
-            Ok(()) => {
+            Ok(_identity) => {
                 debug!("Peered with {}: {}", peer_metadata.id, endpoint);
                 if endpoint != &peer_metadata.active_endpoint {
                     // Remove old active endpoint from peer_manager

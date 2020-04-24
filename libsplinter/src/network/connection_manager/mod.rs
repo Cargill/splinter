@@ -127,7 +127,7 @@ enum CmRequest {
     RequestOutboundConnection {
         endpoint: String,
         connection_id: String,
-        sender: Sender<Result<(), ConnectionManagerError>>,
+        sender: Sender<Result<String, ConnectionManagerError>>,
     },
     RemoveConnection {
         endpoint: String,
@@ -151,14 +151,16 @@ enum CmRequest {
 }
 
 enum AuthResult {
-    Outbound(AuthResultPayload),
-    Inbound(AuthResultPayload),
-}
-
-struct AuthResultPayload {
-    endpoint: String,
-    sender: Sender<Result<(), ConnectionManagerError>>,
-    auth_result: AuthorizationResult,
+    Outbound {
+        endpoint: String,
+        sender: Sender<Result<String, ConnectionManagerError>>,
+        auth_result: AuthorizationResult,
+    },
+    Inbound {
+        endpoint: String,
+        sender: Sender<Result<(), ConnectionManagerError>>,
+        auth_result: AuthorizationResult,
+    },
 }
 
 pub struct ConnectionManager<T: 'static, U: 'static>
@@ -301,7 +303,8 @@ impl Connector {
     /// Request a connection to the given endpoint.
     ///
     /// This operation is idempotent: if a connection to that endpoint already exists, a new
-    /// connection is not created.
+    /// connection is not created. On successful connection, the authorized identity of the
+    /// connection is returned.
     ///
     /// # Errors
     ///
@@ -309,14 +312,14 @@ impl Connector {
     pub fn request_connection(
         &self,
         endpoint: &str,
-        id: &str,
-    ) -> Result<(), ConnectionManagerError> {
+        connection_id: &str,
+    ) -> Result<String, ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
             .send(CmMessage::Request(CmRequest::RequestOutboundConnection {
                 sender,
                 endpoint: endpoint.to_string(),
-                connection_id: id.to_string(),
+                connection_id: connection_id.into(),
             }))
             .map_err(|_| {
                 ConnectionManagerError::SendMessageError(
@@ -506,54 +509,42 @@ impl ShutdownHandle {
 }
 
 #[derive(Clone, Debug)]
-enum ConnectionMetadata {
-    Outbound {
-        id: String,
-        outbound: OutboundConnection,
-    },
-
-    Inbound {
-        id: String,
-        inbound: InboundConnection,
-    },
+struct ConnectionMetadata {
+    connection_id: String,
+    endpoint: String,
+    identity: String,
+    extended_metadata: ConnectionMetadataExt,
 }
 
 impl ConnectionMetadata {
     fn is_outbound(&self) -> bool {
-        match self {
-            ConnectionMetadata::Outbound { .. } => true,
-            _ => false,
-        }
+        matches!(self.extended_metadata, ConnectionMetadataExt::Outbound { .. })
     }
 
-    fn id(&self) -> &str {
-        match self {
-            ConnectionMetadata::Outbound { id, .. } => id,
-            ConnectionMetadata::Inbound { id, .. } => id,
-        }
+    fn connection_id(&self) -> &str {
+        &self.connection_id
     }
 
     fn endpoint(&self) -> &str {
-        match self {
-            ConnectionMetadata::Outbound { outbound, .. } => &outbound.endpoint,
-            ConnectionMetadata::Inbound { inbound, .. } => &inbound.endpoint,
-        }
+        &self.endpoint
+    }
+
+    fn identity(&self) -> &str {
+        &self.identity
     }
 }
 
 #[derive(Clone, Debug)]
-struct OutboundConnection {
-    endpoint: String,
-    reconnecting: bool,
-    retry_frequency: u64,
-    last_connection_attempt: Instant,
-    reconnection_attempts: u64,
-}
-
-#[derive(Clone, Debug)]
-struct InboundConnection {
-    endpoint: String,
-    disconnected: bool,
+enum ConnectionMetadataExt {
+    Outbound {
+        reconnecting: bool,
+        retry_frequency: u64,
+        last_connection_attempt: Instant,
+        reconnection_attempts: u64,
+    },
+    Inbound {
+        disconnected: bool,
+    },
 }
 
 struct ConnectionState<T, U>
@@ -600,8 +591,15 @@ where
         let id = Uuid::new_v4().to_string();
 
         if endpoint.contains("inproc") {
+            let inbound_connection_identity = format!("connection-{}", Uuid::new_v4());
             if reply_sender
-                .send(self.complete_inbound_connection(endpoint, id, connection, subscribers))
+                .send(self.complete_inbound_connection(
+                    endpoint,
+                    id,
+                    connection,
+                    inbound_connection_identity,
+                    subscribers,
+                ))
                 .is_err()
             {
                 warn!("connector dropped before receiving result of add connection");
@@ -615,13 +613,11 @@ where
                 connection,
                 Box::new(move |auth_result| {
                     internal_sender
-                        .send(CmMessage::AuthResult(AuthResult::Inbound(
-                            AuthResultPayload {
-                                endpoint: auth_endpoint.clone(),
-                                sender: auth_sender.clone(),
-                                auth_result,
-                            },
-                        )))
+                        .send(CmMessage::AuthResult(AuthResult::Inbound {
+                            endpoint: auth_endpoint.clone(),
+                            sender: auth_sender.clone(),
+                            auth_result,
+                        }))
                         .map_err(Box::from)
                 }),
             ) {
@@ -640,13 +636,14 @@ where
     fn add_connection(
         &mut self,
         endpoint: &str,
-        id: String,
-        reply_sender: Sender<Result<(), ConnectionManagerError>>,
+        connection_id: String,
+        reply_sender: Sender<Result<String, ConnectionManagerError>>,
         internal_sender: Sender<CmMessage>,
         authorizer: &dyn Authorizer,
     ) {
-        if self.connections.get_mut(endpoint).is_some() {
-            if reply_sender.send(Ok(())).is_err() {
+        if let Some(connection) = self.connections.get(endpoint) {
+            let identity = connection.identity().to_string();
+            if reply_sender.send(Ok(identity)).is_err() {
                 warn!("connector dropped before receiving result of add connection");
             }
         } else {
@@ -654,11 +651,13 @@ where
                 Ok(connection) => {
                     // No need to authorize inproc connections
                     if endpoint.contains("inproc") {
+                        let outbound_connection_identity = format!("connection-{}", Uuid::new_v4());
                         if reply_sender
                             .send(self.complete_outbound_connection(
                                 endpoint.to_string(),
-                                id,
+                                connection_id,
                                 connection,
+                                outbound_connection_identity,
                             ))
                             .is_err()
                         {
@@ -669,17 +668,15 @@ where
                         let auth_endpoint = endpoint.to_string();
                         let auth_sender = reply_sender.clone();
                         if let Err(err) = authorizer.authorize_connection(
-                            id,
+                            connection_id,
                             connection,
                             Box::new(move |auth_result| {
                                 internal_sender
-                                    .send(CmMessage::AuthResult(AuthResult::Outbound(
-                                        AuthResultPayload {
-                                            endpoint: auth_endpoint.clone(),
-                                            sender: auth_sender.clone(),
-                                            auth_result,
-                                        },
-                                    )))
+                                    .send(CmMessage::AuthResult(AuthResult::Outbound {
+                                        endpoint: auth_endpoint.clone(),
+                                        sender: auth_sender.clone(),
+                                        auth_result,
+                                    }))
                                     .map_err(Box::from)
                             }),
                         ) {
@@ -714,13 +711,13 @@ where
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
-    ) -> Result<(), ConnectionManagerError> {
+    ) -> Result<String, ConnectionManagerError> {
         match auth_result {
             AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                ..
-            } => self.complete_outbound_connection(endpoint, connection_id, connection),
+                identity,
+            } => self.complete_outbound_connection(endpoint, connection_id, connection, identity),
             AuthorizationResult::Unauthorized { connection_id, .. } => {
                 Err(ConnectionManagerError::Unauthorized(connection_id))
             }
@@ -737,8 +734,14 @@ where
             AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                ..
-            } => self.complete_inbound_connection(endpoint, connection_id, connection, subscribers),
+                identity,
+            } => self.complete_inbound_connection(
+                endpoint,
+                connection_id,
+                connection,
+                identity,
+                subscribers,
+            ),
             AuthorizationResult::Unauthorized { connection_id, .. } => {
                 Err(ConnectionManagerError::Unauthorized(connection_id))
             }
@@ -750,17 +753,19 @@ where
         endpoint: String,
         connection_id: String,
         connection: Box<dyn Connection>,
-    ) -> Result<(), ConnectionManagerError> {
+        identity: String,
+    ) -> Result<String, ConnectionManagerError> {
         self.life_cycle
             .add(connection, connection_id.clone())
             .map_err(|err| ConnectionManagerError::ConnectionCreationError(format!("{:?}", err)))?;
 
         self.connections.insert(
             endpoint.clone(),
-            ConnectionMetadata::Outbound {
-                id: connection_id,
-                outbound: OutboundConnection {
-                    endpoint,
+            ConnectionMetadata {
+                connection_id,
+                identity: identity.clone(),
+                endpoint,
+                extended_metadata: ConnectionMetadataExt::Outbound {
                     reconnecting: false,
                     retry_frequency: INITIAL_RETRY_FREQUENCY,
                     last_connection_attempt: Instant::now(),
@@ -769,13 +774,14 @@ where
             },
         );
 
-        Ok(())
+        Ok(identity)
     }
     fn complete_inbound_connection(
         &mut self,
         endpoint: String,
         connection_id: String,
         connection: Box<dyn Connection>,
+        identity: String,
         subscribers: &mut SubscriberMap,
     ) -> Result<(), ConnectionManagerError> {
         self.life_cycle
@@ -784,10 +790,11 @@ where
 
         self.connections.insert(
             endpoint.clone(),
-            ConnectionMetadata::Inbound {
-                id: connection_id.clone(),
-                inbound: InboundConnection {
-                    endpoint: endpoint.clone(),
+            ConnectionMetadata {
+                connection_id: connection_id.clone(),
+                endpoint: endpoint.clone(),
+                identity: identity.clone(),
+                extended_metadata: ConnectionMetadataExt::Inbound {
                     disconnected: false,
                 },
             },
@@ -796,6 +803,7 @@ where
         subscribers.broadcast(ConnectionManagerNotification::InboundConnection {
             endpoint,
             connection_id,
+            identity,
         });
 
         Ok(())
@@ -813,12 +821,14 @@ where
 
         self.connections.remove(endpoint);
         // remove mesh id, this may happen before reconnection is attempted
-        self.life_cycle.remove(meta.id()).map_err(|err| {
-            ConnectionManagerError::ConnectionRemovalError(format!(
-                "Cannot remove connection {} from life cycle: {}",
-                endpoint, err
-            ))
-        })?;
+        self.life_cycle
+            .remove(meta.connection_id())
+            .map_err(|err| {
+                ConnectionManagerError::ConnectionRemovalError(format!(
+                    "Cannot remove connection {} from life cycle: {}",
+                    endpoint, err
+                ))
+            })?;
 
         Ok(Some(meta))
     }
@@ -843,29 +853,34 @@ where
 
         if let Ok(connection) = self.transport.connect(endpoint) {
             // remove old mesh id, this may happen before reconnection is attempted
-            self.life_cycle.remove(meta.id()).map_err(|err| {
-                ConnectionManagerError::ConnectionRemovalError(format!(
-                    "Cannot remove connection {} from life cycle: {}",
-                    endpoint, err
-                ))
-            })?;
+            self.life_cycle
+                .remove(meta.connection_id())
+                .map_err(|err| {
+                    ConnectionManagerError::ConnectionRemovalError(format!(
+                        "Cannot remove connection {} from life cycle: {}",
+                        endpoint, err
+                    ))
+                })?;
 
             // add new connection to mesh
             self.life_cycle
-                .add(connection, meta.id().to_string())
+                .add(connection, meta.connection_id().to_string())
                 .map_err(|err| {
                     ConnectionManagerError::ConnectionReconnectError(format!("{:?}", err))
                 })?;
 
             // replace mesh id and reset reconnecting fields
-            match meta {
-                ConnectionMetadata::Outbound {
-                    ref mut outbound, ..
+            match meta.extended_metadata {
+                ConnectionMetadataExt::Outbound {
+                    ref mut reconnecting,
+                    ref mut retry_frequency,
+                    ref mut last_connection_attempt,
+                    ref mut reconnection_attempts,
                 } => {
-                    outbound.reconnecting = false;
-                    outbound.retry_frequency = INITIAL_RETRY_FREQUENCY;
-                    outbound.last_connection_attempt = Instant::now();
-                    outbound.reconnection_attempts = 0;
+                    *reconnecting = false;
+                    *retry_frequency = INITIAL_RETRY_FREQUENCY;
+                    *last_connection_attempt = Instant::now();
+                    *reconnection_attempts = 0;
                 }
                 // We checked earlier that this was an outbound connection
                 _ => unreachable!(),
@@ -878,17 +893,19 @@ where
                 endpoint: endpoint.to_string(),
             });
         } else {
-            let reconnection_attempts = match meta {
-                ConnectionMetadata::Outbound {
-                    ref mut outbound, ..
+            let reconnection_attempts = match meta.extended_metadata {
+                ConnectionMetadataExt::Outbound {
+                    ref mut reconnecting,
+                    ref mut retry_frequency,
+                    ref mut last_connection_attempt,
+                    ref mut reconnection_attempts,
                 } => {
-                    outbound.reconnecting = true;
-                    outbound.retry_frequency =
-                        min(outbound.retry_frequency * 2, self.maximum_retry_frequency);
-                    outbound.last_connection_attempt = Instant::now();
-                    outbound.reconnection_attempts += 1;
+                    *reconnecting = true;
+                    *retry_frequency = min(*retry_frequency * 2, self.maximum_retry_frequency);
+                    *last_connection_attempt = Instant::now();
+                    *reconnection_attempts += 1;
 
-                    outbound.reconnection_attempts
+                    *reconnection_attempts
                 }
                 // We checked earlier that this was an outbound connection
                 _ => unreachable!(),
@@ -989,21 +1006,21 @@ fn handle_auth_result<T: MatrixLifeCycle, U: MatrixSender>(
     subscribers: &mut SubscriberMap,
 ) {
     match auth_result {
-        AuthResult::Outbound(AuthResultPayload {
+        AuthResult::Outbound {
             endpoint,
             sender,
             auth_result,
-        }) => {
+        } => {
             let res = state.outbound_authorization_complete(endpoint, auth_result);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
             }
         }
-        AuthResult::Inbound(AuthResultPayload {
+        AuthResult::Inbound {
             endpoint,
             sender,
             auth_result,
-        }) => {
+        } => {
             let res = state.inbound_authorization_complete(endpoint, auth_result, subscribers);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
@@ -1027,19 +1044,22 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
     let matrix_sender = state.matrix_sender();
     let mut reconnections = vec![];
     for (endpoint, metadata) in state.connection_metadata_mut().iter_mut() {
-        match metadata {
-            ConnectionMetadata::Outbound { id, outbound } => {
+        match metadata.extended_metadata {
+            ConnectionMetadataExt::Outbound {
+                reconnecting,
+                retry_frequency,
+                last_connection_attempt,
+                ..
+            } => {
                 // if connection is already attempting reconnection, call reconnect
-                if outbound.reconnecting {
-                    if outbound.last_connection_attempt.elapsed().as_secs()
-                        > outbound.retry_frequency
-                    {
+                if reconnecting {
+                    if last_connection_attempt.elapsed().as_secs() > retry_frequency {
                         reconnections.push(endpoint.to_string());
                     }
                 } else {
                     info!("Sending heartbeat to {}", endpoint);
-                    if let Err(err) =
-                        matrix_sender.send((*id).to_string(), heartbeat_message.clone())
+                    if let Err(err) = matrix_sender
+                        .send(metadata.connection_id.clone(), heartbeat_message.clone())
                     {
                         error!(
                             "failed to send heartbeat: {:?} attempting reconnection",
@@ -1053,25 +1073,27 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
                     }
                 }
             }
-            ConnectionMetadata::Inbound {
-                id,
-                ref mut inbound,
+            ConnectionMetadataExt::Inbound {
+                ref mut disconnected,
             } => {
                 info!("Sending heartbeat to {}", endpoint);
-                if let Err(err) = matrix_sender.send((*id).to_string(), heartbeat_message.clone()) {
+                if let Err(err) =
+                    matrix_sender.send(metadata.connection_id.clone(), heartbeat_message.clone())
+                {
                     error!(
                         "failed to send heartbeat: {:?} attempting reconnection",
                         err
                     );
 
-                    if !inbound.disconnected {
-                        inbound.disconnected = true;
+                    if !*disconnected {
+                        *disconnected = true;
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
                             endpoint: endpoint.clone(),
                         });
                     }
+                } else {
+                    *disconnected = false;
                 }
-                inbound.disconnected = false;
             }
         }
     }

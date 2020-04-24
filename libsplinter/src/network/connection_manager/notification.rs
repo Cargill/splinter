@@ -28,6 +28,7 @@ pub enum ConnectionManagerNotification {
     InboundConnection {
         endpoint: String,
         connection_id: String,
+        identity: String,
     },
     Disconnected {
         endpoint: String,
