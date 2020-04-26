@@ -525,9 +525,11 @@ fn run_service_loop(
                     correlation_id: admin_direct_message.take_correlation_id(),
                 };
 
-                service
-                    .handle_message(admin_direct_message.get_payload(), &msg_context)
-                    .map_err(to_process_err!("unable to handle admin direct message"))?;
+                if let Err(err) =
+                    service.handle_message(admin_direct_message.get_payload(), &msg_context)
+                {
+                    error!("unable to handle admin direct message: {}", err);
+                }
             }
             ServiceMessage::CircuitDirectMessage(mut direct_message) => {
                 let msg_context = ServiceMessageContext {
@@ -536,9 +538,10 @@ fn run_service_loop(
                     correlation_id: direct_message.take_correlation_id(),
                 };
 
-                service
-                    .handle_message(direct_message.get_payload(), &msg_context)
-                    .map_err(to_process_err!("unable to handle circuit direct message"))?;
+                if let Err(err) = service.handle_message(direct_message.get_payload(), &msg_context)
+                {
+                    error!("unable to handle circuit direct message: {}", err);
+                }
             }
         }
     }
