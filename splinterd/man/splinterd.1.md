@@ -149,7 +149,7 @@ OPTIONS
   `--peers` option. The protocol prefix part of the peer URL specifies the
   type of connection that is created.
 
-`--registry REGISTRY-FILE` `[,...]`
+`--registries REGISTRY-FILE` `[,...]`
 : Specifies one or more read-only node registry files.
 
 `--service-endpoint SERVICE-ENDPOINT`

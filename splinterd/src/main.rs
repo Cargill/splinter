@@ -132,7 +132,6 @@ fn main() {
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
-        (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
         (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
             "How often remote node registries should attempt to fetch upstream changes in the \
              background (in seconds); default is 600 (10 minutes), 0 means off")
@@ -187,6 +186,14 @@ fn main() {
               .takes_value(true)
               .multiple(true)
               .alias("peer"),
+        )
+        .arg(
+            Arg::with_name("registries")
+              .long("registries")
+              .help("Read-only node registries")
+              .takes_value(true)
+              .multiple(true)
+              .alias("registry"),
         )
         .arg(
             Arg::with_name("tls_cert_dir")
