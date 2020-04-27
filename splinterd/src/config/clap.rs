@@ -197,7 +197,7 @@ mod tests {
             (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
             (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
-            (@arg peers: --peer +takes_value +multiple)
+            (@arg peers: --peers +takes_value +multiple)
             (@arg tls_ca_file: --("tls-ca-file") +takes_value)
             (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
             (@arg tls_client_cert: --("tls-client-cert") +takes_value)

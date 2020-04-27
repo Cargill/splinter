@@ -140,13 +140,13 @@ OPTIONS
 : (Required) Sets a new ID for the node. The node ID must be unique across the
   network (for all Splinter nodes that could participate on the same circuit).
 
-`--peer PEER-URL` `[,...]`
+`--peers PEER-URL` `[,...]`
 : Specifies one or more Splinter nodes that `splinterd` will automatically
   connect to when it starts. The *PEER-URL* argument must specify another node's
   network endpoint, using the format `protocol_prefix://ip:port`.
 
   Specify multiple nodes in a comma-separated list or by repeating the
-  `--peer` option. The protocol prefix part of the peer URL specifies the
+  `--peers` option. The protocol prefix part of the peer URL specifies the
   type of connection that is created.
 
 `--registry REGISTRY-FILE` `[,...]`

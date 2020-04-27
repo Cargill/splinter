@@ -129,8 +129,6 @@ fn main() {
           "Storage type used for the node; defaults to yaml")
         (@arg service_endpoint: --("service-endpoint") +takes_value
           "Endpoint that service will connect to, tcp://ip:port")
-        (@arg peers: --peer +takes_value +multiple
-          "Endpoint that service will connect to, protocol-prefix://ip:port")
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
@@ -181,6 +179,14 @@ fn main() {
                 .takes_value(true)
                 .multiple(true)
                 .alias("network-endpoint"),
+        )
+        .arg(
+            Arg::with_name("peers")
+              .long("peers")
+              .help("Endpoint that service will connect to, protocol-prefix://ip:port")
+              .takes_value(true)
+              .multiple(true)
+              .alias("peer"),
         )
         .arg(
             Arg::with_name("tls_cert_dir")
