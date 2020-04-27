@@ -18,12 +18,12 @@ pub mod interconnect;
 mod notification;
 mod peer_map;
 
+use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 use self::error::{
     PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
-    PeerRefUpdateError,
 };
 use crate::collections::BiHashMap;
 use crate::network::connection_manager::ConnectionManagerNotification;
@@ -63,16 +63,14 @@ pub(crate) enum PeerManagerRequest {
         endpoints: Vec<String>,
         sender: Sender<Result<PeerRef, PeerRefAddError>>,
     },
-    UpdatePeer {
-        old_peer_id: String,
-        new_peer_id: String,
-        sender: Sender<Result<(), PeerRefUpdateError>>,
-    },
     RemovePeer {
         peer_id: String,
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
     ListPeers {
+        sender: Sender<Result<Vec<String>, PeerListError>>,
+    },
+    ListTemporaryPeers {
         sender: Sender<Result<Vec<String>, PeerListError>>,
     },
     ConnectionIds {
@@ -113,6 +111,12 @@ impl Drop for PeerRef {
             ),
         }
     }
+}
+
+/// An entry of temporary peers, that may connected externally, but not yet requested locally.
+struct TemporaryPeer {
+    endpoint: String,
+    connection_id: String,
 }
 
 /// The PeerManager is in charge of keeping track of peers and their ref count, as well as
@@ -166,6 +170,8 @@ impl PeerManager {
             .name("Peer Manager".into())
             .spawn(move || {
                 let mut peers = PeerMap::new();
+                // a map of identities to temporary peers.
+                let mut temporary_peers = HashMap::new();
                 let mut ref_map = RefMap::new();
                 let mut subscribers = Vec::new();
                 loop {
@@ -175,6 +181,7 @@ impl PeerManager {
                             handle_request(
                                 request,
                                 connector.clone(),
+                                &mut temporary_peers,
                                 &mut peers,
                                 &peer_remover,
                                 &mut ref_map,
@@ -186,6 +193,7 @@ impl PeerManager {
                         Ok(PeerManagerMessage::InternalNotification(notification)) => {
                             handle_notifications(
                                 notification,
+                                &mut temporary_peers,
                                 &mut peers,
                                 connector.clone(),
                                 &mut subscribers,
@@ -269,6 +277,7 @@ impl ShutdownHandle {
 fn handle_request(
     request: PeerManagerRequest,
     connector: Connector,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
@@ -284,6 +293,7 @@ fn handle_request(
                     peer_id,
                     endpoints,
                     connector,
+                    temporary_peers,
                     peers,
                     peer_remover,
                     ref_map,
@@ -293,21 +303,15 @@ fn handle_request(
                 warn!("connector dropped before receiving result of adding peer");
             }
         }
-        PeerManagerRequest::UpdatePeer {
-            old_peer_id,
-            new_peer_id,
-            sender,
-        } => {
-            if sender
-                .send(update_peer(old_peer_id, new_peer_id, peers, ref_map))
-                .is_err()
-            {
-                warn!("connector dropped before receiving result of updating peer");
-            }
-        }
         PeerManagerRequest::RemovePeer { peer_id, sender } => {
             if sender
-                .send(remove_peer(peer_id, connector, peers, ref_map))
+                .send(remove_peer(
+                    peer_id,
+                    connector,
+                    temporary_peers,
+                    peers,
+                    ref_map,
+                ))
                 .is_err()
             {
                 warn!("connector dropped before receiving result of removing peer");
@@ -316,6 +320,13 @@ fn handle_request(
         PeerManagerRequest::ListPeers { sender } => {
             if sender.send(Ok(peers.peer_ids())).is_err() {
                 warn!("connector dropped before receiving result of list peers");
+            }
+        }
+
+        PeerManagerRequest::ListTemporaryPeers { sender } => {
+            let peer_ids = temporary_peers.keys().map(|s| s.to_owned()).collect();
+            if sender.send(Ok(peer_ids)).is_err() {
+                warn!("connector dropped before receiving result of list temporary peers");
             }
         }
         PeerManagerRequest::ConnectionIds { sender } => {
@@ -330,6 +341,7 @@ fn add_peer(
     peer_id: String,
     endpoints: Vec<String>,
     connector: Connector,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
@@ -342,12 +354,36 @@ fn add_peer(
         return Ok(peer_ref);
     };
 
+    // if it is a temporary peer, promote it to a fully-referenced peer
+    if let Some(TemporaryPeer {
+        connection_id,
+        endpoint,
+    }) = temporary_peers.remove(&peer_id)
+    {
+        peers.insert(peer_id.clone(), connection_id, endpoints, endpoint);
+
+        let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+        return Ok(peer_ref);
+    }
+
     debug!("Attempting to peer with {}", peer_id);
     let connection_id = format!("{}", Uuid::new_v4());
     // If new, try to create a connection
     for endpoint in endpoints.iter() {
         match connector.request_connection(&endpoint, &connection_id) {
-            Ok(_identity) => {
+            Ok(identity) => {
+                if peer_id != identity {
+                    if let Err(err) = connector.remove_connection(&endpoint) {
+                        error!("Unable to clean up mismatched identity connection: {}", err);
+                    }
+                    // remove the reference created above
+                    ref_map.remove_ref(&peer_id);
+                    return Err(PeerRefAddError::AddError(format!(
+                        "Peer {} (via {}) presented a mismatched identity {}",
+                        peer_id, endpoint, identity
+                    )));
+                }
+
                 debug!("Peer {} connected via {}", peer_id, endpoint);
                 peers.insert(
                     peer_id.clone(),
@@ -375,43 +411,18 @@ fn add_peer(
     )))
 }
 
-fn update_peer(
-    peer_id: String,
-    new_peer_id: String,
-    peers: &mut PeerMap,
-    ref_map: &mut RefMap,
-) -> Result<(), PeerRefUpdateError> {
-    // update the ref_map, so old PeerRef can still be used to drop references
-    if ref_map
-        .update_ref(peer_id.clone(), new_peer_id.clone())
-        .is_err()
-    {
-        return Err(PeerRefUpdateError::UpdateError(format!(
-            "Unable to update peer, {} does not exist",
-            peer_id
-        )));
-    }
-
-    // update the peer in the peer map
-    match peers.update_peer_id(peer_id.clone(), new_peer_id.clone()) {
-        Ok(()) => {
-            debug!("Updated peer id from {} to {}", peer_id, new_peer_id);
-            Ok(())
-        }
-        Err(_) => Err(PeerRefUpdateError::UpdateError(format!(
-            "Unable to update peer, {} does not exist",
-            peer_id
-        ))),
-    }
-}
-
 fn remove_peer(
     peer_id: String,
     connector: Connector,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     ref_map: &mut RefMap,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
+
+    // remove from the temporary peers, if it is there.
+    temporary_peers.remove(&peer_id);
+
     // remove the reference
     let removed_peer = ref_map.remove_ref(&peer_id);
     if let Some(removed_peer) = removed_peer {
@@ -485,6 +496,7 @@ fn retry_endpoints(
 
 fn handle_notifications(
     notification: ConnectionManagerNotification,
+    temporary_peers: &mut HashMap<String, TemporaryPeer>,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
@@ -553,13 +565,33 @@ fn handle_notifications(
                 }
             }
         }
-        ConnectionManagerNotification::InboundConnection { .. } => (),
+        ConnectionManagerNotification::InboundConnection {
+            endpoint,
+            connection_id,
+            identity,
+        } => {
+            info!(
+                "Received peer connection from {} (remote endpoint: {})",
+                identity, endpoint
+            );
+            temporary_peers.insert(
+                identity,
+                TemporaryPeer {
+                    connection_id,
+                    endpoint,
+                },
+            );
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    use std::collections::VecDeque;
+    use std::sync::mpsc;
+
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
@@ -584,7 +616,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -601,6 +633,49 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
+    }
+
+    // Test that a call to add_peer_ref, where the authorizer returns an different id than
+    // requested, the connector returns an error.
+    //
+    // 1. add test_peer, whose identity is different_peer
+    // 2. verify that an AddPeer error is returned.
+    // 3. verify that the connection is removed.
+    #[test]
+    fn test_peer_manager_add_peer_identity_mismatch() {
+        let mut transport = Box::new(InprocTransport::default());
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mesh = Mesh::new(512, 128);
+        let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("different_peer")),
+            mesh.get_life_cycle(),
+            mesh.get_sender(),
+            transport,
+            None,
+            None,
+        );
+        let connector = cm.start().unwrap();
+        let mut peer_manager = PeerManager::new(connector.clone(), None);
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_res =
+            peer_connector.add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()]);
+
+        assert!(matches!(peer_res, Err(PeerRefAddError::AddError(_))));
+
+        assert!(connector
+            .list_connections()
+            .expect("Unable to list connections")
+            .is_empty());
+
+        peer_manager.shutdown_and_wait();
+        cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that a call to add_peer_ref with a peer with multiple endpoints is successful, even if
@@ -620,7 +695,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -643,6 +718,7 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that the same peer can be added multiple times.
@@ -660,7 +736,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -683,6 +759,7 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that list_peer returns the correct list of peers
@@ -707,7 +784,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new_multiple(&["test_peer", "next_peer"])),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -741,6 +818,7 @@ pub mod tests {
         );
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that list_peer returns the correct list of peers
@@ -765,7 +843,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new_multiple(&["test_peer", "next_peer"])),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -796,52 +874,7 @@ pub mod tests {
         assert!(peers.get_by_key("test_peer").is_some());
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
-    }
-
-    // Test that if a peer is updated, it is properly put in the list_peer list
-    //
-    // 1. add test_peer
-    // 2. update test_peer to have a new id, new_peer
-    // 3. call list_peers
-    // 4. verify that list peers contains only new_peer
-    #[test]
-    fn test_peer_manager_update_peer() {
-        let mut transport = Box::new(InprocTransport::default());
-        let mut listener = transport.listen("inproc://test").unwrap();
-
-        thread::spawn(move || {
-            listener.accept().unwrap();
-        });
-
-        let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
-        let mut peer_manager = PeerManager::new(connector, None);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
-        let peer_ref = peer_connector
-            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
-            .expect("Unable to add peer");
-
-        assert_eq!(peer_ref.peer_id, "test_peer");
-
-        peer_connector
-            .update_peer_ref("test_peer", "new_peer")
-            .expect("Unable to update peer id");
-
-        let peer_list = peer_connector
-            .list_peers()
-            .expect("Unable to get peer list");
-
-        assert_eq!(peer_list, vec!["new_peer".to_string()]);
-        peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that when a PeerRef is dropped, a remove peer request is properly sent and the peer
@@ -864,7 +897,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -898,97 +931,7 @@ pub mod tests {
         assert_eq!(peer_list, Vec::<String>::new());
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
-    }
-
-    // Test that if a peer is updated, an old peer_ref (with the old peer id) can still remove
-    // a reference for that peer.
-    //
-    // 1. add test_peer
-    // 2. update test_peer id to new_peer
-    // 3. call list peers
-    // 4. verify that the peer list contains new_peer
-    // 5. Add reference to new_peer, and verify new_peer is the only peer in the peer lst
-    // 6. drop the PeerRef for new_peer
-    // 7. call list peers
-    // 8. verify that the peer list still contains new_peer
-    // 9. drop the originally PeerREf for test_peer
-    // 10. call list peers and verify that it is empty
-    #[test]
-    fn test_peer_manager_drop_updated_peer_ref() {
-        let mut transport = Box::new(InprocTransport::default());
-        let mut listener = transport.listen("inproc://test").unwrap();
-
-        thread::spawn(move || {
-            listener.accept().unwrap();
-        });
-
-        let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
-        let mut peer_manager = PeerManager::new(connector, None);
-
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
-
-        {
-            // create peer_ref with peer_id test_peer
-            let peer_ref = peer_connector
-                .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
-                .expect("Unable to add peer");
-
-            assert_eq!(peer_ref.peer_id, "test_peer");
-
-            // update peer id
-            peer_connector
-                .update_peer_ref("test_peer", "new_peer")
-                .expect("Unable to update peer id");
-
-            let peer_list = peer_connector
-                .list_peers()
-                .expect("Unable to get peer list");
-
-            assert_eq!(peer_list, vec!["new_peer".to_string()]);
-
-            {
-                // add another reference to new_peer
-                let peer_ref_2 = peer_connector
-                    .add_peer_ref("new_peer".to_string(), vec!["inproc://test".to_string()])
-                    .expect("Unable to add peer");
-
-                assert_eq!(peer_ref_2.peer_id, "new_peer");
-
-                // verify that only 1 peer is listed
-                let peer_list = peer_connector
-                    .list_peers()
-                    .expect("Unable to get peer list");
-
-                assert_eq!(peer_list, vec!["new_peer".to_string()]);
-            }
-            // drop peer ref 2, reference has peer id "new_peer"
-
-            // verify that new_peer has not been removed
-            let peer_list = peer_connector
-                .list_peers()
-                .expect("Unable to get peer list");
-
-            assert_eq!(peer_list, vec!["new_peer".to_string()]);
-        }
-        // drop peer ref with old peer id test_peer
-
-        // verify that the peer has been removed
-        let peer_list = peer_connector
-            .list_peers()
-            .expect("Unable to get peer list");
-
-        assert_eq!(peer_list, Vec::<String>::new());
-        peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     // Test that if a peer's endpoint disconnects and does not reconnect during a set timeout, the
@@ -1017,6 +960,7 @@ pub mod tests {
             .expect("Cannot listen for connections");
         let endpoint2 = listener2.endpoint();
 
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
             // accept incoming connection and add it to mesh2
             let conn = listener.accept().expect("Cannot accept connection");
@@ -1046,10 +990,14 @@ pub mod tests {
                 .add(conn, "test_id".to_string())
                 .expect("Cannot add connection to mesh");
             mesh2.recv().expect("Cannot receive message");
+
+            rx.recv().unwrap();
+
+            mesh2.shutdown_signaler().shutdown();
         });
 
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -1089,8 +1037,11 @@ pub mod tests {
                 }
         );
 
+        tx.send(()).unwrap();
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh1.shutdown_signaler().shutdown();
     }
 
     // Test that the PeerManager can be started and stopped
@@ -1100,7 +1051,7 @@ pub mod tests {
 
         let mesh = Mesh::new(512, 128);
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
+            Box::new(NoopAuthorizer::new("test_peer")),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1112,16 +1063,88 @@ pub mod tests {
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
+    }
+
+    // Test that the PeerManager can receive incoming peer requests and handle them appropriately.
+    //
+    // 1. Add a connection
+    // 2. Verify that it has been added as a temporary peer
+    // 3. Verify that it can be promoted to a proper peer
+    #[test]
+    fn test_incoming_peer_request() {
+        let mut transport = InprocTransport::default();
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        let mesh = Mesh::new(512, 128);
+        let mut cm = ConnectionManager::new(
+            Box::new(NoopAuthorizer::new("test_peer")),
+            mesh.get_life_cycle(),
+            mesh.get_sender(),
+            Box::new(transport.clone()),
+            None,
+            None,
+        );
+
+        let connector = cm.start().unwrap();
+
+        let recv_connector = connector.clone();
+        let jh = thread::spawn(move || {
+            let connection = listener.accept().unwrap();
+
+            recv_connector.add_inbound_connection(connection).unwrap();
+        });
+
+        let mut peer_manager = PeerManager::new(connector, None);
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+
+        let _conn = transport.connect("inproc://test").unwrap();
+
+        jh.join().unwrap();
+
+        // The peer is not part of the set of active peers
+        assert!(peer_connector.list_peers().unwrap().is_empty());
+
+        assert_eq!(
+            vec!["test_peer".to_string()],
+            peer_connector.list_unreferenced_peers().unwrap()
+        );
+
+        let peer_ref = peer_connector
+            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .expect("Unable to add peer");
+
+        assert_eq!(peer_ref.peer_id, "test_peer");
+
+        let peer_list = peer_connector
+            .list_peers()
+            .expect("Unable to get peer list");
+
+        assert_eq!(peer_list, vec!["test_peer".to_string()]);
+
+        peer_manager.shutdown_and_wait();
+        cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
     }
 
     struct NoopAuthorizer {
-        authorized_id: String,
+        ids: std::cell::RefCell<VecDeque<String>>,
     }
 
     impl NoopAuthorizer {
         fn new(id: &str) -> Self {
+            let mut ids = VecDeque::new();
+            ids.push_back(id.into());
             Self {
-                authorized_id: id.to_string(),
+                ids: std::cell::RefCell::new(ids),
+            }
+        }
+
+        fn new_multiple(ids: &[&str]) -> Self {
+            Self {
+                ids: std::cell::RefCell::new(
+                    ids.iter().map(std::string::ToString::to_string).collect(),
+                ),
             }
         }
     }
@@ -1135,10 +1158,15 @@ pub mod tests {
                 dyn Fn(AuthorizationResult) -> Result<(), Box<dyn std::error::Error>> + Send,
             >,
         ) -> Result<(), AuthorizerError> {
+            let identity = self
+                .ids
+                .borrow_mut()
+                .pop_front()
+                .expect("No more identities to provide");
             (*callback)(AuthorizationResult::Authorized {
                 connection_id,
                 connection,
-                identity: self.authorized_id.clone(),
+                identity,
             })
             .map_err(|err| AuthorizerError(format!("Unable to return result: {}", err)))
         }

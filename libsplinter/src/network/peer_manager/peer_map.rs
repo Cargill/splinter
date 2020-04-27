@@ -35,7 +35,6 @@ pub struct PeerMetadata {
 
 pub struct PeerMap {
     peers: HashMap<String, PeerMetadata>,
-    redirects: HashMap<String, String>,
     // Endpoint to peer id
     endpoints: HashMap<String, String>,
 }
@@ -47,14 +46,11 @@ impl PeerMap {
     pub fn new() -> Self {
         PeerMap {
             peers: HashMap::new(),
-            redirects: HashMap::new(),
             endpoints: HashMap::new(),
         }
     }
 
     /// Returns the current list of peer ids.
-    ///
-    /// This list does not include any of the redirected peer ids.
     pub fn peer_ids(&self) -> Vec<String> {
         self.peers
             .iter()
@@ -63,8 +59,6 @@ impl PeerMap {
     }
 
     /// Returns the current map of peer ids to connection_ids
-    ///
-    /// This list does not include any of the redirected peer ids.
     pub fn connection_ids(&self) -> BiHashMap<String, String> {
         let mut peer_to_connection_id = BiHashMap::new();
         for (peer, metadata) in self.peers.iter() {
@@ -97,11 +91,8 @@ impl PeerMap {
         }
     }
 
-    /// Remove a peer id, its endpoint and all of its redirects. Returns the active_endpoint of
-    /// the peer.
+    /// Remove a peer id and its endpoint. Returns the active_endpoint of the peer.
     pub fn remove(&mut self, peer_id: &str) -> Option<String> {
-        self.redirects
-            .retain(|_, target_peer_id| target_peer_id != peer_id);
         if let Some(peer_metadata) = self.peers.remove(&peer_id.to_string()) {
             for endpoint in peer_metadata.endpoints.iter() {
                 self.endpoints.remove(endpoint);
@@ -112,45 +103,6 @@ impl PeerMap {
             None
         }
     }
-
-    /// Updates a peer id, and creates a redirect for the old id to the given new one.
-    ///
-    /// Additionally, it updates all of the old redirects to point to the given new one.
-    pub fn update_peer_id(
-        &mut self,
-        old_peer_id: String,
-        new_peer_id: String,
-    ) -> Result<(), PeerUpdateError> {
-        if let Some(mut peer_metadata) = self.peers.remove(&old_peer_id) {
-            // let mut new_peer_metadata = peer_metadata.clone();
-            for endpoint in peer_metadata.endpoints.iter() {
-                self.endpoints
-                    .insert(endpoint.to_string(), new_peer_id.clone());
-            }
-
-            peer_metadata.id = new_peer_id.clone();
-            self.peers.insert(new_peer_id.clone(), peer_metadata);
-
-            // update the old forwards
-            for (_, v) in self
-                .redirects
-                .iter_mut()
-                .filter(|(_, v)| **v == old_peer_id)
-            {
-                *v = new_peer_id.clone()
-            }
-
-            self.redirects.insert(old_peer_id, new_peer_id);
-
-            Ok(())
-        } else {
-            Err(PeerUpdateError(format!(
-                "Unable to update {} to {}",
-                old_peer_id, new_peer_id
-            )))
-        }
-    }
-
     /// Updates an existing peer, all fields can be updated except peer_id.
     pub fn update_peer(&mut self, peer_metadata: PeerMetadata) -> Result<(), PeerUpdateError> {
         // Only valid if the peer already exists
@@ -217,14 +169,6 @@ pub mod tests {
             peers,
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
-
-        peer_map
-            .update_peer_id("test_peer".to_string(), "new_peer".to_string())
-            .expect("Unable to update peer id");
-
-        let mut peers = peer_map.peer_ids();
-        peers.sort();
-        assert_eq!(peers, vec!["new_peer".to_string(), "next_peer".to_string()]);
     }
 
     // Test that connection_ids() returns correctly
@@ -358,36 +302,6 @@ pub mod tests {
         assert!(!peer_map.peers.contains_key("test_peer"));
 
         assert_eq!(active_endpoint, Some("test_endpoint2".to_string()),);
-    }
-
-    // Test that update_peer_id() works correctly
-    //  1. Test that an error is returned if the old peer id does not exist
-    //  2. Insert test_peer and check it is in self.peers
-    //  3. Update test_peer to have the id new_peer
-    //  4. Verify that peers contains new_peer and redirects contains a redirect from test_peer
-    //     to new_peer
-    #[test]
-    fn test_update_peer_id() {
-        let mut peer_map = PeerMap::new();
-
-        if let Ok(()) = peer_map.update_peer_id("test_peer".to_string(), "new_peer".to_string()) {
-            panic!("Should not be able to update peer because old peer does not exist")
-        }
-
-        peer_map.insert(
-            "test_peer".to_string(),
-            "connection_id".to_string(),
-            vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
-            "test_endpoint2".to_string(),
-        );
-        assert!(peer_map.peers.contains_key("test_peer"));
-
-        peer_map
-            .update_peer_id("test_peer".to_string(), "new_peer".to_string())
-            .expect("Unable to update peer id");
-
-        assert!(peer_map.peers.contains_key("new_peer"));
-        assert!(peer_map.redirects.contains_key("test_peer"));
     }
 
     // Test that a peer can be updated
