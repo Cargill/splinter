@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std;
 use std::borrow::Borrow;
 use std::error::Error as StdError;
 
-use hyper;
 use sabre_sdk::protocol::payload::{ActionBuildError, SabrePayloadBuildError};
 use sawtooth_sdk::signing;
 use transact::{

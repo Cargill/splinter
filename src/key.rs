@@ -19,7 +19,6 @@ use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 
-use dirs;
 use sawtooth_sdk::signing::{
     create_context, secp256k1::Secp256k1PrivateKey, transact::TransactSigner, Signer,
 };

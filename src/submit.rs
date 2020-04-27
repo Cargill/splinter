@@ -16,14 +16,11 @@
 
 use futures::Stream;
 use futures::{future, Future};
-use hyper;
 use hyper::client::{Client, Request};
 use hyper::header::{ContentLength, ContentType};
 use hyper::Method;
 use hyper::StatusCode;
-use serde_json;
 use std::{fmt, str};
-use tokio_core;
 
 use transact::{protocol::batch::Batch, protos::IntoBytes};
 
