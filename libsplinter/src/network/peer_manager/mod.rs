@@ -70,7 +70,7 @@ pub(crate) enum PeerManagerRequest {
     ListPeers {
         sender: Sender<Result<Vec<String>, PeerListError>>,
     },
-    ListTemporaryPeers {
+    ListUnreferencedPeers {
         sender: Sender<Result<Vec<String>, PeerListError>>,
     },
     ConnectionIds {
@@ -113,8 +113,8 @@ impl Drop for PeerRef {
     }
 }
 
-/// An entry of temporary peers, that may connected externally, but not yet requested locally.
-struct TemporaryPeer {
+/// An entry of unreferenced peers, that may connected externally, but not yet requested locally.
+struct UnreferencedPeer {
     endpoint: String,
     connection_id: String,
 }
@@ -170,8 +170,8 @@ impl PeerManager {
             .name("Peer Manager".into())
             .spawn(move || {
                 let mut peers = PeerMap::new();
-                // a map of identities to temporary peers.
-                let mut temporary_peers = HashMap::new();
+                // a map of identities to unreferenced peers.
+                let mut unreferenced_peers = HashMap::new();
                 let mut ref_map = RefMap::new();
                 let mut subscribers = Vec::new();
                 loop {
@@ -181,7 +181,7 @@ impl PeerManager {
                             handle_request(
                                 request,
                                 connector.clone(),
-                                &mut temporary_peers,
+                                &mut unreferenced_peers,
                                 &mut peers,
                                 &peer_remover,
                                 &mut ref_map,
@@ -193,7 +193,7 @@ impl PeerManager {
                         Ok(PeerManagerMessage::InternalNotification(notification)) => {
                             handle_notifications(
                                 notification,
-                                &mut temporary_peers,
+                                &mut unreferenced_peers,
                                 &mut peers,
                                 connector.clone(),
                                 &mut subscribers,
@@ -277,7 +277,7 @@ impl ShutdownHandle {
 fn handle_request(
     request: PeerManagerRequest,
     connector: Connector,
-    temporary_peers: &mut HashMap<String, TemporaryPeer>,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
@@ -293,7 +293,7 @@ fn handle_request(
                     peer_id,
                     endpoints,
                     connector,
-                    temporary_peers,
+                    unreferenced_peers,
                     peers,
                     peer_remover,
                     ref_map,
@@ -308,7 +308,7 @@ fn handle_request(
                 .send(remove_peer(
                     peer_id,
                     connector,
-                    temporary_peers,
+                    unreferenced_peers,
                     peers,
                     ref_map,
                 ))
@@ -323,10 +323,10 @@ fn handle_request(
             }
         }
 
-        PeerManagerRequest::ListTemporaryPeers { sender } => {
-            let peer_ids = temporary_peers.keys().map(|s| s.to_owned()).collect();
+        PeerManagerRequest::ListUnreferencedPeers { sender } => {
+            let peer_ids = unreferenced_peers.keys().map(|s| s.to_owned()).collect();
             if sender.send(Ok(peer_ids)).is_err() {
-                warn!("connector dropped before receiving result of list temporary peers");
+                warn!("connector dropped before receiving result of list unreferenced peers");
             }
         }
         PeerManagerRequest::ConnectionIds { sender } => {
@@ -341,7 +341,7 @@ fn add_peer(
     peer_id: String,
     endpoints: Vec<String>,
     connector: Connector,
-    temporary_peers: &mut HashMap<String, TemporaryPeer>,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
@@ -354,11 +354,11 @@ fn add_peer(
         return Ok(peer_ref);
     };
 
-    // if it is a temporary peer, promote it to a fully-referenced peer
-    if let Some(TemporaryPeer {
+    // if it is a unreferenced peer, promote it to a fully-referenced peer
+    if let Some(UnreferencedPeer {
         connection_id,
         endpoint,
-    }) = temporary_peers.remove(&peer_id)
+    }) = unreferenced_peers.remove(&peer_id)
     {
         peers.insert(peer_id.clone(), connection_id, endpoints, endpoint);
 
@@ -414,14 +414,14 @@ fn add_peer(
 fn remove_peer(
     peer_id: String,
     connector: Connector,
-    temporary_peers: &mut HashMap<String, TemporaryPeer>,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
     peers: &mut PeerMap,
     ref_map: &mut RefMap,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
 
-    // remove from the temporary peers, if it is there.
-    temporary_peers.remove(&peer_id);
+    // remove from the unreferenced peers, if it is there.
+    unreferenced_peers.remove(&peer_id);
 
     // remove the reference
     let removed_peer = ref_map.remove_ref(&peer_id);
@@ -496,7 +496,7 @@ fn retry_endpoints(
 
 fn handle_notifications(
     notification: ConnectionManagerNotification,
-    temporary_peers: &mut HashMap<String, TemporaryPeer>,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
@@ -574,9 +574,9 @@ fn handle_notifications(
                 "Received peer connection from {} (remote endpoint: {})",
                 identity, endpoint
             );
-            temporary_peers.insert(
+            unreferenced_peers.insert(
                 identity,
-                TemporaryPeer {
+                UnreferencedPeer {
                     connection_id,
                     endpoint,
                 },
@@ -1069,7 +1069,7 @@ pub mod tests {
     // Test that the PeerManager can receive incoming peer requests and handle them appropriately.
     //
     // 1. Add a connection
-    // 2. Verify that it has been added as a temporary peer
+    // 2. Verify that it has been added as a unreferenced peer
     // 3. Verify that it can be promoted to a proper peer
     #[test]
     fn test_incoming_peer_request() {

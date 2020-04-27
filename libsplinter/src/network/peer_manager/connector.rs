@@ -102,7 +102,7 @@ impl PeerManagerConnector {
     pub fn list_unreferenced_peers(&self) -> Result<Vec<String>, PeerListError> {
         let (sender, recv) = channel();
         let message =
-            PeerManagerMessage::Request(PeerManagerRequest::ListTemporaryPeers { sender });
+            PeerManagerMessage::Request(PeerManagerRequest::ListUnreferencedPeers { sender });
 
         match self.sender.send(message) {
             Ok(()) => (),
