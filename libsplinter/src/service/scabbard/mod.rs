@@ -150,10 +150,7 @@ impl Scabbard {
             .get_state_with_prefix(prefix)?)
     }
 
-    pub fn add_batches(
-        &self,
-        batches: Vec<BatchPair>,
-    ) -> Result<Option<BatchListPath>, ScabbardError> {
+    pub fn add_batches(&self, batches: Vec<BatchPair>) -> Result<Option<String>, ScabbardError> {
         let mut shared = self
             .shared
             .lock()
@@ -180,7 +177,7 @@ impl Scabbard {
             link.pop();
 
             debug!("Batch Status Link Created: {}", link);
-            Ok(Some(BatchListPath { link }))
+            Ok(Some(link))
         } else {
             Ok(None)
         }
@@ -359,10 +356,6 @@ impl Service for Scabbard {
     fn as_any(&self) -> &dyn Any {
         self
     }
-}
-#[derive(Serialize, Deserialize, Clone)]
-pub struct BatchListPath {
-    link: String,
 }
 
 #[cfg(test)]

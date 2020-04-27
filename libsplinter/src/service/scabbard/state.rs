@@ -555,7 +555,7 @@ impl From<BatchExecutionResult> for BatchStatus {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ValidTransaction {
-    transaction_id: String,
+    pub transaction_id: String,
 }
 
 impl ValidTransaction {
@@ -566,9 +566,9 @@ impl ValidTransaction {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InvalidTransaction {
-    transaction_id: String,
-    error_message: String,
-    error_data: Vec<u8>,
+    pub transaction_id: String,
+    pub error_message: String,
+    pub error_data: Vec<u8>,
 }
 
 impl InvalidTransaction {

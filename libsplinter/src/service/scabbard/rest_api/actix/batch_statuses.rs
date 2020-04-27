@@ -21,7 +21,9 @@ use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard};
 use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{Scabbard, SERVICE_TYPE};
+use crate::service::scabbard::{
+    rest_api::resources::batch_statuses::BatchInfoResponse, Scabbard, SERVICE_TYPE,
+};
 
 const DEFAULT_BATCH_STATUS_WAIT_SECS: u64 = 300;
 
@@ -91,7 +93,16 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
             };
 
             match batch_info_iter.collect::<Result<Vec<_>, _>>() {
-                Ok(batch_infos) => Box::new(HttpResponse::Ok().json(batch_infos).into_future()),
+                Ok(batch_infos) => Box::new(
+                    HttpResponse::Ok()
+                        .json(
+                            batch_infos
+                                .iter()
+                                .map(BatchInfoResponse::from)
+                                .collect::<Vec<_>>(),
+                        )
+                        .into_future(),
+                ),
                 Err(err) => Box::new(
                     HttpResponse::RequestTimeout()
                         .json(ErrorResponse::request_timeout(&format!(

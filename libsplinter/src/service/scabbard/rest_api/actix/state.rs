@@ -20,7 +20,9 @@ use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard};
 use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{Scabbard, SERVICE_TYPE};
+use crate::service::scabbard::{
+    rest_api::resources::state::StateEntryResponse, Scabbard, SERVICE_TYPE,
+};
 
 pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {
@@ -55,20 +57,18 @@ pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
 
             Box::new(match scabbard.get_state_with_prefix(prefix) {
                 Ok(state_iter) => {
-                    let res = state_iter
-                        .map(|res| {
-                            res.map(|(address, value)| {
-                                json!({
-                                    "address": address,
-                                    "value": value,
-                                })
-                            })
-                        })
-                        .collect::<Result<Vec<_>, _>>();
+                    let res = state_iter.collect::<Result<Vec<_>, _>>();
                     match res {
-                        Ok(entries) => HttpResponse::Ok().json(entries).into_future(),
+                        Ok(entries) => HttpResponse::Ok()
+                            .json(
+                                entries
+                                    .iter()
+                                    .map(StateEntryResponse::from)
+                                    .collect::<Vec<_>>(),
+                            )
+                            .into_future(),
                         Err(err) => {
-                            error!("Failed to convert state iterator: {}", err);
+                            error!("Failed to consume state iterator: {}", err);
                             HttpResponse::InternalServerError()
                                 .json(ErrorResponse::internal_error())
                                 .into_future()

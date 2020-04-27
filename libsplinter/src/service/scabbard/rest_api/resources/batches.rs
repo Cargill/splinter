@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix")]
-pub mod actix;
-pub mod resources;
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BatchLinkResponse<'a> {
+    link: &'a str,
+}
+
+impl<'a> From<&'a str> for BatchLinkResponse<'a> {
+    fn from(link: &'a str) -> Self {
+        Self { link }
+    }
+}

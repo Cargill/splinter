@@ -22,7 +22,9 @@ use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard};
 use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{Scabbard, SERVICE_TYPE};
+use crate::service::scabbard::{
+    rest_api::resources::batches::BatchLinkResponse, Scabbard, SERVICE_TYPE,
+};
 
 pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {
@@ -64,7 +66,9 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
                         };
 
                         match scabbard.add_batches(batches) {
-                            Ok(Some(link)) => HttpResponse::Accepted().json(link).into_future(),
+                            Ok(Some(link)) => HttpResponse::Accepted()
+                                .json(BatchLinkResponse::from(link.as_str()))
+                                .into_future(),
                             Ok(None) => HttpResponse::BadRequest()
                                 .json(ErrorResponse::bad_request("No valid batches provided"))
                                 .into_future(),

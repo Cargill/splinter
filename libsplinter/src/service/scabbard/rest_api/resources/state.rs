@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix")]
-pub mod actix;
-pub mod resources;
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StateEntryResponse<'a> {
+    pub address: &'a str,
+    pub value: &'a [u8],
+}
+
+impl<'a> From<&'a (String, Vec<u8>)> for StateEntryResponse<'a> {
+    fn from(entry: &'a (String, Vec<u8>)) -> Self {
+        Self {
+            address: &entry.0,
+            value: &entry.1,
+        }
+    }
+}

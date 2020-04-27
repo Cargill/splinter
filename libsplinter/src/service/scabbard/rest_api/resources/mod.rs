@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "rest-api-actix")]
-pub mod actix;
-pub mod resources;
+pub mod batch_statuses;
+pub mod batches;
+#[cfg(feature = "scabbard-get-state")]
+pub mod state;
