@@ -145,7 +145,7 @@ fn main() {
         (@arg registry_forced_refresh: --("registry-forced-refresh") +takes_value
             "How long before remote node registries should fetch upstream changes when read \
              (in seconds); default is 10, 0 means off")
-        (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
+        (@arg admin_timeout: --("admin-timeout") +takes_value
             "The coordinator timeout for admin service proposals (in seconds); default is \
              30 seconds")
         (@arg verbose: -v --verbose +multiple
@@ -332,7 +332,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "database")]
     let db_url = config.database();
 
-    let admin_service_coordinator_timeout = config.admin_service_coordinator_timeout();
+    let admin_timeout = config.admin_timeout();
 
     config.log_as_debug();
 
@@ -354,7 +354,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_registry_auto_refresh(config.registry_auto_refresh())
         .with_registry_forced_refresh(config.registry_forced_refresh())
         .with_heartbeat(config.heartbeat())
-        .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
+        .with_admin_timeout(admin_timeout);
 
     #[cfg(feature = "database")]
     {

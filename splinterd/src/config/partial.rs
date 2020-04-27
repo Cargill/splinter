@@ -51,7 +51,7 @@ pub struct PartialConfig {
     registry_auto_refresh: Option<u64>,
     registry_forced_refresh: Option<u64>,
     heartbeat: Option<u64>,
-    admin_service_coordinator_timeout: Option<Duration>,
+    admin_timeout: Option<Duration>,
     state_dir: Option<String>,
     tls_insecure: Option<bool>,
     no_tls: Option<bool>,
@@ -87,7 +87,7 @@ impl PartialConfig {
             registry_auto_refresh: None,
             registry_forced_refresh: None,
             heartbeat: None,
-            admin_service_coordinator_timeout: None,
+            admin_timeout: None,
             state_dir: None,
             tls_insecure: None,
             no_tls: None,
@@ -183,8 +183,8 @@ impl PartialConfig {
         self.heartbeat
     }
 
-    pub fn admin_service_coordinator_timeout(&self) -> Option<Duration> {
-        self.admin_service_coordinator_timeout
+    pub fn admin_timeout(&self) -> Option<Duration> {
+        self.admin_timeout
     }
 
     pub fn state_dir(&self) -> Option<String> {
@@ -460,12 +460,12 @@ impl PartialConfig {
     ///
     /// * `timeout` - The coordinator timeout for admin service proposals (in milliseconds).
     ///
-    pub fn with_admin_service_coordinator_timeout(mut self, timeout: Option<u64>) -> Self {
+    pub fn with_admin_timeout(mut self, timeout: Option<u64>) -> Self {
         let duration: Option<Duration> = match timeout {
             Some(t) => Some(Duration::from_secs(t)),
             _ => None,
         };
-        self.admin_service_coordinator_timeout = duration;
+        self.admin_timeout = duration;
         self
     }
 

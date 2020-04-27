@@ -123,7 +123,7 @@ pub struct SplinterDaemon {
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
     storage_type: String,
-    admin_service_coordinator_timeout: Duration,
+    admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
 }
@@ -416,7 +416,7 @@ impl SplinterDaemon {
             key_registry.clone(),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
-            Some(self.admin_service_coordinator_timeout),
+            Some(self.admin_timeout),
         )
         .map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
@@ -731,7 +731,7 @@ pub struct SplinterDaemonBuilder {
     registry_forced_refresh: Option<u64>,
     storage_type: Option<String>,
     heartbeat: Option<u64>,
-    admin_service_coordinator_timeout: Duration,
+    admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
 }
@@ -828,8 +828,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_admin_service_coordinator_timeout(mut self, value: Duration) -> Self {
-        self.admin_service_coordinator_timeout = value;
+    pub fn with_admin_timeout(mut self, value: Duration) -> Self {
+        self.admin_timeout = value;
         self
     }
 
@@ -932,7 +932,7 @@ impl SplinterDaemonBuilder {
             key_registry_location,
             node_registry_directory,
             storage_type,
-            admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
+            admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
         })

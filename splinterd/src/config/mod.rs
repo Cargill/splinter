@@ -63,7 +63,7 @@ pub struct Config {
     registry_auto_refresh: (u64, ConfigSource),
     registry_forced_refresh: (u64, ConfigSource),
     heartbeat: (u64, ConfigSource),
-    admin_service_coordinator_timeout: (Duration, ConfigSource),
+    admin_timeout: (Duration, ConfigSource),
     state_dir: (String, ConfigSource),
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
@@ -155,8 +155,8 @@ impl Config {
         self.heartbeat.0
     }
 
-    pub fn admin_service_coordinator_timeout(&self) -> Duration {
-        self.admin_service_coordinator_timeout.0
+    pub fn admin_timeout(&self) -> Duration {
+        self.admin_timeout.0
     }
 
     pub fn state_dir(&self) -> &str {
@@ -266,8 +266,8 @@ impl Config {
         &self.heartbeat.1
     }
 
-    fn admin_service_coordinator_timeout_source(&self) -> &ConfigSource {
-        &self.admin_service_coordinator_timeout.1
+    fn admin_timeout_source(&self) -> &ConfigSource {
+        &self.admin_timeout.1
     }
 
     fn state_dir_source(&self) -> &ConfigSource {
@@ -400,9 +400,9 @@ impl Config {
             self.heartbeat_source()
         );
         debug!(
-            "Config: admin_service_coordinator_timeout: {:?} (source: {:?})",
-            self.admin_service_coordinator_timeout(),
-            self.admin_service_coordinator_timeout_source()
+            "Config: admin_timeout: {:?} (source: {:?})",
+            self.admin_timeout(),
+            self.admin_timeout_source()
         );
         #[cfg(feature = "database")]
         debug!(
@@ -937,11 +937,11 @@ mod tests {
             (30, &ConfigSource::Default)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for
-        // `admin_service_coordinator_timeout` (source should be Default).
+        // `admin_timeout` (source should be Default).
         assert_eq!(
             (
-                final_config.admin_service_coordinator_timeout(),
-                final_config.admin_service_coordinator_timeout_source()
+                final_config.admin_timeout(),
+                final_config.admin_timeout_source()
             ),
             (Duration::from_secs(30), &ConfigSource::Default)
         );

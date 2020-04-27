@@ -245,10 +245,10 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("heartbeat interval".to_string()))?,
-            admin_service_coordinator_timeout: self
+            admin_timeout: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.admin_service_coordinator_timeout() {
+                .find_map(|p| match p.admin_timeout() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
@@ -362,7 +362,7 @@ mod tests {
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.heartbeat(), None);
-        assert_eq!(config.admin_service_coordinator_timeout(), None);
+        assert_eq!(config.admin_timeout(), None);
     }
 
     #[test]
@@ -395,7 +395,7 @@ mod tests {
             .with_bind(None)
             .with_registries(Some(vec![]))
             .with_heartbeat(None)
-            .with_admin_service_coordinator_timeout(None);
+            .with_admin_timeout(None);
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(partial_config);
     }
@@ -429,7 +429,7 @@ mod tests {
         partial_config = partial_config.with_peers(Some(vec![]));
         partial_config = partial_config.with_node_id(Some(EXAMPLE_NODE_ID.to_string()));
         partial_config = partial_config.with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()));
-        partial_config = partial_config.with_admin_service_coordinator_timeout(None);
+        partial_config = partial_config.with_admin_timeout(None);
         partial_config = partial_config.with_registries(Some(vec![]));
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(partial_config);

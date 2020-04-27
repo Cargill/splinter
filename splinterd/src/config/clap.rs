@@ -180,7 +180,7 @@ mod tests {
         assert_eq!(config.registry_auto_refresh(), None);
         assert_eq!(config.registry_forced_refresh(), None);
         assert_eq!(config.heartbeat(), None);
-        assert_eq!(config.admin_service_coordinator_timeout(), None);
+        assert_eq!(config.admin_timeout(), None);
         assert_eq!(config.tls_insecure(), Some(true));
         assert_eq!(config.no_tls(), Some(true));
     }

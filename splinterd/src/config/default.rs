@@ -58,7 +58,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_registry_auto_refresh(Some(REGISTRY_AUTO_REFRESH_DEFAULT))
             .with_registry_forced_refresh(Some(REGISTRY_FORCED_REFRESH_DEFAULT))
             .with_heartbeat(Some(HEARTBEAT_DEFAULT))
-            .with_admin_service_coordinator_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
+            .with_admin_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
             .with_tls_insecure(Some(false))
             .with_no_tls(Some(false));
@@ -117,7 +117,7 @@ mod tests {
         );
         assert_eq!(config.heartbeat(), Some(HEARTBEAT_DEFAULT));
         assert_eq!(
-            config.admin_service_coordinator_timeout(),
+            config.admin_timeout(),
             Some(Duration::from_secs(
                 DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT
             ))
