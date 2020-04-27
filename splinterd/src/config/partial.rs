@@ -512,8 +512,8 @@ impl PartialConfig {
     ///
     /// * `enable_biome` - Enable biome REST API routes
     ///
-    pub fn with_enable_biomed(mut self, enable_biomed: Option<bool>) -> Self {
-        self.enable_biomed = enable_biomed;
+    pub fn with_enable_biome(mut self, enable_biome: Option<bool>) -> Self {
+        self.enable_biome = enable_biome;
         self
     }
 

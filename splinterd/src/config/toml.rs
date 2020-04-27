@@ -177,6 +177,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
 mod tests {
     use super::*;
 
+    use std::time::Duration;
+
     use toml::{map::Map, Value};
 
     /// Path to an example config toml file.
@@ -193,6 +195,10 @@ mod tests {
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NODE_ID: &str = "012";
     static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
+    static EXAMPLE_HEARTBEAT: u64 = 20;
+    static EXAMPLE_REGISTRY_AUTO: u64 = 19;
+    static EXAMPLE_REGISTRY_FORCE: u64 = 18;
+    static EXAMPLE_ADMIN_TIMEOUT: u64 = 17;
 
     /// Converts a list of tuples to a toml Table Value used to write a toml file.
     fn get_toml_value() -> Value {
@@ -240,6 +246,26 @@ mod tests {
         let mut config_values = Map::new();
         values.iter().for_each(|v| {
             config_values.insert(v.0.clone(), Value::String(v.1.clone()));
+        });
+
+        let u64_values = vec![
+            ("heartbeat_interval".to_string(), EXAMPLE_HEARTBEAT),
+            (
+                "registry_auto_refresh_interval".to_string(),
+                EXAMPLE_REGISTRY_AUTO,
+            ),
+            (
+                "registry_forced_refresh_interval".to_string(),
+                EXAMPLE_REGISTRY_FORCE,
+            ),
+            (
+                "admin_service_coordinator_timeout".to_string(),
+                EXAMPLE_ADMIN_TIMEOUT,
+            ),
+        ];
+
+        u64_values.iter().for_each(|v| {
+            config_values.insert(v.0.clone(), Value::Integer(v.1.clone() as i64));
         });
         Value::Table(config_values)
     }
@@ -318,8 +344,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        assert_eq!(config.heartbeat(), None);
-        assert_eq!(config.admin_timeout(), None);
+        assert_eq!(config.heartbeat(), Some(20));
+        assert_eq!(config.registry_auto_refresh(), Some(19));
+        assert_eq!(config.registry_forced_refresh(), Some(18));
+        assert_eq!(config.admin_timeout(), Some(Duration::from_secs(17)));
     }
 
     #[test]
