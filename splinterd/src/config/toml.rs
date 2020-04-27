@@ -42,7 +42,7 @@ struct TomlConfig {
     database: Option<String>,
     registries: Option<Vec<String>>,
     registry_auto_refresh: Option<u64>,
-    registry_forced_refresh_interval: Option<u64>,
+    registry_forced_refresh: Option<u64>,
     heartbeat: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
     version: Option<String>,
@@ -58,6 +58,7 @@ struct TomlConfig {
     server_key: Option<String>,
     heartbeat_interval: Option<u64>,
     registry_auto_refresh_interval: Option<u64>,
+    registry_forced_refresh_interval: Option<u64>,
 }
 
 pub struct TomlPartialConfigBuilder {
@@ -118,9 +119,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_bind(self.toml_config.bind)
             .with_registries(self.toml_config.registries)
             .with_registry_auto_refresh(self.toml_config.registry_auto_refresh)
-            .with_registry_forced_refresh_interval(
-                self.toml_config.registry_forced_refresh_interval,
-            )
+            .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
             .with_heartbeat(self.toml_config.heartbeat)
             .with_admin_service_coordinator_timeout(
                 self.toml_config.admin_service_coordinator_timeout,
@@ -161,6 +160,10 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         if partial_config.registry_auto_refresh().is_none() {
             partial_config = partial_config
                 .with_registry_auto_refresh(self.toml_config.registry_auto_refresh_interval)
+        }
+        if partial_config.registry_forced_refresh().is_none() {
+            partial_config = partial_config
+                .with_registry_forced_refresh(self.toml_config.registry_forced_refresh_interval)
         }
 
         Ok(partial_config)
@@ -276,7 +279,7 @@ mod tests {
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
         assert_eq!(config.registry_auto_refresh(), None);
-        assert_eq!(config.registry_forced_refresh_interval(), None);
+        assert_eq!(config.registry_forced_refresh(), None);
         assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }

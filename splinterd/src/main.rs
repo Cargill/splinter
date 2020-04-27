@@ -142,7 +142,7 @@ fn main() {
         (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
             "How often remote node registries should attempt to fetch upstream changes in the \
              background (in seconds); default is 600 (10 minutes), 0 means off")
-        (@arg registry_forced_refresh_interval: --("registry-forced-refresh") +takes_value
+        (@arg registry_forced_refresh: --("registry-forced-refresh") +takes_value
             "How long before remote node registries should fetch upstream changes when read \
              (in seconds); default is 10, 0 means off")
         (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
@@ -352,7 +352,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())
         .with_registry_auto_refresh(config.registry_auto_refresh())
-        .with_registry_forced_refresh_interval(config.registry_forced_refresh_interval())
+        .with_registry_forced_refresh(config.registry_forced_refresh())
         .with_heartbeat(config.heartbeat())
         .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
 

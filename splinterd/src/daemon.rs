@@ -121,7 +121,7 @@ pub struct SplinterDaemon {
     biome_enabled: bool,
     registries: Vec<String>,
     registry_auto_refresh: u64,
-    registry_forced_refresh_interval: u64,
+    registry_forced_refresh: u64,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
@@ -427,7 +427,7 @@ impl SplinterDaemon {
             &self.node_registry_directory,
             &self.registries,
             self.registry_auto_refresh,
-            self.registry_forced_refresh_interval,
+            self.registry_forced_refresh,
         )?;
 
         let node_id = self.node_id.clone();
@@ -728,7 +728,7 @@ pub struct SplinterDaemonBuilder {
     biome_enabled: bool,
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
-    registry_forced_refresh_interval: Option<u64>,
+    registry_forced_refresh: Option<u64>,
     storage_type: Option<String>,
     heartbeat: Option<u64>,
     admin_service_coordinator_timeout: Duration,
@@ -813,8 +813,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_registry_forced_refresh_interval(mut self, value: u64) -> Self {
-        self.registry_forced_refresh_interval = Some(value);
+    pub fn with_registry_forced_refresh(mut self, value: u64) -> Self {
+        self.registry_forced_refresh = Some(value);
         self
     }
 
@@ -904,12 +904,9 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: registry_auto_refresh".to_string())
         })?;
 
-        let registry_forced_refresh_interval =
-            self.registry_forced_refresh_interval.ok_or_else(|| {
-                CreateError::MissingRequiredField(
-                    "Missing field: registry_forced_refresh_interval".to_string(),
-                )
-            })?;
+        let registry_forced_refresh = self.registry_forced_refresh.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: registry_forced_refresh".to_string())
+        })?;
 
         let storage_type = self.storage_type.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: storage_type".to_string())
@@ -931,7 +928,7 @@ impl SplinterDaemonBuilder {
             biome_enabled: self.biome_enabled,
             registries: self.registries,
             registry_auto_refresh,
-            registry_forced_refresh_interval,
+            registry_forced_refresh,
             key_registry_location,
             node_registry_directory,
             storage_type,

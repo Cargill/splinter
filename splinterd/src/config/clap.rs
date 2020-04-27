@@ -74,10 +74,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
             .with_registry_auto_refresh(parse_value(&self.matches, "registry_auto_refresh")?)
-            .with_registry_forced_refresh_interval(parse_value(
-                &self.matches,
-                "registry_forced_refresh_interval",
-            )?)
+            .with_registry_forced_refresh(parse_value(&self.matches, "registry_forced_refresh")?)
             .with_heartbeat(parse_value(&self.matches, "heartbeat")?)
             .with_tls_insecure(if self.matches.is_present("tls_insecure") {
                 Some(true)
@@ -181,7 +178,7 @@ mod tests {
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
         assert_eq!(config.registry_auto_refresh(), None);
-        assert_eq!(config.registry_forced_refresh_interval(), None);
+        assert_eq!(config.registry_forced_refresh(), None);
         assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
         assert_eq!(config.tls_insecure(), Some(true));

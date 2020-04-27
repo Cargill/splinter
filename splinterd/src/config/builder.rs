@@ -227,10 +227,10 @@ impl ConfigBuilder {
                 .ok_or_else(|| {
                     ConfigError::MissingValue("registry auto refresh interval".to_string())
                 })?,
-            registry_forced_refresh_interval: self
+            registry_forced_refresh: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_forced_refresh_interval() {
+                .find_map(|p| match p.registry_forced_refresh() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })

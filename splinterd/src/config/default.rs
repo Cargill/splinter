@@ -56,7 +56,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_bind(Some(String::from("127.0.0.1:8080")))
             .with_registries(Some(vec![]))
             .with_registry_auto_refresh(Some(REGISTRY_AUTO_REFRESH_DEFAULT))
-            .with_registry_forced_refresh_interval(Some(REGISTRY_FORCED_REFRESH_DEFAULT))
+            .with_registry_forced_refresh(Some(REGISTRY_FORCED_REFRESH_DEFAULT))
             .with_heartbeat(Some(HEARTBEAT_DEFAULT))
             .with_admin_service_coordinator_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
@@ -112,7 +112,7 @@ mod tests {
             Some(REGISTRY_AUTO_REFRESH_DEFAULT)
         );
         assert_eq!(
-            config.registry_forced_refresh_interval(),
+            config.registry_forced_refresh(),
             Some(REGISTRY_FORCED_REFRESH_DEFAULT)
         );
         assert_eq!(config.heartbeat(), Some(HEARTBEAT_DEFAULT));
