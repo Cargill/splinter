@@ -176,15 +176,22 @@ impl ServiceFactory for ScabbardFactory {
 
     #[cfg(feature = "rest-api")]
     fn get_rest_endpoints(&self) -> Vec<crate::service::rest_api::ServiceEndpoint> {
+        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
+        // enabled
+        #[allow(unused_mut)]
         let mut endpoints = vec![];
 
-        endpoints.push(super::rest_api::make_add_batches_to_queue_endpoint());
-        endpoints.push(super::rest_api::make_subscribe_endpoint());
-        endpoints.push(super::rest_api::make_get_batch_status_endpoint());
-        #[cfg(feature = "scabbard-get-state")]
+        #[cfg(feature = "rest-api-actix")]
         {
-            endpoints.push(super::rest_api::make_get_state_at_address_endpoint());
-            endpoints.push(super::rest_api::make_get_state_with_prefix_endpoint());
+            use super::rest_api::actix;
+            endpoints.push(actix::batches::make_add_batches_to_queue_endpoint());
+            endpoints.push(actix::ws_subscribe::make_subscribe_endpoint());
+            endpoints.push(actix::batch_statuses::make_get_batch_status_endpoint());
+            #[cfg(feature = "scabbard-get-state")]
+            {
+                endpoints.push(actix::state_address::make_get_state_at_address_endpoint());
+                endpoints.push(actix::state::make_get_state_with_prefix_endpoint());
+            }
         }
 
         endpoints
