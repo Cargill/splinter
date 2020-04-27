@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -290,64 +290,10 @@ where
         let send_join_handle = thread::Builder::new()
             .name("PeerInterconnect Sender".into())
             .spawn(move || {
-                loop {
-                    // receive message from internal handlers to send over the network
-                    let (recipient, payload) = match dispatched_receiver.recv() {
-                        Ok(SendRequest::Message { recipient, payload }) => (recipient, payload),
-                        Ok(SendRequest::Shutdown) => {
-                            info!("Received Shutdown");
-                            break;
-                        }
-                        Err(err) => {
-                            error!("Unable to receive message from handlers: {}", err);
-                            break;
-                        }
-                    };
-                    // convert recipient (peer_id) to connection_id
-                    let connection_id = {
-                        let mut peers = match peers.lock() {
-                            Ok(recv_peers) => recv_peers,
-                            Err(_) => {
-                                error!("PeerInterconnect state has been poisoned");
-                                break;
-                            }
-                        };
-
-                        let mut connection_id = peers
-                            .get_by_key(&recipient)
-                            .to_owned()
-                            .unwrap_or(&"".to_string())
-                            .to_string();
-
-                        if connection_id.is_empty() {
-                            *peers = match peer_connector.connection_ids() {
-                                Ok(peers) => peers,
-                                Err(err) => {
-                                    error!("Unable to get peer map: {}", err);
-                                    break;
-                                }
-                            };
-
-                            connection_id = peers
-                                .get_by_key(&recipient)
-                                .to_owned()
-                                .unwrap_or(&"".to_string())
-                                .to_string();
-                        }
-                        connection_id
-                    };
-
-                    // if peer exists, send message over the network
-                    if !connection_id.is_empty() {
-                        match message_sender.send(connection_id.to_string(), payload) {
-                            Ok(_) => (),
-                            Err(err) => {
-                                error!("Unable to send message to {}", err);
-                            }
-                        }
-                    } else {
-                        error!("Cannot send message, unknown peer: {}", recipient);
-                    }
+                if let Err(err) =
+                    run_send_loop(peers, &peer_connector, dispatched_receiver, message_sender)
+                {
+                    error!("Shutting down peer interconnect sender: {}", err);
                 }
             })
             .map_err(|err| {
@@ -366,6 +312,70 @@ where
                 dispatch_shutdown: network_dispatcher_shutdown,
             },
         })
+    }
+}
+
+fn run_send_loop<S>(
+    peers: Arc<Mutex<BiHashMap<String, String>>>,
+    peer_connector: &PeerManagerConnector,
+    receiver: Receiver<SendRequest>,
+    message_sender: S,
+) -> Result<(), String>
+where
+    S: MatrixSender + 'static,
+{
+    loop {
+        // receive message from internal handlers to send over the network
+        let (recipient, payload) = match receiver.recv() {
+            Ok(SendRequest::Message { recipient, payload }) => (recipient, payload),
+            Ok(SendRequest::Shutdown) => {
+                info!("Received Shutdown");
+                break Ok(());
+            }
+            Err(err) => {
+                break Err(format!("Unable to receive message from handlers: {}", err));
+            }
+        };
+        // convert recipient (peer_id) to connection_id
+        let connection_id = {
+            let mut peers = match peers.lock() {
+                Ok(recv_peers) => recv_peers,
+                Err(_) => {
+                    break Err("PeerInterconnect state has been poisoned".into());
+                }
+            };
+
+            let mut connection_id = peers
+                .get_by_key(&recipient)
+                .to_owned()
+                .unwrap_or(&"".to_string())
+                .to_string();
+
+            if connection_id.is_empty() {
+                *peers = match peer_connector.connection_ids() {
+                    Ok(peers) => peers,
+                    Err(err) => {
+                        break Err(format!("Unable to get peer map: {}", err));
+                    }
+                };
+
+                connection_id = peers
+                    .get_by_key(&recipient)
+                    .to_owned()
+                    .unwrap_or(&"".to_string())
+                    .to_string();
+            }
+            connection_id
+        };
+
+        // if peer exists, send message over the network
+        if !connection_id.is_empty() {
+            if let Err(err) = message_sender.send(connection_id.to_string(), payload) {
+                error!("Unable to send message to {}: {}", recipient, err);
+            }
+        } else {
+            error!("Cannot send message, unknown peer: {}", recipient);
+        }
     }
 }
 
