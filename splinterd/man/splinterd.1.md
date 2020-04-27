@@ -112,6 +112,9 @@ OPTIONS
   Any options on the command line will override the settings in the
   configuration file.
 
+`--display-name DISPLAY-NAME`
+: Specifies a human-readable name for the node (Default: "Node NODE-ID")
+
 `--database DB-URL`
 : Specifies the URL for the PostgreSQL database used for Biome. (Default:
   127.0.0.1:5432.) This option is required when `--enable-biome` is used.
@@ -134,10 +137,11 @@ OPTIONS
 `--peer PEER-URL` `[,...]`
 : Specifies one or more Splinter nodes that `splinterd` will automatically
   connect to when it starts. The *PEER-URL* argument must specify another node's
-  network endpoint, using the format `ip:port`.
+  network endpoint, using the format `protocol_prefix://ip:port`.
 
   Specify multiple nodes in a comma-separated list or by repeating the
-  `--peer` option.
+  `--peer` option. The protocol prefix part of the peer URL specifies the
+  type of connection that is created.
 
 `--registry REGISTRY-FILE` `[,...]`
 : Specifies one or more read-only node registry files.
