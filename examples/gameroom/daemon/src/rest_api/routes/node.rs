@@ -46,15 +46,15 @@ pub async fn fetch_node(
             Ok(HttpResponse::Ok().json(SuccessResponse::new(node)))
         }
         StatusCode::NOT_FOUND => {
-            let message: String = serde_json::from_slice(&body)?;
-            Ok(HttpResponse::NotFound().json(ErrorResponse::not_found(&message)))
+            let err_response: SplinterdErrorResponse = serde_json::from_slice(&body)?;
+            Ok(HttpResponse::NotFound().json(ErrorResponse::not_found(&err_response.message)))
         }
         _ => {
-            let message: String = serde_json::from_slice(&body)?;
+            let err_response: SplinterdErrorResponse = serde_json::from_slice(&body)?;
             debug!(
                 "Internal Server Error. Splinterd responded with error {} message {}",
                 response.status(),
-                message
+                err_response.message
             );
             Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
         }
@@ -104,19 +104,24 @@ pub async fn list_nodes(
             Ok(HttpResponse::Ok().json(list_reponse))
         }
         StatusCode::BAD_REQUEST => {
-            let message: String = serde_json::from_slice(&body)?;
-            Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)))
+            let err_response: SplinterdErrorResponse = serde_json::from_slice(&body)?;
+            Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&err_response.message)))
         }
         _ => {
-            let message: String = serde_json::from_slice(&body)?;
+            let err_response: SplinterdErrorResponse = serde_json::from_slice(&body)?;
             debug!(
                 "Internal Server Error. Splinterd responded with error {} message {}",
                 response.status(),
-                message
+                err_response.message
             );
             Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
         }
     }
+}
+
+#[derive(Deserialize)]
+struct SplinterdErrorResponse {
+    message: String,
 }
 
 #[cfg(all(feature = "test-node-endpoint", test))]
