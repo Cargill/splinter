@@ -13,7 +13,6 @@
 // limitations under the License.
 
 mod gameroom;
-mod gameroom_user;
 mod notification;
 mod xo_games;
 
@@ -28,7 +27,6 @@ pub use gameroom::{
     update_gameroom_member_status, update_gameroom_proposal_status,
     update_gameroom_service_last_event, update_gameroom_service_status, update_gameroom_status,
 };
-pub use gameroom_user::{fetch_user_by_email, insert_user};
 pub use notification::{
     create_new_notification, fetch_notification, fetch_notifications_by_time,
     get_unread_notification_count, insert_gameroom_notification,

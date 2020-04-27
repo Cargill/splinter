@@ -16,15 +16,6 @@
  */
 
 table! {
-    gameroom_user (email) {
-        email -> Text,
-        public_key -> Text,
-        encrypted_private_key -> Text,
-        hashed_password -> Text,
-    }
-}
-
-table! {
     gameroom (circuit_id) {
         circuit_id -> Text,
         authorization_type -> Text,

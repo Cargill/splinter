@@ -13,5 +13,5 @@
 # limitations under the License.
 
 PGPASSWORD=gameroom_test psql -h db-cypress-test -U gameroom_test -c \
-    'TRUNCATE gameroom_user, gameroom, gameroom_proposal, proposal_vote_record,
+    'TRUNCATE gameroom, gameroom_proposal, proposal_vote_record,
       gameroom_member, gameroom_service, gameroom_notification, xo_games';
