@@ -32,5 +32,9 @@ pub trait ServiceFactory: Send {
     ) -> Result<Box<dyn Service>, FactoryCreateError>;
 
     #[cfg(feature = "rest-api")]
+    /// Get the [`ServiceEndpoint`] definitions that represent the REST API resources provided by
+    /// the services that this factory can create.
+    ///
+    /// [`ServiceEndpoint`]: rest_api/struct.ServiceEndpoint.html
     fn get_rest_endpoints(&self) -> Vec<super::rest_api::ServiceEndpoint>;
 }

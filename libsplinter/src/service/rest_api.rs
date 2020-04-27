@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Defines REST API functionality for Splinter services.
+
 use std::sync::Arc;
 
 use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
@@ -20,7 +22,8 @@ use crate::rest_api::{Continuation, Method, RequestGuard};
 
 use super::Service;
 
-type Handler = Arc<
+/// The type for functions that handle REST API requests made to service endpoints.
+pub type Handler = Arc<
     dyn Fn(
             HttpRequest,
             web::Payload,
@@ -31,11 +34,17 @@ type Handler = Arc<
         + 'static,
 >;
 
+/// Represents a REST API endpoint provided by a service.
 pub struct ServiceEndpoint {
+    /// The type of service this endpoint belongs to
     pub service_type: String,
+    /// The enpoint's route
     pub route: String,
+    /// The endpoint's HTTP method
     pub method: Method,
+    /// The function that handles requests made to this endpoint
     pub handler: Handler,
+    /// Guards for this endpoint
     pub request_guards: Vec<Box<dyn ServiceRequestGuard>>,
 }
 

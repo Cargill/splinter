@@ -18,6 +18,13 @@ use crate::rest_api::{Resource, RestResourceProvider};
 
 use super::ServiceOrchestrator;
 
+/// The `ServiceOrchestrator` exposes REST API resources provided by the
+/// [`ServiceFactory::get_rest_endpoints`] methods of its factories. Each factory defines the
+/// endpoints provided by the services it creates; the `ServiceOrchestrator` then exposes these
+/// endpoints under the `/{service_type}/{circuit}/{service_id}` route.
+///
+/// [`ServiceFactory::get_rest_endpoints`]:
+///   ../service/factory/trait.ServiceFactory.html#tymethod.get_rest_endpoints
 impl RestResourceProvider for ServiceOrchestrator {
     fn resources(&self) -> Vec<Resource> {
         // Get endpoints for all factories
