@@ -91,7 +91,7 @@ OPTIONS
   (functions that use the two-phase commit agreement protocol in the Scabbard
   service).
 
-`--advertised-endpoint` `ADVERTISED-ENDPOINT`
+`--advertised-endpoints` `ADVERTISED-ENDPOINT`
 : Specifies the public network endpoint for daemon-to-daemon communication
   between Splinter nodes, if the network endpoint is not public. Use the format
   `tcp://ip:port`. (Default: Same as the network endpoint; see

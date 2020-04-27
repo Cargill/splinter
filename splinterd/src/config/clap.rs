@@ -195,7 +195,7 @@ mod tests {
             (@arg display_name: --("display-name") +takes_value)
             (@arg storage: --("storage") +takes_value)
             (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
-            (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
+            (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
             (@arg peers: --peer +takes_value +multiple)
             (@arg tls_ca_file: --("tls-ca-file") +takes_value)
@@ -233,7 +233,7 @@ mod tests {
             EXAMPLE_STORAGE,
             "--network-endpoints",
             EXAMPLE_NETWORK_ENDPOINT,
-            "--advertised-endpoint",
+            "--advertised-endpoints",
             EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,

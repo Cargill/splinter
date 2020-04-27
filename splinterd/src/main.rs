@@ -127,8 +127,6 @@ fn main() {
           "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
-        (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple
-          "Publicly-visible network endpoints")
         (@arg service_endpoint: --("service-endpoint") +takes_value
           "Endpoint that service will connect to, tcp://ip:port")
         (@arg peers: --peer +takes_value +multiple
@@ -150,6 +148,15 @@ fn main() {
           "Increase output verbosity"));
 
     let app = app
+        .arg(
+            Arg::with_name("advertised_endpoints")
+                .long("advertised-endpoints")
+                .short("a")
+                .long_help("Publicly-visible network endpoints")
+                .takes_value(true)
+                .multiple(true)
+                .alias("advertised-endpoint"),
+        )
         .arg(
             Arg::with_name("heartbeat")
                 .long("heartbeat")
