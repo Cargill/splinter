@@ -59,7 +59,8 @@ const COMPLETED_BATCH_INFO_ITER_RETRY_MILLIS: u64 = 100;
 const DEFAULT_BATCH_HISTORY_SIZE: usize = 100;
 
 #[cfg(feature = "scabbard-get-state")]
-pub type StateIter = dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardStateError>>;
+/// Iterator over entries in a Scabbard service's state
+pub type StateIter = Box<dyn Iterator<Item = Result<(String, Vec<u8>), ScabbardStateError>>>;
 
 pub struct ScabbardState {
     db: Box<dyn Database>,
@@ -181,6 +182,7 @@ impl ScabbardState {
     }
 
     #[cfg(feature = "scabbard-get-state")]
+    /// Fetch the value at the given `address` in state. Returns `None` if the `address` is not set.
     pub fn get_state_at_address(
         &self,
         address: &str,
@@ -192,10 +194,13 @@ impl ScabbardState {
     }
 
     #[cfg(feature = "scabbard-get-state")]
+    /// Fetch a list of entries in state. If a `prefix` is provided, only return entries whose
+    /// addresses are under the given address prefix. If no `prefix` is provided, return all state
+    /// entries.
     pub fn get_state_with_prefix(
         &self,
         prefix: Option<&str>,
-    ) -> Result<Box<StateIter>, ScabbardStateError> {
+    ) -> Result<StateIter, ScabbardStateError> {
         Ok(Box::new(
             MerkleRadixTree::new(self.db.clone(), Some(&self.current_state_root))?
                 .leaves(prefix)?
