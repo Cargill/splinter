@@ -54,4 +54,11 @@ impl ErrorResponse {
             message: message.to_string(),
         }
     }
+
+    pub fn request_timeout(message: &str) -> ErrorResponse {
+        ErrorResponse {
+            code: "408".to_string(),
+            message: message.to_string(),
+        }
+    }
 }
