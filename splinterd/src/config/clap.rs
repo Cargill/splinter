@@ -73,10 +73,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .values_of("registries")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
-            .with_registry_auto_refresh_interval(parse_value(
-                &self.matches,
-                "registry_auto_refresh_interval",
-            )?)
+            .with_registry_auto_refresh(parse_value(&self.matches, "registry_auto_refresh")?)
             .with_registry_forced_refresh_interval(parse_value(
                 &self.matches,
                 "registry_forced_refresh_interval",
@@ -183,7 +180,7 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        assert_eq!(config.registry_auto_refresh_interval(), None);
+        assert_eq!(config.registry_auto_refresh(), None);
         assert_eq!(config.registry_forced_refresh_interval(), None);
         assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);

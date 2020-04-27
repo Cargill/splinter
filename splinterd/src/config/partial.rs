@@ -48,7 +48,7 @@ pub struct PartialConfig {
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
-    registry_auto_refresh_interval: Option<u64>,
+    registry_auto_refresh: Option<u64>,
     registry_forced_refresh_interval: Option<u64>,
     heartbeat: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
@@ -84,7 +84,7 @@ impl PartialConfig {
             #[cfg(feature = "database")]
             database: None,
             registries: None,
-            registry_auto_refresh_interval: None,
+            registry_auto_refresh: None,
             registry_forced_refresh_interval: None,
             heartbeat: None,
             admin_service_coordinator_timeout: None,
@@ -171,8 +171,8 @@ impl PartialConfig {
         self.registries.clone()
     }
 
-    pub fn registry_auto_refresh_interval(&self) -> Option<u64> {
-        self.registry_auto_refresh_interval
+    pub fn registry_auto_refresh(&self) -> Option<u64> {
+        self.registry_auto_refresh
     }
 
     pub fn registry_forced_refresh_interval(&self) -> Option<u64> {
@@ -416,18 +416,15 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `registry_auto_refresh_interval` value to the PartialConfig object.
+    /// Adds a `registry_auto_refresh` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `registry_auto_refresh_interval` - How often remote registries should be refreshed in the
+    /// * `registry_auto_refresh` - How often remote registries should be refreshed in the
     ///   background.
     ///
-    pub fn with_registry_auto_refresh_interval(
-        mut self,
-        registry_auto_refresh_interval: Option<u64>,
-    ) -> Self {
-        self.registry_auto_refresh_interval = registry_auto_refresh_interval;
+    pub fn with_registry_auto_refresh(mut self, registry_auto_refresh: Option<u64>) -> Self {
+        self.registry_auto_refresh = registry_auto_refresh;
         self
     }
 

@@ -217,10 +217,10 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("registries".to_string()))?,
-            registry_auto_refresh_interval: self
+            registry_auto_refresh: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_auto_refresh_interval() {
+                .find_map(|p| match p.registry_auto_refresh() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })

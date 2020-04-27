@@ -60,7 +60,7 @@ pub struct Config {
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
-    registry_auto_refresh_interval: (u64, ConfigSource),
+    registry_auto_refresh: (u64, ConfigSource),
     registry_forced_refresh_interval: (u64, ConfigSource),
     heartbeat: (u64, ConfigSource),
     admin_service_coordinator_timeout: (Duration, ConfigSource),
@@ -143,8 +143,8 @@ impl Config {
         &self.registries.0
     }
 
-    pub fn registry_auto_refresh_interval(&self) -> u64 {
-        self.registry_auto_refresh_interval.0
+    pub fn registry_auto_refresh(&self) -> u64 {
+        self.registry_auto_refresh.0
     }
 
     pub fn registry_forced_refresh_interval(&self) -> u64 {
@@ -254,8 +254,8 @@ impl Config {
         &self.registries.1
     }
 
-    fn registry_auto_refresh_interval_source(&self) -> &ConfigSource {
-        &self.registry_auto_refresh_interval.1
+    fn registry_auto_refresh_source(&self) -> &ConfigSource {
+        &self.registry_auto_refresh.1
     }
 
     fn registry_forced_refresh_interval_source(&self) -> &ConfigSource {
@@ -380,9 +380,9 @@ impl Config {
             self.registries_source()
         );
         debug!(
-            "Config: registry_auto_refresh_interval: {} (source: {:?})",
-            self.registry_auto_refresh_interval(),
-            self.registry_auto_refresh_interval_source()
+            "Config: registry_auto_refresh: {} (source: {:?})",
+            self.registry_auto_refresh(),
+            self.registry_auto_refresh_source()
         );
         debug!(
             "Config: registry_forced_refresh_interval: {} (source: {:?})",
@@ -913,11 +913,11 @@ mod tests {
             ("127.0.0.1:5432", &ConfigSource::Default)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for
-        // `registry_auto_refresh_interval` (source should be Default).
+        // `registry_auto_refresh` (source should be Default).
         assert_eq!(
             (
-                final_config.registry_auto_refresh_interval(),
-                final_config.registry_auto_refresh_interval_source()
+                final_config.registry_auto_refresh(),
+                final_config.registry_auto_refresh_source()
             ),
             (600, &ConfigSource::Default)
         );

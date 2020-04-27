@@ -120,7 +120,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registries: Vec<String>,
-    registry_auto_refresh_interval: u64,
+    registry_auto_refresh: u64,
     registry_forced_refresh_interval: u64,
     storage_type: String,
     admin_service_coordinator_timeout: Duration,
@@ -426,7 +426,7 @@ impl SplinterDaemon {
         let (node_registry, registry_shutdown) = create_node_registry(
             &self.node_registry_directory,
             &self.registries,
-            self.registry_auto_refresh_interval,
+            self.registry_auto_refresh,
             self.registry_forced_refresh_interval,
         )?;
 
@@ -727,7 +727,7 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "biome")]
     biome_enabled: bool,
     registries: Vec<String>,
-    registry_auto_refresh_interval: Option<u64>,
+    registry_auto_refresh: Option<u64>,
     registry_forced_refresh_interval: Option<u64>,
     storage_type: Option<String>,
     heartbeat: Option<u64>,
@@ -808,8 +808,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_registry_auto_refresh_interval(mut self, value: u64) -> Self {
-        self.registry_auto_refresh_interval = Some(value);
+    pub fn with_registry_auto_refresh(mut self, value: u64) -> Self {
+        self.registry_auto_refresh = Some(value);
         self
     }
 
@@ -900,12 +900,9 @@ impl SplinterDaemonBuilder {
             }
         }
 
-        let registry_auto_refresh_interval =
-            self.registry_auto_refresh_interval.ok_or_else(|| {
-                CreateError::MissingRequiredField(
-                    "Missing field: registry_auto_refresh_interval".to_string(),
-                )
-            })?;
+        let registry_auto_refresh = self.registry_auto_refresh.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: registry_auto_refresh".to_string())
+        })?;
 
         let registry_forced_refresh_interval =
             self.registry_forced_refresh_interval.ok_or_else(|| {
@@ -933,7 +930,7 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "biome")]
             biome_enabled: self.biome_enabled,
             registries: self.registries,
-            registry_auto_refresh_interval,
+            registry_auto_refresh,
             registry_forced_refresh_interval,
             key_registry_location,
             node_registry_directory,
