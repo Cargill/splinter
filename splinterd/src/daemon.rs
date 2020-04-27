@@ -118,7 +118,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "database")]
     db_url: Option<String>,
     #[cfg(feature = "biome")]
-    biome_enabled: bool,
+    enable_biome: bool,
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
@@ -473,7 +473,7 @@ impl SplinterDaemon {
 
         #[cfg(feature = "biome")]
         {
-            if self.biome_enabled {
+            if self.enable_biome {
                 let db_url = self.db_url.as_ref().ok_or_else(|| {
                     StartError::StorageError(
                         "biome was enabled but the builder failed to require the db URL".into(),
@@ -725,7 +725,7 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "database")]
     db_url: Option<String>,
     #[cfg(feature = "biome")]
-    biome_enabled: bool,
+    enable_biome: bool,
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
     registry_forced_refresh: Option<u64>,
@@ -799,7 +799,7 @@ impl SplinterDaemonBuilder {
 
     #[cfg(feature = "biome")]
     pub fn enable_biome(mut self, enabled: bool) -> Self {
-        self.biome_enabled = enabled;
+        self.enable_biome = enabled;
         self
     }
 
@@ -893,7 +893,7 @@ impl SplinterDaemonBuilder {
 
         #[cfg(feature = "biome")]
         {
-            if self.biome_enabled && db_url.is_none() {
+            if self.enable_biome && db_url.is_none() {
                 return Err(CreateError::MissingRequiredField(
                     "db_url is required to enable biome features.".to_string(),
                 ));
@@ -925,7 +925,7 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "database")]
             db_url,
             #[cfg(feature = "biome")]
-            biome_enabled: self.biome_enabled,
+            enable_biome: self.enable_biome,
             registries: self.registries,
             registry_auto_refresh,
             registry_forced_refresh,

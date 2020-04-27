@@ -56,7 +56,7 @@ pub struct PartialConfig {
     tls_insecure: Option<bool>,
     no_tls: Option<bool>,
     #[cfg(feature = "biome")]
-    biome_enabled: Option<bool>,
+    enable_biome: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
 }
@@ -92,7 +92,7 @@ impl PartialConfig {
             tls_insecure: None,
             no_tls: None,
             #[cfg(feature = "biome")]
-            biome_enabled: None,
+            enable_biome: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
         }
@@ -200,8 +200,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "biome")]
-    pub fn biome_enabled(&self) -> Option<bool> {
-        self.biome_enabled
+    pub fn enable_biome(&self) -> Option<bool> {
+        self.enable_biome
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -506,14 +506,14 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "biome")]
-    /// Adds a `biome_enabled` value to the PartialConfig object.
+    /// Adds a `enable_biome` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `biome_enabled` - Enable biome REST API routes
+    /// * `enable_biome` - Enable biome REST API routes
     ///
-    pub fn with_biome_enabled(mut self, biome_enabled: Option<bool>) -> Self {
-        self.biome_enabled = biome_enabled;
+    pub fn with_enable_biomed(mut self, enable_biomed: Option<bool>) -> Self {
+        self.enable_biomed = enable_biomed;
         self
     }
 

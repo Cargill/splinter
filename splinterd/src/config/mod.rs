@@ -68,7 +68,7 @@ pub struct Config {
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
     #[cfg(feature = "biome")]
-    biome_enabled: (bool, ConfigSource),
+    enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
 }
@@ -172,8 +172,8 @@ impl Config {
     }
 
     #[cfg(feature = "biome")]
-    pub fn biome_enabled(&self) -> bool {
-        self.biome_enabled.0
+    pub fn enable_biome(&self) -> bool {
+        self.enable_biome.0
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -283,8 +283,8 @@ impl Config {
     }
 
     #[cfg(feature = "biome")]
-    fn biome_enabled_source(&self) -> &ConfigSource {
-        &self.biome_enabled.1
+    fn enable_biome_source(&self) -> &ConfigSource {
+        &self.enable_biome.1
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -422,9 +422,9 @@ impl Config {
         );
         #[cfg(feature = "biome")]
         debug!(
-            "Config: biome_enabled: {:?} (source: {:?})",
-            self.biome_enabled(),
-            self.biome_enabled_source()
+            "Config: enable_biome: {:?} (source: {:?})",
+            self.enable_biome(),
+            self.enable_biome_source()
         );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
@@ -535,7 +535,7 @@ mod tests {
         (@arg bind: --("bind") +takes_value)
         (@arg tls_insecure: --("tls-insecure"))
         (@arg no_tls: --("no-tls"))
-        (@arg biome_enabled: --("enable-biome")))
+        (@arg enable_biome: --("enable-biome")))
         .get_matches_from(args)
     }
 

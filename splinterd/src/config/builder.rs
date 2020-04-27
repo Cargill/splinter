@@ -281,14 +281,14 @@ impl ConfigBuilder {
                 })
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
             #[cfg(feature = "biome")]
-            biome_enabled: self
+            enable_biome: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.biome_enabled() {
+                .find_map(|p| match p.enable_biome() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("biome_enabled".to_string()))?,
+                .ok_or_else(|| ConfigError::MissingValue("enable_biome".to_string()))?,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self
                 .partial_configs

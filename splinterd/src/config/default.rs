@@ -65,7 +65,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         #[cfg(feature = "biome")]
         {
-            partial_config = partial_config.with_biome_enabled(Some(false));
+            partial_config = partial_config.with_enable_biome(Some(false));
         }
 
         #[cfg(feature = "database")]
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(config.tls_insecure(), Some(false));
         assert_eq!(config.no_tls(), Some(false));
         #[cfg(feature = "biome")]
-        assert_eq!(config.biome_enabled(), Some(false));
+        assert_eq!(config.enable_biome(), Some(false));
         // Assert the source is correctly identified for this PartialConfig object.
         assert_eq!(config.source(), ConfigSource::Default);
     }

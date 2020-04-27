@@ -90,7 +90,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         #[cfg(feature = "biome")]
         {
             partial_config =
-                partial_config.with_biome_enabled(if self.matches.is_present("biome_enabled") {
+                partial_config.with_enable_biome(if self.matches.is_present("enable_biome") {
                     Some(true)
                 } else {
                     None

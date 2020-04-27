@@ -181,19 +181,19 @@ fn main() {
         )
         .arg(
             Arg::with_name("peers")
-              .long("peers")
-              .help("Endpoint that service will connect to, protocol-prefix://ip:port")
-              .takes_value(true)
-              .multiple(true)
-              .alias("peer"),
+                .long("peers")
+                .help("Endpoint that service will connect to, protocol-prefix://ip:port")
+                .takes_value(true)
+                .multiple(true)
+                .alias("peer"),
         )
         .arg(
             Arg::with_name("registries")
-              .long("registries")
-              .help("Read-only node registries")
-              .takes_value(true)
-              .multiple(true)
-              .alias("registry"),
+                .long("registries")
+                .help("Read-only node registries")
+                .takes_value(true)
+                .multiple(true)
+                .alias("registry"),
         )
         .arg(
             Arg::with_name("tls_cert_dir")
@@ -254,7 +254,7 @@ fn main() {
 
     #[cfg(feature = "biome")]
     let app = app.arg(
-        Arg::with_name("biome_enabled")
+        Arg::with_name("enable-biome")
             .long("enable-biome")
             .long_help("Enable the biome subsystem"),
     );
@@ -390,7 +390,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     #[cfg(feature = "biome")]
     {
-        daemon_builder = daemon_builder.enable_biome(config.biome_enabled());
+        daemon_builder = daemon_builder.enable_biome(config.enable_biome());
     }
 
     #[cfg(feature = "rest-api-cors")]
