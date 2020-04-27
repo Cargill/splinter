@@ -127,8 +127,6 @@ fn main() {
           "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
-        (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple
-          "Endpoints to connect to the network, protocol-prefix://ip:port")
         (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple
           "Publicly-visible network endpoints")
         (@arg service_endpoint: --("service-endpoint") +takes_value
@@ -167,6 +165,15 @@ fn main() {
                 .help("Path to the directory containing configuration files")
                 .takes_value(true)
                 .alias("config-dir"),
+        )
+        .arg(
+            Arg::with_name("network_endpoints")
+                .long("network-endpoints")
+                .short("n")
+                .long_help("Endpoints to connect to the network, protocol-prefix://ip:port")
+                .takes_value(true)
+                .multiple(true)
+                .alias("network-endpoint"),
         )
         .arg(
             Arg::with_name("tls_cert_dir")

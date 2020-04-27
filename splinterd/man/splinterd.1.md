@@ -95,7 +95,7 @@ OPTIONS
 : Specifies the public network endpoint for daemon-to-daemon communication
   between Splinter nodes, if the network endpoint is not public. Use the format
   `tcp://ip:port`. (Default: Same as the network endpoint; see
-  `-n`, `--network-endpoint`.)
+  `-n`, `--network-endpoints`.)
 
 `--bind BIND-ENDPOINT`
 : Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
@@ -132,7 +132,7 @@ OPTIONS
   This heartbeat is used to check the health of connections to other Splinter
   nodes.
 
-`-n`, `--network-endpoint` `NETWORK-ENDPOINT`
+`-n`, `--network-endpoints` `NETWORK-ENDPOINT`
 : Specifies the endpoint for daemon-to-daemon communication between Splinter
   nodes, using the format `tcp://ip:port`. (Default: 127.0.0.1:8044.)
 

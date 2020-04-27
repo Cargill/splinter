@@ -194,7 +194,7 @@ mod tests {
             (@arg node_id: --("node-id") +takes_value)
             (@arg display_name: --("display-name") +takes_value)
             (@arg storage: --("storage") +takes_value)
-            (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
+            (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
             (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
             (@arg peers: --peer +takes_value +multiple)
@@ -231,7 +231,7 @@ mod tests {
             EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
-            "--network-endpoint",
+            "--network-endpoints",
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoint",
             EXAMPLE_ADVERTISED_ENDPOINT,
