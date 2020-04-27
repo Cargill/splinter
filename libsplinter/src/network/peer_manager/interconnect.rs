@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::collections::BiHashMap;
-use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender, MatrixShutdown};
+use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
 use crate::network::dispatch::{DispatchLoopBuilder, DispatchLoopShutdownSignaler, Dispatcher};
 use crate::network::sender::{NetworkMessageSender, SendRequest};
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
@@ -33,29 +33,23 @@ use super::error::PeerInterconnectError;
 /// is done for an outgoing message. If a message is received from an unknown connection, the
 /// PeerInterconnect will request the current peers from the PeerManager and update the local map
 /// of peers.
-pub struct PeerInterconnect<T: 'static>
-where
-    T: MatrixShutdown,
-{
+pub struct PeerInterconnect {
     // sender that will be wrapped in a NetworkMessageSender and given to Dispatchers for sending
     // messages to peers
     dispatched_sender: Sender<SendRequest>,
     recv_join_handle: thread::JoinHandle<()>,
     send_join_handle: thread::JoinHandle<()>,
-    shutdown_handle: ShutdownHandle<T>,
+    shutdown_handle: ShutdownHandle,
 }
 
-impl<T> PeerInterconnect<T>
-where
-    T: MatrixShutdown,
-{
+impl PeerInterconnect {
     /// get a new NetworkMessageSender that can be used to send messages to peers.
     pub fn new_network_sender(&self) -> NetworkMessageSender {
         NetworkMessageSender::new(self.dispatched_sender.clone())
     }
 
     /// Returns a ShutdownHandle that can be used to shutdown PeerInterconnect
-    pub fn shutdown_handle(&self) -> ShutdownHandle<T> {
+    pub fn shutdown_handle(&self) -> ShutdownHandle {
         self.shutdown_handle.clone()
     }
 
@@ -85,11 +79,10 @@ where
 }
 
 #[derive(Default)]
-pub struct PeerInterconnectBuilder<T: 'static, U: 'static, V: 'static>
+pub struct PeerInterconnectBuilder<T: 'static, U: 'static>
 where
     T: MatrixReceiver,
     U: MatrixSender,
-    V: MatrixShutdown,
 {
     // peer connector to update the local peer map
     peer_connector: Option<PeerManagerConnector>,
@@ -97,17 +90,14 @@ where
     message_receiver: Option<T>,
     // MatrixSender to send messages to peers
     message_sender: Option<U>,
-    // MatrixShutdown to shutdown matrix
-    message_shutdown: Option<V>,
     // a Dispatcher with handlers for NetworkMessageTypes
     network_dispatcher: Option<Dispatcher<NetworkMessageType>>,
 }
 
-impl<T, U, V> PeerInterconnectBuilder<T, U, V>
+impl<T, U> PeerInterconnectBuilder<T, U>
 where
     T: MatrixReceiver,
     U: MatrixSender,
-    V: MatrixShutdown,
 {
     /// Creats an empty builder for a PeerInterconnect
     pub fn new() -> Self {
@@ -115,7 +105,6 @@ where
             peer_connector: None,
             message_receiver: None,
             message_sender: None,
-            message_shutdown: None,
             network_dispatcher: None,
         }
     }
@@ -151,16 +140,6 @@ where
         self
     }
 
-    /// Add a MatrixShutdown to PeerInterconnectBuilder
-    ///
-    /// # Arguments
-    ///
-    /// * `message_shutdown` - a MatrixShutdown that will be used to shutdown a MatrixSender
-    pub fn with_message_shutdown(mut self, message_shutdown: V) -> Self {
-        self.message_shutdown = Some(message_shutdown);
-        self
-    }
-
     /// Add a Dispatcher for NetworkMessageType to PeerInterconnectBuilder
     ///
     /// # Arguments
@@ -180,16 +159,12 @@ where
     ///
     /// Returns the PeerInterconnect object that can be used to get network message senders and
     /// shutdown message threads.
-    pub fn build(&mut self) -> Result<PeerInterconnect<V>, PeerInterconnectError> {
+    pub fn build(&mut self) -> Result<PeerInterconnect, PeerInterconnectError> {
         let (dispatched_sender, dispatched_receiver) = channel();
         let peers = Arc::new(Mutex::new(BiHashMap::new()));
 
         let peer_connector = self.peer_connector.take().ok_or_else(|| {
             PeerInterconnectError::StartUpError("Peer manager connector missing".to_string())
-        })?;
-
-        let message_shutdown = self.message_shutdown.take().ok_or_else(|| {
-            PeerInterconnectError::StartUpError("Message shutdown missing".to_string())
         })?;
 
         let mut network_dispatcher = self.network_dispatcher.take().ok_or_else(|| {
@@ -389,26 +364,18 @@ where
             shutdown_handle: ShutdownHandle {
                 sender: dispatched_sender,
                 dispatch_shutdown: network_dispatcher_shutdown,
-                matrix_shutdown: message_shutdown,
             },
         })
     }
 }
 
 #[derive(Clone)]
-pub struct ShutdownHandle<T: 'static>
-where
-    T: MatrixShutdown,
-{
+pub struct ShutdownHandle {
     sender: Sender<SendRequest>,
     dispatch_shutdown: DispatchLoopShutdownSignaler<NetworkMessageType>,
-    matrix_shutdown: T,
 }
 
-impl<T> ShutdownHandle<T>
-where
-    T: MatrixShutdown,
-{
+impl ShutdownHandle {
     /// Sends a shutdown notifications to PeerInterconnect and the associated dipatcher thread and
     /// Matrix
     pub fn shutdown(&self) {
@@ -417,7 +384,6 @@ where
         }
 
         self.dispatch_shutdown.shutdown();
-        self.matrix_shutdown.shutdown();
     }
 }
 
@@ -427,7 +393,7 @@ pub mod tests {
 
     use protobuf::Message;
 
-    use std::sync::mpsc::Sender;
+    use std::sync::mpsc::{self, Sender};
 
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
@@ -490,6 +456,7 @@ pub mod tests {
         let mesh2 = Mesh::new(512, 128);
 
         // set up thread for the peer
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
             // accept incoming connection and add it to mesh2
             let conn = listener.accept().expect("Cannot accept connection");
@@ -520,6 +487,10 @@ pub mod tests {
                 echo_to_network_message_bytes("shutdown_string".as_bytes().to_vec());
             let envelope = Envelope::new("test_id".to_string(), message_bytes);
             mesh2.send(envelope).expect("Cannot send message");
+
+            rx.recv().unwrap();
+
+            mesh2.shutdown_signaler().shutdown();
         });
 
         let mut cm = ConnectionManager::new(
@@ -547,7 +518,6 @@ pub mod tests {
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh1.get_receiver())
             .with_message_sender(mesh1.get_sender())
-            .with_message_shutdown(mesh1.get_matrix_shutdown())
             .with_network_dispatcher(dispatcher)
             .build()
             .expect("Unable to build PeerInterconnect");
@@ -556,8 +526,13 @@ pub mod tests {
         let test_timeout = std::time::Duration::from_secs(2);
         recv.recv_timeout(test_timeout)
             .expect("Failed to receive message");
+
+        // trigger the thread shutdown
+        tx.send(()).unwrap();
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh1.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
 
@@ -586,13 +561,13 @@ pub mod tests {
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh.get_receiver())
             .with_message_sender(mesh.get_sender())
-            .with_message_shutdown(mesh.get_matrix_shutdown())
             .with_network_dispatcher(dispatcher)
             .build()
             .expect("Unable to build PeerInterconnect");
 
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
 
