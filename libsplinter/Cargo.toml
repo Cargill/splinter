@@ -35,7 +35,6 @@ atomicwrites = "0.2"
 awc = { version = "0.2", optional = true }
 bcrypt = {version = "0.6", optional = true}
 byteorder = "1"
-bzip2 = { version = "0.3", optional = true }
 crossbeam-channel = "0.3"
 diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
 diesel_migrations = { version = "1.4", optional = true }
@@ -57,7 +56,6 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
-tar = { version = "0.4", optional = true }
 tokio = { version = "0.1.22", optional = true }
 transact = { version = "0.2", features = ["sawtooth-compat"] }
 url = "1.7.1"
@@ -137,7 +135,7 @@ rest-api = [
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
 sawtooth-signing-compat = ["sawtooth-sdk"]
-scabbard-client = ["bzip2", "futures", "reqwest", "tar"]
+scabbard-client = ["reqwest"]
 scabbard-get-state = []
 service-arg-validation = []
 ws-transport = ["websocket"]
