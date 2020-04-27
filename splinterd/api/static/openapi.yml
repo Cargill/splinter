@@ -601,12 +601,19 @@ paths:
 
   /scabbard/{circuit}/{service_id}/batches:
     post:
-      description: Send a list of Sabre batches to the specified Scabbard service
+      summary: Submit a list of batches to the Scabbard service
+      description: |
+        This endpoint can be used to submit batches to a Scabbard service. The
+        body of the request must be a list of valid Sabre batches. If the
+        batches are submitted successfully, the response will contain a link for
+        checking the status of the submitted batches.
+      tags:
+        - Scabbard
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: circuit
           in: path
-          description: circuit the targeted service belongs to
+          description: Circuit the targeted service belongs to
           required: true
           schema:
             type: string
@@ -618,19 +625,27 @@ paths:
             type: string
       responses:
         202:
-          description: Batch has been submitted
+          description: Batch was submitted successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Link"
+        400:
+          description: No batches were provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         404:
-          description: The scabbard service was not found, or the circuit id or service id was not found
+          description: |
+            The scabbard service with the given circuit and service id was not
+            found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal service error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -638,12 +653,21 @@ paths:
 
   /scabbard/{circuit}/{service_id}/batch_statuses:
     get:
-      description: Fetches the statuses for a set of Sabre batches
+      summary: Get the statuses of a list of batches
+      description: |
+        This endpoint can be used to check the status of one or more batches
+        that were submitted to a Scabbard service. The IDs of the batches to
+        check should be specified with the `ids` query parameter. The `wait`
+        query parameter requests that the server wait for the given number of
+        seconds for the batches to be committed; however, this wait time is not
+        guaranteed.
+      tags:
+        - Scabbard
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: circuit
           in: path
-          description: circuit the targeted service belongs to
+          description: Circuit the targeted service belongs to
           required: true
           schema:
             type: string
@@ -655,46 +679,53 @@ paths:
             type: string
         - name: ids
           in: query
-          description: Comma separated list of batch ids
+          description: Comma-separated list of batch IDs
           required: true
           schema:
             type: string
         - name: wait
           in: query
-          description: time (in seconds) to wait for batches to be committed
+          description: |
+            Time (in seconds) to wait for batches to be committed. If not
+            provided, the server will return the batch statuses immediately. If
+            the parameter is provided without a value, the default time (300
+            seconds) will be used.
           required: false
           schema:
             type: integer
             default: 300
       responses:
         200:
-          description: A list with the batch statuses of the batches
+          description: The statuses of the batches were successfully retrieved
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/BatchStatus'
-        404:
-          description: The scabbard service was not found, or the circuit id or service id was not found
+        400:
+          description: The request was malformed or no batch IDs were provided
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        400:
-          description: Malformed ids list
+        404:
+          description: |
+            The scabbard service with the given circuit and service id was not
+            found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         408:
-          description: Batches did not complete before specified wait
+          description: |
+            The batches were not committed before the specified wait time
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal service error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -702,12 +733,18 @@ paths:
 
   /scabbard/{circuit}/{service_id}/state:
     get:
-      description: Experimental - Get a list of entries in state from the specified Scabbard service
+      summary: Get a list of entries from a Scabbard service's state
+      description: |
+        This endpoint can be used to fetch a list of entries from a Scabbard
+        service's state. The entries can be filtered using an address prefix
+        provided with the `prefix` query parameter.
+      tags:
+        - Scabbard
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: circuit
           in: path
-          description: circuit the targeted service belongs to
+          description: Circuit the targeted service belongs to
           required: true
           schema:
             type: string
@@ -719,14 +756,16 @@ paths:
             type: string
         - name: prefix
           in: query
-          description: The address prefix for filtering state entries
+          description: |
+            An address prefix for filtering state entries. If no prefix is
+            specified, all state entries will be returned.
           required: false
           schema:
             type: string
             example: 00ec01
       responses:
         200:
-          description: List of entries in state (under given address prefix, if specified)
+          description: The state entries were successfully retrieved
           content:
             application/json:
               schema:
@@ -741,19 +780,21 @@ paths:
                       items:
                         type: integer
         400:
-          description: Request was malformed
+          description: The request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         404:
-          description: The scabbard service was not found
+          description: |
+            The scabbard service with the given circuit and service id was not
+            found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal server error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -761,12 +802,17 @@ paths:
 
   /scabbard/{circuit}/{service_id}/state/{address}:
     get:
-      description: Experimental - Get the value at a given address in state from the specified Scabbard service
+      summary: Get the value at an address in a Scabbard service's state
+      description: |
+        This endpoint can be used to fetch the value at a specific address in a
+        Scabbard service's state.
+      tags:
+        - Scabbard
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: circuit
           in: path
-          description: circuit the targeted service belongs to
+          description: Circuit the targeted service belongs to
           required: true
           schema:
             type: string
@@ -785,7 +831,7 @@ paths:
             example: 000000a87cb5eafdcca6a814e4add97c4b517d3c530c2f44b31d18e3b0c44298fc1c14
       responses:
         200:
-          description: The value at the requested address
+          description: The value was successfully retrieved
           content:
             application/json:
               schema:
@@ -793,19 +839,21 @@ paths:
                 items:
                   type: integer
         400:
-          description: Request was malformed
+          description: The request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         404:
-          description: The scabbard service was not found, or there is no value at the given address
+          description: |
+            The scabbard service with the given circuit and service id was not
+            found, or there is no value at the given address
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal server error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -1664,15 +1712,15 @@ components:
       properties:
         link:
           type: string
-          description: link to batch_statuses endpoint
-          example: "/scabbard/{circuit_id}/{service_id}/batch_statuses?ids={ids}"
+          description: Link to get status of batches that were submitted
+          example: "/scabbard/abcde-01234/ABCD/batch_statuses?ids=6ff35474a572087e08fd6a54d563bd8172951b363e5c9731f1a40a855e14bba45dac515364a08d8403f4fb5d4a206174b7f63c29e4f4e425dc71b95494b8a798"
 
     BatchStatus:
       type: object
       properties:
         id:
           type: string
-          description: Batch header signature
+          description: The batch's ID
           example: 6ff35474a572087e08fd6a54d563bd8172951b363e5c9731f1a40a855e14bba45dac515364a08d8403f4fb5d4a206174b7f63c29e4f4e425dc71b95494b8a798
         status:
           type: object
