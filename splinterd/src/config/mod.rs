@@ -62,7 +62,7 @@ pub struct Config {
     registries: (Vec<String>, ConfigSource),
     registry_auto_refresh_interval: (u64, ConfigSource),
     registry_forced_refresh_interval: (u64, ConfigSource),
-    heartbeat_interval: (u64, ConfigSource),
+    heartbeat: (u64, ConfigSource),
     admin_service_coordinator_timeout: (Duration, ConfigSource),
     state_dir: (String, ConfigSource),
     tls_insecure: (bool, ConfigSource),
@@ -151,8 +151,8 @@ impl Config {
         self.registry_forced_refresh_interval.0
     }
 
-    pub fn heartbeat_interval(&self) -> u64 {
-        self.heartbeat_interval.0
+    pub fn heartbeat(&self) -> u64 {
+        self.heartbeat.0
     }
 
     pub fn admin_service_coordinator_timeout(&self) -> Duration {
@@ -262,8 +262,8 @@ impl Config {
         &self.registry_forced_refresh_interval.1
     }
 
-    fn heartbeat_interval_source(&self) -> &ConfigSource {
-        &self.heartbeat_interval.1
+    fn heartbeat_source(&self) -> &ConfigSource {
+        &self.heartbeat.1
     }
 
     fn admin_service_coordinator_timeout_source(&self) -> &ConfigSource {
@@ -395,9 +395,9 @@ impl Config {
             self.state_dir_source()
         );
         debug!(
-            "Config: heartbeat_interval: {} (source: {:?})",
-            self.heartbeat_interval(),
-            self.heartbeat_interval_source()
+            "Config: heartbeat: {} (source: {:?})",
+            self.heartbeat(),
+            self.heartbeat_source()
         );
         debug!(
             "Config: admin_service_coordinator_timeout: {:?} (source: {:?})",
@@ -930,13 +930,10 @@ mod tests {
             ),
             (10, &ConfigSource::Default)
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for `heartbeat_interval`
+        // The DefaultPartialConfigBuilder is the only config with a value for `heartbeat`
         // (source should be Default).
         assert_eq!(
-            (
-                final_config.heartbeat_interval(),
-                final_config.heartbeat_interval_source()
-            ),
+            (final_config.heartbeat(), final_config.heartbeat_source()),
             (30, &ConfigSource::Default)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for

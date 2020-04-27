@@ -285,8 +285,8 @@ the heartbeat interval to 60 seconds.
 node_id = "mynode"
 
 # The number of seconds between network keep-alive heartbeat messages.
-# Setting heartbeat_interval to 0 disables this feature.
-heartbeat_interval = 60
+# Setting heartbeat to 0 disables this feature.
+heartbeat = 60
 ```
 
 SEE ALSO

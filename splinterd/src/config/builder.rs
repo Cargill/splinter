@@ -237,10 +237,10 @@ impl ConfigBuilder {
                 .ok_or_else(|| {
                     ConfigError::MissingValue("registry forced refresh interval".to_string())
                 })?,
-            heartbeat_interval: self
+            heartbeat: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.heartbeat_interval() {
+                .find_map(|p| match p.heartbeat() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
@@ -361,7 +361,7 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), Some(vec![]));
-        assert_eq!(config.heartbeat_interval(), None);
+        assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }
 
@@ -394,7 +394,7 @@ mod tests {
             .with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()))
             .with_bind(None)
             .with_registries(Some(vec![]))
-            .with_heartbeat_interval(None)
+            .with_heartbeat(None)
             .with_admin_service_coordinator_timeout(None);
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(partial_config);

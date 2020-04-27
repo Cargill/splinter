@@ -153,7 +153,7 @@ fn main() {
 
     let app = app
         .arg(
-            Arg::with_name("heartbeat_interval")
+            Arg::with_name("heartbeat")
                 .long("heartbeat")
                 .long_help(
                     "How often heartbeat should be sent, in seconds; defaults to 30 seconds,\
@@ -353,7 +353,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_registries(config.registries().to_vec())
         .with_registry_auto_refresh_interval(config.registry_auto_refresh_interval())
         .with_registry_forced_refresh_interval(config.registry_forced_refresh_interval())
-        .with_heartbeat_interval(config.heartbeat_interval())
+        .with_heartbeat(config.heartbeat())
         .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
 
     #[cfg(feature = "database")]

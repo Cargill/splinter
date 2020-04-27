@@ -50,7 +50,7 @@ pub struct PartialConfig {
     registries: Option<Vec<String>>,
     registry_auto_refresh_interval: Option<u64>,
     registry_forced_refresh_interval: Option<u64>,
-    heartbeat_interval: Option<u64>,
+    heartbeat: Option<u64>,
     admin_service_coordinator_timeout: Option<Duration>,
     state_dir: Option<String>,
     tls_insecure: Option<bool>,
@@ -86,7 +86,7 @@ impl PartialConfig {
             registries: None,
             registry_auto_refresh_interval: None,
             registry_forced_refresh_interval: None,
-            heartbeat_interval: None,
+            heartbeat: None,
             admin_service_coordinator_timeout: None,
             state_dir: None,
             tls_insecure: None,
@@ -179,8 +179,8 @@ impl PartialConfig {
         self.registry_forced_refresh_interval
     }
 
-    pub fn heartbeat_interval(&self) -> Option<u64> {
-        self.heartbeat_interval
+    pub fn heartbeat(&self) -> Option<u64> {
+        self.heartbeat
     }
 
     pub fn admin_service_coordinator_timeout(&self) -> Option<Duration> {
@@ -448,14 +448,14 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `heartbeat_interval` value to the PartialConfig object.
+    /// Adds a `heartbeat` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `heartbeat_interval` - How often heartbeat should be sent.
+    /// * `heartbeat` - How often heartbeat should be sent.
     ///
-    pub fn with_heartbeat_interval(mut self, heartbeat_interval: Option<u64>) -> Self {
-        self.heartbeat_interval = heartbeat_interval;
+    pub fn with_heartbeat(mut self, heartbeat: Option<u64>) -> Self {
+        self.heartbeat = heartbeat;
         self
     }
 

@@ -43,7 +43,7 @@ struct TomlConfig {
     registries: Option<Vec<String>>,
     registry_auto_refresh_interval: Option<u64>,
     registry_forced_refresh_interval: Option<u64>,
-    heartbeat_interval: Option<u64>,
+    heartbeat: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
     version: Option<String>,
     #[cfg(feature = "rest-api-cors")]
@@ -56,6 +56,7 @@ struct TomlConfig {
     client_key: Option<String>,
     server_cert: Option<String>,
     server_key: Option<String>,
+    heartbeat_interval: Option<u64>,
 }
 
 pub struct TomlPartialConfigBuilder {
@@ -119,7 +120,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_registry_forced_refresh_interval(
                 self.toml_config.registry_forced_refresh_interval,
             )
-            .with_heartbeat_interval(self.toml_config.heartbeat_interval)
+            .with_heartbeat(self.toml_config.heartbeat)
             .with_admin_service_coordinator_timeout(
                 self.toml_config.admin_service_coordinator_timeout,
             );
@@ -152,6 +153,9 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         }
         if partial_config.tls_server_key().is_none() {
             partial_config = partial_config.with_tls_server_key(self.toml_config.server_key)
+        }
+        if partial_config.heartbeat().is_none() {
+            partial_config = partial_config.with_heartbeat(self.toml_config.heartbeat_interval)
         }
 
         Ok(partial_config)
@@ -268,7 +272,7 @@ mod tests {
         assert_eq!(config.registries(), None);
         assert_eq!(config.registry_auto_refresh_interval(), None);
         assert_eq!(config.registry_forced_refresh_interval(), None);
-        assert_eq!(config.heartbeat_interval(), None);
+        assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }
 
@@ -303,7 +307,7 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        assert_eq!(config.heartbeat_interval(), None);
+        assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
     }
 

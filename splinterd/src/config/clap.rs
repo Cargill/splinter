@@ -81,7 +81,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 &self.matches,
                 "registry_forced_refresh_interval",
             )?)
-            .with_heartbeat_interval(parse_value(&self.matches, "heartbeat_interval")?)
+            .with_heartbeat(parse_value(&self.matches, "heartbeat")?)
             .with_tls_insecure(if self.matches.is_present("tls_insecure") {
                 Some(true)
             } else {
@@ -185,7 +185,7 @@ mod tests {
         assert_eq!(config.registries(), None);
         assert_eq!(config.registry_auto_refresh_interval(), None);
         assert_eq!(config.registry_forced_refresh_interval(), None);
-        assert_eq!(config.heartbeat_interval(), None);
+        assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_service_coordinator_timeout(), None);
         assert_eq!(config.tls_insecure(), Some(true));
         assert_eq!(config.no_tls(), Some(true));

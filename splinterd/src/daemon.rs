@@ -730,7 +730,7 @@ pub struct SplinterDaemonBuilder {
     registry_auto_refresh_interval: Option<u64>,
     registry_forced_refresh_interval: Option<u64>,
     storage_type: Option<String>,
-    heartbeat_interval: Option<u64>,
+    heartbeat: Option<u64>,
     admin_service_coordinator_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
@@ -823,8 +823,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_heartbeat_interval(mut self, value: u64) -> Self {
-        self.heartbeat_interval = Some(value);
+    pub fn with_heartbeat(mut self, value: u64) -> Self {
+        self.heartbeat = Some(value);
         self
     }
 
@@ -840,12 +840,12 @@ impl SplinterDaemonBuilder {
     }
 
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
-        let heartbeat_interval = self.heartbeat_interval.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: heartbeat_interval".to_string())
+        let heartbeat = self.heartbeat.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
         })?;
 
         let mesh = Mesh::new(512, 128);
-        let network = Network::new(mesh, heartbeat_interval)
+        let network = Network::new(mesh, heartbeat)
             .map_err(|err| CreateError::NetworkError(err.to_string()))?;
 
         let storage_location = self.storage_location.ok_or_else(|| {
