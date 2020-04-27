@@ -123,9 +123,9 @@ items:
                 cp /config/nodes.yaml /etc/splinter/nodes.yaml && \
                 cp /config/key-registry.yaml /var/lib/splinter/keys.yaml && \
                 splinterd -vv \
-                --registry file:///etc/splinter/nodes.yaml \
+                --registries file:///etc/splinter/nodes.yaml \
                 --bind $HOSTNAME:8085 \
-                --network-endpoint tcps://$HOSTNAME:8044 \
+                --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id acme \
                 --service-endpoint tcp://$HOSTNAME:8043 \
                 --storage yaml \
@@ -295,9 +295,9 @@ items:
                 cp /config/nodes.yaml /etc/splinter/nodes.yaml && \
                 cp /config/key-registry.yaml /var/lib/splinter/keys.yaml && \
                 splinterd -vv \
-                --registry file:///etc/splinter/nodes.yaml \
+                --registries file:///etc/splinter/nodes.yaml \
                 --bind $HOSTNAME:8085 \
-                --network-endpoint tcps://$HOSTNAME:8044 \
+                --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id bubba \
                 --service-endpoint tcp://$HOSTNAME:8043 \
                 --storage yaml \

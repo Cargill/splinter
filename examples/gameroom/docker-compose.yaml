@@ -148,7 +148,7 @@ services:
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --service-endpoint tcp://0.0.0.0:8043 \
-              --network-endpoint tcps://0.0.0.0:8044 \
+              --network-endpoints tcps://0.0.0.0:8044 \
               --bind 0.0.0.0:8085 \
               --tls-insecure
         "
@@ -256,7 +256,7 @@ services:
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --service-endpoint tcp://0.0.0.0:8043 \
-              --network-endpoint tcps://0.0.0.0:8044 \
+              --network-endpoints tcps://0.0.0.0:8044 \
               --bind 0.0.0.0:8085 \
               --tls-insecure
         "
