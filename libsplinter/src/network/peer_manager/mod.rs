@@ -23,7 +23,8 @@ use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 use self::error::{
-    PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
+    PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
+    PeerRefRemoveError,
 };
 use crate::collections::BiHashMap;
 use crate::network::connection_manager::ConnectionManagerNotification;
@@ -75,6 +76,14 @@ pub(crate) enum PeerManagerRequest {
     },
     ConnectionIds {
         sender: Sender<Result<BiHashMap<String, String>, PeerConnectionIdError>>,
+    },
+    GetConnectionId {
+        peer_id: String,
+        sender: Sender<Result<Option<String>, PeerLookupError>>,
+    },
+    GetPeerId {
+        connection_id: String,
+        sender: Sender<Result<Option<String>, PeerLookupError>>,
     },
 }
 
@@ -332,6 +341,38 @@ fn handle_request(
         PeerManagerRequest::ConnectionIds { sender } => {
             if sender.send(Ok(peers.connection_ids())).is_err() {
                 warn!("connector dropped before receiving result of connection ids");
+            }
+        }
+        PeerManagerRequest::GetConnectionId { peer_id, sender } => {
+            let connection_id = peers
+                .get_by_peer_id(&peer_id)
+                .map(|meta| meta.connection_id.clone())
+                .or_else(|| {
+                    unreferenced_peers
+                        .get(&peer_id)
+                        .map(|meta| meta.connection_id.clone())
+                });
+
+            if sender.send(Ok(connection_id)).is_err() {
+                warn!("connector dropped before receiving result of get connection id");
+            }
+        }
+        PeerManagerRequest::GetPeerId {
+            connection_id,
+            sender,
+        } => {
+            let peer_id = peers
+                .get_by_connection_id(&connection_id)
+                .map(|meta| meta.id.clone())
+                .or_else(|| {
+                    unreferenced_peers
+                        .iter()
+                        .find(|(_, meta)| meta.connection_id == connection_id)
+                        .map(|(peer_id, _)| peer_id.clone())
+                });
+
+            if sender.send(Ok(peer_id)).is_err() {
+                warn!("connector dropped before receiving result of get peer id");
             }
         }
     };
