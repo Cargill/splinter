@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{
-    MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
+    MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
     RwNodeRegistry,
 };
 
@@ -89,7 +89,7 @@ impl UnifiedNodeRegistry {
     }
 
     /// Gets all nodes from all sources (in ascending order of precedence) without deduplication.
-    fn all_nodes(&self) -> NodeIter<'_> {
+    fn all_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = Node> + 'a> {
         Box::new(
             // Get node iterators from all read-only sources
             self.readable_sources
@@ -110,36 +110,31 @@ impl UnifiedNodeRegistry {
     }
 }
 
-// A convenience type to cleanup the `NodeRegistryReader::list_nodes` implementation
-type NodeIter<'a> = Box<dyn Iterator<Item = Node> + Send + 'a>;
-
 impl NodeRegistryReader for UnifiedNodeRegistry {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
     ) -> Result<NodeIter<'a>, NodeRegistryError> {
-        Ok(Box::new(
+        let mut id_map = self
             // Get all nodes from all sources
-            self.all_nodes()
-                // Deduplicate and merge metadata
-                .fold(HashMap::<String, Node>::new(), |mut acc, mut node| {
-                    // If the node is already present, merge metadata
-                    if let Some(existing) = acc.remove(&node.identity) {
-                        // Overwrite the existing node's metadata with the new node's if they share
-                        // the same metadata keys
-                        let mut merged_metadata = existing.metadata;
-                        merged_metadata.extend(node.metadata);
-                        node.metadata = merged_metadata;
-                    }
-                    acc.insert(node.identity.clone(), node);
-                    acc
-                })
-                // Convert to iterator of just the nodes
-                .into_iter()
-                .map(|(_, node)| node)
-                // Apply predicate filters
-                .filter(move |node| predicates.iter().all(|predicate| predicate.apply(node))),
-        ))
+            .all_nodes()
+            // Deduplicate and merge metadata
+            .fold(HashMap::<String, Node>::new(), |mut acc, mut node| {
+                // If the node is already present, merge metadata
+                if let Some(existing) = acc.remove(&node.identity) {
+                    // Overwrite the existing node's metadata with the new node's if they share
+                    // the same metadata keys
+                    let mut merged_metadata = existing.metadata;
+                    merged_metadata.extend(node.metadata);
+                    node.metadata = merged_metadata;
+                }
+                acc.insert(node.identity.clone(), node);
+                acc
+            });
+        // Apply predicate filters
+        id_map.retain(|_, node| predicates.iter().all(|predicate| predicate.apply(node)));
+
+        Ok(Box::new(id_map.into_iter().map(|(_, node)| node)))
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
@@ -195,11 +190,19 @@ impl RwNodeRegistry for UnifiedNodeRegistry {
     fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
         Box::new(self.clone())
     }
+
+    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        Box::new(self.clone())
+    }
+
+    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use std::iter::FromIterator;
     use std::sync::{Arc, Mutex};
 
@@ -615,25 +618,21 @@ mod test {
 
     #[derive(Clone, Default)]
     struct MemRegistry {
-        nodes: Arc<Mutex<BTreeMap<String, Node>>>,
+        nodes: Arc<Mutex<HashMap<String, Node>>>,
     }
 
     impl NodeRegistryReader for MemRegistry {
         fn list_nodes<'a, 'b: 'a>(
             &'b self,
             predicates: &'a [MetadataPredicate],
-        ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
-            Ok(Box::new(SnapShotIter {
-                snapshot: self
-                    .nodes
-                    .lock()
-                    .expect("mem registry lock was poisoned")
-                    .iter()
-                    .map(|(_, node)| node)
-                    .filter(move |node| predicates.iter().all(|predicate| predicate.apply(node)))
-                    .cloned()
-                    .collect(),
-            }))
+        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+            let mut nodes = self
+                .nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .clone();
+            nodes.retain(|_, node| predicates.iter().all(|predicate| predicate.apply(node)));
+            Ok(Box::new(nodes.into_iter().map(|(_, node)| node)))
         }
 
         fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
@@ -672,17 +671,13 @@ mod test {
         fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
             Box::new(self.clone())
         }
-    }
 
-    struct SnapShotIter<V: Send + Clone> {
-        snapshot: std::collections::VecDeque<V>,
-    }
+        fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+            Box::new(self.clone())
+        }
 
-    impl<V: Send + Clone> Iterator for SnapShotIter<V> {
-        type Item = V;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            self.snapshot.pop_front()
+        fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+            Box::new(self.clone())
         }
     }
 }

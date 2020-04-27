@@ -401,9 +401,13 @@ paths:
 
   /admin/nodes:
     post:
+      summary: Add a node to the registry
+      description: |
+        This endpoint can be used to add a new node to the node registry. The
+        node must be valid (see the node registry documentation for details on
+        node validity).
       tags:
         - Node Registry
-      description: Add node to the Node Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
       requestBody:
@@ -414,30 +418,29 @@ paths:
               $ref: '#/components/schemas/RegisteredNode'
       responses:
         200:
-          description: The node was added to the registry
+          description: The node was successfully added to the registry
         400:
-          description: The request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        403:
-          description: The node already exists or is invalid
+          description: The request was malformed or the node was invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal server error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 
     get:
+      summary: List nodes in the registry
+      description: |
+        This endpoint can be used to view all or some of the nodes in the
+        registry. If metadata filters are provided via the "filter" query
+        parameter, only nodes that match the given filters will be returned. See
+        the node registry documentation for details on metadata filters.
       tags:
         - Node Registry
-      description: List nodes in the Node Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: offset
@@ -466,7 +469,7 @@ paths:
           example: "%7B%22company%22%3A%5B%22%3D%22%2C%22Cargill%22%5D%7D"
       responses:
         200:
-          description: list of nodes
+          description: The list of nodes was successfully retrieved
           content:
             application/json:
               schema:
@@ -479,13 +482,13 @@ paths:
                   paging:
                     $ref: '#/components/schemas/Paging'
         400:
-          description: Request was malformed
+          description: The request was malformed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal server error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -493,9 +496,11 @@ paths:
 
   /admin/nodes/{identity}:
     get:
+      summary: Fetch a node in the registry by its identity
+      description: |
+        This endpoint can be used to view a specific nodes in the registry.
       tags:
         - Node Registry
-      description: Fetch a nodes in the Node Registry by their identity
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: identity
@@ -506,7 +511,7 @@ paths:
             type: string
       responses:
         200:
-          description: Node
+          description: The node was successfully retrieved
           content:
             application/json:
               schema:
@@ -515,16 +520,26 @@ paths:
                   data:
                     $ref: "#/components/schemas/RegisteredNode"
         404:
-          description: The node with {identity} was not found
+          description: The node was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: An internal server error occurred
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 
     put:
+      summary: Add or replace a node in the registry
+      description: |
+        This endpoint can be used to add a new node to the registry, or replace
+        an existing node. When replacing an existing node, the node identity
+        cannot be changed. This action is idempotent.
       tags:
         - Node Registry
-      description: Add a node to or replace a node in the Node Registry. This action is idempotent.
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: identity
@@ -541,30 +556,25 @@ paths:
               $ref: '#/components/schemas/RegisteredNode'
       responses:
         200:
-          description: The node in the registry has been replaced
+          description: The node has been added or replaced
         400:
-          description: The request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        403:
-          description: The node was invalid
+          description: The request was malformed or the node was invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal server error
+          description: An internal server error occurred
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 
     delete:
+      summary: Delete a node from the registry
+      description: This endpoint can be used to remove a node from the registry.
       tags:
         - Node Registry
-      description: Delete a node from the Node Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: identity
@@ -577,13 +587,13 @@ paths:
         200:
           description: The node has been deleted from the registry
         404:
-          description: The node with {identity} was not found
+          description: The node was not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: Internal server error
+          description: An internal server error occurred
           content:
             application/json:
               schema:

@@ -34,11 +34,12 @@
 
 mod error;
 #[cfg(feature = "rest-api")]
-pub mod rest_api;
+mod rest_api;
 mod unified;
 mod yaml;
 
 use std::collections::HashMap;
+use std::iter::ExactSizeIterator;
 
 pub use error::{InvalidNodeError, NodeRegistryError};
 pub use unified::UnifiedNodeRegistry;
@@ -184,6 +185,9 @@ impl MetadataPredicate {
     }
 }
 
+/// Type returned by the `NodeRegistryReader::list_nodes` method
+pub type NodeIter<'a> = Box<dyn ExactSizeIterator<Item = Node> + Send + 'a>;
+
 /// Defines node registry read capabilities.
 pub trait NodeRegistryReader: Send + Sync {
     /// Returns an iterator over the nodes in the registry.
@@ -196,7 +200,7 @@ pub trait NodeRegistryReader: Send + Sync {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError>;
+    ) -> Result<NodeIter<'a>, NodeRegistryError>;
 
     /// Returns the count of nodes in the registry.
     ///
@@ -254,6 +258,12 @@ pub trait RwNodeRegistry: NodeRegistryWriter + NodeRegistryReader {
     ///  }
     ///```
     fn clone_box(&self) -> Box<dyn RwNodeRegistry>;
+
+    /// Clone the `RwNodeRegistry` as a `Box<dyn NodeRegistryReader>`.
+    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader>;
+
+    /// Clone the `RwNodeRegistry` as a `Box<dyn NodeRegistryWriter>`.
+    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter>;
 }
 
 impl Clone for Box<dyn RwNodeRegistry> {
@@ -269,7 +279,7 @@ where
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
+    ) -> Result<NodeIter<'a>, NodeRegistryError> {
         (**self).list_nodes(predicates)
     }
 

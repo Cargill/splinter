@@ -27,7 +27,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::node_registry::{
     check_if_node_is_duplicate, check_node_required_fields_are_not_empty, validate_nodes,
-    MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
+    MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
     RwNodeRegistry,
 };
 
@@ -183,10 +183,10 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<Box<dyn Iterator<Item = Node> + Send + 'a>, NodeRegistryError> {
-        Ok(Box::new(self.get_cached_nodes()?.into_iter().filter(
-            move |node| predicates.iter().all(|predicate| predicate.apply(node)),
-        )))
+    ) -> Result<NodeIter<'a>, NodeRegistryError> {
+        let mut nodes = self.get_cached_nodes()?;
+        nodes.retain(|node| predicates.iter().all(|predicate| predicate.apply(node)));
+        Ok(Box::new(nodes.into_iter()))
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
@@ -234,6 +234,14 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
 impl RwNodeRegistry for LocalYamlNodeRegistry {
     fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
         Box::new(self.clone())
+    }
+
+    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        Box::new(Clone::clone(self))
+    }
+
+    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        Box::new(Clone::clone(self))
     }
 }
 
