@@ -148,7 +148,7 @@ where
     /// # Arguments
     ///
     /// * `network_dispatcher` - a Dispatcher that is loaded with the Handlers for
-    ////       NetworkMessageTypes
+    ///    NetworkMessageTypes
     pub fn with_network_dispatcher(
         mut self,
         network_dispatcher: Dispatcher<NetworkMessageType>,
