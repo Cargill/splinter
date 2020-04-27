@@ -27,6 +27,3 @@ RUN git rev-parse HEAD > /commit-hash
 FROM postgres:alpine
 
 COPY --from=BUILDER /commit-hash /commit-hash
-
-COPY examples/gameroom/database/tables/gameroom_tables.sql \
-     /docker-entrypoint-initdb.d/

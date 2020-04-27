@@ -29,6 +29,19 @@ services:
         - "8002:8002"
       command: |
         bash -c "
+           # we need to wait for the db to have started.
+           until PGPASSWORD=gameroom_test psql -h db-test -U gameroom_test -c '\q'; do
+               >&2 echo \"Database is unavailable - sleeping\"
+               sleep 1
+           done
+
+           # check if splinterd-node-acme is available
+           while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node:8085/status) -ne 200 ]] ; do
+              >&2 echo \"splinterd is unavailable - sleeping\"
+              sleep 1
+           done
+
+           gameroom -vv database migrate --database-url postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test
            cd examples/gameroom/daemon
            ../tests/bin/run_tests
         "
@@ -68,8 +81,6 @@ services:
       POSTGRES_USER: gameroom_test
       POSTGRES_PASSWORD: gameroom_test
       POSTGRES_DB: gameroom_test
-    volumes:
-      - "../database/tables:/docker-entrypoint-initdb.d"
     build:
       context: ../../..
       dockerfile: ./examples/gameroom/database/Dockerfile-installed

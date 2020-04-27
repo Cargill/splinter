@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS gameroom_member (
   id                        BIGSERIAL   PRIMARY KEY,
   circuit_id               TEXT        NOT NULL,
   node_id                   TEXT        NOT NULL,
-  endpoints                 TEXT[]      NOT NULL,
+  endpoint                 TEXT[]      NOT NULL,
   status                    TEXT        NOT NULL,
   created_time              TIMESTAMP   NOT NULL,
   updated_time              TIMESTAMP   NOT NULL,
