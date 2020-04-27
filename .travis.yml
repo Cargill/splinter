@@ -86,6 +86,6 @@ jobs:
 
 notifications:
   slack:
-    secure: $SLACK_TOKEN
     on_success: change
     on_failure: always
+    secure: M/eU8e9XddwfvMBqnlKjMSnPAH6/VsvDja18+YjTeVeg7q2NnsuHPjrJLPSM3Sg359wbrjLEZl6ceuert4EjGshkdwEVFKKCr1ZyoQIh22upp4q6VNI+eN5ps1EVfmGCDxAs7Cr2m3deJYlcVTA9/xG8Rk7Ek7h9L5i4HvY2zuzU17lrB6HTdwU0Ut4U/qSPtlJujyO+mymiwKymjccaO2S+azk1fXl8JlRI77/0n9nezro+4mRs9Ro4CdZu8r4vE/iRWiEDFZSk/VQRIuh5mlGEAVb3UXYWoPuI3yMKepTUJLZrtZN6m/rEubN8qXbhFsGsgGka4TkkxJ3SJXH4d0Z+eXGNjkRgRAfBlpuhTmYB7ZNymvEYRoAfBQgSWUS2hM9+V/f3yYGOoUupBUzX5vznelDO+btoC2DXwrzxnKA8UT+M10C7NsYm354JKP93HGUfAgCMXkhlMQZv6CHNZvb4e8Kkq63Wsx7z+mI8toYaXVTA3HyuSBimPiTCuUJ4JQ/PGU5Dk1/PAXha7rcyuAMxQLwZ+Lhaoo84UnoLXaGpzD1Rdeh13MaeVis6gv/a6RjxY5MYVIZ8LgLKAdKmoljDyD+L7yTJ8PFbbyVogi4Xi0CJKiNG1kSklOuzhES5Ug+XXJQXeDLV6S93Fp5yVfNsw2Iih5YBlzQxAs6gGfU=
