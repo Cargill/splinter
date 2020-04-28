@@ -31,6 +31,8 @@ use log::Record;
 
 #[cfg(feature = "config-command-line")]
 use crate::config::ClapPartialConfigBuilder;
+#[cfg(feature = "config-toml")]
+use crate::config::ConfigError;
 #[cfg(feature = "config-default")]
 use crate::config::DefaultPartialConfigBuilder;
 #[cfg(feature = "config-env-var")]
@@ -39,12 +41,13 @@ use crate::config::EnvPartialConfigBuilder;
 use crate::config::PartialConfigBuilder;
 #[cfg(feature = "config-toml")]
 use crate::config::TomlPartialConfigBuilder;
-use crate::config::{Config, ConfigBuilder, ConfigError};
+use crate::config::{Config, ConfigBuilder};
 use crate::daemon::SplinterDaemonBuilder;
 use clap::{clap_app, crate_version};
 use clap::{Arg, ArgMatches};
 
 use std::env;
+#[cfg(feature = "config-toml")]
 use std::fs;
 use std::path::Path;
 use std::thread;

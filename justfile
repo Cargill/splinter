@@ -48,16 +48,22 @@ build:
     done
     echo "\n\033[92mBuild Success\033[0m\n"
 
-lint: build
+clean:
+    cargo clean
+
+lint: clean
     #!/usr/bin/env sh
     set -e
     echo "\033[1mcargo fmt -- --check\033[0m"
     cargo fmt -- --check
     for feature in $(echo {{features}})
     do
-        cmd="cargo clippy --manifest-path=libsplinter/Cargo.toml $feature"
-        echo "\033[1m$cmd\033[0m"
-        $cmd
+        for crate in $(echo {{crates}})
+        do
+            cmd="cargo clippy --manifest-path=$crate/Cargo.toml $feature -- -D warnings"
+            echo "\033[1m$cmd\033[0m"
+            $cmd
+        done
     done
     echo "\n\033[92mLint Success\033[0m\n"
 
