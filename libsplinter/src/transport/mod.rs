@@ -337,7 +337,7 @@ pub mod tests {
             // a response. Sending a response here will unblock the listener thread, so it is
             // important we do this even in the error case, as the test will hang ohterwise.
             for (mut conn, _token) in connections {
-                assert_eq!(b"hello".to_vec(), conn.recv().unwrap());
+                assert_eq!(b"hello".to_vec(), block!(conn.recv(), RecvError).unwrap());
                 assert_ok(conn.send(b"world"));
             }
 
