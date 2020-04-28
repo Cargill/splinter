@@ -37,6 +37,8 @@
 
 pub mod error;
 mod factory;
+#[cfg(feature = "service-network")]
+pub mod network;
 mod processor;
 mod registry;
 #[cfg(feature = "rest-api")]
