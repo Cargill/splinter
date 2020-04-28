@@ -29,8 +29,8 @@ spec:
           - |
               mkdir -p /keys &&
               cd keys &&
-              splinter admin keygen alice -q --force &&
-              splinter admin keygen bob -q --force &&
+              splinter keygen alice --key-dir /keys -q --force &&
+              splinter keygen bob --key-dir /keys -q --force &&
               grep '' * | sed 's/\\.//' | sed 's/:/:\ /'
       restartPolicy: Never
   backoffLimit: 4
