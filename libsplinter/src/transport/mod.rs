@@ -149,8 +149,11 @@ pub mod tests {
     }
 
     macro_rules! block {
-        ($op:expr, $err:ident) => {
+        ($op:expr, $err:ident) => {{
+            let start = Instant::now();
+            let duration = Duration::from_millis(60000); // 60 seconds
             loop {
+                assert!(start.elapsed() < duration, "blocked for too long");
                 match $op {
                     Err($err::WouldBlock) => {
                         thread::sleep(Duration::from_millis(100));
@@ -160,7 +163,7 @@ pub mod tests {
                     Ok(ok) => break Ok(ok),
                 }
             }
-        };
+        }};
     }
 
     pub fn test_transport<T: Transport + Send + 'static>(mut transport: T, bind: &str) {
