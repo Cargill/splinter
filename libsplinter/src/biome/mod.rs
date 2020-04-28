@@ -44,10 +44,20 @@ pub mod rest_api;
 mod user;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
-pub use credentials::store::{diesel::DieselCredentialsStore, memory::MemoryCredentialsStore};
+pub use credentials::store::diesel::DieselCredentialsStore;
+#[cfg(feature = "biome-credentials")]
+pub use credentials::store::memory::MemoryCredentialsStore;
+
 #[cfg(all(feature = "biome-key-management", feature = "diesel"))]
-pub use key_management::store::{diesel::DieselKeyStore, memory::MemoryKeyStore};
+pub use key_management::store::diesel::DieselKeyStore;
+#[cfg(feature = "biome-key-management")]
+pub use key_management::store::memory::MemoryKeyStore;
+
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
-pub use refresh_tokens::store::{diesel::DieselRefreshTokenStore, memory::MemoryRefreshTokenStore};
+pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;
+#[cfg(feature = "biome-credentials")]
+pub use refresh_tokens::store::memory::MemoryRefreshTokenStore;
+
 #[cfg(feature = "diesel")]
-pub use user::store::{diesel::DieselUserStore, memory::MemoryUserStore};
+pub use user::store::diesel::DieselUserStore;
+pub use user::store::memory::MemoryUserStore;
