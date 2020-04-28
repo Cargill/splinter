@@ -132,6 +132,16 @@ impl PeerMap {
             None
         }
     }
+
+    pub fn get_by_peer_id(&self, peer_id: &str) -> Option<&PeerMetadata> {
+        self.peers.get(peer_id)
+    }
+
+    pub fn get_by_connection_id(&self, connection_id: &str) -> Option<&PeerMetadata> {
+        self.peers
+            .values()
+            .find(|meta| meta.connection_id == connection_id)
+    }
 }
 
 #[cfg(test)]

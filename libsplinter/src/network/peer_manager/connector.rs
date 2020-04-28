@@ -17,11 +17,34 @@ use std::sync::mpsc::{channel, Sender};
 use crate::collections::BiHashMap;
 
 use super::error::{
-    PeerConnectionIdError, PeerListError, PeerManagerError, PeerRefAddError, PeerRefRemoveError,
+    PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
+    PeerRefRemoveError,
 };
 use super::notification::PeerNotificationIter;
 use super::PeerRef;
 use super::{PeerManagerMessage, PeerManagerRequest};
+
+/// The PeerLookup trait provides an interface for looking up details about individual peer
+/// connections.
+pub trait PeerLookup: Send {
+    /// Retrieves the connection id for a given peer id, if found.
+    ///
+    /// # Errors
+    ///
+    /// Returns a PeerLookupError if the connection id cannot be retrieved.
+    fn connection_id(&self, peer_id: &str) -> Result<Option<String>, PeerLookupError>;
+
+    /// Retrieves the peer id for a given connection id, if found.
+    ///
+    /// # Errors
+    ///
+    /// Returns a PeerLookupError if the peer id cannot be retrieved.
+    fn peer_id(&self, connection_id: &str) -> Result<Option<String>, PeerLookupError>;
+}
+
+pub trait PeerLookupProvider {
+    fn peer_lookup(&self) -> Box<dyn PeerLookup>;
+}
 
 /// The PeerManagerConnector will be used to make requests to the PeerManager.
 ///
@@ -102,7 +125,7 @@ impl PeerManagerConnector {
     pub fn list_unreferenced_peers(&self) -> Result<Vec<String>, PeerListError> {
         let (sender, recv) = channel();
         let message =
-            PeerManagerMessage::Request(PeerManagerRequest::ListTemporaryPeers { sender });
+            PeerManagerMessage::Request(PeerManagerRequest::ListUnreferencedPeers { sender });
 
         match self.sender.send(message) {
             Ok(()) => (),
@@ -149,6 +172,54 @@ impl PeerManagerConnector {
                 "The peer manager is no longer running".into(),
             )),
         }
+    }
+}
+
+impl PeerLookup for PeerManagerConnector {
+    fn connection_id(&self, peer_id: &str) -> Result<Option<String>, PeerLookupError> {
+        let (sender, recv) = channel();
+        let message = PeerManagerMessage::Request(PeerManagerRequest::GetConnectionId {
+            peer_id: peer_id.to_string(),
+            sender,
+        });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerLookupError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerLookupError(format!("{:?}", err)))?
+    }
+
+    fn peer_id(&self, connection_id: &str) -> Result<Option<String>, PeerLookupError> {
+        let (sender, recv) = channel();
+        let message = PeerManagerMessage::Request(PeerManagerRequest::GetPeerId {
+            connection_id: connection_id.to_string(),
+            sender,
+        });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerLookupError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerLookupError(format!("{:?}", err)))?
+    }
+}
+
+impl PeerLookupProvider for PeerManagerConnector {
+    fn peer_lookup(&self) -> Box<dyn PeerLookup> {
+        Box::new(self.clone())
     }
 }
 

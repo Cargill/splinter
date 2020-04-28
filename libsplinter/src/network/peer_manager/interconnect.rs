@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
-use crate::collections::BiHashMap;
-use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender, MatrixShutdown};
-use crate::network::dispatch::{DispatchLoopBuilder, DispatchLoopShutdownSignaler, Dispatcher};
+use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
+use crate::network::dispatch::{
+    DispatchLoopBuilder, DispatchLoopShutdownSignaler, DispatchMessageSender, Dispatcher,
+};
 use crate::network::sender::{NetworkMessageSender, SendRequest};
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 
-use super::connector::PeerManagerConnector;
+use super::connector::{PeerLookup, PeerLookupProvider};
 use super::error::PeerInterconnectError;
 
 /// PeerInterconnect will receive incoming messages from peers and dispatch them to the
@@ -33,29 +34,23 @@ use super::error::PeerInterconnectError;
 /// is done for an outgoing message. If a message is received from an unknown connection, the
 /// PeerInterconnect will request the current peers from the PeerManager and update the local map
 /// of peers.
-pub struct PeerInterconnect<T: 'static>
-where
-    T: MatrixShutdown,
-{
+pub struct PeerInterconnect {
     // sender that will be wrapped in a NetworkMessageSender and given to Dispatchers for sending
     // messages to peers
     dispatched_sender: Sender<SendRequest>,
     recv_join_handle: thread::JoinHandle<()>,
     send_join_handle: thread::JoinHandle<()>,
-    shutdown_handle: ShutdownHandle<T>,
+    shutdown_handle: ShutdownHandle,
 }
 
-impl<T> PeerInterconnect<T>
-where
-    T: MatrixShutdown,
-{
+impl PeerInterconnect {
     /// get a new NetworkMessageSender that can be used to send messages to peers.
     pub fn new_network_sender(&self) -> NetworkMessageSender {
         NetworkMessageSender::new(self.dispatched_sender.clone())
     }
 
     /// Returns a ShutdownHandle that can be used to shutdown PeerInterconnect
-    pub fn shutdown_handle(&self) -> ShutdownHandle<T> {
+    pub fn shutdown_handle(&self) -> ShutdownHandle {
         self.shutdown_handle.clone()
     }
 
@@ -85,49 +80,46 @@ where
 }
 
 #[derive(Default)]
-pub struct PeerInterconnectBuilder<T: 'static, U: 'static, V: 'static>
+pub struct PeerInterconnectBuilder<T: 'static, U: 'static, P>
 where
     T: MatrixReceiver,
     U: MatrixSender,
-    V: MatrixShutdown,
+    P: PeerLookupProvider + 'static,
 {
-    // peer connector to update the local peer map
-    peer_connector: Option<PeerManagerConnector>,
+    // peer lookup provider
+    peer_lookup_provider: Option<P>,
     // MatrixReceiver to receive messages from peers
     message_receiver: Option<T>,
     // MatrixSender to send messages to peers
     message_sender: Option<U>,
-    // MatrixShutdown to shutdown matrix
-    message_shutdown: Option<V>,
     // a Dispatcher with handlers for NetworkMessageTypes
     network_dispatcher: Option<Dispatcher<NetworkMessageType>>,
 }
 
-impl<T, U, V> PeerInterconnectBuilder<T, U, V>
+impl<T, U, P> PeerInterconnectBuilder<T, U, P>
 where
     T: MatrixReceiver,
     U: MatrixSender,
-    V: MatrixShutdown,
+    P: PeerLookupProvider + 'static,
 {
     /// Creats an empty builder for a PeerInterconnect
     pub fn new() -> Self {
         PeerInterconnectBuilder {
-            peer_connector: None,
+            peer_lookup_provider: None,
             message_receiver: None,
             message_sender: None,
-            message_shutdown: None,
             network_dispatcher: None,
         }
     }
 
-    /// Add a PeerManagerConnector to PeerInterconnectBuilder
+    /// Add a PeerLookupProvider to PeerInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `peer_connector` - a PeerManagerConnector that will be used to get the currently
-    ///     connected peers and the associated connection id.
-    pub fn with_peer_connector(mut self, peer_connector: PeerManagerConnector) -> Self {
-        self.peer_connector = Some(peer_connector);
+    /// * `peer_lookup_provider` - a PeerLookupProvider that will be used to facilitate getting the
+    ///   peer ids and connection ids for messages.
+    pub fn with_peer_connector(mut self, peer_lookup_provider: P) -> Self {
+        self.peer_lookup_provider = Some(peer_lookup_provider);
         self
     }
 
@@ -151,22 +143,12 @@ where
         self
     }
 
-    /// Add a MatrixShutdown to PeerInterconnectBuilder
-    ///
-    /// # Arguments
-    ///
-    /// * `message_shutdown` - a MatrixShutdown that will be used to shutdown a MatrixSender
-    pub fn with_message_shutdown(mut self, message_shutdown: V) -> Self {
-        self.message_shutdown = Some(message_shutdown);
-        self
-    }
-
     /// Add a Dispatcher for NetworkMessageType to PeerInterconnectBuilder
     ///
     /// # Arguments
     ///
     /// * `network_dispatcher` - a Dispatcher that is loaded with the Handlers for
-    ////       NetworkMessageTypes
+    ///    NetworkMessageTypes
     pub fn with_network_dispatcher(
         mut self,
         network_dispatcher: Dispatcher<NetworkMessageType>,
@@ -180,16 +162,11 @@ where
     ///
     /// Returns the PeerInterconnect object that can be used to get network message senders and
     /// shutdown message threads.
-    pub fn build(&mut self) -> Result<PeerInterconnect<V>, PeerInterconnectError> {
+    pub fn build(&mut self) -> Result<PeerInterconnect, PeerInterconnectError> {
         let (dispatched_sender, dispatched_receiver) = channel();
-        let peers = Arc::new(Mutex::new(BiHashMap::new()));
 
-        let peer_connector = self.peer_connector.take().ok_or_else(|| {
-            PeerInterconnectError::StartUpError("Peer manager connector missing".to_string())
-        })?;
-
-        let message_shutdown = self.message_shutdown.take().ok_or_else(|| {
-            PeerInterconnectError::StartUpError("Message shutdown missing".to_string())
+        let peer_lookup_provider = self.peer_lookup_provider.take().ok_or_else(|| {
+            PeerInterconnectError::StartUpError("Peer lookup provider missing".to_string())
         })?;
 
         let mut network_dispatcher = self.network_dispatcher.take().ok_or_else(|| {
@@ -213,92 +190,16 @@ where
             PeerInterconnectError::StartUpError("Message receiver missing".to_string())
         })?;
 
-        let recv_peers = peers.clone();
-        let recv_peer_connector = peer_connector.clone();
+        let recv_peer_lookup = peer_lookup_provider.peer_lookup();
         let recv_join_handle = thread::Builder::new()
             .name("PeerInterconnect Receiver".into())
             .spawn(move || {
-                loop {
-                    // receive messages from peers
-                    let envelope = match message_receiver.recv() {
-                        Ok(envelope) => envelope,
-                        Err(MatrixRecvError::Shutdown) => {
-                            info!("Matrix has shutdown");
-                            break;
-                        }
-                        Err(MatrixRecvError::Disconnected) => {
-                            error!("Unable to receive message: disconnected");
-                            break;
-                        }
-                        Err(MatrixRecvError::InternalError { context, .. }) => {
-                            error!("Unable to receive message: {}", context);
-                            break;
-                        }
-                    };
-
-                    let connection_id = envelope.id();
-                    let peer_id = {
-                        let mut peers = match recv_peers.lock() {
-                            Ok(recv_peers) => recv_peers,
-                            Err(_) => {
-                                error!("PeerInterconnect state has been poisoned");
-                                break;
-                            }
-                        };
-
-                        let mut peer_id = peers
-                            .get_by_value(connection_id)
-                            .unwrap_or(&"".to_string())
-                            .to_string();
-
-                        // convert connection id to peer id
-                        // if peer id is None, fetch peers to see if they have changed
-                        if peer_id.is_empty() {
-                            *peers = match recv_peer_connector.connection_ids() {
-                                Ok(peers) => peers,
-                                Err(err) => {
-                                    error!("Unable to get peer map: {}", err);
-                                    break;
-                                }
-                            };
-                            peer_id = peers
-                                .get_by_value(connection_id)
-                                .to_owned()
-                                .unwrap_or(&"".to_string())
-                                .to_string();
-                        }
-                        peer_id
-                    };
-
-                    // If we have the peer, pass message to dispatcher, else print error
-                    if !peer_id.is_empty() {
-                        let mut network_msg: NetworkMessage =
-                            match protobuf::parse_from_bytes(&envelope.payload()) {
-                                Ok(msg) => msg,
-                                Err(err) => {
-                                    error!("Unable to dispatch message: {}", err);
-                                    continue;
-                                }
-                            };
-
-                        trace!(
-                            "Received message from {}: {:?}",
-                            peer_id,
-                            network_msg.get_message_type()
-                        );
-                        match network_dispatcher_sender.send(
-                            network_msg.get_message_type(),
-                            network_msg.take_payload(),
-                            peer_id.into(),
-                        ) {
-                            Ok(()) => (),
-                            Err((message_type, _, _)) => {
-                                error!("Unable to dispatch message of type {:?}", message_type)
-                            }
-                        }
-                    } else {
-                        error!("Received message from unknown peer");
-                    }
+                if let Err(err) = run_recv_loop(
+                    &*recv_peer_lookup,
+                    message_receiver,
+                    network_dispatcher_sender,
+                ) {
+                    error!("Shutting down peer interconnect recevier: {}", err);
                 }
             })
             .map_err(|err| {
@@ -308,6 +209,7 @@ where
                 ))
             })?;
 
+        let send_peer_lookup = peer_lookup_provider.peer_lookup();
         let message_sender = self
             .message_sender
             .take()
@@ -315,64 +217,10 @@ where
         let send_join_handle = thread::Builder::new()
             .name("PeerInterconnect Sender".into())
             .spawn(move || {
-                loop {
-                    // receive message from internal handlers to send over the network
-                    let (recipient, payload) = match dispatched_receiver.recv() {
-                        Ok(SendRequest::Message { recipient, payload }) => (recipient, payload),
-                        Ok(SendRequest::Shutdown) => {
-                            info!("Received Shutdown");
-                            break;
-                        }
-                        Err(err) => {
-                            error!("Unable to receive message from handlers: {}", err);
-                            break;
-                        }
-                    };
-                    // convert recipient (peer_id) to connection_id
-                    let connection_id = {
-                        let mut peers = match peers.lock() {
-                            Ok(recv_peers) => recv_peers,
-                            Err(_) => {
-                                error!("PeerInterconnect state has been poisoned");
-                                break;
-                            }
-                        };
-
-                        let mut connection_id = peers
-                            .get_by_key(&recipient)
-                            .to_owned()
-                            .unwrap_or(&"".to_string())
-                            .to_string();
-
-                        if connection_id.is_empty() {
-                            *peers = match peer_connector.connection_ids() {
-                                Ok(peers) => peers,
-                                Err(err) => {
-                                    error!("Unable to get peer map: {}", err);
-                                    break;
-                                }
-                            };
-
-                            connection_id = peers
-                                .get_by_key(&recipient)
-                                .to_owned()
-                                .unwrap_or(&"".to_string())
-                                .to_string();
-                        }
-                        connection_id
-                    };
-
-                    // if peer exists, send message over the network
-                    if !connection_id.is_empty() {
-                        match message_sender.send(connection_id.to_string(), payload) {
-                            Ok(_) => (),
-                            Err(err) => {
-                                error!("Unable to send message to {}", err);
-                            }
-                        }
-                    } else {
-                        error!("Cannot send message, unknown peer: {}", recipient);
-                    }
+                if let Err(err) =
+                    run_send_loop(&*send_peer_lookup, dispatched_receiver, message_sender)
+                {
+                    error!("Shutting down peer interconnect sender: {}", err);
                 }
             })
             .map_err(|err| {
@@ -389,26 +237,133 @@ where
             shutdown_handle: ShutdownHandle {
                 sender: dispatched_sender,
                 dispatch_shutdown: network_dispatcher_shutdown,
-                matrix_shutdown: message_shutdown,
             },
         })
     }
 }
 
-#[derive(Clone)]
-pub struct ShutdownHandle<T: 'static>
+fn run_recv_loop<R>(
+    peer_connector: &dyn PeerLookup,
+    message_receiver: R,
+    dispatch_msg_sender: DispatchMessageSender<NetworkMessageType>,
+) -> Result<(), String>
 where
-    T: MatrixShutdown,
+    R: MatrixReceiver + 'static,
 {
-    sender: Sender<SendRequest>,
-    dispatch_shutdown: DispatchLoopShutdownSignaler<NetworkMessageType>,
-    matrix_shutdown: T,
+    let mut connection_id_to_peer_id: HashMap<String, String> = HashMap::new();
+    loop {
+        // receive messages from peers
+        let envelope = match message_receiver.recv() {
+            Ok(envelope) => envelope,
+            Err(MatrixRecvError::Shutdown) => {
+                info!("Matrix has shutdown");
+                break Ok(());
+            }
+            Err(MatrixRecvError::Disconnected) => {
+                break Err("Unable to receive message: disconnected".into());
+            }
+            Err(MatrixRecvError::InternalError { context, .. }) => {
+                break Err(format!("Unable to receive message: {}", context));
+            }
+        };
+
+        let connection_id = envelope.id();
+        let peer_id = if let Some(peer_id) = connection_id_to_peer_id.get(connection_id) {
+            Some(peer_id.to_owned())
+        } else if let Some(peer_id) = peer_connector
+            .peer_id(connection_id)
+            .map_err(|err| format!("Unable to get peer id for {}: {}", connection_id, err))?
+        {
+            connection_id_to_peer_id.insert(connection_id.to_string(), peer_id.clone());
+            Some(peer_id)
+        } else {
+            None
+        };
+
+        // If we have the peer, pass message to dispatcher, else print error
+        if let Some(peer_id) = peer_id {
+            let mut network_msg: NetworkMessage =
+                match protobuf::parse_from_bytes(&envelope.payload()) {
+                    Ok(msg) => msg,
+                    Err(err) => {
+                        error!("Unable to dispatch message: {}", err);
+                        continue;
+                    }
+                };
+
+            trace!(
+                "Received message from {}: {:?}",
+                peer_id,
+                network_msg.get_message_type()
+            );
+            match dispatch_msg_sender.send(
+                network_msg.get_message_type(),
+                network_msg.take_payload(),
+                peer_id.into(),
+            ) {
+                Ok(()) => (),
+                Err((message_type, _, _)) => {
+                    error!("Unable to dispatch message of type {:?}", message_type)
+                }
+            }
+        } else {
+            error!("Received message from unknown peer");
+        }
+    }
 }
 
-impl<T> ShutdownHandle<T>
+fn run_send_loop<S>(
+    peer_connector: &dyn PeerLookup,
+    receiver: Receiver<SendRequest>,
+    message_sender: S,
+) -> Result<(), String>
 where
-    T: MatrixShutdown,
+    S: MatrixSender + 'static,
 {
+    let mut peer_id_to_connection_id: HashMap<String, String> = HashMap::new();
+    loop {
+        // receive message from internal handlers to send over the network
+        let (recipient, payload) = match receiver.recv() {
+            Ok(SendRequest::Message { recipient, payload }) => (recipient, payload),
+            Ok(SendRequest::Shutdown) => {
+                info!("Received Shutdown");
+                break Ok(());
+            }
+            Err(err) => {
+                break Err(format!("Unable to receive message from handlers: {}", err));
+            }
+        };
+        // convert recipient (peer_id) to connection_id
+        let connection_id = if let Some(connection_id) = peer_id_to_connection_id.get(&recipient) {
+            Some(connection_id.to_owned())
+        } else if let Some(connection_id) = peer_connector
+            .connection_id(&recipient)
+            .map_err(|err| format!("Unable to get connection id for {}: {}", recipient, err))?
+        {
+            peer_id_to_connection_id.insert(recipient.clone(), connection_id.clone());
+            Some(connection_id)
+        } else {
+            None
+        };
+
+        // if peer exists, send message over the network
+        if let Some(connection_id) = connection_id {
+            if let Err(err) = message_sender.send(connection_id, payload) {
+                error!("Unable to send message to {}: {}", recipient, err);
+            }
+        } else {
+            error!("Cannot send message, unknown peer: {}", recipient);
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ShutdownHandle {
+    sender: Sender<SendRequest>,
+    dispatch_shutdown: DispatchLoopShutdownSignaler<NetworkMessageType>,
+}
+
+impl ShutdownHandle {
     /// Sends a shutdown notifications to PeerInterconnect and the associated dipatcher thread and
     /// Matrix
     pub fn shutdown(&self) {
@@ -417,7 +372,6 @@ where
         }
 
         self.dispatch_shutdown.shutdown();
-        self.matrix_shutdown.shutdown();
     }
 }
 
@@ -427,7 +381,7 @@ pub mod tests {
 
     use protobuf::Message;
 
-    use std::sync::mpsc::Sender;
+    use std::sync::mpsc::{self, Sender};
 
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
@@ -490,6 +444,7 @@ pub mod tests {
         let mesh2 = Mesh::new(512, 128);
 
         // set up thread for the peer
+        let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
             // accept incoming connection and add it to mesh2
             let conn = listener.accept().expect("Cannot accept connection");
@@ -520,6 +475,10 @@ pub mod tests {
                 echo_to_network_message_bytes("shutdown_string".as_bytes().to_vec());
             let envelope = Envelope::new("test_id".to_string(), message_bytes);
             mesh2.send(envelope).expect("Cannot send message");
+
+            rx.recv().unwrap();
+
+            mesh2.shutdown_signaler().shutdown();
         });
 
         let mut cm = ConnectionManager::new(
@@ -547,7 +506,6 @@ pub mod tests {
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh1.get_receiver())
             .with_message_sender(mesh1.get_sender())
-            .with_message_shutdown(mesh1.get_matrix_shutdown())
             .with_network_dispatcher(dispatcher)
             .build()
             .expect("Unable to build PeerInterconnect");
@@ -556,8 +514,13 @@ pub mod tests {
         let test_timeout = std::time::Duration::from_secs(2);
         recv.recv_timeout(test_timeout)
             .expect("Failed to receive message");
+
+        // trigger the thread shutdown
+        tx.send(()).unwrap();
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh1.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
 
@@ -586,13 +549,13 @@ pub mod tests {
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh.get_receiver())
             .with_message_sender(mesh.get_sender())
-            .with_message_shutdown(mesh.get_matrix_shutdown())
             .with_network_dispatcher(dispatcher)
             .build()
             .expect("Unable to build PeerInterconnect");
 
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        mesh.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
 

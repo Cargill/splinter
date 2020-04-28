@@ -152,3 +152,14 @@ impl fmt::Display for PeerInterconnectError {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct PeerLookupError(pub String);
+
+impl error::Error for PeerLookupError {}
+
+impl fmt::Display for PeerLookupError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
