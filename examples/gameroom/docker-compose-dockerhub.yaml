@@ -19,6 +19,8 @@ volumes:
   key-registry:
   acme-var:
   bubba-var:
+  acme-db:
+  bubba-db:
 
 services:
 
@@ -52,6 +54,7 @@ services:
         POSTGRES_DB: gameroom
       volumes:
         - "./database/tables:/docker-entrypoint-initdb.d"
+        - acme-db:/var/lib/postgresql/data/
 
     gameroom-app-acme:
       image: splintercommunity/gameroom-app-acme:master
@@ -138,6 +141,7 @@ services:
         POSTGRES_DB: gameroom
       volumes:
         - "./database/tables:/docker-entrypoint-initdb.d"
+        - bubba-db:/var/lib/postgresql/data/
 
     gameroom-app-bubba:
       image: splintercommunity/gameroom-app-bubba:master
