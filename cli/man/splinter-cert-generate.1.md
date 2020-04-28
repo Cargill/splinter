@@ -19,7 +19,8 @@ development environment.
 
 The files are generated in the location specified by `--cert-dir`, the
 SPLINTER_CERT_DIR environment variable, or in the default location
-/etc/splinter/certs/.
+/etc/splinter/certs/. The default location may be derived from the SPLINTER_HOME
+environment variable, if it is set.
 
 The following files are created:
 
@@ -88,6 +89,12 @@ generate:
 
 : The certificates and keys will be generated at the location specified by the
   environment variable. (See `--cert-dir`)
+
+**SPLINTER_HOME**
+
+: The default location of the generated certificates and keys is derived from
+  the environment variable. This value is not used if SPLINTER_CERT_DIR is
+  specified.
 
 SEE ALSO
 ========

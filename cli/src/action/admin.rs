@@ -34,8 +34,9 @@ use crate::error::CliError;
 
 use super::{chown, Action};
 
-const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
+const DEFAULT_STATE_DIR: &str = "/var/lib/splinter";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
+const SPLINTER_HOME: &str = "SPLINTER_HOME";
 
 pub struct AdminKeyGenAction;
 
@@ -81,7 +82,16 @@ impl Action for KeyRegistryGenerationAction {
             .value_of("target_dir")
             .map(ToOwned::to_owned)
             .or_else(|| env::var(STATE_DIR_ENV).ok())
-            .or_else(|| Some(DEFAULT_STATE_DIR.to_string()))
+            .or_else(|| {
+                if let Ok(splinter_home) = env::var(SPLINTER_HOME) {
+                    Path::new(&splinter_home)
+                        .join(DEFAULT_STATE_DIR)
+                        .to_str()
+                        .map(ToOwned::to_owned)
+                } else {
+                    Some(DEFAULT_STATE_DIR.to_string())
+                }
+            })
             .unwrap();
         let target_dir = Path::new(&target_dir_path);
 
