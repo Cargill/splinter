@@ -398,6 +398,7 @@ impl PartialConfig {
         self
     }
 
+    #[allow(dead_code)]
     /// Adds a `registry_auto_refresh_interval` value to the PartialConfig object.
     ///
     /// # Arguments
@@ -413,6 +414,7 @@ impl PartialConfig {
         self
     }
 
+    #[allow(dead_code)]
     /// Adds a `registry_forced_refresh_interval` value to the PartialConfig object.
     ///
     /// # Arguments
