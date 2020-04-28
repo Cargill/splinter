@@ -159,6 +159,13 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("config_dir")
+                .long("config-dir")
+                .help("Path to the directory containing configuration files")
+                .takes_value(true)
+                .alias("config-dir"),
+        )
+        .arg(
             Arg::with_name("tls_cert_dir")
                 .long("tls-cert-dir")
                 .help("Path to the directory where the certificates and keys are")

@@ -42,6 +42,7 @@ pub use partial::{ConfigSource, PartialConfig};
 /// values from PartialConfig objects generated from various sources.
 #[derive(Debug)]
 pub struct Config {
+    config_dir: (String, ConfigSource),
     storage: (String, ConfigSource),
     tls_cert_dir: (String, ConfigSource),
     tls_ca_file: (String, ConfigSource),
@@ -73,6 +74,10 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn config_dir(&self) -> &str {
+        &self.config_dir.0
+    }
+
     pub fn storage(&self) -> &str {
         &self.storage.0
     }
@@ -178,6 +183,10 @@ impl Config {
         } else {
             None
         }
+    }
+
+    pub fn config_dir_source(&self) -> &ConfigSource {
+        &self.config_dir.1
     }
 
     fn storage_source(&self) -> &ConfigSource {
@@ -287,8 +296,14 @@ impl Config {
         }
     }
 
+    #[allow(clippy::cognitive_complexity)]
     /// Displays the configuration value along with where the value was sourced from.
     pub fn log_as_debug(&self) {
+        debug!(
+            "Config: config_dir: {} (source: {:?})",
+            self.config_dir(),
+            self.config_dir_source()
+        );
         debug!(
             "Config: storage: {} (source: {:?})",
             self.storage(),
@@ -446,13 +461,15 @@ mod tests {
     /// Path to example config toml file.
     static TEST_TOML: &str = "config_test.toml";
 
+    static EXAMPLE_TLS_CERT_DIR: &str = "test/certs/";
+
     /// Values present in the example config TEST_TOML file.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
-    static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
-    static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
-    static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
-    static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    static EXAMPLE_CA_CERTS: &str = "ca.pem";
+    static EXAMPLE_CLIENT_CERT: &str = "client.crt";
+    static EXAMPLE_CLIENT_KEY: &str = "private/client.key";
+    static EXAMPLE_SERVER_CERT: &str = "server.crt";
+    static EXAMPLE_SERVER_KEY: &str = "private/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
@@ -664,8 +681,8 @@ mod tests {
     /// asserting each expected value.
     fn test_final_config_precedence() {
         // Set the environment variables to populate the EnvPartialConfigBuilder object.
-        env::set_var("SPLINTER_STATE_DIR", "state/test/config");
-        env::set_var("SPLINTER_CERT_DIR", "cert/test/config");
+        env::set_var("SPLINTER_STATE_DIR", "test/state/");
+        env::set_var("SPLINTER_CERT_DIR", "test/certs/");
         // Create a new ConfigBuilder object.
         let builder = ConfigBuilder::new();
         // Arguments to be used to create a ClapPartialConfigBuilder object.
@@ -744,7 +761,7 @@ mod tests {
                 final_config.tls_cert_dir(),
                 final_config.tls_cert_dir_source()
             ),
-            ("cert/test/config", &ConfigSource::Environment)
+            ("test/certs/", &ConfigSource::Environment)
         );
         // Both the DefaultPartialConfigBuilder and TomlPartialConfigBuilder had values for
         // `tls_ca_file`, but the TomlPartialConfigBuilder value should have precedence (source
@@ -755,7 +772,7 @@ mod tests {
                 final_config.tls_ca_file_source()
             ),
             (
-                EXAMPLE_CA_CERTS,
+                format!("{}{}", EXAMPLE_TLS_CERT_DIR, EXAMPLE_CA_CERTS).as_str(),
                 &ConfigSource::Toml {
                     file: TEST_TOML.to_string()
                 },
@@ -770,7 +787,7 @@ mod tests {
                 final_config.tls_client_cert_source()
             ),
             (
-                EXAMPLE_CLIENT_CERT,
+                format!("{}{}", EXAMPLE_TLS_CERT_DIR, EXAMPLE_CLIENT_CERT).as_str(),
                 &ConfigSource::Toml {
                     file: TEST_TOML.to_string()
                 }
@@ -785,7 +802,7 @@ mod tests {
                 final_config.tls_client_key_source()
             ),
             (
-                EXAMPLE_CLIENT_KEY,
+                format!("{}{}", EXAMPLE_TLS_CERT_DIR, EXAMPLE_CLIENT_KEY).as_str(),
                 &ConfigSource::Toml {
                     file: TEST_TOML.to_string()
                 },
@@ -800,7 +817,7 @@ mod tests {
                 final_config.tls_server_cert_source()
             ),
             (
-                EXAMPLE_SERVER_CERT,
+                format!("{}{}", EXAMPLE_TLS_CERT_DIR, EXAMPLE_SERVER_CERT).as_str(),
                 &ConfigSource::Toml {
                     file: TEST_TOML.to_string()
                 }
@@ -815,7 +832,7 @@ mod tests {
                 final_config.tls_server_key_source()
             ),
             (
-                EXAMPLE_SERVER_KEY,
+                format!("{}{}", EXAMPLE_TLS_CERT_DIR, EXAMPLE_SERVER_KEY).as_str(),
                 &ConfigSource::Toml {
                     file: TEST_TOML.to_string()
                 }
@@ -936,7 +953,7 @@ mod tests {
         // be EnvVarConfig).
         assert_eq!(
             (final_config.state_dir(), final_config.state_dir_source()),
-            ("state/test/config", &ConfigSource::Environment)
+            ("test/state/", &ConfigSource::Environment)
         );
     }
 

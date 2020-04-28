@@ -41,6 +41,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         let mut partial_config = PartialConfig::new(ConfigSource::CommandLine);
 
         partial_config = partial_config
+            .with_config_dir(self.matches.value_of("config_dir").map(String::from))
             .with_storage(self.matches.value_of("storage").map(String::from))
             .with_tls_cert_dir(self.matches.value_of("tls_cert_dir").map(String::from))
             .with_tls_ca_file(self.matches.value_of("tls_ca_file").map(String::from))

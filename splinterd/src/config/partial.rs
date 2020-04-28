@@ -30,6 +30,7 @@ pub enum ConfigSource {
 #[derive(Deserialize, Debug)]
 pub struct PartialConfig {
     source: ConfigSource,
+    config_dir: Option<String>,
     storage: Option<String>,
     tls_cert_dir: Option<String>,
     tls_ca_file: Option<String>,
@@ -65,6 +66,7 @@ impl PartialConfig {
     pub fn new(source: ConfigSource) -> Self {
         PartialConfig {
             source,
+            config_dir: None,
             storage: None,
             tls_cert_dir: None,
             tls_ca_file: None,
@@ -98,6 +100,10 @@ impl PartialConfig {
 
     pub fn source(&self) -> ConfigSource {
         self.source.clone()
+    }
+
+    pub fn config_dir(&self) -> Option<String> {
+        self.config_dir.clone()
     }
 
     pub fn storage(&self) -> Option<String> {
@@ -201,6 +207,17 @@ impl PartialConfig {
     #[cfg(feature = "rest-api-cors")]
     pub fn whitelist(&self) -> Option<Vec<String>> {
         self.whitelist.clone()
+    }
+
+    /// Adds a `config_dir` value to the PartialConfig object.
+    ///
+    /// # Arguments
+    ///
+    /// * `config_dir` - Directory containing the configuration directories and files.
+    ///
+    pub fn with_config_dir(mut self, config_dir: Option<String>) -> Self {
+        self.config_dir = config_dir;
+        self
     }
 
     #[allow(dead_code)]

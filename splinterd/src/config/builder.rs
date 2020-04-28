@@ -63,6 +63,14 @@ impl ConfigBuilder {
     /// Builds a Config object by incorporating the values from each PartialConfig object.
     ///
     pub fn build(self) -> Result<Config, ConfigError> {
+        let config_dir = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.config_dir() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("config directory".to_string()))?;
         let tls_cert_dir = self
             .partial_configs
             .iter()
@@ -160,6 +168,7 @@ impl ConfigBuilder {
         // Iterates over the list of PartialConfig objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
+            config_dir,
             storage: self
                 .partial_configs
                 .iter()
@@ -324,11 +333,11 @@ mod tests {
 
     /// Example configuration values.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
-    static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
-    static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
-    static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
-    static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    static EXAMPLE_CA_CERTS: &str = "/etc/splinter/certs/ca.pem";
+    static EXAMPLE_CLIENT_CERT: &str = "/etc/splinter/certs/client.crt";
+    static EXAMPLE_CLIENT_KEY: &str = "/etc/splinter/certs/client.key";
+    static EXAMPLE_SERVER_CERT: &str = "/etc/splinter/certs/server.crt";
+    static EXAMPLE_SERVER_KEY: &str = "/etc/splinter/certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";

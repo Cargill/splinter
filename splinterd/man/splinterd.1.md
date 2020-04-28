@@ -112,6 +112,12 @@ OPTIONS
   Any options on the command line will override the settings in the
   configuration file.
 
+`--config-dir CONFIG-DIR`
+: Specifies the directory containing configuration files.
+  (Default: `/etc/splinter`.)
+
+  This option overrides the `SPLINTER_CONFIG_DIR` environment variable, if set.
+
 `--display-name DISPLAY-NAME`
 : Specifies a human-readable name for the node (Default: "Node NODE-ID")
 
@@ -241,6 +247,10 @@ ENVIRONMENT VARIABLES
 : Specifies where to store the circuit state YAML file, if `--storage` is
   set to `yaml`. (See `--storage`.) By default, this file is stored in
   `/var/lib/splinter`.
+
+**SPLINTER_CONFIG_DIR**
+: Specifies the directory containing configuration files.
+  (See: `--config-dir`.)
 
 FILES
 =====
