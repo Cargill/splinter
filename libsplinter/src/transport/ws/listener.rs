@@ -12,23 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::net::TcpStream;
+use std::net::TcpListener;
+use std::thread;
+use std::time::Duration;
 
-use websocket::server::{sync::Server, upgrade::sync::Buffer, InvalidConnection, NoTlsAcceptor};
+use mio::net::TcpStream as MioTcpStream;
+use tungstenite::{accept, handshake::HandshakeError};
 
 use crate::transport::{AcceptError, Connection, Listener};
 
-use super::connection::WsClientConnection;
+use super::connection::WsConnection;
+use super::transport::PROTOCOL_PREFIX;
 
 pub(super) struct WsListener {
-    server: Server<NoTlsAcceptor>,
+    listener: TcpListener,
     local_endpoint: String,
 }
 
 impl WsListener {
-    pub fn new(server: Server<NoTlsAcceptor>, local_endpoint: String) -> Self {
+    pub fn new(listener: TcpListener, local_endpoint: String) -> Self {
         WsListener {
-            server,
+            listener,
             local_endpoint,
         }
     }
@@ -36,14 +40,31 @@ impl WsListener {
 
 impl Listener for WsListener {
     fn accept(&mut self) -> Result<Box<dyn Connection>, AcceptError> {
-        let client = self.server.accept()?.accept()?;
-        client.set_nonblocking(true)?;
+        let (stream, _) = self.listener.accept()?;
+        let remote_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.peer_addr()?);
+        let local_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.local_addr()?);
 
-        let remote_endpoint = format!("ws://{}", client.peer_addr()?);
-        let local_endpoint = format!("ws://{}", client.local_addr()?);
+        let mio_stream = MioTcpStream::from_stream(stream)?;
+        let websocket = accept(mio_stream).map_or_else(
+            {
+                |mut handshake_err| loop {
+                    match handshake_err {
+                        HandshakeError::Interrupted(mid_handshake) => {
+                            thread::sleep(Duration::from_millis(100));
+                            match mid_handshake.handshake() {
+                                Ok(ok) => break Ok(ok),
+                                Err(err) => handshake_err = err,
+                            }
+                        }
+                        HandshakeError::Failure(err) => break Err(err),
+                    }
+                }
+            },
+            Ok,
+        )?;
 
-        Ok(Box::new(WsClientConnection::new(
-            client,
+        Ok(Box::new(WsConnection::new(
+            websocket,
             remote_endpoint,
             local_endpoint,
         )))
@@ -54,14 +75,11 @@ impl Listener for WsListener {
     }
 }
 
-impl From<InvalidConnection<TcpStream, Buffer>> for AcceptError {
-    fn from(iconn: InvalidConnection<TcpStream, Buffer>) -> Self {
-        AcceptError::ProtocolError(format!("HyperIntoWsError: {}", iconn.error.to_string()))
-    }
-}
-
-impl From<(TcpStream, std::io::Error)> for AcceptError {
-    fn from(tuple: (TcpStream, std::io::Error)) -> Self {
-        AcceptError::from(tuple.1)
+impl From<tungstenite::error::Error> for AcceptError {
+    fn from(err: tungstenite::error::Error) -> Self {
+        match err {
+            tungstenite::error::Error::Io(io) => AcceptError::from(io),
+            _ => AcceptError::ProtocolError(format!("handshake failure: {}", err)),
+        }
     }
 }

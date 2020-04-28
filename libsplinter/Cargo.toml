@@ -55,10 +55,10 @@ serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
 tokio = { version = "0.1.22", optional = true }
+tungstenite = { version = "0.10", optional = true }
 url = "1.7.1"
 ursa = { version = "0.1", optional = true }
 uuid = { version = "0.7", features = ["v4"]}
-websocket = { version = "0.24", optional = true }
 zmq = { version = "0.9", optional = true }
 
 [dev-dependencies]
@@ -125,7 +125,7 @@ rest-api-cors = []
 sawtooth-signing-compat = ["sawtooth-sdk"]
 service-arg-validation = []
 service-network = []
-ws-transport = ["websocket"]
+ws-transport = ["tungstenite"]
 zmq-transport = ["zmq"]
 
 # The following features are broken and should not be used.
