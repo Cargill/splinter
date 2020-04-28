@@ -58,10 +58,10 @@ serde_json = "1.0"
 serde_yaml = "0.8"
 tokio = { version = "0.1.22", optional = true }
 transact = { version = "0.2", features = ["sawtooth-compat"] }
+tungstenite = { version = "0.10", optional = true }
 url = "1.7.1"
 ursa = { version = "0.1", optional = true }
 uuid = { version = "0.7", features = ["v4"]}
-websocket = { version = "0.24", optional = true }
 zmq = { version = "0.9", optional = true }
 
 [dev-dependencies]
@@ -138,7 +138,7 @@ sawtooth-signing-compat = ["sawtooth-sdk"]
 scabbard-client = ["reqwest"]
 scabbard-get-state = []
 service-arg-validation = []
-ws-transport = ["websocket"]
+ws-transport = ["tungstenite"]
 zmq-transport = ["zmq"]
 
 # The following features are broken and should not be used.

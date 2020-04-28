@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use websocket::{
-    result::WebSocketError,
-    server::{sync::Server, NoTlsAcceptor},
-    ClientBuilder,
-};
+use std::net::{TcpListener, TcpStream};
+use std::thread;
+use std::time::Duration;
+
+use mio::net::TcpStream as MioTcpStream;
+use tungstenite::{client, handshake::HandshakeError};
 
 use crate::transport::{ConnectError, Connection, ListenError, Listener, Transport};
 
-use super::connection::WsClientConnection;
+use super::connection::WsConnection;
 use super::listener::WsListener;
 
-const PROTOCOL_PREFIX: &str = "ws://";
+pub(super) const PROTOCOL_PREFIX: &str = "ws://";
 
 /// A WebSocket-based `Transport`.
 ///
@@ -99,14 +100,39 @@ impl Transport for WsTransport {
             )));
         }
 
-        let client = ClientBuilder::new(endpoint)?.connect_insecure()?;
-        client.set_nonblocking(true)?;
+        let address = if endpoint.starts_with(PROTOCOL_PREFIX) {
+            &endpoint[PROTOCOL_PREFIX.len()..]
+        } else {
+            endpoint
+        };
 
-        let remote_endpoint = format!("ws://{}", client.peer_addr()?);
-        let local_endpoint = format!("ws://{}", client.local_addr()?);
+        let stream = TcpStream::connect(address)?;
 
-        Ok(Box::new(WsClientConnection::new(
-            client,
+        let remote_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.peer_addr()?);
+        let local_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.local_addr()?);
+
+        let mio_stream = MioTcpStream::from_stream(stream)?;
+
+        let (websocket, _) = client(endpoint, mio_stream).map_or_else(
+            {
+                |mut handshake_err| loop {
+                    match handshake_err {
+                        HandshakeError::Interrupted(mid_handshake) => {
+                            thread::sleep(Duration::from_millis(100));
+                            match mid_handshake.handshake() {
+                                Ok(ok) => break Ok(ok),
+                                Err(err) => handshake_err = err,
+                            }
+                        }
+                        HandshakeError::Failure(err) => break Err(err),
+                    }
+                }
+            },
+            Ok,
+        )?;
+
+        Ok(Box::new(WsConnection::new(
+            websocket,
             remote_endpoint,
             local_endpoint,
         )))
@@ -126,18 +152,18 @@ impl Transport for WsTransport {
             bind
         };
 
-        let server: Server<NoTlsAcceptor> = Server::bind(address)?;
-        let local_endpoint = format!("ws://{}", server.local_addr()?);
+        let tcp_listener = TcpListener::bind(address)?;
+        let local_endpoint = format!("ws://{}", tcp_listener.local_addr()?);
 
-        Ok(Box::new(WsListener::new(server, local_endpoint)))
+        Ok(Box::new(WsListener::new(tcp_listener, local_endpoint)))
     }
 }
 
-impl From<WebSocketError> for ConnectError {
-    fn from(err: WebSocketError) -> Self {
+impl From<tungstenite::error::Error> for ConnectError {
+    fn from(err: tungstenite::error::Error) -> Self {
         match err {
-            WebSocketError::IoError(e) => ConnectError::from(e),
-            _ => ConnectError::ProtocolError(format!("WebSocketError: {}", err.to_string())),
+            tungstenite::error::Error::Io(io) => ConnectError::from(io),
+            _ => ConnectError::ProtocolError(format!("handshake failure: {}", err)),
         }
     }
 }
