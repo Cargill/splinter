@@ -88,6 +88,7 @@ stable = [
     "rest-api-actix",
     "rest-api-cors",
     "sawtooth-signing-compat",
+    "scabbard-client",
 ]
 
 experimental = [
@@ -102,7 +103,6 @@ experimental = [
     "matrix",
     "network-peer-manager",
     "network-ref-map",
-    "scabbard-client",
     "scabbard-get-state",
     "service-arg-validation",
     "ws-transport",
