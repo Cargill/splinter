@@ -118,12 +118,12 @@ pub struct SplinterDaemon {
     #[cfg(feature = "database")]
     db_url: Option<String>,
     #[cfg(feature = "biome")]
-    biome_enabled: bool,
+    enable_biome: bool,
     registries: Vec<String>,
-    registry_auto_refresh_interval: u64,
-    registry_forced_refresh_interval: u64,
+    registry_auto_refresh: u64,
+    registry_forced_refresh: u64,
     storage_type: String,
-    admin_service_coordinator_timeout: Duration,
+    admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
 }
@@ -416,7 +416,7 @@ impl SplinterDaemon {
             key_registry.clone(),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
-            Some(self.admin_service_coordinator_timeout),
+            Some(self.admin_timeout),
         )
         .map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
@@ -426,8 +426,8 @@ impl SplinterDaemon {
         let (node_registry, registry_shutdown) = create_node_registry(
             &self.node_registry_directory,
             &self.registries,
-            self.registry_auto_refresh_interval,
-            self.registry_forced_refresh_interval,
+            self.registry_auto_refresh,
+            self.registry_forced_refresh,
         )?;
 
         let node_id = self.node_id.clone();
@@ -473,7 +473,7 @@ impl SplinterDaemon {
 
         #[cfg(feature = "biome")]
         {
-            if self.biome_enabled {
+            if self.enable_biome {
                 let db_url = self.db_url.as_ref().ok_or_else(|| {
                     StartError::StorageError(
                         "biome was enabled but the builder failed to require the db URL".into(),
@@ -725,13 +725,13 @@ pub struct SplinterDaemonBuilder {
     #[cfg(feature = "database")]
     db_url: Option<String>,
     #[cfg(feature = "biome")]
-    biome_enabled: bool,
+    enable_biome: bool,
     registries: Vec<String>,
-    registry_auto_refresh_interval: Option<u64>,
-    registry_forced_refresh_interval: Option<u64>,
+    registry_auto_refresh: Option<u64>,
+    registry_forced_refresh: Option<u64>,
     storage_type: Option<String>,
-    heartbeat_interval: Option<u64>,
-    admin_service_coordinator_timeout: Duration,
+    heartbeat: Option<u64>,
+    admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
 }
@@ -799,7 +799,7 @@ impl SplinterDaemonBuilder {
 
     #[cfg(feature = "biome")]
     pub fn enable_biome(mut self, enabled: bool) -> Self {
-        self.biome_enabled = enabled;
+        self.enable_biome = enabled;
         self
     }
 
@@ -808,13 +808,13 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_registry_auto_refresh_interval(mut self, value: u64) -> Self {
-        self.registry_auto_refresh_interval = Some(value);
+    pub fn with_registry_auto_refresh(mut self, value: u64) -> Self {
+        self.registry_auto_refresh = Some(value);
         self
     }
 
-    pub fn with_registry_forced_refresh_interval(mut self, value: u64) -> Self {
-        self.registry_forced_refresh_interval = Some(value);
+    pub fn with_registry_forced_refresh(mut self, value: u64) -> Self {
+        self.registry_forced_refresh = Some(value);
         self
     }
 
@@ -823,13 +823,13 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_heartbeat_interval(mut self, value: u64) -> Self {
-        self.heartbeat_interval = Some(value);
+    pub fn with_heartbeat(mut self, value: u64) -> Self {
+        self.heartbeat = Some(value);
         self
     }
 
-    pub fn with_admin_service_coordinator_timeout(mut self, value: Duration) -> Self {
-        self.admin_service_coordinator_timeout = value;
+    pub fn with_admin_timeout(mut self, value: Duration) -> Self {
+        self.admin_timeout = value;
         self
     }
 
@@ -840,12 +840,12 @@ impl SplinterDaemonBuilder {
     }
 
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
-        let heartbeat_interval = self.heartbeat_interval.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: heartbeat_interval".to_string())
+        let heartbeat = self.heartbeat.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
         })?;
 
         let mesh = Mesh::new(512, 128);
-        let network = Network::new(mesh, heartbeat_interval)
+        let network = Network::new(mesh, heartbeat)
             .map_err(|err| CreateError::NetworkError(err.to_string()))?;
 
         let storage_location = self.storage_location.ok_or_else(|| {
@@ -893,26 +893,20 @@ impl SplinterDaemonBuilder {
 
         #[cfg(feature = "biome")]
         {
-            if self.biome_enabled && db_url.is_none() {
+            if self.enable_biome && db_url.is_none() {
                 return Err(CreateError::MissingRequiredField(
                     "db_url is required to enable biome features.".to_string(),
                 ));
             }
         }
 
-        let registry_auto_refresh_interval =
-            self.registry_auto_refresh_interval.ok_or_else(|| {
-                CreateError::MissingRequiredField(
-                    "Missing field: registry_auto_refresh_interval".to_string(),
-                )
-            })?;
+        let registry_auto_refresh = self.registry_auto_refresh.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: registry_auto_refresh".to_string())
+        })?;
 
-        let registry_forced_refresh_interval =
-            self.registry_forced_refresh_interval.ok_or_else(|| {
-                CreateError::MissingRequiredField(
-                    "Missing field: registry_forced_refresh_interval".to_string(),
-                )
-            })?;
+        let registry_forced_refresh = self.registry_forced_refresh.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: registry_forced_refresh".to_string())
+        })?;
 
         let storage_type = self.storage_type.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: storage_type".to_string())
@@ -931,14 +925,14 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "database")]
             db_url,
             #[cfg(feature = "biome")]
-            biome_enabled: self.biome_enabled,
+            enable_biome: self.enable_biome,
             registries: self.registries,
-            registry_auto_refresh_interval,
-            registry_forced_refresh_interval,
+            registry_auto_refresh,
+            registry_forced_refresh,
             key_registry_location,
             node_registry_directory,
             storage_type,
-            admin_service_coordinator_timeout: self.admin_service_coordinator_timeout,
+            admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
         })

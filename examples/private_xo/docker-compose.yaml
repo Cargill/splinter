@@ -34,9 +34,9 @@ services:
         splinterd -vv \
                 --storage yaml \
                 --service-endpoint 0.0.0.0:8043 \
-                --network-endpoint 0.0.0.0:8044 \
+                --network-endpoints 0.0.0.0:8044 \
                 --node-id 012 \
-                --registry file:///node_registry/nodes.yaml \
+                --registries file:///node_registry/nodes.yaml \
                 --no-tls
       "
     environment:
@@ -60,9 +60,9 @@ services:
         splinterd -vv \
                 --storage yaml \
                 --service-endpoint 0.0.0.0:8045 \
-                --network-endpoint 0.0.0.0:8046 \
+                --network-endpoints 0.0.0.0:8046 \
                 --node-id 345 \
-                --registry file:///node_registry/nodes.yaml \
+                --registries file:///node_registry/nodes.yaml \
                 --no-tls
       "
     environment:

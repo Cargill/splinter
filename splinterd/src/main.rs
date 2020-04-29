@@ -127,25 +127,18 @@ fn main() {
           "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
-        (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple
-          "Endpoints to connect to the network, protocol-prefix://ip:port")
-        (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple
-          "Publicly-visible network endpoints")
         (@arg service_endpoint: --("service-endpoint") +takes_value
           "Endpoint that service will connect to, tcp://ip:port")
-        (@arg peers: --peer +takes_value +multiple
-          "Endpoint that service will connect to, protocol-prefix://ip:port")
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
-        (@arg registries: --("registry") +takes_value +multiple "Read-only node registries")
-        (@arg registry_auto_refresh_interval: --("registry-auto-refresh") +takes_value
+        (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
             "How often remote node registries should attempt to fetch upstream changes in the \
              background (in seconds); default is 600 (10 minutes), 0 means off")
-        (@arg registry_forced_refresh_interval: --("registry-forced-refresh") +takes_value
+        (@arg registry_forced_refresh: --("registry-forced-refresh") +takes_value
             "How long before remote node registries should fetch upstream changes when read \
              (in seconds); default is 10, 0 means off")
-        (@arg admin_service_coordinator_timeout: --("admin-timeout") +takes_value
+        (@arg admin_timeout: --("admin-timeout") +takes_value
             "The coordinator timeout for admin service proposals (in seconds); default is \
              30 seconds")
         (@arg verbose: -v --verbose +multiple
@@ -153,7 +146,16 @@ fn main() {
 
     let app = app
         .arg(
-            Arg::with_name("heartbeat_interval")
+            Arg::with_name("advertised_endpoints")
+                .long("advertised-endpoints")
+                .short("a")
+                .long_help("Publicly-visible network endpoints")
+                .takes_value(true)
+                .multiple(true)
+                .alias("advertised-endpoint"),
+        )
+        .arg(
+            Arg::with_name("heartbeat")
                 .long("heartbeat")
                 .long_help(
                     "How often heartbeat should be sent, in seconds; defaults to 30 seconds,\
@@ -167,6 +169,31 @@ fn main() {
                 .help("Path to the directory containing configuration files")
                 .takes_value(true)
                 .alias("config-dir"),
+        )
+        .arg(
+            Arg::with_name("network_endpoints")
+                .long("network-endpoints")
+                .short("n")
+                .long_help("Endpoints to connect to the network, protocol-prefix://ip:port")
+                .takes_value(true)
+                .multiple(true)
+                .alias("network-endpoint"),
+        )
+        .arg(
+            Arg::with_name("peers")
+                .long("peers")
+                .help("Endpoint that service will connect to, protocol-prefix://ip:port")
+                .takes_value(true)
+                .multiple(true)
+                .alias("peer"),
+        )
+        .arg(
+            Arg::with_name("registries")
+                .long("registries")
+                .help("Read-only node registries")
+                .takes_value(true)
+                .multiple(true)
+                .alias("registry"),
         )
         .arg(
             Arg::with_name("tls_cert_dir")
@@ -227,7 +254,7 @@ fn main() {
 
     #[cfg(feature = "biome")]
     let app = app.arg(
-        Arg::with_name("biome_enabled")
+        Arg::with_name("enable-biome")
             .long("enable-biome")
             .long_help("Enable the biome subsystem"),
     );
@@ -332,7 +359,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "database")]
     let db_url = config.database();
 
-    let admin_service_coordinator_timeout = config.admin_service_coordinator_timeout();
+    let admin_timeout = config.admin_timeout();
 
     config.log_as_debug();
 
@@ -351,10 +378,10 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())
-        .with_registry_auto_refresh_interval(config.registry_auto_refresh_interval())
-        .with_registry_forced_refresh_interval(config.registry_forced_refresh_interval())
-        .with_heartbeat_interval(config.heartbeat_interval())
-        .with_admin_service_coordinator_timeout(admin_service_coordinator_timeout);
+        .with_registry_auto_refresh(config.registry_auto_refresh())
+        .with_registry_forced_refresh(config.registry_forced_refresh())
+        .with_heartbeat(config.heartbeat())
+        .with_admin_timeout(admin_timeout);
 
     #[cfg(feature = "database")]
     {
@@ -363,7 +390,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     #[cfg(feature = "biome")]
     {
-        daemon_builder = daemon_builder.enable_biome(config.biome_enabled());
+        daemon_builder = daemon_builder.enable_biome(config.enable_biome());
     }
 
     #[cfg(feature = "rest-api-cors")]

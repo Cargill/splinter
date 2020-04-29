@@ -41,10 +41,10 @@ struct TomlConfig {
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
-    registry_auto_refresh_interval: Option<u64>,
-    registry_forced_refresh_interval: Option<u64>,
-    heartbeat_interval: Option<u64>,
-    admin_service_coordinator_timeout: Option<u64>,
+    registry_auto_refresh: Option<u64>,
+    registry_forced_refresh: Option<u64>,
+    heartbeat: Option<u64>,
+    admin_timeout: Option<u64>,
     version: Option<String>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
@@ -56,6 +56,10 @@ struct TomlConfig {
     client_key: Option<String>,
     server_cert: Option<String>,
     server_key: Option<String>,
+    heartbeat_interval: Option<u64>,
+    registry_auto_refresh_interval: Option<u64>,
+    registry_forced_refresh_interval: Option<u64>,
+    admin_service_coordinator_timeout: Option<u64>,
 }
 
 pub struct TomlPartialConfigBuilder {
@@ -115,14 +119,10 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_display_name(self.toml_config.display_name)
             .with_bind(self.toml_config.bind)
             .with_registries(self.toml_config.registries)
-            .with_registry_auto_refresh_interval(self.toml_config.registry_auto_refresh_interval)
-            .with_registry_forced_refresh_interval(
-                self.toml_config.registry_forced_refresh_interval,
-            )
-            .with_heartbeat_interval(self.toml_config.heartbeat_interval)
-            .with_admin_service_coordinator_timeout(
-                self.toml_config.admin_service_coordinator_timeout,
-            );
+            .with_registry_auto_refresh(self.toml_config.registry_auto_refresh)
+            .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
+            .with_heartbeat(self.toml_config.heartbeat)
+            .with_admin_timeout(self.toml_config.admin_timeout);
 
         #[cfg(feature = "database")]
         {
@@ -153,6 +153,21 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         if partial_config.tls_server_key().is_none() {
             partial_config = partial_config.with_tls_server_key(self.toml_config.server_key)
         }
+        if partial_config.heartbeat().is_none() {
+            partial_config = partial_config.with_heartbeat(self.toml_config.heartbeat_interval)
+        }
+        if partial_config.registry_auto_refresh().is_none() {
+            partial_config = partial_config
+                .with_registry_auto_refresh(self.toml_config.registry_auto_refresh_interval)
+        }
+        if partial_config.registry_forced_refresh().is_none() {
+            partial_config = partial_config
+                .with_registry_forced_refresh(self.toml_config.registry_forced_refresh_interval)
+        }
+        if partial_config.admin_timeout().is_none() {
+            partial_config = partial_config
+                .with_admin_timeout(self.toml_config.admin_service_coordinator_timeout)
+        }
 
         Ok(partial_config)
     }
@@ -161,6 +176,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::time::Duration;
 
     use toml::{map::Map, Value};
 
@@ -178,6 +195,10 @@ mod tests {
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NODE_ID: &str = "012";
     static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
+    static EXAMPLE_HEARTBEAT: u64 = 20;
+    static EXAMPLE_REGISTRY_AUTO: u64 = 19;
+    static EXAMPLE_REGISTRY_FORCE: u64 = 18;
+    static EXAMPLE_ADMIN_TIMEOUT: u64 = 17;
 
     /// Converts a list of tuples to a toml Table Value used to write a toml file.
     fn get_toml_value() -> Value {
@@ -226,6 +247,26 @@ mod tests {
         values.iter().for_each(|v| {
             config_values.insert(v.0.clone(), Value::String(v.1.clone()));
         });
+
+        let u64_values = vec![
+            ("heartbeat_interval".to_string(), EXAMPLE_HEARTBEAT),
+            (
+                "registry_auto_refresh_interval".to_string(),
+                EXAMPLE_REGISTRY_AUTO,
+            ),
+            (
+                "registry_forced_refresh_interval".to_string(),
+                EXAMPLE_REGISTRY_FORCE,
+            ),
+            (
+                "admin_service_coordinator_timeout".to_string(),
+                EXAMPLE_ADMIN_TIMEOUT,
+            ),
+        ];
+
+        u64_values.iter().for_each(|v| {
+            config_values.insert(v.0.clone(), Value::Integer(v.1.clone() as i64));
+        });
         Value::Table(config_values)
     }
 
@@ -266,10 +307,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        assert_eq!(config.registry_auto_refresh_interval(), None);
-        assert_eq!(config.registry_forced_refresh_interval(), None);
-        assert_eq!(config.heartbeat_interval(), None);
-        assert_eq!(config.admin_service_coordinator_timeout(), None);
+        assert_eq!(config.registry_auto_refresh(), None);
+        assert_eq!(config.registry_forced_refresh(), None);
+        assert_eq!(config.heartbeat(), None);
+        assert_eq!(config.admin_timeout(), None);
     }
 
     /// Asserts config values based on the example configuration values.
@@ -303,8 +344,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        assert_eq!(config.heartbeat_interval(), None);
-        assert_eq!(config.admin_service_coordinator_timeout(), None);
+        assert_eq!(config.heartbeat(), Some(20));
+        assert_eq!(config.registry_auto_refresh(), Some(19));
+        assert_eq!(config.registry_forced_refresh(), Some(18));
+        assert_eq!(config.admin_timeout(), Some(Duration::from_secs(17)));
     }
 
     #[test]

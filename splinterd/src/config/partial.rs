@@ -48,15 +48,15 @@ pub struct PartialConfig {
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
-    registry_auto_refresh_interval: Option<u64>,
-    registry_forced_refresh_interval: Option<u64>,
-    heartbeat_interval: Option<u64>,
-    admin_service_coordinator_timeout: Option<Duration>,
+    registry_auto_refresh: Option<u64>,
+    registry_forced_refresh: Option<u64>,
+    heartbeat: Option<u64>,
+    admin_timeout: Option<Duration>,
     state_dir: Option<String>,
     tls_insecure: Option<bool>,
     no_tls: Option<bool>,
     #[cfg(feature = "biome")]
-    biome_enabled: Option<bool>,
+    enable_biome: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
 }
@@ -84,15 +84,15 @@ impl PartialConfig {
             #[cfg(feature = "database")]
             database: None,
             registries: None,
-            registry_auto_refresh_interval: None,
-            registry_forced_refresh_interval: None,
-            heartbeat_interval: None,
-            admin_service_coordinator_timeout: None,
+            registry_auto_refresh: None,
+            registry_forced_refresh: None,
+            heartbeat: None,
+            admin_timeout: None,
             state_dir: None,
             tls_insecure: None,
             no_tls: None,
             #[cfg(feature = "biome")]
-            biome_enabled: None,
+            enable_biome: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
         }
@@ -171,20 +171,20 @@ impl PartialConfig {
         self.registries.clone()
     }
 
-    pub fn registry_auto_refresh_interval(&self) -> Option<u64> {
-        self.registry_auto_refresh_interval
+    pub fn registry_auto_refresh(&self) -> Option<u64> {
+        self.registry_auto_refresh
     }
 
-    pub fn registry_forced_refresh_interval(&self) -> Option<u64> {
-        self.registry_forced_refresh_interval
+    pub fn registry_forced_refresh(&self) -> Option<u64> {
+        self.registry_forced_refresh
     }
 
-    pub fn heartbeat_interval(&self) -> Option<u64> {
-        self.heartbeat_interval
+    pub fn heartbeat(&self) -> Option<u64> {
+        self.heartbeat
     }
 
-    pub fn admin_service_coordinator_timeout(&self) -> Option<Duration> {
-        self.admin_service_coordinator_timeout
+    pub fn admin_timeout(&self) -> Option<Duration> {
+        self.admin_timeout
     }
 
     pub fn state_dir(&self) -> Option<String> {
@@ -200,8 +200,8 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "biome")]
-    pub fn biome_enabled(&self) -> Option<bool> {
-        self.biome_enabled
+    pub fn enable_biome(&self) -> Option<bool> {
+        self.enable_biome
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -416,46 +416,40 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `registry_auto_refresh_interval` value to the PartialConfig object.
+    /// Adds a `registry_auto_refresh` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `registry_auto_refresh_interval` - How often remote registries should be refreshed in the
+    /// * `registry_auto_refresh` - How often remote registries should be refreshed in the
     ///   background.
     ///
-    pub fn with_registry_auto_refresh_interval(
-        mut self,
-        registry_auto_refresh_interval: Option<u64>,
-    ) -> Self {
-        self.registry_auto_refresh_interval = registry_auto_refresh_interval;
+    pub fn with_registry_auto_refresh(mut self, registry_auto_refresh: Option<u64>) -> Self {
+        self.registry_auto_refresh = registry_auto_refresh;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `registry_forced_refresh_interval` value to the PartialConfig object.
+    /// Adds a `registry_forced_refresh` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `registry_forced_refresh_interval` - How long before remote registries should be
+    /// * `registry_forced_refresh` - How long before remote registries should be
     ///   refreshed on read.
     ///
-    pub fn with_registry_forced_refresh_interval(
-        mut self,
-        registry_forced_refresh_interval: Option<u64>,
-    ) -> Self {
-        self.registry_forced_refresh_interval = registry_forced_refresh_interval;
+    pub fn with_registry_forced_refresh(mut self, registry_forced_refresh: Option<u64>) -> Self {
+        self.registry_forced_refresh = registry_forced_refresh;
         self
     }
 
     #[allow(dead_code)]
-    /// Adds a `heartbeat_interval` value to the PartialConfig object.
+    /// Adds a `heartbeat` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `heartbeat_interval` - How often heartbeat should be sent.
+    /// * `heartbeat` - How often heartbeat should be sent.
     ///
-    pub fn with_heartbeat_interval(mut self, heartbeat_interval: Option<u64>) -> Self {
-        self.heartbeat_interval = heartbeat_interval;
+    pub fn with_heartbeat(mut self, heartbeat: Option<u64>) -> Self {
+        self.heartbeat = heartbeat;
         self
     }
 
@@ -466,12 +460,12 @@ impl PartialConfig {
     ///
     /// * `timeout` - The coordinator timeout for admin service proposals (in milliseconds).
     ///
-    pub fn with_admin_service_coordinator_timeout(mut self, timeout: Option<u64>) -> Self {
+    pub fn with_admin_timeout(mut self, timeout: Option<u64>) -> Self {
         let duration: Option<Duration> = match timeout {
             Some(t) => Some(Duration::from_secs(t)),
             _ => None,
         };
-        self.admin_service_coordinator_timeout = duration;
+        self.admin_timeout = duration;
         self
     }
 
@@ -512,14 +506,14 @@ impl PartialConfig {
     }
 
     #[cfg(feature = "biome")]
-    /// Adds a `biome_enabled` value to the PartialConfig object.
+    /// Adds a `enable_biome` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `biome_enabled` - Enable biome REST API routes
+    /// * `enable_biome` - Enable biome REST API routes
     ///
-    pub fn with_biome_enabled(mut self, biome_enabled: Option<bool>) -> Self {
-        self.biome_enabled = biome_enabled;
+    pub fn with_enable_biome(mut self, enable_biome: Option<bool>) -> Self {
+        self.enable_biome = enable_biome;
         self
     }
 

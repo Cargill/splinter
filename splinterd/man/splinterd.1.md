@@ -91,11 +91,11 @@ OPTIONS
   (functions that use the two-phase commit agreement protocol in the Scabbard
   service).
 
-`--advertised-endpoint` `ADVERTISED-ENDPOINT`
+`--advertised-endpoints` `ADVERTISED-ENDPOINT`
 : Specifies the public network endpoint for daemon-to-daemon communication
   between Splinter nodes, if the network endpoint is not public. Use the format
   `tcp://ip:port`. (Default: Same as the network endpoint; see
-  `-n`, `--network-endpoint`.)
+  `-n`, `--network-endpoints`.)
 
 `--bind BIND-ENDPOINT`
 : Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
@@ -132,7 +132,7 @@ OPTIONS
   This heartbeat is used to check the health of connections to other Splinter
   nodes.
 
-`-n`, `--network-endpoint` `NETWORK-ENDPOINT`
+`-n`, `--network-endpoints` `NETWORK-ENDPOINT`
 : Specifies the endpoint for daemon-to-daemon communication between Splinter
   nodes, using the format `tcp://ip:port`. (Default: 127.0.0.1:8044.)
 
@@ -140,16 +140,16 @@ OPTIONS
 : (Required) Sets a new ID for the node. The node ID must be unique across the
   network (for all Splinter nodes that could participate on the same circuit).
 
-`--peer PEER-URL` `[,...]`
+`--peers PEER-URL` `[,...]`
 : Specifies one or more Splinter nodes that `splinterd` will automatically
   connect to when it starts. The *PEER-URL* argument must specify another node's
   network endpoint, using the format `protocol_prefix://ip:port`.
 
   Specify multiple nodes in a comma-separated list or by repeating the
-  `--peer` option. The protocol prefix part of the peer URL specifies the
+  `--peers` option. The protocol prefix part of the peer URL specifies the
   type of connection that is created.
 
-`--registry REGISTRY-FILE` `[,...]`
+`--registries REGISTRY-FILE` `[,...]`
 : Specifies one or more read-only node registry files.
 
 `--service-endpoint SERVICE-ENDPOINT`
@@ -285,8 +285,8 @@ the heartbeat interval to 60 seconds.
 node_id = "mynode"
 
 # The number of seconds between network keep-alive heartbeat messages.
-# Setting heartbeat_interval to 0 disables this feature.
-heartbeat_interval = 60
+# Setting heartbeat to 0 disables this feature.
+heartbeat = 60
 ```
 
 SEE ALSO

@@ -60,15 +60,15 @@ pub struct Config {
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
-    registry_auto_refresh_interval: (u64, ConfigSource),
-    registry_forced_refresh_interval: (u64, ConfigSource),
-    heartbeat_interval: (u64, ConfigSource),
-    admin_service_coordinator_timeout: (Duration, ConfigSource),
+    registry_auto_refresh: (u64, ConfigSource),
+    registry_forced_refresh: (u64, ConfigSource),
+    heartbeat: (u64, ConfigSource),
+    admin_timeout: (Duration, ConfigSource),
     state_dir: (String, ConfigSource),
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
     #[cfg(feature = "biome")]
-    biome_enabled: (bool, ConfigSource),
+    enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
 }
@@ -143,20 +143,20 @@ impl Config {
         &self.registries.0
     }
 
-    pub fn registry_auto_refresh_interval(&self) -> u64 {
-        self.registry_auto_refresh_interval.0
+    pub fn registry_auto_refresh(&self) -> u64 {
+        self.registry_auto_refresh.0
     }
 
-    pub fn registry_forced_refresh_interval(&self) -> u64 {
-        self.registry_forced_refresh_interval.0
+    pub fn registry_forced_refresh(&self) -> u64 {
+        self.registry_forced_refresh.0
     }
 
-    pub fn heartbeat_interval(&self) -> u64 {
-        self.heartbeat_interval.0
+    pub fn heartbeat(&self) -> u64 {
+        self.heartbeat.0
     }
 
-    pub fn admin_service_coordinator_timeout(&self) -> Duration {
-        self.admin_service_coordinator_timeout.0
+    pub fn admin_timeout(&self) -> Duration {
+        self.admin_timeout.0
     }
 
     pub fn state_dir(&self) -> &str {
@@ -172,8 +172,8 @@ impl Config {
     }
 
     #[cfg(feature = "biome")]
-    pub fn biome_enabled(&self) -> bool {
-        self.biome_enabled.0
+    pub fn enable_biome(&self) -> bool {
+        self.enable_biome.0
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -254,20 +254,20 @@ impl Config {
         &self.registries.1
     }
 
-    fn registry_auto_refresh_interval_source(&self) -> &ConfigSource {
-        &self.registry_auto_refresh_interval.1
+    fn registry_auto_refresh_source(&self) -> &ConfigSource {
+        &self.registry_auto_refresh.1
     }
 
-    fn registry_forced_refresh_interval_source(&self) -> &ConfigSource {
-        &self.registry_forced_refresh_interval.1
+    fn registry_forced_refresh_source(&self) -> &ConfigSource {
+        &self.registry_forced_refresh.1
     }
 
-    fn heartbeat_interval_source(&self) -> &ConfigSource {
-        &self.heartbeat_interval.1
+    fn heartbeat_source(&self) -> &ConfigSource {
+        &self.heartbeat.1
     }
 
-    fn admin_service_coordinator_timeout_source(&self) -> &ConfigSource {
-        &self.admin_service_coordinator_timeout.1
+    fn admin_timeout_source(&self) -> &ConfigSource {
+        &self.admin_timeout.1
     }
 
     fn state_dir_source(&self) -> &ConfigSource {
@@ -283,8 +283,8 @@ impl Config {
     }
 
     #[cfg(feature = "biome")]
-    fn biome_enabled_source(&self) -> &ConfigSource {
-        &self.biome_enabled.1
+    fn enable_biome_source(&self) -> &ConfigSource {
+        &self.enable_biome.1
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -380,14 +380,14 @@ impl Config {
             self.registries_source()
         );
         debug!(
-            "Config: registry_auto_refresh_interval: {} (source: {:?})",
-            self.registry_auto_refresh_interval(),
-            self.registry_auto_refresh_interval_source()
+            "Config: registry_auto_refresh: {} (source: {:?})",
+            self.registry_auto_refresh(),
+            self.registry_auto_refresh_source()
         );
         debug!(
-            "Config: registry_forced_refresh_interval: {} (source: {:?})",
-            self.registry_forced_refresh_interval(),
-            self.registry_forced_refresh_interval_source()
+            "Config: registry_forced_refresh: {} (source: {:?})",
+            self.registry_forced_refresh(),
+            self.registry_forced_refresh_source()
         );
         debug!(
             "Config: state_dir: {} (source: {:?})",
@@ -395,14 +395,14 @@ impl Config {
             self.state_dir_source()
         );
         debug!(
-            "Config: heartbeat_interval: {} (source: {:?})",
-            self.heartbeat_interval(),
-            self.heartbeat_interval_source()
+            "Config: heartbeat: {} (source: {:?})",
+            self.heartbeat(),
+            self.heartbeat_source()
         );
         debug!(
-            "Config: admin_service_coordinator_timeout: {:?} (source: {:?})",
-            self.admin_service_coordinator_timeout(),
-            self.admin_service_coordinator_timeout_source()
+            "Config: admin_timeout: {:?} (source: {:?})",
+            self.admin_timeout(),
+            self.admin_timeout_source()
         );
         #[cfg(feature = "database")]
         debug!(
@@ -422,9 +422,9 @@ impl Config {
         );
         #[cfg(feature = "biome")]
         debug!(
-            "Config: biome_enabled: {:?} (source: {:?})",
-            self.biome_enabled(),
-            self.biome_enabled_source()
+            "Config: enable_biome: {:?} (source: {:?})",
+            self.enable_biome(),
+            self.enable_biome_source()
         );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
@@ -535,7 +535,7 @@ mod tests {
         (@arg bind: --("bind") +takes_value)
         (@arg tls_insecure: --("tls-insecure"))
         (@arg no_tls: --("no-tls"))
-        (@arg biome_enabled: --("enable-biome")))
+        (@arg enable_biome: --("enable-biome")))
         .get_matches_from(args)
     }
 
@@ -913,38 +913,35 @@ mod tests {
             ("127.0.0.1:5432", &ConfigSource::Default)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for
-        // `registry_auto_refresh_interval` (source should be Default).
+        // `registry_auto_refresh` (source should be Default).
         assert_eq!(
             (
-                final_config.registry_auto_refresh_interval(),
-                final_config.registry_auto_refresh_interval_source()
+                final_config.registry_auto_refresh(),
+                final_config.registry_auto_refresh_source()
             ),
             (600, &ConfigSource::Default)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for
-        // `registry_forced_refresh_interval` (source should be Default).
+        // `registry_forced_refresh` (source should be Default).
         assert_eq!(
             (
-                final_config.registry_forced_refresh_interval(),
-                final_config.registry_forced_refresh_interval_source()
+                final_config.registry_forced_refresh(),
+                final_config.registry_forced_refresh_source()
             ),
             (10, &ConfigSource::Default)
         );
-        // The DefaultPartialConfigBuilder is the only config with a value for `heartbeat_interval`
+        // The DefaultPartialConfigBuilder is the only config with a value for `heartbeat`
         // (source should be Default).
         assert_eq!(
-            (
-                final_config.heartbeat_interval(),
-                final_config.heartbeat_interval_source()
-            ),
+            (final_config.heartbeat(), final_config.heartbeat_source()),
             (30, &ConfigSource::Default)
         );
         // The DefaultPartialConfigBuilder is the only config with a value for
-        // `admin_service_coordinator_timeout` (source should be Default).
+        // `admin_timeout` (source should be Default).
         assert_eq!(
             (
-                final_config.admin_service_coordinator_timeout(),
-                final_config.admin_service_coordinator_timeout_source()
+                final_config.admin_timeout(),
+                final_config.admin_timeout_source()
             ),
             (Duration::from_secs(30), &ConfigSource::Default)
         );

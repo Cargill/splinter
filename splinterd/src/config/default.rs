@@ -55,17 +55,17 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_peers(Some(vec![]))
             .with_bind(Some(String::from("127.0.0.1:8080")))
             .with_registries(Some(vec![]))
-            .with_registry_auto_refresh_interval(Some(REGISTRY_AUTO_REFRESH_DEFAULT))
-            .with_registry_forced_refresh_interval(Some(REGISTRY_FORCED_REFRESH_DEFAULT))
-            .with_heartbeat_interval(Some(HEARTBEAT_DEFAULT))
-            .with_admin_service_coordinator_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
+            .with_registry_auto_refresh(Some(REGISTRY_AUTO_REFRESH_DEFAULT))
+            .with_registry_forced_refresh(Some(REGISTRY_FORCED_REFRESH_DEFAULT))
+            .with_heartbeat(Some(HEARTBEAT_DEFAULT))
+            .with_admin_timeout(Some(DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT))
             .with_state_dir(Some(String::from(DEFAULT_STATE_DIR)))
             .with_tls_insecure(Some(false))
             .with_no_tls(Some(false));
 
         #[cfg(feature = "biome")]
         {
-            partial_config = partial_config.with_biome_enabled(Some(false));
+            partial_config = partial_config.with_enable_biome(Some(false));
         }
 
         #[cfg(feature = "database")]
@@ -108,16 +108,16 @@ mod tests {
         assert_eq!(config.database(), Some(String::from("127.0.0.1:5432")));
         assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(
-            config.registry_auto_refresh_interval(),
+            config.registry_auto_refresh(),
             Some(REGISTRY_AUTO_REFRESH_DEFAULT)
         );
         assert_eq!(
-            config.registry_forced_refresh_interval(),
+            config.registry_forced_refresh(),
             Some(REGISTRY_FORCED_REFRESH_DEFAULT)
         );
-        assert_eq!(config.heartbeat_interval(), Some(HEARTBEAT_DEFAULT));
+        assert_eq!(config.heartbeat(), Some(HEARTBEAT_DEFAULT));
         assert_eq!(
-            config.admin_service_coordinator_timeout(),
+            config.admin_timeout(),
             Some(Duration::from_secs(
                 DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT
             ))
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(config.tls_insecure(), Some(false));
         assert_eq!(config.no_tls(), Some(false));
         #[cfg(feature = "biome")]
-        assert_eq!(config.biome_enabled(), Some(false));
+        assert_eq!(config.enable_biome(), Some(false));
         // Assert the source is correctly identified for this PartialConfig object.
         assert_eq!(config.source(), ConfigSource::Default);
     }

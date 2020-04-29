@@ -73,15 +73,9 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                     .values_of("registries")
                     .map(|values| values.map(String::from).collect::<Vec<String>>()),
             )
-            .with_registry_auto_refresh_interval(parse_value(
-                &self.matches,
-                "registry_auto_refresh_interval",
-            )?)
-            .with_registry_forced_refresh_interval(parse_value(
-                &self.matches,
-                "registry_forced_refresh_interval",
-            )?)
-            .with_heartbeat_interval(parse_value(&self.matches, "heartbeat_interval")?)
+            .with_registry_auto_refresh(parse_value(&self.matches, "registry_auto_refresh")?)
+            .with_registry_forced_refresh(parse_value(&self.matches, "registry_forced_refresh")?)
+            .with_heartbeat(parse_value(&self.matches, "heartbeat")?)
             .with_tls_insecure(if self.matches.is_present("tls_insecure") {
                 Some(true)
             } else {
@@ -96,7 +90,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         #[cfg(feature = "biome")]
         {
             partial_config =
-                partial_config.with_biome_enabled(if self.matches.is_present("biome_enabled") {
+                partial_config.with_enable_biome(if self.matches.is_present("enable_biome") {
                     Some(true)
                 } else {
                     None
@@ -183,10 +177,10 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
-        assert_eq!(config.registry_auto_refresh_interval(), None);
-        assert_eq!(config.registry_forced_refresh_interval(), None);
-        assert_eq!(config.heartbeat_interval(), None);
-        assert_eq!(config.admin_service_coordinator_timeout(), None);
+        assert_eq!(config.registry_auto_refresh(), None);
+        assert_eq!(config.registry_forced_refresh(), None);
+        assert_eq!(config.heartbeat(), None);
+        assert_eq!(config.admin_timeout(), None);
         assert_eq!(config.tls_insecure(), Some(true));
         assert_eq!(config.no_tls(), Some(true));
     }
@@ -200,10 +194,10 @@ mod tests {
             (@arg node_id: --("node-id") +takes_value)
             (@arg display_name: --("display-name") +takes_value)
             (@arg storage: --("storage") +takes_value)
-            (@arg network_endpoints: -n --("network-endpoint") +takes_value +multiple)
-            (@arg advertised_endpoints: -a --("advertised-endpoint") +takes_value +multiple)
+            (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
+            (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
             (@arg service_endpoint: --("service-endpoint") +takes_value)
-            (@arg peers: --peer +takes_value +multiple)
+            (@arg peers: --peers +takes_value +multiple)
             (@arg tls_ca_file: --("tls-ca-file") +takes_value)
             (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
             (@arg tls_client_cert: --("tls-client-cert") +takes_value)
@@ -237,9 +231,9 @@ mod tests {
             EXAMPLE_DISPLAY_NAME,
             "--storage",
             EXAMPLE_STORAGE,
-            "--network-endpoint",
+            "--network-endpoints",
             EXAMPLE_NETWORK_ENDPOINT,
-            "--advertised-endpoint",
+            "--advertised-endpoints",
             EXAMPLE_ADVERTISED_ENDPOINT,
             "--service-endpoint",
             EXAMPLE_SERVICE_ENDPOINT,

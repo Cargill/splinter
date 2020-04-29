@@ -43,7 +43,7 @@ services:
         splinter cert generate --skip && \
         splinterd \
             -c ./configs/splinterd-node-0-docker.toml \
-            --registry file://./node_registries/nodes.yaml \
+            --registries file://./node_registries/nodes.yaml \
             --tls-insecure \
             --enable-biome \
             --database postgres://splinter_admin:splinter_test@splinter-db:5432/splinter \

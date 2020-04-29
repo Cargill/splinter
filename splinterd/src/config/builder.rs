@@ -217,38 +217,38 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("registries".to_string()))?,
-            registry_auto_refresh_interval: self
+            registry_auto_refresh: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_auto_refresh_interval() {
+                .find_map(|p| match p.registry_auto_refresh() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
                 .ok_or_else(|| {
                     ConfigError::MissingValue("registry auto refresh interval".to_string())
                 })?,
-            registry_forced_refresh_interval: self
+            registry_forced_refresh: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.registry_forced_refresh_interval() {
+                .find_map(|p| match p.registry_forced_refresh() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
                 .ok_or_else(|| {
                     ConfigError::MissingValue("registry forced refresh interval".to_string())
                 })?,
-            heartbeat_interval: self
+            heartbeat: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.heartbeat_interval() {
+                .find_map(|p| match p.heartbeat() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("heartbeat interval".to_string()))?,
-            admin_service_coordinator_timeout: self
+            admin_timeout: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.admin_service_coordinator_timeout() {
+                .find_map(|p| match p.admin_timeout() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
@@ -281,14 +281,14 @@ impl ConfigBuilder {
                 })
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
             #[cfg(feature = "biome")]
-            biome_enabled: self
+            enable_biome: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.biome_enabled() {
+                .find_map(|p| match p.enable_biome() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("biome_enabled".to_string()))?,
+                .ok_or_else(|| ConfigError::MissingValue("enable_biome".to_string()))?,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self
                 .partial_configs
@@ -361,8 +361,8 @@ mod tests {
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), Some(vec![]));
-        assert_eq!(config.heartbeat_interval(), None);
-        assert_eq!(config.admin_service_coordinator_timeout(), None);
+        assert_eq!(config.heartbeat(), None);
+        assert_eq!(config.admin_timeout(), None);
     }
 
     #[test]
@@ -394,8 +394,8 @@ mod tests {
             .with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()))
             .with_bind(None)
             .with_registries(Some(vec![]))
-            .with_heartbeat_interval(None)
-            .with_admin_service_coordinator_timeout(None);
+            .with_heartbeat(None)
+            .with_admin_timeout(None);
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(partial_config);
     }
@@ -429,7 +429,7 @@ mod tests {
         partial_config = partial_config.with_peers(Some(vec![]));
         partial_config = partial_config.with_node_id(Some(EXAMPLE_NODE_ID.to_string()));
         partial_config = partial_config.with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()));
-        partial_config = partial_config.with_admin_service_coordinator_timeout(None);
+        partial_config = partial_config.with_admin_timeout(None);
         partial_config = partial_config.with_registries(Some(vec![]));
         // Compare the generated PartialConfig object against the expected values.
         assert_config_values(partial_config);
