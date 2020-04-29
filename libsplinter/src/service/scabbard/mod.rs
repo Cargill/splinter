@@ -29,7 +29,7 @@ mod state;
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};
 use std::convert::TryFrom;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -99,14 +99,8 @@ impl Scabbard {
     ) -> Result<Self, ScabbardError> {
         let shared = ScabbardShared::new(VecDeque::new(), None, peer_services, signature_verifier);
 
-        let hash = hash(
-            MessageDigest::sha256(),
-            format!("{}::{}", service_id, circuit_id).as_bytes(),
-        )
-        .map(|digest| to_hex(&*digest))
-        .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
-        let state_db_path = state_db_dir.join(format!("{}-state.lmdb", hash));
-        let receipt_db_path = receipt_db_dir.join(format!("{}-receipts.lmdb", hash));
+        let (state_db_path, receipt_db_path) =
+            compute_db_paths(&service_id, circuit_id, state_db_dir, receipt_db_dir)?;
         let state = ScabbardState::new(
             state_db_path.as_path(),
             state_db_size,
@@ -358,6 +352,23 @@ impl Service for Scabbard {
     fn as_any(&self) -> &dyn Any {
         self
     }
+}
+
+fn compute_db_paths(
+    service_id: &str,
+    circuit_id: &str,
+    state_db_dir: &Path,
+    receipt_db_dir: &Path,
+) -> Result<(PathBuf, PathBuf), ScabbardError> {
+    let hash = hash(
+        MessageDigest::sha256(),
+        format!("{}::{}", service_id, circuit_id).as_bytes(),
+    )
+    .map(|digest| to_hex(&*digest))
+    .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
+    let state_db_path = state_db_dir.join(format!("{}-state.lmdb", hash));
+    let receipt_db_path = receipt_db_dir.join(format!("{}-receipts.lmdb", hash));
+    Ok((state_db_path, receipt_db_path))
 }
 
 #[cfg(test)]
