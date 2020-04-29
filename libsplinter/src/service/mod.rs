@@ -42,7 +42,7 @@ pub mod network;
 mod processor;
 mod registry;
 #[cfg(feature = "rest-api")]
-mod rest_api;
+pub mod rest_api;
 pub mod scabbard;
 mod sender;
 #[cfg(feature = "service-arg-validation")]

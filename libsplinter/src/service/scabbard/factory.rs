@@ -175,16 +175,37 @@ impl ServiceFactory for ScabbardFactory {
     }
 
     #[cfg(feature = "rest-api")]
+    /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
+    /// endpoints as [`ServiceEndpoint`]s:
+    ///
+    /// * `POST /batches` - Add one or more batches to Scabbard's queue
+    /// * `GET /batch_statuses` - Get the status of one or more batches
+    /// * `GET /ws/subscribe` - Subscribe to Scabbard state-delta events
+    /// * `GET /state/{address}` - Get a value from Scabbard's state
+    /// * `GET /state` - Get multiple Scabbard state entries
+    ///
+    /// These endpoints are only available if the following REST API backend feature is enabled:
+    ///
+    /// * `rest-api-actix`
+    ///
+    /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
     fn get_rest_endpoints(&self) -> Vec<crate::service::rest_api::ServiceEndpoint> {
+        // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
+        // enabled
+        #[allow(unused_mut)]
         let mut endpoints = vec![];
 
-        endpoints.push(super::rest_api::make_add_batches_to_queue_endpoint());
-        endpoints.push(super::rest_api::make_subscribe_endpoint());
-        endpoints.push(super::rest_api::make_get_batch_status_endpoint());
-        #[cfg(feature = "scabbard-get-state")]
+        #[cfg(feature = "rest-api-actix")]
         {
-            endpoints.push(super::rest_api::make_get_state_at_address_endpoint());
-            endpoints.push(super::rest_api::make_get_state_with_prefix_endpoint());
+            use super::rest_api::actix;
+            endpoints.push(actix::batches::make_add_batches_to_queue_endpoint());
+            endpoints.push(actix::ws_subscribe::make_subscribe_endpoint());
+            endpoints.push(actix::batch_statuses::make_get_batch_status_endpoint());
+            #[cfg(feature = "scabbard-get-state")]
+            {
+                endpoints.push(actix::state_address::make_get_state_at_address_endpoint());
+                endpoints.push(actix::state::make_get_state_with_prefix_endpoint());
+            }
         }
 
         endpoints

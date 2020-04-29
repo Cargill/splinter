@@ -29,7 +29,7 @@ mod state;
 use std::any::Any;
 use std::collections::{HashSet, VecDeque};
 use std::convert::TryFrom;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -54,7 +54,7 @@ pub use factory::ScabbardArgValidator;
 pub use factory::ScabbardFactory;
 use shared::ScabbardShared;
 #[cfg(feature = "scabbard-get-state")]
-use state::StateIter;
+pub use state::StateIter;
 pub use state::{BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent};
 use state::{ScabbardState, StateSubscriber};
 
@@ -99,14 +99,8 @@ impl Scabbard {
     ) -> Result<Self, ScabbardError> {
         let shared = ScabbardShared::new(VecDeque::new(), None, peer_services, signature_verifier);
 
-        let hash = hash(
-            MessageDigest::sha256(),
-            format!("{}::{}", service_id, circuit_id).as_bytes(),
-        )
-        .map(|digest| to_hex(&*digest))
-        .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
-        let state_db_path = state_db_dir.join(format!("{}-state.lmdb", hash));
-        let receipt_db_path = receipt_db_dir.join(format!("{}-receipts.lmdb", hash));
+        let (state_db_path, receipt_db_path) =
+            compute_db_paths(&service_id, circuit_id, state_db_dir, receipt_db_dir)?;
         let state = ScabbardState::new(
             state_db_path.as_path(),
             state_db_size,
@@ -130,6 +124,8 @@ impl Scabbard {
     }
 
     #[cfg(feature = "scabbard-get-state")]
+    /// Fetch the value at the given `address` in the Scabbard service's state. Returns `None` if
+    /// the `address` is not set.
     pub fn get_state_at_address(&self, address: &str) -> Result<Option<Vec<u8>>, ScabbardError> {
         Ok(self
             .state
@@ -139,10 +135,10 @@ impl Scabbard {
     }
 
     #[cfg(feature = "scabbard-get-state")]
-    pub fn get_state_with_prefix(
-        &self,
-        prefix: Option<&str>,
-    ) -> Result<Box<StateIter>, ScabbardError> {
+    /// Fetch a list of entries in the Scabbard service's state. If a `prefix` is provided, only
+    /// return entries whose addresses are under the given address prefix. If no `prefix` is
+    /// provided, return all state entries.
+    pub fn get_state_with_prefix(&self, prefix: Option<&str>) -> Result<StateIter, ScabbardError> {
         Ok(self
             .state
             .lock()
@@ -150,10 +146,7 @@ impl Scabbard {
             .get_state_with_prefix(prefix)?)
     }
 
-    pub fn add_batches(
-        &self,
-        batches: Vec<BatchPair>,
-    ) -> Result<Option<BatchListPath>, ScabbardError> {
+    pub fn add_batches(&self, batches: Vec<BatchPair>) -> Result<Option<String>, ScabbardError> {
         let mut shared = self
             .shared
             .lock()
@@ -180,7 +173,7 @@ impl Scabbard {
             link.pop();
 
             debug!("Batch Status Link Created: {}", link);
-            Ok(Some(BatchListPath { link }))
+            Ok(Some(link))
         } else {
             Ok(None)
         }
@@ -360,9 +353,22 @@ impl Service for Scabbard {
         self
     }
 }
-#[derive(Serialize, Deserialize, Clone)]
-pub struct BatchListPath {
-    link: String,
+
+fn compute_db_paths(
+    service_id: &str,
+    circuit_id: &str,
+    state_db_dir: &Path,
+    receipt_db_dir: &Path,
+) -> Result<(PathBuf, PathBuf), ScabbardError> {
+    let hash = hash(
+        MessageDigest::sha256(),
+        format!("{}::{}", service_id, circuit_id).as_bytes(),
+    )
+    .map(|digest| to_hex(&*digest))
+    .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
+    let state_db_path = state_db_dir.join(format!("{}-state.lmdb", hash));
+    let receipt_db_path = receipt_db_dir.join(format!("{}-receipts.lmdb", hash));
+    Ok((state_db_path, receipt_db_path))
 }
 
 #[cfg(test)]
