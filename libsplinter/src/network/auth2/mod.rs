@@ -200,7 +200,7 @@ impl PoolAuthorizer {
                 return;
             }
 
-            let authed = 'main: loop {
+            let authed_identity = 'main: loop {
                 match connection.recv() {
                     Ok(bytes) => {
                         let mut msg: NetworkMessage = match protobuf::parse_from_bytes(&bytes) {
@@ -225,18 +225,18 @@ impl PoolAuthorizer {
                     }
                     Err(RecvError::Disconnected) => {
                         error!("Connection unexpectedly disconnected; aborting authorization");
-                        break 'main false;
+                        break 'main None;
                     }
                     Err(RecvError::IoError(err)) => {
                         error!("Unable to authorize connection due to I/O error: {}", err);
-                        break 'main false;
+                        break 'main None;
                     }
                     Err(RecvError::ProtocolError(msg)) => {
                         error!(
                             "Unable to authorize connection due to protocol error: {}",
                             msg
                         );
-                        break 'main false;
+                        break 'main None;
                     }
                     Err(RecvError::WouldBlock) => continue,
                 }
@@ -246,7 +246,7 @@ impl PoolAuthorizer {
                         Ok(()) => (),
                         Err(err) => {
                             error!("Unable to send outgoing message; aborting auth: {}", err);
-                            break 'main false;
+                            break 'main None;
                         }
                     }
                 }
@@ -255,21 +255,20 @@ impl PoolAuthorizer {
                     Ok(shared) => shared,
                     Err(_) => {
                         error!("connection authorization lock poisoned; aborting auth");
-                        break 'main false;
+                        break 'main None;
                     }
                 };
 
-                if let Some(authed) = shared.is_authorized(&connection_id).copied() {
-                    shared.cleanup_connection_state(&connection_id);
-                    break 'main authed;
+                if shared.is_complete(&connection_id).is_some() {
+                    break 'main shared.cleanup_connection_state(&connection_id);
                 }
             };
 
-            let auth_state = if authed {
+            let auth_state = if let Some(identity) = authed_identity {
                 ConnectionAuthorizationState::Authorized {
                     connection_id,
                     connection,
-                    identity: "".into(),
+                    identity,
                 }
             } else {
                 ConnectionAuthorizationState::Unauthorized {
@@ -347,7 +346,7 @@ impl AuthorizationPoolStateMachine {
                     Ok(AuthorizationState::Connecting)
                 }
                 AuthorizationAction::Unauthorizing => {
-                    shared.mark_complete(connection_id, true);
+                    shared.mark_complete(connection_id, None);
                     Ok(AuthorizationState::Unauthorized)
                 }
                 _ => Err(AuthorizationActionError::InvalidMessageOrder(
@@ -357,20 +356,20 @@ impl AuthorizationPoolStateMachine {
             },
             AuthorizationState::Connecting => match action {
                 AuthorizationAction::Connecting => Err(AuthorizationActionError::AlreadyConnecting),
-                AuthorizationAction::TrustIdentifying(_identity) => {
+                AuthorizationAction::TrustIdentifying(identity) => {
                     // Verify pub key allowed
-                    shared.mark_complete(connection_id, true);
+                    shared.mark_complete(connection_id, Some(identity));
                     Ok(AuthorizationState::Authorized)
                 }
                 AuthorizationAction::Unauthorizing => {
-                    shared.mark_complete(connection_id, false);
+                    shared.mark_complete(connection_id, None);
 
                     Ok(AuthorizationState::Unauthorized)
                 }
             },
             AuthorizationState::Authorized => match action {
                 AuthorizationAction::Unauthorizing => {
-                    shared.mark_complete(connection_id, false);
+                    shared.mark_complete(connection_id, None);
 
                     Ok(AuthorizationState::Unauthorized)
                 }
@@ -393,7 +392,7 @@ type Callback =
 #[derive(Default)]
 struct ManagedAuthorizations {
     states: HashMap<String, AuthorizationState>,
-    complete_and_authorized: HashMap<String, bool>,
+    complete_and_authorized: HashMap<String, Option<String>>,
 }
 
 impl ManagedAuthorizations {
@@ -404,18 +403,21 @@ impl ManagedAuthorizations {
         }
     }
 
-    fn cleanup_connection_state(&mut self, connection_id: &str) {
+    fn cleanup_connection_state(&mut self, connection_id: &str) -> Option<String> {
         self.states.remove(connection_id);
-        self.complete_and_authorized.remove(connection_id);
+        self.complete_and_authorized.remove(connection_id).flatten()
     }
 
-    fn mark_complete(&mut self, connection_id: &str, is_authorized: bool) {
+    // Mark complete with an optional identity
+    fn mark_complete(&mut self, connection_id: &str, authorized_identity: Option<String>) {
         self.complete_and_authorized
-            .insert(connection_id.to_string(), is_authorized);
+            .insert(connection_id.to_string(), authorized_identity);
     }
 
-    fn is_authorized(&self, connection_id: &str) -> Option<&bool> {
-        self.complete_and_authorized.get(connection_id)
+    fn is_complete(&self, connection_id: &str) -> Option<bool> {
+        self.complete_and_authorized
+            .get(connection_id)
+            .map(|ident| ident.is_some())
     }
 }
 
@@ -453,7 +455,11 @@ pub(in crate::network) mod tests {
         }
     }
 
-    pub(in crate::network) fn negotiation_connection_auth(mesh: &Mesh, connection_id: &str) {
+    pub(in crate::network) fn negotiation_connection_auth(
+        mesh: &Mesh,
+        connection_id: &str,
+        expected_identity: &str,
+    ) {
         let env = mesh.recv().expect("unable to receive from mesh");
 
         // receive the connect request from the connection manager
@@ -505,7 +511,7 @@ pub(in crate::network) mod tests {
         let env = write_auth_message(
             connection_id,
             AuthorizationMessage::TrustRequest(TrustRequest {
-                identity: "test_identity".to_string(),
+                identity: expected_identity.to_string(),
             }),
         );
         mesh.send(env).expect("unable to send authorized");
