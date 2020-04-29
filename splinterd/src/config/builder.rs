@@ -23,12 +23,16 @@ pub trait PartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError>;
 }
 
-fn get_file_path(cert_dir: &str, file: &str) -> String {
-    if file.starts_with("./") || file.starts_with("../") {
-        String::from(file)
+fn get_tls_file_path(cert_dir: &str, file: &str) -> String {
+    let file_path = Path::new(file);
+    if file_path.is_absolute() || file_path.starts_with("../") || file_path.starts_with("./") {
+        file_path
+            .to_str()
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| String::from(file))
     } else {
         Path::new(cert_dir)
-            .join(file)
+            .join(file_path)
             .to_str()
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| String::from(file))
@@ -63,6 +67,14 @@ impl ConfigBuilder {
     /// Builds a Config object by incorporating the values from each PartialConfig object.
     ///
     pub fn build(self) -> Result<Config, ConfigError> {
+        let config_dir = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.config_dir() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("config directory".to_string()))?;
         let tls_cert_dir = self
             .partial_configs
             .iter()
@@ -75,13 +87,7 @@ impl ConfigBuilder {
             .partial_configs
             .iter()
             .find_map(|p| match p.tls_ca_file() {
-                Some(v) => {
-                    if p.source() != ConfigSource::Default {
-                        Some((v, p.source()))
-                    } else {
-                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
-                    }
-                }
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("ca file".to_string()))?;
@@ -89,13 +95,7 @@ impl ConfigBuilder {
             .partial_configs
             .iter()
             .find_map(|p| match p.tls_client_cert() {
-                Some(v) => {
-                    if p.source() != ConfigSource::Default {
-                        Some((v, p.source()))
-                    } else {
-                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
-                    }
-                }
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("client certificate".to_string()))?;
@@ -103,13 +103,7 @@ impl ConfigBuilder {
             .partial_configs
             .iter()
             .find_map(|p| match p.tls_client_key() {
-                Some(v) => {
-                    if p.source() != ConfigSource::Default {
-                        Some((v, p.source()))
-                    } else {
-                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
-                    }
-                }
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("client key".to_string()))?;
@@ -117,13 +111,7 @@ impl ConfigBuilder {
             .partial_configs
             .iter()
             .find_map(|p| match p.tls_server_cert() {
-                Some(v) => {
-                    if p.source() != ConfigSource::Default {
-                        Some((v, p.source()))
-                    } else {
-                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
-                    }
-                }
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("server certificate".to_string()))?;
@@ -131,13 +119,7 @@ impl ConfigBuilder {
             .partial_configs
             .iter()
             .find_map(|p| match p.tls_server_key() {
-                Some(v) => {
-                    if p.source() != ConfigSource::Default {
-                        Some((v, p.source()))
-                    } else {
-                        Some((get_file_path(&tls_cert_dir.0, &v), p.source()))
-                    }
-                }
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("server key".to_string()))?;
@@ -160,6 +142,7 @@ impl ConfigBuilder {
         // Iterates over the list of PartialConfig objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
+            config_dir,
             storage: self
                 .partial_configs
                 .iter()
@@ -324,11 +307,11 @@ mod tests {
 
     /// Example configuration values.
     static EXAMPLE_STORAGE: &str = "yaml";
-    static EXAMPLE_CA_CERTS: &str = "certs/ca.pem";
-    static EXAMPLE_CLIENT_CERT: &str = "certs/client.crt";
-    static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
-    static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
-    static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    static EXAMPLE_CA_CERTS: &str = "/etc/splinter/certs/ca.pem";
+    static EXAMPLE_CLIENT_CERT: &str = "/etc/splinter/certs/client.crt";
+    static EXAMPLE_CLIENT_KEY: &str = "/etc/splinter/certs/client.key";
+    static EXAMPLE_SERVER_CERT: &str = "/etc/splinter/certs/server.crt";
+    static EXAMPLE_SERVER_KEY: &str = "/etc/splinter/certs/server.key";
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";

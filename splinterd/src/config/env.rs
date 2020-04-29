@@ -16,6 +16,7 @@ use std::env;
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
+const CONFIG_DIR_ENV: &str = "SPLINTER_CONFIG_DIR";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const CERT_DIR_ENV: &str = "SPLINTER_CERT_DIR";
 
@@ -31,6 +32,7 @@ impl EnvPartialConfigBuilder {
 impl PartialConfigBuilder for EnvPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         Ok(PartialConfig::new(ConfigSource::Environment)
+            .with_config_dir(env::var(CONFIG_DIR_ENV).ok())
             .with_tls_cert_dir(env::var(CERT_DIR_ENV).ok())
             .with_state_dir(env::var(STATE_DIR_ENV).ok()))
     }

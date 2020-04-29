@@ -14,8 +14,9 @@
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
-const DEFAULT_CERT_DIR: &str = "/etc/splinter/certs/";
-const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
+const DEFAULT_CONFIG_DIR: &str = "/etc/splinter";
+const DEFAULT_CERT_DIR: &str = "/etc/splinter/certs";
+const DEFAULT_STATE_DIR: &str = "/var/lib/splinter";
 
 const CLIENT_CERT: &str = "client.crt";
 const CLIENT_KEY: &str = "private/client.key";
@@ -41,6 +42,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
 
         partial_config = partial_config
+            .with_config_dir(Some(String::from(DEFAULT_CONFIG_DIR)))
             .with_storage(Some(String::from("yaml")))
             .with_tls_cert_dir(Some(String::from(DEFAULT_CERT_DIR)))
             .with_tls_ca_file(Some(String::from(CA_PEM)))
