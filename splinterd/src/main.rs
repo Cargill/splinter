@@ -254,7 +254,7 @@ fn main() {
 
     #[cfg(feature = "biome")]
     let app = app.arg(
-        Arg::with_name("enable-biome")
+        Arg::with_name("enable_biome")
             .long("enable-biome")
             .long_help("Enable the biome subsystem"),
     );
