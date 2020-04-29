@@ -73,7 +73,6 @@ experimental = [
     "biome-credentials",
     "biome-key-management",
     "health",
-    "scabbard-get-state",
     "service-arg-validation",
     "ws-transport",
 ]
@@ -87,7 +86,6 @@ config-env-var = []
 config-toml = []
 database = ["splinter/postgres"]
 rest-api-cors = ["splinter/rest-api-cors"]
-scabbard-get-state = ["splinter/scabbard-get-state"]
 service-arg-validation = ["splinter/service-arg-validation"]
 ws-transport = ["splinter/ws-transport"]
 

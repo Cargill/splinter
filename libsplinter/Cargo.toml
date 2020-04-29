@@ -104,7 +104,6 @@ experimental = [
     "matrix",
     "network-peer-manager",
     "network-ref-map",
-    "scabbard-get-state",
     "service-arg-validation",
     "service-network",
     "ws-transport",
@@ -138,7 +137,6 @@ rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
 sawtooth-signing-compat = ["sawtooth-sdk"]
 scabbard-client = ["reqwest"]
-scabbard-get-state = []
 service-arg-validation = []
 service-network = ["connection-manager"]
 ws-transport = ["websocket"]
