@@ -33,6 +33,8 @@ use transact::database::{
 };
 use transact::sawtooth::SawtoothToTransactHandlerAdapter;
 use transact::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
+#[cfg(feature = "scabbard-get-state")]
+use transact::state::merkle::StateDatabaseError;
 use transact::state::{
     merkle::{MerkleRadixTree, MerkleState, INDEXES},
     StateChange as TransactStateChange, Write,
@@ -203,7 +205,11 @@ impl ScabbardState {
     ) -> Result<StateIter, ScabbardStateError> {
         Ok(Box::new(
             MerkleRadixTree::new(self.db.clone(), Some(&self.current_state_root))?
-                .leaves(prefix)?
+                .leaves(prefix)
+                .or_else(|err| match err {
+                    StateDatabaseError::NotFound(_) => Ok(Box::new(std::iter::empty())),
+                    err => Err(err),
+                })?
                 .map(|res| res.map_err(ScabbardStateError::from)),
         ))
     }
