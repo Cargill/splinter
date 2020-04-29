@@ -16,6 +16,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::env;
 use std::iter::FromIterator;
+use std::path::Path;
 use std::time::SystemTime;
 
 use protobuf::{Message, RepeatedField};
@@ -66,6 +67,7 @@ use super::{
 
 const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
+const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
 
@@ -220,6 +222,12 @@ impl AdminServiceShared {
         let location = {
             if let Ok(s) = env::var(STATE_DIR_ENV) {
                 s
+            } else if let Ok(s) = env::var(SPLINTER_HOME_ENV) {
+                Path::new(&s)
+                    .join("data")
+                    .to_str()
+                    .map(ToOwned::to_owned)
+                    .unwrap_or_else(|| String::from(DEFAULT_STATE_DIR))
             } else {
                 DEFAULT_STATE_DIR.to_string()
             }

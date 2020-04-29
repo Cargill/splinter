@@ -13,12 +13,15 @@
 // limitations under the License.
 
 use std::env;
+use std::fs;
+use std::path::Path;
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
 const CONFIG_DIR_ENV: &str = "SPLINTER_CONFIG_DIR";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const CERT_DIR_ENV: &str = "SPLINTER_CERT_DIR";
+const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 
 /// Holds configuration values defined as environment variables.
 pub struct EnvPartialConfigBuilder;
@@ -31,10 +34,52 @@ impl EnvPartialConfigBuilder {
 
 impl PartialConfigBuilder for EnvPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
+        let config_dir_env = match (
+            env::var(CONFIG_DIR_ENV).ok(),
+            env::var(SPLINTER_HOME_ENV).ok(),
+        ) {
+            (Some(config_dir), _) => Some(config_dir),
+            (None, Some(splinter_home)) => {
+                let opt_path = Path::new(&splinter_home).join("etc");
+                if !opt_path.is_dir() {
+                    fs::create_dir_all(&opt_path).map_err(ConfigError::StdError)?;
+                }
+                opt_path.to_str().map(ToOwned::to_owned)
+            }
+            _ => None,
+        };
+        let tls_cert_dir_env = match (
+            env::var(CERT_DIR_ENV).ok(),
+            env::var(SPLINTER_HOME_ENV).ok(),
+        ) {
+            (Some(tls_cert_dir), _) => Some(tls_cert_dir),
+            (None, Some(splinter_home)) => {
+                let opt_path = Path::new(&splinter_home).join("certs");
+                if !opt_path.is_dir() {
+                    fs::create_dir_all(&opt_path).map_err(ConfigError::StdError)?;
+                }
+                opt_path.to_str().map(ToOwned::to_owned)
+            }
+            _ => None,
+        };
+        let state_dir_env = match (
+            env::var(STATE_DIR_ENV).ok(),
+            env::var(SPLINTER_HOME_ENV).ok(),
+        ) {
+            (Some(state_dir), _) => Some(state_dir),
+            (None, Some(splinter_home)) => {
+                let opt_path = Path::new(&splinter_home).join("data");
+                if !opt_path.is_dir() {
+                    fs::create_dir_all(&opt_path).map_err(ConfigError::StdError)?;
+                }
+                opt_path.to_str().map(ToOwned::to_owned)
+            }
+            _ => None,
+        };
         Ok(PartialConfig::new(ConfigSource::Environment)
-            .with_config_dir(env::var(CONFIG_DIR_ENV).ok())
-            .with_tls_cert_dir(env::var(CERT_DIR_ENV).ok())
-            .with_state_dir(env::var(STATE_DIR_ENV).ok()))
+            .with_config_dir(config_dir_env)
+            .with_tls_cert_dir(tls_cert_dir_env)
+            .with_state_dir(state_dir_env))
     }
 }
 

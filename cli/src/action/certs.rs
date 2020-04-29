@@ -42,6 +42,7 @@ pub struct CertGenAction;
 
 const DEFAULT_CERT_DIR: &str = "/etc/splinter/certs/";
 const CERT_DIR_ENV: &str = "SPLINTER_CERT_DIR";
+const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 
 const CLIENT_CERT: &str = "client.crt";
 const CLIENT_KEY: &str = "client.key";
@@ -63,7 +64,24 @@ impl Action for CertGenAction {
             .value_of("cert_dir")
             .map(ToOwned::to_owned)
             .or_else(|| env::var(CERT_DIR_ENV).ok())
-            .or_else(|| Some(DEFAULT_CERT_DIR.to_string()))
+            .or_else(|| {
+                if let Ok(splinter_home) = env::var(SPLINTER_HOME_ENV) {
+                    let cert_path = Path::new(&splinter_home).join("certs");
+                    if !cert_path.is_dir() {
+                        fs::create_dir_all(&cert_path)
+                            .map_err(|err| {
+                                CliError::ActionError(format!(
+                                    "Unable to create cert directory: {}",
+                                    err
+                                ))
+                            })
+                            .ok()?
+                    }
+                    cert_path.to_str().map(ToOwned::to_owned)
+                } else {
+                    Some(DEFAULT_CERT_DIR.to_string())
+                }
+            })
             .unwrap();
 
         let cert_dir = Path::new(&cert_dir_string);

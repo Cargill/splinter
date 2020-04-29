@@ -16,7 +16,7 @@
 # Config file format version
 version = "1"
 
-node_id = "012"
+node_id =  "012"
 
 # Endpoint used for service to daemon communication.
 service_endpoint = "127.0.0.1:8043"
