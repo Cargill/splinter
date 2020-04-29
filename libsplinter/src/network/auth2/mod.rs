@@ -455,7 +455,11 @@ pub(in crate::network) mod tests {
         }
     }
 
-    pub(in crate::network) fn negotiation_connection_auth(mesh: &Mesh, connection_id: &str) {
+    pub(in crate::network) fn negotiation_connection_auth(
+        mesh: &Mesh,
+        connection_id: &str,
+        expected_identity: &str,
+    ) {
         let env = mesh.recv().expect("unable to receive from mesh");
 
         // receive the connect request from the connection manager
@@ -507,7 +511,7 @@ pub(in crate::network) mod tests {
         let env = write_auth_message(
             connection_id,
             AuthorizationMessage::TrustRequest(TrustRequest {
-                identity: "test_identity".to_string(),
+                identity: expected_identity.to_string(),
             }),
         );
         mesh.send(env).expect("unable to send authorized");

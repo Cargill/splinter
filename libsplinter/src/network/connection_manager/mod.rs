@@ -1205,7 +1205,7 @@ mod tests {
             let conn = listener.accept().unwrap();
             mesh.add(conn, "test_id".to_string()).unwrap();
 
-            negotiation_connection_auth(&mesh, "test_id");
+            negotiation_connection_auth(&mesh, "test_id", "some-peer");
 
             // Verify mesh received heartbeat
 
@@ -1234,9 +1234,11 @@ mod tests {
         );
         let connector = cm.start().unwrap();
 
-        connector
+        let identity = connector
             .request_connection(&endpoint, "test_id")
             .expect("A connection could not be created");
+
+        assert_eq!("some-peer", identity);
 
         // wait for completion
         rx.recv().expect("Did not receive completion signal");
@@ -1257,7 +1259,7 @@ mod tests {
             let mesh = Mesh::new(512, 128);
             let conn = listener.accept().unwrap();
             mesh.add(conn, "test_id".to_string()).unwrap();
-            negotiation_connection_auth(&mesh, "test_id");
+            negotiation_connection_auth(&mesh, "test_id", "some-peer");
 
             // wait for completion
             rx.recv().expect("Did not receive completion signal");
@@ -1351,7 +1353,7 @@ mod tests {
                 .add(conn, "test_id".to_string())
                 .expect("Cannot add connection to mesh");
 
-            negotiation_connection_auth(&mesh2, "test_id");
+            negotiation_connection_auth(&mesh2, "test_id", "some-peer");
 
             // Verify mesh received heartbeat
             let envelope = mesh2.recv().expect("Cannot receive message");
@@ -1530,7 +1532,7 @@ mod tests {
             mesh.add(connection, "test_id".into())
                 .expect("Unable to add to remote mesh");
 
-            negotiation_connection_auth(&mesh, "test_id");
+            negotiation_connection_auth(&mesh, "test_id", "inbound-identity");
 
             // block until done
             conn_rx.recv().unwrap();
@@ -1551,7 +1553,16 @@ mod tests {
         let notification = subscriber
             .next()
             .expect("Cannot get message from subscriber");
-        assert!(matches!(notification, ConnectionManagerNotification::InboundConnection { ..  }));
+
+        if let ConnectionManagerNotification::InboundConnection { ref identity, .. } = &notification
+        {
+            assert_eq!(identity, "inbound-identity");
+        } else {
+            panic!(
+                "Did not receive the correct notification: {:?}",
+                notification
+            );
+        }
 
         let connection_endpoints = connector.list_connections().unwrap();
         assert_eq!(vec![remote_endpoint.clone()], connection_endpoints);
