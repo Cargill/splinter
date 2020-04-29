@@ -12,18 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# The `keys` field must be non-empty and valid hex, but this example application
+# doesn't require them to be valid keys since circuits are pre-configured.
+
 - identity: "012"
   endpoints:
     - "tcp://splinter-node-0:8044"
   display_name: "Node 1"
+  keys:
+    - abcd
   metadata: {}
 - identity: "345"
   endpoints:
     - "tcp://splinter-node-1:8046"
   display_name: "Node 2"
+  keys:
+    - abcd
   metadata: {}
 - identity: "678"
   endpoints:
     - "tcp://splinter-node-2:8048"
   display_name: "Node 3"
+  keys:
+    - abcd
   metadata: {}

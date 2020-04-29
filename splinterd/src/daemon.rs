@@ -42,10 +42,7 @@ use splinter::circuit::handlers::{
 use splinter::circuit::{SplinterState, SplinterStateError};
 #[cfg(feature = "biome")]
 use splinter::database::{self, ConnectionPool};
-use splinter::keys::{
-    insecure::AllowAllKeyPermissionManager, rest_api::KeyRegistryManager,
-    storage::StorageKeyRegistry,
-};
+use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::handlers::{
     create_authorization_dispatcher, AuthorizationMessageHandler, NetworkAuthGuardHandler,
@@ -105,7 +102,6 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 
 pub struct SplinterDaemon {
     storage_location: String,
-    key_registry_location: String,
     node_registry_directory: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
@@ -394,10 +390,12 @@ impl SplinterDaemon {
 
         let signature_verifier = SawtoothSecp256k1SignatureVerifier::new();
 
-        let key_registry = Box::new(
-            StorageKeyRegistry::new(self.key_registry_location.clone())
-                .map_err(|err| StartError::StorageError(format!("{}", err)))?,
-        );
+        let (node_registry, registry_shutdown) = create_node_registry(
+            &self.node_registry_directory,
+            &self.registries,
+            self.registry_auto_refresh,
+            self.registry_forced_refresh,
+        )?;
 
         let admin_service = AdminService::new(
             &self.node_id,
@@ -413,7 +411,7 @@ impl SplinterDaemon {
             Box::new(auth_manager),
             state.clone(),
             Box::new(signature_verifier),
-            key_registry.clone(),
+            node_registry.clone_box_as_reader(),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
             Some(self.admin_timeout),
@@ -421,14 +419,6 @@ impl SplinterDaemon {
         .map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
         })?;
-        let key_registry_manager = KeyRegistryManager::new(key_registry);
-
-        let (node_registry, registry_shutdown) = create_node_registry(
-            &self.node_registry_directory,
-            &self.registries,
-            self.registry_auto_refresh,
-            self.registry_forced_refresh,
-        )?;
 
         let node_id = self.node_id.clone();
         let display_name = self.display_name.clone();
@@ -458,7 +448,6 @@ impl SplinterDaemon {
                 }),
             )
             .add_resources(node_registry.resources())
-            .add_resources(key_registry_manager.resources())
             .add_resources(admin_service.resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
@@ -713,7 +702,6 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 #[derive(Default)]
 pub struct SplinterDaemonBuilder {
     storage_location: Option<String>,
-    key_registry_location: Option<String>,
     node_registry_directory: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
@@ -743,11 +731,6 @@ impl SplinterDaemonBuilder {
 
     pub fn with_storage_location(mut self, value: String) -> Self {
         self.storage_location = Some(value);
-        self
-    }
-
-    pub fn with_key_registry_location(mut self, value: String) -> Self {
-        self.key_registry_location = Some(value);
         self
     }
 
@@ -852,10 +835,6 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: storage_location".to_string())
         })?;
 
-        let key_registry_location = self.key_registry_location.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: key_registry_location".to_string())
-        })?;
-
         let node_registry_directory = self.node_registry_directory.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: node_registry_directory".to_string())
         })?;
@@ -929,7 +908,6 @@ impl SplinterDaemonBuilder {
             registries: self.registries,
             registry_auto_refresh,
             registry_forced_refresh,
-            key_registry_location,
             node_registry_directory,
             storage_type,
             admin_timeout: self.admin_timeout,

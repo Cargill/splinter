@@ -117,19 +117,13 @@ export interface Game {
   game_name: string;
   game_name_hash: string;
   circuit_id: string;
-  player_1: Player;
-  player_2: Player;
+  player_1: string;
+  player_2: string;
   game_status: string;
   game_board: string;
   created_time: number;
   updated_time: number;
   committed: boolean;
-}
-
-export interface Player {
-  name: string;
-  publicKey: string;
-  organization: string;
 }
 
 export interface BatchInfo {

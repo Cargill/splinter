@@ -70,6 +70,9 @@ fn propose_successful_basic() {
 /// 2. Verify that the proposal summary is output correctly by inspecting the output for the node
 ///    IDs, service IDs, service types, and `admin_keys` service argument.
 /// 3. Verify that the proposal is committed.
+///
+/// NOTE: this test is currently broken, since the node file used no longer exists and must be
+/// generated.
 #[test]
 #[serial(stdout)]
 #[ignore]

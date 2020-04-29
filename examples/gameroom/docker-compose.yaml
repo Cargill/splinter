@@ -16,13 +16,13 @@ version: "3.7"
 
 volumes:
   cargo-registry:
-  key-registry:
+  registry:
   acme-var:
   bubba-var:
 
 services:
 
-    generate-key-registry:
+    generate-registry:
         image: splinter-cli
         build:
           context: ../..
@@ -31,18 +31,48 @@ services:
             - CARGO_ARGS=${CARGO_ARGS}
             - REPO_VERSION=${REPO_VERSION}
         volumes:
-          - key-registry:/key_registry
-          - ./key_registry:/input
+          - registry:/registry
         command: |
           bash -c "
-            if [ ! -f /key_registry/keys.yaml ]
+            if [ ! -f /registry/nodes.yaml ]
             then
-              splinter admin keyregistry \
-                -i /input/key_registry_spec.yaml \
-                -d /key_registry \
-                --force
+              # generate keys
+              splinter admin keygen alice -d /registry
+              splinter admin keygen bob -d /registry
+              # check if splinterd-node-acme is available
+              while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-acme:8085/status) -ne 200 ]] ; do
+                 >&2 echo \"splinterd is unavailable - sleeping\"
+                 sleep 1
+              done
+              # check if splinterd-node-bubba is available
+              while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-bubba:8085/status) -ne 200 ]] ; do
+                 >&2 echo \"splinterd is unavailable - sleeping\"
+                 sleep 1
+              done
+              # build the registry
+              splinter registry build \
+                http://splinterd-node-acme:8085 \
+                --file /registry/nodes.yaml \
+                --key-file /registry/alice.pub \
+                --metadata organization='ACME Corporation'
+              splinter registry build \
+                http://splinterd-node-bubba:8085 \
+                --file /registry/nodes.yaml \
+                --key-file /registry/bob.pub \
+                --metadata organization='Bubba Bakery'
             fi
           "
+
+    registry-server:
+      image: httpd:2.4
+      container_name: registry-server
+      restart: always
+      expose:
+        - 80
+      ports:
+          - "8099:80"
+      volumes:
+        - registry:/usr/local/apache2/htdocs
 
     db-acme:
       image: gameroom-database
@@ -115,6 +145,7 @@ services:
             gameroomd -vv --database-url postgres://gameroom:gameroom_example@db-acme:5432/gameroom \
               -b gameroomd-acme:8000 --splinterd-url http://splinterd-node-acme:8085
           "
+
     splinterd-node-acme:
       image: splinterd-node
       container_name: splinterd-node-acme
@@ -132,24 +163,17 @@ services:
       ports:
         - 8088:8085
       volumes:
-        - key-registry:/key_registry_shared
         - acme-var:/var/lib/splinter
         - ./splinterd-config:/configs
-        - ./node_registry:/node_registry
       entrypoint: |
         bash -c "
-          # We need to wait for the generated key registry to be available
-          while [ ! -f /key_registry_shared/keys.yaml ]; do \
-            echo 'waiting for key registry'; \
-            sleep 1; \
-          done && \
-          # Copy the generated key registry to its expected location
-          cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --service-endpoint tcp://0.0.0.0:8043 \
               --network-endpoints tcps://0.0.0.0:8044 \
+              --advertised-endpoints tcps://splinterd-node-acme:8044 \
               --bind 0.0.0.0:8085 \
+              --registries http://registry-server:80/nodes.yaml \
               --tls-insecure
         "
 
@@ -240,23 +264,16 @@ services:
       ports:
         - 8089:8085
       volumes:
-        - key-registry:/key_registry_shared
         - ./splinterd-config:/configs
-        - ./node_registry:/node_registry
         - bubba-var:/var/lib/splinter
       entrypoint: |
         bash -c "
-          # We need to wait for the generated key registry to be available
-          while [ ! -f /key_registry_shared/keys.yaml ]; do \
-            echo 'waiting for key registry'; \
-            sleep 1; \
-          done && \
-          # Copy the generated key registry to its expected location
-          cp -a /key_registry_shared/keys.yaml /var/lib/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --service-endpoint tcp://0.0.0.0:8043 \
               --network-endpoints tcps://0.0.0.0:8044 \
+              --advertised-endpoints tcps://splinterd-node-bubba:8044 \
               --bind 0.0.0.0:8085 \
+              --registries http://registry-server:80/nodes.yaml \
               --tls-insecure
         "

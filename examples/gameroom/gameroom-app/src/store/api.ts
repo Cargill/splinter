@@ -25,7 +25,6 @@ import {
   Gameroom,
   Ballot,
   Game,
-  Player,
   BatchInfo,
 } from './models';
 
@@ -142,32 +141,11 @@ export async function listNodes(): Promise<Node[]> {
   return response.data.data as Node[];
 }
 
-
-// Game information
-export async function fetchPlayerInformation(publicKey: string): Promise<Player> {
-  const response = await gameroomAPI.get(`/keys/${publicKey}`);
-  const player: Player = {
-    name: response.data.data.metadata['gameroom/first-name'],
-    publicKey: response.data.data.public_key,
-    organization: response.data.data.metadata['gameroom/organization'],
-  };
-  return player;
-}
-
 export async function listGames(circuitID: string): Promise<Game[]> {
   const response = await gameroomAPI.get(`/xo/${circuitID}/games`);
   const games = response.data.data.map(async (game: any) => {
-    if (game.player_1 !== '') {
-      const player1 = await fetchPlayerInformation(game.player_1);
-      Promise.all([player1]).then((p1) => game.player_1 = player1);
-    }
-    if (game.player_2 !== '') {
-      const player2 = await fetchPlayerInformation(game.player_2);
-      Promise.all([player2]).then((p2) => game.player_2 = player2);
-    }
     game.committed = true;
     game.game_name_hash = hashGameName(game.game_name);
-
     return game as Game;
   });
   return Promise.all(games);

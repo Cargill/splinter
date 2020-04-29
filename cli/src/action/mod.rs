@@ -12,7 +12,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 pub mod admin;
+mod api;
 pub mod certs;
 pub mod circuit;
 #[cfg(feature = "database")]
@@ -20,9 +22,12 @@ pub mod database;
 #[cfg(feature = "health")]
 pub mod health;
 pub mod keygen;
+pub mod registry;
 
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::fs::File;
+use std::io::{Error as IoError, ErrorKind, Read};
 use std::path::Path;
 
 use clap::ArgMatches;
@@ -89,5 +94,37 @@ fn chown(path: &Path, uid: u32, gid: u32) -> Result<(), CliError> {
             "Error chowning file {}: {}",
             pathstr, code
         ))),
+    }
+}
+
+/// Reads a private key from the given file name.
+fn read_private_key(file_name: &str) -> Result<String, CliError> {
+    let mut file = File::open(file_name).map_err(|err| {
+        CliError::EnvironmentError(format!(
+            "Unable to open key file '{}': {}",
+            file_name,
+            msg_from_io_error(err)
+        ))
+    })?;
+
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).map_err(|err| {
+        CliError::EnvironmentError(format!(
+            "Unable to read key file '{}': {}",
+            file_name,
+            msg_from_io_error(err)
+        ))
+    })?;
+    let key = buf.trim().to_string();
+
+    Ok(key)
+}
+
+fn msg_from_io_error(err: IoError) -> String {
+    match err.kind() {
+        ErrorKind::NotFound => "File not found".into(),
+        ErrorKind::PermissionDenied => "Permission denied".into(),
+        ErrorKind::InvalidData => "Invalid data".into(),
+        _ => "Unknown I/O error".into(),
     }
 }

@@ -57,8 +57,17 @@ pub struct Node {
     pub endpoints: Vec<String>,
     /// A human-readable name for the node; must be non-empty.
     pub display_name: String,
+    /// The list of public keys that are permitted to act on behalf of the node; at least one key
+    /// must be provided, and each key must be non-empty.
+    pub keys: Vec<String>,
     /// A map with node metadata.
     pub metadata: HashMap<String, String>,
+}
+
+impl Node {
+    pub fn has_key(&self, key: &str) -> bool {
+        self.keys.iter().any(|node_key| node_key == key)
+    }
 }
 
 /// A builder for creating new nodes.
@@ -66,6 +75,7 @@ pub struct NodeBuilder {
     identity: String,
     endpoints: Vec<String>,
     display_name: Option<String>,
+    keys: Vec<String>,
     metadata: HashMap<String, String>,
 }
 
@@ -76,6 +86,7 @@ impl NodeBuilder {
             identity: identity.into(),
             endpoints: vec![],
             display_name: None,
+            keys: vec![],
             metadata: HashMap::new(),
         }
     }
@@ -98,6 +109,18 @@ impl NodeBuilder {
         self
     }
 
+    /// Add the `key` to the builder.
+    pub fn with_key<S: Into<String>>(mut self, key: S) -> Self {
+        self.keys.push(key.into());
+        self
+    }
+
+    /// Add all of the `keys` to the builder.
+    pub fn with_keys<V: Into<Vec<String>>>(mut self, keys: V) -> Self {
+        self.keys.append(&mut keys.into());
+        self
+    }
+
     /// Add the `key`/`value` pair to the node's metadata.
     pub fn with_metadata<S: Into<String>>(mut self, key: S, value: S) -> Self {
         self.metadata.insert(key.into(), value.into());
@@ -115,6 +138,7 @@ impl NodeBuilder {
             identity,
             endpoints: self.endpoints,
             display_name,
+            keys: self.keys,
             metadata: self.metadata,
         };
 
@@ -328,6 +352,10 @@ fn check_node_required_fields_are_not_empty(node: &Node) -> Result<(), InvalidNo
         Err(InvalidNodeError::EmptyEndpoint)
     } else if node.display_name.is_empty() {
         Err(InvalidNodeError::EmptyDisplayName)
+    } else if node.keys.is_empty() {
+        Err(InvalidNodeError::MissingKeys)
+    } else if node.keys.iter().any(|key| key.is_empty()) {
+        Err(InvalidNodeError::EmptyKey)
     } else {
         Ok(())
     }

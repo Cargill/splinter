@@ -17,6 +17,8 @@
   endpoints:
     - "tcps://acme.default.svc.cluster.local:8044"
   display_name: "Acme"
+  keys:
+    - "alice.pub"
   metadata:
     organization: "Acme Corporation"
 
@@ -24,5 +26,7 @@
   endpoints:
     - "tcps://bubba.default.svc.cluster.local:8044"
   display_name: "Bubba Bakery"
+  keys:
+    - "bob.pub"
   metadata:
     organization: "Bubba Bakery"
