@@ -31,6 +31,8 @@ use transact::database::{
     lmdb::{LmdbContext, LmdbDatabase},
     Database,
 };
+#[cfg(test)]
+use transact::families::command::CommandTransactionHandler;
 use transact::sawtooth::SawtoothToTransactHandlerAdapter;
 use transact::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
 #[cfg(feature = "scabbard-get-state")]
@@ -124,9 +126,13 @@ impl ScabbardState {
         // Initialize transact
         let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
         let mut executor = Executor::new(vec![Box::new(StaticExecutionAdapter::new_adapter(
-            vec![Box::new(SawtoothToTransactHandlerAdapter::new(
-                SabreTransactionHandler::new(),
-            ))],
+            vec![
+                Box::new(SawtoothToTransactHandlerAdapter::new(
+                    SabreTransactionHandler::new(),
+                )),
+                #[cfg(test)]
+                Box::new(CommandTransactionHandler::new()),
+            ],
             context_manager.clone(),
         )?)]);
         executor
@@ -834,91 +840,245 @@ impl Iterator for ChannelBatchInfoIter {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use tempdir::TempDir;
+    #[cfg(feature = "scabbard-get-state")]
+    use transact::{
+        families::command::make_command_transaction,
+        protocol::{
+            batch::BatchBuilder,
+            command::{BytesEntry, Command, SetState},
+        },
+        signing::hash::HashSigner,
+    };
+
     const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
     /// Verify that an empty receipt store returns an empty iterator
     #[test]
     fn empty_event_iterator() {
-        let temp_db_path = get_temp_db_path();
+        let paths = StatePaths::new("empty_event_iterator");
 
-        let test_result = std::panic::catch_unwind(|| {
-            let transaction_receipt_store =
-                Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                    LmdbOrderedStore::new(&temp_db_path, Some(TEMP_DB_SIZE))
-                        .expect("Failed to create LMDB store"),
-                ))));
+        let transaction_receipt_store =
+            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                    .expect("Failed to create LMDB store"),
+            ))));
 
-            // Test without a specified start
-            let all_events = Events::new(transaction_receipt_store.clone(), None)
-                .expect("failed to get iterator for all events");
-            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-            assert!(
-                all_event_ids.is_empty(),
-                "All events should have been empty"
-            );
-        });
-
-        std::fs::remove_file(temp_db_path.as_path()).expect("Failed to remove temp DB file");
-
-        assert!(test_result.is_ok());
+        // Test without a specified start
+        let all_events = Events::new(transaction_receipt_store.clone(), None)
+            .expect("failed to get iterator for all events");
+        let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+        assert!(
+            all_event_ids.is_empty(),
+            "All events should have been empty"
+        );
     }
 
     /// Verify that the event iterator works as expected.
     #[test]
     fn event_iterator() {
-        let temp_db_path = get_temp_db_path();
+        let paths = StatePaths::new("event_iterator");
 
-        let test_result = std::panic::catch_unwind(|| {
-            let receipts = vec![
-                mock_transaction_receipt("ab"),
-                mock_transaction_receipt("cd"),
-                mock_transaction_receipt("ef"),
-            ];
-            let receipt_ids = receipts
-                .iter()
-                .map(|receipt| receipt.transaction_id.clone())
-                .collect::<Vec<_>>();
+        let receipts = vec![
+            mock_transaction_receipt("ab"),
+            mock_transaction_receipt("cd"),
+            mock_transaction_receipt("ef"),
+        ];
+        let receipt_ids = receipts
+            .iter()
+            .map(|receipt| receipt.transaction_id.clone())
+            .collect::<Vec<_>>();
 
-            let transaction_receipt_store =
-                Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
-                    LmdbOrderedStore::new(&temp_db_path, Some(TEMP_DB_SIZE))
-                        .expect("Failed to create LMDB store"),
-                ))));
+        let transaction_receipt_store =
+            Arc::new(RwLock::new(TransactionReceiptStore::new(Box::new(
+                LmdbOrderedStore::new(&paths.receipt_db_path, Some(TEMP_DB_SIZE))
+                    .expect("Failed to create LMDB store"),
+            ))));
 
-            transaction_receipt_store
-                .write()
-                .expect("failed to get write lock")
-                .append(receipts.clone())
-                .expect("failed to add receipts to store");
+        transaction_receipt_store
+            .write()
+            .expect("failed to get write lock")
+            .append(receipts.clone())
+            .expect("failed to add receipts to store");
 
-            // Test without a specified start
-            let all_events = Events::new(transaction_receipt_store.clone(), None)
-                .expect("failed to get iterator for all events");
-            let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
-            assert_eq!(all_event_ids, receipt_ids);
+        // Test without a specified start
+        let all_events = Events::new(transaction_receipt_store.clone(), None)
+            .expect("failed to get iterator for all events");
+        let all_event_ids = all_events.map(|event| event.id.clone()).collect::<Vec<_>>();
+        assert_eq!(all_event_ids, receipt_ids);
 
-            // Test with a specified start
-            let some_events = Events::new(
-                transaction_receipt_store.clone(),
-                Some(receipt_ids[0].clone()),
-            )
-            .expect("failed to get iterator for some events");
-            let some_event_ids = some_events
-                .map(|event| event.id.clone())
-                .collect::<Vec<_>>();
-            assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
-        });
-
-        std::fs::remove_file(temp_db_path.as_path()).expect("Failed to remove temp DB file");
-
-        assert!(test_result.is_ok());
+        // Test with a specified start
+        let some_events = Events::new(
+            transaction_receipt_store.clone(),
+            Some(receipt_ids[0].clone()),
+        )
+        .expect("failed to get iterator for some events");
+        let some_event_ids = some_events
+            .map(|event| event.id.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(some_event_ids, receipt_ids[1..].to_vec());
     }
 
-    fn get_temp_db_path() -> std::path::PathBuf {
-        let mut temp_db_path = std::env::temp_dir();
-        let thread_id = std::thread::current().id();
-        temp_db_path.push(format!("store-{:?}.lmdb", thread_id));
-        temp_db_path
+    #[cfg(feature = "scabbard-get-state")]
+    /// Verify that the `ScabbardState::get_state_at_address` method works properly.
+    ///
+    /// 1. Initialize a new, empty `ScabbardState`.
+    /// 2. Set the value for a single address in state.
+    /// 3. Get the value at the set address and verify it matches the value that was set.
+    /// 4. Get the value at an unset address and verify that `None` is returned, which indicates
+    ///    that the address is unset.
+    #[test]
+    fn get_state_at_address() {
+        // Initialize state
+        let paths = StatePaths::new("get_state_at_address");
+        let mut state = ScabbardState::new(
+            &paths.state_db_path,
+            TEMP_DB_SIZE,
+            &paths.receipt_db_path,
+            TEMP_DB_SIZE,
+            vec![],
+        )
+        .expect("Failed to initialize state");
+
+        // Set a value in state
+        let address = "abcdef".to_string();
+        let value = b"value".to_vec();
+
+        let signer = HashSigner::default();
+        let batch = BatchBuilder::new()
+            .with_transactions(vec![
+                make_command_transaction(&[Command::SetState(SetState::new(vec![
+                    BytesEntry::new(address.clone(), value.clone()),
+                ]))])
+                .take()
+                .0,
+            ])
+            .build_pair(&signer)
+            .expect("Failed to build batch");
+        state
+            .prepare_change(batch)
+            .expect("Failed to prepare change");
+        state.commit().expect("Failed to commit change");
+
+        // Get the value and verify it
+        assert_eq!(
+            state
+                .get_state_at_address(&address)
+                .expect("Failed to get state for set address"),
+            Some(value),
+        );
+
+        // Get state at an unset address and verify it
+        assert_eq!(
+            state
+                .get_state_at_address("0123456789")
+                .expect("Failed to get state for unset address"),
+            None,
+        );
+    }
+
+    #[cfg(feature = "scabbard-get-state")]
+    /// Verify that the `ScabbardState::get_state_with_prefix` method works properly.
+    ///
+    /// 1. Initialize a new, empty `ScabbardState`.
+    /// 2. Set some values in state; 2 with a shared prefix, and 1 without.
+    /// 3. Call `get_state_with_prefix(None)` to get all state entries and verify that all the
+    ///    entries that were set are included in the result (there may be other entries because
+    ///    the `ScabbardState` contstructor sets some state).
+    /// 4. Call `get_state_with_prefix` with the shared prefix and verify that only the 2 entries
+    ///    under that prefix are returned.
+    /// 5. Call `get_state_with_prefix` with a prefix under which no addresses are set and verify
+    ///    that no entries are returned (the iterator is empty).
+    #[test]
+    fn get_state_with_prefix() {
+        // Initialize state
+        let paths = StatePaths::new("get_state_at_address");
+        let mut state = ScabbardState::new(
+            &paths.state_db_path,
+            TEMP_DB_SIZE,
+            &paths.receipt_db_path,
+            TEMP_DB_SIZE,
+            vec![],
+        )
+        .expect("Failed to initialize state");
+
+        // Set some values in state
+        let prefix = "abcdef".to_string();
+
+        let address1 = format!("{}01", prefix);
+        let value1 = b"value1".to_vec();
+        let address2 = format!("{}02", prefix);
+        let value2 = b"value2".to_vec();
+        let address3 = "0123456789".to_string();
+        let value3 = b"value3".to_vec();
+
+        let signer = HashSigner::default();
+        let batch = BatchBuilder::new()
+            .with_transactions(vec![
+                make_command_transaction(&[Command::SetState(SetState::new(vec![
+                    BytesEntry::new(address1.clone(), value1.clone()),
+                    BytesEntry::new(address2.clone(), value2.clone()),
+                    BytesEntry::new(address3.clone(), value3.clone()),
+                ]))])
+                .take()
+                .0,
+            ])
+            .build_pair(&signer)
+            .expect("Failed to build batch");
+        state
+            .prepare_change(batch)
+            .expect("Failed to prepare change");
+        state.commit().expect("Failed to commit change");
+
+        // Get all state entries and verify that they're correctly returned
+        let all_entries = state
+            .get_state_with_prefix(None)
+            .expect("Failed to get all entries")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to collect all entries");
+        assert!(all_entries.contains(&(address1.clone(), value1.clone())));
+        assert!(all_entries.contains(&(address2.clone(), value2.clone())));
+        assert!(all_entries.contains(&(address3, value3)));
+
+        // Get state entries under the shared prefix and verify the correct entries are returned
+        let prefix_entries = state
+            .get_state_with_prefix(Some(&prefix))
+            .expect("Failed to get entries under prefix")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to collect entries under prefix");
+        assert_eq!(prefix_entries.len(), 2);
+        assert!(prefix_entries.contains(&(address1, value1)));
+        assert!(prefix_entries.contains(&(address2, value2)));
+
+        // Get state entries under a prefix with no set addresses and verify that no entries are
+        // returned
+        let no_entries = state
+            .get_state_with_prefix(Some("abcdef0123456789"))
+            .expect("Failed to get entries under unset prefix")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to collect entries under unset prefix");
+        assert!(no_entries.is_empty());
+    }
+
+    struct StatePaths {
+        _temp_dir_handle: TempDir,
+        pub state_db_path: PathBuf,
+        pub receipt_db_path: PathBuf,
+    }
+
+    impl StatePaths {
+        fn new(prefix: &str) -> Self {
+            let temp_dir = TempDir::new(prefix).expect("Failed to create temp dir");
+            let state_db_path = temp_dir.path().join("state.lmdb");
+            let receipt_db_path = temp_dir.path().join("receipts.lmdb");
+            Self {
+                _temp_dir_handle: temp_dir,
+                state_db_path,
+                receipt_db_path,
+            }
+        }
     }
 
     fn mock_transaction_receipt(id: &str) -> TransactionReceipt {
