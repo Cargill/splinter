@@ -38,7 +38,10 @@ use crate::network::{
     peer::PeerConnector,
 };
 use crate::orchestrator::ServiceOrchestrator;
-use crate::protos::admin::{AdminMessage, AdminMessage_Type, CircuitManagementPayload};
+use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
+use crate::protos::admin::{
+    AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
+};
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
@@ -308,6 +311,7 @@ impl Service for AdminService {
     ) -> Result<(), ServiceError> {
         let admin_message: AdminMessage = protobuf::parse_from_bytes(message_bytes)
             .map_err(|err| ServiceError::InvalidMessageFormat(Box::new(err)))?;
+
         debug!("received admin message {:?}", admin_message);
         match admin_message.get_message_type() {
             AdminMessage_Type::CONSENSUS_MESSAGE => self
@@ -352,6 +356,60 @@ impl Service for AdminService {
                 shared
                     .add_ready_member(circuit_id, member_node_id.into())
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
+            }
+            AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST => {
+                let request = admin_message.get_protocol_request();
+                let protocol =
+                    supported_protocol_version(request.protocol_min, request.protocol_max);
+
+                let mut response = ServiceProtocolVersionResponse::new();
+                response.set_protocol(protocol);
+
+                let mut msg = AdminMessage::new();
+                msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_RESPONSE);
+                msg.set_protocol_response(response);
+                let envelope_bytes = msg
+                    .write_to_bytes()
+                    .map_err(|err| ServiceError::InvalidMessageFormat(Box::new(err)))?;
+
+                let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
+                    ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
+                })?;
+
+                admin_service_shared
+                    .network_sender()
+                    .as_ref()
+                    .ok_or_else(|| ServiceError::NotStarted)?
+                    .send(&message_context.sender.to_string(), &envelope_bytes)
+                    .map_err(|err| ServiceError::UnableToSendMessage(Box::new(err)))?;
+                admin_service_shared
+                    .on_protocol_agreement(&message_context.sender, protocol)
+                    .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
+            }
+            AdminMessage_Type::SERVICE_PROTOCOL_VERSION_RESPONSE => {
+                let request = admin_message.get_protocol_response();
+                let protocol = request.get_protocol();
+
+                let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
+                    ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
+                })?;
+
+                if protocol > ADMIN_PROTOCOL_VERSION || protocol < ADMIN_SERVICE_PROTOCOL_MIN {
+                    warn!(
+                        "Received service protocol version is not supported: {}",
+                        protocol
+                    );
+
+                    admin_service_shared
+                        .on_protocol_agreement(&message_context.sender, 0)
+                        .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+                } else {
+                    admin_service_shared
+                        .on_protocol_agreement(&message_context.sender, protocol)
+                        .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+                }
+
+                Ok(())
             }
             AdminMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 AdminError::MessageTypeUnset,
@@ -432,6 +490,29 @@ where
     hash(MessageDigest::sha256(), &bytes)
         .map(|digest| to_hex(&*digest))
         .map_err(|err| Sha256Error(Box::new(err)))
+}
+
+fn supported_protocol_version(min: u32, max: u32) -> u32 {
+    if max < min {
+        info!("Received invalid ServiceProtocolVersionRequest: min cannot be greater than max");
+        return 0;
+    }
+
+    if min > ADMIN_PROTOCOL_VERSION {
+        info!(
+            "Request requires newer version than can be provided: {}",
+            min
+        );
+        return 0;
+    } else if max < ADMIN_PROTOCOL_VERSION {
+        info!(
+            "Request requires older version than van be provided: {}",
+            max
+        );
+        return 0;
+    }
+
+    ADMIN_PROTOCOL_VERSION
 }
 
 #[cfg(test)]
@@ -553,14 +634,45 @@ mod tests {
             .propose_circuit(payload, "test".to_string())
             .expect("The proposal was not handled correctly");
 
-        // wait up to 1 second for the proposed circuit message
+        // wait up to 60 second for the service protocol version request
+        let message;
+        let start = Instant::now();
+        loop {
+            if Instant::now().duration_since(start) > Duration::from_secs(60) {
+                panic!("Failed to receive service protocol version request in time");
+            }
+
+            if let Ok((_, m)) = rx.recv_timeout(Duration::from_millis(100)) {
+                message = m;
+                break;
+            }
+        }
+
+        let admin_envelope: admin::AdminMessage =
+            protobuf::parse_from_bytes(&message).expect("The message could not be parsed");
+
+        assert_eq!(
+            admin::AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST,
+            admin_envelope.get_message_type()
+        );
+
+        // add agreement for protocol version for other-node
+        admin_service
+            .admin_service_shared
+            .lock()
+            .unwrap()
+            .on_protocol_agreement("admin::other-node", 1)
+            .expect("Unable to set protocol agreement");
+
+        // wait up to 60 second for the proposed circuit message
         let recipient;
         let message;
         let start = Instant::now();
         loop {
-            if Instant::now().duration_since(start) > Duration::from_secs(1) {
+            if Instant::now().duration_since(start) > Duration::from_secs(60) {
                 panic!("Failed to receive proposed circuit message in time");
             }
+
             if let Ok((r, m)) = rx.recv_timeout(Duration::from_millis(100)) {
                 recipient = r;
                 message = m;

@@ -526,9 +526,11 @@ fn run_inbound_loop(
                             correlation_id: admin_direct_message.take_correlation_id(),
                         };
 
-                        service
-                            .handle_message(admin_direct_message.get_payload(), &msg_context)
-                            .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
+                        if let Err(err) =
+                            service.handle_message(admin_direct_message.get_payload(), &msg_context)
+                        {
+                            error!("unable to handle admin direct message: {}", err);
+                        }
                     }
                     None => warn!(
                         "Service with id {} does not exist on circuit {}; ignoring message",
@@ -562,9 +564,11 @@ fn run_inbound_loop(
                             correlation_id: circuit_direct_message.take_correlation_id(),
                         };
 
-                        service
+                        if let Err(err) = service
                             .handle_message(circuit_direct_message.get_payload(), &msg_context)
-                            .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
+                        {
+                            error!("unable to handle direct message: {}", err);
+                        }
                     }
                     None => warn!(
                         "Service with id {} does not exist on circuit {}; ignoring message",

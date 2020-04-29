@@ -36,6 +36,7 @@ use crate::network::{
     peer::PeerConnector,
 };
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator, ShutdownServiceError};
+use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 #[cfg(feature = "service-arg-validation")]
 use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
@@ -43,7 +44,8 @@ use crate::protos::admin::{
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
     CircuitProposalVote, CircuitProposalVote_Vote, CircuitProposal_ProposalType,
     CircuitProposal_VoteRecord, Circuit_AuthorizationType, Circuit_DurabilityType,
-    Circuit_PersistenceType, Circuit_RouteType, MemberReady, SplinterNode,
+    Circuit_PersistenceType, Circuit_RouteType, MemberReady, ServiceProtocolVersionRequest,
+    SplinterNode,
 };
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -71,8 +73,9 @@ pub enum PayloadType {
     Consensus(ProposalId, (Proposal, CircuitManagementPayload)),
 }
 
-pub struct UnpeeredPendingPayload {
-    pub ids: Vec<String>,
+pub struct PendingPayload {
+    pub unpeered_ids: Vec<String>,
+    pub missing_protocol_ids: Vec<String>,
     pub payload_type: PayloadType,
     pub message_sender: String,
 }
@@ -166,8 +169,13 @@ pub struct AdminServiceShared {
     network_sender: Option<Box<dyn ServiceNetworkSender>>,
     // the CircuitManagementPayloads that require peers to be fully authorized before they can go
     // through consensus
-    unpeered_payloads: Vec<UnpeeredPendingPayload>,
-
+    unpeered_payloads: Vec<PendingPayload>,
+    // the CircuitManagementPayloads that require the peers' admin services to negotiate a protocol
+    // version
+    pending_protocol_payloads: Vec<PendingPayload>,
+    // the agreed upon protocol version between another admin service, map of service id to
+    // version protocol
+    service_protocols: HashMap<String, u32>,
     // CircuitManagmentPayloads that still need to go through consensus
     pending_circuit_payloads: VecDeque<CircuitManagementPayload>,
     // The pending consensus proposals
@@ -176,7 +184,6 @@ pub struct AdminServiceShared {
     pending_changes: Option<CircuitProposalContext>,
     // the verifiers that should be broadcasted for the pending change
     current_consensus_verifiers: Vec<String>,
-
     // Admin Service Event Subscribers
     event_subscribers: SubscriberMap,
     // Mailbox of AdminServiceEvent values
@@ -239,6 +246,8 @@ impl AdminServiceShared {
             peer_connector,
             auth_inquisitor,
             unpeered_payloads: Vec::new(),
+            pending_protocol_payloads: Vec::new(),
+            service_protocols: HashMap::new(),
             pending_circuit_payloads: VecDeque::new(),
             pending_consensus_proposals: HashMap::new(),
             pending_changes: None,
@@ -609,9 +618,35 @@ impl AdminServiceShared {
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut unauthorized_peers = vec![];
+        let mut missing_protocol_ids = vec![];
         for node in members {
             if self.node_id() != node.get_node_id() {
                 if self.auth_inquisitor.is_authorized(node.get_node_id()) {
+                    if self
+                        .service_protocols
+                        .get(&admin_service_id(node.get_node_id()))
+                        .is_none()
+                    {
+                        // we will always have the network sender at this point
+                        if let Some(ref network_sender) = self.network_sender {
+                            debug!("Sending service protocol request to {}", node.get_node_id());
+                            let mut request = ServiceProtocolVersionRequest::new();
+                            request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
+                            request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+                            let mut msg = AdminMessage::new();
+                            msg.set_message_type(
+                                AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST,
+                            );
+                            msg.set_protocol_request(request);
+
+                            let envelope_bytes = msg.write_to_bytes()?;
+                            network_sender
+                                .send(&admin_service_id(node.get_node_id()), &envelope_bytes)?;
+                        }
+
+                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                    }
+
                     continue;
                 }
 
@@ -621,19 +656,32 @@ impl AdminServiceShared {
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
                 unauthorized_peers.push(node.get_node_id().into());
+                missing_protocol_ids.push(admin_service_id(node.get_node_id()));
             }
         }
 
-        if unauthorized_peers.is_empty() {
+        if unauthorized_peers.is_empty() && missing_protocol_ids.is_empty() {
             self.pending_circuit_payloads.push_back(payload);
+        } else if unauthorized_peers.is_empty() && !missing_protocol_ids.is_empty() {
+            debug!(
+                "Members {:?} added; awaiting service protocol agreement before proceeding",
+                &missing_protocol_ids
+            );
+            self.pending_protocol_payloads.push(PendingPayload {
+                unpeered_ids: unauthorized_peers,
+                missing_protocol_ids,
+                payload_type: PayloadType::Circuit(payload),
+                message_sender,
+            });
         } else {
             debug!(
                 "Members {:?} added; awaiting network authorization before proceeding",
                 &unauthorized_peers
             );
 
-            self.unpeered_payloads.push(UnpeeredPendingPayload {
-                ids: unauthorized_peers,
+            self.unpeered_payloads.push(PendingPayload {
+                unpeered_ids: unauthorized_peers,
+                missing_protocol_ids,
                 payload_type: PayloadType::Circuit(payload),
                 message_sender,
             });
@@ -723,6 +771,7 @@ impl AdminServiceShared {
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut unauthorized_peers = vec![];
+        let mut missing_protocol_ids = vec![];
         for node in payload
             .get_circuit_create_request()
             .get_circuit()
@@ -730,6 +779,30 @@ impl AdminServiceShared {
         {
             if self.node_id() != node.get_node_id() {
                 if self.auth_inquisitor().is_authorized(node.get_node_id()) {
+                    if self
+                        .service_protocols
+                        .get(&admin_service_id(node.get_node_id()))
+                        .is_none()
+                    {
+                        // we will always have the network sender at this point
+                        if let Some(ref network_sender) = self.network_sender {
+                            debug!("Sending service protocol request to {}", node.get_node_id());
+                            let mut request = ServiceProtocolVersionRequest::new();
+                            request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
+                            request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+                            let mut msg = AdminMessage::new();
+                            msg.set_message_type(
+                                AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST,
+                            );
+                            msg.set_protocol_request(request);
+
+                            let envelope_bytes = msg.write_to_bytes()?;
+                            network_sender
+                                .send(&admin_service_id(node.get_node_id()), &envelope_bytes)?;
+                        }
+
+                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                    }
                     continue;
                 }
 
@@ -739,10 +812,11 @@ impl AdminServiceShared {
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
                 unauthorized_peers.push(node.get_node_id().into());
+                missing_protocol_ids.push(admin_service_id(node.get_node_id()));
             }
         }
 
-        if unauthorized_peers.is_empty() {
+        if unauthorized_peers.is_empty() && missing_protocol_ids.is_empty() {
             self.add_pending_consensus_proposal(proposal.id.clone(), (proposal.clone(), payload));
             self.proposal_sender
                 .as_ref()
@@ -752,14 +826,28 @@ impl AdminServiceShared {
                     message_sender.as_bytes().into(),
                 ))
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
+        } else if unauthorized_peers.is_empty() && !missing_protocol_ids.is_empty() {
+            debug!(
+                "Members {:?} added; service protocol agreement before proceeding",
+                &missing_protocol_ids
+            );
+
+            self.pending_protocol_payloads.push(PendingPayload {
+                unpeered_ids: unauthorized_peers,
+                missing_protocol_ids,
+                payload_type: PayloadType::Consensus(proposal.id.clone(), (proposal, payload)),
+                message_sender,
+            });
+            Ok(())
         } else {
             debug!(
                 "Members {:?} added; awaiting network authorization before proceeding",
                 &unauthorized_peers
             );
 
-            self.unpeered_payloads.push(UnpeeredPendingPayload {
-                ids: unauthorized_peers,
+            self.unpeered_payloads.push(PendingPayload {
+                unpeered_ids: unauthorized_peers,
+                missing_protocol_ids,
                 payload_type: PayloadType::Consensus(proposal.id.clone(), (proposal, payload)),
                 message_sender,
             });
@@ -827,12 +915,12 @@ impl AdminServiceShared {
             match state {
                 PeerAuthorizationState::Authorized => {
                     unpeered_payload
-                        .ids
+                        .unpeered_ids
                         .retain(|unpeered_id| unpeered_id != peer_id);
                 }
                 PeerAuthorizationState::Unauthorized => {
                     if unpeered_payload
-                        .ids
+                        .unpeered_ids
                         .iter()
                         .any(|unpeered_id| unpeered_id == peer_id)
                     {
@@ -841,46 +929,131 @@ impl AdminServiceShared {
                              due to authorization failure",
                             peer_id
                         );
-                        unpeered_payload.ids.clear();
+                        unpeered_payload.unpeered_ids.clear();
                     }
                 }
             }
         }
 
-        let (fully_peered, still_unpeered): (
-            Vec<UnpeeredPendingPayload>,
-            Vec<UnpeeredPendingPayload>,
-        ) = unpeered_payloads
-            .into_iter()
-            .partition(|unpeered_payload| unpeered_payload.ids.is_empty());
+        let (fully_peered, still_unpeered): (Vec<PendingPayload>, Vec<PendingPayload>) =
+            unpeered_payloads
+                .into_iter()
+                .partition(|unpeered_payload| unpeered_payload.unpeered_ids.is_empty());
 
         std::mem::replace(&mut self.unpeered_payloads, still_unpeered);
         if state == PeerAuthorizationState::Authorized {
             for peered_payload in fully_peered {
-                match peered_payload.payload_type {
-                    PayloadType::Circuit(payload) => {
-                        self.pending_circuit_payloads.push_back(payload)
-                    }
-                    PayloadType::Consensus(id, (proposal, payload)) => {
-                        self.add_pending_consensus_proposal(id, (proposal.clone(), payload));
+                self.pending_protocol_payloads.push(peered_payload);
+            }
 
-                        if let Some(proposal_sender) = &self.proposal_sender {
-                            proposal_sender
-                                .send(ProposalUpdate::ProposalReceived(
-                                    proposal,
-                                    peered_payload.message_sender.as_bytes().into(),
+            // Ignore own admin service
+            if peer_id == admin_service_id(self.node_id()) {
+                return Ok(());
+            }
+
+            if let Some(ref network_sender) = self.network_sender {
+                debug!(
+                    "Sending service protocol request to {}",
+                    admin_service_id(peer_id)
+                );
+                let mut request = ServiceProtocolVersionRequest::new();
+                request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
+                request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+                let mut msg = AdminMessage::new();
+                msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST);
+                msg.set_protocol_request(request);
+
+                let envelope_bytes = msg.write_to_bytes().map_err(|err| {
+                    AuthorizationCallbackError(format!(
+                        "Unable to send service protocol request: {}",
+                        err
+                    ))
+                })?;
+
+                network_sender
+                    .send(&admin_service_id(peer_id), &envelope_bytes)
+                    .map_err(|err| {
+                        AuthorizationCallbackError(format!(
+                            "Unable to send service protocol request: {}",
+                            err
+                        ))
+                    })?;
+            } else {
+                return Err(AuthorizationCallbackError(format!(
+                    "AdminService is not started {}",
+                    peer_id
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn on_protocol_agreement(
+        &mut self,
+        service_id: &str,
+        protocol: u32,
+    ) -> Result<(), AdminSharedError> {
+        let mut pending_protocol_payloads =
+            std::mem::replace(&mut self.pending_protocol_payloads, vec![]);
+        for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
+            match protocol {
+                0 => {
+                    if pending_protocol_payload
+                        .missing_protocol_ids
+                        .iter()
+                        .any(|missing_protocol_id| missing_protocol_id == service_id)
+                    {
+                        warn!(
+                            "Dropping circuit request including service {}, \
+                             due to protocol mismatch",
+                            service_id
+                        );
+                        pending_protocol_payload.missing_protocol_ids.clear();
+                    }
+                }
+                _ => {
+                    debug!(
+                        "Agreed with {} to use protocol version {}",
+                        service_id, protocol
+                    );
+                    pending_protocol_payload
+                        .missing_protocol_ids
+                        .retain(|missing_protocol_id| missing_protocol_id != service_id);
+                }
+            }
+        }
+
+        let (ready, waiting): (Vec<PendingPayload>, Vec<PendingPayload>) =
+            pending_protocol_payloads
+                .into_iter()
+                .partition(|pending_payload| pending_payload.missing_protocol_ids.is_empty());
+        std::mem::replace(&mut self.pending_protocol_payloads, waiting);
+
+        if protocol == 0 {
+            return Ok(());
+        }
+
+        self.service_protocols.insert(service_id.into(), protocol);
+        for pending_payload in ready {
+            match pending_payload.payload_type {
+                PayloadType::Circuit(payload) => self.pending_circuit_payloads.push_back(payload),
+                PayloadType::Consensus(id, (proposal, payload)) => {
+                    self.add_pending_consensus_proposal(id, (proposal.clone(), payload));
+
+                    // Admin service should always will always be started at this point
+                    if let Some(proposal_sender) = &self.proposal_sender {
+                        proposal_sender
+                            .send(ProposalUpdate::ProposalReceived(
+                                proposal,
+                                pending_payload.message_sender.as_bytes().into(),
+                            ))
+                            .map_err(|err| {
+                                AdminSharedError::ServiceProtocolError(format!(
+                                    "Unable to send consensus proposal update: {}",
+                                    err
                                 ))
-                                .map_err(|err| {
-                                    AuthorizationCallbackError(format!(
-                                        "Unable to send consensus proposal update: {}",
-                                        err
-                                    ))
-                                })?;
-                        } else {
-                            return Err(AuthorizationCallbackError(
-                                "AdminService is not started".into(),
-                            ));
-                        }
+                            })?;
                     }
                 }
             }
@@ -1702,6 +1875,8 @@ impl AdminServiceShared {
 mod tests {
     use super::*;
 
+    use std::sync::{Arc, Mutex};
+
     use protobuf::{Message, RepeatedField};
 
     use crate::circuit::directory::CircuitDirectory;
@@ -1719,6 +1894,7 @@ mod tests {
         AuthorizationMessage, AuthorizationMessageType, AuthorizedMessage,
     };
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
+    use crate::service::{ServiceMessageContext, ServiceSendError};
     use crate::signing::{
         hash::{HashSigner, HashVerifier},
         Signer,
@@ -1762,6 +1938,9 @@ mod tests {
         )
         .unwrap();
 
+        let service_sender = MockServiceNetworkSender::new();
+        shared.set_network_sender(Some(Box::new(service_sender.clone())));
+
         let mut circuit = admin::Circuit::new();
         circuit.set_circuit_id("01234-ABCDE".into());
         circuit.set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
@@ -1797,18 +1976,36 @@ mod tests {
             .expect("Proposal not accepted");
 
         // None of the proposed members are peered
+        assert_eq!(0, shared.pending_protocol_payloads.len());
         assert_eq!(0, shared.pending_circuit_payloads.len());
         shared
             .on_authorization_change("test-node", PeerAuthorizationState::Authorized)
             .expect("received unexpected error");
 
         // One node is still unpeered
+        assert_eq!(0, shared.pending_protocol_payloads.len());
         assert_eq!(0, shared.pending_circuit_payloads.len());
         shared
             .on_authorization_change("other-node", PeerAuthorizationState::Authorized)
             .expect("received unexpected error");
 
-        // We're fully peered, so the pending payload is now available
+        // We're fully peered, but need to wait for protocol to be agreed on
+        assert_eq!(1, shared.pending_protocol_payloads.len());
+        assert_eq!(0, shared.pending_circuit_payloads.len());
+
+        shared
+            .on_protocol_agreement("admin::other-node", 1)
+            .expect("received unexpected error");
+
+        // Waiting on 1 node for protocol agreement
+        assert_eq!(1, shared.pending_protocol_payloads.len());
+        assert_eq!(0, shared.pending_circuit_payloads.len());
+
+        shared
+            .on_protocol_agreement("admin::test-node", 1)
+            .expect("received unexpected error");
+        // We're fully peered and agreed on protocol, so the pending payload is now available
+        assert_eq!(0, shared.pending_protocol_payloads.len());
         assert_eq!(1, shared.pending_circuit_payloads.len());
     }
 
@@ -1844,6 +2041,9 @@ mod tests {
             "memory",
         )
         .unwrap();
+
+        let service_sender = MockServiceNetworkSender::new();
+        shared.set_network_sender(Some(Box::new(service_sender.clone())));
 
         let mut circuit = admin::Circuit::new();
         circuit.set_circuit_id("01234-ABCDE".into());
@@ -1888,6 +2088,15 @@ mod tests {
         // The message should be dropped
         assert_eq!(0, shared.pending_circuit_payloads.len());
         assert_eq!(0, shared.unpeered_payloads.len());
+
+        assert_eq!(
+            0,
+            service_sender
+                .sent
+                .lock()
+                .expect("Network sender lock poisoned")
+                .len()
+        );
     }
 
     #[test]
@@ -3437,5 +3646,60 @@ mod tests {
         network_msg
             .write_to_bytes()
             .expect("unable to write to bytes")
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct MockServiceNetworkSender {
+        pub sent: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+        pub sent_and_awaited: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+        pub replied: Arc<Mutex<Vec<(ServiceMessageContext, Vec<u8>)>>>,
+    }
+
+    impl MockServiceNetworkSender {
+        pub fn new() -> Self {
+            MockServiceNetworkSender {
+                sent: Arc::new(Mutex::new(vec![])),
+                sent_and_awaited: Arc::new(Mutex::new(vec![])),
+                replied: Arc::new(Mutex::new(vec![])),
+            }
+        }
+    }
+
+    impl ServiceNetworkSender for MockServiceNetworkSender {
+        fn send(&self, recipient: &str, message: &[u8]) -> Result<(), ServiceSendError> {
+            self.sent
+                .lock()
+                .expect("sent lock poisoned")
+                .push((recipient.to_string(), message.to_vec()));
+            Ok(())
+        }
+
+        fn send_and_await(
+            &self,
+            recipient: &str,
+            message: &[u8],
+        ) -> Result<Vec<u8>, ServiceSendError> {
+            self.sent_and_awaited
+                .lock()
+                .expect("sent_and_awaited lock poisoned")
+                .push((recipient.to_string(), message.to_vec()));
+            Ok(vec![])
+        }
+
+        fn reply(
+            &self,
+            message_origin: &ServiceMessageContext,
+            message: &[u8],
+        ) -> Result<(), ServiceSendError> {
+            self.replied
+                .lock()
+                .expect("replied lock poisoned")
+                .push((message_origin.clone(), message.to_vec()));
+            Ok(())
+        }
+
+        fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
+            Box::new(self.clone())
+        }
     }
 }

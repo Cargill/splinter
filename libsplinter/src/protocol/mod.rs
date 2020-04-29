@@ -20,6 +20,7 @@ pub const ADMIN_PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(feature = "rest-api-actix")]
 pub(crate) const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
+pub(crate) const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
 #[cfg(feature = "rest-api-actix")]
 pub(crate) const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 
