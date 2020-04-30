@@ -117,6 +117,39 @@ pub struct ServiceConnectionManager {
 }
 
 impl ServiceConnectionManager {
+    /// Create a builder for a `ServiceConnectionManager`.
+    ///
+    /// For example:
+    ///
+    /// ```no_run
+    /// # use splinter::mesh::Mesh;
+    /// # use splinter::network::auth2::AuthorizationPool;
+    /// # use splinter::network::connection_manager::{Authorizer, ConnectionManager};
+    /// # use splinter::service::network::ServiceConnectionManager;
+    /// # use splinter::transport::inproc::InprocTransport;
+    /// # let transport = InprocTransport::default();
+    /// # let mesh = Mesh::new(1, 1);
+    /// # let authorization_pool = AuthorizationPool::new("test_identity".into()).unwrap();
+    /// # let authorizer: Box<dyn Authorizer> = Box::new(authorization_pool.pool_authorizer());
+    /// let mut cm = ConnectionManager::new(
+    ///     Box::new(authorization_pool.pool_authorizer()),
+    ///     mesh.get_life_cycle(),
+    ///     mesh.get_sender(),
+    ///     Box::new(transport),
+    ///     None,
+    ///     None,
+    /// );
+    /// let connector = cm.start().expect("Unable to start Connection Manager");
+    ///
+    /// let service_connection_manager = ServiceConnectionManager::builder()
+    ///     .with_connector(connector)
+    ///     .start()
+    ///     .unwrap();
+    /// ```
+    pub fn builder() -> ServiceConnectionManagerBuilder {
+        ServiceConnectionManagerBuilder::new()
+    }
+
     /// Returns a shutdown signaler.
     pub fn shutdown_signaler(&self) -> ShutdownSignaler {
         ShutdownSignaler {
