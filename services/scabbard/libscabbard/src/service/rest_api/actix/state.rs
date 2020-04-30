@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::actix_web::HttpResponse;
-use crate::futures::IntoFuture;
-use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard};
-use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{Scabbard, SERVICE_TYPE};
+use actix_web::{web, HttpResponse};
+use futures::IntoFuture;
+use splinter::{
+    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
+    service::rest_api::ServiceEndpoint,
+};
 
-pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
+use crate::protocol;
+use crate::service::{rest_api::resources::state::StateEntryResponse, Scabbard, SERVICE_TYPE};
+
+pub fn make_get_state_with_prefix_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {
         service_type: SERVICE_TYPE.into(),
-        route: "/state/{address}".into(),
+        route: "/state".into(),
         method: Method::Get,
         handler: Arc::new(move |request, _, service| {
             let scabbard = match service.as_any().downcast_ref::<Scabbard>() {
@@ -39,18 +43,41 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
                 }
             };
 
-            let address = request
-                .match_info()
-                .get("address")
-                .expect("address should not be none");
+            let query: web::Query<HashMap<String, String>> =
+                if let Ok(q) = web::Query::from_query(request.query_string()) {
+                    q
+                } else {
+                    return Box::new(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request("Invalid query"))
+                            .into_future(),
+                    );
+                };
 
-            Box::new(match scabbard.get_state_at_address(address) {
-                Ok(Some(value)) => HttpResponse::Ok().json(value).into_future(),
-                Ok(None) => HttpResponse::NotFound()
-                    .json(ErrorResponse::not_found("Address not set"))
-                    .into_future(),
+            let prefix = query.get("prefix").map(String::as_str);
+
+            Box::new(match scabbard.get_state_with_prefix(prefix) {
+                Ok(state_iter) => {
+                    let res = state_iter.collect::<Result<Vec<_>, _>>();
+                    match res {
+                        Ok(entries) => HttpResponse::Ok()
+                            .json(
+                                entries
+                                    .iter()
+                                    .map(StateEntryResponse::from)
+                                    .collect::<Vec<_>>(),
+                            )
+                            .into_future(),
+                        Err(err) => {
+                            error!("Failed to consume state iterator: {}", err);
+                            HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                                .into_future()
+                        }
+                    }
+                }
                 Err(err) => {
-                    error!("Failed to get state at adddress: {}", err);
+                    error!("Failed to get state with prefix: {}", err);
                     HttpResponse::InternalServerError()
                         .json(ErrorResponse::internal_error())
                         .into_future()
@@ -58,7 +85,7 @@ pub fn make_get_state_at_address_endpoint() -> ServiceEndpoint {
             })
         }),
         request_guards: vec![Box::new(ProtocolVersionRangeGuard::new(
-            protocol::SCABBARD_GET_STATE_PROTOCOL_MIN,
+            protocol::SCABBARD_LIST_STATE_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
     }
@@ -72,6 +99,7 @@ mod tests {
     use std::sync::Mutex;
 
     use reqwest::{blocking::Client, StatusCode, Url};
+    use serde_json::{to_value, Value as JsonValue};
     use tempdir::TempDir;
     use transact::{
         families::command::make_command_transaction,
@@ -82,32 +110,44 @@ mod tests {
         signing::hash::HashSigner,
     };
 
-    use crate::rest_api::{Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle};
-    use crate::service::scabbard::{compute_db_paths, state::ScabbardState, Scabbard};
-    use crate::service::Service;
-    use crate::signing::hash::HashVerifier;
+    use splinter::{
+        rest_api::{Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle},
+        service::Service,
+        signing::hash::HashVerifier,
+    };
+
+    use crate::service::{compute_db_paths, state::ScabbardState, Scabbard};
 
     const MOCK_CIRCUIT_ID: &str = "abcde-01234";
     const MOCK_SERVICE_ID: &str = "ABCD";
     const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
-    /// Verify that the `GET /state/{address}` endpoint works properly.
+    /// Verify that the `GET /state` endpoint works properly.
     ///
-    /// 1. Initialize a temporary instance of `ScabbardState` and set a single address in state.
+    /// 1. Initialize a temporary instance of `ScabbardState` and set some values in state; 2 with
+    ///    a shared prefix, and 1 without.
     /// 2. Initialize an instance of the `Scabbard` service that's backed by the same underlying
     ///    state that was set in the previous step.
-    /// 3. Setup the REST API with the `GET /state/{address}` endpoint exposed.
-    /// 4. Make a request to the endpoint with an unset address and verify that the response code is
-    ///    400 to indicate that the address was not found (unset).
-    /// 5. Make a request to the endpoint with the previously set address, verify that the response
-    ///    code is 200, and check that the body of the response is the value that was set in state.
+    /// 3. Setup the REST API with the `GET /state` endpoint exposed.
+    /// 3. Make a request to the endpoint with no prefix, verify that the response code is 200, and
+    ///    check that all the entries that were set are included in the response (there may be other
+    ///    entries because the `ScabbardState` contstructor sets some state).
+    /// 4. Make a request to the endpoint with the shared prefix, verify that the response code is
+    ///    200, and check that the response contains only the 2 entries under that prefix.
+    /// 5. Make a request to the endpoint with a prefix under which no addresses are set, verify
+    ///    that the response code is 200, and check that there are no entries in the response.
     #[test]
-    fn state_at_address() {
-        let paths = StatePaths::new("state_at_address");
+    fn state_with_prefix() {
+        let paths = StatePaths::new("state_with_prefix");
 
-        // Initialize a temporary scabbard state and set a value; this will pre-populate the DBs
-        let address = "abcdef".to_string();
-        let value = b"value".to_vec();
+        // Initialize a temporary scabbard state and set some values; this will pre-populate the DBs
+        let prefix = "abcdef".to_string();
+        let address1 = format!("{}01", prefix);
+        let value1 = b"value1".to_vec();
+        let address2 = format!("{}02", prefix);
+        let value2 = b"value2".to_vec();
+        let address3 = "0123456789".to_string();
+        let value3 = b"value3".to_vec();
         {
             let mut state = ScabbardState::new(
                 &paths.state_db_path,
@@ -122,7 +162,9 @@ mod tests {
             let batch = BatchBuilder::new()
                 .with_transactions(vec![
                     make_command_transaction(&[Command::SetState(SetState::new(vec![
-                        BytesEntry::new(address.clone(), value.clone()),
+                        BytesEntry::new(address1.clone(), value1.clone()),
+                        BytesEntry::new(address2.clone(), value2.clone()),
+                        BytesEntry::new(address3.clone(), value3.clone()),
                     ]))])
                     .take()
                     .0,
@@ -153,26 +195,14 @@ mod tests {
         // Setup the REST API
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![resource_from_service_endpoint(
-                make_get_state_at_address_endpoint(),
+                make_get_state_with_prefix_endpoint(),
                 Arc::new(Mutex::new(scabbard.clone())),
             )]);
 
         let base_url = format!("http://{}/state", bind_url);
 
-        // Verify that a request for an unset address results in a NOT_FOUND response
-        let url = Url::parse(&format!("{}/012345", base_url)).expect("Failed to parse URL");
-        let resp = Client::new()
-            .get(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::SCABBARD_PROTOCOL_VERSION,
-            )
-            .send()
-            .expect("Failed to perform request");
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-
-        // Verify that a request for a set address results in the proper value being returned
-        let url = Url::parse(&format!("{}/{}", base_url, address)).expect("Failed to parse URL");
+        // Verify that a request for all state entries results in the correct entries being returned
+        let url = Url::parse(&base_url).expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
             .header(
@@ -182,8 +212,93 @@ mod tests {
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
-        let response_value: Vec<u8> = resp.json().expect("Failed to deserialize body");
-        assert_eq!(response_value, value);
+        let entries = resp
+            .json::<JsonValue>()
+            .expect("Failed to deserialize body")
+            .as_array()
+            .expect("Response is not a JSON array")
+            .to_vec();
+
+        assert!(entries.len() >= 3);
+        assert!(entries.contains(
+            &to_value(StateEntryResponse::from(&(
+                address1.clone(),
+                value1.clone()
+            )))
+            .expect("Failed to convert entry1 to JsonValue")
+        ));
+        assert!(entries.contains(
+            &to_value(StateEntryResponse::from(&(
+                address2.clone(),
+                value2.clone()
+            )))
+            .expect("Failed to convert entry2 to JsonValue")
+        ));
+        assert!(entries.contains(
+            &to_value(StateEntryResponse::from(&(
+                address3.clone(),
+                value3.clone()
+            )))
+            .expect("Failed to convert entry3 to JsonValue")
+        ));
+
+        // Verify that a request for state entries under the shared prefix results in the correct
+        // entries being returned
+        let url =
+            Url::parse(&format!("{}?prefix={}", base_url, prefix)).expect("Failed to parse URL");
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::SCABBARD_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
+        let entries = resp
+            .json::<JsonValue>()
+            .expect("Failed to deserialize body")
+            .as_array()
+            .expect("Response is not a JSON array")
+            .to_vec();
+
+        assert_eq!(entries.len(), 2);
+        assert!(entries.contains(
+            &to_value(StateEntryResponse::from(&(
+                address1.clone(),
+                value1.clone()
+            )))
+            .expect("Failed to convert entry1 to JsonValue")
+        ));
+        assert!(entries.contains(
+            &to_value(StateEntryResponse::from(&(
+                address2.clone(),
+                value2.clone()
+            )))
+            .expect("Failed to convert entry2 to JsonValue")
+        ));
+
+        // Verify that a request for state entries under a prefix with no set addresses results in
+        // no entries being returned
+        let url = Url::parse(&format!("{}?prefix=abcdef0123456789", base_url))
+            .expect("Failed to parse URL");
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::SCABBARD_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
+        let entries = resp
+            .json::<JsonValue>()
+            .expect("Failed to deserialize body")
+            .as_array()
+            .expect("Response is not a JSON array")
+            .to_vec();
+
+        assert!(entries.is_empty());
 
         shutdown_handle
             .shutdown()

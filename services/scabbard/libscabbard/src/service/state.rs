@@ -14,41 +14,42 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
+use std::fmt;
+use std::path::Path;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     Arc, RwLock,
 };
 use std::time::{Duration, Instant, SystemTime};
-use std::{fmt, path::Path};
 
 use protobuf::Message;
-use sawtooth::store::lmdb::LmdbOrderedStore;
-use sawtooth::store::receipt_store::TransactionReceiptStore;
-use sawtooth_sabre::handler::SabreTransactionHandler;
-use sawtooth_sabre::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};
-use transact::context::manager::sync::ContextManager;
-use transact::database::{
-    lmdb::{LmdbContext, LmdbDatabase},
-    Database,
+use sawtooth::store::{lmdb::LmdbOrderedStore, receipt_store::TransactionReceiptStore};
+use sawtooth_sabre::{
+    handler::SabreTransactionHandler, ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY,
 };
+#[cfg(feature = "events")]
+use splinter::events::{ParseBytes, ParseError};
 #[cfg(test)]
 use transact::families::command::CommandTransactionHandler;
-use transact::sawtooth::SawtoothToTransactHandlerAdapter;
-use transact::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
-use transact::state::{
-    merkle::{MerkleRadixTree, MerkleState, StateDatabaseError, INDEXES},
-    StateChange as TransactStateChange, Write,
-};
 use transact::{
+    context::manager::sync::ContextManager,
+    database::{
+        lmdb::{LmdbContext, LmdbDatabase},
+        Database,
+    },
     execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor},
     protocol::{
         batch::BatchPair,
         receipt::{TransactionReceipt, TransactionResult},
     },
+    sawtooth::SawtoothToTransactHandlerAdapter,
+    scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler},
+    state::{
+        merkle::{MerkleRadixTree, MerkleState, StateDatabaseError, INDEXES},
+        StateChange as TransactStateChange, Write,
+    },
 };
 
-#[cfg(feature = "events")]
-use crate::events::{ParseBytes, ParseError};
 use crate::hex;
 use crate::protos::scabbard::{Setting, Setting_Entry};
 

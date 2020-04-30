@@ -16,12 +16,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::actix_web::{web, HttpResponse};
-use crate::futures::IntoFuture;
+use actix_web::{web, HttpResponse};
+use futures::IntoFuture;
+use splinter::{
+    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
+    service::rest_api::ServiceEndpoint,
+};
+
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard};
-use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{
+use crate::service::{
     rest_api::resources::batch_statuses::BatchInfoResponse, Scabbard, SERVICE_TYPE,
 };
 

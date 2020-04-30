@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Scabbard is a Splinter service that runs the Sawtooth Sabre smart contract engine using
-//! Hyperledger Transact for state management. Scabbard uses two-phase consensus to reach agreement
-//! on transactions.
+pub const SCABBARD_PROTOCOL_VERSION: u32 = 1;
 
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-
-#[cfg(feature = "client")]
-pub mod client;
-mod hex;
-pub mod protocol;
-pub mod protos;
-pub mod service;
+#[cfg(feature = "rest-api")]
+pub(crate) const SCABBARD_SUBSCRIBE_PROTOCOL_MIN: u32 = 1;
+#[cfg(feature = "rest-api")]
+pub(crate) const SCABBARD_ADD_BATCHES_PROTOCOL_MIN: u32 = 1;
+#[cfg(feature = "rest-api")]
+pub(crate) const SCABBARD_BATCH_STATUSES_PROTOCOL_MIN: u32 = 1;
+#[cfg(feature = "rest-api")]
+pub(crate) const SCABBARD_GET_STATE_PROTOCOL_MIN: u32 = 1;
+#[cfg(feature = "rest-api")]
+pub(crate) const SCABBARD_LIST_STATE_PROTOCOL_MIN: u32 = 1;

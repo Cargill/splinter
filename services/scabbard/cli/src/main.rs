@@ -52,7 +52,7 @@ use sabre_sdk::{
     },
     protos::FromBytes,
 };
-use splinter::service::scabbard::client::{ScabbardClient, ServiceId};
+use scabbard::client::{ScabbardClient, ServiceId};
 use transact::contract::archive::{default_scar_path, SmartContractArchive};
 
 use error::CliError;

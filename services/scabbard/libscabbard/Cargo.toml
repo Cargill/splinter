@@ -19,22 +19,53 @@ authors = ["Cargill Incorporated"]
 edition = "2018"
 license = "Apache-2.0"
 description = """\
-    Splinter is a privacy-focused platform for distributed applications that \
-    provides a blockchain-inspired networking environment for communication \
-    and transactions between organizations.
+    Scabbard is a Splinter service that runs the Sawtooth Sabre smart contract \
+    engine using Hyperledger Transact for state management. Scabbard uses \
+    two-phase consensus to reach agreement on transactions.
 """
 
 [dependencies]
+actix-web = { version = "1.0", optional = true, default-features = false, features = ["flate2-zlib"] }
+futures = { version = "0.1", optional = true }
+log = "0.3.0"
+openssl = "0.10"
+protobuf = "2"
+reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
+sawtooth = { version = "0.3", default-features = false, features = ["lmdb-store", "receipt-store"] }
+sawtooth-sabre = "0.5"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+splinter = { path = "../../../libsplinter" }
+transact = { version = "0.2", features = ["sawtooth-compat"] }
 
 [dev-dependencies]
+tempdir = "0.3"
+transact = { version = "0.2", features = ["family-command", "sawtooth-compat"] }
+
+[build-dependencies]
+protoc-rust = "2.14"
+glob = "0.2"
 
 [features]
 default = []
 
-stable = ["default"]
+stable = [
+  "client",
+  "default",
+  "events",
+  "rest-api",
+  "rest-api-actix",
+]
 
 experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
 ]
+
+client = ["reqwest"]
+events = ["splinter/events"]
+rest-api = ["futures", "splinter/rest-api"]
+rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
+service-arg-validation = ["splinter/service-arg-validation"]

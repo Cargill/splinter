@@ -24,10 +24,8 @@ use reqwest::{
 };
 use transact::{protocol::batch::Batch, protos::IntoBytes};
 
-use crate::hex::parse_hex;
-use crate::protocol::SCABBARD_PROTOCOL_VERSION;
-
-use super::SERVICE_TYPE;
+use super::hex::parse_hex;
+use super::protocol::SCABBARD_PROTOCOL_VERSION;
 
 pub use error::ScabbardClientError;
 
@@ -61,9 +59,8 @@ impl ScabbardClient {
         wait: Option<Duration>,
     ) -> Result<(), ScabbardClientError> {
         let url = parse_http_url(&format!(
-            "{}/{}/{}/{}/batches",
+            "{}/scabbard/{}/{}/batches",
             self.url,
-            SERVICE_TYPE,
             service_id.circuit(),
             service_id.service_id()
         ))?;
@@ -107,9 +104,8 @@ impl ScabbardClient {
             .map_err(|err| ScabbardClientError::new_with_source("invalid address", err.into()))?;
 
         let url = Url::parse(&format!(
-            "{}/{}/{}/{}/state/{}",
+            "{}/scabbard/{}/{}/state/{}",
             &self.url,
-            SERVICE_TYPE,
             service_id.circuit(),
             service_id.service_id(),
             address
@@ -162,9 +158,8 @@ impl ScabbardClient {
         prefix: Option<&str>,
     ) -> Result<Vec<StateEntry>, ScabbardClientError> {
         let mut url = Url::parse(&format!(
-            "{}/{}/{}/{}/state",
+            "{}/scabbard/{}/{}/state",
             &self.url,
-            SERVICE_TYPE,
             service_id.circuit(),
             service_id.service_id()
         ))
@@ -455,7 +450,7 @@ impl std::fmt::Display for ErrorResponse {
     }
 }
 
-#[cfg(all(feature = "rest-api", feature = "rest-api-actix", test))]
+#[cfg(all(test, feature = "rest-api", feature = "rest-api-actix"))]
 mod tests {
     use super::*;
 
@@ -468,11 +463,14 @@ mod tests {
     use actix_web::web;
     use actix_web::HttpResponse;
     use futures::future::IntoFuture;
-
-    use crate::protocol;
-    use crate::rest_api::{
+    use splinter::rest_api::{
         Method, ProtocolVersionRangeGuard, Resource, RestApiBuilder, RestApiServerError,
         RestApiShutdownHandle,
+    };
+
+    use crate::protocol::{
+        SCABBARD_ADD_BATCHES_PROTOCOL_MIN, SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
+        SCABBARD_GET_STATE_PROTOCOL_MIN, SCABBARD_LIST_STATE_PROTOCOL_MIN,
     };
 
     const MOCK_CIRCUIT_ID: &str = "01234-abcde";
@@ -661,8 +659,8 @@ mod tests {
             let internal_server_error_clone = internal_server_error.clone();
             let batches = Resource::build(&format!("{}/batches", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
-                    protocol::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
-                    protocol::SCABBARD_PROTOCOL_VERSION,
+                    SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
+                    SCABBARD_PROTOCOL_VERSION,
                 ))
                 .add_method(Method::Post, move |_, _| {
                     if internal_server_error_clone.load(Ordering::SeqCst) {
@@ -691,8 +689,8 @@ mod tests {
             let dont_commit_clone = dont_commit.clone();
             let batch_statuses = Resource::build(&format!("{}/batch_statuses", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
-                    protocol::SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
-                    protocol::SCABBARD_PROTOCOL_VERSION,
+                    SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
+                    SCABBARD_PROTOCOL_VERSION,
                 ))
                 .add_method(Method::Get, move |_, _| {
                     if internal_server_error_clone.load(Ordering::SeqCst) {
@@ -741,8 +739,8 @@ mod tests {
             let internal_server_error_clone = internal_server_error.clone();
             let state_address = Resource::build(&format!("{}/state/{{address}}", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
-                    protocol::SCABBARD_GET_STATE_PROTOCOL_MIN,
-                    protocol::SCABBARD_PROTOCOL_VERSION,
+                    SCABBARD_GET_STATE_PROTOCOL_MIN,
+                    SCABBARD_PROTOCOL_VERSION,
                 ))
                 .add_method(Method::Get, move |request, _| {
                     let address = request
@@ -777,8 +775,8 @@ mod tests {
             let internal_server_error_clone = internal_server_error.clone();
             let state = Resource::build(&format!("{}/state", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
-                    protocol::SCABBARD_LIST_STATE_PROTOCOL_MIN,
-                    protocol::SCABBARD_PROTOCOL_VERSION,
+                    SCABBARD_LIST_STATE_PROTOCOL_MIN,
+                    SCABBARD_PROTOCOL_VERSION,
                 ))
                 .add_method(Method::Get, move |request, _| {
                     let query: web::Query<HashMap<String, String>> =

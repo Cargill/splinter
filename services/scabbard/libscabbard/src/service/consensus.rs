@@ -19,14 +19,14 @@ use std::thread::{Builder, JoinHandle};
 use std::time::Duration;
 
 use protobuf::Message;
-use transact::protos::IntoBytes;
-
-use crate::consensus::two_phase::TwoPhaseEngine;
-use crate::consensus::{
+use splinter::consensus::{
     error::{ConsensusSendError, ProposalManagerError},
+    two_phase::TwoPhaseEngine,
     ConsensusEngine, ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId,
     ProposalManager, ProposalUpdate, StartupState,
 };
+use transact::protos::IntoBytes;
+
 use crate::protos::scabbard::{ProposedBatch, ScabbardMessage, ScabbardMessage_Type};
 
 use super::error::{ScabbardConsensusManagerError, ScabbardError};
@@ -378,8 +378,10 @@ mod tests {
 
     use std::collections::{HashSet, VecDeque};
 
-    use crate::service::tests::*;
-    use crate::signing::hash::HashVerifier;
+    use splinter::{
+        service::{ServiceMessageContext, ServiceNetworkSender, ServiceSendError},
+        signing::hash::HashVerifier,
+    };
 
     /// Tests that the network sender properly creates messages and sends them using the
     /// `ServiceNetworkSender`.
@@ -473,5 +475,60 @@ mod tests {
                 .expect("failed to parse 3rd consensus message");
         assert_eq!(consensus_message.message, vec![1]);
         assert_eq!(consensus_message.origin_id, "0".as_bytes().into());
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct MockServiceNetworkSender {
+        pub sent: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+        pub sent_and_awaited: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+        pub replied: Arc<Mutex<Vec<(ServiceMessageContext, Vec<u8>)>>>,
+    }
+
+    impl MockServiceNetworkSender {
+        pub fn new() -> Self {
+            MockServiceNetworkSender {
+                sent: Arc::new(Mutex::new(vec![])),
+                sent_and_awaited: Arc::new(Mutex::new(vec![])),
+                replied: Arc::new(Mutex::new(vec![])),
+            }
+        }
+    }
+
+    impl ServiceNetworkSender for MockServiceNetworkSender {
+        fn send(&self, recipient: &str, message: &[u8]) -> Result<(), ServiceSendError> {
+            self.sent
+                .lock()
+                .expect("sent lock poisoned")
+                .push((recipient.to_string(), message.to_vec()));
+            Ok(())
+        }
+
+        fn send_and_await(
+            &self,
+            recipient: &str,
+            message: &[u8],
+        ) -> Result<Vec<u8>, ServiceSendError> {
+            self.sent_and_awaited
+                .lock()
+                .expect("sent_and_awaited lock poisoned")
+                .push((recipient.to_string(), message.to_vec()));
+            Ok(vec![])
+        }
+
+        fn reply(
+            &self,
+            message_origin: &ServiceMessageContext,
+            message: &[u8],
+        ) -> Result<(), ServiceSendError> {
+            self.replied
+                .lock()
+                .expect("replied lock poisoned")
+                .push((message_origin.clone(), message.to_vec()));
+            Ok(())
+        }
+
+        fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
+            Box::new(self.clone())
+        }
     }
 }

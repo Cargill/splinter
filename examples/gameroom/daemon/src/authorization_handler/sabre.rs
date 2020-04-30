@@ -36,7 +36,7 @@ use sawtooth_sdk::signing::{
     create_context, secp256k1::Secp256k1PrivateKey, transact::TransactSigner,
     Signer as SawtoothSigner,
 };
-use splinter::protocol;
+use scabbard::protocol;
 use transact::{
     protocol::{batch::BatchBuilder, transaction::Transaction},
     protos::IntoBytes,

@@ -24,7 +24,7 @@ use sabre_sdk::{
     protos::ProtoConversionError,
 };
 use sawtooth_sdk::signing::Error as SigningError;
-use splinter::service::scabbard::client::ScabbardClientError;
+use scabbard::client::ScabbardClientError;
 use transact::{
     contract::archive::Error as ContractArchiveError,
     protocol::{batch::BatchBuildError, transaction::TransactionBuildError},

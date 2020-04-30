@@ -18,8 +18,11 @@ use std::time::{Duration, Instant};
 
 use actix_web::{client::Client, dev::Body, error, http::StatusCode, web, Error, HttpResponse};
 use gameroom_database::{helpers, ConnectionPool};
-use splinter::protocol;
-use splinter::service::scabbard::{BatchInfo, BatchStatus};
+use scabbard::{
+    protocol::SCABBARD_PROTOCOL_VERSION,
+    service::{BatchInfo, BatchStatus},
+};
+use splinter::protocol::ADMIN_PROTOCOL_VERSION;
 
 use super::{ErrorResponse, SuccessResponse};
 
@@ -37,7 +40,7 @@ pub async fn submit_signed_payload(
         .post(format!("{}/admin/submit", *splinterd_url))
         .header(
             "SplinterProtocolVersion",
-            protocol::ADMIN_PROTOCOL_VERSION.to_string(),
+            ADMIN_PROTOCOL_VERSION.to_string(),
         )
         .send_body(Body::Bytes(signed_payload))
         .await
@@ -119,7 +122,7 @@ pub async fn submit_scabbard_payload(
         ))
         .header(
             "SplinterProtocolVersion",
-            protocol::SCABBARD_PROTOCOL_VERSION.to_string(),
+            SCABBARD_PROTOCOL_VERSION.to_string(),
         )
         .send_body(Body::Bytes(signed_payload))
         .await?;
@@ -275,7 +278,7 @@ async fn check_batch_status(
             .get(format!("{}{}", splinterd_url, link))
             .header(
                 "SplinterProtocolVersion",
-                protocol::SCABBARD_PROTOCOL_VERSION.to_string(),
+                SCABBARD_PROTOCOL_VERSION.to_string(),
             )
             .send()
             .await

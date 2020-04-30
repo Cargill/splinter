@@ -17,14 +17,15 @@ use std::sync::Arc;
 use transact::protocol::batch::BatchPair;
 use transact::protos::FromBytes;
 
-use crate::actix_web::{web, Error as ActixError, HttpResponse};
-use crate::futures::{stream::Stream, Future, IntoFuture};
-use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard};
-use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{
-    rest_api::resources::batches::BatchLinkResponse, Scabbard, SERVICE_TYPE,
+use actix_web::{web, Error as ActixError, HttpResponse};
+use futures::{stream::Stream, Future, IntoFuture};
+use splinter::{
+    rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard},
+    service::rest_api::ServiceEndpoint,
 };
+
+use crate::protocol;
+use crate::service::{rest_api::resources::batches::BatchLinkResponse, Scabbard, SERVICE_TYPE};
 
 pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
     ServiceEndpoint {

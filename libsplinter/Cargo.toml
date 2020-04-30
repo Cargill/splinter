@@ -49,15 +49,12 @@ percent-encoding = { version = "2.0", optional = true }
 protobuf = "2"
 rand = "0.7"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
-sawtooth = { version = "0.3", default-features = false, features = ["lmdb-store", "receipt-store"] }
-sawtooth-sabre = "0.5"
 sawtooth-sdk = { version = "0.4", optional = true }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
 tokio = { version = "0.1.22", optional = true }
-transact = { version = "0.2", features = ["sawtooth-compat"] }
 url = "1.7.1"
 ursa = { version = "0.1", optional = true }
 uuid = { version = "0.7", features = ["v4"]}
@@ -68,7 +65,6 @@ zmq = { version = "0.9", optional = true }
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 serial_test = "0.3"
 tempdir = "0.3"
-transact = { version = "0.2", features = ["family-command", "sawtooth-compat"] }
 
 [build-dependencies]
 protoc-rust = "2.14"
@@ -90,7 +86,6 @@ stable = [
     "rest-api-actix",
     "rest-api-cors",
     "sawtooth-signing-compat",
-    "scabbard-client",
 ]
 
 experimental = [
@@ -128,7 +123,6 @@ rest-api = [
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
 sawtooth-signing-compat = ["sawtooth-sdk"]
-scabbard-client = ["reqwest"]
 service-arg-validation = []
 service-network = []
 ws-transport = ["websocket"]

@@ -41,19 +41,6 @@ pub(crate) const REGISTRY_LIST_NODES_MIN: u32 = 1;
 #[cfg(feature = "rest-api-actix")]
 pub(crate) const REGISTRY_FETCH_NODE_MIN: u32 = 1;
 
-pub const SCABBARD_PROTOCOL_VERSION: u32 = 1;
-
-#[cfg(feature = "rest-api")]
-pub(crate) const SCABBARD_SUBSCRIBE_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "rest-api")]
-pub(crate) const SCABBARD_ADD_BATCHES_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "rest-api")]
-pub(crate) const SCABBARD_BATCH_STATUSES_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "rest-api")]
-pub(crate) const SCABBARD_GET_STATE_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "rest-api")]
-pub(crate) const SCABBARD_LIST_STATE_PROTOCOL_MIN: u32 = 1;
-
 #[cfg(feature = "biome")]
 pub const BIOME_PROTOCOL_VERSION: u32 = 1;
 

@@ -24,7 +24,9 @@ COPY libsplinter/protos /build/libsplinter/protos
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
 COPY services/health/Cargo.toml /build/services/health/Cargo.toml
 COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
+COPY services/scabbard/libscabbard/build.rs /build/services/scabbard/libscabbard/build.rs
 COPY services/scabbard/libscabbard/Cargo.toml /build/services/scabbard/libscabbard/Cargo.toml
+COPY services/scabbard/libscabbard/protos /build/services/scabbard/libscabbard/protos
 
 # Copy over example Cargo.toml files
 COPY examples/gameroom/cli/Cargo.toml \
@@ -47,6 +49,7 @@ COPY examples/gameroom/database /build/examples/gameroom/database
 COPY examples/gameroom/daemon/ /build/examples/gameroom/daemon
 COPY libsplinter /build/libsplinter
 COPY splinterd /build/splinterd
+COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 
 # Build the gameroomd package
 WORKDIR /build/examples/gameroom/daemon
