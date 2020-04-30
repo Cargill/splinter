@@ -26,9 +26,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::node_registry::{
-    check_if_node_is_duplicate, check_node_required_fields_are_not_empty, validate_nodes,
-    MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
-    RwNodeRegistry,
+    validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
+    NodeRegistryWriter, RwNodeRegistry,
 };
 
 /// A local, read/write node registry.
@@ -120,16 +119,9 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
 impl NodeRegistryWriter for LocalYamlNodeRegistry {
     fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
         let mut nodes = self.get_cached_nodes()?;
-
-        check_node_required_fields_are_not_empty(&node)?;
-
         // If a node with the same identity already exists, remove it
         nodes.retain(|existing_node| existing_node.identity != node.identity);
-
-        check_if_node_is_duplicate(&node, &nodes)?;
-
         nodes.push(node);
-
         self.write_nodes(nodes)
     }
 
@@ -209,8 +201,11 @@ impl Internal {
         Ok(())
     }
 
-    /// Write the given nodes to the backing file and update the in-memory cache.
+    /// Verify that the given nodes represent a valid node registry, write them to the backing file,
+    /// and update the in-memory cache.
     fn write_nodes(&mut self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+        validate_nodes(&nodes)?;
+
         let output = serde_yaml::to_vec(&nodes).map_err(|err| {
             NodeRegistryError::general_error_with_source(
                 "Failed to write nodes to YAML",
