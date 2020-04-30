@@ -16,6 +16,7 @@
 //! with services processors over connections.
 
 mod error;
+pub mod interconnect;
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Receiver, Sender};
