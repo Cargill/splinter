@@ -26,6 +26,6 @@ members = [
     "examples/gameroom/database",
     "examples/gameroom/daemon",
     "services/health",
-    "services/scabbard",
     "services/scabbard/cli",
+    "services/scabbard/libscabbard",
 ]
