@@ -12,7 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The interconnect module provides the ServiceInterconnect struct, which may be used to route
-//! and receive messages based on a service processor's identity.
+use std::error::Error;
+use std::fmt;
 
-mod error;
+#[derive(Debug, PartialEq)]
+pub struct ServiceInterconnectError(pub String);
+
+impl Error for ServiceInterconnectError {}
+
+impl fmt::Display for ServiceInterconnectError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+#[derive(Debug)]
+pub struct ServiceLookupError(pub String);
+
+impl Error for ServiceLookupError {}
+
+impl fmt::Display for ServiceLookupError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
