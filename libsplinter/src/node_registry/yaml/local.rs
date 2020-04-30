@@ -24,6 +24,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use crate::node_registry::{
     validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
@@ -36,10 +37,10 @@ use crate::node_registry::{
 /// file. The local registry file must be a YAML sequence of nodes, where each node is valid (see
 /// [`Node`] for validity criteria).
 ///
-/// The contents of the YAML file are cached in-memory by the registry so that a disk operation is
-/// not necessary when reading from the registry. This means that the YAML file is only read on
-/// initialization, so it should not be modified directly while in use by the
-/// `LocalYamlNodeRegistry`.
+/// The contents of the YAML file are cached in-memory by the registry; this means that the registry
+/// will continue to be available even if the backing YAML file becomes unavailable. Each time the
+/// registry is read, it will check the backing file for any changes since the last read and
+/// refresh the internal cache if necessary.
 ///
 /// On initializaion, the registry will check if its backing file already exists. If the backing
 /// file already exists, the registry will attempt to load, parse, and validate it. If the backing
@@ -66,16 +67,15 @@ impl LocalYamlNodeRegistry {
         })
     }
 
-    /// Get the list of nodes from the in-memory cache.
-    pub(super) fn get_cached_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
+    /// Get all nodes in the registry.
+    pub(super) fn get_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
         Ok(self
             .internal
             .lock()
             .map_err(|_| {
                 NodeRegistryError::general_error("YAML registry's internal lock poisoned")
             })?
-            .cached_nodes
-            .clone())
+            .get_nodes())
     }
 
     /// Write the given list of nodes to the backing YAML file.
@@ -92,7 +92,7 @@ impl LocalYamlNodeRegistry {
 impl NodeRegistryReader for LocalYamlNodeRegistry {
     fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         Ok(self
-            .get_cached_nodes()?
+            .get_nodes()?
             .iter()
             .find(|node| node.identity == identity)
             .cloned())
@@ -102,14 +102,14 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
         &'b self,
         predicates: &'a [MetadataPredicate],
     ) -> Result<NodeIter<'a>, NodeRegistryError> {
-        let mut nodes = self.get_cached_nodes()?;
+        let mut nodes = self.get_nodes()?;
         nodes.retain(|node| predicates.iter().all(|predicate| predicate.apply(node)));
         Ok(Box::new(nodes.into_iter()))
     }
 
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
         Ok(self
-            .get_cached_nodes()?
+            .get_nodes()?
             .iter()
             .filter(move |node| predicates.iter().all(|predicate| predicate.apply(node)))
             .count() as u32)
@@ -118,7 +118,7 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
 
 impl NodeRegistryWriter for LocalYamlNodeRegistry {
     fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
-        let mut nodes = self.get_cached_nodes()?;
+        let mut nodes = self.get_nodes()?;
         // If a node with the same identity already exists, remove it
         nodes.retain(|existing_node| existing_node.identity != node.identity);
         nodes.push(node);
@@ -126,7 +126,7 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
-        let mut nodes = self.get_cached_nodes()?;
+        let mut nodes = self.get_nodes()?;
         let mut index = None;
         for (i, node) in nodes.iter().enumerate() {
             if node.identity == identity {
@@ -160,6 +160,7 @@ impl RwNodeRegistry for LocalYamlNodeRegistry {
 struct Internal {
     file_path: String,
     cached_nodes: Vec<Node>,
+    last_read: SystemTime,
 }
 
 impl Internal {
@@ -167,6 +168,7 @@ impl Internal {
         let mut internal = Self {
             file_path: file_path.into(),
             cached_nodes: vec![],
+            last_read: SystemTime::UNIX_EPOCH,
         };
 
         // If file already exists, read it; otherwise initialize it.
@@ -177,6 +179,37 @@ impl Internal {
         }
 
         Ok(internal)
+    }
+
+    /// Get the internal list of nodes. If the backing file has been modified since the last read,
+    /// attempt to refresh the cache.
+    fn get_nodes(&mut self) -> Vec<Node> {
+        let file_read_result = std::fs::metadata(&self.file_path)
+            .and_then(|metadata| metadata.modified())
+            .map_err(|err| {
+                NodeRegistryError::general_error_with_source(
+                    "Failed to read YAML registry file's last modification time",
+                    Box::new(err),
+                )
+            })
+            .and_then(|last_modified| {
+                if last_modified > self.last_read {
+                    self.read_nodes()
+                } else {
+                    Ok(())
+                }
+            });
+
+        // Log any errors that occurred with checking or reading the backing file and use the
+        // in-memory cache.
+        if let Err(err) = file_read_result {
+            warn!(
+                "Using cached nodes; failed to read from YAML registry file: {}",
+                err
+            );
+        }
+
+        self.cached_nodes.clone()
     }
 
     /// Read the backing file, verify that it's valid, and cache its contents.
@@ -197,6 +230,7 @@ impl Internal {
         validate_nodes(&nodes)?;
 
         self.cached_nodes = nodes;
+        self.last_read = SystemTime::now();
 
         Ok(())
     }
@@ -234,6 +268,7 @@ impl Internal {
         })?;
 
         self.cached_nodes = nodes;
+        self.last_read = SystemTime::now();
 
         Ok(())
     }

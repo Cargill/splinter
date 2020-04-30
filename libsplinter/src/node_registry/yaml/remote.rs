@@ -289,7 +289,7 @@ impl Internal {
             }
         }
 
-        self.cache.get_cached_nodes()
+        self.cache.get_nodes()
     }
 }
 
