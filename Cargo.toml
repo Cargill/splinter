@@ -27,4 +27,5 @@ members = [
     "examples/gameroom/daemon",
     "services/health",
     "services/scabbard",
+    "services/scabbard/cli",
 ]

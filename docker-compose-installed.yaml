@@ -19,7 +19,7 @@ services:
   scabbard-cli:
     build:
       context: .
-      dockerfile: services/scabbard/Dockerfile-installed-${DISTRO}
+      dockerfile: services/scabbard/cli/Dockerfile-installed-${DISTRO}
       args:
       - CARGO_ARGS=${CARGO_ARGS}
       - REPO_VERSION=${REPO_VERSION}

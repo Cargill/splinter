@@ -24,6 +24,7 @@ COPY libsplinter/protos /build/libsplinter/protos
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
 COPY services/health/Cargo.toml /build/services/health/Cargo.toml
 COPY services/scabbard/Cargo.toml /build/services/scabbard/Cargo.toml
+COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 
 # Copy over example Cargo.toml files
 COPY examples/gameroom/cli/Cargo.toml \
@@ -41,10 +42,10 @@ COPY examples/private_xo/Cargo.toml /build/examples/private_xo/Cargo.toml
 # Copy over source files
 COPY Cargo.toml /build/Cargo.toml
 COPY libsplinter /build/libsplinter
-COPY services/scabbard /build/services/scabbard
+COPY services/scabbard/cli /build/services/scabbard/cli
 
 # Build the project
-WORKDIR /build/services/scabbard
+WORKDIR /build/services/scabbard/cli
 ARG REPO_VERSION
 ARG CARGO_ARGS
 RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
@@ -62,10 +63,10 @@ FROM ubuntu:bionic
 ARG CARGO_ARGS
 RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
 
-COPY --from=builder /build/target/debian/scabbard_*.deb /tmp
+COPY --from=builder /build/target/debian/scabbard-cli_*.deb /tmp
 COPY --from=builder /commit-hash /commit-hash
 
 RUN apt-get update \
  && apt-get install -y curl \
- && dpkg --unpack /tmp/scabbard_*.deb \
+ && dpkg --unpack /tmp/scabbard-cli_*.deb \
  && apt-get -f -y install

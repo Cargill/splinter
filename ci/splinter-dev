@@ -71,10 +71,7 @@ RUN USER=root cargo new --bin examples/private_xo
 # Create empty Cargo projects for splinter services
 RUN USER=root cargo new --bin services/health
 RUN USER=root cargo new --bin services/scabbard/
-
-# This is required for scabbard because it has a library and a binary
-RUN mkdir /build/services/scabbard/src/cli \
- && cp /build/services/scabbard/src/main.rs services/scabbard/src/cli/main.rs
+RUN USER=root cargo new --bin services/scabbard/cli
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
@@ -86,6 +83,7 @@ COPY libsplinter/protos /build/libsplinter/protos
 COPY splinterd/Cargo.toml /build/splinterd/Cargo.toml
 COPY services/health/Cargo.toml /build/services/health/Cargo.toml
 COPY services/scabbard/Cargo.toml /build/services/scabbard/Cargo.toml
+COPY services/scabbard/cli/Cargo.toml /build/services/scabbard/cli/Cargo.toml
 
 # Copy over example Cargo.toml files
 COPY examples/gameroom/cli/Cargo.toml \

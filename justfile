@@ -18,6 +18,7 @@ crates := '\
     cli \
     client \
     services/scabbard \
+    services/scabbard/cli \
     services/health \
     examples/gameroom/database \
     examples/gameroom/daemon \
