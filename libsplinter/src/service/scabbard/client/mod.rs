@@ -16,7 +16,7 @@
 
 mod error;
 
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use reqwest::{
     blocking::{Client, RequestBuilder, Response},
@@ -27,7 +27,7 @@ use transact::{protocol::batch::Batch, protos::IntoBytes};
 use crate::hex::parse_hex;
 use crate::protocol::SCABBARD_PROTOCOL_VERSION;
 
-use super::{BatchInfo, BatchStatus, SERVICE_TYPE};
+use super::SERVICE_TYPE;
 
 pub use error::ScabbardClientError;
 
@@ -412,6 +412,36 @@ impl std::fmt::Display for Link {
     }
 }
 
+/// Used for deserializing `GET /batch_status` responses.
+#[derive(Debug, Serialize, Deserialize)]
+struct BatchInfo {
+    pub id: String,
+    pub status: BatchStatus,
+    pub timestamp: SystemTime,
+}
+
+/// Used by `BatchInfo` for deserializing `GET /batch_status` responses.
+#[derive(Debug, Serialize, Deserialize)]
+enum BatchStatus {
+    Unknown,
+    Pending,
+    Invalid(Vec<InvalidTransaction>),
+    Valid(Vec<ValidTransaction>),
+    Committed(Vec<ValidTransaction>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ValidTransaction {
+    pub transaction_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct InvalidTransaction {
+    pub transaction_id: String,
+    pub error_message: String,
+    pub error_data: Vec<u8>,
+}
+
 /// Used for deserializing error responses from the Scabbard REST API.
 #[derive(Debug, Serialize, Deserialize)]
 struct ErrorResponse {
@@ -433,7 +463,6 @@ mod tests {
         atomic::{AtomicBool, Ordering},
         Arc,
     };
-    use std::time::SystemTime;
 
     use actix_web::web;
     use actix_web::HttpResponse;
