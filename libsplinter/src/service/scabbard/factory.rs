@@ -198,14 +198,13 @@ impl ServiceFactory for ScabbardFactory {
         #[cfg(feature = "rest-api-actix")]
         {
             use super::rest_api::actix;
-            endpoints.push(actix::batches::make_add_batches_to_queue_endpoint());
-            endpoints.push(actix::ws_subscribe::make_subscribe_endpoint());
-            endpoints.push(actix::batch_statuses::make_get_batch_status_endpoint());
-            #[cfg(feature = "scabbard-get-state")]
-            {
-                endpoints.push(actix::state_address::make_get_state_at_address_endpoint());
-                endpoints.push(actix::state::make_get_state_with_prefix_endpoint());
-            }
+            endpoints.append(&mut vec![
+                actix::batches::make_add_batches_to_queue_endpoint(),
+                actix::ws_subscribe::make_subscribe_endpoint(),
+                actix::batch_statuses::make_get_batch_status_endpoint(),
+                actix::state_address::make_get_state_at_address_endpoint(),
+                actix::state::make_get_state_with_prefix_endpoint(),
+            ])
         }
 
         endpoints

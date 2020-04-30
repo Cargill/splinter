@@ -14,8 +14,6 @@
 
 pub mod batch_statuses;
 pub mod batches;
-#[cfg(feature = "scabbard-get-state")]
 pub mod state;
-#[cfg(feature = "scabbard-get-state")]
 pub mod state_address;
 pub mod ws_subscribe;

@@ -53,9 +53,9 @@ use error::ScabbardError;
 pub use factory::ScabbardArgValidator;
 pub use factory::ScabbardFactory;
 use shared::ScabbardShared;
-#[cfg(feature = "scabbard-get-state")]
-pub use state::StateIter;
-pub use state::{BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent};
+pub use state::{
+    BatchInfo, BatchInfoIter, BatchStatus, Events, StateChange, StateChangeEvent, StateIter,
+};
 use state::{ScabbardState, StateSubscriber};
 
 const SERVICE_TYPE: &str = "scabbard";
@@ -123,7 +123,6 @@ impl Scabbard {
         })
     }
 
-    #[cfg(feature = "scabbard-get-state")]
     /// Fetch the value at the given `address` in the Scabbard service's state. Returns `None` if
     /// the `address` is not set.
     pub fn get_state_at_address(&self, address: &str) -> Result<Option<Vec<u8>>, ScabbardError> {
@@ -134,7 +133,6 @@ impl Scabbard {
             .get_state_at_address(address)?)
     }
 
-    #[cfg(feature = "scabbard-get-state")]
     /// Fetch a list of entries in the Scabbard service's state. If a `prefix` is provided, only
     /// return entries whose addresses are under the given address prefix. If no `prefix` is
     /// provided, return all state entries.

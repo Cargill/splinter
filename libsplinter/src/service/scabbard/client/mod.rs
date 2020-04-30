@@ -428,7 +428,6 @@ impl std::fmt::Display for ErrorResponse {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "scabbard-get-state")]
     use std::collections::HashMap;
     use std::sync::{
         atomic::{AtomicBool, Ordering},
@@ -436,7 +435,6 @@ mod tests {
     };
     use std::time::SystemTime;
 
-    #[cfg(feature = "scabbard-get-state")]
     use actix_web::web;
     use actix_web::HttpResponse;
     use futures::future::IntoFuture;
@@ -517,7 +515,6 @@ mod tests {
     }
 
     /// Verify that the `ScabbardClient::get_state_at_address` method works properly.
-    #[cfg(feature = "scabbard-get-state")]
     #[test]
     fn get_state_at_address() {
         let mut resource_manager = ResourceManager::new();
@@ -563,7 +560,6 @@ mod tests {
     }
 
     /// Verify that the `ScabbardClient::get_state_with_prefix` method works properly.
-    #[cfg(feature = "scabbard-get-state")]
     #[test]
     fn get_state_with_prefix() {
         let mut resource_manager = ResourceManager::new();
@@ -712,84 +708,77 @@ mod tests {
                 });
             resources.push(batch_statuses);
 
-            #[cfg(feature = "scabbard-get-state")]
-            {
-                let internal_server_error_clone = internal_server_error.clone();
-                let state_address =
-                    Resource::build(&format!("{}/state/{{address}}", scabbard_base))
-                        .add_request_guard(ProtocolVersionRangeGuard::new(
-                            protocol::SCABBARD_GET_STATE_PROTOCOL_MIN,
-                            protocol::SCABBARD_PROTOCOL_VERSION,
-                        ))
-                        .add_method(Method::Get, move |request, _| {
-                            let address = request
-                                .match_info()
-                                .get("address")
-                                .expect("address should not be none");
+            let internal_server_error_clone = internal_server_error.clone();
+            let state_address = Resource::build(&format!("{}/state/{{address}}", scabbard_base))
+                .add_request_guard(ProtocolVersionRangeGuard::new(
+                    protocol::SCABBARD_GET_STATE_PROTOCOL_MIN,
+                    protocol::SCABBARD_PROTOCOL_VERSION,
+                ))
+                .add_method(Method::Get, move |request, _| {
+                    let address = request
+                        .match_info()
+                        .get("address")
+                        .expect("address should not be none");
 
-                            if internal_server_error_clone.load(Ordering::SeqCst) {
-                                let response = ErrorResponse {
-                                    message: "Request failed".into(),
-                                };
-                                Box::new(
-                                    HttpResponse::InternalServerError()
-                                        .json(response)
-                                        .into_future(),
-                                )
-                            } else if address == mock_state_entry().address {
-                                Box::new(
-                                    HttpResponse::Ok()
-                                        .json(mock_state_entry().value)
-                                        .into_future(),
-                                )
-                            } else {
-                                let response = ErrorResponse {
-                                    message: "Not found".into(),
-                                };
-                                Box::new(HttpResponse::NotFound().json(response).into_future())
-                            }
-                        });
-                resources.push(state_address);
-            }
+                    if internal_server_error_clone.load(Ordering::SeqCst) {
+                        let response = ErrorResponse {
+                            message: "Request failed".into(),
+                        };
+                        Box::new(
+                            HttpResponse::InternalServerError()
+                                .json(response)
+                                .into_future(),
+                        )
+                    } else if address == mock_state_entry().address {
+                        Box::new(
+                            HttpResponse::Ok()
+                                .json(mock_state_entry().value)
+                                .into_future(),
+                        )
+                    } else {
+                        let response = ErrorResponse {
+                            message: "Not found".into(),
+                        };
+                        Box::new(HttpResponse::NotFound().json(response).into_future())
+                    }
+                });
+            resources.push(state_address);
 
-            #[cfg(feature = "scabbard-get-state")]
-            {
-                let internal_server_error_clone = internal_server_error.clone();
-                let state = Resource::build(&format!("{}/state", scabbard_base))
-                    .add_request_guard(ProtocolVersionRangeGuard::new(
-                        protocol::SCABBARD_LIST_STATE_PROTOCOL_MIN,
-                        protocol::SCABBARD_PROTOCOL_VERSION,
-                    ))
-                    .add_method(Method::Get, move |request, _| {
-                        let query: web::Query<HashMap<String, String>> =
-                            web::Query::from_query(request.query_string())
-                                .expect("Failed to get query string");
-                        let prefix = query.get("prefix").map(String::as_str);
+            let internal_server_error_clone = internal_server_error.clone();
+            let state = Resource::build(&format!("{}/state", scabbard_base))
+                .add_request_guard(ProtocolVersionRangeGuard::new(
+                    protocol::SCABBARD_LIST_STATE_PROTOCOL_MIN,
+                    protocol::SCABBARD_PROTOCOL_VERSION,
+                ))
+                .add_method(Method::Get, move |request, _| {
+                    let query: web::Query<HashMap<String, String>> =
+                        web::Query::from_query(request.query_string())
+                            .expect("Failed to get query string");
+                    let prefix = query.get("prefix").map(String::as_str);
 
-                        if internal_server_error_clone.load(Ordering::SeqCst) {
-                            let response = ErrorResponse {
-                                message: "Request failed".into(),
-                            };
-                            Box::new(
-                                HttpResponse::InternalServerError()
-                                    .json(response)
-                                    .into_future(),
-                            )
+                    if internal_server_error_clone.load(Ordering::SeqCst) {
+                        let response = ErrorResponse {
+                            message: "Request failed".into(),
+                        };
+                        Box::new(
+                            HttpResponse::InternalServerError()
+                                .json(response)
+                                .into_future(),
+                        )
+                    } else {
+                        let return_entry = match prefix {
+                            Some(prefix) => mock_state_entry().address.starts_with(prefix),
+                            None => true,
+                        };
+                        let entries = if return_entry {
+                            vec![mock_state_entry()]
                         } else {
-                            let return_entry = match prefix {
-                                Some(prefix) => mock_state_entry().address.starts_with(prefix),
-                                None => true,
-                            };
-                            let entries = if return_entry {
-                                vec![mock_state_entry()]
-                            } else {
-                                vec![]
-                            };
-                            Box::new(HttpResponse::Ok().json(entries).into_future())
-                        }
-                    });
-                resources.push(state);
-            }
+                            vec![]
+                        };
+                        Box::new(HttpResponse::Ok().json(entries).into_future())
+                    }
+                });
+            resources.push(state);
 
             Self {
                 resources,
@@ -816,7 +805,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "scabbard-get-state")]
     fn mock_state_entry() -> StateEntry {
         StateEntry {
             address: "abcdef".into(),
