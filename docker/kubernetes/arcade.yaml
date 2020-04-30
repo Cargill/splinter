@@ -82,6 +82,7 @@ items:
                     >&2 echo 'splinterd is unavailable - sleeping'
                     sleep 1
                   done &&
+                  gameroom -vv database migrate --database-url postgres://gameroom:gameroom_example@$HOSTNAME:5432/gameroom &&
                   gameroomd -vv --database-url postgres://gameroom:gameroom_example@$HOSTNAME:5432/gameroom \
                     -b $HOSTNAME:8000 --splinterd-url http://$HOSTNAME:8085
             ports:
@@ -245,6 +246,7 @@ items:
                     >&2 echo 'splinterd is unavailable - sleeping'
                     sleep 1
                   done &&
+                  gameroom -vv database migrate --database-url postgres://gameroom:gameroom_example@$HOSTNAME:5432/gameroom &&
                   gameroomd -vv --database-url postgres://gameroom:gameroom_example@$HOSTNAME:5432/gameroom \
                     -b $HOSTNAME:8000 --splinterd-url http://$HOSTNAME:8085
             ports:

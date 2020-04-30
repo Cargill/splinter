@@ -19,6 +19,8 @@ volumes:
   registry:
   acme-var:
   bubba-var:
+  acme-db:
+  bubba-db:
 
 services:
 
@@ -83,6 +85,8 @@ services:
         args:
           - REPO_VERSION=${REPO_VERSION}
       restart: always
+      volumes:
+        - acme-db:/var/lib/postgresql/data
       expose:
         - 5432
       ports:
@@ -186,6 +190,8 @@ services:
         args:
           - REPO_VERSION=${REPO_VERSION}
       restart: always
+      volumes:
+        - bubba-db:/var/lib/postgresql/data
       expose:
         - 5432
       ports:
