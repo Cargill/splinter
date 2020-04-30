@@ -52,12 +52,6 @@ pub struct LocalYamlNodeRegistry {
     internal: Arc<Mutex<Internal>>,
 }
 
-/// Internal state of the registry
-struct Internal {
-    file_path: String,
-    cached_nodes: Vec<Node>,
-}
-
 impl LocalYamlNodeRegistry {
     /// Construct a new `LocalYamlNodeRegistry`. If the backing file already exists, it will be
     /// loaded, parsed, and validated; if any of these steps fails, the error will be returned. If
@@ -68,49 +62,9 @@ impl LocalYamlNodeRegistry {
     ///
     /// * `file_path` - The path of the backing YAML file.
     pub fn new(file_path: &str) -> Result<LocalYamlNodeRegistry, NodeRegistryError> {
-        // If file already exists, read, verify and cache its contents; otherwise create it and
-        // initialize the nodes list.
-        if PathBuf::from(file_path).is_file() {
-            let file = File::open(file_path).map_err(|err| {
-                NodeRegistryError::general_error_with_source(
-                    "Failed to open YAML registry file",
-                    Box::new(err),
-                )
-            })?;
-            let cached_nodes: Vec<Node> = serde_yaml::from_reader(&file).map_err(|err| {
-                NodeRegistryError::general_error_with_source(
-                    "Failed to read YAML registry file",
-                    Box::new(err),
-                )
-            })?;
-
-            validate_nodes(&cached_nodes)?;
-
-            Ok(LocalYamlNodeRegistry {
-                internal: Arc::new(Mutex::new(Internal {
-                    file_path: file_path.into(),
-                    cached_nodes,
-                })),
-            })
-        } else {
-            File::create(file_path).map_err(|err| {
-                NodeRegistryError::general_error_with_source(
-                    "Failed to create YAML registry file",
-                    Box::new(err),
-                )
-            })?;
-
-            let registry = LocalYamlNodeRegistry {
-                internal: Arc::new(Mutex::new(Internal {
-                    file_path: file_path.into(),
-                    cached_nodes: vec![],
-                })),
-            };
-
-            registry.write_nodes(vec![])?;
-
-            Ok(registry)
-        }
+        Ok(LocalYamlNodeRegistry {
+            internal: Arc::new(Mutex::new(Internal::new(file_path)?)),
+        })
     }
 
     /// Get the list of nodes from the in-memory cache.
@@ -127,47 +81,12 @@ impl LocalYamlNodeRegistry {
 
     /// Write the given list of nodes to the backing YAML file.
     pub(super) fn write_nodes(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
-        let mut file_backend = self.internal.lock().map_err(|_| {
-            NodeRegistryError::general_error("YAML registry's internal lock poisoned")
-        })?;
-        let output = serde_yaml::to_vec(&nodes).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
-                "Failed to write nodes to YAML",
-                Box::new(err),
-            )
-        })?;
-
-        let mut file = File::create(&file_backend.file_path).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
-                &format!(
-                    "Failed to open YAML registry file '{}'",
-                    file_backend.file_path
-                ),
-                Box::new(err),
-            )
-        })?;
-        file.write_all(&output).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
-                &format!(
-                    "Failed to write to YAML registry file '{}'",
-                    file_backend.file_path
-                ),
-                Box::new(err),
-            )
-        })?;
-        // Append newline to file
-        writeln!(file).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
-                &format!(
-                    "Failed to write to YAML registry file '{}'",
-                    file_backend.file_path
-                ),
-                Box::new(err),
-            )
-        })?;
-
-        file_backend.cached_nodes = nodes;
-        Ok(())
+        self.internal
+            .lock()
+            .map_err(|_| {
+                NodeRegistryError::general_error("YAML registry's internal lock poisoned")
+            })?
+            .write_nodes(nodes)
     }
 }
 
@@ -242,6 +161,86 @@ impl RwNodeRegistry for LocalYamlNodeRegistry {
 
     fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
         Box::new(Clone::clone(self))
+    }
+}
+
+/// Internal state of the registry
+struct Internal {
+    file_path: String,
+    cached_nodes: Vec<Node>,
+}
+
+impl Internal {
+    fn new(file_path: &str) -> Result<Self, NodeRegistryError> {
+        let mut internal = Self {
+            file_path: file_path.into(),
+            cached_nodes: vec![],
+        };
+
+        // If file already exists, read it; otherwise initialize it.
+        if PathBuf::from(file_path).is_file() {
+            internal.read_nodes()?;
+        } else {
+            internal.write_nodes(vec![])?;
+        }
+
+        Ok(internal)
+    }
+
+    /// Read the backing file, verify that it's valid, and cache its contents.
+    fn read_nodes(&mut self) -> Result<(), NodeRegistryError> {
+        let file = File::open(&self.file_path).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                "Failed to open YAML registry file",
+                Box::new(err),
+            )
+        })?;
+        let nodes: Vec<Node> = serde_yaml::from_reader(&file).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                "Failed to read YAML registry file",
+                Box::new(err),
+            )
+        })?;
+
+        validate_nodes(&nodes)?;
+
+        self.cached_nodes = nodes;
+
+        Ok(())
+    }
+
+    /// Write the given nodes to the backing file and update the in-memory cache.
+    fn write_nodes(&mut self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+        let output = serde_yaml::to_vec(&nodes).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                "Failed to write nodes to YAML",
+                Box::new(err),
+            )
+        })?;
+
+        let mut file = File::create(&self.file_path).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                &format!("Failed to open YAML registry file '{}'", self.file_path),
+                Box::new(err),
+            )
+        })?;
+        file.write_all(&output).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                &format!("Failed to write to YAML registry file '{}'", self.file_path),
+                Box::new(err),
+            )
+        })?;
+        // Append newline to file
+        writeln!(file).map_err(|err| {
+            NodeRegistryError::general_error_with_source(
+                &format!("Failed to write to YAML registry file '{}'", self.file_path),
+                Box::new(err),
+            )
+        })?;
+
+        self.cached_nodes = nodes;
+
+        Ok(())
     }
 }
 
