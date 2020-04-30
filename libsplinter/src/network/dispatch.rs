@@ -54,6 +54,12 @@ impl From<PeerId> for String {
     }
 }
 
+impl fmt::Display for PeerId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 /// A wrapper for Connection Id
 ///
 /// The type constrains a dispatcher to connection-specific messages
@@ -83,6 +89,12 @@ impl From<&str> for ConnectionId {
 impl From<ConnectionId> for String {
     fn from(connection_id: ConnectionId) -> String {
         connection_id.0
+    }
+}
+
+impl fmt::Display for ConnectionId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }
 
