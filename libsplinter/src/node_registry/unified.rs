@@ -30,13 +30,13 @@ use super::{
 
 /// A node registry with multiple sources.
 ///
-/// The `UnifiedNodeRegistry` provides a unified view of multiple node registries. It has one local
-/// read-write registry and an arbitrary number of read-only registries.
+/// The `UnifiedNodeRegistry` provides a unified view of multiple node registries. It has one
+/// internal read-write registry and an arbitrary number of external read-only registries.
 ///
 /// # Writing
 ///
 /// All write operations (provided by the implementation of the [`NodeRegistryWriter`] trait) affect
-/// only the local read-write registry.
+/// only the internal read-write registry.
 ///
 /// # Reading
 ///
@@ -52,9 +52,9 @@ use super::{
 ///
 /// ## Registry Precedence
 ///
-/// The local read-write registry has the highest precedence, followed by the read-only registries.
-/// The precedence of the read-only registries is based on the order they appear (the earlier in the
-/// list, the higher the priority).
+/// The internal read-write registry has the highest precedence, followed by the read-only
+/// registries. The precedence of the read-only registries is based on the order they appear (the
+/// earlier in the list, the higher the priority).
 ///
 /// ## Metadata Merging
 ///
@@ -71,20 +71,20 @@ use super::{
 /// [`Metadata Merging`]: #metadata-merging
 #[derive(Clone)]
 pub struct UnifiedNodeRegistry {
-    local_source: Arc<dyn RwNodeRegistry>,
-    readable_sources: Vec<Arc<dyn NodeRegistryReader>>,
+    internal_source: Arc<dyn RwNodeRegistry>,
+    external_sources: Vec<Arc<dyn NodeRegistryReader>>,
 }
 
 impl UnifiedNodeRegistry {
-    /// Constructs a new `UnifiedNodeRegistry` with a local, read-write node registry and an
+    /// Constructs a new `UnifiedNodeRegistry` with an internal read-write node registry and an
     /// arbitrary number of read-only node registries.
     pub fn new(
-        local_source: Box<dyn RwNodeRegistry>,
-        readable_sources: Vec<Box<dyn NodeRegistryReader>>,
+        internal_source: Box<dyn RwNodeRegistry>,
+        external_sources: Vec<Box<dyn NodeRegistryReader>>,
     ) -> Self {
         Self {
-            local_source: local_source.into(),
-            readable_sources: readable_sources.into_iter().map(Arc::from).collect(),
+            internal_source: internal_source.into(),
+            external_sources: external_sources.into_iter().map(Arc::from).collect(),
         }
     }
 
@@ -92,13 +92,14 @@ impl UnifiedNodeRegistry {
     fn all_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = Node> + 'a> {
         Box::new(
             // Get node iterators from all read-only sources
-            self.readable_sources
+            self.external_sources
                 .iter()
                 .map(|registry| registry.list_nodes(&[]))
                 // Reverse the sources, so lowest precedence is first
                 .rev()
-                // Add the local source's node iterator to the end, since it has highest precedence
-                .chain(std::iter::once(self.local_source.list_nodes(&[])))
+                // Add the internal source's node iterator to the end, since it has highest
+                // precedence
+                .chain(std::iter::once(self.internal_source.list_nodes(&[])))
                 // Log any errors from the `list_nodes` calls and ignore the failing registries
                 .filter_map(|res| {
                     res.map_err(|err| debug!("Failed to list nodes in source registry: {}", err))
@@ -144,13 +145,14 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
     fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
         // Get node from all read-only sources
         Ok(self
-            .readable_sources
+            .external_sources
             .iter()
             .map(|registry| registry.fetch_node(identity))
             // Reverse the sources, so lowest precedence is first
             .rev()
-            // Get node from the local source and add it to the end, since it has highest precedence
-            .chain(std::iter::once(self.local_source.fetch_node(identity)))
+            // Get node from the internal source and add it to the end, since it has highest
+            // precedence
+            .chain(std::iter::once(self.internal_source.fetch_node(identity)))
             // Log any errors from the `fetch_node` calls and ignore the failing registries
             .filter_map(|res| {
                 res.map_err(|err| debug!("Failed to fetch node from source registry: {}", err))
@@ -178,11 +180,11 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
 
 impl NodeRegistryWriter for UnifiedNodeRegistry {
     fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
-        self.local_source.insert_node(node)
+        self.internal_source.insert_node(node)
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
-        self.local_source.delete_node(identity)
+        self.internal_source.delete_node(identity)
     }
 }
 
@@ -320,9 +322,9 @@ mod test {
         assert_eq!(node, retreived_node);
     }
 
-    /// Verify that a node is fetched from the local source if it only exists there.
+    /// Verify that a node is fetched from the internal source if it only exists there.
     #[test]
-    fn fetch_node_local() {
+    fn fetch_node_internal() {
         let node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
 
         let writable = MemRegistry::default();
@@ -342,7 +344,7 @@ mod test {
     }
 
     /// Verify that a node is fetched from the highest-precedence read-only source if it does not
-    /// exist in the local registry, and that the metadata is properly merged.
+    /// exist in the internal registry, and that the metadata is properly merged.
     ///
     /// 1. Add the same node to three read-only registries with different endpoints and metadata.
     /// 2. Add the read-only registries to a unified registry, along with an empty writable
@@ -392,16 +394,16 @@ mod test {
         assert_eq!(expected_node, retreived_node);
     }
 
-    /// Verify that a node is fetched from the local source even if it exists in one or more
+    /// Verify that a node is fetched from the internal source even if it exists in one or more
     /// read-only registries, and that the metadata is properly merged.
     ///
-    /// 1. Add the same node to the local registry and two read-only registries with different
+    /// 1. Add the same node to the internal registry and two read-only registries with different
     ///    endpoints and metadata.
     /// 2. Add the registries to a unified registry.
-    /// 3. Fetch the node and verify that it has the correct data (endpoints from local registry,
+    /// 3. Fetch the node and verify that it has the correct data (endpoints from internal registry,
     ///    metadata merged from all sources).
     #[test]
-    fn fetch_node_local_precedence() {
+    fn fetch_node_internal_precedence() {
         let high_precedence_node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
         let med_precedence_node = new_node("node1", "endpoint2", &[("meta_b", "val_b")]);
         let low_precedence_node = new_node("node1", "endpoint3", &[("meta_a", "val_c")]);
@@ -445,13 +447,13 @@ mod test {
     /// Verify that listed nodes are properly returned based on precedence and that metadata is
     /// correctly merged.
     ///
-    /// 1. Add the same node to the local registry and a read-only registry with different data.
+    /// 1. Add the same node to the internal registry and a read-only registry with different data.
     /// 2. Add the same node to two read-only registries with different data.
     /// 3. Add all three registries to a unified registry.
     /// 4. List the nodes and verify that the correct node data is returned.
     #[test]
     fn list_nodes_precedence() {
-        let node1_local = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
+        let node1_internal = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
         let node1_read_only = new_node(
             "node1",
             "endpoint3",
@@ -485,8 +487,8 @@ mod test {
 
         let writable = MemRegistry::default();
         writable
-            .insert_node(node1_local)
-            .expect("Unable to insert local node1");
+            .insert_node(node1_internal)
+            .expect("Unable to insert internal node1");
 
         let readable_high = MemRegistry::default();
         readable_high
@@ -559,7 +561,7 @@ mod test {
         assert_eq!(None, nodes.next());
     }
 
-    /// Verify that the `NodeRegistryWriter` implementation affects only the local registry.
+    /// Verify that the `NodeRegistryWriter` implementation affects only the internal registry.
     #[test]
     fn write_nodes() {
         let node1 = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
