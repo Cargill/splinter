@@ -63,7 +63,7 @@ impl fmt::Display for PeerId {
 /// A wrapper for Connection Id
 ///
 /// The type constrains a dispatcher to connection-specific messages
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ConnectionId(String);
 
 impl std::ops::Deref for ConnectionId {
