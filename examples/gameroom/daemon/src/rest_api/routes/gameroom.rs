@@ -233,7 +233,7 @@ async fn fetch_node_information(
     let node_ids = node_ids.to_owned();
     let mut response = client
         .get(&format!(
-            "{}/admin/nodes?limit={}",
+            "{}/registry/nodes?limit={}",
             splinterd_url,
             std::i64::MAX
         ))

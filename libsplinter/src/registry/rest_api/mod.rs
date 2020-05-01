@@ -24,11 +24,11 @@ use super::RwRegistry;
 
 /// The `RwRegistry` trait service provides the following endpoints as REST API resources:
 ///
-/// * `GET /admin/nodes` - List the nodes in the registry
-/// * `POST /admin/nodes` - Add a node to the registry
-/// * `GET /admin/nodes/{identity}` - Fetch a specific node in the registry
-/// * `PUT /admin/nodes/{identity}` - Replace a node in the registry
-/// * `DELETE /admin/nodes/{identity}` - Delete a node from the registry
+/// * `GET /registry/nodes` - List the nodes in the registry
+/// * `POST /registry/nodes` - Add a node to the registry
+/// * `GET /registry/nodes/{identity}` - Fetch a specific node in the registry
+/// * `PUT /registry/nodes/{identity}` - Replace a node in the registry
+/// * `DELETE /registry/nodes/{identity}` - Delete a node from the registry
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///

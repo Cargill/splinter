@@ -14,8 +14,8 @@
 
 //! This module provides the following endpoints:
 //!
-//! * `GET /admin/nodes` for listing nodes in the registry
-//! * `POST /admin/nodes` for adding a node to the registry
+//! * `GET /registry/nodes` for listing nodes in the registry
+//! * `POST /registry/nodes` for adding a node to the registry
 
 use std::collections::HashMap;
 
@@ -36,10 +36,10 @@ type Filter = HashMap<String, (String, String)>;
 
 pub fn make_nodes_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
-    Resource::build("/admin/nodes")
+    Resource::build("/registry/nodes")
         .add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::ADMIN_LIST_NODES_MIN,
-            protocol::ADMIN_PROTOCOL_VERSION,
+            protocol::REGISTRY_LIST_NODES_MIN,
+            protocol::REGISTRY_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
             list_nodes(r, web::Data::new(registry.clone_box_as_reader()))
@@ -262,17 +262,20 @@ mod tests {
     };
 
     #[test]
-    /// Tests a GET /admin/nodes request with no filters returns the expected nodes.
+    /// Tests a GET /registry/nodes request with no filters returns the expected nodes.
     fn test_list_nodes_ok() {
         let (shutdown_handle, join_handle, bind_url) = run_rest_api_on_open_port(vec![
             make_nodes_resource(Box::new(MemRegistry::new(vec![get_node_1(), get_node_2()]))),
         ]);
 
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
@@ -304,7 +307,7 @@ mod tests {
                 0,
                 0,
                 2,
-                "/admin/nodes?"
+                "/registry/nodes?"
             ))
             .expect("failed to convert expected paging")
         );
@@ -316,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests a GET /admin/nodes request with filters returns the expected node.
+    /// Tests a GET /registry/nodes request with filters returns the expected node.
     fn test_list_nodes_with_filters_ok() {
         let (shutdown_handle, join_handle, bind_url) = run_rest_api_on_open_port(vec![
             make_nodes_resource(Box::new(MemRegistry::new(vec![get_node_1(), get_node_2()]))),
@@ -324,13 +327,16 @@ mod tests {
 
         let filter = percent_encode_filter_query("{\"company\":[\"=\",\"Bitwise IO\"]}");
         let url = Url::parse(&format!(
-            "http://{}/admin/nodes?filter={}",
+            "http://{}/registry/nodes?filter={}",
             bind_url, filter
         ))
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
@@ -351,7 +357,7 @@ mod tests {
                 0,
                 0,
                 1,
-                &format!("/admin/nodes?filter={}&", filter)
+                &format!("/registry/nodes?filter={}&", filter)
             ))
             .expect("failed to convert expected paging")
         );
@@ -363,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests a GET /admin/nodes request with invalid filter returns BadRequest response.
+    /// Tests a GET /registry/nodes request with invalid filter returns BadRequest response.
     fn test_list_node_with_filters_bad_request() {
         let (shutdown_handle, join_handle, bind_url) = run_rest_api_on_open_port(vec![
             make_nodes_resource(Box::new(MemRegistry::new(vec![get_node_1(), get_node_2()]))),
@@ -371,13 +377,16 @@ mod tests {
 
         let filter = percent_encode_filter_query("{\"company\":[\"*\",\"Bitwise IO\"]}");
         let url = Url::parse(&format!(
-            "http://{}/admin/nodes?filter={}",
+            "http://{}/registry/nodes?filter={}",
             bind_url, filter
         ))
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
@@ -390,28 +399,34 @@ mod tests {
     }
 
     #[test]
-    /// Test the POST /admin/nodes route for adding a node to the registry.
+    /// Test the POST /registry/nodes route for adding a node to the registry.
     fn test_add_node() {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_nodes_resource(Box::new(MemRegistry::default()))]);
 
         // Verify an invalid node gets a BAD_REQUEST response
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .post(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
         // Verify a valid node gets an OK response
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .post(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .json(&get_node_1())
             .send()
             .expect("Failed to perform request");
@@ -419,11 +434,14 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
 
         // Verify a duplicate node gets a BAD_REQUEST response
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .post(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .json(&get_node_1())
             .send()
             .expect("Failed to perform request");
