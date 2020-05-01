@@ -1513,18 +1513,19 @@ impl AdminServiceShared {
                     .map(|(key, value)| (key.clone(), value.clone()))
                     .collect();
 
-                self.orchestrator
+                if let Err(err) = self
+                    .orchestrator
                     .initialize_service(service_definition.clone(), service_arguments)
-                    .map_err(|err| AdminSharedError::ServiceInitializationFailed {
-                        context: format!(
-                            "Unable to start service {} on circuit {}",
-                            service.service_id(),
-                            circuit_name
-                        ),
-                        source: Some(err),
-                    })?;
-
-                self.running_services.insert(service_definition);
+                {
+                    error!(
+                        "Unable to start service {} on circuit {}: {}",
+                        service.service_id(),
+                        circuit_name,
+                        err
+                    );
+                } else {
+                    self.running_services.insert(service_definition);
+                }
             }
         }
         Ok(())
