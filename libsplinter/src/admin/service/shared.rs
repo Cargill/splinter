@@ -1478,7 +1478,7 @@ impl AdminServiceShared {
     }
 
     /// On restart of a splinter node, all services that this node should run on the existing
-    /// circuits should be intialized using the service orchestrator. This may not include all
+    /// circuits should be initialized using the service orchestrator. This may not include all
     /// services if they are not supported locally. It is expected that some services will be
     /// started externally.
     pub fn restart_services(&mut self) -> Result<(), AdminSharedError> {
