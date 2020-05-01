@@ -207,14 +207,10 @@ mod test {
     use std::iter::FromIterator;
     use std::sync::{Arc, Mutex};
 
-    use crate::registry::NodeBuilder;
-
     use super::*;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
-        let mut builder = NodeBuilder::new(id)
-            .with_endpoint(endpoint)
-            .with_key("abcd");
+        let mut builder = Node::builder(id).with_endpoint(endpoint).with_key("abcd");
         for (key, val) in metadata {
             builder = builder.with_metadata(*key, *val);
         }

@@ -276,7 +276,7 @@ mod test {
     use std::panic;
     use std::thread;
 
-    use crate::registry::{InvalidNodeError, NodeBuilder};
+    use crate::registry::InvalidNodeError;
 
     ///
     /// Verifies that reading from a YAML file that contains two nodes with the same identity
@@ -942,7 +942,7 @@ mod test {
     }
 
     fn get_node_1() -> Node {
-        NodeBuilder::new("Node-123")
+        Node::builder("Node-123")
             .with_endpoint("tcps://12.0.0.123:8431")
             .with_display_name("Bitwise IO - Node 1")
             .with_key("abcd")
@@ -953,7 +953,7 @@ mod test {
     }
 
     fn get_node_2() -> Node {
-        NodeBuilder::new("Node-456")
+        Node::builder("Node-456")
             .with_endpoint("tcps://12.0.0.123:8434")
             .with_display_name("Cargill - Node 1")
             .with_key("0123")
@@ -964,7 +964,7 @@ mod test {
     }
 
     fn get_node_3() -> Node {
-        NodeBuilder::new("Node-789")
+        Node::builder("Node-789")
             .with_endpoint("tcps://12.0.0.123:8435")
             .with_display_name("Cargill - Node 2")
             .with_key("4567")

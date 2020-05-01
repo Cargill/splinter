@@ -65,6 +65,12 @@ pub struct Node {
 }
 
 impl Node {
+    /// Creates a new `NodeBuilder` with the node's `identity`.
+    pub fn builder<S: Into<String>>(identity: S) -> NodeBuilder {
+        NodeBuilder::new(identity)
+    }
+
+    /// Returns `true` if the given key is listed for the node; returns `false` otherwise.
     pub fn has_key(&self, key: &str) -> bool {
         self.keys.iter().any(|node_key| node_key == key)
     }

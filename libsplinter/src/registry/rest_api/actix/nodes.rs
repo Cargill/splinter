@@ -256,7 +256,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::registry::{NodeBuilder, NodeIter};
+    use crate::registry::NodeIter;
     use crate::rest_api::{
         paging::Paging, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
     };
@@ -506,7 +506,7 @@ mod tests {
     }
 
     fn get_node_1() -> Node {
-        NodeBuilder::new("Node-123")
+        Node::builder("Node-123")
             .with_endpoint("12.0.0.123:8431")
             .with_display_name("Bitwise IO - Node 1")
             .with_key("0123")
@@ -516,7 +516,7 @@ mod tests {
     }
 
     fn get_node_2() -> Node {
-        NodeBuilder::new("Node-456")
+        Node::builder("Node-456")
             .with_endpoint("13.0.0.123:8434")
             .with_display_name("Cargill - Node 1")
             .with_key("abcd")
