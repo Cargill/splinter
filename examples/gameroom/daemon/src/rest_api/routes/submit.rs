@@ -18,12 +18,12 @@ use std::time::{Duration, Instant};
 
 use actix_web::{client::Client, dev::Body, error, http::StatusCode, web, Error, HttpResponse};
 use gameroom_database::{helpers, ConnectionPool};
-use splinter::node_registry::Node;
 use splinter::protocol;
 use splinter::service::scabbard::{BatchInfo, BatchStatus};
 
 use super::{ErrorResponse, SuccessResponse};
 
+use crate::config::NodeInfo;
 use crate::rest_api::RestApiResponseError;
 
 const DEFAULT_WAIT: u64 = 30; // default wait time in seconds for batch to be commited
@@ -74,7 +74,7 @@ pub async fn submit_scabbard_payload(
     splinterd_url: web::Data<String>,
     pool: web::Data<ConnectionPool>,
     circuit_id: web::Path<String>,
-    node_info: web::Data<Node>,
+    node_info: web::Data<NodeInfo>,
     signed_payload: web::Bytes,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {

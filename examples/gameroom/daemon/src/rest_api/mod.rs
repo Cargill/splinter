@@ -23,7 +23,8 @@ use actix_web::{
     Result,
 };
 use gameroom_database::ConnectionPool;
-use splinter::node_registry::Node;
+
+use super::config::NodeInfo;
 
 pub use error::{RestApiResponseError, RestApiServerError};
 use routes::ErrorResponse;
@@ -46,7 +47,7 @@ impl RestApiShutdownHandle {
 pub fn run(
     bind_url: &str,
     splinterd_url: &str,
-    node: Node,
+    node: NodeInfo,
     database_connection: ConnectionPool,
     public_key: String,
 ) -> Result<
