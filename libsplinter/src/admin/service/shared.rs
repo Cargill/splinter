@@ -1661,7 +1661,7 @@ impl AdminServiceShared {
     }
 
     /// On restart of a splinter node, all services that this node should run on the existing
-    /// circuits should be intialized using the service orchestrator. This may not include all
+    /// circuits should be initialized using the service orchestrator. This may not include all
     /// services if they are not supported locally. It is expected that some services will be
     /// started externally.
     pub fn restart_services(&mut self) -> Result<(), AdminSharedError> {
@@ -1696,18 +1696,19 @@ impl AdminServiceShared {
                     .map(|(key, value)| (key.clone(), value.clone()))
                     .collect();
 
-                self.orchestrator
+                if let Err(err) = self
+                    .orchestrator
                     .initialize_service(service_definition.clone(), service_arguments)
-                    .map_err(|err| AdminSharedError::ServiceInitializationFailed {
-                        context: format!(
-                            "Unable to start service {} on circuit {}",
-                            service.service_id(),
-                            circuit_name
-                        ),
-                        source: Some(err),
-                    })?;
-
-                self.running_services.insert(service_definition);
+                {
+                    error!(
+                        "Unable to start service {} on circuit {}: {}",
+                        service.service_id(),
+                        circuit_name,
+                        err
+                    );
+                } else {
+                    self.running_services.insert(service_definition);
+                }
             }
         }
         Ok(())
