@@ -18,19 +18,11 @@
 //! its builder, [`NodeBuilder`]), and the registry traits: [`RegistryReader`], [`RegistryWriter`],
 //! and [`RwRegistry`].
 //!
-//! The following registry implementations are provided by this module:
-//!
-//! * [`LocalYamlRegistry`] - A read/write registry that is backed by a local YAML file.
-//! * [`UnifiedRegistry`] - A read/write registry with a single read/write sub-registry and an
-//!   arbitrary number of read-only sub-registries.
-//!
 //! [`Node`]: struct.Node.html
 //! [`NodeBuilder`]: struct.NodeBuilder.html
 //! [`RegistryReader`]: trait.RegistryReader.html
 //! [`RegistryWriter`]: trait.RegistryWriter.html
 //! [`RwRegistry`]: trait.RwRegistry.html
-//! [`LocalYamlRegistry`]: struct.LocalYamlRegistry.html
-//! [`UnifiedRegistry`]: struct.UnifiedRegistry.html
 
 mod error;
 #[cfg(feature = "rest-api")]
