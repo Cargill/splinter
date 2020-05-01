@@ -31,7 +31,7 @@ use std::time::{Duration, Instant};
 use openssl::hash::{hash, MessageDigest};
 
 use crate::hex::to_hex;
-use crate::node_registry::{
+use crate::registry::{
     validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
 };
 

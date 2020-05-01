@@ -37,13 +37,13 @@ use crate::network::{
     auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
     peer::PeerConnector,
 };
-#[cfg(feature = "registry")]
-use crate::node_registry::NodeRegistryReader;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
 };
+#[cfg(feature = "registry")]
+use crate::registry::NodeRegistryReader;
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{

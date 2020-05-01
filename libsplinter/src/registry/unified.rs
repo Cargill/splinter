@@ -208,7 +208,7 @@ mod test {
     use std::iter::FromIterator;
     use std::sync::{Arc, Mutex};
 
-    use crate::node_registry::NodeBuilder;
+    use crate::registry::NodeBuilder;
 
     use super::*;
 

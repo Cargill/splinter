@@ -21,12 +21,12 @@ use std::collections::HashMap;
 
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
-use crate::node_registry::{
+use crate::protocol;
+use crate::registry::{
     rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
     InvalidNodeError, MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader,
     NodeRegistryWriter, RwNodeRegistry,
 };
-use crate::protocol;
 use crate::rest_api::{
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
     percent_encode_filter_query, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
@@ -258,7 +258,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::node_registry::{NodeBuilder, NodeIter};
+    use crate::registry::{NodeBuilder, NodeIter};
     use crate::rest_api::{
         paging::Paging, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
     };

@@ -53,14 +53,14 @@ use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
 use splinter::network::peer::PeerConnector;
 use splinter::network::{sender, sender::NetworkMessageSender};
 use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
-use splinter::node_registry::{
-    LocalYamlNodeRegistry, NodeRegistryReader, RemoteYamlNodeRegistry, RemoteYamlShutdownHandle,
-    RwNodeRegistry, UnifiedNodeRegistry,
-};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::protos::authorization::AuthorizationMessageType;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::{NetworkMessage, NetworkMessageType};
+use splinter::registry::{
+    LocalYamlNodeRegistry, NodeRegistryReader, RemoteYamlNodeRegistry, RemoteYamlShutdownHandle,
+    RwNodeRegistry, UnifiedNodeRegistry,
+};
 use splinter::rest_api::{
     Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };

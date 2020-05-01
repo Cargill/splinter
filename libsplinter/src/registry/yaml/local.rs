@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
-use crate::node_registry::{
+use crate::registry::{
     validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
     NodeRegistryWriter, RwNodeRegistry,
 };
@@ -283,7 +283,7 @@ mod test {
     use std::panic;
     use std::thread;
 
-    use crate::node_registry::{InvalidNodeError, NodeBuilder};
+    use crate::registry::{InvalidNodeError, NodeBuilder};
 
     ///
     /// Verifies that reading from a YAML file that contains two nodes with the same identity

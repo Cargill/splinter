@@ -20,11 +20,11 @@
 
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
-use crate::node_registry::{
+use crate::protocol;
+use crate::registry::{
     rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, NodeRegistryError,
     NodeRegistryReader, NodeRegistryWriter, RwNodeRegistry,
 };
-use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 pub fn make_nodes_identity_resource(registry: Box<dyn RwNodeRegistry>) -> Resource {
@@ -166,7 +166,7 @@ mod tests {
 
     use reqwest::{blocking::Client, StatusCode, Url};
 
-    use crate::node_registry::{MetadataPredicate, NodeBuilder, NodeIter};
+    use crate::registry::{MetadataPredicate, NodeBuilder, NodeIter};
     use crate::rest_api::{RestApiBuilder, RestApiServerError, RestApiShutdownHandle};
 
     #[test]
