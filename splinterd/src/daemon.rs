@@ -411,7 +411,7 @@ impl SplinterDaemon {
             Box::new(auth_manager),
             state.clone(),
             Box::new(signature_verifier),
-            node_registry.clone_box_as_reader(),
+            Box::new(node_registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
             Some(self.admin_timeout),

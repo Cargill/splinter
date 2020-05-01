@@ -35,7 +35,6 @@ use crate::network::{
     auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
     peer::PeerConnector,
 };
-use crate::node_registry::NodeRegistryReader;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator, ShutdownServiceError};
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 #[cfg(feature = "service-arg-validation")]
@@ -60,7 +59,10 @@ use super::error::{AdminSharedError, MarshallingError};
 use super::mailbox::Mailbox;
 use super::messages;
 use super::open_proposals::OpenProposals;
-use super::{admin_service_id, sha256, AdminServiceEventSubscriber, AdminSubscriberError, Events};
+use super::{
+    admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, AdminSubscriberError,
+    Events,
+};
 
 const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
@@ -193,7 +195,7 @@ pub struct AdminServiceShared {
     splinter_state: SplinterState,
     // signature verifier
     signature_verifier: Box<dyn SignatureVerifier + Send>,
-    node_registry: Box<dyn NodeRegistryReader>,
+    key_verifier: Box<dyn AdminKeyVerifier>,
     key_permission_manager: Box<dyn KeyPermissionManager>,
     proposal_sender: Option<Sender<ProposalUpdate>>,
 }
@@ -211,7 +213,7 @@ impl AdminServiceShared {
         auth_inquisitor: Box<dyn AuthorizationInquisitor>,
         splinter_state: SplinterState,
         signature_verifier: Box<dyn SignatureVerifier + Send>,
-        node_registry: Box<dyn NodeRegistryReader>,
+        key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
     ) -> Result<Self, ServiceError> {
@@ -257,7 +259,7 @@ impl AdminServiceShared {
             event_mailbox,
             splinter_state,
             signature_verifier,
-            node_registry,
+            key_verifier,
             key_permission_manager,
             proposal_sender: None,
         })
@@ -1208,23 +1210,10 @@ impl AdminServiceShared {
 
         self.validate_key(signer_public_key)?;
 
-        let requester_node = self
-            .node_registry
-            .fetch_node(requester_node_id)
-            .map_err(|err| {
-                AdminSharedError::ValidationFailed(format!(
-                    "Failed to lookup requester node {} in node registry: {}",
-                    requester_node_id, err,
-                ))
-            })?
-            .ok_or_else(|| {
-                AdminSharedError::ValidationFailed(format!(
-                    "Requester node {} not found in node registry",
-                    requester_node_id,
-                ))
-            })?;
-
-        if !requester_node.has_key(&to_hex(signer_public_key)) {
+        if !self
+            .key_verifier
+            .is_permitted(requester_node_id, signer_public_key)?
+        {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "{} is not registered for the requester node {}",
                 to_hex(signer_public_key),
@@ -1457,23 +1446,7 @@ impl AdminServiceShared {
 
         self.validate_key(signer_public_key)?;
 
-        let node = self
-            .node_registry
-            .fetch_node(node_id)
-            .map_err(|err| {
-                AdminSharedError::ValidationFailed(format!(
-                    "Failed to lookup voting node {} in node registry: {}",
-                    node_id, err,
-                ))
-            })?
-            .ok_or_else(|| {
-                AdminSharedError::ValidationFailed(format!(
-                    "Voting node {} not found in node registry",
-                    node_id,
-                ))
-            })?;
-
-        if !node.has_key(&to_hex(signer_public_key)) {
+        if !self.key_verifier.is_permitted(node_id, signer_public_key)? {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "{} is not registered for voting node {}",
                 to_hex(signer_public_key),
@@ -1890,15 +1863,13 @@ mod tests {
 
     use protobuf::{Message, RepeatedField};
 
+    use crate::admin::service::AdminKeyVerifierError;
     use crate::circuit::directory::CircuitDirectory;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
     use crate::network::{
         auth::{AuthorizationCallback, AuthorizationCallbackError},
         Network,
-    };
-    use crate::node_registry::{
-        MetadataPredicate, Node, NodeBuilder, NodeIter, NodeRegistryError, NodeRegistryReader,
     };
     use crate::protos::admin;
     use crate::protos::admin::{SplinterNode, SplinterService};
@@ -1948,7 +1919,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2051,7 +2022,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2130,7 +2101,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2143,9 +2114,9 @@ mod tests {
     }
 
     #[test]
-    // test that if a circuit is proposed by a node that is not registered the proposal is
+    // test that a circuit proposed with a key that is not permitted for the requesting node is
     // invalid
-    fn test_validate_circuit_signer_node_not_registered() {
+    fn test_validate_circuit_signer_not_permitted() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
@@ -2159,7 +2130,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::new(None)),
+            Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2168,38 +2139,6 @@ mod tests {
 
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to requester node not being registered");
-        }
-    }
-
-    #[test]
-    // test that if a proposal is signed by a key that is not registered for the requester node the
-    // proposal is invalid
-    fn test_validate_circuit_signer_key_not_registered_for_requester_node() {
-        let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
-        let orchestrator = setup_orchestrator();
-
-        let admin_shared = AdminServiceShared::new(
-            "node_a".into(),
-            orchestrator,
-            #[cfg(feature = "service-arg-validation")]
-            HashMap::new(),
-            peer_connector,
-            Box::new(MockAuthInquisitor),
-            state,
-            Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
-            Box::new(AllowAllKeyPermissionManager),
-            "memory",
-        )
-        .unwrap();
-        let circuit = setup_test_circuit();
-
-        let pub_key = (33u8..66u8).collect::<Vec<_>>();
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
-            panic!(
-                "Should have been invalid due to signer not being registered for requester node"
-            );
         }
     }
 
@@ -2220,7 +2159,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2255,7 +2194,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2290,7 +2229,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2328,7 +2267,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2363,7 +2302,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2398,7 +2337,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2438,7 +2377,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2467,7 +2406,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2498,7 +2437,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2533,7 +2472,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2575,7 +2514,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2617,7 +2556,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2647,7 +2586,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2677,7 +2616,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2715,7 +2654,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2753,7 +2692,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2791,7 +2730,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2821,7 +2760,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2851,7 +2790,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2881,7 +2820,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2911,7 +2850,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2941,7 +2880,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2956,8 +2895,9 @@ mod tests {
     }
 
     #[test]
-    // test that if the vote is from a node that is not registered the vote is invalid
-    fn test_validate_proposal_vote_node_not_registered() {
+    // test that if the vote is from a key that is not permitted for the voting node the vote is
+    // invalid
+    fn test_validate_proposal_vote_not_permitted() {
         let state = setup_splinter_state();
         let peer_connector = setup_peer_connector();
         let orchestrator = setup_orchestrator();
@@ -2971,7 +2911,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::new(None)),
+            Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -2982,38 +2922,6 @@ mod tests {
 
         if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been invalid because voting node is not registered");
-        }
-    }
-
-    #[test]
-    // test that if the vote is signed by a key that is not registered for the voting node the vote
-    // is invalid
-    fn test_validate_proposal_vote_signer_key_not_registered_for_voting_node() {
-        let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
-        let orchestrator = setup_orchestrator();
-
-        let admin_shared = AdminServiceShared::new(
-            "node_a".into(),
-            orchestrator,
-            #[cfg(feature = "service-arg-validation")]
-            HashMap::new(),
-            peer_connector,
-            Box::new(MockAuthInquisitor),
-            state,
-            Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
-            Box::new(AllowAllKeyPermissionManager),
-            "memory",
-        )
-        .unwrap();
-        let circuit = setup_test_circuit();
-        let vote = setup_test_vote(&circuit);
-        let proposal = setup_test_proposal(&circuit);
-
-        let pub_key = (33u8..66u8).collect::<Vec<_>>();
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, &pub_key, &proposal, "node_a") {
-            panic!("Should have been invalid because signer is not registered for voting node");
         }
     }
 
@@ -3033,7 +2941,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::new(Some("node_b"))),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3063,7 +2971,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3101,7 +3009,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3134,7 +3042,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3182,7 +3090,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3232,7 +3140,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3284,7 +3192,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry::default()),
+            Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
         )
@@ -3623,40 +3531,23 @@ mod tests {
         }
     }
 
-    struct MockNodeRegistry(Option<&'static str>);
+    struct MockAdminKeyVerifier(bool);
 
-    impl MockNodeRegistry {
-        fn new(node_id: Option<&'static str>) -> Self {
-            Self(node_id)
+    impl MockAdminKeyVerifier {
+        fn new(is_permitted: bool) -> Self {
+            Self(is_permitted)
         }
     }
 
-    impl NodeRegistryReader for MockNodeRegistry {
-        fn list_nodes<'a, 'b: 'a>(
-            &'b self,
-            _predicates: &'a [MetadataPredicate],
-        ) -> Result<NodeIter<'a>, NodeRegistryError> {
-            unimplemented!()
-        }
-
-        fn count_nodes(&self, _predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
-            unimplemented!()
-        }
-
-        fn fetch_node(&self, _identity: &str) -> Result<Option<Node>, NodeRegistryError> {
-            Ok(self.0.map(|node_id| {
-                NodeBuilder::new(node_id)
-                    .with_endpoint("tcp://someplace:8000")
-                    .with_key(to_hex(PUB_KEY))
-                    .build()
-                    .expect("Failed to build node")
-            }))
-        }
-    }
-
-    impl Default for MockNodeRegistry {
+    impl Default for MockAdminKeyVerifier {
         fn default() -> Self {
-            Self::new(Some("node_a"))
+            Self::new(true)
+        }
+    }
+
+    impl AdminKeyVerifier for MockAdminKeyVerifier {
+        fn is_permitted(&self, _node_id: &str, _key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
+            Ok(self.0)
         }
     }
 }
