@@ -28,7 +28,6 @@ services:
       - 8044
     volumes:
       - ./demo_state:/splinter_state
-      - ./node_registry:/node_registry
     command: >
       bash -c "
         splinterd -vv \
@@ -36,7 +35,6 @@ services:
                 --service-endpoint 0.0.0.0:8043 \
                 --network-endpoints 0.0.0.0:8044 \
                 --node-id 012 \
-                --registries file:///node_registry/nodes.yaml \
                 --no-tls
       "
     environment:
@@ -54,7 +52,6 @@ services:
       - 8046
     volumes:
       - ./demo_state:/splinter_state
-      - ./node_registry:/node_registry
     command: >
       bash -c "
         splinterd -vv \
@@ -62,7 +59,6 @@ services:
                 --service-endpoint 0.0.0.0:8045 \
                 --network-endpoints 0.0.0.0:8046 \
                 --node-id 345 \
-                --registries file:///node_registry/nodes.yaml \
                 --no-tls
       "
     environment:
@@ -80,7 +76,6 @@ services:
       - 8048
     volumes:
       - ./demo_state:/splinter_state
-      - ./node_registry:/node_registry
     command: >
       bash -c "
         splinterd -vv \
@@ -88,7 +83,6 @@ services:
                 --service-endpoint 0.0.0.0:8047 \
                 --network-endpoints 0.0.0.0:8048 \
                 --node-id 678 \
-                --registries file:///node_registry/nodes.yaml \
                 --no-tls
       "
     environment:
