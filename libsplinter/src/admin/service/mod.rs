@@ -37,6 +37,7 @@ use crate::network::{
     auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
     peer::PeerConnector,
 };
+#[cfg(feature = "registry")]
 use crate::node_registry::NodeRegistryReader;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
@@ -103,6 +104,7 @@ pub trait AdminKeyVerifier: Send + Sync {
     fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError>;
 }
 
+#[cfg(feature = "registry")]
 impl AdminKeyVerifier for dyn NodeRegistryReader {
     /// The key is permitted if and only if the node with the given `node_id` exists in the
     /// registry and the node has the given key. Otherwise, the key is not permitted.
@@ -120,6 +122,7 @@ impl AdminKeyVerifier for dyn NodeRegistryReader {
     }
 }
 
+#[cfg(feature = "registry")]
 impl AdminKeyVerifier for Box<dyn NodeRegistryReader> {
     fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
         (**self).is_permitted(node_id, key)

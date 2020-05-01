@@ -46,6 +46,7 @@ toml = "0.5"
 [dependencies.splinter]
 path = "../libsplinter"
 features = [
+  "registry",
   "registry-remote",
   "rest-api",
   "rest-api-actix",

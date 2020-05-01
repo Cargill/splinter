@@ -74,6 +74,7 @@ pub mod keys;
 mod matrix;
 pub mod mesh;
 pub mod network;
+#[cfg(feature = "registry")]
 pub mod node_registry;
 pub mod orchestrator;
 pub mod protocol;

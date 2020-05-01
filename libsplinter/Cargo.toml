@@ -84,6 +84,7 @@ stable = [
     "default",
     "events",
     "postgres",
+    "registry",
     "registry-remote",
     "rest-api",
     "rest-api-actix",
@@ -123,7 +124,8 @@ matrix = []
 network-peer-manager = ["connection-manager", "network-ref-map"]
 network-ref-map = []
 postgres = ["diesel/postgres", "diesel_migrations"]
-registry-remote = ["reqwest"]
+registry = []
+registry-remote = ["reqwest", "registry"]
 rest-api = [
     "actix",
     "actix-http",
