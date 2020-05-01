@@ -105,7 +105,7 @@ impl PeerRef {
         }
     }
 
-    pub fn peer_id(&mut self) -> &str {
+    pub fn peer_id(&self) -> &str {
         &self.peer_id
     }
 }
