@@ -54,6 +54,9 @@ features = [
 
 [features]
 default = [
+    "biome",
+    "biome-credentials",
+    "biome-key-management",
     "config-command-line",
     "config-default",
     "config-env-var",
@@ -69,9 +72,6 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "biome",
-    "biome-credentials",
-    "biome-key-management",
     "health",
     "service-arg-validation",
     "ws-transport",
