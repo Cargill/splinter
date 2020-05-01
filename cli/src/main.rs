@@ -508,7 +508,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     app = app.subcommand(
         SubCommand::with_name("registry")
-            .about("Node registry commands")
+            .about("Splinter registry commands")
             .subcommand(
                 SubCommand::with_name("build")
                     .about("Add a node to a YAML file")

@@ -22,12 +22,12 @@ use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpRespon
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
 use crate::registry::{
-    rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, NodeRegistryError,
-    NodeRegistryReader, NodeRegistryWriter, RwNodeRegistry,
+    rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, RegistryError,
+    RegistryReader, RegistryWriter, RwRegistry,
 };
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
-pub fn make_nodes_identity_resource(registry: Box<dyn RwNodeRegistry>) -> Resource {
+pub fn make_nodes_identity_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
     let registry2 = registry.clone();
     Resource::build("/admin/nodes/{identity}")
@@ -48,7 +48,7 @@ pub fn make_nodes_identity_resource(registry: Box<dyn RwNodeRegistry>) -> Resour
 
 fn fetch_node(
     request: HttpRequest,
-    registry: web::Data<Box<dyn NodeRegistryReader>>,
+    registry: web::Data<Box<dyn RegistryReader>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let identity = request
         .match_info()
@@ -74,7 +74,7 @@ fn fetch_node(
 fn put_node(
     request: HttpRequest,
     payload: web::Payload,
-    registry: web::Data<Box<dyn NodeRegistryWriter>>,
+    registry: web::Data<Box<dyn RegistryWriter>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let path_identity = request
         .match_info()
@@ -93,7 +93,7 @@ fn put_node(
                 Ok(node) => Box::new(
                     web::block(move || {
                         if node.identity != path_identity {
-                            Err(NodeRegistryError::InvalidNode(
+                            Err(RegistryError::InvalidNode(
                                 InvalidNodeError::InvalidIdentity(
                                     node.identity,
                                     "Node identity cannot be changed".into(),
@@ -106,7 +106,7 @@ fn put_node(
                     .then(|res| {
                         Ok(match res {
                             Ok(_) => HttpResponse::Ok().finish(),
-                            Err(BlockingError::Error(NodeRegistryError::InvalidNode(err))) => {
+                            Err(BlockingError::Error(RegistryError::InvalidNode(err))) => {
                                 HttpResponse::BadRequest().json(ErrorResponse::bad_request(
                                     &format!("Invalid node: {}", err),
                                 ))
@@ -134,7 +134,7 @@ fn put_node(
 
 fn delete_node(
     request: HttpRequest,
-    registry: web::Data<Box<dyn NodeRegistryWriter>>,
+    registry: web::Data<Box<dyn RegistryWriter>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let identity = request
         .match_info()
@@ -397,11 +397,11 @@ mod tests {
         }
     }
 
-    impl NodeRegistryReader for MemRegistry {
+    impl RegistryReader for MemRegistry {
         fn list_nodes<'a, 'b: 'a>(
             &'b self,
             predicates: &'a [MetadataPredicate],
-        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+        ) -> Result<NodeIter<'a>, RegistryError> {
             let mut nodes = self
                 .nodes
                 .lock()
@@ -411,11 +411,11 @@ mod tests {
             Ok(Box::new(nodes.into_iter().map(|(_, node)| node)))
         }
 
-        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
             self.list_nodes(predicates).map(|iter| iter.count() as u32)
         }
 
-        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
@@ -425,8 +425,8 @@ mod tests {
         }
     }
 
-    impl NodeRegistryWriter for MemRegistry {
-        fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
+    impl RegistryWriter for MemRegistry {
+        fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
             self.nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
@@ -434,7 +434,7 @@ mod tests {
             Ok(())
         }
 
-        fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
@@ -443,16 +443,16 @@ mod tests {
         }
     }
 
-    impl RwNodeRegistry for MemRegistry {
-        fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+    impl RwRegistry for MemRegistry {
+        fn clone_box(&self) -> Box<dyn RwRegistry> {
             Box::new(self.clone())
         }
 
-        fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
             Box::new(self.clone())
         }
 
-        fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
             Box::new(self.clone())
         }
     }

@@ -12,25 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Data structures, traits, and implementations for tracking and managing known Splinter nodes.
+//! Data structures, traits, and implementations for tracking and managing known Splinter entities.
 //!
-//! The public node registry interface is defined primarily by the [`Node`] data structure (along
-//! with its builder, [`NodeBuilder`]), and the node registry traits: [`NodeRegistryReader`],
-//! [`NodeRegistryWriter`], and [`RwNodeRegistry`].
+//! The public registry interface is defined primarily by the [`Node`] data structure (along with
+//! its builder, [`NodeBuilder`]), and the registry traits: [`RegistryReader`], [`RegistryWriter`],
+//! and [`RwRegistry`].
 //!
-//! The following node registry implementations are provided by this module:
+//! The following registry implementations are provided by this module:
 //!
-//! * [`LocalYamlNodeRegistry`] - A read/write registry that is backed by a local YAML file.
-//! * [`UnifiedNodeRegistry`] - A read/write registry with a single read/write sub-registry and an
+//! * [`LocalYamlRegistry`] - A read/write registry that is backed by a local YAML file.
+//! * [`UnifiedRegistry`] - A read/write registry with a single read/write sub-registry and an
 //!   arbitrary number of read-only sub-registries.
 //!
 //! [`Node`]: struct.Node.html
 //! [`NodeBuilder`]: struct.NodeBuilder.html
-//! [`NodeRegistryReader`]: trait.NodeRegistryReader.html
-//! [`NodeRegistryWriter`]: trait.NodeRegistryWriter.html
-//! [`RwNodeRegistry`]: trait.RwNodeRegistry.html
-//! [`LocalYamlNodeRegistry`]: struct.LocalYamlNodeRegistry.html
-//! [`UnifiedNodeRegistry`]: struct.UnifiedNodeRegistry.html
+//! [`RegistryReader`]: trait.RegistryReader.html
+//! [`RegistryWriter`]: trait.RegistryWriter.html
+//! [`RwRegistry`]: trait.RwRegistry.html
+//! [`LocalYamlRegistry`]: struct.LocalYamlRegistry.html
+//! [`UnifiedRegistry`]: struct.UnifiedRegistry.html
 
 mod error;
 #[cfg(feature = "rest-api")]
@@ -41,11 +41,11 @@ mod yaml;
 use std::collections::HashMap;
 use std::iter::ExactSizeIterator;
 
-pub use error::{InvalidNodeError, NodeRegistryError};
-pub use unified::UnifiedNodeRegistry;
-pub use yaml::LocalYamlNodeRegistry;
+pub use error::{InvalidNodeError, RegistryError};
+pub use unified::UnifiedRegistry;
+pub use yaml::LocalYamlRegistry;
 #[cfg(feature = "registry-remote")]
-pub use yaml::{RemoteYamlNodeRegistry, RemoteYamlShutdownHandle};
+pub use yaml::{RemoteYamlRegistry, RemoteYamlShutdownHandle};
 
 /// Native representation of a node in a registry.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -209,11 +209,11 @@ impl MetadataPredicate {
     }
 }
 
-/// Type returned by the `NodeRegistryReader::list_nodes` method
+/// Type returned by the `RegistryReader::list_nodes` method
 pub type NodeIter<'a> = Box<dyn ExactSizeIterator<Item = Node> + Send + 'a>;
 
-/// Defines node registry read capabilities.
-pub trait NodeRegistryReader: Send + Sync {
+/// Defines registry read capabilities.
+pub trait RegistryReader: Send + Sync {
     /// Returns an iterator over the nodes in the registry.
     ///
     /// # Arguments
@@ -224,7 +224,7 @@ pub trait NodeRegistryReader: Send + Sync {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<NodeIter<'a>, NodeRegistryError>;
+    ) -> Result<NodeIter<'a>, RegistryError>;
 
     /// Returns the count of nodes in the registry.
     ///
@@ -233,102 +233,102 @@ pub trait NodeRegistryReader: Send + Sync {
     /// * `predicates` - A list of of predicates to be applied before counting the nodes. These are
     /// applied as an AND, from a query perspective. If the list is empty, it is the equivalent of
     /// no predicates (i.e. return all).
-    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError>;
+    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError>;
 
     /// Returns the node with the given identity, if it exists in the registry.
     ///
     /// # Arguments
     ///
     ///  * `identity` - The identity of the node.
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError>;
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
 
     /// Determines whether or not the node exists in the registry.
     ///
     /// # Arguments
     ///
     ///  * `identity` - The identity of the node.
-    fn has_node(&self, identity: &str) -> Result<bool, NodeRegistryError> {
+    fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
         self.fetch_node(identity).map(|opt| opt.is_some())
     }
 }
 
-/// Defines node registry write capabilities.
-pub trait NodeRegistryWriter: Send + Sync {
+/// Defines registry write capabilities.
+pub trait RegistryWriter: Send + Sync {
     /// Adds a new node to the registry, or replaces an existing node with the same identity.
     ///
     /// # Arguments
     ///
     /// * `node` - The node to be added to or updated in the registry.
     ///
-    fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError>;
+    fn insert_node(&self, node: Node) -> Result<(), RegistryError>;
 
     /// Deletes a node with the given identity and returns the node if it was in the registry.
     ///
     /// # Arguments
     ///
     ///  * `identity` - The Splinter identity of the node.
-    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError>;
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
 }
 
-/// Provides a marker trait for a clonable, readable and writable node registry.
-pub trait RwNodeRegistry: NodeRegistryWriter + NodeRegistryReader {
-    /// Clone implementation for `RwNodeRegistry`. The implementation of the `Clone` trait for
-    /// `Box<RwNodeRegistry>` calls this method.
+/// Provides a marker trait for a clonable, readable and writable registry.
+pub trait RwRegistry: RegistryWriter + RegistryReader {
+    /// Clone implementation for `RwRegistry`. The implementation of the `Clone` trait for
+    /// `Box<RwRegistry>` calls this method.
     ///
     /// # Example
     ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+    ///  fn clone_box(&self) -> Box<dyn RwRegistry> {
     ///     Box::new(self.clone())
     ///  }
     ///```
-    fn clone_box(&self) -> Box<dyn RwNodeRegistry>;
+    fn clone_box(&self) -> Box<dyn RwRegistry>;
 
-    /// Clone the `RwNodeRegistry` as a `Box<dyn NodeRegistryReader>`.
-    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader>;
+    /// Clone the `RwRegistry` as a `Box<dyn RegistryReader>`.
+    fn clone_box_as_reader(&self) -> Box<dyn RegistryReader>;
 
-    /// Clone the `RwNodeRegistry` as a `Box<dyn NodeRegistryWriter>`.
-    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter>;
+    /// Clone the `RwRegistry` as a `Box<dyn RegistryWriter>`.
+    fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter>;
 }
 
-impl Clone for Box<dyn RwNodeRegistry> {
-    fn clone(&self) -> Box<dyn RwNodeRegistry> {
+impl Clone for Box<dyn RwRegistry> {
+    fn clone(&self) -> Box<dyn RwRegistry> {
         self.clone_box()
     }
 }
 
-impl<NR> NodeRegistryReader for Box<NR>
+impl<NR> RegistryReader for Box<NR>
 where
-    NR: NodeRegistryReader + ?Sized,
+    NR: RegistryReader + ?Sized,
 {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<NodeIter<'a>, NodeRegistryError> {
+    ) -> Result<NodeIter<'a>, RegistryError> {
         (**self).list_nodes(predicates)
     }
 
-    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
         (**self).count_nodes(predicates)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         (**self).fetch_node(identity)
     }
 
-    fn has_node(&self, identity: &str) -> Result<bool, NodeRegistryError> {
+    fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
         (**self).has_node(identity)
     }
 }
 
-impl<NW> NodeRegistryWriter for Box<NW>
+impl<NW> RegistryWriter for Box<NW>
 where
-    NW: NodeRegistryWriter + ?Sized,
+    NW: RegistryWriter + ?Sized,
 {
-    fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
+    fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
         (**self).insert_node(node)
     }
 
-    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         (**self).delete_node(identity)
     }
 }

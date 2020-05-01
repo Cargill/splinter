@@ -25,7 +25,7 @@ services:
       - 8080:8080
     volumes:
       - ./splinterd/sample_configs:/configs
-      - ./splinterd/sample_node_registries:/node_registries
+      - ./splinterd/sample_registries:/registries
     build:
       context: .
       dockerfile: splinterd/Dockerfile-installed-${DISTRO}
@@ -43,7 +43,7 @@ services:
         splinter cert generate --skip && \
         splinterd \
             -c ./configs/splinterd-node-0-docker.toml \
-            --registries file://./node_registries/nodes.yaml \
+            --registries file://./registries/registry.yaml \
             --tls-insecure \
             --enable-biome \
             --database postgres://splinter_admin:splinter_test@splinter-db:5432/splinter \

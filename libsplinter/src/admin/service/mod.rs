@@ -43,7 +43,7 @@ use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
 };
 #[cfg(feature = "registry")]
-use crate::registry::NodeRegistryReader;
+use crate::registry::RegistryReader;
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
@@ -105,13 +105,13 @@ pub trait AdminKeyVerifier: Send + Sync {
 }
 
 #[cfg(feature = "registry")]
-impl AdminKeyVerifier for dyn NodeRegistryReader {
+impl AdminKeyVerifier for dyn RegistryReader {
     /// The key is permitted if and only if the node with the given `node_id` exists in the
     /// registry and the node has the given key. Otherwise, the key is not permitted.
     fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
         let node_opt = self.fetch_node(node_id).map_err(|err| {
             AdminKeyVerifierError::new_with_source(
-                &format!("Failed to lookup node '{}' in node registry", node_id),
+                &format!("Failed to lookup node '{}' in registry", node_id),
                 Box::new(err),
             )
         })?;
@@ -123,7 +123,7 @@ impl AdminKeyVerifier for dyn NodeRegistryReader {
 }
 
 #[cfg(feature = "registry")]
-impl AdminKeyVerifier for Box<dyn NodeRegistryReader> {
+impl AdminKeyVerifier for Box<dyn RegistryReader> {
     fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
         (**self).is_permitted(node_id, key)
     }

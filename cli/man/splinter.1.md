@@ -48,7 +48,7 @@ SUBCOMMANDS
 : Generates secp256k1 public/private keys
 
 `registry`
-: Provides commands to create and manage node registry information.
+: Provides commands to create and manage Splinter registry information.
 
 FLAGS
 =====

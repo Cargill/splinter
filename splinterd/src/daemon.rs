@@ -58,8 +58,8 @@ use splinter::protos::authorization::AuthorizationMessageType;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::{NetworkMessage, NetworkMessageType};
 use splinter::registry::{
-    LocalYamlNodeRegistry, NodeRegistryReader, RemoteYamlNodeRegistry, RemoteYamlShutdownHandle,
-    RwNodeRegistry, UnifiedNodeRegistry,
+    LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
+    UnifiedRegistry,
 };
 use splinter::rest_api::{
     Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
@@ -102,7 +102,7 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 
 pub struct SplinterDaemon {
     storage_location: String,
-    node_registry_directory: String,
+    registry_directory: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
@@ -390,8 +390,8 @@ impl SplinterDaemon {
 
         let signature_verifier = SawtoothSecp256k1SignatureVerifier::new();
 
-        let (node_registry, registry_shutdown) = create_node_registry(
-            &self.node_registry_directory,
+        let (registry, registry_shutdown) = create_registry(
+            &self.registry_directory,
             &self.registries,
             self.registry_auto_refresh,
             self.registry_forced_refresh,
@@ -411,7 +411,7 @@ impl SplinterDaemon {
             Box::new(auth_manager),
             state.clone(),
             Box::new(signature_verifier),
-            Box::new(node_registry.clone_box_as_reader()),
+            Box::new(registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
             Some(self.admin_timeout),
@@ -447,7 +447,7 @@ impl SplinterDaemon {
                     )
                 }),
             )
-            .add_resources(node_registry.resources())
+            .add_resources(registry.resources())
             .add_resources(admin_service.resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
@@ -702,7 +702,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 #[derive(Default)]
 pub struct SplinterDaemonBuilder {
     storage_location: Option<String>,
-    node_registry_directory: Option<String>,
+    registry_directory: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -734,8 +734,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_node_registry_directory(mut self, value: String) -> Self {
-        self.node_registry_directory = Some(value);
+    pub fn with_registry_directory(mut self, value: String) -> Self {
+        self.registry_directory = Some(value);
         self
     }
 
@@ -835,8 +835,8 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: storage_location".to_string())
         })?;
 
-        let node_registry_directory = self.node_registry_directory.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: node_registry_directory".to_string())
+        let registry_directory = self.registry_directory.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: registry_directory".to_string())
         })?;
 
         let service_endpoint = self.service_endpoint.ok_or_else(|| {
@@ -908,7 +908,7 @@ impl SplinterDaemonBuilder {
             registries: self.registries,
             registry_auto_refresh,
             registry_forced_refresh,
-            node_registry_directory,
+            registry_directory,
             storage_type,
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
@@ -977,31 +977,29 @@ fn set_up_circuit_dispatcher(
     dispatcher
 }
 
-fn create_node_registry(
-    node_registry_directory: &str,
+fn create_registry(
+    registry_directory: &str,
     registries: &[String],
     auto_refresh_interval: u64,
     forced_refresh_interval: u64,
-) -> Result<(Box<dyn RwNodeRegistry>, RegistryShutdownHandle), StartError> {
+) -> Result<(Box<dyn RwRegistry>, RegistryShutdownHandle), StartError> {
     let mut registry_shutdown_handle = RegistryShutdownHandle::new();
 
-    let local_registry_path = Path::new(node_registry_directory)
+    let local_registry_path = Path::new(registry_directory)
         .join("local_registry.yaml")
         .to_str()
         .expect("path built from &str cannot be invalid")
         .to_string();
     debug!(
-        "Creating local node registry with registry file: {:?}",
+        "Creating local registry with registry file: {:?}",
         local_registry_path
     );
-    let local_registry = Box::new(LocalYamlNodeRegistry::new(&local_registry_path).map_err(
-        |err| {
-            StartError::NodeRegistryError(format!(
-                "Failed to initialize local LocalYamlNodeRegistry: {}",
-                err
-            ))
-        },
-    )?);
+    let local_registry = Box::new(LocalYamlRegistry::new(&local_registry_path).map_err(|err| {
+        StartError::RegistryError(format!(
+            "Failed to initialize local LocalYamlRegistry: {}",
+            err
+        ))
+    })?);
 
     let read_only_registries = registries
         .iter()
@@ -1012,14 +1010,14 @@ fn create_node_registry(
 
             if scheme == "file" {
                 debug!(
-                    "Attempting to add local read-only node registry from file: {}",
+                    "Attempting to add local read-only registry from file: {}",
                     path
                 );
-                match LocalYamlNodeRegistry::new(path) {
-                    Ok(registry) => Some(Box::new(registry) as Box<dyn NodeRegistryReader>),
+                match LocalYamlRegistry::new(path) {
+                    Ok(registry) => Some(Box::new(registry) as Box<dyn RegistryReader>),
                     Err(err) => {
                         error!(
-                            "Failed to add read-only LocalYamlNodeRegistry '{}': {}",
+                            "Failed to add read-only LocalYamlRegistry '{}': {}",
                             path, err
                         );
                         None
@@ -1027,7 +1025,7 @@ fn create_node_registry(
                 }
             } else if scheme == "http" || scheme == "https" {
                 debug!(
-                    "Attempting to add remote read-only node registry from URL: {}",
+                    "Attempting to add remote read-only registry from URL: {}",
                     registry
                 );
                 let auto_refresh_interval = if auto_refresh_interval != 0 {
@@ -1040,20 +1038,20 @@ fn create_node_registry(
                 } else {
                     None
                 };
-                match RemoteYamlNodeRegistry::new(
+                match RemoteYamlRegistry::new(
                     registry,
-                    node_registry_directory,
+                    registry_directory,
                     auto_refresh_interval,
                     forced_refresh_interval,
                 ) {
                     Ok(registry) => {
                         registry_shutdown_handle
                             .add_remote_yaml_shutdown_handle(registry.shutdown_handle());
-                        Some(Box::new(registry) as Box<dyn NodeRegistryReader>)
+                        Some(Box::new(registry) as Box<dyn RegistryReader>)
                     }
                     Err(err) => {
                         error!(
-                            "Failed to add read-only RemoteYamlNodeRegistry '{}': {}",
+                            "Failed to add read-only RemoteYamlRegistry '{}': {}",
                             registry, err
                         );
                         None
@@ -1069,10 +1067,7 @@ fn create_node_registry(
         })
         .collect();
 
-    let unified_registry = Box::new(UnifiedNodeRegistry::new(
-        local_registry,
-        read_only_registries,
-    ));
+    let unified_registry = Box::new(UnifiedRegistry::new(local_registry, read_only_registries));
 
     Ok((unified_registry, registry_shutdown_handle))
 }
@@ -1131,7 +1126,7 @@ pub enum StartError {
     StorageError(String),
     ProtocolError(String),
     RestApiError(String),
-    NodeRegistryError(String),
+    RegistryError(String),
     AdminServiceError(String),
     #[cfg(feature = "health")]
     HealthServiceError(String),
@@ -1150,9 +1145,7 @@ impl fmt::Display for StartError {
             StartError::StorageError(msg) => write!(f, "unable to set up storage: {}", msg),
             StartError::ProtocolError(msg) => write!(f, "unable to parse protocol: {}", msg),
             StartError::RestApiError(msg) => write!(f, "REST API encountered an error: {}", msg),
-            StartError::NodeRegistryError(msg) => {
-                write!(f, "unable to setup node registry: {}", msg)
-            }
+            StartError::RegistryError(msg) => write!(f, "unable to setup registry: {}", msg),
             StartError::AdminServiceError(msg) => {
                 write!(f, "the admin service encountered an error: {}", msg)
             }

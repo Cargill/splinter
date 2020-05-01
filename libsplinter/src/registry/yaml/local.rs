@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A local, read/write node registry.
+//! A local, read/write registry.
 //!
-//! This module contains the [`LocalYamlNodeRegistry`], which provides an implementation of the
-//! [`RwNodeRegistry`] trait.
+//! This module contains the [`LocalYamlRegistry`], which provides an implementation of the
+//! [`RwRegistry`] trait.
 //!
-//! [`LocalYamlNodeRegistry`]: struct.LocalYamlNodeRegistry.html
-//! [`RwNodeRegistry`]: ../../trait.RwNodeRegistry.html
+//! [`LocalYamlRegistry`]: struct.LocalYamlRegistry.html
+//! [`RwRegistry`]: ../../trait.RwRegistry.html
 
 use std::fs::File;
 use std::io::Write;
@@ -27,15 +27,15 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::registry::{
-    validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
-    NodeRegistryWriter, RwNodeRegistry,
+    validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
+    RegistryWriter, RwRegistry,
 };
 
-/// A local, read/write node registry.
+/// A local, read/write registry.
 ///
-/// The `LocalYamlNodeRegistry` provides access to and modification of a local node registry YAML
-/// file. The local registry file must be a YAML sequence of nodes, where each node is valid (see
-/// [`Node`] for validity criteria).
+/// The `LocalYamlRegistry` provides access to and modification of a local registry YAML file. The
+/// local registry file must be a YAML sequence of nodes, where each node is valid (see [`Node`] for
+/// validity criteria).
 ///
 /// The contents of the YAML file are cached in-memory by the registry; this means that the registry
 /// will continue to be available even if the backing YAML file becomes unavailable. Each time the
@@ -48,12 +48,12 @@ use crate::registry::{
 ///
 /// [`Node`]: struct.Node.html
 #[derive(Clone)]
-pub struct LocalYamlNodeRegistry {
+pub struct LocalYamlRegistry {
     internal: Arc<Mutex<Internal>>,
 }
 
-impl LocalYamlNodeRegistry {
-    /// Construct a new `LocalYamlNodeRegistry`. If the backing file already exists, it will be
+impl LocalYamlRegistry {
+    /// Construct a new `LocalYamlRegistry`. If the backing file already exists, it will be
     /// loaded, parsed, and validated; if any of these steps fails, the error will be returned. If
     /// the backing file doesn't already exist, it will be created and initialized; if file creation
     /// fails, the error will be returned.
@@ -61,36 +61,32 @@ impl LocalYamlNodeRegistry {
     /// # Arguments
     ///
     /// * `file_path` - The path of the backing YAML file.
-    pub fn new(file_path: &str) -> Result<LocalYamlNodeRegistry, NodeRegistryError> {
-        Ok(LocalYamlNodeRegistry {
+    pub fn new(file_path: &str) -> Result<LocalYamlRegistry, RegistryError> {
+        Ok(LocalYamlRegistry {
             internal: Arc::new(Mutex::new(Internal::new(file_path)?)),
         })
     }
 
     /// Get all nodes in the registry.
-    pub(super) fn get_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
+    pub(super) fn get_nodes(&self) -> Result<Vec<Node>, RegistryError> {
         Ok(self
             .internal
             .lock()
-            .map_err(|_| {
-                NodeRegistryError::general_error("YAML registry's internal lock poisoned")
-            })?
+            .map_err(|_| RegistryError::general_error("YAML registry's internal lock poisoned"))?
             .get_nodes())
     }
 
     /// Write the given list of nodes to the backing YAML file.
-    pub(super) fn write_nodes(&self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+    pub(super) fn write_nodes(&self, nodes: Vec<Node>) -> Result<(), RegistryError> {
         self.internal
             .lock()
-            .map_err(|_| {
-                NodeRegistryError::general_error("YAML registry's internal lock poisoned")
-            })?
+            .map_err(|_| RegistryError::general_error("YAML registry's internal lock poisoned"))?
             .write_nodes(nodes)
     }
 }
 
-impl NodeRegistryReader for LocalYamlNodeRegistry {
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+impl RegistryReader for LocalYamlRegistry {
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         Ok(self
             .get_nodes()?
             .iter()
@@ -101,13 +97,13 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<NodeIter<'a>, NodeRegistryError> {
+    ) -> Result<NodeIter<'a>, RegistryError> {
         let mut nodes = self.get_nodes()?;
         nodes.retain(|node| predicates.iter().all(|predicate| predicate.apply(node)));
         Ok(Box::new(nodes.into_iter()))
     }
 
-    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
         Ok(self
             .get_nodes()?
             .iter()
@@ -116,8 +112,8 @@ impl NodeRegistryReader for LocalYamlNodeRegistry {
     }
 }
 
-impl NodeRegistryWriter for LocalYamlNodeRegistry {
-    fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
+impl RegistryWriter for LocalYamlRegistry {
+    fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
         let mut nodes = self.get_nodes()?;
         // If a node with the same identity already exists, remove it
         nodes.retain(|existing_node| existing_node.identity != node.identity);
@@ -125,7 +121,7 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
         self.write_nodes(nodes)
     }
 
-    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         let mut nodes = self.get_nodes()?;
         let mut index = None;
         for (i, node) in nodes.iter().enumerate() {
@@ -142,16 +138,16 @@ impl NodeRegistryWriter for LocalYamlNodeRegistry {
     }
 }
 
-impl RwNodeRegistry for LocalYamlNodeRegistry {
-    fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+impl RwRegistry for LocalYamlRegistry {
+    fn clone_box(&self) -> Box<dyn RwRegistry> {
         Box::new(self.clone())
     }
 
-    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+    fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
         Box::new(Clone::clone(self))
     }
 
-    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+    fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
         Box::new(Clone::clone(self))
     }
 }
@@ -164,7 +160,7 @@ struct Internal {
 }
 
 impl Internal {
-    fn new(file_path: &str) -> Result<Self, NodeRegistryError> {
+    fn new(file_path: &str) -> Result<Self, RegistryError> {
         let mut internal = Self {
             file_path: file_path.into(),
             cached_nodes: vec![],
@@ -187,7 +183,7 @@ impl Internal {
         let file_read_result = std::fs::metadata(&self.file_path)
             .and_then(|metadata| metadata.modified())
             .map_err(|err| {
-                NodeRegistryError::general_error_with_source(
+                RegistryError::general_error_with_source(
                     "Failed to read YAML registry file's last modification time",
                     Box::new(err),
                 )
@@ -213,15 +209,15 @@ impl Internal {
     }
 
     /// Read the backing file, verify that it's valid, and cache its contents.
-    fn read_nodes(&mut self) -> Result<(), NodeRegistryError> {
+    fn read_nodes(&mut self) -> Result<(), RegistryError> {
         let file = File::open(&self.file_path).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 "Failed to open YAML registry file",
                 Box::new(err),
             )
         })?;
         let nodes: Vec<Node> = serde_yaml::from_reader(&file).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 "Failed to read YAML registry file",
                 Box::new(err),
             )
@@ -235,33 +231,30 @@ impl Internal {
         Ok(())
     }
 
-    /// Verify that the given nodes represent a valid node registry, write them to the backing file,
-    /// and update the in-memory cache.
-    fn write_nodes(&mut self, nodes: Vec<Node>) -> Result<(), NodeRegistryError> {
+    /// Verify that the given nodes represent a valid registry, write them to the backing file, and
+    /// update the in-memory cache.
+    fn write_nodes(&mut self, nodes: Vec<Node>) -> Result<(), RegistryError> {
         validate_nodes(&nodes)?;
 
         let output = serde_yaml::to_vec(&nodes).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
-                "Failed to write nodes to YAML",
-                Box::new(err),
-            )
+            RegistryError::general_error_with_source("Failed to write nodes to YAML", Box::new(err))
         })?;
 
         let mut file = File::create(&self.file_path).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 &format!("Failed to open YAML registry file '{}'", self.file_path),
                 Box::new(err),
             )
         })?;
         file.write_all(&output).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 &format!("Failed to write to YAML registry file '{}'", self.file_path),
                 Box::new(err),
             )
         })?;
         // Append newline to file
         writeln!(file).map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 &format!("Failed to write to YAML registry file '{}'", self.file_path),
                 Box::new(err),
             )
@@ -298,12 +291,12 @@ mod test {
 
             write_to_file(&vec![node1.clone(), node2], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => {
                     panic!("Two nodes with same identity in YAML file. Error should be returned")
                 }
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::DuplicateIdentity(id))) => {
+                Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateIdentity(id))) => {
                     assert_eq!(id, node1.identity)
                 }
                 Err(err) => panic!(
@@ -327,14 +320,14 @@ mod test {
 
             write_to_file(&vec![node1.clone(), node2], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => {
                     panic!("Two nodes with same endpoint in YAML file. Error should be returned")
                 }
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(
-                    endpoint,
-                ))) => assert!(node1.endpoints.contains(&endpoint)),
+                Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
+                    assert!(node1.endpoints.contains(&endpoint))
+                }
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
                     err
@@ -355,10 +348,10 @@ mod test {
 
             write_to_file(&vec![node], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with empty identity in YAML file. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
                     err
@@ -379,10 +372,10 @@ mod test {
 
             write_to_file(&vec![node], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with empty endpoint in YAML file. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
                     err
@@ -403,12 +396,12 @@ mod test {
 
             write_to_file(&vec![node], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => {
                     panic!("Node with empty display_name in YAML file. Error should be returned")
                 }
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
                     err
@@ -429,10 +422,10 @@ mod test {
 
             write_to_file(&vec![node], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with empty key in YAML file. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyKey but got {}",
                     err
@@ -453,10 +446,10 @@ mod test {
 
             write_to_file(&vec![node], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with no endpoint in YAML file. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
                     err
@@ -477,10 +470,10 @@ mod test {
 
             write_to_file(&vec![node], test_yaml_file_path);
 
-            let result = LocalYamlNodeRegistry::new(test_yaml_file_path);
+            let result = LocalYamlRegistry::new(test_yaml_file_path);
             match result {
                 Ok(_) => panic!("Node with no keys in YAML file. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingKeys but got {}",
                     err
@@ -497,8 +490,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let node = registry
                 .fetch_node(&get_node_1().identity)
@@ -516,8 +509,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let result = registry.fetch_node("NodeNotInRegistry");
             match result {
@@ -535,8 +528,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let nodes = registry
                 .list_nodes(&[])
@@ -557,8 +550,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let nodes = registry
                 .list_nodes(&[])
@@ -576,8 +569,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let filter = vec![MetadataPredicate::Eq(
                 "company".into(),
@@ -605,8 +598,8 @@ mod test {
                 test_yaml_file_path,
             );
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let filter = vec![
                 MetadataPredicate::Eq(
@@ -637,8 +630,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let filter = vec![MetadataPredicate::Eq(
                 "admin".to_string(),
@@ -662,8 +655,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let node = get_node_1();
 
@@ -689,8 +682,8 @@ mod test {
             let mut node = get_node_1();
             write_to_file(&vec![node.clone()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             node.metadata
                 .insert("location".to_string(), "Minneapolis".to_string());
@@ -719,8 +712,8 @@ mod test {
 
             write_to_file(&vec![node1.clone()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_2();
             node.endpoints = node1.endpoints.clone();
@@ -728,9 +721,9 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(
-                    endpoint,
-                ))) => assert!(node1.endpoints.contains(&endpoint)),
+                Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
+                    assert!(node1.endpoints.contains(&endpoint))
+                }
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
                     err
@@ -748,8 +741,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_1();
             node.identity = "".to_string();
@@ -757,7 +750,7 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node identity is empty. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
                     err
@@ -775,8 +768,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_1();
             node.endpoints = vec!["".to_string()];
@@ -784,7 +777,7 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node endpoint is empty. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
                     err
@@ -802,8 +795,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_1();
             node.display_name = "".to_string();
@@ -811,7 +804,7 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node display_name is empty. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
                     err
@@ -829,8 +822,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_1();
             node.keys = vec!["".to_string()];
@@ -838,7 +831,7 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node key is empty. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::EmptyKey but got {}",
                     err
@@ -856,8 +849,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_1();
             node.endpoints = vec![];
@@ -865,7 +858,7 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node endpoints is empty. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
                     err
@@ -883,8 +876,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let mut node = get_node_1();
             node.keys = vec![];
@@ -892,7 +885,7 @@ mod test {
 
             match result {
                 Ok(_) => panic!("Node keys is empty. Error should be returned"),
-                Err(NodeRegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+                Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
                 Err(err) => panic!(
                     "Should have gotten InvalidNodeError::MissingKeys but got {}",
                     err
@@ -909,8 +902,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let node = registry
                 .delete_node(&get_node_1().identity)
@@ -937,8 +930,8 @@ mod test {
         run_test(|test_yaml_file_path| {
             write_to_file(&vec![get_node_1(), get_node_2()], test_yaml_file_path);
 
-            let registry = LocalYamlNodeRegistry::new(test_yaml_file_path)
-                .expect("Failed to create LocalYamlNodeRegistry");
+            let registry = LocalYamlRegistry::new(test_yaml_file_path)
+                .expect("Failed to create LocalYamlRegistry");
 
             let result = registry.delete_node("NodeNotInRegistry");
             match result {
@@ -982,7 +975,7 @@ mod test {
     }
 
     fn write_to_file(data: &[Node], file_path: &str) {
-        let file = File::create(file_path).expect("Error creating test nodes yaml file.");
+        let file = File::create(file_path).expect("Error creating test yaml file.");
         serde_yaml::to_writer(file, data).expect("Error writing nodes to file.");
     }
 
@@ -1004,7 +997,7 @@ mod test {
         let mut temp_dir = env::temp_dir();
 
         let thread_id = thread::current().id();
-        temp_dir.push(format!("test_node_registry-{:?}.yaml", thread_id));
+        temp_dir.push(format!("test_registry-{:?}.yaml", thread_id));
         temp_dir.to_str().unwrap().to_string()
     }
 }

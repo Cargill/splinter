@@ -71,7 +71,7 @@ fn propose_successful_basic() {
 ///    IDs, service IDs, service types, and `admin_keys` service argument.
 /// 3. Verify that the proposal is committed.
 ///
-/// NOTE: this test is currently broken, since the node file used no longer exists and must be
+/// NOTE: this test is currently broken, since the registry file used no longer exists and must be
 /// generated.
 #[test]
 #[serial(stdout)]
@@ -81,7 +81,7 @@ fn propose_successful_with_node_file() {
         "splinter circuit propose \
          --url http://localhost:8088 \
          --key /tmp/alice.priv \
-         --node-file {}/../examples/gameroom/node_registry/nodes.yaml \
+         --node-file {}/../examples/gameroom/registry/registry.yaml \
          --service sc00::acme-node-000 \
          --service sc01::bubba-node-000 \
          --service-type *::scabbard \

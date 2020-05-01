@@ -38,8 +38,8 @@ transport = "tls"
 # Rest api address.
 bind = "0.0.0.0:8085"
 
-# Node Registry file
-registries = ["file:///project/tests/sample_node_registry.yaml"]
+# Splinter Registry file
+registries = ["file:///project/tests/sample_registry.yaml"]
 
 # List of certificate authority certificates (*.pem files).
 ca_certs = "/etc/splinter/certs/generated_ca.pem"

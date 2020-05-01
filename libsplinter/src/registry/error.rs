@@ -16,7 +16,7 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug)]
-pub enum NodeRegistryError {
+pub enum RegistryError {
     InvalidNode(InvalidNodeError),
     GeneralError {
         context: String,
@@ -24,27 +24,27 @@ pub enum NodeRegistryError {
     },
 }
 
-impl NodeRegistryError {
+impl RegistryError {
     pub fn general_error(context: &str) -> Self {
-        NodeRegistryError::GeneralError {
+        RegistryError::GeneralError {
             context: context.into(),
             source: None,
         }
     }
 
     pub fn general_error_with_source(context: &str, err: Box<dyn Error + Send>) -> Self {
-        NodeRegistryError::GeneralError {
+        RegistryError::GeneralError {
             context: context.into(),
             source: Some(err),
         }
     }
 }
 
-impl Error for NodeRegistryError {
+impl Error for RegistryError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            NodeRegistryError::InvalidNode(err) => Some(err),
-            NodeRegistryError::GeneralError { source, .. } => {
+            RegistryError::InvalidNode(err) => Some(err),
+            RegistryError::GeneralError { source, .. } => {
                 if let Some(ref err) = source {
                     Some(&**err)
                 } else {
@@ -55,11 +55,11 @@ impl Error for NodeRegistryError {
     }
 }
 
-impl fmt::Display for NodeRegistryError {
+impl fmt::Display for RegistryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NodeRegistryError::InvalidNode(err) => write!(f, "Invalid node detected: {}", err),
-            NodeRegistryError::GeneralError { context, source } => {
+            RegistryError::InvalidNode(err) => write!(f, "Invalid node detected: {}", err),
+            RegistryError::GeneralError { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
@@ -70,9 +70,9 @@ impl fmt::Display for NodeRegistryError {
     }
 }
 
-impl From<InvalidNodeError> for NodeRegistryError {
+impl From<InvalidNodeError> for RegistryError {
     fn from(err: InvalidNodeError) -> Self {
-        NodeRegistryError::InvalidNode(err)
+        RegistryError::InvalidNode(err)
     }
 }
 

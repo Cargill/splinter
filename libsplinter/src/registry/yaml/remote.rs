@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A remote, read-only node registry.
+//! A remote, read-only registry.
 //!
-//! This module contains the [`RemoteYamlNodeRegistry`], which provides an implementation of the
-//! [`NodeRegistryReader`] trait.
+//! This module contains the [`RemoteYamlRegistry`], which provides an implementation of the
+//! [`RegistryReader`] trait.
 //!
-//! [`RemoteYamlNodeRegistry`]: struct.RemoteYamlNodeRegistry.html
-//! [`NodeRegistryReader`]: ../../trait.NodeRegistryReader.html
+//! [`RemoteYamlRegistry`]: struct.RemoteYamlRegistry.html
+//! [`RegistryReader`]: ../../trait.RegistryReader.html
 
 use std::path::Path;
 use std::sync::{
@@ -32,27 +32,26 @@ use openssl::hash::{hash, MessageDigest};
 
 use crate::hex::to_hex;
 use crate::registry::{
-    validate_nodes, MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader,
+    validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
 };
 
-use super::LocalYamlNodeRegistry;
+use super::LocalYamlRegistry;
 
-/// A remote, read-only node registry.
+/// A remote, read-only registry.
 ///
-/// The `RemoteYamlNodeRegistry` provides access to a remote node registry YAML file over HTTP(S).
-/// The remote registry file must be a YAML sequence of nodes, where each node is valid (see
-/// [`Node`] for validity criteria). Read operations are provided by the [`NodeRegistryReader`]
-/// implementation.
+/// The `RemoteYamlRegistry` provides access to a remote registry YAML file over HTTP(S). The remote
+/// registry file must be a YAML sequence of nodes, where each node is valid (see [`Node`] for
+/// validity criteria). Read operations are provided by the [`RegistryReader`] implementation.
 ///
 /// The remote YAML file is cached locally by saving it to the filesystem. This ensures that the
 /// registry will remain available even if the remote file becomes unreachable. The on-disk
 /// location of the local cache is determined by the `cache_dir` argument of the registry's
 /// [`constructor`].
 ///
-/// On initialization, the `RemoteYamlNodeRegistry` will attempt to immediately fetch and cache the
+/// On initialization, the `RemoteYamlRegistry` will attempt to immediately fetch and cache the
 /// remote file. If this fails, the registry will log an error message and attempt to fetch/cache
 /// the remote file every time a read query is made on the registry (through one of the
-/// [`NodeRegistryReader`] methods) until the file is successfully cached. Until the registry has a
+/// [`RegistryReader`] methods) until the file is successfully cached. Until the registry has a
 /// local cache, it will behave as an empty registry. Once the remote file has been successfully
 /// cached for the first time, the registry will always provide data from the cache.
 ///
@@ -69,15 +68,15 @@ use super::LocalYamlNodeRegistry;
 /// is read, it will try again to refresh the cache.
 ///
 /// [`Node`]: struct.Node.html
-/// [`NodeRegistryReader`]: trait.NodeRegistryReader.html
-/// [`constructor`]: struct.RemoteYamlNodeRegistry.html#method.new
-pub struct RemoteYamlNodeRegistry {
+/// [`RegistryReader`]: trait.RegistryReader.html
+/// [`constructor`]: struct.RemoteYamlRegistry.html#method.new
+pub struct RemoteYamlRegistry {
     internal: Arc<Mutex<Internal>>,
     shutdown_handle: ShutdownHandle,
 }
 
-impl RemoteYamlNodeRegistry {
-    /// Construct a new `RemoteYamlNodeRegistry`.
+impl RemoteYamlRegistry {
+    /// Construct a new `RemoteYamlRegistry`.
     ///
     /// # Arguments
     ///
@@ -94,7 +93,7 @@ impl RemoteYamlNodeRegistry {
         cache_dir: &str,
         automatic_refresh_period: Option<Duration>,
         forced_refresh_period: Option<Duration>,
-    ) -> Result<Self, NodeRegistryError> {
+    ) -> Result<Self, RegistryError> {
         let internal = Arc::new(Mutex::new(Internal::new(
             url,
             cache_dir,
@@ -102,7 +101,7 @@ impl RemoteYamlNodeRegistry {
         )?));
 
         let running = automatic_refresh_period
-            .map::<Result<_, NodeRegistryError>, _>(|refresh_period| {
+            .map::<Result<_, RegistryError>, _>(|refresh_period| {
                 let running = Arc::new(AtomicBool::new(true));
 
                 let thread_internal = internal.clone();
@@ -119,7 +118,7 @@ impl RemoteYamlNodeRegistry {
                         )
                     })
                     .map_err(|err| {
-                        NodeRegistryError::general_error_with_source(
+                        RegistryError::general_error_with_source(
                             &format!(
                                 "Failed to spawn automatic refresh thread for remote registry '{}'",
                                 url
@@ -144,16 +143,16 @@ impl RemoteYamlNodeRegistry {
     }
 
     /// Acquire the lock for the internal cache and get the nodes from it.
-    fn get_nodes(&self) -> Result<Vec<Node>, NodeRegistryError> {
+    fn get_nodes(&self) -> Result<Vec<Node>, RegistryError> {
         self.internal
             .lock()
-            .map_err(|_| NodeRegistryError::general_error("Internal lock poisoned"))?
+            .map_err(|_| RegistryError::general_error("Internal lock poisoned"))?
             .get_nodes()
     }
 }
 
-impl NodeRegistryReader for RemoteYamlNodeRegistry {
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+impl RegistryReader for RemoteYamlRegistry {
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         Ok(self
             .get_nodes()?
             .into_iter()
@@ -163,13 +162,13 @@ impl NodeRegistryReader for RemoteYamlNodeRegistry {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<NodeIter<'a>, NodeRegistryError> {
+    ) -> Result<NodeIter<'a>, RegistryError> {
         let mut nodes = self.get_nodes()?;
         nodes.retain(|node| predicates.iter().all(|predicate| predicate.apply(node)));
         Ok(Box::new(nodes.into_iter()))
     }
 
-    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
         Ok(self
             .get_nodes()?
             .iter()
@@ -181,7 +180,7 @@ impl NodeRegistryReader for RemoteYamlNodeRegistry {
 /// Holds the internal state of the remote registry.
 struct Internal {
     url: String,
-    cache: LocalYamlNodeRegistry,
+    cache: LocalYamlRegistry,
     last_refresh_successful: bool,
     forced_refresh_period: Option<Duration>,
     next_forced_refresh: Option<Instant>,
@@ -193,7 +192,7 @@ impl Internal {
         url: &str,
         cache_dir: &str,
         forced_refresh_period: Option<Duration>,
-    ) -> Result<Self, NodeRegistryError> {
+    ) -> Result<Self, RegistryError> {
         let url = url.to_string();
 
         // The filename for the cache is derived from a hash of the URL; this makes the location
@@ -201,7 +200,7 @@ impl Internal {
         let hash = hash(MessageDigest::sha256(), url.as_bytes())
             .map(|digest| to_hex(&*digest))
             .map_err(|err| {
-                NodeRegistryError::general_error_with_source(
+                RegistryError::general_error_with_source(
                     "Failed to hash URL for cache file",
                     Box::new(err),
                 )
@@ -213,7 +212,7 @@ impl Internal {
             .expect("path built from &str cannot be invalid")
             .to_string();
 
-        let cache = LocalYamlNodeRegistry::new(&path)?;
+        let cache = LocalYamlRegistry::new(&path)?;
 
         let mut internal = Self {
             url,
@@ -236,7 +235,7 @@ impl Internal {
     }
 
     /// Attempt to refresh the internal cache and update state accordingly.
-    fn refresh_cache(&mut self) -> Result<(), NodeRegistryError> {
+    fn refresh_cache(&mut self) -> Result<(), RegistryError> {
         fetch_nodes_from_remote(&self.url)
             .and_then(|nodes| self.cache.write_nodes(nodes))
             .map_err(|err| {
@@ -251,7 +250,7 @@ impl Internal {
                     .forced_refresh_period
                     .map(|duration| {
                         Instant::now().checked_add(duration).ok_or_else(|| {
-                            NodeRegistryError::general_error(
+                            RegistryError::general_error(
                                 "Forced refresh time could not be determined; \
                                  forced_refresh_period may be too large",
                             )
@@ -263,7 +262,7 @@ impl Internal {
     }
 
     /// Attempt to refresh the internal cache if necessary and return the cache's contents.
-    fn get_nodes(&mut self) -> Result<Vec<Node>, NodeRegistryError> {
+    fn get_nodes(&mut self) -> Result<Vec<Node>, RegistryError> {
         // If the last attempt to refresh the cache wasn't successful, try again
         if !self.last_refresh_successful {
             match self.refresh_cache() {
@@ -293,25 +292,25 @@ impl Internal {
     }
 }
 
-/// Fetch, parse, and validate the YAML node registry file at the given URL.
-fn fetch_nodes_from_remote(url: &str) -> Result<Vec<Node>, NodeRegistryError> {
+/// Fetch, parse, and validate the YAML registry file at the given URL.
+fn fetch_nodes_from_remote(url: &str) -> Result<Vec<Node>, RegistryError> {
     let bytes = reqwest::blocking::get(url)
         .and_then(|response| response.error_for_status())
         .map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 &format!("Failed to fetch remote registry file from {}", url),
                 Box::new(err),
             )
         })?
         .bytes()
         .map_err(|err| {
-            NodeRegistryError::general_error_with_source(
+            RegistryError::general_error_with_source(
                 "Failed to get bytes from remote registry file HTTP response",
                 Box::new(err),
             )
         })?;
     let nodes: Vec<Node> = serde_yaml::from_slice(&bytes).map_err(|_| {
-        NodeRegistryError::general_error(
+        RegistryError::general_error(
             "Failed to deserialize remote registry file: Not a valid YAML sequence of nodes",
         )
     })?;
@@ -371,14 +370,14 @@ fn automatic_refresh_loop(
     }
 }
 
-/// Handle for signaling the `RemoteYamlNodeRegistry` to shutdown.
+/// Handle for signaling the `RemoteYamlRegistry` to shutdown.
 #[derive(Clone)]
 pub struct ShutdownHandle {
     running: Option<Arc<AtomicBool>>,
 }
 
 impl ShutdownHandle {
-    /// Send shutdown signal to `RemoteYamlNodeRegistry`.
+    /// Send shutdown signal to `RemoteYamlRegistry`.
     pub fn shutdown(&self) {
         if let Some(running) = &self.running {
             running.store(false, Ordering::SeqCst)
