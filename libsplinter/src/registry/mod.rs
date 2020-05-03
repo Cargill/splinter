@@ -378,3 +378,341 @@ fn check_if_node_is_duplicate(
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that the `NodeBuilder` properly constructs a new `Node` when just the minimum values
+    /// are provided. Also verifies that the node builder can be initialized with the
+    /// `Node::builder` method.
+    ///
+    /// * The identity field should match the value provided to the `Node::builder` method
+    /// * The set endpoint should be the only endpoint for the node
+    /// * The display name should be set to a default value of "Node <identity>"
+    /// * The set key should be the only key for the node
+    /// * The metadata should be empty, because metadata is optional and no entries are provided
+    #[test]
+    fn node_builder_minimum() {
+        let node = Node::builder("identity")
+            .with_endpoint("endpoint")
+            .with_key("key")
+            .build()
+            .expect("Failed to build node");
+
+        assert_eq!(&node.identity, "identity");
+        assert_eq!(node.endpoints, vec!["endpoint".to_string()]);
+        assert_eq!(node.display_name, format!("Node {}", node.identity));
+        assert_eq!(node.keys, vec!["key".to_string()]);
+        assert!(node.metadata.is_empty());
+    }
+
+    /// Verify that the `NodeBuilder` properly constructs a new `Node` when all builder methods are
+    /// used.
+    ///
+    /// * The identity field should match the value provided to the `NodeBuilder::new` method
+    /// * All endpoints provided using the `with_endpoint` and `with_endpoints` methods should be
+    ///   in the node's endpoints
+    /// * The display name should match the value provided using the `with_display_name` method
+    /// * All keys provided using the `with_key` and `with_keys` methods should be in the node's
+    ///   keys
+    /// * The metadata should include all of the entries provided using the `with_metadata` method
+    #[test]
+    fn node_builder_all_fields() {
+        let node = NodeBuilder::new("identity")
+            .with_endpoint("endpoint1")
+            .with_endpoints(vec!["endpoint2".into(), "endpoint3".into()])
+            .with_display_name("display name")
+            .with_key("key1")
+            .with_keys(vec!["key2".into(), "key3".into()])
+            .with_metadata("k1", "v1")
+            .with_metadata("k2", "v2")
+            .build()
+            .expect("Failed to build node");
+
+        assert_eq!(&node.identity, "identity");
+        assert_eq!(
+            node.endpoints,
+            vec![
+                "endpoint1".to_string(),
+                "endpoint2".to_string(),
+                "endpoint3".to_string()
+            ]
+        );
+        assert_eq!(&node.display_name, "display name");
+        assert_eq!(
+            node.keys,
+            vec!["key1".to_string(), "key2".to_string(), "key3".to_string()]
+        );
+        assert_eq!(node.metadata.len(), 2);
+        assert_eq!(node.metadata.get("k1"), Some(&"v1".to_string()));
+        assert_eq!(node.metadata.get("k2"), Some(&"v2".to_string()));
+    }
+
+    /// Verify that the `NodeBuilder` checks all the required fields for emptiness.
+    ///
+    /// * `identity` must be non-empty
+    /// * `endpoints` must be non-empty
+    /// * All `endpoints` entries must be non-empty
+    /// * `keys` must be non-empty
+    /// * All `keys` entries must be non-empty
+    #[test]
+    fn node_builder_required_fields_emptiness() {
+        match NodeBuilder::new("")
+            .with_endpoint("endpoint")
+            .with_key("key")
+            .build()
+        {
+            Err(InvalidNodeError::EmptyIdentity) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyIdentity), got: {:?}",
+                res
+            ),
+        }
+
+        match NodeBuilder::new("identity").with_key("key").build() {
+            Err(InvalidNodeError::MissingEndpoints) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::MissingEndpoints), got: {:?}",
+                res
+            ),
+        }
+
+        match NodeBuilder::new("identity")
+            .with_endpoint("")
+            .with_key("key")
+            .build()
+        {
+            Err(InvalidNodeError::EmptyEndpoint) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyEndpoint), got: {:?}",
+                res
+            ),
+        }
+
+        match NodeBuilder::new("identity")
+            .with_endpoint("endpoint")
+            .build()
+        {
+            Err(InvalidNodeError::MissingKeys) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::MissingKeys), got: {:?}",
+                res
+            ),
+        }
+
+        match NodeBuilder::new("identity")
+            .with_endpoint("endpoint")
+            .with_key("")
+            .build()
+        {
+            Err(InvalidNodeError::EmptyKey) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyKey), got: {:?}",
+                res
+            ),
+        }
+    }
+
+    /// Verify that the `Node::has_key` method properly determines whether or not a key belongs to
+    /// a node.
+    #[test]
+    fn node_has_key() {
+        let node = Node::builder("identity")
+            .with_endpoint("endpoint")
+            .with_key("key")
+            .build()
+            .expect("Failed to build node");
+
+        assert!(node.has_key("key"));
+        assert!(!node.has_key("other"));
+    }
+
+    /// Verify that the `MetadataPredicate::apply` method properly determines if a node satisfies
+    /// the predicate for each of the predicate variants.
+    #[test]
+    fn metadata_predicates() {
+        let node = Node::builder("identity")
+            .with_endpoint("endpoint")
+            .with_key("key")
+            .with_metadata("key", "5".into())
+            .build()
+            .expect("Failed to build node");
+
+        assert!(MetadataPredicate::Eq("key".into(), "5".into()).apply(&node));
+        assert!(!MetadataPredicate::Eq("key".into(), "4".into()).apply(&node));
+
+        assert!(MetadataPredicate::Ne("key".into(), "4".into()).apply(&node));
+        assert!(!MetadataPredicate::Ne("key".into(), "5".into()).apply(&node));
+
+        assert!(MetadataPredicate::Gt("key".into(), "4".into()).apply(&node));
+        assert!(!MetadataPredicate::Gt("key".into(), "5".into()).apply(&node));
+        assert!(!MetadataPredicate::Gt("key".into(), "6".into()).apply(&node));
+
+        assert!(MetadataPredicate::Ge("key".into(), "4".into()).apply(&node));
+        assert!(MetadataPredicate::Ge("key".into(), "5".into()).apply(&node));
+        assert!(!MetadataPredicate::Ge("key".into(), "6".into()).apply(&node));
+
+        assert!(MetadataPredicate::Lt("key".into(), "6".into()).apply(&node));
+        assert!(!MetadataPredicate::Lt("key".into(), "5".into()).apply(&node));
+        assert!(!MetadataPredicate::Lt("key".into(), "4".into()).apply(&node));
+
+        assert!(MetadataPredicate::Le("key".into(), "6".into()).apply(&node));
+        assert!(MetadataPredicate::Le("key".into(), "5".into()).apply(&node));
+        assert!(!MetadataPredicate::Le("key".into(), "4".into()).apply(&node));
+    }
+
+    /// Verify that the `validate_nodes` method properly validates nodes based on the following
+    /// criteria:
+    ///
+    /// * `identity` must be non-empty
+    /// * `endpoints` must be non-empty
+    /// * All `endpoints` entries must be non-empty
+    /// * `display_name` must be non-empty
+    /// * `keys` must be non-empty
+    /// * All `keys` entries must be non-empty
+    /// * All identities must be unique with respect to the other nodes
+    /// * All endpoints must be unique with respect to the other nodes
+    #[test]
+    fn node_validation() {
+        let node1 = Node::builder("identity1")
+            .with_endpoint("endpoint1")
+            .with_key("key1")
+            .build()
+            .expect("Failed to build node1");
+        let node2 = Node::builder("identity2")
+            .with_endpoint("endpoint2")
+            .with_key("key2")
+            .build()
+            .expect("Failed to build node2");
+
+        let empty_identity = Node {
+            identity: "".into(),
+            endpoints: vec!["endpoint3".into()],
+            display_name: "display name".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), empty_identity]) {
+            Err(InvalidNodeError::EmptyIdentity) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyIdentity), got: {:?}",
+                res
+            ),
+        }
+
+        let missing_endpoints = Node {
+            identity: "identity3".into(),
+            endpoints: vec![],
+            display_name: "display name".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), missing_endpoints]) {
+            Err(InvalidNodeError::MissingEndpoints) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::MissingEndpoints), got: {:?}",
+                res
+            ),
+        }
+
+        let empty_endpoint = Node {
+            identity: "identity3".into(),
+            endpoints: vec!["".into()],
+            display_name: "display name".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), empty_endpoint]) {
+            Err(InvalidNodeError::EmptyEndpoint) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyEndpoint), got: {:?}",
+                res
+            ),
+        }
+
+        let empty_display_name = Node {
+            identity: "identity3".into(),
+            endpoints: vec!["endpoint3".into()],
+            display_name: "".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), empty_display_name]) {
+            Err(InvalidNodeError::EmptyDisplayName) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyDisplayName), got: {:?}",
+                res
+            ),
+        }
+
+        let missing_keys = Node {
+            identity: "identity3".into(),
+            endpoints: vec!["endpoint3".into()],
+            display_name: "display name".into(),
+            keys: vec![],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), missing_keys]) {
+            Err(InvalidNodeError::MissingKeys) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::MissingKeys), got: {:?}",
+                res
+            ),
+        }
+
+        let empty_key = Node {
+            identity: "identity3".into(),
+            endpoints: vec!["endpoint3".into()],
+            display_name: "display name".into(),
+            keys: vec!["".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), empty_key]) {
+            Err(InvalidNodeError::EmptyKey) => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::EmptyKey), got: {:?}",
+                res
+            ),
+        }
+
+        let duplicate_identity = Node {
+            identity: "identity1".into(),
+            endpoints: vec!["endpoint3".into()],
+            display_name: "display name".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), duplicate_identity]) {
+            Err(InvalidNodeError::DuplicateIdentity(id)) if &id == "identity1" => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::DuplicateIdentity), got: {:?}",
+                res
+            ),
+        }
+
+        let duplicate_endpoint = Node {
+            identity: "identity3".into(),
+            endpoints: vec!["endpoint1".into()],
+            display_name: "display name".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        match validate_nodes(&[node1.clone(), node2.clone(), duplicate_endpoint]) {
+            Err(InvalidNodeError::DuplicateEndpoint(endpoint)) if &endpoint == "endpoint1" => {}
+            res => panic!(
+                "Result should have been Err(InvalidNodeError::DuplicateEndpoint), got: {:?}",
+                res
+            ),
+        }
+
+        let valid_node3 = Node {
+            identity: "identity3".into(),
+            endpoints: vec!["endpoint3".into()],
+            display_name: "display name".into(),
+            keys: vec!["key3".into()],
+            metadata: HashMap::new(),
+        };
+        assert!(validate_nodes(&[node1, node2, valid_node3]).is_ok());
+    }
+}
