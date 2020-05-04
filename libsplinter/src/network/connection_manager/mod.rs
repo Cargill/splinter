@@ -1001,7 +1001,7 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
                         reconnections.push(endpoint.to_string());
                     }
                 } else {
-                    info!("Sending heartbeat to {}", endpoint);
+                    trace!("Sending heartbeat to {}", endpoint);
                     if let Err(err) = matrix_sender
                         .send(metadata.connection_id.clone(), heartbeat_message.clone())
                     {
@@ -1020,7 +1020,7 @@ fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
             ConnectionMetadataExt::Inbound {
                 ref mut disconnected,
             } => {
-                info!("Sending heartbeat to {}", endpoint);
+                trace!("Sending heartbeat to {}", endpoint);
                 if let Err(err) =
                     matrix_sender.send(metadata.connection_id.clone(), heartbeat_message.clone())
                 {
