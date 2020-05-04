@@ -92,7 +92,8 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("scar")
                                 .long_help(
                                     "The name and version requirement of the .scar to upload, in \
-                                     the format 'name:version_req'. The version requirement can \
+                                     the format 'name:version_req'. The contract name must not \
+                                     include underscores, '_'. The version requirement can \
                                      be any valid semver requirement string.",
                                 )
                                 .required(true),
