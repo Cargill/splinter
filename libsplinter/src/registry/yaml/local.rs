@@ -1089,6 +1089,99 @@ mod test {
         }
     }
 
+    ///
+    /// Verifies that if the YAML file does not exist on initialization, `LocalYamlRegistry` will
+    /// create and initialize it as an empty registry.
+    ///
+    #[test]
+    fn test_create_file() {
+        let temp_dir = TempDir::new("test_create_file").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        // Verify that the internal cache is empty
+        assert!(registry
+            .get_nodes()
+            .expect("Failed to get nodes")
+            .is_empty());
+
+        // Verify that the file exists and is empty
+        let file = File::open(&path).expect("Failed to open file");
+        let file_contents: Vec<Node> =
+            serde_yaml::from_reader(file).expect("Failed to deserialize file");
+        assert!(file_contents.is_empty());
+    }
+
+    ///
+    /// Verifies that if the YAML file is modified directly, it will be reloaded on the next read.
+    ///
+    #[test]
+    fn test_reload_modified_file() {
+        let temp_dir =
+            TempDir::new("test_reload_modified_file").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&[], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        assert!(registry
+            .get_nodes()
+            .expect("Failed to get nodes from original file")
+            .is_empty());
+
+        // Allow some time before writing the file to make sure the read time is earlier than the
+        // write time; the sytem clock may not be very precise.
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        write_to_file(&[get_node_1()], &path);
+
+        let nodes = registry
+            .get_nodes()
+            .expect("Failed to get nodes from updated file");
+        assert_eq!(nodes, vec![get_node_1()]);
+    }
+
+    ///
+    /// Verifies that if the YAML file is removed, the registry will still return nodes using its
+    /// in-memory cache.
+    ///
+    #[test]
+    fn test_file_removed() {
+        let temp_dir = TempDir::new("test_file_removed").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&[get_node_1()], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let nodes = registry.get_nodes().expect("Failed to get nodes with file");
+        assert_eq!(nodes, vec![get_node_1()]);
+
+        remove_file(&path).expect("Failed to remove file");
+
+        let nodes = registry
+            .get_nodes()
+            .expect("Failed to get nodes without file");
+        assert_eq!(nodes, vec![get_node_1()]);
+    }
+
     fn get_node_1() -> Node {
         Node::builder("Node-123")
             .with_endpoint("tcps://12.0.0.123:8431")
