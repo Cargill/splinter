@@ -305,14 +305,13 @@ pub trait MessageSender<R>: Send {
 ///
 /// Message Types (MT) merely need to implement Hash, Eq and Debug (for unknown message type
 /// results). Beyond that, there are no other requirements.
-#[derive(Default)]
 pub struct Dispatcher<MT, Source = PeerId>
 where
     Source: 'static,
     MT: Any + Hash + Eq + Debug + Clone,
 {
     handlers: HashMap<MT, HandlerWrapper<Source, MT>>,
-    network_sender: Option<Box<dyn MessageSender<Source>>>,
+    network_sender: Box<dyn MessageSender<Source>>,
 }
 
 impl<MT, Source> Dispatcher<MT, Source>
@@ -330,7 +329,7 @@ where
     {
         Dispatcher {
             handlers: HashMap::new(),
-            network_sender: Some(network_sender.into()),
+            network_sender: network_sender.into(),
         }
     }
 
@@ -357,13 +356,6 @@ where
         );
     }
 
-    pub fn set_network_sender<S>(&mut self, network_sender: S)
-    where
-        S: Into<Box<dyn MessageSender<Source>>>,
-    {
-        self.network_sender = Some(network_sender.into());
-    }
-
     /// Dispatch a message by type.
     ///
     /// This dispatches a message (in raw byte form) as a given message type.  The message will be
@@ -384,25 +376,18 @@ where
             message_bytes,
             source_id,
         };
-        if let Some(network_sender) = &self.network_sender {
-            self.handlers
-                .get(message_type)
-                .ok_or_else(|| {
-                    DispatchError::UnknownMessageType(format!(
-                        "No handler for type {:?}",
-                        message_type
-                    ))
-                })
-                .and_then(|handler| {
-                    handler.handle(
-                        &message_context.message_bytes,
-                        &message_context,
-                        &**network_sender,
-                    )
-                })
-        } else {
-            Err(DispatchError::MissingNetworkSender)
-        }
+        self.handlers
+            .get(message_type)
+            .ok_or_else(|| {
+                DispatchError::UnknownMessageType(format!("No handler for type {:?}", message_type))
+            })
+            .and_then(|handler| {
+                handler.handle(
+                    &message_context.message_bytes,
+                    &message_context,
+                    &*self.network_sender,
+                )
+            })
     }
 }
 
