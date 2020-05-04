@@ -1,0 +1,104 @@
+// Copyright 2018-2020 Cargill Incorporated
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+message ServiceMessage {
+    // The message type for the payload
+    ServiceMessageType message_type = 1;
+
+    // The name of the circuit the message is meant for
+    string circuit = 2;
+
+    // The unique ID of the service that is connecting to the circuit
+    string service_id = 3;
+
+    // Either a message defined below or another message envelope
+    bytes payload = 4;
+}
+
+enum ServiceMessageType {
+    UNSET_SERVICE_MESSAGE_TYPE = 0;
+
+    // Registration-related messages
+    SM_SERVICE_CONNECT_REQUEST = 100;
+    SM_SERVICE_CONNECT_RESPONSE = 101;
+    SM_SERVICE_DISCONNECT_REQUEST = 102;
+    SM_SERVICE_DISCONNECT_RESPONSE = 103;
+
+    // Opaque message contents, with routing information.
+    SM_SERVICE_PROCESSOR_MESSAGE = 200;
+}
+
+message SMConnectRequest {
+    // ID used to correlate the response with this request
+    string correlation_id = 1;
+}
+
+message SMConnectResponse {
+    enum Status {
+        UNSET_STATUS = 0;
+        OK = 1;
+        ERROR_CIRCUIT_DOES_NOT_EXIST = 2;
+        ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY = 3;
+        ERROR_SERVICE_ALREADY_REGISTERED = 4;
+        ERROR_NOT_AN_ALLOWED_NODE = 5;
+        ERROR_QUEUE_FULL = 6;
+    }
+
+    Status status = 1;
+    // Explanation of the error (optional)
+    string error_message = 2;
+
+    // ID used to correlate this response with the request
+    string correlation_id = 3;
+}
+
+message SMDisconnectRequest {
+    // ID used to correlate the response with this request
+    string correlation_id = 3;
+}
+
+message SMDisconnectResponse {
+    enum Status {
+        UNSET_ERROR = 0;
+        OK = 1;
+        ERROR_CIRCUIT_DOES_NOT_EXIST = 2;
+        ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY = 3;
+        ERROR_SERVICE_NOT_REGISTERED = 4;
+        ERROR_QUEUE_FULL = 5;
+    }
+
+    Status status = 1;
+
+    // Explanation of the error (optional)
+    string error_message = 2;
+
+    // ID used to correlate this response with the request
+    string correlation_id = 3;
+}
+
+message ServiceProcessorMessage {
+    // ID of the sender of the message
+    string sender = 1;
+
+    // ID of recipient of the message
+    string recipient = 2;
+
+    // The request payload
+    bytes payload = 3;
+
+    // ID used to correlate the response with this request (optional)
+    string correlation_id = 4;
+}
