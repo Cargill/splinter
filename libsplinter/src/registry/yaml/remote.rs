@@ -195,24 +195,7 @@ impl Internal {
     ) -> Result<Self, RegistryError> {
         let url = url.to_string();
 
-        // The filename for the cache is derived from a hash of the URL; this makes the location
-        // deterministic, which allows the local cache to be used across restarts.
-        let hash = hash(MessageDigest::sha256(), url.as_bytes())
-            .map(|digest| to_hex(&*digest))
-            .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to hash URL for cache file",
-                    Box::new(err),
-                )
-            })?;
-        let filename = format!("remote_registry_{}.yaml", hash);
-        let path = Path::new(cache_dir)
-            .join(filename)
-            .to_str()
-            .expect("path built from &str cannot be invalid")
-            .to_string();
-
-        let cache = LocalYamlRegistry::new(&path)?;
+        let cache = LocalYamlRegistry::new(&compute_cache_filename(&url, cache_dir)?)?;
 
         let mut internal = Self {
             url,
@@ -290,6 +273,25 @@ impl Internal {
 
         self.cache.get_nodes()
     }
+}
+
+// Derive the filename for the cache from a hash of the URL; this makes the location deterministic,
+// which allows the local cache to be used across restarts.
+fn compute_cache_filename(url: &str, cache_dir: &str) -> Result<String, RegistryError> {
+    let hash = hash(MessageDigest::sha256(), url.as_bytes())
+        .map(|digest| to_hex(&*digest))
+        .map_err(|err| {
+            RegistryError::general_error_with_source(
+                "Failed to hash URL for cache file",
+                Box::new(err),
+            )
+        })?;
+    let filename = format!("remote_registry_{}.yaml", hash);
+    Ok(Path::new(cache_dir)
+        .join(filename)
+        .to_str()
+        .expect("path built from &str cannot be invalid")
+        .to_string())
 }
 
 /// Fetch, parse, and validate the YAML registry file at the given URL.
