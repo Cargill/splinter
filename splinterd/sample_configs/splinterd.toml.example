@@ -13,40 +13,103 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
+# The default values are shown for each setting, unless otherwise noted.
+
 # Config file format version
 version = "1"
 
+# Sets a new ID for the node. The node ID must be unique across the
+# network (for all Splinter nodes that could participate on the same circuit).
+# (default 'nXXXXX', where 'XXXXX' is 5 random numbers)
 node_id = "012"
 
+# Human-readable name for the node
+# (default 'Node {node_id}')
+display_name = "node-012"
+
 # Endpoint used for service to daemon communication.
+# Use a protocol prefix to enforce the connection type, using the format
+# `protocol_prefix://ip:port`
+# (default "127.0.0.1:8043")
 service_endpoint = "127.0.0.1:8043"
 
 # Endpoints used for daemon to daemon communication.
+# Use a protocol prefix to enforce the connection type, using the format
+# `protocol_prefix://ip:port`
+# (default ["127.0.0.1:8044"])
 network_endpoints = ["tcps://127.0.0.1:8044"]
 
-# A list of splinter nodes the daemon will automatically
+# Endpoint used for REST API communication
+# (default "127.0.0.1:8080")
+bind = "127.0.0.1:8080"
+
+# A list of splinter node endpoints the daemon will automatically
 # connect to on start up.
+# Use a protocol prefix to enforce the connection type, using the format
+# `protocol_prefix://ip:port`
+# (default []; empty list)
 peers = []
 
 # The type of storage that should be used to store circuit state. Option are
-# currently "yaml" or "memory"
+# currently "yaml" or "memory".
+# (default "yaml")
 storage = "yaml"
 
 # List of certificate authority certificates (*.pem files).
-tls_ca_file = "certs/ca.pem"
+# (default "/etc/splinter/certs/ca.pem")
+tls_ca_file = "/etc/splinter/node_012/certs/ca.pem"
 
 # A certificate signed by a certificate authority.
 # Used by the daemon when it is acting as a client
 # (sending messages).
-tls_client_cert = "certs/client.crt"
+# (default "/etc/splinter/certs/client.crt")
+tls_client_cert = "/etc/splinter/node_012/certs/client.crt"
 
 # Private key used by daemon when it is acting as a client.
-tls_client_key = "certs/client.key"
+# (default "/etc/splinter/certs/private/client.key")
+tls_client_key = "/etc/splinter/node_012/certs/client.key"
 
 # A certificate signed by a certificate authority.
 # Used by the daemon when it is acting as a server
 # (receiving messages).
-tls_server_cert = "certs/server.crt"
+# (default "/etc/splinter/certs/server.crt")
+tls_server_cert = "/etc/splinter/node_012/certs/server.crt"
 
 # Private key used by daemon when it is acting as a server.
-tls_server_key = "certs/server.key"
+# (default "/etc/splinter/certs/private/server.key")
+tls_server_key = "/etc/splinter/node_012/certs/server.key"
+
+# Public network endpoint for daemon-to-daemon communication
+# Use a protocol prefix to enforce the connection type, using the format
+# `protocol_prefix://ip:port`
+# (default [{network_endpoints}])
+advertised_endpoints = ["tcps://127.0.0.1:8044"]
+
+# Endpoint used for database communication
+# (default "127.0.0.1:5432")
+database = "127.0.0.1:5432"
+
+# Read-only registry files
+# (default []; empty list)
+registries = ["file://./registries/registry.yaml"]
+
+# Interval remote registries should attempt to fetch upstream changes
+# in background
+# (in seconds; default 600 seconds = 10 minutes)
+registry_auto_refresh = 1200
+
+# How long before remote registries should fetch upstream changes when read
+# (in seconds; default 10 seconds)
+registry_forced_refresh = 10
+
+# Interval at which heartbeat message should be sent
+# (in seconds; default 30 seconds)
+heartbeat = 60
+
+# Coordinator timeout for admin service proposals
+# (in seconds; default 30 seconds)
+admin_timeout = 30
+
+# Domains included in the REST API CORS
+# (default ["*"])
+whitelist = ["*"]
