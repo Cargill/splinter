@@ -54,7 +54,7 @@ pub struct Config {
     network_endpoints: (Vec<String>, ConfigSource),
     advertised_endpoints: (Vec<String>, ConfigSource),
     peers: (Vec<String>, ConfigSource),
-    node_id: (String, ConfigSource),
+    node_id: Option<(String, ConfigSource)>,
     display_name: (String, ConfigSource),
     bind: (String, ConfigSource),
     #[cfg(feature = "database")]
@@ -122,8 +122,12 @@ impl Config {
         &self.peers.0
     }
 
-    pub fn node_id(&self) -> &str {
-        &self.node_id.0
+    pub fn node_id(&self) -> Option<&str> {
+        if let Some((id, _)) = &self.node_id {
+            Some(id)
+        } else {
+            None
+        }
     }
 
     pub fn display_name(&self) -> &str {
@@ -233,8 +237,12 @@ impl Config {
         &self.peers.1
     }
 
-    fn node_id_source(&self) -> &ConfigSource {
-        &self.node_id.1
+    fn node_id_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.node_id {
+            Some(source)
+        } else {
+            None
+        }
     }
 
     fn display_name_source(&self) -> &ConfigSource {
@@ -359,11 +367,13 @@ impl Config {
             self.peers(),
             self.peers_source()
         );
-        debug!(
-            "Config: node_id: {} (source: {:?})",
-            self.node_id(),
-            self.node_id_source()
-        );
+        if let Some(id) = self.node_id() {
+            debug!(
+                "Config: node_id: {:?} (source: {:?})",
+                id,
+                self.node_id_source()
+            );
+        }
         debug!(
             "Config: display_name: {} (source: {:?})",
             self.display_name(),
@@ -540,16 +550,15 @@ mod tests {
     }
 
     #[test]
-    /// This test verifies that a finalized Config object constructed from just
-    /// a DefaultPartialConfigBuilder object will be unsuccessful because of the missing values, in
-    /// the following steps:
+    /// This test verifies that a finalized Config object may be constructed from just
+    /// a DefaultPartialConfigBuilder object, in the following steps:
     ///
     /// 1. An empty ConfigBuilder object is created.
     /// 2. A PartialConfig built from a DefaultPartialConfigBuilder is added to the ConfigBuilder.
     ///
     /// This test then verifies the final Config object built from the ConfigBuilder object has
-    /// resulted in an error because of the missing values.
-    fn test_default_final_config_err() {
+    /// resulted in a default Config object, as the node_id is not required.
+    fn test_default_final_config() {
         // Create a new ConfigBuilder object.
         let mut builder = ConfigBuilder::new();
         // Add a PartialConfig built from a DefaultPartialConfigBuilder object to the
@@ -561,8 +570,8 @@ mod tests {
         );
         // Build the final Config object.
         let final_config = builder.build();
-        // Asserts the final Config was not successfully built.
-        assert!(final_config.is_err());
+        // Asserts the final Config was successfully built.
+        assert!(final_config.is_ok());
     }
 
     #[test]
@@ -887,7 +896,7 @@ mod tests {
         // CommandLine).
         assert_eq!(
             (final_config.node_id(), final_config.node_id_source()),
-            ("123", &ConfigSource::CommandLine)
+            (Some("123"), Some(&ConfigSource::CommandLine))
         );
         // The TomlPartialConfigBuilder and ClapPartialConfigBuilder had values for `display_name`,
         // but the ClapPartialConfigBuilder value should have precedence (source should be
