@@ -422,6 +422,7 @@ struct BatchInfo {
 
 /// Used by `BatchInfo` for deserializing `GET /batch_status` responses.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "statusType", content = "message")]
 enum BatchStatus {
     Unknown,
     Pending,
