@@ -200,7 +200,10 @@ pub async fn submit_scabbard_payload(
             RestApiResponseError::BadRequest(message) => {
                 Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&message)))
             }
-            _ => Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error())),
+            _ => {
+                debug!("Internal Server Error: {}", err);
+                Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+            }
         },
     }
 }

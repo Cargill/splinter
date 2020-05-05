@@ -216,7 +216,10 @@ pub async fn proposal_vote(
                 RestApiResponseError::BadRequest(err) => {
                     Ok(HttpResponse::BadRequest().json(ErrorResponse::bad_request(&err)))
                 }
-                _ => Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error())),
+                _ => {
+                    debug!("Internal Server Error: {}", err);
+                    Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+                }
             },
             error::BlockingError::Canceled => {
                 debug!("Internal Server Error: {}", err);
