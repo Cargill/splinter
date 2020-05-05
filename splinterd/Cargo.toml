@@ -60,11 +60,13 @@ default = [
     "config-command-line",
     "config-default",
     "config-env-var",
-    "config-toml",
 ]
 
 stable = [
+    # The stable feature extends default:
     "default",
+    # The following features are stable:
+    "config-toml",
     "rest-api-cors",
 ]
 
