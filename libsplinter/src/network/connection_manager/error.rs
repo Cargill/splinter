@@ -56,3 +56,14 @@ impl From<io::Error> for ConnectionManagerError {
         ConnectionManagerError::StartUpError(err.to_string())
     }
 }
+
+#[derive(Debug)]
+pub struct AuthorizerError(pub String);
+
+impl std::error::Error for AuthorizerError {}
+
+impl std::fmt::Display for AuthorizerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
