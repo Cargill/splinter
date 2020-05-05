@@ -36,6 +36,7 @@ impl<'a> From<&'a BatchInfo> for BatchInfoResponse<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "statusType", content = "message")]
 pub enum BatchStatusResponse<'a> {
     Unknown,
     Pending,
