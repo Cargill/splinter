@@ -14,6 +14,8 @@
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
+const STORAGE: &str = "yaml";
+
 const CONFIG_DIR: &str = "/etc/splinter";
 const TLS_CERT_DIR: &str = "/etc/splinter/certs";
 const STATE_DIR: &str = "/var/lib/splinter";
@@ -23,6 +25,12 @@ const TLS_CLIENT_KEY: &str = "private/client.key";
 const TLS_SERVER_CERT: &str = "server.crt";
 const TLS_SERVER_KEY: &str = "private/server.key";
 const TLS_CA_FILE: &str = "ca.pem";
+
+const BIND: &str = "127.0.0.1:8080";
+const SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
+const NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+#[cfg(feature = "database")]
+const DATABASE: &str = "127.0.0.1:5432";
 
 const REGISTRY_AUTO_REFRESH: u64 = 600; // 600 seconds = 10 minutes
 const REGISTRY_FORCED_REFRESH: u64 = 10; // 10 seconds
@@ -44,17 +52,17 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         partial_config = partial_config
             .with_config_dir(Some(String::from(CONFIG_DIR)))
-            .with_storage(Some(String::from("yaml")))
+            .with_storage(Some(String::from(STORAGE)))
             .with_tls_cert_dir(Some(String::from(TLS_CERT_DIR)))
             .with_tls_ca_file(Some(String::from(TLS_CA_FILE)))
             .with_tls_client_cert(Some(String::from(TLS_CLIENT_CERT)))
             .with_tls_client_key(Some(String::from(TLS_CLIENT_KEY)))
             .with_tls_server_cert(Some(String::from(TLS_SERVER_CERT)))
             .with_tls_server_key(Some(String::from(TLS_SERVER_KEY)))
-            .with_service_endpoint(Some(String::from("127.0.0.1:8043")))
-            .with_network_endpoints(Some(vec![String::from("127.0.0.1:8044")]))
+            .with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
+            .with_network_endpoints(Some(vec![String::from(NETWORK_ENDPOINT)]))
             .with_peers(Some(vec![]))
-            .with_bind(Some(String::from("127.0.0.1:8080")))
+            .with_bind(Some(String::from(BIND)))
             .with_registries(Some(vec![]))
             .with_registry_auto_refresh(Some(REGISTRY_AUTO_REFRESH))
             .with_registry_forced_refresh(Some(REGISTRY_FORCED_REFRESH))
@@ -71,7 +79,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         #[cfg(feature = "database")]
         {
-            partial_config = partial_config.with_database(Some(String::from("127.0.0.1:5432")));
+            partial_config = partial_config.with_database(Some(String::from(DATABASE)));
         }
 
         Ok(partial_config)
@@ -86,7 +94,7 @@ mod tests {
 
     /// Asserts config values based on the default values.
     fn assert_default_values(config: PartialConfig) {
-        assert_eq!(config.storage(), Some(String::from("yaml")));
+        assert_eq!(config.storage(), Some(String::from(STORAGE)));
         assert_eq!(config.tls_cert_dir(), Some(String::from(TLS_CERT_DIR)));
         assert_eq!(config.tls_ca_file(), Some(String::from(TLS_CA_FILE)));
         assert_eq!(
@@ -101,18 +109,18 @@ mod tests {
         assert_eq!(config.tls_server_key(), Some(String::from(TLS_SERVER_KEY)));
         assert_eq!(
             config.service_endpoint(),
-            Some(String::from("127.0.0.1:8043"))
+            Some(String::from(SERVICE_ENDPOINT))
         );
         assert_eq!(
             config.network_endpoints(),
-            Some(vec![String::from("127.0.0.1:8044")])
+            Some(vec![String::from(NETWORK_ENDPOINT)])
         );
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), None);
         assert_eq!(config.display_name(), None);
-        assert_eq!(config.bind(), Some(String::from("127.0.0.1:8080")));
+        assert_eq!(config.bind(), Some(String::from(BIND)));
         #[cfg(feature = "database")]
-        assert_eq!(config.database(), Some(String::from("127.0.0.1:5432")));
+        assert_eq!(config.database(), Some(String::from(DATABASE)));
         assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.registry_auto_refresh(), Some(REGISTRY_AUTO_REFRESH));
         assert_eq!(
