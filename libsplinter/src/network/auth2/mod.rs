@@ -160,6 +160,9 @@ impl ShutdownSignaler {
     }
 }
 
+type Callback =
+    Box<dyn Fn(ConnectionAuthorizationState) -> Result<(), Box<dyn std::error::Error>> + Send>;
+
 pub struct PoolAuthorizer {
     local_identity: String,
     shared: Arc<Mutex<ManagedAuthorizations>>,
@@ -387,9 +390,6 @@ impl AuthorizationPoolStateMachine {
         }
     }
 }
-
-type Callback =
-    Box<dyn Fn(ConnectionAuthorizationState) -> Result<(), Box<dyn std::error::Error>> + Send>;
 
 #[derive(Default)]
 struct ManagedAuthorizations {
