@@ -25,8 +25,8 @@ const SERVER_KEY: &str = "private/server.key";
 const CA_PEM: &str = "ca.pem";
 const REGISTRY_AUTO_REFRESH_DEFAULT: u64 = 600; // 600 seconds = 10 minutes
 const REGISTRY_FORCED_REFRESH_DEFAULT: u64 = 10; // 10 seconds
-const HEARTBEAT_DEFAULT: u64 = 30;
 const DEFAULT_ADMIN_SERVICE_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
+const HEARTBEAT_DEFAULT: u64 = 30; // 30 seconds
 
 /// Holds the default configuration values.
 pub struct DefaultPartialConfigBuilder;
