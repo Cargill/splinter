@@ -28,6 +28,7 @@ mod transport;
 
 use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
+use rand::{thread_rng, Rng};
 
 #[cfg(feature = "config-command-line")]
 use crate::config::ClapPartialConfigBuilder;
@@ -47,8 +48,8 @@ use clap::{clap_app, crate_version};
 use clap::{Arg, ArgMatches};
 
 use std::env;
-#[cfg(feature = "config-toml")]
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::Path;
 use std::thread;
 
@@ -96,6 +97,73 @@ fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Confi
     builder
         .build()
         .map_err(|e| UserError::MissingArgument(e.to_string()))
+}
+
+// Checks whether there is a saved node_id file. If there is, the config node_id must match
+// the node_id in the file, otherwise we will return an error.
+fn find_node_id(config: &Config) -> Result<String, UserError> {
+    let node_id_path = Path::new(config.state_dir()).join("node_id");
+
+    // Check if node file exists
+    if node_id_path.exists() {
+        // If the node file exists, read the node_id within the file.
+        let mut file_node_id = fs::read_to_string(&node_id_path).map_err(|err| {
+            UserError::io_err_with_source("Unable to read node_id file", Box::new(err))
+        })?;
+        if file_node_id.ends_with('\n') {
+            file_node_id.pop();
+        }
+        match config.node_id() {
+            // If the config has a node_id, check if this matches the node_id read from the file.
+            Some(config_node_id) => {
+                if config_node_id != file_node_id {
+                    // If the node_id from the config object and the file do not match,
+                    // return an error.
+                    Err(UserError::InvalidArgument(format!(
+                        "node_id from file {} does not match node_id from config {}",
+                        file_node_id, config_node_id
+                    )))
+                } else {
+                    // If the node_id does match, then we return this node_id and continue.
+                    Ok(config_node_id.to_string())
+                }
+            }
+            None => {
+                // If the config object does not have a node_id, continue with the node_id read
+                // from the file.
+                Ok(file_node_id)
+            }
+        }
+    } else {
+        // If node file does not exist, need to create and save a node_id file.
+        // Check if the config obejct has a node_id, otherwise generate a random one.
+        let node_id = config
+            .node_id()
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
+        let mut file = File::create(&node_id_path).map_err(|err| {
+            UserError::io_err_with_source(
+                &format!("Unable to create node_id file {:?}", &node_id_path),
+                Box::new(err),
+            )
+        })?;
+        file.write_all(&node_id.as_bytes()).map_err(|err| {
+            UserError::io_err_with_source(
+                &format!("Unable to write node_id file {:?}", &node_id_path),
+                Box::new(err),
+            )
+        })?;
+        // Append newline to file
+        writeln!(file).map_err(|err| {
+            UserError::io_err_with_source(
+                &format!("Unable to write to node_id file {:?}", &node_id_path),
+                Box::new(err),
+            )
+        })?;
+
+        // Continue with node_id
+        Ok(node_id)
+    }
 }
 
 // format for logs
@@ -346,6 +414,8 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     config.log_as_debug();
 
+    let node_id = find_node_id(&config)?;
+
     let mut daemon_builder = SplinterDaemonBuilder::new();
 
     daemon_builder = daemon_builder
@@ -355,7 +425,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
-        .with_node_id(String::from(config.node_id()))
+        .with_node_id(node_id)
         .with_display_name(String::from(config.display_name()))
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
