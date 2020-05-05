@@ -618,6 +618,16 @@ where
     }
 }
 
+impl<MT, Source> DispatchLoop<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone + Send,
+    Source: Send + 'static,
+{
+    pub fn builder() -> DispatchLoopBuilder<MT, Source> {
+        DispatchLoopBuilder::new()
+    }
+}
+
 pub fn dispatch_channel<MT, Source>() -> (
     DispatchMessageSender<MT, Source>,
     DispatchMessageReceiver<MT, Source>,
