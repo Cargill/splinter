@@ -924,7 +924,7 @@ fn set_up_network_dispatcher(
     circuit_sender: DispatchMessageSender<CircuitMessageType>,
     auth_sender: DispatchMessageSender<AuthorizationMessageType>,
 ) -> Dispatcher<NetworkMessageType> {
-    let mut dispatcher = Dispatcher::<NetworkMessageType>::new(network_sender);
+    let mut dispatcher = Dispatcher::<NetworkMessageType>::new(Box::new(network_sender));
 
     let network_echo_handler = NetworkEchoHandler::new(node_id.to_string());
     dispatcher.set_handler(Box::new(NetworkAuthGuardHandler::new(
@@ -954,7 +954,7 @@ fn set_up_circuit_dispatcher(
     endpoints: &[String],
     state: SplinterState,
 ) -> Dispatcher<CircuitMessageType> {
-    let mut dispatcher = Dispatcher::<CircuitMessageType>::new(network_sender);
+    let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 
     let service_connect_request_handler =
         ServiceConnectRequestHandler::new(node_id.to_string(), endpoints.to_vec(), state.clone());

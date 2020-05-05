@@ -299,7 +299,7 @@ mod tests {
         let network_echo_sender = network_message_queue.new_network_sender();
 
         let mut inproc_transport = InprocTransport::default();
-        let mut dispatcher = Dispatcher::new(network_sender);
+        let mut dispatcher = Dispatcher::new(Box::new(network_sender));
         let mut listener = inproc_transport
             .listen("inproc://circuit_error")
             .expect("Cannot get listener");
@@ -391,7 +391,7 @@ mod tests {
         let network_sender = network_message_queue.new_network_sender();
 
         let mut inproc_transport = InprocTransport::default();
-        let dispatcher = Dispatcher::new(network_sender);
+        let dispatcher = Dispatcher::new(Box::new(network_sender));
         let listener = inproc_transport
             .listen("inproc://circuit_error")
             .expect("Cannot get listener");

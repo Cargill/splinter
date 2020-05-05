@@ -130,7 +130,8 @@ mod tests {
         let network_sender = network_message_queue.new_network_sender();
 
         let mut inproc_transport = InprocTransport::default();
-        let mut dispatcher: Dispatcher<NetworkMessageType> = Dispatcher::new(network_sender);
+        let mut dispatcher: Dispatcher<NetworkMessageType> =
+            Dispatcher::new(Box::new(network_sender));
         let mut listener = inproc_transport
             .listen("inproc://network_echo")
             .expect("Cannot get listener");

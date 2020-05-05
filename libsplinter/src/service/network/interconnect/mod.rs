@@ -23,10 +23,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
-use crate::network::dispatch::{
-    ConnectionId, DispatchLoopBuilder, DispatchLoopShutdownSignaler, DispatchMessageSender,
-    Dispatcher, MessageSender,
-};
+use crate::network::dispatch::{ConnectionId, DispatchMessageSender, MessageSender};
 use crate::protos::component::{ComponentMessage, ComponentMessageType};
 
 pub use self::error::{ServiceInterconnectError, ServiceLookupError};
@@ -119,7 +116,8 @@ where
     // MatrixSender to send messages to services
     message_sender: Option<U>,
     // a Dispatcher with handlers for ComponentMessageTypes
-    service_msg_dispatcher: Option<Dispatcher<ComponentMessageType, ConnectionId>>,
+    service_msg_dispatcher_sender:
+        Option<DispatchMessageSender<ComponentMessageType, ConnectionId>>,
 }
 
 impl<T, U, P> ServiceInterconnectBuilder<T, U, P>
@@ -134,7 +132,7 @@ where
             service_lookup_provider: None,
             message_receiver: None,
             message_sender: None,
-            service_msg_dispatcher: None,
+            service_msg_dispatcher_sender: None,
         }
     }
 
@@ -389,6 +387,7 @@ enum SendRequest {
     Shutdown,
 }
 
+#[derive(Clone)]
 struct ServiceInterconnectMessageSender {
     sender: Sender<SendRequest>,
 }
@@ -411,12 +410,6 @@ impl MessageSender<ConnectionId> for ServiceInterconnectMessageSender {
                 SendRequest::Message(recipient, payload) => (recipient, payload),
                 SendRequest::Shutdown => unreachable!(), // we didn't send this
             })
-    }
-}
-
-impl Into<Box<dyn MessageSender<ConnectionId>>> for ServiceInterconnectMessageSender {
-    fn into(self) -> Box<dyn MessageSender<ConnectionId>> {
-        Box::new(self)
     }
 }
 

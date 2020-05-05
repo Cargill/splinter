@@ -485,7 +485,7 @@ pub mod tests {
             .build()
             .expect("Unable to build PeerInterconnect");
 
-        let mut dispatcher = Dispatcher::new(interconnect.new_network_sender());
+        let mut dispatcher = Dispatcher::new(Box::new(interconnect.new_network_sender()));
         let handler = NetworkTestHandler::new(send);
         dispatcher.set_handler(Box::new(handler));
 

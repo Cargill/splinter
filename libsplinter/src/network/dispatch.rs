@@ -323,13 +323,10 @@ where
     ///
     /// Creates a dispatcher with a given `NetworkSender` to supply to handlers when they are
     /// executed.
-    pub fn new<S>(network_sender: S) -> Self
-    where
-        S: Into<Box<dyn MessageSender<Source>>>,
-    {
+    pub fn new(network_sender: Box<dyn MessageSender<Source>>) -> Self {
         Dispatcher {
             handlers: HashMap::new(),
-            network_sender: network_sender.into(),
+            network_sender,
         }
     }
 
@@ -700,7 +697,7 @@ mod tests {
             .expect("Unable to create queue");
         let network_sender = network_message_queue.new_network_sender();
 
-        let mut dispatcher = Dispatcher::new(network_sender);
+        let mut dispatcher = Dispatcher::new(Box::new(network_sender));
 
         let handler = NetworkEchoHandler::default();
         let echos = handler.echos.clone();
@@ -745,7 +742,7 @@ mod tests {
             .build()
             .expect("Unable to create queue");
         let network_sender = network_message_queue.new_network_sender();
-        let mut dispatcher = Dispatcher::new(network_sender);
+        let mut dispatcher = Dispatcher::new(Box::new(network_sender));
 
         let handler = NetworkEchoHandler::default();
         let echos = handler.echos.clone();
