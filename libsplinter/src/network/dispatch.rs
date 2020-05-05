@@ -20,7 +20,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::mpsc::{channel, RecvError, Sender};
+use std::sync::mpsc::{channel, Receiver, RecvError, Sender};
 
 /// A wrapper for a PeerId.
 ///
@@ -493,6 +493,10 @@ where
     MT: Any + Hash + Eq + Debug + Clone,
 {
     dispatcher: Option<Dispatcher<MT, Source>>,
+    channel: Option<(
+        DispatchMessageSender<MT, Source>,
+        DispatchMessageReceiver<MT, Source>,
+    )>,
     thread_name: Option<String>,
 }
 
@@ -504,8 +508,20 @@ where
     pub fn new() -> Self {
         DispatchLoopBuilder {
             dispatcher: None,
+            channel: None,
             thread_name: None,
         }
+    }
+
+    pub fn with_dispatch_channel(
+        mut self,
+        channel: (
+            DispatchMessageSender<MT, Source>,
+            DispatchMessageReceiver<MT, Source>,
+        ),
+    ) -> Self {
+        self.channel = Some(channel);
+        self
     }
 
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher<MT, Source>) -> Self {
@@ -519,7 +535,7 @@ where
     }
 
     pub fn build(mut self) -> Result<DispatchLoop<MT, Source>, String> {
-        let (tx, rx) = channel();
+        let (tx, rx) = self.channel.take().unwrap_or_else(dispatch_channel);
 
         let dispatcher = self
             .dispatcher
@@ -534,7 +550,7 @@ where
             .name(thread_name)
             .spawn(move || loop {
                 loop {
-                    let (message_type, message_bytes, source_id) = match rx.recv() {
+                    let (message_type, message_bytes, source_id) = match rx.receiver.recv() {
                         Ok(DispatchMessage::Message {
                             message_type,
                             message_bytes,
@@ -558,7 +574,7 @@ where
 
         match join_handle {
             Ok(join_handle) => Ok(DispatchLoop {
-                sender: tx,
+                sender: tx.sender,
                 join_handle,
             }),
             Err(err) => Err(format!("Unable to start up dispatch loop thread: {}", err)),
@@ -600,6 +616,27 @@ where
             sender: self.sender.clone(),
         }
     }
+}
+
+pub fn dispatch_channel<MT, Source>() -> (
+    DispatchMessageSender<MT, Source>,
+    DispatchMessageReceiver<MT, Source>,
+)
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    let (tx, rx) = channel();
+    (
+        DispatchMessageSender { sender: tx },
+        DispatchMessageReceiver { receiver: rx },
+    )
+}
+
+pub struct DispatchMessageReceiver<MT, Source = PeerId>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    receiver: Receiver<DispatchMessage<MT, Source>>,
 }
 
 #[derive(Clone)]
