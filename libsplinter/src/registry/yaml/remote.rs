@@ -84,7 +84,7 @@ impl RemoteYamlRegistry {
     /// * `cache_dir` - Directory that the local registry cache will be stored in.
     /// * `automatic_refresh_period` - Amount of time between attempts to automatically fetch and
     ///   cache the remote YAML file in the background. If `None`, background refreshes will be
-    ///   disabled.
+    ///   disabled. The automatic refresh occurs with a tolerance of +/- 1 second.
     /// * `forced_refresh_period` - Amount of time since the last successful cache refresh before
     ///   attempting to refresh on every read operation. If `None`, forced refreshes will be
     ///   disabled.
