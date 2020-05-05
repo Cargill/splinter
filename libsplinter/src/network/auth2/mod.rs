@@ -53,7 +53,7 @@ impl fmt::Display for AuthorizationState {
 
 type Identity = String;
 
-/// The state transitions that can be applied on an connection during authorization.
+/// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
 pub(crate) enum AuthorizationAction {
     Connecting,
@@ -112,7 +112,7 @@ pub struct AuthorizationPool {
 }
 
 impl AuthorizationPool {
-    /// Constructs an AuthorizationManager
+    /// Constructs an AuthorizationPool
     pub fn new(local_identity: String) -> Result<Self, AuthorizationPoolError> {
         let thread_pool = ThreadPoolBuilder::new()
             .with_size(8)
