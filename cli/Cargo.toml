@@ -50,10 +50,12 @@ gag = "0.1"
 serial_test = "0.3"
 
 [features]
-default = []
+default = [
+    "database",
+    "database-migrate-biome",
+]
 
 stable = [
-    "database-migrate-biome",
     "default"
 ]
 
@@ -63,7 +65,6 @@ experimental = [
     # The following features are experimental:
     "circuit-template",
     "health",
-    "database",
     "postgres",
     "circuit-auth-type",
 ]
