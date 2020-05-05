@@ -72,7 +72,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             )
             .with_node_id(self.matches.value_of("node_id").map(String::from))
             .with_display_name(self.matches.value_of("display_name").map(String::from))
-            .with_bind(self.matches.value_of("bind").map(String::from))
+            .with_rest_api_endpoint(self.matches.value_of("rest_api_endpoint").map(String::from))
             .with_registries(
                 self.matches
                     .values_of("registries")
@@ -180,7 +180,7 @@ mod tests {
             config.display_name(),
             Some(EXAMPLE_DISPLAY_NAME.to_string())
         );
-        assert_eq!(config.bind(), None);
+        assert_eq!(config.rest_api_endpoint(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
@@ -212,7 +212,7 @@ mod tests {
             (@arg tls_server_cert: --("tls-server-cert") +takes_value)
             (@arg tls_server_key:  --("tls-server-key") +takes_value)
             (@arg tls_client_key:  --("tls-client-key") +takes_value)
-            (@arg bind: --("bind") +takes_value)
+            (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
             (@arg tls_insecure: --("tls-insecure"))
             (@arg no_tls: --("no-tls"))
             (@arg state_dir: --("state-dir") + takes_value))

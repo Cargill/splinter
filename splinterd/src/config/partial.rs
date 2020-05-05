@@ -47,7 +47,7 @@ pub struct PartialConfig {
     peers: Option<Vec<String>>,
     node_id: Option<String>,
     display_name: Option<String>,
-    bind: Option<String>,
+    rest_api_endpoint: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
@@ -83,7 +83,7 @@ impl PartialConfig {
             peers: None,
             node_id: None,
             display_name: None,
-            bind: None,
+            rest_api_endpoint: None,
             #[cfg(feature = "database")]
             database: None,
             registries: None,
@@ -161,8 +161,8 @@ impl PartialConfig {
         self.display_name.clone()
     }
 
-    pub fn bind(&self) -> Option<String> {
-        self.bind.clone()
+    pub fn rest_api_endpoint(&self) -> Option<String> {
+        self.rest_api_endpoint.clone()
     }
 
     #[cfg(feature = "database")]
@@ -383,14 +383,15 @@ impl PartialConfig {
     }
 
     #[allow(dead_code)]
-    /// Adds a `bind` value to the `PartialConfig` object.
+
+    /// Adds a `rest_api_endpoint` value to the PartialConfig object.
     ///
     /// # Arguments
     ///
-    /// * `bind` - Connection endpoint for REST API.
+    /// * `rest_api_endpoint` - Connection endpoint for REST API.
     ///
-    pub fn with_bind(mut self, bind: Option<String>) -> Self {
-        self.bind = bind;
+    pub fn with_rest_api_endpoint(mut self, rest_api_endpoint: Option<String>) -> Self {
+        self.rest_api_endpoint = rest_api_endpoint;
         self
     }
 

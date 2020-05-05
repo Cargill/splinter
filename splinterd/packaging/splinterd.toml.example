@@ -33,7 +33,7 @@ peers = []
 storage = "memory"
 
 # Rest api address.
-bind = "localhost:8085"
+rest_api_endpoint = "localhost:8085"
 
 # Splinter Registry file
 registries = ["file:///etc/splinter/registry.yaml"]

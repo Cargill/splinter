@@ -198,8 +198,6 @@ fn main() {
         (@arg service_endpoint: --("service-endpoint") +takes_value
           "Endpoint that service will connect to, tcp://ip:port")
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
-        (@arg bind: --("bind") +takes_value
-          "Connection endpoint for REST API")
         (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
             "How often remote Splinter registries should attempt to fetch upstream changes in the \
              background (in seconds); default is 600 (10 minutes), 0 means off")
@@ -246,6 +244,13 @@ fn main() {
                 .takes_value(true)
                 .multiple(true)
                 .alias("network-endpoint"),
+        )
+        .arg(
+            Arg::with_name("rest_api_endpoint")
+                .long("rest-api-endpoint")
+                .help("Connection endpoint for REST API")
+                .takes_value(true)
+                .alias("bind"),
         )
         .arg(
             Arg::with_name("peers")
@@ -385,7 +390,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let transport = build_transport(&config)?;
 
-    let rest_api_endpoint = config.bind();
+    let rest_api_endpoint = config.rest_api_endpoint();
 
     #[cfg(feature = "database")]
     let db_url = config.database();

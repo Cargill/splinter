@@ -103,9 +103,6 @@ OPTIONS
   Specify multiple endpoints in a comma-separated list or with separate
   `--advertised-endpoint` options.
 
-`--bind BIND-ENDPOINT`
-: Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
-
 `-c`, `--config` `CONFIG-FILE`
 : Specifies the path and file name for a `splinterd` configuration file, which
   is a TOML file that contains `splinterd` settings. (The file name must end
@@ -166,6 +163,9 @@ OPTIONS
 `--registry-forced-refresh SECONDS`
 : Specifies how often, in seconds, to fetch remote node registry changes on
   read. (Default: 10 seconds.) Use 0 to turn off forced refreshes.
+
+`--rest-api-endpoint REST-API-ENDPOINT`
+: Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
 
 `--state-dir STATE-DIR`
 : Specifies the storage directory.

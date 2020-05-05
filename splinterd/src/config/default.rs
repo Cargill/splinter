@@ -28,7 +28,7 @@ const TLS_SERVER_CERT: &str = "server.crt";
 const TLS_SERVER_KEY: &str = "private/server.key";
 const TLS_CA_FILE: &str = "ca.pem";
 
-const BIND: &str = "127.0.0.1:8080";
+const REST_API_ENDPOINT: &str = "127.0.0.1:8080";
 const SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
 const NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
 #[cfg(feature = "database")]
@@ -64,7 +64,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
             .with_network_endpoints(Some(vec![String::from(NETWORK_ENDPOINT)]))
             .with_peers(Some(vec![]))
-            .with_bind(Some(String::from(BIND)))
+            .with_rest_api_endpoint(Some(String::from(REST_API_ENDPOINT)))
             .with_registries(Some(vec![]))
             .with_registry_auto_refresh(Some(REGISTRY_AUTO_REFRESH))
             .with_registry_forced_refresh(Some(REGISTRY_FORCED_REFRESH))
@@ -120,7 +120,10 @@ mod tests {
         assert_eq!(config.peers(), Some(vec![]));
         assert_eq!(config.node_id(), None);
         assert_eq!(config.display_name(), None);
-        assert_eq!(config.bind(), Some(String::from(BIND)));
+        assert_eq!(
+            config.rest_api_endpoint(),
+            Some(String::from(REST_API_ENDPOINT))
+        );
         #[cfg(feature = "database")]
         assert_eq!(config.database(), Some(String::from(DATABASE)));
         assert_eq!(config.registries(), Some(vec![]));
