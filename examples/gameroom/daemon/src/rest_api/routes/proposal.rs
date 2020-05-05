@@ -24,7 +24,6 @@ use gameroom_database::{
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::CircuitProposalVote;
-use splinter::node_registry::Node;
 use splinter::protos::admin::{
     CircuitManagementPayload, CircuitManagementPayload_Action as Action,
     CircuitManagementPayload_Header as Header,
@@ -34,6 +33,8 @@ use super::{
     get_response_paging_info, validate_limit, ErrorResponse, SuccessResponse, DEFAULT_LIMIT,
     DEFAULT_OFFSET,
 };
+
+use crate::config::NodeInfo;
 use crate::rest_api::RestApiResponseError;
 
 #[derive(Debug, Serialize)]
@@ -195,7 +196,7 @@ pub async fn proposal_vote(
     vote: web::Json<CircuitProposalVote>,
     proposal_id: web::Path<i64>,
     pool: web::Data<ConnectionPool>,
-    node_info: web::Data<Node>,
+    node_info: web::Data<NodeInfo>,
 ) -> Result<HttpResponse, Error> {
     let node_identity = node_info.identity.to_string();
     match web::block(move || check_proposal_exists(*proposal_id, pool)).await {

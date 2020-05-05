@@ -37,12 +37,13 @@ use crate::network::{
     auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
     peer::PeerConnector,
 };
-use crate::node_registry::NodeRegistryReader;
 use crate::orchestrator::ServiceOrchestrator;
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
 };
+#[cfg(feature = "registry")]
+use crate::registry::RegistryReader;
 #[cfg(feature = "service-arg-validation")]
 use crate::service::validation::ServiceArgValidator;
 use crate::service::{
@@ -56,6 +57,7 @@ use self::error::{AdminError, Sha256Error};
 use self::proposal_store::{AdminServiceProposals, ProposalStore};
 use self::shared::AdminServiceShared;
 
+pub use self::error::AdminKeyVerifierError;
 pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
 
@@ -96,6 +98,37 @@ impl Clone for Box<dyn AdminCommands> {
     }
 }
 
+/// Verifies that a key has permission to act as admin on behalf of a node.
+pub trait AdminKeyVerifier: Send + Sync {
+    /// Check if the given `key` is permitted as an admin for the given node.
+    fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError>;
+}
+
+#[cfg(feature = "registry")]
+impl AdminKeyVerifier for dyn RegistryReader {
+    /// The key is permitted if and only if the node with the given `node_id` exists in the
+    /// registry and the node has the given key. Otherwise, the key is not permitted.
+    fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
+        let node_opt = self.fetch_node(node_id).map_err(|err| {
+            AdminKeyVerifierError::new_with_source(
+                &format!("Failed to lookup node '{}' in registry", node_id),
+                Box::new(err),
+            )
+        })?;
+        Ok(match node_opt {
+            Some(node) => node.has_key(&to_hex(key)),
+            None => false,
+        })
+    }
+}
+
+#[cfg(feature = "registry")]
+impl AdminKeyVerifier for Box<dyn RegistryReader> {
+    fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
+        (**self).is_permitted(node_id, key)
+    }
+}
+
 /// An iterator over AdminServiceEvents and the time that each occurred.
 pub struct Events {
     inner: Box<dyn Iterator<Item = (SystemTime, messages::AdminServiceEvent)> + Send>,
@@ -130,7 +163,7 @@ impl AdminService {
         authorization_inquistor: Box<dyn AuthorizationInquisitor>,
         splinter_state: SplinterState,
         signature_verifier: Box<dyn SignatureVerifier + Send>,
-        node_registry: Box<dyn NodeRegistryReader>,
+        key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
         // The coordinator timeout for the two-phase commit consensus engine; if `None`, the
@@ -151,7 +184,7 @@ impl AdminService {
                 authorization_inquistor,
                 splinter_state,
                 signature_verifier,
-                node_registry,
+                key_verifier,
                 key_permission_manager,
                 storage_type,
             )?)),
@@ -528,9 +561,6 @@ mod tests {
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
     use crate::network::{auth::AuthorizationCallback, Network};
-    use crate::node_registry::{
-        MetadataPredicate, Node, NodeBuilder, NodeIter, NodeRegistryError, NodeRegistryReader,
-    };
     use crate::protos::{
         admin,
         authorization::{AuthorizationMessage, AuthorizationMessageType, AuthorizedMessage},
@@ -583,7 +613,7 @@ mod tests {
             Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
-            Box::new(MockNodeRegistry),
+            Box::new(MockAdminKeyVerifier),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
             None,
@@ -933,28 +963,11 @@ mod tests {
         }
     }
 
-    struct MockNodeRegistry;
+    struct MockAdminKeyVerifier;
 
-    impl NodeRegistryReader for MockNodeRegistry {
-        fn list_nodes<'a, 'b: 'a>(
-            &'b self,
-            _predicates: &'a [MetadataPredicate],
-        ) -> Result<NodeIter<'a>, NodeRegistryError> {
-            unimplemented!()
-        }
-
-        fn count_nodes(&self, _predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
-            unimplemented!()
-        }
-
-        fn fetch_node(&self, _identity: &str) -> Result<Option<Node>, NodeRegistryError> {
-            Ok(Some(
-                NodeBuilder::new("test-node")
-                    .with_endpoint("tcp://someplace:8000")
-                    .with_key(to_hex(PUB_KEY))
-                    .build()
-                    .expect("Failed to build node"),
-            ))
+    impl AdminKeyVerifier for MockAdminKeyVerifier {
+        fn is_permitted(&self, _node_id: &str, _key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
+            Ok(true)
         }
     }
 }

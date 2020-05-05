@@ -151,7 +151,7 @@ OPTIONS
   type of connection that is created.
 
 `--registries REGISTRY-FILE` `[,...]`
-: Specifies one or more read-only node registry files.
+: Specifies one or more read-only Splinter registry files.
 
 `--service-endpoint SERVICE-ENDPOINT`
 : Specifies the endpoint for service-to-daemon communication, using the format

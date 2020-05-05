@@ -12,8 +12,8 @@ demonstate the Kubernetes primitives.
 
 This procedure walks you through:
 
-* Generating keys and updating the node registry
-* Creating a ConfigMap for the node registry
+* Generating keys and updating the Splinter registry
+* Creating a ConfigMap for the Splinter registry
 * Starting Gameroom
 * Creating users and logging in to the web app
 * Playing tic-tac-toe
@@ -51,13 +51,13 @@ walkthrough. For installation instructions, see the
 1. Copy these values to a scratchpad or keep them available in your terminal,
    because you'll be using them a few times in the walkthrough.
 
-### Step 2: Update the node registry template
+### Step 2: Update the Splinter registry template
 
-1. Download the node registry template, [node-registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/node-registry.yaml).
+1. Download the Splinter registry template, [registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/registry.yaml).
 
-1. Edit `node-registry.yaml` to add the public key values created above.
+1. Edit `registry.yaml` to add the public key values created above.
 
-   `$ vim node-registry.yaml`
+   `$ vim registry.yaml`
 
 1. Replace the lines that say `alice.pub` with the corresponding key data generated
    from the job run in the previous step.
@@ -87,33 +87,33 @@ walkthrough. For installation instructions, see the
        organization: "Bubba Bakery"
    ```
 
-### Step 3: Create a ConfigMap for the node registry
+### Step 3: Create a ConfigMap for the Splinter registry
 
-1. Generate a ConfigMap for the node registry.
+1. Generate a ConfigMap for the Splinter registry.
 
-    `$ kubectl create configmap node-registry --from-file node-registry.yaml`
+    `$ kubectl create configmap registry --from-file registry.yaml`
 
 1. Verify that the ConfigMap was created.
 
     ```
     $ kubectl get cm
     NAME            DATA   AGE
-    node-registry   1      30s
+    registry   1      30s
     ```
 
 1. You can inspect the values of the ConfigMap by running
     `kubectl describe cm <configmapname>`. For example:
 
     ```
-    $ kubectl describe cm node-registry
-    Name:         node-registry
+    $ kubectl describe cm registry
+    Name:         registry
     Namespace:    default
     Labels:       <none>
     Annotations:  <none>
 
     Data
     ====
-    node-registry.yaml:
+    registry.yaml:
     ----
     ---
     - identity: "acme"

@@ -14,7 +14,6 @@
 
 use actix_web::{client::Client, http::StatusCode, web, Error, HttpResponse};
 use percent_encoding::utf8_percent_encode;
-use splinter::node_registry::Node;
 use splinter::protocol;
 use std::collections::HashMap;
 
@@ -27,13 +26,13 @@ pub async fn fetch_node(
 ) -> Result<HttpResponse, Error> {
     let mut response = client
         .get(&format!(
-            "{}/admin/nodes/{}",
+            "{}/registry/nodes/{}",
             splinterd_url.get_ref(),
             identity
         ))
         .header(
             "SplinterProtocolVersion",
-            protocol::ADMIN_PROTOCOL_VERSION.to_string(),
+            protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
         )
         .send()
         .await?;
@@ -42,7 +41,7 @@ pub async fn fetch_node(
 
     match response.status() {
         StatusCode::OK => {
-            let node: Node = serde_json::from_slice(&body)?;
+            let node: NodeResponse = serde_json::from_slice(&body)?;
             Ok(HttpResponse::Ok().json(SuccessResponse::new(node)))
         }
         StatusCode::NOT_FOUND => {
@@ -66,7 +65,7 @@ pub async fn list_nodes(
     splinterd_url: web::Data<String>,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
-    let mut request_url = format!("{}/admin/nodes", splinterd_url.get_ref());
+    let mut request_url = format!("{}/registry/nodes", splinterd_url.get_ref());
 
     let offset = query
         .get("offset")
@@ -91,7 +90,7 @@ pub async fn list_nodes(
         .get(&request_url)
         .header(
             "SplinterProtocolVersion",
-            protocol::ADMIN_PROTOCOL_VERSION.to_string(),
+            protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
         )
         .send()
         .await?;
@@ -100,7 +99,7 @@ pub async fn list_nodes(
 
     match response.status() {
         StatusCode::OK => {
-            let list_reponse: SuccessResponse<Vec<Node>> = serde_json::from_slice(&body)?;
+            let list_reponse: SuccessResponse<Vec<NodeResponse>> = serde_json::from_slice(&body)?;
             Ok(HttpResponse::Ok().json(list_reponse))
         }
         StatusCode::BAD_REQUEST => {
@@ -119,6 +118,15 @@ pub async fn list_nodes(
     }
 }
 
+/// Represents a node as presented by the Splinter REST API.
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+struct NodeResponse {
+    identity: String,
+    endpoints: Vec<String>,
+    display_name: String,
+    metadata: HashMap<String, String>,
+}
+
 #[derive(Deserialize)]
 struct SplinterdErrorResponse {
     message: String,
@@ -132,46 +140,49 @@ mod test {
         http::{header, StatusCode},
         test, web, App,
     };
-    use splinter::node_registry::NodeBuilder;
 
     static SPLINTERD_URL: &str = "http://splinterd-node:8085";
 
     #[actix_rt::test]
-    /// Tests a GET /admin/nodes/{identity} request returns the expected node.
+    /// Tests a GET /registry/nodes/{identity} request returns the expected node.
     async fn test_fetch_node_ok() {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
                 .data(SPLINTERD_URL.to_string())
-                .service(web::resource("/admin/nodes/{identity}").route(web::get().to(fetch_node))),
+                .service(
+                    web::resource("/registry/nodes/{identity}").route(web::get().to(fetch_node)),
+                ),
         )
         .await;
 
         let req = test::TestRequest::get()
-            .uri(&format!("/admin/nodes/{}", get_node_1().identity))
+            .uri(&format!("/registry/nodes/{}", get_node_1().identity))
             .to_request();
 
         let resp = test::call_service(&mut app, req).await;
 
         assert_eq!(resp.status(), StatusCode::OK);
-        let response: SuccessResponse<Node> =
+        let response: SuccessResponse<NodeResponse> =
             serde_json::from_slice(&test::read_body(resp).await).unwrap();
         assert_eq!(response.data, get_node_1())
     }
 
     #[actix_rt::test]
-    /// Tests a GET /admin/nodes/{identity} request returns NotFound when an invalid identity is passed
+    /// Tests a GET /registry/nodes/{identity} request returns NotFound when an invalid identity is passed
     async fn test_fetch_node_not_found() {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
                 .data(SPLINTERD_URL.to_string())
-                .service(web::resource("/admin/nodes/{identity}").route(web::get().to(fetch_node))),
+                .service(
+                    web::resource("/registry/nodes/{identity}").route(web::get().to(fetch_node)),
+                ),
         )
         .await;
 
         let req = test::TestRequest::get()
-            .uri("/admin/nodes/Node-not-valid")
+            .uri("/registry/nodes/Node-not-valid")
             .to_request();
 
         let resp = test::call_service(&mut app, req).await;
@@ -180,22 +191,22 @@ mod test {
     }
 
     #[actix_rt::test]
-    /// Tests a GET /admin/nodes request with no filters returns the expected nodes.
+    /// Tests a GET /registry/nodes request with no filters returns the expected nodes.
     async fn test_list_node_ok() {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
                 .data(SPLINTERD_URL.to_string())
-                .service(web::resource("/admin/nodes").route(web::get().to(list_nodes))),
+                .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
         .await;
 
-        let req = test::TestRequest::get().uri("/admin/nodes").to_request();
+        let req = test::TestRequest::get().uri("/registry/nodes").to_request();
 
         let resp = test::call_service(&mut app, req).await;
 
         assert_eq!(resp.status(), StatusCode::OK);
-        let nodes: SuccessResponse<Vec<Node>> =
+        let nodes: SuccessResponse<Vec<NodeResponse>> =
             serde_json::from_slice(&test::read_body(resp).await).unwrap();
         assert_eq!(nodes.data.len(), 2);
         assert!(nodes.data.contains(&get_node_1()));
@@ -209,19 +220,19 @@ mod test {
                 0,
                 0,
                 2,
-                "/admin/nodes?"
+                "/registry/nodes?"
             ))
         )
     }
 
     #[actix_rt::test]
-    /// Tests a GET /admin/nodes request with filters returns the expected node.
+    /// Tests a GET /registry/nodes request with filters returns the expected node.
     async fn test_list_node_with_filters_ok() {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
                 .data(SPLINTERD_URL.to_string())
-                .service(web::resource("/admin/nodes").route(web::get().to(list_nodes))),
+                .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
         .await;
 
@@ -229,17 +240,17 @@ mod test {
             .to_string();
 
         let req = test::TestRequest::get()
-            .uri(&format!("/admin/nodes?filter={}", filter))
+            .uri(&format!("/registry/nodes?filter={}", filter))
             .header(header::CONTENT_TYPE, "application/json")
             .to_request();
 
         let resp = test::call_service(&mut app, req).await;
 
         assert_eq!(resp.status(), StatusCode::OK);
-        let nodes: SuccessResponse<Vec<Node>> =
+        let nodes: SuccessResponse<Vec<NodeResponse>> =
             serde_json::from_slice(&test::read_body(resp).await).unwrap();
         assert_eq!(nodes.data, vec![get_node_1()]);
-        let link = format!("/admin/nodes?filter={}&", filter);
+        let link = format!("/registry/nodes?filter={}&", filter);
         assert_eq!(
             nodes.paging,
             Some(create_test_paging_response(0, 100, 0, 0, 0, 1, &link))
@@ -247,13 +258,13 @@ mod test {
     }
 
     #[actix_rt::test]
-    /// Tests a GET /admin/nodes request with invalid filter returns BadRequest response.
+    /// Tests a GET /registry/nodes request with invalid filter returns BadRequest response.
     async fn test_list_node_with_filters_bad_request() {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
                 .data(SPLINTERD_URL.to_string())
-                .service(web::resource("/admin/nodes").route(web::get().to(list_nodes))),
+                .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
         .await;
 
@@ -261,7 +272,7 @@ mod test {
             .to_string();
 
         let req = test::TestRequest::get()
-            .uri(&format!("/admin/nodes?filter={}", filter))
+            .uri(&format!("/registry/nodes?filter={}", filter))
             .header(header::CONTENT_TYPE, "application/json")
             .to_request();
 
@@ -270,24 +281,26 @@ mod test {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
-    fn get_node_1() -> Node {
-        NodeBuilder::new("Node-123")
-            .with_endpoint("tcps://127.0.0.1:8080")
-            .with_display_name("Bitwise IO - Node 1")
-            .with_key("0123")
-            .with_metadata("company", "Bitwise IO")
-            .build()
-            .expect("Failed to build node1")
+    fn get_node_1() -> NodeResponse {
+        let mut metadata = HashMap::new();
+        metadata.insert("company".into(), "Bitwise IO".into());
+        NodeResponse {
+            identity: "Node-123".into(),
+            endpoints: vec!["tcps://127.0.0.1:8080".into()],
+            display_name: "Bitwise IO - Node 1".into(),
+            metadata,
+        }
     }
 
-    fn get_node_2() -> Node {
-        NodeBuilder::new("Node-456")
-            .with_endpoint("tcps://127.0.0.1:8082")
-            .with_display_name("Cargill - Node 1")
-            .with_key("abcd")
-            .with_metadata("company", "Cargill")
-            .build()
-            .expect("Failed to build node2")
+    fn get_node_2() -> NodeResponse {
+        let mut metadata = HashMap::new();
+        metadata.insert("company".into(), "Cargill".into());
+        NodeResponse {
+            identity: "Node-456".into(),
+            endpoints: vec!["tcps://127.0.0.1:8082".into()],
+            display_name: "Cargill - Node 1".into(),
+            metadata,
+        }
     }
 
     fn create_test_paging_response(

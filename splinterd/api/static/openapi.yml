@@ -321,15 +321,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /admin/nodes:
+  /registry/nodes:
     post:
       summary: Add a node to the registry
       description: |
-        This endpoint can be used to add a new node to the node registry. The
-        node must be valid (see the node registry documentation for details on
-        node validity).
+        This endpoint can be used to add a new node to the Splinter registry.
+        The node must be valid (see the Splinter registry documentation for
+        details on node validity).
       tags:
-        - Node Registry
+        - Splinter Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
       requestBody:
@@ -360,9 +360,9 @@ paths:
         This endpoint can be used to view all or some of the nodes in the
         registry. If metadata filters are provided via the "filter" query
         parameter, only nodes that match the given filters will be returned. See
-        the node registry documentation for details on metadata filters.
+        the Splinter registry documentation for details on metadata filters.
       tags:
-        - Node Registry
+        - Splinter Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: offset
@@ -416,13 +416,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /admin/nodes/{identity}:
+  /registry/nodes/{identity}:
     get:
       summary: Fetch a node in the registry by its identity
       description: |
         This endpoint can be used to view a specific nodes in the registry.
       tags:
-        - Node Registry
+        - Splinter Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: identity
@@ -461,7 +461,7 @@ paths:
         an existing node. When replacing an existing node, the node identity
         cannot be changed. This action is idempotent.
       tags:
-        - Node Registry
+        - Splinter Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: identity
@@ -496,7 +496,7 @@ paths:
       summary: Delete a node from the registry
       description: This endpoint can be used to remove a node from the registry.
       tags:
-        - Node Registry
+        - Splinter Registry
       parameters:
         - $ref: "#/components/parameters/protocol_version"
         - name: identity
@@ -1825,14 +1825,14 @@ components:
         last:
           type: string
       example:
-        current: /admin/nodes?offset=10&limit=10
+        current: /registry/nodes?offset=10&limit=10
         offset: 10
         limit: 10
         total: 50
-        first: /admin/nodes?offset=0&limit=10
-        prev: /admin/nodes?offset=0&limit=10
-        next: /admin/nodes?offset=20&limit=10
-        last: /admin/nodes?offset=40&limit=10
+        first: /registry/nodes?offset=0&limit=10
+        prev: /registry/nodes?offset=0&limit=10
+        next: /registry/nodes?offset=20&limit=10
+        last: /registry/nodes?offset=40&limit=10
 
     BiomeUserKey:
       type: object

@@ -24,7 +24,6 @@ use protobuf::Message;
 use splinter::admin::messages::{
     CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterServiceBuilder,
 };
-use splinter::node_registry::Node;
 use splinter::protocol;
 use splinter::protos::admin::{
     CircuitManagementPayload, CircuitManagementPayload_Action as Action,
@@ -32,6 +31,7 @@ use splinter::protos::admin::{
 };
 
 use crate::application_metadata::ApplicationMetadata;
+use crate::config::NodeInfo;
 use crate::rest_api::{GameroomdData, RestApiResponseError};
 
 use super::{
@@ -93,7 +93,7 @@ impl ApiGameroomMember {
 pub async fn propose_gameroom(
     pool: web::Data<ConnectionPool>,
     create_gameroom: web::Json<CreateGameroomForm>,
-    node_info: web::Data<Node>,
+    node_info: web::Data<NodeInfo>,
     client: web::Data<Client>,
     splinterd_url: web::Data<String>,
     gameroomd_data: web::Data<GameroomdData>,
@@ -224,15 +224,16 @@ pub async fn propose_gameroom(
     })))
 }
 
+// TODO
 async fn fetch_node_information(
     node_ids: &[String],
     splinterd_url: &str,
     client: web::Data<Client>,
-) -> Result<Vec<Node>, RestApiResponseError> {
+) -> Result<Vec<NodeResponse>, RestApiResponseError> {
     let node_ids = node_ids.to_owned();
     let mut response = client
         .get(&format!(
-            "{}/admin/nodes?limit={}",
+            "{}/registry/nodes?limit={}",
             splinterd_url,
             std::i64::MAX
         ))
@@ -252,8 +253,8 @@ async fn fetch_node_information(
 
     match response.status() {
         StatusCode::OK => {
-            let list_reponse: SuccessResponse<Vec<Node>> =
-                serde_json::from_slice(&body).map_err(|err| {
+            let list_reponse: SuccessResponse<Vec<NodeResponse>> = serde_json::from_slice(&body)
+                .map_err(|err| {
                     RestApiResponseError::InternalError(format!(
                         "Failed to parse response body {}",
                         err
@@ -297,6 +298,13 @@ async fn fetch_node_information(
             Err(RestApiResponseError::InternalError(message))
         }
     }
+}
+
+/// Represents a node as presented by the Splinter REST API.
+#[derive(Clone, Deserialize, Serialize)]
+struct NodeResponse {
+    identity: String,
+    endpoints: Vec<String>,
 }
 
 fn check_alias_uniqueness(

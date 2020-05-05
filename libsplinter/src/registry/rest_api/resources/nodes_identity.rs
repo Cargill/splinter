@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use crate::node_registry::Node;
+use crate::registry::Node;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NodeResponse<'a> {

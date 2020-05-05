@@ -408,7 +408,7 @@ impl PartialConfig {
     ///
     /// # Arguments
     ///
-    /// * `registries` - A list of read-only node registries.
+    /// * `registries` - A list of read-only Splinter registries.
     ///
     pub fn with_registries(mut self, registries: Option<Vec<String>>) -> Self {
         self.registries = registries;

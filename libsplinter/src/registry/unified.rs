@@ -12,49 +12,48 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A node registry with multiple sources.
+//! A registry with multiple sources.
 //!
-//! This module contains the [`UnifiedNodeRegistry`], which provides an implementation of the
-//! [`RwNodeRegistry`] trait.
+//! This module contains the [`UnifiedRegistry`], which provides an implementation of the
+//! [`RwRegistry`] trait.
 //!
-//! [`UnifiedNodeRegistry`]: struct.UnifiedNodeRegistry.html
-//! [`RwNodeRegistry`]: ../trait.RwNodeRegistry.html
+//! [`UnifiedRegistry`]: struct.UnifiedRegistry.html
+//! [`RwRegistry`]: ../trait.RwRegistry.html
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{
-    MetadataPredicate, Node, NodeIter, NodeRegistryError, NodeRegistryReader, NodeRegistryWriter,
-    RwNodeRegistry,
+    MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader, RegistryWriter, RwRegistry,
 };
 
-/// A node registry with multiple sources.
+/// A registry with multiple sources.
 ///
-/// The `UnifiedNodeRegistry` provides a unified view of multiple node registries. It has one local
-/// read-write registry and an arbitrary number of read-only registries.
+/// The `UnifiedRegistry` provides a unified view of multiple source registries. It has one internal
+/// read-write registry and an arbitrary number of external read-only registries.
 ///
 /// # Writing
 ///
-/// All write operations (provided by the implementation of the [`NodeRegistryWriter`] trait) affect
-/// only the local read-write registry.
+/// All write operations (provided by the implementation of the [`RegistryWriter`] trait) affect
+/// only the internal read-write registry.
 ///
 /// # Reading
 ///
-/// Read operations (provided by the [`NodeRegistryReader`] implementation) provide [`Node`] data
-/// from all source registries.
+/// Read operations (provided by the [`RegistryReader`] implementation) provide [`Node`] data from
+/// all source registries.
 ///
 /// If a [`Node`] exists in more than one registry (nodes are considered duplicates if they have the
 /// same [`identity`]), then the definition of the [`Node`] from the registry with the highest
-/// precedence is used, with the exception of the node's [`metadata`] (see the
-/// [`Metadata Merging`] section below).
+/// precedence is used, with the exception of the node's [`metadata`] (see the [`Metadata Merging`]
+/// section below).
 ///
 /// If reading a source registry fails, the error will be logged and the registry will be ignored.
 ///
 /// ## Registry Precedence
 ///
-/// The local read-write registry has the highest precedence, followed by the read-only registries.
-/// The precedence of the read-only registries is based on the order they appear (the earlier in the
-/// list, the higher the priority).
+/// The internal read-write registry has the highest precedence, followed by the read-only
+/// registries. The precedence of the read-only registries is based on the order they appear (the
+/// earlier in the list, the higher the priority).
 ///
 /// ## Metadata Merging
 ///
@@ -62,29 +61,29 @@ use super::{
 /// If the same metadata key is set for the node in different registires, the value for that key
 /// from the highest-precedence registry will be used.
 ///
-/// [`NodeRegistryReader`]: ../trait.NodeRegistryReader.html
-/// [`NodeRegistryWriter`]: ../trait.NodeRegistryWriter.html
-/// [`RwNodeRegistry`]: ../trait.RwNodeRegistry.html
+/// [`RegistryReader`]: ../trait.RegistryReader.html
+/// [`RegistryWriter`]: ../trait.RegistryWriter.html
+/// [`RwRegistry`]: ../trait.RwRegistry.html
 /// [`Node`]: ../struct.Node.html
 /// [`identity`]: ../struct.Node.html#structfield.identity
 /// [`metadata`]: ../struct.Node.html#structfield.metadata
 /// [`Metadata Merging`]: #metadata-merging
 #[derive(Clone)]
-pub struct UnifiedNodeRegistry {
-    local_source: Arc<dyn RwNodeRegistry>,
-    readable_sources: Vec<Arc<dyn NodeRegistryReader>>,
+pub struct UnifiedRegistry {
+    internal_source: Arc<dyn RwRegistry>,
+    external_sources: Vec<Arc<dyn RegistryReader>>,
 }
 
-impl UnifiedNodeRegistry {
-    /// Constructs a new `UnifiedNodeRegistry` with a local, read-write node registry and an
-    /// arbitrary number of read-only node registries.
+impl UnifiedRegistry {
+    /// Constructs a new `UnifiedRegistry` with an internal read-write registry and an arbitrary
+    /// number of read-only registries.
     pub fn new(
-        local_source: Box<dyn RwNodeRegistry>,
-        readable_sources: Vec<Box<dyn NodeRegistryReader>>,
+        internal_source: Box<dyn RwRegistry>,
+        external_sources: Vec<Box<dyn RegistryReader>>,
     ) -> Self {
         Self {
-            local_source: local_source.into(),
-            readable_sources: readable_sources.into_iter().map(Arc::from).collect(),
+            internal_source: internal_source.into(),
+            external_sources: external_sources.into_iter().map(Arc::from).collect(),
         }
     }
 
@@ -92,13 +91,14 @@ impl UnifiedNodeRegistry {
     fn all_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = Node> + 'a> {
         Box::new(
             // Get node iterators from all read-only sources
-            self.readable_sources
+            self.external_sources
                 .iter()
                 .map(|registry| registry.list_nodes(&[]))
                 // Reverse the sources, so lowest precedence is first
                 .rev()
-                // Add the local source's node iterator to the end, since it has highest precedence
-                .chain(std::iter::once(self.local_source.list_nodes(&[])))
+                // Add the internal source's node iterator to the end, since it has highest
+                // precedence
+                .chain(std::iter::once(self.internal_source.list_nodes(&[])))
                 // Log any errors from the `list_nodes` calls and ignore the failing registries
                 .filter_map(|res| {
                     res.map_err(|err| debug!("Failed to list nodes in source registry: {}", err))
@@ -110,11 +110,11 @@ impl UnifiedNodeRegistry {
     }
 }
 
-impl NodeRegistryReader for UnifiedNodeRegistry {
+impl RegistryReader for UnifiedRegistry {
     fn list_nodes<'a, 'b: 'a>(
         &'b self,
         predicates: &'a [MetadataPredicate],
-    ) -> Result<NodeIter<'a>, NodeRegistryError> {
+    ) -> Result<NodeIter<'a>, RegistryError> {
         let mut id_map = self
             // Get all nodes from all sources
             .all_nodes()
@@ -137,20 +137,21 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
         Ok(Box::new(id_map.into_iter().map(|(_, node)| node)))
     }
 
-    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+    fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
         self.list_nodes(predicates).map(|iter| iter.count() as u32)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         // Get node from all read-only sources
         Ok(self
-            .readable_sources
+            .external_sources
             .iter()
             .map(|registry| registry.fetch_node(identity))
             // Reverse the sources, so lowest precedence is first
             .rev()
-            // Get node from the local source and add it to the end, since it has highest precedence
-            .chain(std::iter::once(self.local_source.fetch_node(identity)))
+            // Get node from the internal source and add it to the end, since it has highest
+            // precedence
+            .chain(std::iter::once(self.internal_source.fetch_node(identity)))
             // Log any errors from the `fetch_node` calls and ignore the failing registries
             .filter_map(|res| {
                 res.map_err(|err| debug!("Failed to fetch node from source registry: {}", err))
@@ -176,26 +177,26 @@ impl NodeRegistryReader for UnifiedNodeRegistry {
     }
 }
 
-impl NodeRegistryWriter for UnifiedNodeRegistry {
-    fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
-        self.local_source.insert_node(node)
+impl RegistryWriter for UnifiedRegistry {
+    fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
+        self.internal_source.insert_node(node)
     }
 
-    fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
-        self.local_source.delete_node(identity)
+    fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+        self.internal_source.delete_node(identity)
     }
 }
 
-impl RwNodeRegistry for UnifiedNodeRegistry {
-    fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+impl RwRegistry for UnifiedRegistry {
+    fn clone_box(&self) -> Box<dyn RwRegistry> {
         Box::new(self.clone())
     }
 
-    fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+    fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
         Box::new(self.clone())
     }
 
-    fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+    fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
         Box::new(self.clone())
     }
 }
@@ -206,14 +207,10 @@ mod test {
     use std::iter::FromIterator;
     use std::sync::{Arc, Mutex};
 
-    use crate::node_registry::NodeBuilder;
-
     use super::*;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
-        let mut builder = NodeBuilder::new(id)
-            .with_endpoint(endpoint)
-            .with_key("abcd");
+        let mut builder = Node::builder(id).with_endpoint(endpoint).with_key("abcd");
         for (key, val) in metadata {
             builder = builder.with_metadata(*key, *val);
         }
@@ -223,7 +220,7 @@ mod test {
     /// Verify that the number of nodes is correctly reported when all registries are empty.
     #[test]
     fn node_count_empty() {
-        let unified = UnifiedNodeRegistry::new(
+        let unified = UnifiedRegistry::new(
             Box::new(MemRegistry::default()),
             vec![Box::new(MemRegistry::default())],
         );
@@ -251,7 +248,7 @@ mod test {
             .insert_node(node3)
             .expect("Unable to insert node3");
 
-        let unified = UnifiedNodeRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
+        let unified = UnifiedRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
 
         assert_eq!(2, unified.count_nodes(&[]).expect("Unable to get count"));
     }
@@ -286,7 +283,7 @@ mod test {
         let readable = MemRegistry::default();
         readable.insert_node(node3).expect("Unable to insert node3");
 
-        let unified = UnifiedNodeRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
+        let unified = UnifiedRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
 
         assert_eq!(
             1,
@@ -310,7 +307,7 @@ mod test {
             .expect("Unable to insert node");
 
         let unified =
-            UnifiedNodeRegistry::new(Box::new(MemRegistry::default()), vec![Box::new(readable)]);
+            UnifiedRegistry::new(Box::new(MemRegistry::default()), vec![Box::new(readable)]);
 
         let retreived_node = unified
             .fetch_node("node1")
@@ -320,9 +317,9 @@ mod test {
         assert_eq!(node, retreived_node);
     }
 
-    /// Verify that a node is fetched from the local source if it only exists there.
+    /// Verify that a node is fetched from the internal source if it only exists there.
     #[test]
-    fn fetch_node_local() {
+    fn fetch_node_internal() {
         let node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
 
         let writable = MemRegistry::default();
@@ -331,7 +328,7 @@ mod test {
             .expect("Unable to insert node");
 
         let unified =
-            UnifiedNodeRegistry::new(Box::new(writable), vec![Box::new(MemRegistry::default())]);
+            UnifiedRegistry::new(Box::new(writable), vec![Box::new(MemRegistry::default())]);
 
         let retreived_node = unified
             .fetch_node("node1")
@@ -342,7 +339,7 @@ mod test {
     }
 
     /// Verify that a node is fetched from the highest-precedence read-only source if it does not
-    /// exist in the local registry, and that the metadata is properly merged.
+    /// exist in the internal registry, and that the metadata is properly merged.
     ///
     /// 1. Add the same node to three read-only registries with different endpoints and metadata.
     /// 2. Add the read-only registries to a unified registry, along with an empty writable
@@ -375,7 +372,7 @@ mod test {
             .insert_node(low_precedence_node)
             .expect("Unable to insert low-precedence node");
 
-        let unified = UnifiedNodeRegistry::new(
+        let unified = UnifiedRegistry::new(
             Box::new(MemRegistry::default()),
             vec![
                 Box::new(high_precedence_readable),
@@ -392,16 +389,16 @@ mod test {
         assert_eq!(expected_node, retreived_node);
     }
 
-    /// Verify that a node is fetched from the local source even if it exists in one or more
+    /// Verify that a node is fetched from the internal source even if it exists in one or more
     /// read-only registries, and that the metadata is properly merged.
     ///
-    /// 1. Add the same node to the local registry and two read-only registries with different
+    /// 1. Add the same node to the internal registry and two read-only registries with different
     ///    endpoints and metadata.
     /// 2. Add the registries to a unified registry.
-    /// 3. Fetch the node and verify that it has the correct data (endpoints from local registry,
+    /// 3. Fetch the node and verify that it has the correct data (endpoints from internal registry,
     ///    metadata merged from all sources).
     #[test]
-    fn fetch_node_local_precedence() {
+    fn fetch_node_internal_precedence() {
         let high_precedence_node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
         let med_precedence_node = new_node("node1", "endpoint2", &[("meta_b", "val_b")]);
         let low_precedence_node = new_node("node1", "endpoint3", &[("meta_a", "val_c")]);
@@ -426,7 +423,7 @@ mod test {
             .insert_node(low_precedence_node)
             .expect("Unable to insert low-precedence node");
 
-        let unified = UnifiedNodeRegistry::new(
+        let unified = UnifiedRegistry::new(
             Box::new(writable),
             vec![
                 Box::new(med_precedence_readable),
@@ -445,13 +442,13 @@ mod test {
     /// Verify that listed nodes are properly returned based on precedence and that metadata is
     /// correctly merged.
     ///
-    /// 1. Add the same node to the local registry and a read-only registry with different data.
+    /// 1. Add the same node to the internal registry and a read-only registry with different data.
     /// 2. Add the same node to two read-only registries with different data.
     /// 3. Add all three registries to a unified registry.
     /// 4. List the nodes and verify that the correct node data is returned.
     #[test]
     fn list_nodes_precedence() {
-        let node1_local = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
+        let node1_internal = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
         let node1_read_only = new_node(
             "node1",
             "endpoint3",
@@ -485,8 +482,8 @@ mod test {
 
         let writable = MemRegistry::default();
         writable
-            .insert_node(node1_local)
-            .expect("Unable to insert local node1");
+            .insert_node(node1_internal)
+            .expect("Unable to insert internal node1");
 
         let readable_high = MemRegistry::default();
         readable_high
@@ -501,7 +498,7 @@ mod test {
             .insert_node(node2_low)
             .expect("Unable to insert low-precedence node2");
 
-        let unified = UnifiedNodeRegistry::new(
+        let unified = UnifiedRegistry::new(
             Box::new(writable),
             vec![Box::new(readable_high), Box::new(readable_low)],
         );
@@ -545,7 +542,7 @@ mod test {
         let readable = MemRegistry::default();
         readable.insert_node(node3).expect("Unable to insert node3");
 
-        let unified = UnifiedNodeRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
+        let unified = UnifiedRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
 
         let predicates = vec![
             MetadataPredicate::eq("meta_a", "val_a"),
@@ -559,7 +556,7 @@ mod test {
         assert_eq!(None, nodes.next());
     }
 
-    /// Verify that the `NodeRegistryWriter` implementation affects only the local registry.
+    /// Verify that the `NodeRegistryWriter` implementation affects only the internal registry.
     #[test]
     fn write_nodes() {
         let node1 = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
@@ -572,7 +569,7 @@ mod test {
             .insert_node(node2.clone())
             .expect("Unable to insert node2 into read-only registry");
 
-        let unified = UnifiedNodeRegistry::new(
+        let unified = UnifiedRegistry::new(
             Box::new(writeable.clone()),
             vec![Box::new(readable.clone())],
         );
@@ -623,11 +620,11 @@ mod test {
         nodes: Arc<Mutex<HashMap<String, Node>>>,
     }
 
-    impl NodeRegistryReader for MemRegistry {
+    impl RegistryReader for MemRegistry {
         fn list_nodes<'a, 'b: 'a>(
             &'b self,
             predicates: &'a [MetadataPredicate],
-        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+        ) -> Result<NodeIter<'a>, RegistryError> {
             let mut nodes = self
                 .nodes
                 .lock()
@@ -637,11 +634,11 @@ mod test {
             Ok(Box::new(nodes.into_iter().map(|(_, node)| node)))
         }
 
-        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
             self.list_nodes(predicates).map(|iter| iter.count() as u32)
         }
 
-        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
@@ -651,8 +648,8 @@ mod test {
         }
     }
 
-    impl NodeRegistryWriter for MemRegistry {
-        fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
+    impl RegistryWriter for MemRegistry {
+        fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
             self.nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
@@ -660,7 +657,7 @@ mod test {
             Ok(())
         }
 
-        fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
@@ -669,16 +666,16 @@ mod test {
         }
     }
 
-    impl RwNodeRegistry for MemRegistry {
-        fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+    impl RwRegistry for MemRegistry {
+        fn clone_box(&self) -> Box<dyn RwRegistry> {
             Box::new(self.clone())
         }
 
-        fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
             Box::new(self.clone())
         }
 
-        fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
             Box::new(self.clone())
         }
     }

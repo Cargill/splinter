@@ -34,6 +34,3 @@ storage = "yaml"
 
 # Rest api address.
 bind = "localhost:8085"
-
-# Node Registry file
-registries = ["file:///node_registry/nodes.yaml"]

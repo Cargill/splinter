@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! YAML file-backed node registry implementations.
+//! YAML file-backed registry implementations.
 
 mod local;
 #[cfg(feature = "registry-remote")]
 mod remote;
 
-pub use local::LocalYamlNodeRegistry;
+pub use local::LocalYamlRegistry;
 #[cfg(feature = "registry-remote")]
-pub use remote::{RemoteYamlNodeRegistry, ShutdownHandle as RemoteYamlShutdownHandle};
+pub use remote::{RemoteYamlRegistry, ShutdownHandle as RemoteYamlShutdownHandle};

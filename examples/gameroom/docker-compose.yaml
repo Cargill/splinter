@@ -36,7 +36,7 @@ services:
           - registry:/registry
         command: |
           bash -c "
-            if [ ! -f /registry/nodes.yaml ]
+            if [ ! -f /registry/registry.yaml ]
             then
               # generate keys
               splinter admin keygen alice -d /registry
@@ -54,12 +54,12 @@ services:
               # build the registry
               splinter registry build \
                 http://splinterd-node-acme:8085 \
-                --file /registry/nodes.yaml \
+                --file /registry/registry.yaml \
                 --key-file /registry/alice.pub \
                 --metadata organization='ACME Corporation'
               splinter registry build \
                 http://splinterd-node-bubba:8085 \
-                --file /registry/nodes.yaml \
+                --file /registry/registry.yaml \
                 --key-file /registry/bob.pub \
                 --metadata organization='Bubba Bakery'
             fi
@@ -177,7 +177,7 @@ services:
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-acme:8044 \
               --bind 0.0.0.0:8085 \
-              --registries http://registry-server:80/nodes.yaml \
+              --registries http://registry-server:80/registry.yaml \
               --tls-insecure
         "
 
@@ -280,6 +280,6 @@ services:
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-bubba:8044 \
               --bind 0.0.0.0:8085 \
-              --registries http://registry-server:80/nodes.yaml \
+              --registries http://registry-server:80/registry.yaml \
               --tls-insecure
         "

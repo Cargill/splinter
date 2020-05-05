@@ -26,8 +26,8 @@ paths:
   /nodes:
     get:
       tags:
-          - Node Registry
-      description: List nodes in the Node Registry
+          - Splinter Registry
+      description: List nodes in the Splinter Registry
       parameters:
         - name: offset
           in: query
@@ -78,8 +78,8 @@ paths:
   /nodes/{identity}:
       get:
         tags:
-          - Node Registry
-        description: Fetch a node in the Node Registry by their identity
+          - Splinter Registry
+        description: Fetch a node in the Splinter Registry by their identity
         parameters:
           - name: identity
             in: path

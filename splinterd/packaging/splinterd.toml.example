@@ -35,8 +35,8 @@ storage = "memory"
 # Rest api address.
 bind = "localhost:8085"
 
-# Node Registry file
-registries = ["file:///etc/splinter/nodes.yaml"]
+# Splinter Registry file
+registries = ["file:///etc/splinter/registry.yaml"]
 
 # List of certificate authority certificates (*.pem files).
 ca_certs = "/etc/splinter/certs/ca.pem"

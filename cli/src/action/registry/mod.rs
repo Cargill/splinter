@@ -17,7 +17,7 @@ use std::io::Write;
 use std::path::Path;
 
 use clap::ArgMatches;
-use splinter::node_registry::Node;
+use splinter::registry::Node;
 
 use crate::error::CliError;
 

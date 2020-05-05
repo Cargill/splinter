@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module defines the REST API endpoints for interacting with node registries.
+//! This module defines the REST API endpoints for interacting with registries.
 
 #[cfg(feature = "rest-api-actix")]
 mod actix;
@@ -20,20 +20,20 @@ mod resources;
 
 use crate::rest_api::{Resource, RestResourceProvider};
 
-use super::RwNodeRegistry;
+use super::RwRegistry;
 
-/// The `RwNodeRegistry` trait service provides the following endpoints as REST API resources:
+/// The `RwRegistry` trait service provides the following endpoints as REST API resources:
 ///
-/// * `GET /admin/nodes` - List the nodes in the registry
-/// * `POST /admin/nodes` - Add a node to the registry
-/// * `GET /admin/nodes/{identity}` - Fetch a specific node in the registry
-/// * `PUT /admin/nodes/{identity}` - Replace a node in the registry
-/// * `DELETE /admin/nodes/{identity}` - Delete a node from the registry
+/// * `GET /registry/nodes` - List the nodes in the registry
+/// * `POST /registry/nodes` - Add a node to the registry
+/// * `GET /registry/nodes/{identity}` - Fetch a specific node in the registry
+/// * `PUT /registry/nodes/{identity}` - Replace a node in the registry
+/// * `DELETE /registry/nodes/{identity}` - Delete a node from the registry
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
 /// * `rest-api-actix`
-impl RestResourceProvider for dyn RwNodeRegistry {
+impl RestResourceProvider for dyn RwRegistry {
     fn resources(&self) -> Vec<Resource> {
         // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
         // enabled

@@ -7,7 +7,7 @@ example demonstrates how to create a Splinter service that shares state, as
 managed by two-phase commit consensus.
 
 The Private Counter demo uses Docker containers to create three Splinter nodes,
-each with a Private Counter service, a node registry, and a local copy of state.
+each with a Private Counter service and a local copy of state.
 
 **Prerequisites**:
 This demo requires [Docker Engine](https://docs.docker.com/engine)

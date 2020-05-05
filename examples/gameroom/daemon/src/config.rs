@@ -22,7 +22,6 @@ use futures::{
 };
 use hyper::{Client as HyperClient, StatusCode, Uri};
 use serde_json::Value;
-use splinter::node_registry::Node;
 use tokio::runtime::Runtime;
 
 use crate::error::{ConfigurationError, GetNodeError};
@@ -103,7 +102,7 @@ impl GameroomConfigBuilder {
     }
 }
 
-pub fn get_node(splinterd_url: &str) -> Result<Node, GetNodeError> {
+pub fn get_node(splinterd_url: &str) -> Result<NodeInfo, GetNodeError> {
     let mut runtime = Runtime::new()
         .map_err(|err| GetNodeError(format!("Failed to get set up runtime: {}", err)))?;
     let client = HyperClient::new();
@@ -155,7 +154,7 @@ pub fn get_node(splinterd_url: &str) -> Result<Node, GetNodeError> {
                 Ok(node_id)
             })
             .and_then(move |node_id| {
-                let uri = match format!("{}/admin/nodes/{}", splinterd_url, node_id).parse::<Uri>() {
+                let uri = match format!("{}/registry/nodes/{}", splinterd_url, node_id).parse::<Uri>() {
                         Ok(uri) => uri,
                         Err(err) => return
                             Either::A(
@@ -190,7 +189,7 @@ pub fn get_node(splinterd_url: &str) -> Result<Node, GetNodeError> {
 
                         match status {
                             StatusCode::OK => {
-                                let node: Node = serde_json::from_slice(&body).map_err(|err| {
+                                let node: NodeInfo = serde_json::from_slice(&body).map_err(|err| {
                                     GetNodeError(format!(
                                         "Failed to get splinter node: {}",
                                         err
@@ -207,4 +206,10 @@ pub fn get_node(splinterd_url: &str) -> Result<Node, GetNodeError> {
                     }))
             }),
     )
+}
+
+#[derive(Clone, Deserialize)]
+pub struct NodeInfo {
+    pub identity: String,
+    pub endpoints: Vec<String>,
 }

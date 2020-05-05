@@ -122,7 +122,7 @@ items:
                   cp -R /config/certs/ /etc/splinter/
                 fi && \
                 splinterd -vv \
-                --registries file:///config/node-registry/node-registry.yaml \
+                --registries file:///config/registry/registry.yaml \
                 --bind $HOSTNAME:8085 \
                 --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id acme \
@@ -130,8 +130,8 @@ items:
                 --storage yaml \
                 --tls-insecure
             volumeMounts:
-              - name: node-registry-volume
-                mountPath: /config/node-registry
+              - name: registry-volume
+                mountPath: /config/registry
               - name: certificate-volume
                 mountPath: /config/certs
             ports:
@@ -139,9 +139,9 @@ items:
                 containerPort: 8044
 
         volumes:
-        - name: node-registry-volume
+        - name: registry-volume
           configMap:
-            name: node-registry
+            name: registry
         - name: certificate-volume
           emptyDir: {}
 
@@ -286,7 +286,7 @@ items:
                   cp -R /config/certs/ /etc/splinter/
                 fi && \
                 splinterd -vv \
-                --registries file:///config/node-registry/node-registry.yaml \
+                --registries file:///config/registry/registry.yaml \
                 --bind $HOSTNAME:8085 \
                 --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id bubba \
@@ -294,8 +294,8 @@ items:
                 --storage yaml \
                 --tls-insecure
             volumeMounts:
-              - name: node-registry-volume
-                mountPath: /config/node-registry
+              - name: registry-volume
+                mountPath: /config/registry
               - name: certificate-volume
                 mountPath: /config/certs
             ports:
@@ -303,9 +303,9 @@ items:
                 containerPort: 8044
 
         volumes:
-        - name: node-registry-volume
+        - name: registry-volume
           configMap:
-            name: node-registry
+            name: registry
         - name: certificate-volume
           emptyDir: {}
 

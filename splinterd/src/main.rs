@@ -133,10 +133,10 @@ fn main() {
         (@arg bind: --("bind") +takes_value
           "Connection endpoint for REST API")
         (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
-            "How often remote node registries should attempt to fetch upstream changes in the \
+            "How often remote Splinter registries should attempt to fetch upstream changes in the \
              background (in seconds); default is 600 (10 minutes), 0 means off")
         (@arg registry_forced_refresh: --("registry-forced-refresh") +takes_value
-            "How long before remote node registries should fetch upstream changes when read \
+            "How long before remote Splinter registries should fetch upstream changes when read \
              (in seconds); default is 10, 0 means off")
         (@arg admin_timeout: --("admin-timeout") +takes_value
             "The coordinator timeout for admin service proposals (in seconds); default is \
@@ -190,7 +190,7 @@ fn main() {
         .arg(
             Arg::with_name("registries")
                 .long("registries")
-                .help("Read-only node registries")
+                .help("Read-only Splinter registries")
                 .takes_value(true)
                 .multiple(true)
                 .alias("registry"),
@@ -330,7 +330,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
-    let node_registry_directory = state_dir
+    let registry_directory = state_dir
         .to_str()
         .ok_or_else(|| {
             UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
@@ -350,7 +350,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     daemon_builder = daemon_builder
         .with_storage_location(storage_location)
-        .with_node_registry_directory(node_registry_directory)
+        .with_registry_directory(registry_directory)
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))

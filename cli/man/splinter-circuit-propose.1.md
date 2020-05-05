@@ -65,10 +65,10 @@ OPTIONS
 
 `--node NODE-STRING` ...
 : Specifies a node that should be part of the circuit, using the format
-  `NODE-ID::ENDPOINT1,ENDPOINT2`. All endpoints must be in the node's entry in
-  the node registry. The proposer must also specify its own node, if it is to
-  be included on the circuit proposal. Repeat this option to specify multiple
-  nodes.
+  `NODE-ID::ENDPOINT1,ENDPOINT2`. All endpoints must be in the registry entry
+  for the given node ID. The proposer must also specify its own node, if it is
+  to be be included on the circuit proposal. Repeat this option to specify
+  multiple nodes.
 
 `--service SERVICE-STRING` ...
 : Specifies the service ID and allowed nodes, using the format

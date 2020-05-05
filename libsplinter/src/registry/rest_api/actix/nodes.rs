@@ -14,19 +14,19 @@
 
 //! This module provides the following endpoints:
 //!
-//! * `GET /admin/nodes` for listing nodes in the registry
-//! * `POST /admin/nodes` for adding a node to the registry
+//! * `GET /registry/nodes` for listing nodes in the registry
+//! * `POST /registry/nodes` for adding a node to the registry
 
 use std::collections::HashMap;
 
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
-use crate::node_registry::{
-    rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
-    InvalidNodeError, MetadataPredicate, Node, NodeRegistryError, NodeRegistryReader,
-    NodeRegistryWriter, RwNodeRegistry,
-};
 use crate::protocol;
+use crate::registry::{
+    rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
+    InvalidNodeError, MetadataPredicate, Node, RegistryError, RegistryReader, RegistryWriter,
+    RwRegistry,
+};
 use crate::rest_api::{
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
     percent_encode_filter_query, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
@@ -34,12 +34,12 @@ use crate::rest_api::{
 
 type Filter = HashMap<String, (String, String)>;
 
-pub fn make_nodes_resource(registry: Box<dyn RwNodeRegistry>) -> Resource {
+pub fn make_nodes_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
-    Resource::build("/admin/nodes")
+    Resource::build("/registry/nodes")
         .add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::ADMIN_LIST_NODES_MIN,
-            protocol::ADMIN_PROTOCOL_VERSION,
+            protocol::REGISTRY_LIST_NODES_MIN,
+            protocol::REGISTRY_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |r, _| {
             list_nodes(r, web::Data::new(registry.clone_box_as_reader()))
@@ -51,7 +51,7 @@ pub fn make_nodes_resource(registry: Box<dyn RwNodeRegistry>) -> Resource {
 
 fn list_nodes(
     req: HttpRequest,
-    registry: web::Data<Box<dyn NodeRegistryReader>>,
+    registry: web::Data<Box<dyn RegistryReader>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
@@ -144,7 +144,7 @@ fn list_nodes(
 }
 
 fn query_list_nodes(
-    registry: web::Data<Box<dyn NodeRegistryReader>>,
+    registry: web::Data<Box<dyn RegistryReader>>,
     link: String,
     filters: Vec<MetadataPredicate>,
     offset: Option<usize>,
@@ -163,20 +163,18 @@ fn query_list_nodes(
 
         Ok((nodes, link, limit, offset, total as usize))
     })
-    .then(
-        |res: Result<_, BlockingError<NodeRegistryError>>| match res {
-            Ok((nodes, link, limit, offset, total_count)) => {
-                Ok(HttpResponse::Ok().json(ListNodesResponse {
-                    data: nodes.iter().map(NodeResponse::from).collect(),
-                    paging: get_response_paging_info(limit, offset, &link, total_count),
-                }))
-            }
-            Err(err) => {
-                error!("Unable to list nodes: {}", err);
-                Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
-            }
-        },
-    )
+    .then(|res: Result<_, BlockingError<RegistryError>>| match res {
+        Ok((nodes, link, limit, offset, total_count)) => {
+            Ok(HttpResponse::Ok().json(ListNodesResponse {
+                data: nodes.iter().map(NodeResponse::from).collect(),
+                paging: get_response_paging_info(limit, offset, &link, total_count),
+            }))
+        }
+        Err(err) => {
+            error!("Unable to list nodes: {}", err);
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+        }
+    })
 }
 
 fn to_predicates(filters: Option<Filter>) -> Result<Vec<MetadataPredicate>, String> {
@@ -199,7 +197,7 @@ fn to_predicates(filters: Option<Filter>) -> Result<Vec<MetadataPredicate>, Stri
 
 fn add_node(
     payload: web::Payload,
-    registry: web::Data<Box<dyn RwNodeRegistry>>,
+    registry: web::Data<Box<dyn RwRegistry>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(
         payload
@@ -213,7 +211,7 @@ fn add_node(
                 Ok(node) => Box::new(
                     web::block(move || {
                         if registry.has_node(&node.identity)? {
-                            Err(NodeRegistryError::InvalidNode(
+                            Err(RegistryError::InvalidNode(
                                 InvalidNodeError::DuplicateIdentity(node.identity),
                             ))
                         } else {
@@ -223,7 +221,7 @@ fn add_node(
                     .then(|res| {
                         Ok(match res {
                             Ok(_) => HttpResponse::Ok().finish(),
-                            Err(BlockingError::Error(NodeRegistryError::InvalidNode(err))) => {
+                            Err(BlockingError::Error(RegistryError::InvalidNode(err))) => {
                                 HttpResponse::BadRequest().json(ErrorResponse::bad_request(
                                     &format!("Invalid node: {}", err),
                                 ))
@@ -258,23 +256,26 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::node_registry::{NodeBuilder, NodeIter};
+    use crate::registry::NodeIter;
     use crate::rest_api::{
         paging::Paging, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
     };
 
     #[test]
-    /// Tests a GET /admin/nodes request with no filters returns the expected nodes.
+    /// Tests a GET /registry/nodes request with no filters returns the expected nodes.
     fn test_list_nodes_ok() {
         let (shutdown_handle, join_handle, bind_url) = run_rest_api_on_open_port(vec![
             make_nodes_resource(Box::new(MemRegistry::new(vec![get_node_1(), get_node_2()]))),
         ]);
 
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
@@ -306,7 +307,7 @@ mod tests {
                 0,
                 0,
                 2,
-                "/admin/nodes?"
+                "/registry/nodes?"
             ))
             .expect("failed to convert expected paging")
         );
@@ -318,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests a GET /admin/nodes request with filters returns the expected node.
+    /// Tests a GET /registry/nodes request with filters returns the expected node.
     fn test_list_nodes_with_filters_ok() {
         let (shutdown_handle, join_handle, bind_url) = run_rest_api_on_open_port(vec![
             make_nodes_resource(Box::new(MemRegistry::new(vec![get_node_1(), get_node_2()]))),
@@ -326,13 +327,16 @@ mod tests {
 
         let filter = percent_encode_filter_query("{\"company\":[\"=\",\"Bitwise IO\"]}");
         let url = Url::parse(&format!(
-            "http://{}/admin/nodes?filter={}",
+            "http://{}/registry/nodes?filter={}",
             bind_url, filter
         ))
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
@@ -353,7 +357,7 @@ mod tests {
                 0,
                 0,
                 1,
-                &format!("/admin/nodes?filter={}&", filter)
+                &format!("/registry/nodes?filter={}&", filter)
             ))
             .expect("failed to convert expected paging")
         );
@@ -365,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests a GET /admin/nodes request with invalid filter returns BadRequest response.
+    /// Tests a GET /registry/nodes request with invalid filter returns BadRequest response.
     fn test_list_node_with_filters_bad_request() {
         let (shutdown_handle, join_handle, bind_url) = run_rest_api_on_open_port(vec![
             make_nodes_resource(Box::new(MemRegistry::new(vec![get_node_1(), get_node_2()]))),
@@ -373,13 +377,16 @@ mod tests {
 
         let filter = percent_encode_filter_query("{\"company\":[\"*\",\"Bitwise IO\"]}");
         let url = Url::parse(&format!(
-            "http://{}/admin/nodes?filter={}",
+            "http://{}/registry/nodes?filter={}",
             bind_url, filter
         ))
         .expect("Failed to parse URL");
         let resp = Client::new()
             .get(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
@@ -392,28 +399,34 @@ mod tests {
     }
 
     #[test]
-    /// Test the POST /admin/nodes route for adding a node to the registry.
+    /// Test the POST /registry/nodes route for adding a node to the registry.
     fn test_add_node() {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_nodes_resource(Box::new(MemRegistry::default()))]);
 
         // Verify an invalid node gets a BAD_REQUEST response
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .post(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .send()
             .expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
         // Verify a valid node gets an OK response
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .post(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .json(&get_node_1())
             .send()
             .expect("Failed to perform request");
@@ -421,11 +434,14 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
 
         // Verify a duplicate node gets a BAD_REQUEST response
-        let url =
-            Url::parse(&format!("http://{}/admin/nodes", bind_url)).expect("Failed to parse URL");
+        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
+            .expect("Failed to parse URL");
         let resp = Client::new()
             .post(url)
-            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::REGISTRY_PROTOCOL_VERSION,
+            )
             .json(&get_node_1())
             .send()
             .expect("Failed to perform request");
@@ -490,7 +506,7 @@ mod tests {
     }
 
     fn get_node_1() -> Node {
-        NodeBuilder::new("Node-123")
+        Node::builder("Node-123")
             .with_endpoint("12.0.0.123:8431")
             .with_display_name("Bitwise IO - Node 1")
             .with_key("0123")
@@ -500,7 +516,7 @@ mod tests {
     }
 
     fn get_node_2() -> Node {
-        NodeBuilder::new("Node-456")
+        Node::builder("Node-456")
             .with_endpoint("13.0.0.123:8434")
             .with_display_name("Cargill - Node 1")
             .with_key("abcd")
@@ -526,11 +542,11 @@ mod tests {
         }
     }
 
-    impl NodeRegistryReader for MemRegistry {
+    impl RegistryReader for MemRegistry {
         fn list_nodes<'a, 'b: 'a>(
             &'b self,
             predicates: &'a [MetadataPredicate],
-        ) -> Result<NodeIter<'a>, NodeRegistryError> {
+        ) -> Result<NodeIter<'a>, RegistryError> {
             let mut nodes = self
                 .nodes
                 .lock()
@@ -540,11 +556,11 @@ mod tests {
             Ok(Box::new(nodes.into_iter().map(|(_, node)| node)))
         }
 
-        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, NodeRegistryError> {
+        fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
             self.list_nodes(predicates).map(|iter| iter.count() as u32)
         }
 
-        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
@@ -554,8 +570,8 @@ mod tests {
         }
     }
 
-    impl NodeRegistryWriter for MemRegistry {
-        fn insert_node(&self, node: Node) -> Result<(), NodeRegistryError> {
+    impl RegistryWriter for MemRegistry {
+        fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
             self.nodes
                 .lock()
                 .expect("mem registry lock was poisoned")
@@ -563,7 +579,7 @@ mod tests {
             Ok(())
         }
 
-        fn delete_node(&self, identity: &str) -> Result<Option<Node>, NodeRegistryError> {
+        fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
@@ -572,16 +588,16 @@ mod tests {
         }
     }
 
-    impl RwNodeRegistry for MemRegistry {
-        fn clone_box(&self) -> Box<dyn RwNodeRegistry> {
+    impl RwRegistry for MemRegistry {
+        fn clone_box(&self) -> Box<dyn RwRegistry> {
             Box::new(self.clone())
         }
 
-        fn clone_box_as_reader(&self) -> Box<dyn NodeRegistryReader> {
+        fn clone_box_as_reader(&self) -> Box<dyn RegistryReader> {
             Box::new(self.clone())
         }
 
-        fn clone_box_as_writer(&self) -> Box<dyn NodeRegistryWriter> {
+        fn clone_box_as_writer(&self) -> Box<dyn RegistryWriter> {
             Box::new(self.clone())
         }
     }

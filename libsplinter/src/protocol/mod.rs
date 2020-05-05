@@ -33,10 +33,13 @@ pub(crate) const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 pub(crate) const ADMIN_LIST_CIRCUITS_MIN: u32 = 1;
 #[cfg(feature = "rest-api-actix")]
 pub(crate) const ADMIN_FETCH_CIRCUIT_MIN: u32 = 1;
+
+pub const REGISTRY_PROTOCOL_VERSION: u32 = 1;
+
 #[cfg(feature = "rest-api-actix")]
-pub(crate) const ADMIN_LIST_NODES_MIN: u32 = 1;
+pub(crate) const REGISTRY_LIST_NODES_MIN: u32 = 1;
 #[cfg(feature = "rest-api-actix")]
-pub(crate) const ADMIN_FETCH_NODE_MIN: u32 = 1;
+pub(crate) const REGISTRY_FETCH_NODE_MIN: u32 = 1;
 
 pub const SCABBARD_PROTOCOL_VERSION: u32 = 1;
 
