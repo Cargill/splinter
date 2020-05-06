@@ -18,7 +18,7 @@ use crate::collections::BiHashMap;
 
 use super::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
-    PeerRefRemoveError,
+    PeerRefRemoveError, PeerUnknownAddError,
 };
 use super::notification::PeerNotificationIter;
 use super::PeerRef;
@@ -95,6 +95,33 @@ impl PeerManagerConnector {
 
         recv.recv()
             .map_err(|err| PeerRefAddError::ReceiveError(format!("{:?}", err)))?
+    }
+
+    /// Request that a peer is added to the PeerManager. This function should be used when the
+    /// peer id is unknown.
+    ///
+    /// # Arguments
+    ///
+    /// * `endpoint` - The endpoint associated with the peer.
+    ///
+    /// Returns Ok() if the unidentified peer was added
+    pub fn add_unidentified_peer(&self, endpoint: String) -> Result<(), PeerUnknownAddError> {
+        let (sender, recv) = channel();
+
+        let message =
+            PeerManagerMessage::Request(PeerManagerRequest::AddUnidentified { endpoint, sender });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerUnknownAddError::InternalError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerUnknownAddError::ReceiveError(format!("{:?}", err)))?
     }
 
     /// Request the list of currently connected peers.
