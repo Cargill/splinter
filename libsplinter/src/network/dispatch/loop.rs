@@ -131,26 +131,24 @@ where
         let join_handle = std::thread::Builder::new()
             .name(thread_name)
             .spawn(move || loop {
-                loop {
-                    let (message_type, message_bytes, source_id) = match rx.receiver.recv() {
-                        Ok(DispatchMessage::Message {
-                            message_type,
-                            message_bytes,
-                            source_id,
-                        }) => (message_type, message_bytes, source_id),
-                        Ok(DispatchMessage::Shutdown) => {
-                            debug!("Received shutdown signal");
-                            break;
-                        }
-                        Err(RecvError) => {
-                            error!("Received error from receiver");
-                            break;
-                        }
-                    };
-                    match dispatcher.dispatch(source_id, &message_type, message_bytes) {
-                        Ok(_) => (),
-                        Err(err) => warn!("Unable to dispatch message: {:?}", err),
+                let (message_type, message_bytes, source_id) = match rx.receiver.recv() {
+                    Ok(DispatchMessage::Message {
+                        message_type,
+                        message_bytes,
+                        source_id,
+                    }) => (message_type, message_bytes, source_id),
+                    Ok(DispatchMessage::Shutdown) => {
+                        debug!("Received shutdown signal");
+                        break;
                     }
+                    Err(RecvError) => {
+                        error!("Received error from receiver");
+                        break;
+                    }
+                };
+                match dispatcher.dispatch(source_id, &message_type, message_bytes) {
+                    Ok(_) => (),
+                    Err(err) => warn!("Unable to dispatch message: {:?}", err),
                 }
             });
 
