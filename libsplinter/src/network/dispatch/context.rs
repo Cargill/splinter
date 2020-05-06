@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt::Debug;
-use std::hash::Hash;
-
 use super::{ConnectionId, PeerId};
 
 /// The Message Context
@@ -22,20 +19,13 @@ use super::{ConnectionId, PeerId};
 /// The message context provides information about an incoming message beyond its parsed bytes.  It
 /// includes the source peer id, the message type, the original bytes, and potentially other,
 /// future items.
-#[derive(Clone, Debug)]
-pub struct MessageContext<Source, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
+pub struct MessageContext<Source, MT> {
     source_id: Source,
     message_type: MT,
     message_bytes: Vec<u8>,
 }
 
-impl<Source, MT> MessageContext<Source, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
+impl<Source, MT> MessageContext<Source, MT> {
     pub(super) fn new(message_type: MT, message_bytes: Vec<u8>, source_id: Source) -> Self {
         Self {
             message_type,
@@ -62,10 +52,7 @@ where
     }
 }
 
-impl<MT> MessageContext<PeerId, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
+impl<MT> MessageContext<PeerId, MT> {
     /// The Source Peer ID.
     ///
     /// This is the peer id of the original sender of the message
@@ -74,10 +61,7 @@ where
     }
 }
 
-impl<MT> MessageContext<ConnectionId, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
+impl<MT> MessageContext<ConnectionId, MT> {
     /// The Source Connection ID.
     ///
     /// This is the connection id of the original sender of the message
