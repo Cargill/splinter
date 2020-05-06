@@ -31,6 +31,8 @@ use crate::transport::{Connection, RecvError};
 use self::handlers::create_authorization_dispatcher;
 use self::pool::{ThreadPool, ThreadPoolBuilder};
 
+const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
+
 /// The states of a connection during authorization.
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum AuthorizationState {
@@ -53,7 +55,7 @@ impl fmt::Display for AuthorizationState {
 
 type Identity = String;
 
-/// The state transitions that can be applied on an connection during authorization.
+/// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
 pub(crate) enum AuthorizationAction {
     Connecting,
@@ -112,10 +114,10 @@ pub struct AuthorizationPool {
 }
 
 impl AuthorizationPool {
-    /// Constructs an AuthorizationManager
+    /// Constructs an AuthorizationPool
     pub fn new(local_identity: String) -> Result<Self, AuthorizationPoolError> {
         let thread_pool = ThreadPoolBuilder::new()
-            .with_size(8)
+            .with_size(AUTHORIZATION_THREAD_POOL_SIZE)
             .with_prefix("AuthorizationPool-".into())
             .build()
             .map_err(|err| AuthorizationPoolError(err.to_string()))?;
@@ -157,6 +159,9 @@ impl ShutdownSignaler {
         self.thread_pool_signaler.shutdown();
     }
 }
+
+type Callback =
+    Box<dyn Fn(ConnectionAuthorizationState) -> Result<(), Box<dyn std::error::Error>> + Send>;
 
 pub struct PoolAuthorizer {
     local_identity: String,
@@ -385,9 +390,6 @@ impl AuthorizationPoolStateMachine {
         }
     }
 }
-
-type Callback =
-    Box<dyn Fn(ConnectionAuthorizationState) -> Result<(), Box<dyn std::error::Error>> + Send>;
 
 #[derive(Default)]
 struct ManagedAuthorizations {

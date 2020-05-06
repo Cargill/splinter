@@ -25,7 +25,7 @@ use std::time::Instant;
 
 use uuid::Uuid;
 
-pub use error::ConnectionManagerError;
+pub use error::{AuthorizerError, ConnectionManagerError};
 pub use notification::{ConnectionManagerNotification, NotificationIter};
 use pacemaker::Pacemaker;
 use protobuf::Message;
@@ -60,17 +60,6 @@ pub enum AuthorizationResult {
         connection_id: String,
         connection: Box<dyn Connection>,
     },
-}
-
-#[derive(Debug)]
-pub struct AuthorizerError(pub String);
-
-impl std::error::Error for AuthorizerError {}
-
-impl std::fmt::Display for AuthorizerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
 }
 
 pub type SubscriberId = usize;
