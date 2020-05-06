@@ -85,7 +85,8 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 Some(true)
             } else {
                 None
-            });
+            })
+            .with_state_dir(self.matches.value_of("state_dir").map(String::from));
 
         #[cfg(feature = "biome")]
         {
@@ -133,6 +134,7 @@ mod tests {
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
     static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
+    static EXAMPLE_STATE_DIR: &str = "/var/lib/splinter/";
 
     /// Asserts config values based on the example values.
     fn assert_config_values(config: PartialConfig) {
@@ -183,6 +185,7 @@ mod tests {
         assert_eq!(config.admin_timeout(), None);
         assert_eq!(config.tls_insecure(), Some(true));
         assert_eq!(config.no_tls(), Some(true));
+        assert_eq!(config.state_dir(), Some(EXAMPLE_STATE_DIR.to_string()));
     }
 
     /// Creates an ArgMatches object to be used to construct a ClapPartialConfigBuilder object.
@@ -206,7 +209,8 @@ mod tests {
             (@arg tls_client_key:  --("tls-client-key") +takes_value)
             (@arg bind: --("bind") +takes_value)
             (@arg tls_insecure: --("tls-insecure"))
-            (@arg no_tls: --("no-tls")))
+            (@arg no_tls: --("no-tls"))
+            (@arg state_dir: --("state-dir") + takes_value))
         .get_matches_from(args)
     }
 
@@ -249,6 +253,8 @@ mod tests {
             EXAMPLE_SERVER_KEY,
             "--tls-insecure",
             "--no-tls",
+            "--state-dir",
+            EXAMPLE_STATE_DIR,
         ];
         // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
         let matches = create_arg_matches(args);

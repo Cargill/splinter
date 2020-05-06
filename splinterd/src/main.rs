@@ -310,6 +310,12 @@ fn main() {
                 .long("tls-insecure")
                 .help("If set to tls, should accept all peer certificates")
                 .alias("insecure"),
+        )
+        .arg(
+            Arg::with_name("state_dir")
+                .long("state-dir")
+                .help("Storage directory when storage is YAML")
+                .takes_value(true),
         );
 
     #[cfg(feature = "database")]
