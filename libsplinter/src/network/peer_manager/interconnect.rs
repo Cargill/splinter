@@ -17,9 +17,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
-use crate::network::dispatch::{
-    DispatchLoopBuilder, DispatchLoopShutdownSignaler, DispatchMessageSender, Dispatcher,
-};
+use crate::network::dispatch::DispatchMessageSender;
 use crate::network::sender::{NetworkMessageSender, SendRequest};
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 
@@ -93,7 +91,7 @@ where
     // MatrixSender to send messages to peers
     message_sender: Option<U>,
     // a Dispatcher with handlers for NetworkMessageTypes
-    network_dispatcher: Option<Dispatcher<NetworkMessageType>>,
+    network_dispatcher_sender: Option<DispatchMessageSender<NetworkMessageType>>,
 }
 
 impl<T, U, P> PeerInterconnectBuilder<T, U, P>
@@ -108,7 +106,7 @@ where
             peer_lookup_provider: None,
             message_receiver: None,
             message_sender: None,
-            network_dispatcher: None,
+            network_dispatcher_sender: None,
         }
     }
 
@@ -143,47 +141,34 @@ where
         self
     }
 
-    /// Add a Dispatcher for NetworkMessageType to PeerInterconnectBuilder
+    /// Add a DispatchMessageSender for NetworkMessageType to PeerInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `network_dispatcher` - a Dispatcher that is loaded with the Handlers for
-    ///    NetworkMessageTypes
-    pub fn with_network_dispatcher(
+    /// * `network_dispatcher_sender` - a DispatchMessageSender<NetworkMessageType> to dispatch
+    ///     NetworkMessages
+    pub fn with_network_dispatcher_sender(
         mut self,
-        network_dispatcher: Dispatcher<NetworkMessageType>,
+        network_dispatcher_sender: DispatchMessageSender<NetworkMessageType>,
     ) -> Self {
-        self.network_dispatcher = Some(network_dispatcher);
+        self.network_dispatcher_sender = Some(network_dispatcher_sender);
         self
     }
 
-    /// Build the PeerInterconnect. This function will build the dispatch loop for network message
-    /// types and start up threads to send and recv messages from the peers.
+    /// Build the PeerInterconnect. This function will start up threads to send and recv messages
+    /// from the peers.
     ///
     /// Returns the PeerInterconnect object that can be used to get network message senders and
     /// shutdown message threads.
     pub fn build(&mut self) -> Result<PeerInterconnect, PeerInterconnectError> {
         let (dispatched_sender, dispatched_receiver) = channel();
-
         let peer_lookup_provider = self.peer_lookup_provider.take().ok_or_else(|| {
             PeerInterconnectError::StartUpError("Peer lookup provider missing".to_string())
         })?;
 
-        let mut network_dispatcher = self.network_dispatcher.take().ok_or_else(|| {
-            PeerInterconnectError::StartUpError("Network dispatcher missing".to_string())
+        let network_dispatcher_sender = self.network_dispatcher_sender.take().ok_or_else(|| {
+            PeerInterconnectError::StartUpError("Network dispatcher sender missing".to_string())
         })?;
-        network_dispatcher.set_network_sender(NetworkMessageSender::new(dispatched_sender.clone()));
-        let network_dispatch_loop = DispatchLoopBuilder::new()
-            .with_dispatcher(network_dispatcher)
-            .build()
-            .map_err(|err| {
-                PeerInterconnectError::StartUpError(format!(
-                    "Unable to start network dispatch loop: {}",
-                    err
-                ))
-            })?;
-        let network_dispatcher_sender = network_dispatch_loop.new_dispatcher_sender();
-        let network_dispatcher_shutdown = network_dispatch_loop.shutdown_signaler();
 
         // start receiver loop
         let message_receiver = self.message_receiver.take().ok_or_else(|| {
@@ -236,7 +221,6 @@ where
             send_join_handle,
             shutdown_handle: ShutdownHandle {
                 sender: dispatched_sender,
-                dispatch_shutdown: network_dispatcher_shutdown,
             },
         })
     }
@@ -360,7 +344,6 @@ where
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<SendRequest>,
-    dispatch_shutdown: DispatchLoopShutdownSignaler<NetworkMessageType>,
 }
 
 impl ShutdownHandle {
@@ -370,8 +353,6 @@ impl ShutdownHandle {
         if self.sender.send(SendRequest::Shutdown).is_err() {
             warn!("Peer Interconnect is no longer running");
         }
-
-        self.dispatch_shutdown.shutdown();
     }
 }
 
@@ -387,7 +368,10 @@ pub mod tests {
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
     };
-    use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
+    use crate::network::dispatch::{
+        dispatch_channel, DispatchError, DispatchLoopBuilder, Dispatcher, Handler, MessageContext,
+        MessageSender, PeerId,
+    };
     use crate::network::peer_manager::PeerManager;
     use crate::protos::network::NetworkEcho;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
@@ -456,18 +440,16 @@ pub mod tests {
             let message_bytes = echo_to_network_message_bytes(b"test_retrieve".to_vec());
             let envelope = Envelope::new("test_id".to_string(), message_bytes);
             mesh2.send(envelope).expect("Unable to send message");
-
             // Verify mesh received the same network echo back
             let envelope = mesh2.recv().expect("Cannot receive message");
             let network_msg: NetworkMessage = protobuf::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse NetworkMessage");
-
-            let echo: NetworkEcho = protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
             assert_eq!(
                 network_msg.get_message_type(),
                 NetworkMessageType::NETWORK_ECHO
             );
 
+            let echo: NetworkEcho = protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
             assert_eq!(echo.get_payload().to_vec(), b"test_retrieve".to_vec());
 
             // Send a message back to PeerInterconnect that will shutdown the test
@@ -492,23 +474,35 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let (send, recv) = channel();
+
+        let (dispatcher_sender, dispatcher_receiver) = dispatch_channel();
+        let interconnect = PeerInterconnectBuilder::new()
+            .with_peer_connector(peer_connector.clone())
+            .with_message_receiver(mesh1.get_receiver())
+            .with_message_sender(mesh1.get_sender())
+            .with_network_dispatcher_sender(dispatcher_sender.clone())
+            .build()
+            .expect("Unable to build PeerInterconnect");
+
+        let mut dispatcher = Dispatcher::new(Box::new(interconnect.new_network_sender()));
+        let handler = NetworkTestHandler::new(send);
+        dispatcher.set_handler(Box::new(handler));
+
+        let network_dispatch_loop = DispatchLoopBuilder::new()
+            .with_dispatcher(dispatcher)
+            .with_thread_name("NetworkDispatchLoop".to_string())
+            .with_dispatch_channel((dispatcher_sender, dispatcher_receiver))
+            .build()
+            .expect("Unable to create network dispatch loop");
+
+        let dispatch_shutdown = network_dispatch_loop.shutdown_signaler();
+
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["test".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
-        let (send, recv) = channel();
-
-        let mut dispatcher = Dispatcher::default();
-        let handler = NetworkTestHandler::new(send);
-        dispatcher.set_handler(Box::new(handler));
-        let interconnect = PeerInterconnectBuilder::new()
-            .with_peer_connector(peer_connector)
-            .with_message_receiver(mesh1.get_receiver())
-            .with_message_sender(mesh1.get_sender())
-            .with_network_dispatcher(dispatcher)
-            .build()
-            .expect("Unable to build PeerInterconnect");
 
         // wait to be told to shutdown, timeout after 2 seconds
         let test_timeout = std::time::Duration::from_secs(2);
@@ -520,6 +514,7 @@ pub mod tests {
 
         peer_manager.shutdown_and_wait();
         cm.shutdown_and_wait();
+        dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
@@ -543,13 +538,12 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start PeerManager");
-        let dispatcher = Dispatcher::default();
-
+        let (dispatcher_sender, _dispatched_receiver) = dispatch_channel();
         let interconnect = PeerInterconnectBuilder::new()
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh.get_receiver())
             .with_message_sender(mesh.get_sender())
-            .with_network_dispatcher(dispatcher)
+            .with_network_dispatcher_sender(dispatcher_sender)
             .build()
             .expect("Unable to build PeerInterconnect");
 

@@ -37,15 +37,12 @@ use super::{
 /// itself to handle updating identities (or removing connections with authorization failures).
 ///
 /// The identity provided is sent to connections for Trust authorizations.
-pub fn create_authorization_dispatcher<T>(
+pub fn create_authorization_dispatcher(
     identity: String,
     auth_manager: AuthorizationPoolStateMachine,
-    auth_msg_sender: T,
-) -> Dispatcher<NetworkMessageType, ConnectionId>
-where
-    T: Into<Box<dyn MessageSender<ConnectionId>>> + Clone,
-{
-    let mut auth_dispatcher = Dispatcher::new(auth_msg_sender.clone());
+    auth_msg_sender: impl MessageSender<ConnectionId> + Clone + 'static,
+) -> Dispatcher<NetworkMessageType, ConnectionId> {
+    let mut auth_dispatcher = Dispatcher::new(Box::new(auth_msg_sender.clone()));
 
     auth_dispatcher.set_handler(Box::new(ConnectRequestHandler::new(auth_manager.clone())));
 
@@ -57,7 +54,7 @@ where
 
     auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));
 
-    let mut network_msg_dispatcher = Dispatcher::new(auth_msg_sender);
+    let mut network_msg_dispatcher = Dispatcher::new(Box::new(auth_msg_sender));
 
     network_msg_dispatcher.set_handler(Box::new(AuthorizationMessageHandler::new(auth_dispatcher)));
 
@@ -398,12 +395,6 @@ impl MessageSender<ConnectionId> for AuthorizationMessageSender {
     }
 }
 
-impl Into<Box<dyn MessageSender<ConnectionId>>> for AuthorizationMessageSender {
-    fn into(self) -> Box<dyn MessageSender<ConnectionId>> {
-        Box::new(self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -633,12 +624,6 @@ mod tests {
                 .push_back((id, message));
 
             Ok(())
-        }
-    }
-
-    impl Into<Box<dyn MessageSender<ConnectionId>>> for MockSender {
-        fn into(self) -> Box<dyn MessageSender<ConnectionId>> {
-            Box::new(self)
         }
     }
 }

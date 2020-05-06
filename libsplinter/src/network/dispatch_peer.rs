@@ -22,9 +22,3 @@ impl MessageSender<PeerId> for NetworkMessageSender {
             .map_err(|(id, msg)| (id.into(), msg))
     }
 }
-
-impl Into<Box<dyn MessageSender<PeerId>>> for NetworkMessageSender {
-    fn into(self) -> Box<dyn MessageSender<PeerId>> {
-        Box::new(self)
-    }
-}

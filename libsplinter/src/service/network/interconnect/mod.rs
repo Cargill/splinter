@@ -23,10 +23,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
-use crate::network::dispatch::{
-    ConnectionId, DispatchLoopBuilder, DispatchLoopShutdownSignaler, DispatchMessageSender,
-    Dispatcher, MessageSender,
-};
+use crate::network::dispatch::{ConnectionId, DispatchMessageSender, MessageSender};
 use crate::protos::component::{ComponentMessage, ComponentMessageType};
 
 pub use self::error::{ServiceInterconnectError, ServiceLookupError};
@@ -119,7 +116,8 @@ where
     // MatrixSender to send messages to services
     message_sender: Option<U>,
     // a Dispatcher with handlers for ComponentMessageTypes
-    service_msg_dispatcher: Option<Dispatcher<ComponentMessageType, ConnectionId>>,
+    service_msg_dispatcher_sender:
+        Option<DispatchMessageSender<ComponentMessageType, ConnectionId>>,
 }
 
 impl<T, U, P> ServiceInterconnectBuilder<T, U, P>
@@ -134,7 +132,7 @@ where
             service_lookup_provider: None,
             message_receiver: None,
             message_sender: None,
-            service_msg_dispatcher: None,
+            service_msg_dispatcher_sender: None,
         }
     }
 
@@ -170,22 +168,21 @@ where
         self
     }
 
-    /// Add a Dispatcher for ComponentMessageType to ServiceInterconnectBuilder
+    /// Add a DispatchMessageSender for ComponentMessageType to ServiceInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `service_msg_dispatcher` - a Dispatcher that is loaded with the Handlers for
-    ///    ComponentMessageTypes
-    pub fn with_service_msg_dispatcher(
+    /// * `service_msg_dispatcher_sender` - a DispatchMessageSender to dispatche ComponentMessage
+    pub fn with_service_msg_dispatcher_sender(
         mut self,
-        service_msg_dispatcher: Dispatcher<ComponentMessageType, ConnectionId>,
+        service_msg_dispatcher_sender: DispatchMessageSender<ComponentMessageType, ConnectionId>,
     ) -> Self {
-        self.service_msg_dispatcher = Some(service_msg_dispatcher);
+        self.service_msg_dispatcher_sender = Some(service_msg_dispatcher_sender);
         self
     }
 
-    /// Build the ServiceInterconnect. This function will build the dispatch loop for network message
-    /// types and start up threads to send and recv messages from the services.
+    /// Build the ServiceInterconnect. This function will start up threads to send and recv
+    /// messages from the services.
     ///
     /// Returns the ServiceInterconnect object that can be used to get network message senders and
     /// shutdown message threads.
@@ -196,21 +193,10 @@ where
             ServiceInterconnectError("Service lookup provider missing".to_string())
         })?;
 
-        let mut service_msg_dispatcher = self
-            .service_msg_dispatcher
-            .take()
-            .ok_or_else(|| ServiceInterconnectError("Network dispatcher missing".to_string()))?;
-        service_msg_dispatcher.set_network_sender(ServiceInterconnectMessageSender::new(
-            dispatched_sender.clone(),
-        ));
-        let component_dispatch_loop = DispatchLoopBuilder::new()
-            .with_dispatcher(service_msg_dispatcher)
-            .build()
-            .map_err(|err| {
-                ServiceInterconnectError(format!("Unable to start network dispatch loop: {}", err))
+        let service_msg_dispatcher_sender =
+            self.service_msg_dispatcher_sender.take().ok_or_else(|| {
+                ServiceInterconnectError("Network dispatcher  sender missing".to_string())
             })?;
-        let service_msg_dispatcher_sender = component_dispatch_loop.new_dispatcher_sender();
-        let service_msg_dispatcher_shutdown = component_dispatch_loop.shutdown_signaler();
 
         // start receiver loop
         let message_receiver = self
@@ -264,7 +250,6 @@ where
             send_join_handle,
             shutdown_handle: ShutdownHandle {
                 sender: dispatched_sender,
-                dispatch_shutdown: service_msg_dispatcher_shutdown,
             },
         })
     }
@@ -389,6 +374,7 @@ enum SendRequest {
     Shutdown,
 }
 
+#[derive(Clone)]
 struct ServiceInterconnectMessageSender {
     sender: Sender<SendRequest>,
 }
@@ -414,16 +400,9 @@ impl MessageSender<ConnectionId> for ServiceInterconnectMessageSender {
     }
 }
 
-impl Into<Box<dyn MessageSender<ConnectionId>>> for ServiceInterconnectMessageSender {
-    fn into(self) -> Box<dyn MessageSender<ConnectionId>> {
-        Box::new(self)
-    }
-}
-
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<SendRequest>,
-    dispatch_shutdown: DispatchLoopShutdownSignaler<ComponentMessageType, ConnectionId>,
 }
 
 impl ShutdownHandle {
@@ -433,8 +412,6 @@ impl ShutdownHandle {
         if self.sender.send(SendRequest::Shutdown).is_err() {
             warn!("Service Interconnect is no longer running");
         }
-
-        self.dispatch_shutdown.shutdown();
     }
 }
 
@@ -452,7 +429,8 @@ pub mod tests {
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
     };
     use crate::network::dispatch::{
-        ConnectionId, DispatchError, Handler, MessageContext, MessageSender,
+        dispatch_channel, ConnectionId, DispatchError, DispatchLoopBuilder, Dispatcher, Handler,
+        MessageContext, MessageSender,
     };
     use crate::protos::service;
     use crate::service::network::ServiceConnectionManager;
@@ -550,33 +528,47 @@ pub mod tests {
 
             mesh2.shutdown_signaler().shutdown();
         });
-
-        let conn = listener.accept().expect("Cannot accept connection");
-        connector.add_inbound_connection(conn).unwrap();
-
-        let mut dispatcher = Dispatcher::default();
-        let handler = ComponentTestHandler::new(&[b"test_retrieve"]);
-        dispatcher.set_handler(Box::new(handler));
+        let (dispatcher_sender, dispatcher_receiver) = dispatch_channel();
         let interconnect = ServiceInterconnectBuilder::new()
             .with_service_connector(service_conn_mgr.service_connector())
             .with_message_receiver(mesh1.get_receiver())
             .with_message_sender(mesh1.get_sender())
-            .with_service_msg_dispatcher(dispatcher)
+            .with_service_msg_dispatcher_sender(dispatcher_sender.clone())
             .build()
             .expect("Unable to build ServiceInterconnect");
+
+        let message_sender = interconnect.new_message_sender();
+
+        let mut dispatcher: Dispatcher<ComponentMessageType, ConnectionId> =
+            Dispatcher::new(Box::new(message_sender));
+        let handler = ComponentTestHandler::new(&[b"test_retrieve"]);
+        dispatcher.set_handler(Box::new(handler));
+
+        let dispatch_loop = DispatchLoopBuilder::new()
+            .with_dispatcher(dispatcher)
+            .with_thread_name("ServiceDispatchLoop".to_string())
+            .with_dispatch_channel((dispatcher_sender, dispatcher_receiver))
+            .build()
+            .expect("Unable to create service dispatch loop");
+
+        let dispatch_shutdown = dispatch_loop.shutdown_signaler();
+
+        let conn = listener.accept().expect("Cannot accept connection");
+        connector.add_inbound_connection(conn).unwrap();
 
         // Wait for the remote to finish it's testing
         join_handle.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
         cm.shutdown_and_wait();
+        dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
 
     // Verify that ServiceInterconnect can be shutdown after start but without any messages being
-    // sent. This test starts up the ServiceInterconnect and the associated Connection/ServiceConnectionManager
-    // and then immediately shuts them down.
+    // sent. This test starts up the ServiceInterconnect and the associated
+    // Connection/ServiceConnectionManager and then immediately shuts them down.
     #[test]
     fn test_service_interconnect_shutdown() {
         let transport = Box::new(InprocTransport::default());
@@ -597,13 +589,12 @@ pub mod tests {
             .start()
             .expect("Unable to start service manager");
 
-        let dispatcher = Dispatcher::default();
-
+        let (dispatcher_sender, _) = dispatch_channel();
         let interconnect = ServiceInterconnectBuilder::new()
             .with_service_connector(service_conn_mgr.service_connector())
             .with_message_receiver(mesh.get_receiver())
             .with_message_sender(mesh.get_sender())
-            .with_service_msg_dispatcher(dispatcher)
+            .with_service_msg_dispatcher_sender(dispatcher_sender.clone())
             .build()
             .expect("Unable to build ServiceInterconnect");
 

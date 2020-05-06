@@ -20,7 +20,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::mpsc::{channel, RecvError, Sender};
+use std::sync::mpsc::{channel, Receiver, RecvError, Sender};
 
 /// A wrapper for a PeerId.
 ///
@@ -305,14 +305,13 @@ pub trait MessageSender<R>: Send {
 ///
 /// Message Types (MT) merely need to implement Hash, Eq and Debug (for unknown message type
 /// results). Beyond that, there are no other requirements.
-#[derive(Default)]
 pub struct Dispatcher<MT, Source = PeerId>
 where
     Source: 'static,
     MT: Any + Hash + Eq + Debug + Clone,
 {
     handlers: HashMap<MT, HandlerWrapper<Source, MT>>,
-    network_sender: Option<Box<dyn MessageSender<Source>>>,
+    network_sender: Box<dyn MessageSender<Source>>,
 }
 
 impl<MT, Source> Dispatcher<MT, Source>
@@ -324,13 +323,10 @@ where
     ///
     /// Creates a dispatcher with a given `NetworkSender` to supply to handlers when they are
     /// executed.
-    pub fn new<S>(network_sender: S) -> Self
-    where
-        S: Into<Box<dyn MessageSender<Source>>>,
-    {
+    pub fn new(network_sender: Box<dyn MessageSender<Source>>) -> Self {
         Dispatcher {
             handlers: HashMap::new(),
-            network_sender: Some(network_sender.into()),
+            network_sender,
         }
     }
 
@@ -357,13 +353,6 @@ where
         );
     }
 
-    pub fn set_network_sender<S>(&mut self, network_sender: S)
-    where
-        S: Into<Box<dyn MessageSender<Source>>>,
-    {
-        self.network_sender = Some(network_sender.into());
-    }
-
     /// Dispatch a message by type.
     ///
     /// This dispatches a message (in raw byte form) as a given message type.  The message will be
@@ -384,25 +373,18 @@ where
             message_bytes,
             source_id,
         };
-        if let Some(network_sender) = &self.network_sender {
-            self.handlers
-                .get(message_type)
-                .ok_or_else(|| {
-                    DispatchError::UnknownMessageType(format!(
-                        "No handler for type {:?}",
-                        message_type
-                    ))
-                })
-                .and_then(|handler| {
-                    handler.handle(
-                        &message_context.message_bytes,
-                        &message_context,
-                        &**network_sender,
-                    )
-                })
-        } else {
-            Err(DispatchError::MissingNetworkSender)
-        }
+        self.handlers
+            .get(message_type)
+            .ok_or_else(|| {
+                DispatchError::UnknownMessageType(format!("No handler for type {:?}", message_type))
+            })
+            .and_then(|handler| {
+                handler.handle(
+                    &message_context.message_bytes,
+                    &message_context,
+                    &*self.network_sender,
+                )
+            })
     }
 }
 
@@ -493,6 +475,10 @@ where
     MT: Any + Hash + Eq + Debug + Clone,
 {
     dispatcher: Option<Dispatcher<MT, Source>>,
+    channel: Option<(
+        DispatchMessageSender<MT, Source>,
+        DispatchMessageReceiver<MT, Source>,
+    )>,
     thread_name: Option<String>,
 }
 
@@ -504,8 +490,20 @@ where
     pub fn new() -> Self {
         DispatchLoopBuilder {
             dispatcher: None,
+            channel: None,
             thread_name: None,
         }
+    }
+
+    pub fn with_dispatch_channel(
+        mut self,
+        channel: (
+            DispatchMessageSender<MT, Source>,
+            DispatchMessageReceiver<MT, Source>,
+        ),
+    ) -> Self {
+        self.channel = Some(channel);
+        self
     }
 
     pub fn with_dispatcher(mut self, dispatcher: Dispatcher<MT, Source>) -> Self {
@@ -519,7 +517,7 @@ where
     }
 
     pub fn build(mut self) -> Result<DispatchLoop<MT, Source>, String> {
-        let (tx, rx) = channel();
+        let (tx, rx) = self.channel.take().unwrap_or_else(dispatch_channel);
 
         let dispatcher = self
             .dispatcher
@@ -534,7 +532,7 @@ where
             .name(thread_name)
             .spawn(move || loop {
                 loop {
-                    let (message_type, message_bytes, source_id) = match rx.recv() {
+                    let (message_type, message_bytes, source_id) = match rx.receiver.recv() {
                         Ok(DispatchMessage::Message {
                             message_type,
                             message_bytes,
@@ -558,7 +556,7 @@ where
 
         match join_handle {
             Ok(join_handle) => Ok(DispatchLoop {
-                sender: tx,
+                sender: tx.sender,
                 join_handle,
             }),
             Err(err) => Err(format!("Unable to start up dispatch loop thread: {}", err)),
@@ -600,6 +598,37 @@ where
             sender: self.sender.clone(),
         }
     }
+}
+
+impl<MT, Source> DispatchLoop<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone + Send,
+    Source: Send + 'static,
+{
+    pub fn builder() -> DispatchLoopBuilder<MT, Source> {
+        DispatchLoopBuilder::new()
+    }
+}
+
+pub fn dispatch_channel<MT, Source>() -> (
+    DispatchMessageSender<MT, Source>,
+    DispatchMessageReceiver<MT, Source>,
+)
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    let (tx, rx) = channel();
+    (
+        DispatchMessageSender { sender: tx },
+        DispatchMessageReceiver { receiver: rx },
+    )
+}
+
+pub struct DispatchMessageReceiver<MT, Source = PeerId>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    receiver: Receiver<DispatchMessage<MT, Source>>,
 }
 
 #[derive(Clone)]
@@ -668,7 +697,7 @@ mod tests {
             .expect("Unable to create queue");
         let network_sender = network_message_queue.new_network_sender();
 
-        let mut dispatcher = Dispatcher::new(network_sender);
+        let mut dispatcher = Dispatcher::new(Box::new(network_sender));
 
         let handler = NetworkEchoHandler::default();
         let echos = handler.echos.clone();
@@ -713,7 +742,7 @@ mod tests {
             .build()
             .expect("Unable to create queue");
         let network_sender = network_message_queue.new_network_sender();
-        let mut dispatcher = Dispatcher::new(network_sender);
+        let mut dispatcher = Dispatcher::new(Box::new(network_sender));
 
         let handler = NetworkEchoHandler::default();
         let echos = handler.echos.clone();

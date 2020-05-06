@@ -97,9 +97,9 @@ mod tests {
             .expect("Unable to create queue");
         let network_sender = network_message_queue.new_network_sender();
 
-        let mut network_dispatcher = Dispatcher::new(network_sender.clone());
+        let mut network_dispatcher = Dispatcher::new(Box::new(network_sender.clone()));
 
-        let mut circuit_dispatcher = Dispatcher::new(network_sender);
+        let mut circuit_dispatcher = Dispatcher::new(Box::new(network_sender));
         let handler = ServiceConnectedTestHandler::default();
         let echos = handler.echos.clone();
         circuit_dispatcher.set_handler(Box::new(handler));

@@ -40,7 +40,7 @@ pub fn create_authorization_dispatcher(
     auth_manager: AuthorizationManager,
     network_sender: NetworkMessageSender,
 ) -> Dispatcher<AuthorizationMessageType> {
-    let mut auth_dispatcher = Dispatcher::new(network_sender);
+    let mut auth_dispatcher = Dispatcher::new(Box::new(network_sender));
 
     auth_dispatcher.set_handler(Box::new(ConnectRequestHandler::new(auth_manager.clone())));
 
