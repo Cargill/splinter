@@ -266,24 +266,28 @@ impl Mesh {
     }
 
     #[cfg(feature = "matrix")]
+    /// Creates a MeshLifeCycle that can be used to add and remove connection from this Mesh
     pub fn get_life_cycle(&self) -> MeshLifeCycle {
         let mesh = self.clone();
         MeshLifeCycle::new(mesh)
     }
 
     #[cfg(feature = "matrix")]
+    /// Creates a MeshMatrixSender that can be used to send messages over through this Mesh
     pub fn get_sender(&self) -> MeshMatrixSender {
         let mesh = self.clone();
         MeshMatrixSender::new(mesh)
     }
 
     #[cfg(feature = "matrix")]
+    /// Creates a MeshMatrixReceiver that can be used to receives message from this Mesh
     pub fn get_receiver(&self) -> MeshMatrixReceiver {
         let mesh = self.clone();
         MeshMatrixReceiver::new(mesh)
     }
 
     #[cfg(feature = "matrix")]
+    /// Creates a MeshMatrixShutdown to shutdown this Mesh instance
     pub fn get_matrix_shutdown(&self) -> MeshMatrixShutdown {
         MeshMatrixShutdown::new(self.shutdown_signaler())
     }
