@@ -13,7 +13,9 @@
 // limitations under the License.
 
 //! Methods for Dispatching and Handling Messages.
-//!
+
+mod context;
+
 use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
@@ -21,6 +23,8 @@ use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::mpsc::{channel, Receiver, RecvError, Sender};
+
+pub use context::MessageContext;
 
 /// A wrapper for a PeerId.
 ///
@@ -95,67 +99,6 @@ impl From<ConnectionId> for String {
 impl fmt::Display for ConnectionId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.0)
-    }
-}
-
-/// The Message Context
-///
-/// The message context provides information about an incoming message beyond its parsed bytes.  It
-/// includes the source peer id, the message type, the original bytes, and potentially other,
-/// future items.
-#[derive(Clone, Debug)]
-pub struct MessageContext<Source, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
-    source_id: Source,
-    message_type: MT,
-    message_bytes: Vec<u8>,
-}
-
-impl<Source, MT> MessageContext<Source, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
-    /// The Message Type.
-    ///
-    /// This is the message type that determined which handler to execute on receipt of this
-    /// message.
-    pub fn message_type(&self) -> &MT {
-        &self.message_type
-    }
-
-    /// The raw message bytes.
-    pub fn message_bytes(&self) -> &[u8] {
-        &self.message_bytes
-    }
-
-    pub fn source_id(&self) -> &Source {
-        &self.source_id
-    }
-}
-
-impl<MT> MessageContext<PeerId, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
-    /// The Source Peer ID.
-    ///
-    /// This is the peer id of the original sender of the message
-    pub fn source_peer_id(&self) -> &str {
-        &self.source_id
-    }
-}
-
-impl<MT> MessageContext<ConnectionId, MT>
-where
-    MT: Hash + Eq + Debug + Clone,
-{
-    /// The Source Connection ID.
-    ///
-    /// This is the connection id of the original sender of the message
-    pub fn source_connection_id(&self) -> &str {
-        &self.source_id
     }
 }
 
@@ -368,11 +311,7 @@ where
         message_type: &MT,
         message_bytes: Vec<u8>,
     ) -> Result<(), DispatchError> {
-        let message_context = MessageContext {
-            message_type: message_type.clone(),
-            message_bytes,
-            source_id,
-        };
+        let message_context = MessageContext::new(message_type.clone(), message_bytes, source_id);
         self.handlers
             .get(message_type)
             .ok_or_else(|| {
@@ -380,7 +319,7 @@ where
             })
             .and_then(|handler| {
                 handler.handle(
-                    &message_context.message_bytes,
+                    message_context.message_bytes(),
                     &message_context,
                     &*self.network_sender,
                 )
