@@ -16,6 +16,7 @@
 
 mod context;
 mod peer;
+mod proto;
 
 use std::any::Any;
 use std::collections::HashMap;
