@@ -19,6 +19,7 @@ use std::io;
 use toml::de::Error as TomlError;
 
 #[derive(Debug)]
+/// General error type used during `Config` contruction.
 pub enum ConfigError {
     #[cfg(feature = "config-toml")]
     ReadError {

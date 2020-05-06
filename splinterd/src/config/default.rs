@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! `PartialConfig` builder using default values.
+
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
 const STORAGE: &str = "yaml";
@@ -37,7 +39,6 @@ const REGISTRY_FORCED_REFRESH: u64 = 10; // 10 seconds
 const HEARTBEAT: u64 = 30; // 30 seconds
 const ADMIN_TIMEOUT: u64 = 30; // 30 seconds
 
-/// Holds the default configuration values.
 pub struct DefaultPartialConfigBuilder;
 
 impl DefaultPartialConfigBuilder {
@@ -46,6 +47,7 @@ impl DefaultPartialConfigBuilder {
     }
 }
 
+/// Constructs a `PartialConfig` object from the `DefaultPartialConfigBuilder`.
 impl PartialConfigBuilder for DefaultPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
@@ -137,31 +139,31 @@ mod tests {
         assert_eq!(config.no_tls(), Some(false));
         #[cfg(feature = "biome")]
         assert_eq!(config.enable_biome(), Some(false));
-        // Assert the source is correctly identified for this PartialConfig object.
+        // Assert the source is correctly identified for this `PartialConfig` object.
         assert_eq!(config.source(), ConfigSource::Default);
     }
 
     #[test]
-    /// This test verifies that a PartialConfig object is accurately constructed by using the
-    /// `build` method implemented by the DefaultPartialConfigBuilder module. The following steps
+    /// This test verifies that a `PartialConfig` object is accurately constructed by using the
+    /// `build` method implemented by the `DefaultPartialConfigBuilder` module. The following steps
     /// are performed:
     ///
-    /// 1. An empty DefaultPartialConfigBuilder object is constructed, which implements the
-    ///    PartialConfigBuilder trait.
-    /// 2. A PartialConfig object is created by calling the `build` method of the
-    ///    DefaultPartialConfigBuilder object.
+    /// 1. An empty `DefaultPartialConfigBuilder` object is constructed, which implements the
+    ///    `PartialConfigBuilder` trait.
+    /// 2. A `PartialConfig` object is created by calling the `build` method of the
+    ///    `DefaultPartialConfigBuilder` object.
     ///
-    /// This test then verifies the PartialConfig object built from the DefaulConfig object has
-    /// the correct values by asserting each expected value.
+    /// This test then verifies the `PartialConfig` object built from the
+    /// `DefaultPartialConfigBuilder` has the correct values by asserting each expected value.
     fn test_default_builder() {
         // Create a new DefaultPartialConfigBuilder object, which implements the
         // PartialConfigBuilder trait.
         let default_config = DefaultPartialConfigBuilder::new();
-        // Create a PartialConfig object using the `build` method.
+        // Create a `PartialConfig` object using the `build` method.
         let partial_config = default_config
             .build()
             .expect("Unable to build DefaultPartialConfigBuilder");
-        // Compare the generated PartialConfig object against the expected values.
+        // Compare the generated `PartialConfig` object against the expected values.
         assert_default_values(partial_config);
     }
 }

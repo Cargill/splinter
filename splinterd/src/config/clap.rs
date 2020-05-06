@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! `PartialConfig` builder using values from splinterd command line arguments.
+
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 use clap::{ArgMatches, ErrorKind};
 
-/// Holds configuration values from command line arguments, represented by clap ArgMatches.
+/// `PartialConfig` builder which holds command line arguments, represented as clap `ArgMatches`.
 pub struct ClapPartialConfigBuilder<'a> {
     matches: ArgMatches<'a>,
 }
 
+// Parses a u64 value from a clap argument.
 fn parse_value(matches: &ArgMatches, arg: &str) -> Result<Option<u64>, ConfigError> {
     match value_t!(matches.value_of(arg), u64) {
         Ok(v) => Ok(Some(v)),
@@ -36,6 +39,8 @@ impl<'a> ClapPartialConfigBuilder<'a> {
     }
 }
 
+/// Implementation of the `PartialConfigBuilder` trait to create a `PartialConfig` object from the
+/// command line config options.
 impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         let mut partial_config = PartialConfig::new(ConfigSource::CommandLine);
@@ -188,7 +193,7 @@ mod tests {
         assert_eq!(config.state_dir(), Some(EXAMPLE_STATE_DIR.to_string()));
     }
 
-    /// Creates an ArgMatches object to be used to construct a ClapPartialConfigBuilder object.
+    /// Creates an `ArgMatches` object to be used to construct a `ClapPartialConfigBuilder` object.
     fn create_arg_matches(args: Vec<&str>) -> ArgMatches<'static> {
         clap_app!(configtest =>
             (version: crate_version!())
@@ -215,16 +220,16 @@ mod tests {
     }
 
     #[test]
-    /// This test verifies that a PartialConfig object, constructed from the
-    /// ClapPartialConfigBuilder module, contains the correct values using the following steps:
+    /// This test verifies that a `PartialConfig` object, constructed from the
+    /// `ClapPartialConfigBuilder` module, contains the correct values using the following steps:
     ///
-    /// 1. An example ArgMatches object is created using `create_arg_matches`.
-    /// 2. A ClapPartialConfigBuilder object is constructed by passing in the example ArgMatches
+    /// 1. An example `ArgMatches` object is created using `create_arg_matches`.
+    /// 2. A `ClapPartialConfigBuilder` object is constructed by passing in the example `ArgMatches`
     ///    created in the previous step.
-    /// 3. The ClapPartialConfigBuilder object is transformed to a PartialConfig object using the
+    /// 3. The `ClapPartialConfigBuilder` object is transformed to a `PartialConfig` object using
     ///    `build`.
     ///
-    /// This test then verifies the PartialConfig object built from the ClapPartialConfigBuilder
+    /// This test then verifies the `PartialConfig` object built from the `ClapPartialConfigBuilder`
     /// object by asserting each expected value.
     fn test_command_line_config() {
         let args = vec![
@@ -256,17 +261,17 @@ mod tests {
             "--state-dir",
             EXAMPLE_STATE_DIR,
         ];
-        // Create an example ArgMatches object to initialize the ClapPartialConfigBuilder.
+        // Create an example ArgMatches object to initialize the `ClapPartialConfigBuilder`.
         let matches = create_arg_matches(args);
-        // Create a new CommandLine object from the arg matches.
+        // Create a new `ClapPartialConfigBuilder` object from the arg matches.
         let command_config = ClapPartialConfigBuilder::new(matches);
-        // Build a PartialConfig from the ClapPartialConfigBuilder object created.
+        // Build a `PartialConfig` from the `ClapPartialConfigBuilder` object created.
         let built_config = command_config
             .build()
             .expect("Unable to build ClapPartialConfigBuilder");
-        // Assert the source is correctly identified for this PartialConfig object.
+        // Assert the source is correctly identified for this `PartialConfig` object.
         assert_eq!(built_config.source(), ConfigSource::CommandLine);
-        // Compare the generated PartialConfig object against the expected values.
+        // Compare the generated `PartialConfig` object against the expected values.
         assert_config_values(built_config);
     }
 }
