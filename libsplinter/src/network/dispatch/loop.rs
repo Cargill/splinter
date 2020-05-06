@@ -33,6 +33,7 @@ where
         message_type: MT,
         message_bytes: Vec<u8>,
         source_id: Source,
+        parent_context: Option<Box<dyn Any + Send>>,
     },
     Shutdown,
 }
@@ -131,12 +132,34 @@ where
         let join_handle = std::thread::Builder::new()
             .name(thread_name)
             .spawn(move || loop {
-                let (message_type, message_bytes, source_id) = match rx.receiver.recv() {
+                match rx.receiver.recv() {
                     Ok(DispatchMessage::Message {
                         message_type,
                         message_bytes,
                         source_id,
-                    }) => (message_type, message_bytes, source_id),
+                        parent_context: Some(context),
+                    }) => {
+                        if let Err(err) = dispatcher.dispatch_with_parent_context(
+                            source_id,
+                            &message_type,
+                            message_bytes,
+                            context,
+                        ) {
+                            warn!("Unable to dispatch message: {:?}", err);
+                        }
+                    }
+                    Ok(DispatchMessage::Message {
+                        message_type,
+                        message_bytes,
+                        source_id,
+                        parent_context: None,
+                    }) => {
+                        if let Err(err) =
+                            dispatcher.dispatch(source_id, &message_type, message_bytes)
+                        {
+                            warn!("Unable to dispatch message: {:?}", err);
+                        }
+                    }
                     Ok(DispatchMessage::Shutdown) => {
                         debug!("Received shutdown signal");
                         break;
@@ -145,10 +168,6 @@ where
                         error!("Received error from receiver");
                         break;
                     }
-                };
-                match dispatcher.dispatch(source_id, &message_type, message_bytes) {
-                    Ok(_) => (),
-                    Err(err) => warn!("Unable to dispatch message: {:?}", err),
                 }
             });
 
@@ -219,6 +238,10 @@ where
     receiver: Receiver<DispatchMessage<MT, Source>>,
 }
 
+// These type defs make clippy happy.
+type MessageTuple<MT, Source> = (MT, Vec<u8>, Source);
+type MessageTupleWithParentContext<MT, Source> = (MT, Vec<u8>, Source, Box<dyn Any + Send>);
+
 #[derive(Clone)]
 pub struct DispatchMessageSender<MT, Source = PeerId>
 where
@@ -236,20 +259,47 @@ where
         message_type: MT,
         message_bytes: Vec<u8>,
         source_id: Source,
-    ) -> Result<(), (MT, Vec<u8>, Source)> {
+    ) -> Result<(), MessageTuple<MT, Source>> {
         self.sender
             .send(DispatchMessage::Message {
                 message_type,
                 message_bytes,
                 source_id,
+                parent_context: None,
             })
             .map_err(|err| match err.0 {
                 DispatchMessage::Message {
                     message_type,
                     message_bytes,
                     source_id,
+                    ..
                 } => (message_type, message_bytes, source_id),
                 DispatchMessage::Shutdown => unreachable!(), // we didn't send this
+            })
+    }
+
+    pub fn send_with_parent_context(
+        &self,
+        message_type: MT,
+        message_bytes: Vec<u8>,
+        source_id: Source,
+        parent_context: Box<dyn Any + Send>,
+    ) -> Result<(), MessageTupleWithParentContext<MT, Source>> {
+        self.sender
+            .send(DispatchMessage::Message {
+                message_type,
+                message_bytes,
+                source_id,
+                parent_context: Some(parent_context),
+            })
+            .map_err(|err| match err.0 {
+                DispatchMessage::Message {
+                    message_type,
+                    message_bytes,
+                    source_id,
+                    parent_context: Some(pc),
+                } => (message_type, message_bytes, source_id, pc),
+                _ => unreachable!(), // we didn't anything else
             })
     }
 }

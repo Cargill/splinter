@@ -317,18 +317,42 @@ where
         message_bytes: Vec<u8>,
     ) -> Result<(), DispatchError> {
         let message_context = MessageContext::new(message_type.clone(), message_bytes, source_id);
+        self.execute(message_context)
+    }
+
+    /// Dispatch a message by type, including a parent context.
+    ///
+    /// This dispatches a message (in raw byte form) as a given message type.  The message will be
+    /// handled by a handler that has been set previously via `set_handler`, if one exists.
+    ///
+    /// Errors
+    ///
+    /// A DispatchError is returned if either there is no handler for the given message type, or an
+    /// error occurs while handling the messages (e.g. the message cannot be deserialized).
+    pub fn dispatch_with_parent_context(
+        &self,
+        source_id: Source,
+        message_type: &MT,
+        message_bytes: Vec<u8>,
+        parent_context: Box<dyn Any + Send>,
+    ) -> Result<(), DispatchError> {
+        let mut message_context =
+            MessageContext::new(message_type.clone(), message_bytes, source_id);
+        message_context.set_parent_context(parent_context);
+
+        self.execute(message_context)
+    }
+
+    fn execute(&self, ctx: MessageContext<Source, MT>) -> Result<(), DispatchError> {
         self.handlers
-            .get(message_type)
+            .get(ctx.message_type())
             .ok_or_else(|| {
-                DispatchError::UnknownMessageType(format!("No handler for type {:?}", message_type))
+                DispatchError::UnknownMessageType(format!(
+                    "No handler for type {:?}",
+                    ctx.message_type(),
+                ))
             })
-            .and_then(|handler| {
-                handler.handle(
-                    message_context.message_bytes(),
-                    &message_context,
-                    &*self.network_sender,
-                )
-            })
+            .and_then(|handler| handler.handle(ctx.message_bytes(), &ctx, &*self.network_sender))
     }
 }
 

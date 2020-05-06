@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::any::Any;
+
 use super::{ConnectionId, PeerId};
 
 /// The Message Context
@@ -23,6 +25,7 @@ pub struct MessageContext<Source, MT> {
     source_id: Source,
     message_type: MT,
     message_bytes: Vec<u8>,
+    parent_context: Option<Box<dyn Any + Send>>,
 }
 
 impl<Source, MT> MessageContext<Source, MT> {
@@ -31,6 +34,7 @@ impl<Source, MT> MessageContext<Source, MT> {
             message_type,
             message_bytes,
             source_id,
+            parent_context: None,
         }
     }
 
@@ -49,6 +53,18 @@ impl<Source, MT> MessageContext<Source, MT> {
 
     pub fn source_id(&self) -> &Source {
         &self.source_id
+    }
+
+    /// Add an item to the parent context.
+    pub(super) fn set_parent_context(&mut self, parent_context: Box<dyn Any + Send>) {
+        self.parent_context = Some(parent_context);
+    }
+
+    /// Get an item of a given type in the context, if it exists.
+    pub fn get_parent_context<T: 'static>(&self) -> Option<&T> {
+        self.parent_context
+            .as_ref()
+            .and_then(|boxed| boxed.downcast_ref())
     }
 }
 
