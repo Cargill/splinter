@@ -54,7 +54,6 @@ impl From<std::io::Error> for RestApiServerError {
 pub enum RestApiResponseError {
     DatabaseError(String),
     InternalError(String),
-    Unauthorized,
     BadRequest(String),
     NotFound(String),
 }
@@ -64,7 +63,6 @@ impl Error for RestApiResponseError {
         match self {
             RestApiResponseError::DatabaseError(_) => None,
             RestApiResponseError::InternalError(_) => None,
-            RestApiResponseError::Unauthorized => None,
             RestApiResponseError::BadRequest(_) => None,
             RestApiResponseError::NotFound(_) => None,
         }
@@ -76,7 +74,6 @@ impl fmt::Display for RestApiResponseError {
         match self {
             RestApiResponseError::DatabaseError(e) => write!(f, "Database error: {}", e),
             RestApiResponseError::InternalError(e) => write!(f, "Internal error occurred: {}", e),
-            RestApiResponseError::Unauthorized => write!(f, "Unauthorized"),
             RestApiResponseError::BadRequest(e) => write!(f, "Bad Request: {}", e),
             RestApiResponseError::NotFound(e) => write!(f, "Not Found: {}", e),
         }

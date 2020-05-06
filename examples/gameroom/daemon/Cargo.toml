@@ -52,7 +52,7 @@ sawtooth-sdk = { version = "0.4", features = ["transact-compat"] }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-splinter = { path = "../../../libsplinter", features = ["events"]}
+splinter = { path = "../../../libsplinter", features = ["biome", "events",  "postgres"]}
 tokio = "0.1"
 transact = "0.2"
 

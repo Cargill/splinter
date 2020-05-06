@@ -102,9 +102,33 @@ services:
         - REPO_VERSION=${REPO_VERSION}
     entrypoint: |
       bash -c "
+        until PGPASSWORD=admin psql -h splinterd-db-node -U admin -d splinter -c '\q'; do
+          >&2 echo \"Database is unavailable - sleeping\"
+          sleep 1
+        done && \
+        splinter database migrate -C postgres://admin:admin@splinterd-db-node:5432/splinter && \
         splinter cert generate --skip && \
-        splinterd -c ./project/tests/splinterd-node-0-docker.toml --tls-insecure -vv
+        splinterd -c ./project/tests/splinterd-node-0-docker.toml -vv \
+              --database postgres://admin:admin@splinterd-db-node:5432/splinter \
+              --service-endpoint 0.0.0.0:8043 \
+              --network-endpoint 0.0.0.0:8044 \
+              --bind 0.0.0.0:8085 \
+              --tls-insecure \
+              --enable-biome
       "
+
+  splinterd-db-node:
+    image: postgres
+    container_name: splinterd-db-node
+    restart: always
+    expose:
+      - 5432
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: splinter
 
   db-cypress-test:
     image: gameroom-database
