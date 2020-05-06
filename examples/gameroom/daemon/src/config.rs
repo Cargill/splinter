@@ -16,12 +16,8 @@
  */
 
 use actix_web::Result;
-use futures::{
-    future::{self, Either},
-    Future, Stream,
-};
+use futures::{Future, Stream};
 use hyper::{Client as HyperClient, StatusCode, Uri};
-use serde_json::Value;
 use tokio::runtime::Runtime;
 
 use crate::error::{ConfigurationError, GetNodeError};
@@ -114,12 +110,7 @@ pub fn get_node(splinterd_url: &str) -> Result<NodeInfo, GetNodeError> {
     runtime.block_on(
         client
             .get(uri)
-            .map_err(|err| {
-                GetNodeError(format!(
-                    "Failed to get splinter node metadata: {}",
-                    err
-                ))
-            })
+            .map_err(|err| GetNodeError(format!("Failed to get splinter node metadata: {}", err)))
             .and_then(|resp| {
                 if resp.status() != StatusCode::OK {
                     return Err(GetNodeError(format!(
@@ -132,84 +123,21 @@ pub fn get_node(splinterd_url: &str) -> Result<NodeInfo, GetNodeError> {
                     .concat2()
                     .wait()
                     .map_err(|err| {
-                        GetNodeError(format!(
-                            "Failed to get splinter node metadata: {}",
-                            err
-                        ))
+                        GetNodeError(format!("Failed to get splinter node metadata: {}", err))
                     })?
                     .to_vec();
 
-                let node_status: Value = serde_json::from_slice(&body).map_err(|err| {
-                    GetNodeError(format!(
-                        "Failed to get splinter node metadata: {}",
-                        err
-                    ))
-                })?;
-
-                let node_id = match node_status.get("node_id") {
-                    Some(node_id_val) => node_id_val.as_str().unwrap_or("").to_string(),
-                    None => "".to_string(),
-                };
-
-                Ok(node_id)
-            })
-            .and_then(move |node_id| {
-                let uri = match format!("{}/registry/nodes/{}", splinterd_url, node_id).parse::<Uri>() {
-                        Ok(uri) => uri,
-                        Err(err) => return
-                            Either::A(
-                                future::err(GetNodeError(format!(
-                                    "Failed to get set up request : {}",
-                                    err
-                                ))))
-                };
-
-                Either::B(client
-                    .get(uri)
-                    .map_err(|err| {
-                        GetNodeError(format!(
-                            "Failed to get splinter node: {}",
-                            err
-                        ))
-                    })
-                    .then(|resp| {
-                        let response = resp?;
-                        let status = response.status();
-                        let body = response
-                            .into_body()
-                            .concat2()
-                            .wait()
-                            .map_err(|err| {
-                                GetNodeError(format!(
-                                    "Failed to get splinter node metadata: {}",
-                                    err
-                                ))
-                            })?
-                            .to_vec();
-
-                        match status {
-                            StatusCode::OK => {
-                                let node: NodeInfo = serde_json::from_slice(&body).map_err(|err| {
-                                    GetNodeError(format!(
-                                        "Failed to get splinter node: {}",
-                                        err
-                                    ))
-                                })?;
-
-                                Ok(node)
-                            }
-                            _ => Err(GetNodeError(format!(
-                                "Failed to get splinter node data. Splinterd responded with status {}",
-                                status
-                            ))),
-                        }
-                    }))
+                serde_json::from_slice(&body).map_err(|err| {
+                    GetNodeError(format!("Failed to get splinter node metadata: {}", err))
+                })
             }),
     )
 }
 
 #[derive(Clone, Deserialize)]
 pub struct NodeInfo {
+    #[serde(alias = "node_id")]
     pub identity: String,
+    #[serde(alias = "network_endpoints")]
     pub endpoints: Vec<String>,
 }
