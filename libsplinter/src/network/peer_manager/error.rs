@@ -59,6 +59,31 @@ impl fmt::Display for PeerRefAddError {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum PeerUnknownAddError {
+    InternalError(String),
+    ReceiveError(String),
+    AddError(String),
+}
+
+impl error::Error for PeerUnknownAddError {}
+
+impl fmt::Display for PeerUnknownAddError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PeerUnknownAddError::InternalError(msg) => {
+                write!(f, "Received internal error: {}", msg)
+            }
+            PeerUnknownAddError::ReceiveError(msg) => {
+                write!(f, "Unable to receive response from PeerManager: {}", msg)
+            }
+            PeerUnknownAddError::AddError(msg) => {
+                write!(f, "Unable to add unidentified peer: {}", msg)
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum PeerRefRemoveError {
     InternalError(String),
     ReceiveError(String),

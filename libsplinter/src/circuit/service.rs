@@ -70,7 +70,7 @@ impl Service {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct SplinterNode {
-    #[serde(skip)]
+    #[serde(default)]
     id: String,
     endpoints: Vec<String>,
 }

@@ -85,7 +85,7 @@ impl Authorizer for InprocAuthorizer {
 /// the empty string as a prefix, but should be added last.
 #[derive(Default)]
 pub struct Authorizers {
-    authorizers: Vec<(String, Box<dyn Authorizer>)>,
+    authorizers: Vec<(String, Box<dyn Authorizer + Send>)>,
 }
 
 impl Authorizers {
@@ -97,7 +97,11 @@ impl Authorizers {
     /// Add an Authorizer instances that will match on the given prefix.
     ///
     /// Connections are evaluated against these prefixes based on the order they are added.
-    pub fn add_authorizer(&mut self, match_prefix: &str, authorizer: impl Authorizer + 'static) {
+    pub fn add_authorizer(
+        &mut self,
+        match_prefix: &str,
+        authorizer: impl Authorizer + 'static + Send,
+    ) {
         self.authorizers
             .push((match_prefix.to_string(), Box::new(authorizer)));
     }

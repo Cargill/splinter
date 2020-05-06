@@ -24,7 +24,7 @@ use std::thread;
 
 use self::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
-    PeerRefRemoveError,
+    PeerRefRemoveError, PeerUnknownAddError,
 };
 use crate::collections::BiHashMap;
 use crate::network::connection_manager::ConnectionManagerNotification;
@@ -63,6 +63,10 @@ pub(crate) enum PeerManagerRequest {
         peer_id: String,
         endpoints: Vec<String>,
         sender: Sender<Result<PeerRef, PeerRefAddError>>,
+    },
+    AddUnidentified {
+        endpoint: String,
+        sender: Sender<Result<(), PeerUnknownAddError>>,
     },
     RemovePeer {
         peer_id: String,
@@ -105,7 +109,7 @@ impl PeerRef {
         }
     }
 
-    pub fn peer_id(&mut self) -> &str {
+    pub fn peer_id(&self) -> &str {
         &self.peer_id
     }
 }
@@ -312,6 +316,14 @@ fn handle_request(
                 warn!("connector dropped before receiving result of adding peer");
             }
         }
+        PeerManagerRequest::AddUnidentified { endpoint, sender } => {
+            if sender
+                .send(add_unidentified(endpoint, connector, unreferenced_peers))
+                .is_err()
+            {
+                warn!("connector dropped before receiving result of adding unidentified peer");
+            }
+        }
         PeerManagerRequest::RemovePeer { peer_id, sender } => {
             if sender
                 .send(remove_peer(
@@ -450,6 +462,35 @@ fn add_peer(
         "Unable to connect any endpoint that was provided for peer {}",
         peer_id
     )))
+}
+
+fn add_unidentified(
+    endpoint: String,
+    connector: Connector,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+) -> Result<(), PeerUnknownAddError> {
+    debug!("Attempting to peer with unidentified peer");
+    let connection_id = format!("{}", Uuid::new_v4());
+    match connector.request_connection(&endpoint, &connection_id) {
+        Ok(identity) => {
+            unreferenced_peers.insert(
+                identity,
+                UnreferencedPeer {
+                    connection_id,
+                    endpoint,
+                },
+            );
+            Ok(())
+        }
+        Err(err) => {
+            warn!("Unable to peer with unidentified peer: {}", endpoint);
+            // unable to connect to any of the endpoints provided
+            Err(PeerUnknownAddError::AddError(format!(
+                "Unable to connect to endpoint {} that was provided for unidentified peer: {}",
+                endpoint, err
+            )))
+        }
+    }
 }
 
 fn remove_peer(
