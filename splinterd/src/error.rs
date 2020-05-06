@@ -27,7 +27,10 @@ pub enum UserError {
     MissingArgument(String),
     InvalidArgument(String),
     ConfigError(ConfigError),
-    IoError(io::Error),
+    IoError {
+        context: String,
+        source: Option<Box<io::Error>>,
+    },
     DaemonError {
         context: String,
         source: Option<Box<dyn Error>>,
@@ -35,6 +38,13 @@ pub enum UserError {
 }
 
 impl UserError {
+    pub fn io_err_with_source(context: &str, err: Box<io::Error>) -> Self {
+        UserError::IoError {
+            context: context.into(),
+            source: Some(err),
+        }
+    }
+
     pub fn daemon_err_with_source(context: &str, err: Box<dyn Error>) -> Self {
         UserError::DaemonError {
             context: context.into(),
@@ -50,7 +60,13 @@ impl Error for UserError {
             UserError::MissingArgument(_) => None,
             UserError::InvalidArgument(_) => None,
             UserError::ConfigError(err) => Some(err),
-            UserError::IoError(err) => Some(err),
+            UserError::IoError { source, .. } => {
+                if let Some(ref err) = source {
+                    Some(&**err)
+                } else {
+                    None
+                }
+            }
             UserError::DaemonError { source, .. } => {
                 if let Some(ref err) = source {
                     Some(&**err)
@@ -71,7 +87,13 @@ impl fmt::Display for UserError {
             UserError::ConfigError(msg) => {
                 write!(f, "error occurred building config object: {}", msg)
             }
-            UserError::IoError(err) => write!(f, "encountered an IoError: {}", err),
+            UserError::IoError { context, source } => {
+                if let Some(ref err) = source {
+                    write!(f, "{}: {}", context, err)
+                } else {
+                    f.write_str(&context)
+                }
+            }
             UserError::DaemonError { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
@@ -85,7 +107,7 @@ impl fmt::Display for UserError {
 
 impl From<io::Error> for UserError {
     fn from(io_error: io::Error) -> Self {
-        UserError::IoError(io_error)
+        UserError::io_err_with_source("encountered IO error", Box::new(io_error))
     }
 }
 
