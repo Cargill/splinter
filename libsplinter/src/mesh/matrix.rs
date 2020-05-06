@@ -23,6 +23,7 @@ use crate::transport::Connection;
 use super::{Mesh, RecvError, RecvTimeoutError};
 
 #[derive(Clone)]
+/// Mesh specific implementation of MatrixLifeCycle
 pub struct MeshLifeCycle {
     mesh: Mesh,
 }
@@ -54,6 +55,7 @@ impl MatrixLifeCycle for MeshLifeCycle {
 }
 
 #[derive(Clone)]
+/// Mesh specific implementation of MatrixSender
 pub struct MeshMatrixSender {
     mesh: Mesh,
 }
@@ -77,6 +79,7 @@ impl MatrixSender for MeshMatrixSender {
 }
 
 #[derive(Clone)]
+/// Mesh specific implementation of MatrixReceiver
 pub struct MeshMatrixReceiver {
     mesh: Mesh,
 }
@@ -119,6 +122,7 @@ impl MatrixReceiver for MeshMatrixReceiver {
 }
 
 #[derive(Clone)]
+/// Mesh specific implementation of MatrixShutdown
 pub struct MeshMatrixShutdown {
     shutdown_signaler: MeshShutdownSignaler,
 }
