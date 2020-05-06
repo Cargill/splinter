@@ -15,6 +15,7 @@
 //! Methods for Dispatching and Handling Messages.
 
 mod context;
+mod peer;
 
 use std::any::Any;
 use std::collections::HashMap;

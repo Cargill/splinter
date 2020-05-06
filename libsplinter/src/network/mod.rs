@@ -17,7 +17,6 @@ pub mod auth2;
 #[cfg(feature = "connection-manager")]
 pub mod connection_manager;
 pub mod dispatch;
-mod dispatch_peer;
 mod dispatch_proto;
 pub mod handlers;
 pub mod peer;
