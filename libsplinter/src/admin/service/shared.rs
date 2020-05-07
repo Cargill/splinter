@@ -14,9 +14,7 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
-use std::env;
 use std::iter::FromIterator;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
@@ -66,9 +64,6 @@ use super::{
     Events,
 };
 
-const DEFAULT_STATE_DIR: &str = "/var/lib/splinter/";
-const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
-const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
 
@@ -216,21 +211,8 @@ impl AdminServiceShared {
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
+        location: &str,
     ) -> Result<Self, ServiceError> {
-        let location = {
-            if let Ok(s) = env::var(STATE_DIR_ENV) {
-                s
-            } else if let Ok(s) = env::var(SPLINTER_HOME_ENV) {
-                Path::new(&s)
-                    .join("data")
-                    .to_str()
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_else(|| String::from(DEFAULT_STATE_DIR))
-            } else {
-                DEFAULT_STATE_DIR.to_string()
-            }
-        };
-
         let storage_location = match storage_type {
             "yaml" => format!("{}{}", location, "/circuit_proposals.yaml"),
             "memory" => "memory".to_string(),
@@ -1829,6 +1811,8 @@ mod tests {
         25, 26, 27, 28, 29, 30, 31, 32,
     ];
 
+    const STORAGE_LOCATION: &str = "/var/lib/splinter/";
+
     /// Test that the CircuitManagementPayload is moved to the pending payloads when the peers are
     /// fully authorized.
     #[test]
@@ -1859,6 +1843,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
 
@@ -1962,6 +1947,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
 
@@ -2041,6 +2027,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2070,6 +2057,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2099,6 +2087,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2134,6 +2123,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2169,6 +2159,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2207,6 +2198,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2242,6 +2234,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2277,6 +2270,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2317,6 +2311,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2346,6 +2341,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2377,6 +2373,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2412,6 +2409,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2454,6 +2452,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2496,6 +2495,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2526,6 +2526,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2556,6 +2557,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2594,6 +2596,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2632,6 +2635,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2670,6 +2674,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2700,6 +2705,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2730,6 +2736,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2760,6 +2767,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2790,6 +2798,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2820,6 +2829,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2851,6 +2861,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2881,6 +2892,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2911,6 +2923,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2949,6 +2962,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2982,6 +2996,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
 
@@ -3030,6 +3045,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
 
@@ -3080,6 +3096,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
 
@@ -3132,6 +3149,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
         )
         .unwrap();
 

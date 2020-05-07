@@ -168,6 +168,7 @@ impl AdminService {
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
+        storage_location: &str,
         // The coordinator timeout for the two-phase commit consensus engine; if `None`, the
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
@@ -191,6 +192,7 @@ impl AdminService {
                 key_verifier,
                 key_permission_manager,
                 storage_type,
+                storage_location,
             )?)),
             orchestrator,
             coordinator_timeout,
@@ -646,6 +648,8 @@ mod tests {
         25, 26, 27, 28, 29, 30, 31, 32,
     ];
 
+    const STORAGE_LOCATION: &str = "/var/lib/splinter/";
+
     /// Test that a circuit creation creates the correct connections and sends the appropriate
     /// messages.
     #[test]
@@ -681,6 +685,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
+            STORAGE_LOCATION,
             None,
         )
         .expect("Service should have been created correctly");

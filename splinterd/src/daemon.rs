@@ -414,6 +414,7 @@ impl SplinterDaemon {
             Box::new(registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
+            &self.storage_location,
             Some(self.admin_timeout),
         )
         .map_err(|err| {
