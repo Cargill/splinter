@@ -72,7 +72,7 @@ message SMDisconnectRequest {
 
 message SMDisconnectResponse {
     enum Status {
-        UNSET_ERROR = 0;
+        UNSET_STATUS = 0;
         OK = 1;
         ERROR_CIRCUIT_DOES_NOT_EXIST = 2;
         ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY = 3;
