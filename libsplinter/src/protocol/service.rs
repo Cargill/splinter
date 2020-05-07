@@ -60,6 +60,7 @@ pub enum ConnectResponseStatus {
     ServiceNotInCircuitRegistry(String),
     ServiceAlreadyRegistered(String),
     NotAnAllowedNode(String),
+    InternalError(String),
     QueueFull,
 }
 
@@ -84,6 +85,7 @@ pub enum DisconnectResponseStatus {
     ServiceNotInCircuitRegistry(String),
     ServiceNotRegistered(String),
     QueueFull,
+    InternalError(String),
 }
 
 /// Opaque messages that are sent to or received from a service processor.
@@ -134,6 +136,9 @@ impl FromProto<service::SMConnectResponse> for ServiceConnectResponse {
                     ConnectResponseStatus::NotAnAllowedNode(res.take_error_message())
                 }
                 ERROR_QUEUE_FULL => ConnectResponseStatus::QueueFull,
+                ERROR_INTERNAL_ERROR => {
+                    ConnectResponseStatus::InternalError(res.take_error_message())
+                }
                 UNSET_STATUS => {
                     return Err(ProtoConversionError::InvalidTypeError(
                         "no status was set".into(),
@@ -166,6 +171,10 @@ impl FromNative<ServiceConnectResponse> for service::SMConnectResponse {
             }
             ConnectResponseStatus::NotAnAllowedNode(msg) => {
                 proto_res.set_status(ERROR_NOT_AN_ALLOWED_NODE);
+                proto_res.set_error_message(msg);
+            }
+            ConnectResponseStatus::InternalError(msg) => {
+                proto_res.set_status(ERROR_INTERNAL_ERROR);
                 proto_res.set_error_message(msg);
             }
             ConnectResponseStatus::QueueFull => proto_res.set_status(ERROR_QUEUE_FULL),
@@ -208,6 +217,9 @@ impl FromProto<service::SMDisconnectResponse> for ServiceDisconnectResponse {
                 ERROR_SERVICE_NOT_REGISTERED => {
                     DisconnectResponseStatus::ServiceNotRegistered(res.take_error_message())
                 }
+                ERROR_INTERNAL_ERROR => {
+                    DisconnectResponseStatus::InternalError(res.take_error_message())
+                }
                 ERROR_QUEUE_FULL => DisconnectResponseStatus::QueueFull,
                 UNSET_STATUS => {
                     return Err(ProtoConversionError::InvalidTypeError(
@@ -237,6 +249,10 @@ impl FromNative<ServiceDisconnectResponse> for service::SMDisconnectResponse {
             }
             DisconnectResponseStatus::ServiceNotRegistered(msg) => {
                 proto_res.set_status(ERROR_SERVICE_NOT_REGISTERED);
+                proto_res.set_error_message(msg);
+            }
+            DisconnectResponseStatus::InternalError(msg) => {
+                proto_res.set_status(ERROR_INTERNAL_ERROR);
                 proto_res.set_error_message(msg);
             }
             DisconnectResponseStatus::QueueFull => proto_res.set_status(ERROR_QUEUE_FULL),

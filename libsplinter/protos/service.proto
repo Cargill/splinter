@@ -55,6 +55,7 @@ message SMConnectResponse {
         ERROR_SERVICE_ALREADY_REGISTERED = 4;
         ERROR_NOT_AN_ALLOWED_NODE = 5;
         ERROR_QUEUE_FULL = 6;
+        ERROR_INTERNAL_ERROR = 7;
     }
 
     Status status = 1;
@@ -78,6 +79,7 @@ message SMDisconnectResponse {
         ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY = 3;
         ERROR_SERVICE_NOT_REGISTERED = 4;
         ERROR_QUEUE_FULL = 5;
+        ERROR_INTERNAL_ERROR = 6;
     }
 
     Status status = 1;
