@@ -61,7 +61,7 @@ pub struct Config {
     advertised_endpoints: (Vec<String>, ConfigSource),
     peers: (Vec<String>, ConfigSource),
     node_id: Option<(String, ConfigSource)>,
-    display_name: (String, ConfigSource),
+    display_name: Option<(String, ConfigSource)>,
     bind: (String, ConfigSource),
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
@@ -136,8 +136,12 @@ impl Config {
         }
     }
 
-    pub fn display_name(&self) -> &str {
-        &self.display_name.0
+    pub fn display_name(&self) -> Option<&str> {
+        if let Some((name, _)) = &self.display_name {
+            Some(name)
+        } else {
+            None
+        }
     }
 
     pub fn bind(&self) -> &str {
@@ -251,8 +255,12 @@ impl Config {
         }
     }
 
-    fn display_name_source(&self) -> &ConfigSource {
-        &self.display_name.1
+    fn display_name_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.display_name {
+            Some(source)
+        } else {
+            None
+        }
     }
 
     fn bind_source(&self) -> &ConfigSource {
@@ -380,11 +388,9 @@ impl Config {
                 self.node_id_source()
             );
         }
-        debug!(
-            "Config: display_name: {} (source: {:?})",
-            self.display_name(),
-            self.display_name_source()
-        );
+        if let (Some(name), Some(source)) = (self.display_name(), self.display_name_source()) {
+            debug!("Config: display_name: {:?} (source: {:?})", name, source,);
+        }
         debug!(
             "Config: bind: {} (source: {:?})",
             self.bind(),
