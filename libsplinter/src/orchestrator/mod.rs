@@ -270,6 +270,29 @@ impl ServiceOrchestrator {
         Ok(())
     }
 
+    /// Shut down (stop and destroy) all services managed by this `ServiceOrchestrator`.
+    pub fn shutdown_all_services(&self) -> Result<(), ShutdownServiceError> {
+        let mut services = self
+            .services
+            .lock()
+            .map_err(|_| ShutdownServiceError::LockPoisoned)?;
+
+        for (service_definition, managed_service) in services.drain() {
+            let ManagedService {
+                mut service,
+                registry,
+            } = managed_service;
+            service.stop(&registry).map_err(|err| {
+                ShutdownServiceError::ShutdownFailed((service_definition.clone(), Box::new(err)))
+            })?;
+            service.destroy().map_err(|err| {
+                ShutdownServiceError::ShutdownFailed((service_definition, Box::new(err)))
+            })?;
+        }
+
+        Ok(())
+    }
+
     /// List services managed by this `ServiceOrchestrator`; filters may be provided to only show
     /// services on specified circuit(s) and of given service type(s).
     pub fn list_services(
