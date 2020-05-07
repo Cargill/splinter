@@ -212,6 +212,7 @@ impl PartialConfig {
         self.whitelist.clone()
     }
 
+    #[cfg(feature = "config-env-var")]
     /// Adds a `config_dir` value to the `PartialConfig` object.
     ///
     /// # Arguments
