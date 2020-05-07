@@ -18,13 +18,13 @@ command to generate development certificates and the associated keys for your
 development environment.
 
 The files are generated in the location specified by `--cert-dir`, the
-SPLINTER_CERT_DIR environment variable, or in the default location
-/etc/splinter/certs/.
+`SPLINTER_CERT_DIR` environment variable, or in the default location
+`/etc/splinter/certs/`. Note: The default location could be different if the
+`SPLINTER_HOME` environment variable is set; see the `splinterd(1)` man page
+for more information.
 
-The following files are created:
-
-  client.crt, client.key, server.crt, server.key, generated_ca.pem,
-  generated_ca.key
+The following files are created: `client.crt`, `client.key`, `server.crt`,
+`server.key`, `generated_ca.pem`, and `generated_ca.key`.
 
 FLAGS
 =====
@@ -36,7 +36,7 @@ FLAGS
 : Prints help information
 
 `-q`, `--quiet`
-: Decrease verbosity (the opposite of -v). When specified, only errors or
+: Decreases verbosity (the opposite of -v). When specified, only errors or
   warnings will be output.
 
 `--skip`
@@ -53,18 +53,18 @@ flag is not provided and the file exists, an error is returned.
 OPTIONS
 =======
 `-d`, `--cert-dir CERT-DIR`
-: Path to the directory certificates are created in. Defaults to
-  /etc/splinter/certs/. This location can also be changed with the
-  SPLINTER_CERT_DIR environment variable. This directory must exist.
+: Specifies the path to the directory to contain the certificates and associated
+  key files. (Default: `/etc/splinter/certs/`, unless `SPLINTER_CERT_DIR` or
+  `SPLINTER_HOME` is set). This directory must exist.
 
 `--common-name COMMON-NAME`
-: String that specifies a common name for the generated certificate (defaults to
-  localhost). Use this option if the splinterd URL uses a DNS address instead
-  of a numerical IP address.
+: Specifies a common name for the generated certificate. (Default: `localhost`.)
+  Use this option if the `splinterd` URL uses a DNS address instead of a
+  numerical IP address.
 
 EXAMPLES
 ========
-Generates test certificates and keys:
+To generate test certificates and keys:
 
   `$ splinter cert generate`
 
@@ -79,17 +79,22 @@ overwrite all existing files.
 
   `$ splinter cert generate --force`
 
-ENVIRONMENT
-===========
-The following environment variables affect the execution of splinter cert
-generate:
+ENVIRONMENT VARIABLES
+=====================
 
 **SPLINTER_CERT_DIR**
 
-: The certificates and keys will be generated at the location specified by the
-  environment variable. (See `--cert-dir`)
+: Specifies the directory containing certificates and associated key files
+  (see `--cert-dir`).
+
+**SPLINTER_HOME**
+
+: Changes the base directory path for the Splinter directories, including the
+  certificate directory. (See the `splinterd(1)` man page for more information.)
+  This value is not used if `SPLINTER_CERT_DIR` is set.
 
 SEE ALSO
 ========
-For more information, see the Splinter documentation at
-https://github.com/Cargill/splinter-docs/blob/master/docs/index.md
+| `splinterd(1)`
+|
+| Splinter documentation: https://github.com/Cargill/splinter-docs/blob/master/docs/index.md

@@ -14,7 +14,6 @@
 
 use std::error::Error;
 use std::fmt;
-#[cfg(feature = "config-toml")]
 use std::io;
 
 use toml::de::Error as TomlError;
@@ -31,6 +30,7 @@ pub enum ConfigError {
     MissingValue(String),
     #[cfg(feature = "config-toml")]
     InvalidVersion(String),
+    StdError(io::Error),
 }
 
 impl From<TomlError> for ConfigError {
@@ -55,6 +55,7 @@ impl Error for ConfigError {
             ConfigError::MissingValue(_) => None,
             #[cfg(feature = "config-toml")]
             ConfigError::InvalidVersion(_) => None,
+            ConfigError::StdError(source) => Some(source),
         }
     }
 }
@@ -71,6 +72,7 @@ impl fmt::Display for ConfigError {
             ConfigError::MissingValue(msg) => write!(f, "Configuration value must be set: {}", msg),
             #[cfg(feature = "config-toml")]
             ConfigError::InvalidVersion(msg) => write!(f, "{}", msg),
+            ConfigError::StdError(source) => write!(f, "{}", source),
         }
     }
 }
