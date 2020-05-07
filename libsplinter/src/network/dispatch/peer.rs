@@ -14,7 +14,7 @@
 
 use crate::network::sender::NetworkMessageSender;
 
-use super::dispatch::{MessageSender, PeerId};
+use super::{MessageSender, PeerId};
 
 impl MessageSender<PeerId> for NetworkMessageSender {
     fn send(&self, recipient: PeerId, message: Vec<u8>) -> Result<(), (PeerId, Vec<u8>)> {
