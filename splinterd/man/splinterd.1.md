@@ -159,6 +159,14 @@ OPTIONS
 `--registries REGISTRY-FILE` `[,...]`
 : Specifies one or more read-only Splinter registry files.
 
+`--registry-auto-refresh SECONDS`
+: Specifies how often, in seconds, to fetch remote node registry changes in the
+  background. (Default: 600 seconds.) Use 0 to turn off automatic refreshes.
+
+`--registry-forced-refresh SECONDS`
+: Specifies how often, in seconds, to fetch remote node registry changes on
+  read. (Default: 10 seconds.) Use 0 to turn off forced refreshes.
+
 `--service-endpoint SERVICE-ENDPOINT`
 : Specifies the endpoint for service-to-daemon communication, using the format
   `tcp://ip:port`. (Default: `127.0.0.1:8043`.)
