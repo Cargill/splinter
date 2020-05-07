@@ -17,7 +17,7 @@ version: '3.7'
 
 services:
   splinter-dev:
-    image: splintercommunity/splinter-dev:v3
+    image: splintercommunity/splinter-dev:v4
     build:
       context: ..
       dockerfile: ci/splinter-dev
