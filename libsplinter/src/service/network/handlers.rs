@@ -68,3 +68,132 @@ impl Handler for ServiceMessageHandler {
             })
     }
 }
+
+/// A mapping of service instances and the component responsible for it.  This can be used to add
+/// or remove service connection information.
+pub trait ServiceInstances {
+    /// Add a service instance.
+    ///
+    /// This method should create an association of the service with the given component id.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ServiceAddInstanceError` if the service cannot be added.
+    fn add_service_instance(
+        &self,
+        service_id: ServiceId,
+        component_id: String,
+    ) -> Result<(), ServiceAddInstanceError>;
+
+    /// Remove a service instance.
+    ///
+    /// This method should remove the association of the service with the given component id.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ServiceRemoveInstanceError` if the service cannot be removed.
+    fn remove_service_instance(
+        &self,
+        service_id: ServiceId,
+        component_id: String,
+    ) -> Result<(), ServiceRemoveInstanceError>;
+}
+
+/// Errors that may occur on registration.
+#[derive(Debug)]
+pub enum ServiceAddInstanceError {
+    /// The service is not allowed to register for the given circuit on this node.
+    NotAllowed,
+    /// The service is already registered.
+    AlreadyRegistered,
+    /// The service does not belong to the specified circuit.
+    NotInCircuit,
+    /// The specified circuit does not exist.
+    CircuitDoesNotExist,
+    /// An internal error has occurred while processing the service registration.
+    InternalError {
+        context: String,
+        source: Option<Box<dyn std::error::Error + Send>>,
+    },
+}
+
+impl std::error::Error for ServiceAddInstanceError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ServiceAddInstanceError::InternalError {
+                source: Some(ref err),
+                ..
+            } => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ServiceAddInstanceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ServiceAddInstanceError::NotAllowed => f.write_str("service not allowed on this node"),
+            ServiceAddInstanceError::AlreadyRegistered => f.write_str("service already registered"),
+            ServiceAddInstanceError::NotInCircuit => f.write_str("service is not in the circuit"),
+            ServiceAddInstanceError::CircuitDoesNotExist => f.write_str("circuit does not exist"),
+            ServiceAddInstanceError::InternalError {
+                context,
+                source: Some(ref err),
+            } => write!(f, "{}: {}", context, err),
+            ServiceAddInstanceError::InternalError {
+                context,
+                source: None,
+            } => f.write_str(&context),
+        }
+    }
+}
+
+/// Errors that may occur on deregistration.
+#[derive(Debug)]
+pub enum ServiceRemoveInstanceError {
+    /// The service is not currently registered with this node.
+    NotRegistered,
+    /// The service does not belong to the specified circuit.
+    NotInCircuit,
+    /// The specified circuit does not exist.
+    CircuitDoesNotExist,
+    /// An internal error has occurred while processing the service deregistration.
+    InternalError {
+        context: String,
+        source: Option<Box<dyn std::error::Error + Send>>,
+    },
+}
+
+impl std::error::Error for ServiceRemoveInstanceError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ServiceRemoveInstanceError::InternalError {
+                source: Some(ref err),
+                ..
+            } => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ServiceRemoveInstanceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ServiceRemoveInstanceError::NotRegistered => f.write_str("service is not registered"),
+            ServiceRemoveInstanceError::NotInCircuit => {
+                f.write_str("service is not in the circuit")
+            }
+            ServiceRemoveInstanceError::CircuitDoesNotExist => {
+                f.write_str("circuit does not exist")
+            }
+            ServiceRemoveInstanceError::InternalError {
+                context,
+                source: Some(ref err),
+            } => write!(f, "{}: {}", context, err),
+            ServiceRemoveInstanceError::InternalError {
+                context,
+                source: None,
+            } => f.write_str(&context),
+        }
+    }
+}
