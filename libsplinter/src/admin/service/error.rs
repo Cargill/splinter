@@ -17,7 +17,7 @@ use std::fmt;
 
 use crate::circuit;
 use crate::consensus::error::ProposalManagerError;
-use crate::orchestrator::{InitializeServiceError, ShutdownServiceError};
+use crate::orchestrator::InitializeServiceError;
 use crate::service::error::{ServiceError, ServiceSendError};
 use crate::signing;
 
@@ -162,7 +162,6 @@ pub enum AdminSharedError {
         context: String,
         source: Option<InitializeServiceError>,
     },
-    ServiceShutdownFailed(Vec<ShutdownServiceError>),
     ServiceSendError(ServiceSendError),
     UnknownAction(String),
     ValidationFailed(String),
@@ -194,7 +193,6 @@ impl Error for AdminSharedError {
                     None
                 }
             }
-            AdminSharedError::ServiceShutdownFailed(_) => None,
             AdminSharedError::ServiceSendError(err) => Some(err),
             AdminSharedError::UnknownAction(_) => None,
             AdminSharedError::ValidationFailed(_) => None,
@@ -224,14 +222,6 @@ impl fmt::Display for AdminSharedError {
                 } else {
                     f.write_str(&context)
                 }
-            }
-            AdminSharedError::ServiceShutdownFailed(err) => {
-                let err_message = err
-                    .iter()
-                    .map(|err| format!("{}", err))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                write!(f, "failed to shutdown services: {}", err_message)
             }
             AdminSharedError::ServiceSendError(err) => {
                 write!(f, "failed to send service message: {}", err)
