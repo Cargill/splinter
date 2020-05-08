@@ -20,7 +20,8 @@ use crate::network::dispatch::{
 };
 use crate::protocol::component::ComponentMessage;
 use crate::protocol::service::{
-    ConnectResponseStatus, ServiceConnectResponse, ServiceMessage, ServiceMessagePayload,
+    ConnectResponseStatus, DisconnectResponseStatus, ServiceConnectResponse,
+    ServiceDisconnectResponse, ServiceMessage, ServiceMessagePayload,
 };
 use crate::protos::component;
 use crate::protos::prelude::*;
@@ -276,6 +277,88 @@ impl Handler for ServiceConnectRequestHandler {
             circuit: service_id.circuit().to_string(),
             service_id: service_id.service_id().to_string(),
             payload: ServiceMessagePayload::ConnectResponse(ServiceConnectResponse {
+                correlation_id: msg.take_correlation_id(),
+                status,
+            }),
+        });
+
+        sender
+            .send(
+                context.source_connection_id().into(),
+                IntoBytes::<component::ComponentMessage>::into_bytes(response)?,
+            )
+            .map_err(|(recipient, msg)| DispatchError::NetworkSendError((recipient.into(), msg)))?;
+
+        Ok(())
+    }
+}
+
+pub struct ServiceDisconnectRequestHandler {
+    service_instances: Box<dyn ServiceInstances + Send>,
+}
+
+impl ServiceDisconnectRequestHandler {
+    /// Construct a new handler with a given service instances implementation.
+    pub fn new(service_instances: Box<dyn ServiceInstances + Send>) -> Self {
+        Self { service_instances }
+    }
+}
+
+impl Handler for ServiceDisconnectRequestHandler {
+    type Source = ConnectionId;
+    type MessageType = service::ServiceMessageType;
+    type Message = service::SMDisconnectRequest;
+
+    fn match_type(&self) -> Self::MessageType {
+        service::ServiceMessageType::SM_SERVICE_DISCONNECT_REQUEST
+    }
+
+    fn handle(
+        &self,
+        mut msg: Self::Message,
+        context: &MessageContext<Self::Source, Self::MessageType>,
+        sender: &dyn MessageSender<Self::Source>,
+    ) -> Result<(), DispatchError> {
+        let service_id: &ServiceId = context.get_parent_context().ok_or_else(|| {
+            DispatchError::HandleError(
+                "Service Disconnect Request not provided with service ID from envelope.".into(),
+            )
+        })?;
+        let status = match self
+            .service_instances
+            .remove_service_instance(service_id.clone(), context.source_connection_id().into())
+        {
+            Ok(()) => DisconnectResponseStatus::Ok,
+            Err(ServiceRemoveInstanceError::NotRegistered) => {
+                DisconnectResponseStatus::ServiceNotRegistered(format!(
+                    "Service {} is not registered",
+                    service_id
+                ))
+            }
+            Err(ServiceRemoveInstanceError::NotInCircuit) => {
+                DisconnectResponseStatus::ServiceNotInCircuitRegistry(format!(
+                    "Service {} is not allowed in circuit {}",
+                    service_id.service_id(),
+                    service_id.circuit()
+                ))
+            }
+            Err(ServiceRemoveInstanceError::CircuitDoesNotExist) => {
+                DisconnectResponseStatus::CircuitDoesNotExist(format!(
+                    "Circuit {} does not exist",
+                    service_id.circuit()
+                ))
+            }
+            Err(err @ ServiceRemoveInstanceError::InternalError { .. }) => {
+                error!("Unable to register service {}: {}", service_id, err);
+
+                DisconnectResponseStatus::InternalError("An internal error has occurred".into())
+            }
+        };
+
+        let response = ComponentMessage::Service(ServiceMessage {
+            circuit: service_id.circuit().to_string(),
+            service_id: service_id.service_id().to_string(),
+            payload: ServiceMessagePayload::DisconnectResponse(ServiceDisconnectResponse {
                 correlation_id: msg.take_correlation_id(),
                 status,
             }),
@@ -571,9 +654,233 @@ mod tests {
         );
     }
 
+    // Test that service disconnection request is properly handled and sends a response with an OK
+    // status, if the deregistration is successful.
+    #[test]
+    fn test_disconnect_request_ok() {
+        let mock_instances = MockServiceInstances::new().with_remove_result(Ok(()));
+
+        let mock_sender = MockMessageSender::default();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let disconnect_request_handler =
+            ServiceDisconnectRequestHandler::new(Box::new(mock_instances.clone()));
+        dispatcher.set_handler(Box::new(disconnect_request_handler));
+
+        let mut connect_req = service::SMDisconnectRequest::new();
+        connect_req.set_correlation_id("test-correlation-id".into());
+
+        dispatcher
+            .dispatch_with_parent_context(
+                "service-component".into(),
+                &service::ServiceMessageType::SM_SERVICE_DISCONNECT_REQUEST,
+                connect_req.write_to_bytes().unwrap(),
+                Box::new(ServiceId::new("some-circuit".into(), "test-service".into())),
+            )
+            .expect("unable to dispatch message");
+
+        let (connection_id, msg_bytes) = mock_sender
+            .pop_sent()
+            .expect("A message should have been sent");
+
+        assert_eq!(ConnectionId::from("service-component"), connection_id);
+        assert_service_msg(
+            &msg_bytes,
+            service::ServiceMessageType::SM_SERVICE_DISCONNECT_RESPONSE,
+            |msg: service::SMDisconnectResponse| {
+                assert_eq!("test-correlation-id", msg.get_correlation_id());
+                assert_eq!(service::SMDisconnectResponse_Status::OK, msg.get_status());
+                assert!(msg.get_error_message().is_empty());
+            },
+        );
+    }
+
+    // Test that service disconnection request is properly handled and sends a response with an
+    // ERROR_SERVICE_NOT_REGISTERED status, if the deregistration is fails with a NotRegistered
+    // error.
+    #[test]
+    fn test_disconnect_request_not_registered() {
+        let mock_instances = MockServiceInstances::new()
+            .with_remove_result(Err(ServiceRemoveInstanceError::NotRegistered));
+
+        let mock_sender = MockMessageSender::default();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let disconnect_request_handler =
+            ServiceDisconnectRequestHandler::new(Box::new(mock_instances.clone()));
+        dispatcher.set_handler(Box::new(disconnect_request_handler));
+
+        let mut connect_req = service::SMDisconnectRequest::new();
+        connect_req.set_correlation_id("test-correlation-id".into());
+
+        dispatcher
+            .dispatch_with_parent_context(
+                "service-component".into(),
+                &service::ServiceMessageType::SM_SERVICE_DISCONNECT_REQUEST,
+                connect_req.write_to_bytes().unwrap(),
+                Box::new(ServiceId::new("some-circuit".into(), "test-service".into())),
+            )
+            .expect("unable to dispatch message");
+
+        let (connection_id, msg_bytes) = mock_sender
+            .pop_sent()
+            .expect("A message should have been sent");
+
+        assert_eq!(ConnectionId::from("service-component"), connection_id);
+        assert_service_msg(
+            &msg_bytes,
+            service::ServiceMessageType::SM_SERVICE_DISCONNECT_RESPONSE,
+            |msg: service::SMDisconnectResponse| {
+                assert_eq!("test-correlation-id", msg.get_correlation_id());
+                assert_eq!(
+                    service::SMDisconnectResponse_Status::ERROR_SERVICE_NOT_REGISTERED,
+                    msg.get_status()
+                );
+                assert!(!msg.get_error_message().is_empty());
+            },
+        );
+    }
+
+    // Test that service disconnection request is properly handled and sends a response with an
+    // ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY status, if the deregistration is fails with a
+    // NotInCircuit error.
+    #[test]
+    fn test_disconnect_request_not_in_circuit() {
+        let mock_instances = MockServiceInstances::new()
+            .with_remove_result(Err(ServiceRemoveInstanceError::NotInCircuit));
+
+        let mock_sender = MockMessageSender::default();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let disconnect_request_handler =
+            ServiceDisconnectRequestHandler::new(Box::new(mock_instances.clone()));
+        dispatcher.set_handler(Box::new(disconnect_request_handler));
+
+        let mut connect_req = service::SMDisconnectRequest::new();
+        connect_req.set_correlation_id("test-correlation-id".into());
+
+        dispatcher
+            .dispatch_with_parent_context(
+                "service-component".into(),
+                &service::ServiceMessageType::SM_SERVICE_DISCONNECT_REQUEST,
+                connect_req.write_to_bytes().unwrap(),
+                Box::new(ServiceId::new("some-circuit".into(), "test-service".into())),
+            )
+            .expect("unable to dispatch message");
+
+        let (connection_id, msg_bytes) = mock_sender
+            .pop_sent()
+            .expect("A message should have been sent");
+
+        assert_eq!(ConnectionId::from("service-component"), connection_id);
+        assert_service_msg(
+            &msg_bytes,
+            service::ServiceMessageType::SM_SERVICE_DISCONNECT_RESPONSE,
+            |msg: service::SMDisconnectResponse| {
+                assert_eq!("test-correlation-id", msg.get_correlation_id());
+                assert_eq!(
+                    service::SMDisconnectResponse_Status::ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY,
+                    msg.get_status()
+                );
+                assert!(!msg.get_error_message().is_empty());
+            },
+        );
+    }
+
+    // Test that service disconnection request is properly handled and sends a response with an
+    // ERROR_CIRCUIT_DOES_NOT_EXIST status, if the deregistration is fails with a
+    // CircuitDoesNotExist error.
+    #[test]
+    fn test_disconnect_request_circuit_does_not_exist() {
+        let mock_instances = MockServiceInstances::new()
+            .with_remove_result(Err(ServiceRemoveInstanceError::CircuitDoesNotExist));
+
+        let mock_sender = MockMessageSender::default();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let disconnect_request_handler =
+            ServiceDisconnectRequestHandler::new(Box::new(mock_instances.clone()));
+        dispatcher.set_handler(Box::new(disconnect_request_handler));
+
+        let mut connect_req = service::SMDisconnectRequest::new();
+        connect_req.set_correlation_id("test-correlation-id".into());
+
+        dispatcher
+            .dispatch_with_parent_context(
+                "service-component".into(),
+                &service::ServiceMessageType::SM_SERVICE_DISCONNECT_REQUEST,
+                connect_req.write_to_bytes().unwrap(),
+                Box::new(ServiceId::new("some-circuit".into(), "test-service".into())),
+            )
+            .expect("unable to dispatch message");
+
+        let (connection_id, msg_bytes) = mock_sender
+            .pop_sent()
+            .expect("A message should have been sent");
+
+        assert_eq!(ConnectionId::from("service-component"), connection_id);
+        assert_service_msg(
+            &msg_bytes,
+            service::ServiceMessageType::SM_SERVICE_DISCONNECT_RESPONSE,
+            |msg: service::SMDisconnectResponse| {
+                assert_eq!("test-correlation-id", msg.get_correlation_id());
+                assert_eq!(
+                    service::SMDisconnectResponse_Status::ERROR_CIRCUIT_DOES_NOT_EXIST,
+                    msg.get_status()
+                );
+                assert!(!msg.get_error_message().is_empty());
+            },
+        );
+    }
+
+    // Test that service disconnection request is properly handled and sends a response with an
+    // ERROR_INTERNAL_ERROR status, if the deregistration is fails with a InternalError error.
+    #[test]
+    fn test_disconnect_request_internal_error() {
+        let mock_instances = MockServiceInstances::new().with_remove_result(Err(
+            ServiceRemoveInstanceError::InternalError {
+                context: "An error".into(),
+                source: None,
+            },
+        ));
+
+        let mock_sender = MockMessageSender::default();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let disconnect_request_handler =
+            ServiceDisconnectRequestHandler::new(Box::new(mock_instances.clone()));
+        dispatcher.set_handler(Box::new(disconnect_request_handler));
+
+        let mut connect_req = service::SMDisconnectRequest::new();
+        connect_req.set_correlation_id("test-correlation-id".into());
+
+        dispatcher
+            .dispatch_with_parent_context(
+                "service-component".into(),
+                &service::ServiceMessageType::SM_SERVICE_DISCONNECT_REQUEST,
+                connect_req.write_to_bytes().unwrap(),
+                Box::new(ServiceId::new("some-circuit".into(), "test-service".into())),
+            )
+            .expect("unable to dispatch message");
+
+        let (connection_id, msg_bytes) = mock_sender
+            .pop_sent()
+            .expect("A message should have been sent");
+
+        assert_eq!(ConnectionId::from("service-component"), connection_id);
+        assert_service_msg(
+            &msg_bytes,
+            service::ServiceMessageType::SM_SERVICE_DISCONNECT_RESPONSE,
+            |msg: service::SMDisconnectResponse| {
+                assert_eq!("test-correlation-id", msg.get_correlation_id());
+                assert_eq!(
+                    service::SMDisconnectResponse_Status::ERROR_INTERNAL_ERROR,
+                    msg.get_status()
+                );
+                assert!(!msg.get_error_message().is_empty());
+            },
+        );
+    }
+
     #[derive(Clone, Default)]
     struct MockServiceInstances {
         add_result: Arc<Mutex<Option<Result<(), ServiceAddInstanceError>>>>,
+        remove_result: Arc<Mutex<Option<Result<(), ServiceRemoveInstanceError>>>>,
         instances: Arc<Mutex<HashMap<ServiceId, String>>>,
     }
 
@@ -584,6 +891,15 @@ mod tests {
 
         fn with_add_result(self, result: Result<(), ServiceAddInstanceError>) -> Self {
             self.add_result
+                .lock()
+                .expect("test lock was poisoned")
+                .replace(result);
+
+            self
+        }
+
+        fn with_remove_result(self, result: Result<(), ServiceRemoveInstanceError>) -> Self {
+            self.remove_result
                 .lock()
                 .expect("test lock was poisoned")
                 .replace(result);
@@ -632,7 +948,11 @@ mod tests {
             _service_id: ServiceId,
             _component_id: String,
         ) -> Result<(), ServiceRemoveInstanceError> {
-            Ok(())
+            self.remove_result
+                .lock()
+                .expect("test lock was poisoned")
+                .take()
+                .expect("Unexpected second call to remove_service_instance without resetting the result")
         }
     }
 
