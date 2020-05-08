@@ -163,7 +163,7 @@ where
     authorizer: Option<Box<dyn Authorizer + Send>>,
     join_handle: Option<thread::JoinHandle<()>>,
     sender: Option<Sender<CmMessage>>,
-    shutdown_handle: Option<ShutdownHandle>,
+    shutdown_signaler: Option<ShutdownSignaler>,
 }
 
 impl<T, U> ConnectionManager<T, U>
@@ -195,7 +195,7 @@ where
             connection_state,
             join_handle: None,
             sender: None,
-            shutdown_handle: None,
+            shutdown_signaler: None,
         }
     }
 
@@ -243,17 +243,17 @@ where
         self.pacemaker
             .start(sender.clone(), || CmMessage::SendHeartbeats)?;
         self.join_handle = Some(join_handle);
-        self.shutdown_handle = Some(ShutdownHandle {
+        self.shutdown_signaler = Some(ShutdownSignaler {
             sender: sender.clone(),
-            pacemaker_shutdown_handle: self.pacemaker.shutdown_handle().unwrap(),
+            pacemaker_shutdown_signaler: self.pacemaker.shutdown_signaler().unwrap(),
         });
         self.sender = Some(sender.clone());
 
         Ok(Connector { sender })
     }
 
-    pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        self.shutdown_handle.clone()
+    pub fn shutdown_signaler(&self) -> Option<ShutdownSignaler> {
+        self.shutdown_signaler.clone()
     }
 
     pub fn await_shutdown(self) {
@@ -274,7 +274,7 @@ where
     }
 
     pub fn shutdown_and_wait(self) {
-        if let Some(sh) = self.shutdown_handle.clone() {
+        if let Some(sh) = self.shutdown_signaler.clone() {
             sh.shutdown();
         } else {
             return;
@@ -482,15 +482,15 @@ impl Connector {
 
 /// Signals shutdown to the ConnectionManager
 #[derive(Clone)]
-pub struct ShutdownHandle {
+pub struct ShutdownSignaler {
     sender: Sender<CmMessage>,
-    pacemaker_shutdown_handle: pacemaker::ShutdownHandle,
+    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
 }
 
-impl ShutdownHandle {
+impl ShutdownSignaler {
     /// Signal the ConnectionManager to shutdown.
     pub fn shutdown(self) {
-        self.pacemaker_shutdown_handle.shutdown();
+        self.pacemaker_shutdown_signaler.shutdown();
 
         if self.sender.send(CmMessage::Shutdown).is_err() {
             warn!("Connection manager is no longer running");
