@@ -12,7 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module will contain components that will be used to support different threading models
+use std::{error, fmt};
 
-pub mod error;
-pub mod pacemaker;
+#[derive(Clone, Debug, PartialEq)]
+pub struct PacemakerStartError(pub String);
+
+impl error::Error for PacemakerStartError {}
+
+impl fmt::Display for PacemakerStartError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Pacemaker was unable to start: {}", self.0)
+    }
+}

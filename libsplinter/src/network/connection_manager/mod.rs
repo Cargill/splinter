@@ -15,7 +15,6 @@
 pub mod authorizers;
 mod error;
 mod notification;
-mod pacemaker;
 
 use std::cmp::min;
 use std::collections::HashMap;
@@ -27,10 +26,10 @@ use uuid::Uuid;
 
 pub use error::{AuthorizerError, ConnectionManagerError};
 pub use notification::{ConnectionManagerNotification, NotificationIter};
-use pacemaker::Pacemaker;
 use protobuf::Message;
 
 use crate::protos::network::{NetworkHeartbeat, NetworkMessage, NetworkMessageType};
+use crate::threading::pacemaker;
 use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
 use crate::transport::{Connection, Transport};
 
@@ -158,7 +157,7 @@ where
     T: ConnectionMatrixLifeCycle,
     U: ConnectionMatrixSender,
 {
-    pacemaker: Pacemaker,
+    pacemaker: pacemaker::Pacemaker,
     connection_state: Option<ConnectionManagerState<T, U>>,
     authorizer: Option<Box<dyn Authorizer + Send>>,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -187,7 +186,7 @@ where
             transport,
             retry_frequency,
         ));
-        let pacemaker = Pacemaker::new(heartbeat);
+        let pacemaker = pacemaker::Pacemaker::new(heartbeat);
 
         Self {
             authorizer: Some(authorizer),
@@ -241,7 +240,8 @@ where
             })?;
 
         self.pacemaker
-            .start(sender.clone(), || CmMessage::SendHeartbeats)?;
+            .start(sender.clone(), || CmMessage::SendHeartbeats)
+            .map_err(|err| ConnectionManagerError::StartUpError(err.to_string()))?;
         self.join_handle = Some(join_handle);
         self.shutdown_signaler = Some(ShutdownSignaler {
             sender: sender.clone(),
