@@ -381,15 +381,11 @@ impl Config {
             self.peers(),
             self.peers_source()
         );
-        if let Some(id) = self.node_id() {
-            debug!(
-                "Config: node_id: {:?} (source: {:?})",
-                id,
-                self.node_id_source()
-            );
+        if let (Some(id), Some(source)) = (self.node_id(), self.node_id_source()) {
+            debug!("Config: node_id: {} (source: {:?})", id, source,);
         }
         if let (Some(name), Some(source)) = (self.display_name(), self.display_name_source()) {
-            debug!("Config: display_name: {:?} (source: {:?})", name, source,);
+            debug!("Config: display_name: {} (source: {:?})", name, source,);
         }
         debug!(
             "Config: bind: {} (source: {:?})",
@@ -454,12 +450,8 @@ impl Config {
 
     #[cfg(feature = "rest-api-cors")]
     fn log_whitelist(&self) {
-        if let Some(list) = self.whitelist() {
-            debug!(
-                "Config: whitelist: {:?} (source: {:?})",
-                list,
-                self.whitelist_source()
-            );
+        if let (Some(list), Some(source)) = (self.whitelist(), self.whitelist_source()) {
+            debug!("Config: whitelist: {:?} (source: {:?})", list, source,);
         }
     }
 }
@@ -919,7 +911,7 @@ mod tests {
                 final_config.display_name(),
                 final_config.display_name_source()
             ),
-            ("Node 1", &ConfigSource::CommandLine)
+            (Some("Node 1"), Some(&ConfigSource::CommandLine))
         );
         // The `DefaultPartialConfigBuilder` is the only config with a value for `bind` (source
         // should be `Default`).
