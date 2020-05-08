@@ -102,7 +102,6 @@ experimental = [
     "circuit-template",
     "connection-manager",
     "connection-manager-notification-iter-try-next",
-    "matrix",
     "network-peer-manager",
     "network-ref-map",
     "service-arg-validation",
@@ -117,10 +116,9 @@ biome-key-management = ["biome"]
 biome-notifications = ["biome"]
 biome-user = ["biome"]
 circuit-template = []
-connection-manager = ["matrix"]
+connection-manager = []
 connection-manager-notification-iter-try-next = ["connection-manager"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
-matrix = []
 network-peer-manager = ["connection-manager", "network-ref-map"]
 network-ref-map = []
 postgres = ["diesel/postgres", "diesel_migrations"]

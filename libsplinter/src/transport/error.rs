@@ -218,21 +218,18 @@ impl From<io::Error> for SendError {
     }
 }
 
-#[cfg(feature = "matrix")]
 #[derive(Debug)]
 pub struct ConnectionMatrixAddError {
     pub context: String,
     pub source: Option<Box<dyn Error + Send>>,
 }
 
-#[cfg(feature = "matrix")]
 impl ConnectionMatrixAddError {
     pub fn new(context: String, source: Option<Box<dyn Error + Send>>) -> Self {
         Self { context, source }
     }
 }
 
-#[cfg(feature = "matrix")]
 impl Error for ConnectionMatrixAddError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         if let Some(ref err) = self.source {
@@ -243,7 +240,6 @@ impl Error for ConnectionMatrixAddError {
     }
 }
 
-#[cfg(feature = "matrix")]
 impl std::fmt::Display for ConnectionMatrixAddError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(ref err) = self.source {
@@ -254,21 +250,18 @@ impl std::fmt::Display for ConnectionMatrixAddError {
     }
 }
 
-#[cfg(feature = "matrix")]
 #[derive(Debug)]
 pub struct ConnectionMatrixRemoveError {
     pub context: String,
     pub source: Option<Box<dyn Error + Send>>,
 }
 
-#[cfg(feature = "matrix")]
 impl ConnectionMatrixRemoveError {
     pub fn new(context: String, source: Option<Box<dyn Error + Send>>) -> Self {
         Self { context, source }
     }
 }
 
-#[cfg(feature = "matrix")]
 impl Error for ConnectionMatrixRemoveError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         if let Some(ref err) = self.source {
@@ -279,7 +272,6 @@ impl Error for ConnectionMatrixRemoveError {
     }
 }
 
-#[cfg(feature = "matrix")]
 impl std::fmt::Display for ConnectionMatrixRemoveError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(ref err) = self.source {
@@ -290,21 +282,18 @@ impl std::fmt::Display for ConnectionMatrixRemoveError {
     }
 }
 
-#[cfg(feature = "matrix")]
 #[derive(Debug)]
 pub struct ConnectionMatrixSendError {
     pub context: String,
     pub source: Option<Box<dyn Error + Send>>,
 }
 
-#[cfg(feature = "matrix")]
 impl ConnectionMatrixSendError {
     pub fn new(context: String, source: Option<Box<dyn Error + Send>>) -> Self {
         Self { context, source }
     }
 }
 
-#[cfg(feature = "matrix")]
 impl Error for ConnectionMatrixSendError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         if let Some(ref err) = self.source {
@@ -315,7 +304,6 @@ impl Error for ConnectionMatrixSendError {
     }
 }
 
-#[cfg(feature = "matrix")]
 impl std::fmt::Display for ConnectionMatrixSendError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(ref err) = self.source {
@@ -326,7 +314,6 @@ impl std::fmt::Display for ConnectionMatrixSendError {
     }
 }
 
-#[cfg(feature = "matrix")]
 #[derive(Debug)]
 pub enum ConnectionMatrixRecvError {
     Disconnected,
@@ -337,14 +324,12 @@ pub enum ConnectionMatrixRecvError {
     Shutdown,
 }
 
-#[cfg(feature = "matrix")]
 impl ConnectionMatrixRecvError {
     pub fn new_internal_error(context: String, source: Option<Box<dyn Error + Send>>) -> Self {
         ConnectionMatrixRecvError::InternalError { context, source }
     }
 }
 
-#[cfg(feature = "matrix")]
 impl Error for ConnectionMatrixRecvError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -361,7 +346,6 @@ impl Error for ConnectionMatrixRecvError {
     }
 }
 
-#[cfg(feature = "matrix")]
 impl std::fmt::Display for ConnectionMatrixRecvError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -382,7 +366,6 @@ impl std::fmt::Display for ConnectionMatrixRecvError {
     }
 }
 
-#[cfg(feature = "matrix")]
 #[derive(Debug)]
 pub enum ConnectionMatrixRecvTimeoutError {
     Timeout,
@@ -394,14 +377,12 @@ pub enum ConnectionMatrixRecvTimeoutError {
     Shutdown,
 }
 
-#[cfg(feature = "matrix")]
 impl ConnectionMatrixRecvTimeoutError {
     pub fn new_internal_error(context: String, source: Option<Box<dyn Error + Send>>) -> Self {
         ConnectionMatrixRecvTimeoutError::InternalError { context, source }
     }
 }
 
-#[cfg(feature = "matrix")]
 impl Error for ConnectionMatrixRecvTimeoutError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -419,7 +400,6 @@ impl Error for ConnectionMatrixRecvTimeoutError {
     }
 }
 
-#[cfg(feature = "matrix")]
 impl std::fmt::Display for ConnectionMatrixRecvTimeoutError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

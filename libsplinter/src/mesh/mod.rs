@@ -51,7 +51,6 @@
 
 mod control;
 mod incoming;
-#[cfg(feature = "matrix")]
 mod matrix;
 mod outgoing;
 mod pool;
@@ -66,12 +65,10 @@ use std::time::Duration;
 use crate::mesh::control::Control;
 pub use crate::mesh::control::{AddError, RemoveError};
 use crate::mesh::incoming::Incoming;
-#[cfg(feature = "matrix")]
 pub use crate::mesh::matrix::{
     MeshLifeCycle, MeshMatrixReceiver, MeshMatrixSender, MeshMatrixShutdown,
 };
 use crate::mesh::outgoing::Outgoing;
-#[cfg(feature = "matrix")]
 pub use crate::transport::matrix::ConnectionMatrixEnvelope as Envelope;
 
 pub use crate::collections::BiHashMap;
@@ -83,33 +80,6 @@ use crate::transport::Connection;
 pub(in crate::mesh) enum InternalEnvelope {
     Message { id: usize, payload: Vec<u8> },
     Shutdown,
-}
-
-#[cfg(not(feature = "matrix"))]
-/// Wrapper around payload to include connection id
-#[derive(Debug, Default, PartialEq)]
-pub struct Envelope {
-    id: String,
-    payload: Vec<u8>,
-}
-
-#[cfg(not(feature = "matrix"))]
-impl Envelope {
-    pub fn new(id: String, payload: Vec<u8>) -> Self {
-        Envelope { id, payload }
-    }
-
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
-    }
-
-    pub fn take_payload(self) -> Vec<u8> {
-        self.payload
-    }
 }
 
 struct MeshState {
@@ -265,28 +235,24 @@ impl Mesh {
         }
     }
 
-    #[cfg(feature = "matrix")]
     /// Creates a MeshLifeCycle that can be used to add and remove connection from this Mesh
     pub fn get_life_cycle(&self) -> MeshLifeCycle {
         let mesh = self.clone();
         MeshLifeCycle::new(mesh)
     }
 
-    #[cfg(feature = "matrix")]
     /// Creates a MeshMatrixSender that can be used to send messages over through this Mesh
     pub fn get_sender(&self) -> MeshMatrixSender {
         let mesh = self.clone();
         MeshMatrixSender::new(mesh)
     }
 
-    #[cfg(feature = "matrix")]
     /// Creates a MeshMatrixReceiver that can be used to receives message from this Mesh
     pub fn get_receiver(&self) -> MeshMatrixReceiver {
         let mesh = self.clone();
         MeshMatrixReceiver::new(mesh)
     }
 
-    #[cfg(feature = "matrix")]
     /// Creates a MeshMatrixShutdown to shutdown this Mesh instance
     pub fn get_matrix_shutdown(&self) -> MeshMatrixShutdown {
         MeshMatrixShutdown::new(self.shutdown_signaler())
