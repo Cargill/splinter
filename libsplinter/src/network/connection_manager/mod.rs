@@ -159,7 +159,7 @@ where
     U: ConnectionMatrixSender,
 {
     pacemaker: Pacemaker,
-    connection_state: Option<ConnectionState<T, U>>,
+    connection_state: Option<ConnectionManagerState<T, U>>,
     authorizer: Option<Box<dyn Authorizer + Send>>,
     join_handle: Option<thread::JoinHandle<()>>,
     sender: Option<Sender<CmMessage>>,
@@ -181,7 +181,7 @@ where
     ) -> Self {
         let heartbeat = heartbeat_interval.unwrap_or(DEFAULT_HEARTBEAT_INTERVAL);
         let retry_frequency = maximum_retry_frequency.unwrap_or(DEFAULT_MAXIMUM_RETRY_FREQUENCY);
-        let connection_state = Some(ConnectionState::new(
+        let connection_state = Some(ConnectionManagerState::new(
             life_cycle,
             matrix_sender,
             transport,
@@ -537,7 +537,7 @@ enum ConnectionMetadataExt {
     },
 }
 
-struct ConnectionState<T, U>
+struct ConnectionManagerState<T, U>
 where
     T: ConnectionMatrixLifeCycle,
     U: ConnectionMatrixSender,
@@ -549,7 +549,7 @@ where
     maximum_retry_frequency: u64,
 }
 
-impl<T, U> ConnectionState<T, U>
+impl<T, U> ConnectionManagerState<T, U>
 where
     T: ConnectionMatrixLifeCycle,
     U: ConnectionMatrixSender,
@@ -874,7 +874,7 @@ where
 
 fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     req: CmRequest,
-    state: &mut ConnectionState<T, U>,
+    state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
     authorizer: &dyn Authorizer,
     internal_sender: Sender<CmMessage>,
@@ -935,7 +935,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 
 fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     auth_result: AuthResult,
-    state: &mut ConnectionState<T, U>,
+    state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
 ) {
     match auth_result {
@@ -963,7 +963,7 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 }
 
 fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
-    state: &mut ConnectionState<T, U>,
+    state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
 ) {
     let heartbeat_message = match create_heartbeat() {
