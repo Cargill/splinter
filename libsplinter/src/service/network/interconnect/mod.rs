@@ -562,7 +562,8 @@ pub mod tests {
         join_handle.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
@@ -601,7 +602,8 @@ pub mod tests {
             .expect("Unable to build ServiceInterconnect");
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }

@@ -714,7 +714,8 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -756,7 +757,8 @@ pub mod tests {
             .is_empty());
 
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -799,7 +801,8 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -840,7 +843,8 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id, "test_peer");
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -899,7 +903,8 @@ pub mod tests {
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -955,7 +960,8 @@ pub mod tests {
 
         assert!(peers.get_by_key("test_peer").is_some());
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -1012,7 +1018,8 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -1122,7 +1129,8 @@ pub mod tests {
         tx.send(()).unwrap();
 
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh1.shutdown_signaler().shutdown();
     }
 
@@ -1205,7 +1213,8 @@ pub mod tests {
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
 
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 

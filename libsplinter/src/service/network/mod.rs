@@ -589,7 +589,8 @@ mod tests {
         jh.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     struct NoopAuthorizer {
