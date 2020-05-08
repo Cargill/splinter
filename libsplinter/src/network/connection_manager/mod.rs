@@ -606,7 +606,7 @@ where
         }
     }
 
-    fn add_connection(
+    fn add_outbound_connection(
         &mut self,
         endpoint: &str,
         connection_id: String,
@@ -884,7 +884,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             endpoint,
             sender,
             connection_id,
-        } => state.add_connection(
+        } => state.add_outbound_connection(
             &endpoint,
             connection_id,
             sender,
