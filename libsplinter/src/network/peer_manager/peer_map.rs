@@ -21,6 +21,7 @@ use super::error::PeerUpdateError;
 #[derive(Clone, PartialEq, Debug)]
 pub enum PeerStatus {
     Connected,
+    Pending,
     Disconnected { retry_attempts: u64 },
 }
 
@@ -80,7 +81,7 @@ impl PeerMap {
             id: peer_id.clone(),
             endpoints: endpoints.clone(),
             active_endpoint,
-            status: PeerStatus::Connected,
+            status: PeerStatus::Pending,
             connection_id,
         };
 
