@@ -26,7 +26,7 @@ use self::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
     PeerRefRemoveError, PeerUnknownAddError,
 };
-use crate::collections::BiHashMap;
+use crate::collections::{BiHashMap, RefMap};
 use crate::network::connection_manager::ConnectionManagerNotification;
 use crate::network::connection_manager::Connector;
 pub use crate::network::peer_manager::connector::PeerManagerConnector;
@@ -35,7 +35,6 @@ pub use crate::network::peer_manager::notification::{
     PeerManagerNotification, PeerNotificationIter,
 };
 use crate::network::peer_manager::peer_map::{PeerMap, PeerMetadata, PeerStatus};
-use crate::network::ref_map::RefMap;
 
 use uuid::Uuid;
 
