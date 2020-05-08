@@ -159,7 +159,7 @@ where
     U: ConnectionMatrixSender,
 {
     pacemaker: Pacemaker,
-    connection_state: Option<ConnectionState<T, U>>,
+    connection_state: Option<ConnectionManagerState<T, U>>,
     authorizer: Option<Box<dyn Authorizer + Send>>,
     join_handle: Option<thread::JoinHandle<()>>,
     sender: Option<Sender<CmMessage>>,
@@ -181,7 +181,7 @@ where
     ) -> Self {
         let heartbeat = heartbeat_interval.unwrap_or(DEFAULT_HEARTBEAT_INTERVAL);
         let retry_frequency = maximum_retry_frequency.unwrap_or(DEFAULT_MAXIMUM_RETRY_FREQUENCY);
-        let connection_state = Some(ConnectionState::new(
+        let connection_state = Some(ConnectionManagerState::new(
             life_cycle,
             matrix_sender,
             transport,
@@ -527,7 +527,7 @@ enum ConnectionMetadataExt {
     },
 }
 
-struct ConnectionState<T, U>
+struct ConnectionManagerState<T, U>
 where
     T: ConnectionMatrixLifeCycle,
     U: ConnectionMatrixSender,
@@ -539,7 +539,7 @@ where
     maximum_retry_frequency: u64,
 }
 
-impl<T, U> ConnectionState<T, U>
+impl<T, U> ConnectionManagerState<T, U>
 where
     T: ConnectionMatrixLifeCycle,
     U: ConnectionMatrixSender,
@@ -596,7 +596,7 @@ where
         }
     }
 
-    fn add_connection(
+    fn add_outbound_connection(
         &mut self,
         endpoint: &str,
         connection_id: String,
@@ -652,7 +652,7 @@ where
         }
     }
 
-    fn outbound_authorization_complete(
+    fn on_outbound_authorization_complete(
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
@@ -692,7 +692,7 @@ where
         }
     }
 
-    fn inbound_authorization_complete(
+    fn on_inbound_authorization_complete(
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
@@ -864,7 +864,7 @@ where
 
 fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     req: CmRequest,
-    state: &mut ConnectionState<T, U>,
+    state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
     authorizer: &dyn Authorizer,
     internal_sender: Sender<CmMessage>,
@@ -874,7 +874,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             endpoint,
             sender,
             connection_id,
-        } => state.add_connection(
+        } => state.add_outbound_connection(
             &endpoint,
             connection_id,
             sender,
@@ -925,7 +925,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 
 fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     auth_result: AuthResult,
-    state: &mut ConnectionState<T, U>,
+    state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
 ) {
     match auth_result {
@@ -934,7 +934,7 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             sender,
             auth_result,
         } => {
-            let res = state.outbound_authorization_complete(endpoint, auth_result);
+            let res = state.on_outbound_authorization_complete(endpoint, auth_result);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
             }
@@ -944,7 +944,7 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             sender,
             auth_result,
         } => {
-            let res = state.inbound_authorization_complete(endpoint, auth_result, subscribers);
+            let res = state.on_inbound_authorization_complete(endpoint, auth_result, subscribers);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
             }
@@ -953,7 +953,7 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 }
 
 fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
-    state: &mut ConnectionState<T, U>,
+    state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
 ) {
     let heartbeat_message = match create_heartbeat() {
