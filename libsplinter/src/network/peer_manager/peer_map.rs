@@ -151,6 +151,12 @@ impl PeerMap {
             .values()
             .find(|meta| meta.connection_id == connection_id)
     }
+
+    pub fn get_pending(&self) -> impl Iterator<Item = (&String, &PeerMetadata)> {
+        self.peers
+            .iter()
+            .filter(|(_id, peer_meta)| peer_meta.status == PeerStatus::Pending)
+    }
 }
 
 #[cfg(test)]
