@@ -20,8 +20,11 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-use crate::network::connection_manager::error::ConnectionManagerError;
+use super::error::PacemakerStartError;
 
+/// Pacemaker is responsible for periodically sending a message to
+/// another component over a channel. The message is meant to be used as
+/// a notfication that some action should take place.
 pub struct Pacemaker {
     interval: u64,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -39,9 +42,9 @@ impl Pacemaker {
 
     pub fn start<M, F>(
         &mut self,
-        cm_sender: Sender<M>,
+        sender: Sender<M>,
         new_message: F,
-    ) -> Result<(), ConnectionManagerError>
+    ) -> Result<(), PacemakerStartError>
     where
         M: Send + 'static,
         F: Fn() -> M + Send + 'static,
@@ -55,22 +58,23 @@ impl Pacemaker {
         let running_clone = running.clone();
         let interval = self.interval;
         let join_handle = thread::Builder::new()
-            .name("Heartbeat Monitor".into())
+            .name("Pacemaker".into())
             .spawn(move || {
                 info!("Starting heartbeat manager");
 
                 while running_clone.load(Ordering::SeqCst) {
                     thread::sleep(Duration::from_secs(interval));
-                    if let Err(err) = cm_sender.send(new_message()) {
+                    if let Err(err) = sender.send(new_message()) {
                         error!(
-                            "Connection manager has disconnected before
-                            shutting down heartbeat monitor {:?}",
+                            "Sender has disconnected before
+                            shutting down pacemaker {:?}",
                             err
                         );
                         break;
                     }
                 }
-            })?;
+            })
+            .map_err(|err| PacemakerStartError(err.to_string()))?;
 
         self.join_handle = Some(join_handle);
         self.shutdown_signaler = Some(ShutdownSignaler { running });
