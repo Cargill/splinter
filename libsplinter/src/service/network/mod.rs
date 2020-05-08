@@ -130,9 +130,9 @@ impl ServiceConnectionManager {
     /// # let transport = InprocTransport::default();
     /// # let mesh = Mesh::new(1, 1);
     /// # let authorization_pool = AuthorizationManager::new("test_identity".into()).unwrap();
-    /// # let authorizer: Box<dyn Authorizer> = Box::new(authorization_pool.authorization_connector());
+    /// # let authorizer = Box::new(authorization_pool.authorization_connector());
     /// let mut cm = ConnectionManager::new(
-    ///     Box::new(authorization_pool.authorization_connector()),
+    ///     authorizer,
     ///     mesh.get_life_cycle(),
     ///     mesh.get_sender(),
     ///     Box::new(transport),
