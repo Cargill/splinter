@@ -662,7 +662,7 @@ where
         }
     }
 
-    fn outbound_authorization_complete(
+    fn on_outbound_authorization_complete(
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
@@ -702,7 +702,7 @@ where
         }
     }
 
-    fn inbound_authorization_complete(
+    fn on_inbound_authorization_complete(
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
@@ -944,7 +944,7 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             sender,
             auth_result,
         } => {
-            let res = state.outbound_authorization_complete(endpoint, auth_result);
+            let res = state.on_outbound_authorization_complete(endpoint, auth_result);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
             }
@@ -954,7 +954,7 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             sender,
             auth_result,
         } => {
-            let res = state.inbound_authorization_complete(endpoint, auth_result, subscribers);
+            let res = state.on_inbound_authorization_complete(endpoint, auth_result, subscribers);
             if sender.send(res).is_err() {
                 warn!("connector dropped before receiving result of connection authorization");
             }
