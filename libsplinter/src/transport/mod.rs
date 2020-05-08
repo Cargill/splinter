@@ -37,7 +37,6 @@
 
 mod error;
 pub mod inproc;
-#[cfg(feature = "matrix")]
 pub(crate) mod matrix;
 pub mod multi;
 #[deprecated(since = "0.3.14", note = "please use splinter::transport::socket")]
