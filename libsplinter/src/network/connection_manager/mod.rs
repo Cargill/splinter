@@ -163,7 +163,7 @@ where
     authorizer: Option<Box<dyn Authorizer + Send>>,
     join_handle: Option<thread::JoinHandle<()>>,
     sender: Option<Sender<CmMessage>>,
-    shutdown_handle: Option<ShutdownHandle>,
+    shutdown_signaler: Option<ShutdownSignaler>,
 }
 
 impl<T, U> ConnectionManager<T, U>
@@ -195,7 +195,7 @@ where
             connection_state,
             join_handle: None,
             sender: None,
-            shutdown_handle: None,
+            shutdown_signaler: None,
         }
     }
 
@@ -243,17 +243,17 @@ where
         self.pacemaker
             .start(sender.clone(), || CmMessage::SendHeartbeats)?;
         self.join_handle = Some(join_handle);
-        self.shutdown_handle = Some(ShutdownHandle {
+        self.shutdown_signaler = Some(ShutdownSignaler {
             sender: sender.clone(),
-            pacemaker_shutdown_handle: self.pacemaker.shutdown_handle().unwrap(),
+            pacemaker_shutdown_signaler: self.pacemaker.shutdown_signaler().unwrap(),
         });
         self.sender = Some(sender.clone());
 
         Ok(Connector { sender })
     }
 
-    pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        self.shutdown_handle.clone()
+    pub fn shutdown_signaler(&self) -> Option<ShutdownSignaler> {
+        self.shutdown_signaler.clone()
     }
 
     pub fn await_shutdown(self) {
@@ -271,16 +271,6 @@ where
                 err
             );
         }
-    }
-
-    pub fn shutdown_and_wait(self) {
-        if let Some(sh) = self.shutdown_handle.clone() {
-            sh.shutdown();
-        } else {
-            return;
-        }
-
-        self.await_shutdown();
     }
 }
 
@@ -482,15 +472,15 @@ impl Connector {
 
 /// Signals shutdown to the ConnectionManager
 #[derive(Clone)]
-pub struct ShutdownHandle {
+pub struct ShutdownSignaler {
     sender: Sender<CmMessage>,
-    pacemaker_shutdown_handle: pacemaker::ShutdownHandle,
+    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
 }
 
-impl ShutdownHandle {
+impl ShutdownSignaler {
     /// Signal the ConnectionManager to shutdown.
     pub fn shutdown(self) {
-        self.pacemaker_shutdown_handle.shutdown();
+        self.pacemaker_shutdown_signaler.shutdown();
 
         if self.sender.send(CmMessage::Shutdown).is_err() {
             warn!("Connection manager is no longer running");
@@ -1079,7 +1069,8 @@ mod tests {
         );
 
         cm.start().unwrap();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     #[test]
@@ -1106,7 +1097,8 @@ mod tests {
             .request_connection("inproc://test", "test_id")
             .expect("A connection could not be created");
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     /// Test that adding the same connection twice is an idempotent operation
@@ -1138,7 +1130,8 @@ mod tests {
             .request_connection("inproc://test", "test_id")
             .expect("A connection could not be re-requested");
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     /// Test that heartbeats are correctly sent to inproc connections
@@ -1177,7 +1170,8 @@ mod tests {
             NetworkMessageType::NETWORK_HEARTBEAT
         );
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     /// Test that heartbeats are correctly sent to tcp connections
@@ -1233,7 +1227,8 @@ mod tests {
         // wait for completion
         rx.recv().expect("Did not receive completion signal");
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         authorization_pool.shutdown_and_await();
     }
 
@@ -1293,7 +1288,8 @@ mod tests {
 
         tx.send(()).expect("Could not send completion signal");
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         authorization_pool.shutdown_and_await();
     }
 
@@ -1317,7 +1313,8 @@ mod tests {
             .expect("Unable to remove connection");
 
         assert_eq!(None, endpoint_removed);
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     /// test_reconnect_raw_tcp
@@ -1415,7 +1412,8 @@ mod tests {
 
         tx.send(()).expect("Could not send completion signal");
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         authorization_pool.shutdown_and_await();
     }
 
@@ -1486,7 +1484,8 @@ mod tests {
         conn_tx.send(()).unwrap();
         jh.join().unwrap();
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
     }
 
     /// Test that an inbound tcp connection can be add and removed from the network.o
@@ -1564,7 +1563,8 @@ mod tests {
         conn_tx.send(()).unwrap();
         jh.join().unwrap();
 
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         authorization_pool.shutdown_and_await();
     }
 

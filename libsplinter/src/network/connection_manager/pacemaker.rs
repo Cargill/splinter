@@ -25,7 +25,7 @@ use crate::network::connection_manager::error::ConnectionManagerError;
 pub struct Pacemaker {
     interval: u64,
     join_handle: Option<thread::JoinHandle<()>>,
-    shutdown_handle: Option<ShutdownHandle>,
+    shutdown_signaler: Option<ShutdownSignaler>,
 }
 
 impl Pacemaker {
@@ -33,7 +33,7 @@ impl Pacemaker {
         Self {
             interval,
             join_handle: None,
-            shutdown_handle: None,
+            shutdown_signaler: None,
         }
     }
 
@@ -73,13 +73,13 @@ impl Pacemaker {
             })?;
 
         self.join_handle = Some(join_handle);
-        self.shutdown_handle = Some(ShutdownHandle { running });
+        self.shutdown_signaler = Some(ShutdownSignaler { running });
 
         Ok(())
     }
 
-    pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        self.shutdown_handle.clone()
+    pub fn shutdown_signaler(&self) -> Option<ShutdownSignaler> {
+        self.shutdown_signaler.clone()
     }
 
     pub fn await_shutdown(self) {
@@ -96,11 +96,11 @@ impl Pacemaker {
 }
 
 #[derive(Clone)]
-pub struct ShutdownHandle {
+pub struct ShutdownSignaler {
     running: Arc<AtomicBool>,
 }
 
-impl ShutdownHandle {
+impl ShutdownSignaler {
     pub fn shutdown(&self) {
         self.running.store(false, Ordering::SeqCst)
     }

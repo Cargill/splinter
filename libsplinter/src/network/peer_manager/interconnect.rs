@@ -516,7 +516,8 @@ pub mod tests {
         tx.send(()).unwrap();
 
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
@@ -551,7 +552,8 @@ pub mod tests {
             .expect("Unable to build PeerInterconnect");
 
         peer_manager.shutdown_and_wait();
-        cm.shutdown_and_wait();
+        cm.shutdown_signaler().unwrap().shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
     }
