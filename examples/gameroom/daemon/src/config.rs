@@ -138,6 +138,6 @@ pub fn get_node(splinterd_url: &str) -> Result<NodeInfo, GetNodeError> {
 pub struct NodeInfo {
     #[serde(alias = "node_id")]
     pub identity: String,
-    #[serde(alias = "network_endpoints")]
+    #[serde(alias = "advertised_endpoints")]
     pub endpoints: Vec<String>,
 }
