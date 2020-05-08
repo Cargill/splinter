@@ -63,8 +63,6 @@ use std::io;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-#[cfg(feature = "matrix")]
-pub use crate::matrix::Envelope;
 use crate::mesh::control::Control;
 pub use crate::mesh::control::{AddError, RemoveError};
 use crate::mesh::incoming::Incoming;
@@ -73,6 +71,8 @@ pub use crate::mesh::matrix::{
     MeshLifeCycle, MeshMatrixReceiver, MeshMatrixSender, MeshMatrixShutdown,
 };
 use crate::mesh::outgoing::Outgoing;
+#[cfg(feature = "matrix")]
+pub use crate::transport::matrix::ConnectionMatrixEnvelope as Envelope;
 
 pub use crate::collections::BiHashMap;
 use crate::mesh::reactor::Reactor;

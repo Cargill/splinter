@@ -16,10 +16,12 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
-use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
 use crate::network::dispatch::DispatchMessageSender;
 use crate::network::sender::{NetworkMessageSender, SendRequest};
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::transport::matrix::{
+    ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixSender,
+};
 
 use super::connector::{PeerLookup, PeerLookupProvider};
 use super::error::PeerInterconnectError;
@@ -80,15 +82,15 @@ impl PeerInterconnect {
 #[derive(Default)]
 pub struct PeerInterconnectBuilder<T: 'static, U: 'static, P>
 where
-    T: MatrixReceiver,
-    U: MatrixSender,
+    T: ConnectionMatrixReceiver,
+    U: ConnectionMatrixSender,
     P: PeerLookupProvider + 'static,
 {
     // peer lookup provider
     peer_lookup_provider: Option<P>,
-    // MatrixReceiver to receive messages from peers
+    // ConnectionMatrixReceiver to receive messages from peers
     message_receiver: Option<T>,
-    // MatrixSender to send messages to peers
+    // ConnectionMatrixSender to send messages to peers
     message_sender: Option<U>,
     // a Dispatcher with handlers for NetworkMessageTypes
     network_dispatcher_sender: Option<DispatchMessageSender<NetworkMessageType>>,
@@ -96,8 +98,8 @@ where
 
 impl<T, U, P> PeerInterconnectBuilder<T, U, P>
 where
-    T: MatrixReceiver,
-    U: MatrixSender,
+    T: ConnectionMatrixReceiver,
+    U: ConnectionMatrixSender,
     P: PeerLookupProvider + 'static,
 {
     /// Creats an empty builder for a PeerInterconnect
@@ -121,21 +123,22 @@ where
         self
     }
 
-    /// Add a MatrixReceiver to PeerInterconnectBuilder
+    /// Add a ConnectionMatrixReceiver to PeerInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `message_receiver` - a MatrixReceiver that will be used to receive messages from peers
+    /// * `message_receiver` - a ConnectionMatrixReceiver that will be used to receive messages
+    /// from peers
     pub fn with_message_receiver(mut self, message_receiver: T) -> Self {
         self.message_receiver = Some(message_receiver);
         self
     }
 
-    /// Add a MatrixSender to PeerInterconnectBuilder
+    /// Add a ConnectionMatrixSender to PeerInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `message_sender` - a MatrixSender that will be used to send messages to peers
+    /// * `message_sender` - a ConnectionMatrixSender that will be used to send messages to peers
     pub fn with_message_sender(mut self, message_sender: U) -> Self {
         self.message_sender = Some(message_sender);
         self
@@ -232,21 +235,21 @@ fn run_recv_loop<R>(
     dispatch_msg_sender: DispatchMessageSender<NetworkMessageType>,
 ) -> Result<(), String>
 where
-    R: MatrixReceiver + 'static,
+    R: ConnectionMatrixReceiver + 'static,
 {
     let mut connection_id_to_peer_id: HashMap<String, String> = HashMap::new();
     loop {
         // receive messages from peers
         let envelope = match message_receiver.recv() {
             Ok(envelope) => envelope,
-            Err(MatrixRecvError::Shutdown) => {
-                info!("Matrix has shutdown");
+            Err(ConnectionMatrixRecvError::Shutdown) => {
+                info!("ConnectionMatrix has shutdown");
                 break Ok(());
             }
-            Err(MatrixRecvError::Disconnected) => {
+            Err(ConnectionMatrixRecvError::Disconnected) => {
                 break Err("Unable to receive message: disconnected".into());
             }
-            Err(MatrixRecvError::InternalError { context, .. }) => {
+            Err(ConnectionMatrixRecvError::InternalError { context, .. }) => {
                 break Err(format!("Unable to receive message: {}", context));
             }
         };
@@ -302,7 +305,7 @@ fn run_send_loop<S>(
     message_sender: S,
 ) -> Result<(), String>
 where
-    S: MatrixSender + 'static,
+    S: ConnectionMatrixSender + 'static,
 {
     let mut peer_id_to_connection_id: HashMap<String, String> = HashMap::new();
     loop {
@@ -348,7 +351,7 @@ pub struct ShutdownHandle {
 
 impl ShutdownHandle {
     /// Sends a shutdown notifications to PeerInterconnect and the associated dipatcher thread and
-    /// Matrix
+    /// ConnectionMatrix
     pub fn shutdown(&self) {
         if self.sender.send(SendRequest::Shutdown).is_err() {
             warn!("Peer Interconnect is no longer running");

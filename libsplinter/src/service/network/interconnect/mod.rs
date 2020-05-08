@@ -22,9 +22,11 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
-use crate::matrix::{MatrixReceiver, MatrixRecvError, MatrixSender};
 use crate::network::dispatch::{ConnectionId, DispatchMessageSender, MessageSender};
 use crate::protos::component::{ComponentMessage, ComponentMessageType};
+use crate::transport::matrix::{
+    ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixSender,
+};
 
 pub use self::error::{ServiceInterconnectError, ServiceLookupError};
 
@@ -105,15 +107,15 @@ impl ServiceInterconnect {
 #[derive(Default)]
 pub struct ServiceInterconnectBuilder<T, U, P>
 where
-    T: MatrixReceiver + 'static,
-    U: MatrixSender + 'static,
+    T: ConnectionMatrixReceiver + 'static,
+    U: ConnectionMatrixSender + 'static,
     P: ServiceLookupProvider + 'static,
 {
     // service lookup provider
     service_lookup_provider: Option<P>,
-    // MatrixReceiver to receive messages from services
+    // ConnectionMatrixReceiver to receive messages from services
     message_receiver: Option<T>,
-    // MatrixSender to send messages to services
+    // ConnectionMatrixSender to send messages to services
     message_sender: Option<U>,
     // a Dispatcher with handlers for ComponentMessageTypes
     service_msg_dispatcher_sender:
@@ -122,8 +124,8 @@ where
 
 impl<T, U, P> ServiceInterconnectBuilder<T, U, P>
 where
-    T: MatrixReceiver + 'static,
-    U: MatrixSender + 'static,
+    T: ConnectionMatrixReceiver + 'static,
+    U: ConnectionMatrixSender + 'static,
     P: ServiceLookupProvider + 'static,
 {
     /// Create an empty builder for a ServiceInterconnect
@@ -147,22 +149,22 @@ where
         self
     }
 
-    /// Add a MatrixReceiver to ServiceInterconnectBuilder
+    /// Add a ConnectionMatrixReceiver to ServiceInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `message_receiver` - a MatrixReceiver that will be used to receive messages from
+    /// * `message_receiver` - a ConnectionMatrixReceiver that will be used to receive messages from
     ///   services.
     pub fn with_message_receiver(mut self, message_receiver: T) -> Self {
         self.message_receiver = Some(message_receiver);
         self
     }
 
-    /// Add a MatrixSender to ServiceInterconnectBuilder
+    /// Add a ConnectionMatrixSender to ServiceInterconnectBuilder
     ///
     /// # Arguments
     ///
-    /// * `message_sender` - a MatrixSender that will be used to send messages to services.
+    /// * `message_sender` - a ConnectionMatrixSender that will be used to send messages to services.
     pub fn with_message_sender(mut self, message_sender: U) -> Self {
         self.message_sender = Some(message_sender);
         self
@@ -261,21 +263,21 @@ fn run_recv_loop<R>(
     dispatch_msg_sender: DispatchMessageSender<ComponentMessageType, ConnectionId>,
 ) -> Result<(), String>
 where
-    R: MatrixReceiver + 'static,
+    R: ConnectionMatrixReceiver + 'static,
 {
     let mut connection_id_to_service_id: HashMap<String, String> = HashMap::new();
     loop {
         // receive messages from components
         let envelope = match message_receiver.recv() {
             Ok(envelope) => envelope,
-            Err(MatrixRecvError::Shutdown) => {
-                info!("Matrix has shutdown");
+            Err(ConnectionMatrixRecvError::Shutdown) => {
+                info!("ConnectionMatrix has shutdown");
                 break Ok(());
             }
-            Err(MatrixRecvError::Disconnected) => {
+            Err(ConnectionMatrixRecvError::Disconnected) => {
                 break Err("Unable to receive message: disconnected".into());
             }
-            Err(MatrixRecvError::InternalError { context, .. }) => {
+            Err(ConnectionMatrixRecvError::InternalError { context, .. }) => {
                 break Err(format!("Unable to receive message: {}", context));
             }
         };
@@ -329,7 +331,7 @@ fn run_send_loop<S>(
     message_sender: S,
 ) -> Result<(), String>
 where
-    S: MatrixSender + 'static,
+    S: ConnectionMatrixSender + 'static,
 {
     let mut service_id_to_connection_id: HashMap<String, String> = HashMap::new();
     loop {
@@ -407,7 +409,7 @@ pub struct ShutdownHandle {
 
 impl ShutdownHandle {
     /// Sends a shutdown notifications to ServiceInterconnect and the associated dipatcher thread and
-    /// Matrix
+    /// ConnectionMatrix
     pub fn shutdown(&self) {
         if self.sender.send(SendRequest::Shutdown).is_err() {
             warn!("Service Interconnect is no longer running");

@@ -30,8 +30,8 @@ pub use notification::{ConnectionManagerNotification, NotificationIter};
 use pacemaker::Pacemaker;
 use protobuf::Message;
 
-use crate::matrix::{MatrixLifeCycle, MatrixSender};
 use crate::protos::network::{NetworkHeartbeat, NetworkMessage, NetworkMessageType};
+use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
 use crate::transport::{Connection, Transport};
 
 const DEFAULT_HEARTBEAT_INTERVAL: u64 = 10;
@@ -155,8 +155,8 @@ enum AuthResult {
 
 pub struct ConnectionManager<T: 'static, U: 'static>
 where
-    T: MatrixLifeCycle,
-    U: MatrixSender,
+    T: ConnectionMatrixLifeCycle,
+    U: ConnectionMatrixSender,
 {
     pacemaker: Pacemaker,
     connection_state: Option<ConnectionState<T, U>>,
@@ -168,8 +168,8 @@ where
 
 impl<T, U> ConnectionManager<T, U>
 where
-    T: MatrixLifeCycle,
-    U: MatrixSender,
+    T: ConnectionMatrixLifeCycle,
+    U: ConnectionMatrixSender,
 {
     pub fn new(
         authorizer: Box<dyn Authorizer + Send>,
@@ -539,8 +539,8 @@ enum ConnectionMetadataExt {
 
 struct ConnectionState<T, U>
 where
-    T: MatrixLifeCycle,
-    U: MatrixSender,
+    T: ConnectionMatrixLifeCycle,
+    U: ConnectionMatrixSender,
 {
     connections: HashMap<String, ConnectionMetadata>,
     life_cycle: T,
@@ -551,8 +551,8 @@ where
 
 impl<T, U> ConnectionState<T, U>
 where
-    T: MatrixLifeCycle,
-    U: MatrixSender,
+    T: ConnectionMatrixLifeCycle,
+    U: ConnectionMatrixSender,
 {
     fn new(
         life_cycle: T,
@@ -872,7 +872,7 @@ where
     }
 }
 
-fn handle_request<T: MatrixLifeCycle, U: MatrixSender>(
+fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     req: CmRequest,
     state: &mut ConnectionState<T, U>,
     subscribers: &mut SubscriberMap,
@@ -933,7 +933,7 @@ fn handle_request<T: MatrixLifeCycle, U: MatrixSender>(
     };
 }
 
-fn handle_auth_result<T: MatrixLifeCycle, U: MatrixSender>(
+fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     auth_result: AuthResult,
     state: &mut ConnectionState<T, U>,
     subscribers: &mut SubscriberMap,
@@ -962,7 +962,7 @@ fn handle_auth_result<T: MatrixLifeCycle, U: MatrixSender>(
     }
 }
 
-fn send_heartbeats<T: MatrixLifeCycle, U: MatrixSender>(
+fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     state: &mut ConnectionState<T, U>,
     subscribers: &mut SubscriberMap,
 ) {

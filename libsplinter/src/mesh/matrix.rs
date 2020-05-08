@@ -13,17 +13,19 @@
 // limitations under the License.
 use std::time::Duration;
 
-use crate::matrix::{
-    Envelope, MatrixAddError, MatrixLifeCycle, MatrixReceiver, MatrixRecvError,
-    MatrixRecvTimeoutError, MatrixRemoveError, MatrixSendError, MatrixSender, MatrixShutdown,
-};
 use crate::mesh::MeshShutdownSignaler;
+use crate::transport::matrix::{
+    ConnectionMatrixAddError, ConnectionMatrixEnvelope, ConnectionMatrixLifeCycle,
+    ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixRecvTimeoutError,
+    ConnectionMatrixRemoveError, ConnectionMatrixSendError, ConnectionMatrixSender,
+    ConnectionMatrixShutdown,
+};
 use crate::transport::Connection;
 
 use super::{Mesh, RecvError, RecvTimeoutError};
 
 #[derive(Clone)]
-/// Mesh specific implementation of MatrixLifeCycle
+/// Mesh specific implementation of ConnectionMatrixLifeCycle
 pub struct MeshLifeCycle {
     mesh: Mesh,
 }
@@ -34,20 +36,24 @@ impl MeshLifeCycle {
     }
 }
 
-impl MatrixLifeCycle for MeshLifeCycle {
-    fn add(&self, connection: Box<dyn Connection>, id: String) -> Result<usize, MatrixAddError> {
+impl ConnectionMatrixLifeCycle for MeshLifeCycle {
+    fn add(
+        &self,
+        connection: Box<dyn Connection>,
+        id: String,
+    ) -> Result<usize, ConnectionMatrixAddError> {
         self.mesh.add(connection, id).map_err(|err| {
-            MatrixAddError::new(
-                "Unable to add connection to Matrix".to_string(),
+            ConnectionMatrixAddError::new(
+                "Unable to add connection to matrix".to_string(),
                 Some(Box::new(err)),
             )
         })
     }
 
-    fn remove(&self, id: &str) -> Result<Box<dyn Connection>, MatrixRemoveError> {
+    fn remove(&self, id: &str) -> Result<Box<dyn Connection>, ConnectionMatrixRemoveError> {
         self.mesh.remove(id).map_err(|err| {
-            MatrixRemoveError::new(
-                "Unable to remove connection from Matrix".to_string(),
+            ConnectionMatrixRemoveError::new(
+                "Unable to remove connection from matrix".to_string(),
                 Some(Box::new(err)),
             )
         })
@@ -55,7 +61,7 @@ impl MatrixLifeCycle for MeshLifeCycle {
 }
 
 #[derive(Clone)]
-/// Mesh specific implementation of MatrixSender
+/// Mesh specific implementation of ConnectionMatrixSender
 pub struct MeshMatrixSender {
     mesh: Mesh,
 }
@@ -66,11 +72,11 @@ impl MeshMatrixSender {
     }
 }
 
-impl MatrixSender for MeshMatrixSender {
-    fn send(&self, id: String, message: Vec<u8>) -> Result<(), MatrixSendError> {
-        let envelope = Envelope::new(id, message);
+impl ConnectionMatrixSender for MeshMatrixSender {
+    fn send(&self, id: String, message: Vec<u8>) -> Result<(), ConnectionMatrixSendError> {
+        let envelope = ConnectionMatrixEnvelope::new(id, message);
         self.mesh.send(envelope).map_err(|err| {
-            MatrixSendError::new(
+            ConnectionMatrixSendError::new(
                 "Unable to send message to connection".to_string(),
                 Some(Box::new(err)),
             )
@@ -90,32 +96,39 @@ impl MeshMatrixReceiver {
     }
 }
 
-impl MatrixReceiver for MeshMatrixReceiver {
-    fn recv(&self) -> Result<Envelope, MatrixRecvError> {
+impl ConnectionMatrixReceiver for MeshMatrixReceiver {
+    fn recv(&self) -> Result<ConnectionMatrixEnvelope, ConnectionMatrixRecvError> {
         match self.mesh.recv() {
             Ok(envelope) => Ok(envelope),
             Err(err) => match err {
-                RecvError::Disconnected => Err(MatrixRecvError::Disconnected),
-                RecvError::PoisonedLock => Err(MatrixRecvError::new_internal_error(
+                RecvError::Disconnected => Err(ConnectionMatrixRecvError::Disconnected),
+                RecvError::PoisonedLock => Err(ConnectionMatrixRecvError::new_internal_error(
                     "Internal state poisoned".to_string(),
                     Some(Box::new(err)),
                 )),
-                RecvError::Shutdown => Err(MatrixRecvError::Shutdown),
+                RecvError::Shutdown => Err(ConnectionMatrixRecvError::Shutdown),
             },
         }
     }
 
-    fn recv_timeout(&self, timeout: Duration) -> Result<Envelope, MatrixRecvTimeoutError> {
+    fn recv_timeout(
+        &self,
+        timeout: Duration,
+    ) -> Result<ConnectionMatrixEnvelope, ConnectionMatrixRecvTimeoutError> {
         match self.mesh.recv_timeout(timeout) {
             Ok(envelope) => Ok(envelope),
             Err(err) => match err {
-                RecvTimeoutError::Timeout => Err(MatrixRecvTimeoutError::Timeout),
-                RecvTimeoutError::Disconnected => Err(MatrixRecvTimeoutError::Disconnected),
-                RecvTimeoutError::PoisonedLock => Err(MatrixRecvTimeoutError::new_internal_error(
-                    "Internal state poisoned".to_string(),
-                    Some(Box::new(err)),
-                )),
-                RecvTimeoutError::Shutdown => Err(MatrixRecvTimeoutError::Shutdown),
+                RecvTimeoutError::Timeout => Err(ConnectionMatrixRecvTimeoutError::Timeout),
+                RecvTimeoutError::Disconnected => {
+                    Err(ConnectionMatrixRecvTimeoutError::Disconnected)
+                }
+                RecvTimeoutError::PoisonedLock => {
+                    Err(ConnectionMatrixRecvTimeoutError::new_internal_error(
+                        "Internal state poisoned".to_string(),
+                        Some(Box::new(err)),
+                    ))
+                }
+                RecvTimeoutError::Shutdown => Err(ConnectionMatrixRecvTimeoutError::Shutdown),
             },
         }
     }
@@ -133,7 +146,7 @@ impl MeshMatrixShutdown {
     }
 }
 
-impl MatrixShutdown for MeshMatrixShutdown {
+impl ConnectionMatrixShutdown for MeshMatrixShutdown {
     fn shutdown(&self) {
         self.shutdown_signaler.shutdown();
     }
