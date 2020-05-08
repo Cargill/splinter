@@ -116,7 +116,7 @@ enum CmRequest {
     RequestOutboundConnection {
         endpoint: String,
         connection_id: String,
-        sender: Sender<Result<String, ConnectionManagerError>>,
+        sender: Sender<Result<(), ConnectionManagerError>>,
     },
     RemoveConnection {
         endpoint: String,
@@ -142,12 +142,10 @@ enum CmRequest {
 enum AuthResult {
     Outbound {
         endpoint: String,
-        sender: Sender<Result<String, ConnectionManagerError>>,
         auth_result: AuthorizationResult,
     },
     Inbound {
         endpoint: String,
-        sender: Sender<Result<(), ConnectionManagerError>>,
         auth_result: AuthorizationResult,
     },
 }
@@ -286,8 +284,9 @@ impl Connector {
     /// Request a connection to the given endpoint.
     ///
     /// This operation is idempotent: if a connection to that endpoint already exists, a new
-    /// connection is not created. On successful connection, the authorized identity of the
-    /// connection is returned.
+    /// connection is not created. On successful connection Ok is returned. The connection is not
+    /// ready to use, it must complete authorization. When the connection is ready a
+    /// `ConnectionManagerNotification::Connected`will be sent to subscribers.
     ///
     /// # Errors
     ///
@@ -296,7 +295,7 @@ impl Connector {
         &self,
         endpoint: &str,
         connection_id: &str,
-    ) -> Result<String, ConnectionManagerError> {
+    ) -> Result<(), ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
             .send(CmMessage::Request(CmRequest::RequestOutboundConnection {
@@ -574,7 +573,6 @@ where
 
         // add the connection to the authorization pool
         let auth_endpoint = endpoint;
-        let auth_sender = reply_sender.clone();
         if let Err(err) = authorizer.authorize_connection(
             id,
             connection,
@@ -582,7 +580,6 @@ where
                 internal_sender
                     .send(CmMessage::AuthResult(AuthResult::Inbound {
                         endpoint: auth_endpoint.clone(),
-                        sender: auth_sender.clone(),
                         auth_result,
                     }))
                     .map_err(Box::from)
@@ -596,6 +593,8 @@ where
             {
                 warn!("connector dropped before receiving result of add connection");
             }
+        } else if reply_sender.send(Ok(())).is_err() {
+            warn!("connector dropped before receiving result of add connection");
         }
     }
 
@@ -603,13 +602,39 @@ where
         &mut self,
         endpoint: &str,
         connection_id: String,
-        reply_sender: Sender<Result<String, ConnectionManagerError>>,
+        reply_sender: Sender<Result<(), ConnectionManagerError>>,
         internal_sender: Sender<CmMessage>,
         authorizer: &dyn Authorizer,
+        subscribers: &mut SubscriberMap,
     ) {
         if let Some(connection) = self.connections.get(endpoint) {
             let identity = connection.identity().to_string();
-            if reply_sender.send(Ok(identity)).is_err() {
+            // if this connection not reconnecting or disconnected, send Connected
+            // notification
+            match connection.extended_metadata {
+                ConnectionMetadataExt::Outbound {
+                    ref reconnecting, ..
+                } => {
+                    if !reconnecting {
+                        subscribers.broadcast(ConnectionManagerNotification::Connected {
+                            endpoint: endpoint.to_string(),
+                            connection_id,
+                            identity,
+                        });
+                    }
+                }
+                ConnectionMetadataExt::Inbound { ref disconnected } => {
+                    if !disconnected {
+                        subscribers.broadcast(ConnectionManagerNotification::Connected {
+                            endpoint: endpoint.to_string(),
+                            connection_id,
+                            identity,
+                        });
+                    }
+                }
+            }
+
+            if reply_sender.send(Ok(())).is_err() {
                 warn!("connector dropped before receiving result of add connection");
             }
         } else {
@@ -617,7 +642,6 @@ where
                 Ok(connection) => {
                     // add the connection to the authorization pool
                     let auth_endpoint = endpoint.to_string();
-                    let auth_sender = reply_sender.clone();
                     if let Err(err) = authorizer.authorize_connection(
                         connection_id,
                         connection,
@@ -625,7 +649,6 @@ where
                             internal_sender
                                 .send(CmMessage::AuthResult(AuthResult::Outbound {
                                     endpoint: auth_endpoint.clone(),
-                                    sender: auth_sender.clone(),
                                     auth_result,
                                 }))
                                 .map_err(Box::from)
@@ -639,6 +662,8 @@ where
                         {
                             warn!("connector dropped before receiving result of add connection");
                         }
+                    } else if reply_sender.send(Ok(())).is_err() {
+                        warn!("connector dropped before receiving result of add connection");
                     }
                 }
                 Err(err) => {
@@ -659,25 +684,35 @@ where
         &mut self,
         endpoint: String,
         auth_result: AuthorizationResult,
-    ) -> Result<String, ConnectionManagerError> {
+        subscribers: &mut SubscriberMap,
+    ) {
         match auth_result {
             AuthorizationResult::Authorized {
                 connection_id,
                 connection,
                 identity,
             } => {
-                self.life_cycle
+                if let Err(err) = self
+                    .life_cycle
                     .add(connection, connection_id.clone())
                     .map_err(|err| {
                         ConnectionManagerError::ConnectionCreationError(format!("{:?}", err))
-                    })?;
+                    })
+                {
+                    subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
+                        endpoint,
+                        error: err,
+                    });
+
+                    return;
+                }
 
                 self.connections.insert(
                     endpoint.clone(),
                     ConnectionMetadata {
-                        connection_id,
+                        connection_id: connection_id.to_string(),
                         identity: identity.clone(),
-                        endpoint,
+                        endpoint: endpoint.clone(),
                         extended_metadata: ConnectionMetadataExt::Outbound {
                             reconnecting: false,
                             retry_frequency: INITIAL_RETRY_FREQUENCY,
@@ -687,10 +722,19 @@ where
                     },
                 );
 
-                Ok(identity)
+                subscribers.broadcast(ConnectionManagerNotification::Connected {
+                    endpoint,
+                    connection_id,
+                    identity,
+                });
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
-                Err(ConnectionManagerError::Unauthorized(connection_id))
+                // If the connection is unauthorized, notify subscriber this is a bad connection
+                // and will not be added
+                subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
+                    endpoint,
+                    error: ConnectionManagerError::Unauthorized(connection_id),
+                });
             }
         }
     }
@@ -700,18 +744,26 @@ where
         endpoint: String,
         auth_result: AuthorizationResult,
         subscribers: &mut SubscriberMap,
-    ) -> Result<(), ConnectionManagerError> {
+    ) {
         match auth_result {
             AuthorizationResult::Authorized {
                 connection_id,
                 connection,
                 identity,
             } => {
-                self.life_cycle
+                if let Err(err) = self
+                    .life_cycle
                     .add(connection, connection_id.clone())
                     .map_err(|err| {
                         ConnectionManagerError::ConnectionCreationError(format!("{:?}", err))
-                    })?;
+                    })
+                {
+                    subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
+                        endpoint,
+                        error: err,
+                    });
+                    return;
+                }
 
                 self.connections.insert(
                     endpoint.clone(),
@@ -730,11 +782,14 @@ where
                     connection_id,
                     identity,
                 });
-
-                Ok(())
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
-                Err(ConnectionManagerError::Unauthorized(connection_id))
+                // If the connection is unauthorized, notify subscriber this is a bad connection
+                // and will not be added
+                subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
+                    endpoint,
+                    error: ConnectionManagerError::Unauthorized(connection_id),
+                });
             }
         }
     }
@@ -870,6 +925,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
             sender,
             internal_sender,
             authorizer,
+            subscribers,
         ),
         CmRequest::RemoveConnection { endpoint, sender } => {
             let response = state
@@ -921,23 +977,15 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     match auth_result {
         AuthResult::Outbound {
             endpoint,
-            sender,
             auth_result,
         } => {
-            let res = state.on_outbound_authorization_complete(endpoint, auth_result);
-            if sender.send(res).is_err() {
-                warn!("connector dropped before receiving result of connection authorization");
-            }
+            state.on_outbound_authorization_complete(endpoint, auth_result, subscribers);
         }
         AuthResult::Inbound {
             endpoint,
-            sender,
             auth_result,
         } => {
-            let res = state.on_inbound_authorization_complete(endpoint, auth_result, subscribers);
-            if sender.send(res).is_err() {
-                warn!("connector dropped before receiving result of connection authorization");
-            }
+            state.on_inbound_authorization_complete(endpoint, auth_result, subscribers);
         }
     }
 }
@@ -1214,12 +1262,26 @@ mod tests {
             None,
         );
         let connector = cm.start().unwrap();
+        let (sub_tx, sub_rx): (
+            Sender<ConnectionManagerNotification>,
+            mpsc::Receiver<ConnectionManagerNotification>,
+        ) = channel();
+        connector.subscribe(sub_tx).expect("Unable to respond.");
 
-        let identity = connector
+        connector
             .request_connection(&endpoint, "test_id")
             .expect("A connection could not be created");
 
-        assert_eq!("some-peer", identity);
+        // Validate that the connection completed authorization
+        let notification = sub_rx.recv().expect("Cannot receive notification");
+        assert!(
+            notification
+                == ConnectionManagerNotification::Connected {
+                    endpoint: endpoint.clone(),
+                    connection_id: "test_id".to_string(),
+                    identity: "some-peer".to_string()
+                }
+        );
 
         // wait for completion
         rx.recv().expect("Did not receive completion signal");
@@ -1261,9 +1323,26 @@ mod tests {
         );
         let connector = cm.start().unwrap();
 
+        let (sub_tx, sub_rx): (
+            Sender<ConnectionManagerNotification>,
+            mpsc::Receiver<ConnectionManagerNotification>,
+        ) = channel();
+        connector.subscribe(sub_tx).expect("Unable to respond.");
+
         connector
             .request_connection(&endpoint, "test_id")
             .expect("A connection could not be created");
+
+        // Validate that the connection completed authorization
+        let notification = sub_rx.recv().expect("Cannot receive notification");
+        assert!(
+            notification
+                == ConnectionManagerNotification::Connected {
+                    endpoint: endpoint.clone(),
+                    connection_id: "test_id".to_string(),
+                    identity: "some-peer".to_string()
+                }
+        );
 
         assert_eq!(
             vec![endpoint.clone()],
@@ -1357,7 +1436,11 @@ mod tests {
                 .expect("Connection failed to disconnect");
 
             // wait for reconnection attempt
-            listener.accept().expect("Unable to accept connection");
+            let conn = listener.accept().expect("Unable to accept connection");
+            mesh2
+                .add(conn, "test_id".to_string())
+                .expect("Cannot add connection to mesh");
+            negotiation_connection_auth(&mesh2, "test_id", "some-peer");
 
             // wait for completion
             rx.recv().expect("Did not receive completion signal");
@@ -1377,9 +1460,26 @@ mod tests {
         );
         let connector = cm.start().expect("Unable to start ConnectionManager");
 
+        let (sub_tx, sub_rx): (
+            Sender<ConnectionManagerNotification>,
+            mpsc::Receiver<ConnectionManagerNotification>,
+        ) = channel();
+        connector.subscribe(sub_tx).expect("Unable to respond.");
+
         connector
             .request_connection(&endpoint, "test_id")
-            .expect("Unable to request connection");
+            .expect("A connection could not be created");
+
+        // Validate that the connection completed authorization
+        let notification = sub_rx.recv().expect("Cannot receive notification");
+        assert!(
+            notification
+                == ConnectionManagerNotification::Connected {
+                    endpoint: endpoint.clone(),
+                    connection_id: "test_id".to_string(),
+                    identity: "some-peer".to_string()
+                }
+        );
 
         let mut subscriber = connector
             .subscription_iter()
