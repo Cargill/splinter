@@ -1442,12 +1442,14 @@ pub mod tests {
         let recv_connector = connector.clone();
         let jh = thread::spawn(move || {
             let connection = listener.accept().unwrap();
-            let mut subscriber = recv_connector
-                .subscription_iter()
+            let (subs_tx, subs_rx): (mpsc::Sender<ConnectionManagerNotification>, _) =
+                mpsc::channel();
+            let _ = recv_connector
+                .subscribe(subs_tx)
                 .expect("unable to get subscriber");
             recv_connector.add_inbound_connection(connection).unwrap();
             // wait for inbound connection notfication to come
-            subscriber.next().expect("unable to get notfication");
+            subs_rx.recv().expect("unable to get notfication");
         });
 
         let mut peer_manager = PeerManager::new(connector, None);
