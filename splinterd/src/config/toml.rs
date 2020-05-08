@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! `PartialConfig` builder using values from a toml config file.
+
 use crate::config::PartialConfigBuilder;
 use crate::config::{ConfigError, ConfigSource, PartialConfig};
 
 use serde_derive::Deserialize;
 
+/// `TOML_VERSION` represents the version of the toml config file.
+/// The version determines the most current valid toml config entries.
 const TOML_VERSION: &str = "1";
 
-/// Holds configuration values defined in a toml file. This struct must be
+/// `TomlConfig` object which holds values defined in a toml file. This struct must be
 /// treated as part of the external API of splinter because changes here
 /// will impact the valid format of the config file.
 #[derive(Deserialize, Default, Debug)]
@@ -62,11 +66,14 @@ struct TomlConfig {
     admin_service_coordinator_timeout: Option<u64>,
 }
 
+/// `PartialConfig` builder which holds values defined in a toml file.
 pub struct TomlPartialConfigBuilder {
     source: Option<ConfigSource>,
     toml_config: TomlConfig,
 }
 
+/// Takes a toml file, represented as a string, and the path to the toml file to
+/// construct a `TomlPartialConfigBuilder`.
 impl TomlPartialConfigBuilder {
     pub fn new(toml: String, toml_path: String) -> Result<TomlPartialConfigBuilder, ConfigError> {
         Ok(TomlPartialConfigBuilder {
@@ -76,6 +83,8 @@ impl TomlPartialConfigBuilder {
     }
 }
 
+/// Implementation of the `PartialConfigBuilder` trait to create a `PartialConfig` object from the
+/// toml config file entries.
 impl PartialConfigBuilder for TomlPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
         let source = match self.source {
@@ -200,7 +209,7 @@ mod tests {
     static EXAMPLE_REGISTRY_FORCE: u64 = 18;
     static EXAMPLE_ADMIN_TIMEOUT: u64 = 17;
 
-    /// Converts a list of tuples to a toml Table Value used to write a toml file.
+    /// Converts a list of tuples to a toml `Table` `Value` used to write a toml file.
     fn get_toml_value() -> Value {
         let values = vec![
             ("storage".to_string(), EXAMPLE_STORAGE.to_string()),
@@ -231,7 +240,7 @@ mod tests {
         Value::Table(config_values)
     }
 
-    /// Converts a list of tuples to a toml Table Value used to write a toml file.
+    /// Converts a list of tuples to a toml `Table` `Value` used to write a toml file.
     fn get_deprecated_toml_value() -> Value {
         let values = vec![
             ("cert_dir".to_string(), EXAMPLE_CERT_DIR.to_string()),
@@ -351,61 +360,61 @@ mod tests {
     }
 
     #[test]
-    /// This test verifies that a PartialConfig object, constructed from the
-    /// TomlPartialConfigBuilder module, contains the correct values using the following steps:
+    /// This test verifies that a `PartialConfig `object, constructed from the
+    /// `TomlPartialConfigBuilder` module, contains the correct values using the following steps:
     ///
     /// 1. An example config toml is string is created.
-    /// 2. A TomlPartialConfigBuilder object is constructed by passing in the toml string created
+    /// 2. A `TomlPartialConfigBuilder` object is constructed by passing in the toml string created
     ///    in the previous step.
-    /// 3. The TomlPartialConfigBuilder object is transformed to a PartialConfig object using the
-    ///    `build` method.
+    /// 3. The `TomlPartialConfigBuilder` object is transformed to a `PartialConfig` object using
+    ///    `build`.
     ///
-    /// This test then verifies the PartialConfig object built from the TomlPartialConfigBuilder
+    /// This test then verifies the `PartialConfig` object built from the `TomlPartialConfigBuilder`
     /// object by asserting each expected value.
     fn test_toml_build() {
         // Create an example toml string.
         let toml_string = toml::to_string(&get_toml_value()).expect("Could not encode TOML value");
-        // Create a TomlPartialConfigBuilder object from the toml string.
+        // Create a `TomlPartialConfigBuilder` object from the toml string.
         let toml_builder = TomlPartialConfigBuilder::new(toml_string, TEST_TOML.to_string())
             .expect(&format!(
                 "Unable to create TomlPartialConfigBuilder from: {}",
                 TEST_TOML
             ));
-        // Build a PartialConfig from the TomlPartialConfigBuilder object created.
+        // Build a `PartialConfig` from the `TomlPartialConfigBuilder `object created.
         let built_config = toml_builder
             .build()
             .expect("Unable to build TomlPartialConfigBuilder");
-        // Compare the generated PartialConfig object against the expected values.
+        // Compare the generated `PartialConfig` object against the expected values.
         assert_config_values(built_config);
     }
 
     #[test]
-    /// This test verifies that a PartialConfig object, constructed from the
-    /// TomlPartialConfigBuilder module, contains the correct values when using deprecated values:
+    /// This test verifies that a `PartialConfig` object, constructed from the
+    /// `TomlPartialConfigBuilder` module, contains the correct values when using deprecated values:
     ///
     /// 1. An example config toml string is created that is only made up of deprecated tls values
-    /// 2. A TomlPartialConfigBuilder object is constructed by passing in the toml string created
+    /// 2. A `TomlPartialConfigBuilder` object is constructed by passing in the toml string created
     ///    in the previous step.
-    /// 3. The TomlPartialConfigBuilder object is transformed to a PartialConfig object using the
-    ///    `build` method.
+    /// 3. The `TomlPartialConfigBuilder` object is transformed to a `PartialConfig` object using
+    ///    `build`.
     ///
-    /// This test then verifies the PartialConfig object built from the TomlPartialConfigBuilder
+    /// This test then verifies the `PartialConfig` object built from the `TomlPartialConfigBuilder`
     /// object by asserting each expected tls value was properly set from deprecated values
     fn test_deprecated_toml_build() {
         // Create an example toml string.
         let toml_string =
             toml::to_string(&get_deprecated_toml_value()).expect("Could not encode TOML value");
-        // Create a TomlPartialConfigBuilder object from the toml string.
+        // Create a `TomlPartialConfigBuilder` object from the toml string.
         let toml_builder = TomlPartialConfigBuilder::new(toml_string, TEST_TOML.to_string())
             .expect(&format!(
                 "Unable to create TomlPartialConfigBuilder from: {}",
                 TEST_TOML
             ));
-        // Build a PartialConfig from the TomlPartialConfigBuilder object created.
+        // Build a `PartialConfig` from the `TomlPartialConfigBuilder` object created.
         let built_config = toml_builder
             .build()
             .expect("Unable to build TomlPartialConfigBuilder");
-        // Compare the generated PartialConfig object against the expected values.
+        // Compare the generated `PartialConfig` object against the expected values.
         assert_deprecated_config_values(built_config);
     }
 }

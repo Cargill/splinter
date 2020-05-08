@@ -167,6 +167,12 @@ OPTIONS
 : Specifies how often, in seconds, to fetch remote node registry changes on
   read. (Default: 10 seconds.) Use 0 to turn off forced refreshes.
 
+`--state-dir STATE-DIR`
+: Specifies the storage directory.
+  (Default: `/var/lib/splinter`.)
+
+  This option overrides the `SPLINTER_STATE_DIR` environment variable, if set.
+
 `--service-endpoint SERVICE-ENDPOINT`
 : Specifies the endpoint for service-to-daemon communication, using the format
   `tcp://ip:port`. (Default: `127.0.0.1:8043`.)

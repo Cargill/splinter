@@ -310,6 +310,12 @@ fn main() {
                 .long("tls-insecure")
                 .help("If set to tls, should accept all peer certificates")
                 .alias("insecure"),
+        )
+        .arg(
+            Arg::with_name("state_dir")
+                .long("state-dir")
+                .help("Storage directory when storage is YAML")
+                .takes_value(true),
         );
 
     #[cfg(feature = "database")]
@@ -415,6 +421,10 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     config.log_as_debug();
 
     let node_id = find_node_id(&config)?;
+    let display_name = config
+        .display_name()
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| format!("Node {}", &node_id));
 
     let mut daemon_builder = SplinterDaemonBuilder::new();
 
@@ -426,7 +436,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
         .with_node_id(node_id)
-        .with_display_name(String::from(config.display_name()))
+        .with_display_name(display_name)
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())

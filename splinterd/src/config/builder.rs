@@ -12,17 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! `ConfigBuilder` implementation to construct a finalized `Config` object.
+//!
+//! Takes various `PartialConfig` objects and finalizes the config values sourced from the
+//! `PartialConfigs` to construct a `Config` object to be used to start up the Splinter daemon.
+
 use std::path::Path;
 
 use crate::config::error::ConfigError;
 use crate::config::{Config, ConfigSource, PartialConfig};
 
 pub trait PartialConfigBuilder {
-    /// Takes all values set in a config object to create a PartialConfig object.
+    /// Takes all values set in a config object to create a `PartialConfig` object.
     ///
     fn build(self) -> Result<PartialConfig, ConfigError>;
 }
 
+// Constructs the tls config file paths by checking whether the file is an absolute or relative
+// path, otherwise if only a file name is provided, the `cert_dir` option will be appended to the
+// file name.
 fn get_tls_file_path(cert_dir: &str, file: &str) -> String {
     let file_path = Path::new(file);
     if file_path.is_absolute() || file_path.starts_with("../") || file_path.starts_with("./") {
@@ -39,8 +47,8 @@ fn get_tls_file_path(cert_dir: &str, file: &str) -> String {
     }
 }
 
-/// ConfigBuilder collects PartialConfig objects from various sources to be used to generate a
-/// Config object.
+/// ConfigBuilder collects `PartialConfig` objects from various sources to be used to generate a
+/// `Config` object.
 pub struct ConfigBuilder {
     partial_configs: Vec<PartialConfig>,
 }
@@ -53,18 +61,18 @@ impl ConfigBuilder {
     }
 
     #[cfg(feature = "default")]
-    /// Adds a PartialConfig to the ConfigBuilder object.
+    /// Adds a `PartialConfig` to the `ConfigBuilder` object.
     ///
     /// # Arguments
     ///
-    /// * `partial` - A PartialConfig object generated from any of the config modules.
+    /// * `partial` - A `PartialConfig` object generated from any of the config modules.
     ///
     pub fn with_partial_config(mut self, partial: PartialConfig) -> Self {
         self.partial_configs.push(partial);
         self
     }
 
-    /// Builds a Config object by incorporating the values from each PartialConfig object.
+    /// Builds a `Config` object by incorporating the values from each `PartialConfig` object.
     ///
     pub fn build(self) -> Result<Config, ConfigError> {
         let config_dir = self
@@ -131,22 +139,7 @@ impl ConfigBuilder {
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?;
-        let node_id = self.partial_configs.iter().find_map(|p| match p.node_id() {
-            Some(v) => Some((v, p.source())),
-            None => None,
-        });
-        let display_name = self
-            .partial_configs
-            .iter()
-            .find_map(|p| match p.display_name() {
-                Some(v) => Some((v, p.source())),
-                None => None,
-            })
-            .unwrap_or_else(|| match &node_id {
-                Some((id, _)) => (format!("Node {}", id), ConfigSource::Default),
-                None => (String::from("Node"), ConfigSource::Default),
-            });
-        // Iterates over the list of PartialConfig objects to find the first config with a value
+        // Iterates over the list of `PartialConfig` objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
             config_dir,
@@ -190,8 +183,17 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("peers".to_string()))?,
-            display_name,
-            node_id,
+            display_name: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.display_name() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }),
+            node_id: self.partial_configs.iter().find_map(|p| match p.node_id() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            }),
             bind: self
                 .partial_configs
                 .iter()
@@ -366,18 +368,18 @@ mod tests {
     }
 
     #[test]
-    /// This test verifies that a PartialConfig object is accurately constructed by chaining the
-    /// PartialConfigBuilder methods. The following steps are performed:
+    /// This test verifies that a `PartialConfig` object is accurately constructed by chaining the
+    /// `PartialConfigBuilder` methods. The following steps are performed:
     ///
-    /// 1. An empty PartialConfig object is constructed.
-    /// 2. The fields of the PartialConfig object are populated by chaining the builder methods.
+    /// 1. An empty `PartialConfig` object is constructed.
+    /// 2. The fields of the `PartialConfig` object are populated by chaining the builder methods.
     ///
-    /// This test then verifies the PartialConfig object built from chaining the builder methods
+    /// This test then verifies the `PartialConfig` object built from chaining the builder methods
     /// contains the correct values by asserting each expected value.
     fn test_builder_chain() {
-        // Create an empty PartialConfig object.
+        // Create an empty `PartialConfig` object.
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
-        // Populate the PartialConfig fields by chaining the builder methods.
+        // Populate the `PartialConfig` fields by chaining the builder methods.
         partial_config = partial_config
             .with_storage(Some(EXAMPLE_STORAGE.to_string()))
             .with_tls_cert_dir(None)
@@ -396,24 +398,24 @@ mod tests {
             .with_registries(Some(vec![]))
             .with_heartbeat(None)
             .with_admin_timeout(None);
-        // Compare the generated PartialConfig object against the expected values.
+        // Compare the generated `PartialConfig` object against the expected values.
         assert_config_values(partial_config);
     }
 
     #[test]
-    /// This test verifies that a PartialConfig object is accurately constructed by separately
+    /// This test verifies that a `PartialConfig` object is accurately constructed by separately
     /// applying the builder methods. The following steps are performed:
     ///
-    /// 1. An empty PartialConfig object is constructed.
-    /// 2. The fields of the PartialConfig object are populated by separately applying the builder
+    /// 1. An empty `PartialConfig` object is constructed.
+    /// 2. The fields of the `PartialConfig` object are populated by separately applying the builder
     ///    methods.
     ///
-    /// This test then verifies the PartialConfig object built from separately applying the builder
+    /// This test then verifies the `PartialConfig` object built from separately applying the builder
     /// methods contains the correct values by asserting each expected value.
     fn test_builder_separate() {
-        // Create a new PartialConfig object.
+        // Create a new `PartialConfig` object.
         let mut partial_config = PartialConfig::new(ConfigSource::Default);
-        // Populate the PartialConfig fields by separately applying the builder methods.
+        // Populate the `PartialConfig` fields by separately applying the builder methods.
         partial_config = partial_config.with_storage(Some(EXAMPLE_STORAGE.to_string()));
         partial_config = partial_config.with_tls_ca_file(Some(EXAMPLE_CA_CERTS.to_string()));
         partial_config = partial_config.with_tls_client_cert(Some(EXAMPLE_CLIENT_CERT.to_string()));
@@ -431,7 +433,7 @@ mod tests {
         partial_config = partial_config.with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()));
         partial_config = partial_config.with_admin_timeout(None);
         partial_config = partial_config.with_registries(Some(vec![]));
-        // Compare the generated PartialConfig object against the expected values.
+        // Compare the generated `PartialConfig` object against the expected values.
         assert_config_values(partial_config);
     }
 }
