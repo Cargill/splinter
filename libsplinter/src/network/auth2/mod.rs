@@ -78,7 +78,7 @@ impl fmt::Display for AuthorizationAction {
 pub(crate) enum AuthorizationActionError {
     AlreadyConnecting,
     InvalidMessageOrder(AuthorizationState, AuthorizationAction),
-    SystemFailure(String),
+    InternalError(String),
 }
 
 impl fmt::Display for AuthorizationActionError {
@@ -90,7 +90,7 @@ impl fmt::Display for AuthorizationActionError {
             AuthorizationActionError::InvalidMessageOrder(start, action) => {
                 write!(f, "Attempting to transition from {} via {}.", start, action)
             }
-            AuthorizationActionError::SystemFailure(msg) => f.write_str(&msg),
+            AuthorizationActionError::InternalError(msg) => f.write_str(&msg),
         }
     }
 }
@@ -334,7 +334,7 @@ impl AuthorizationPoolStateMachine {
         action: AuthorizationAction,
     ) -> Result<AuthorizationState, AuthorizationActionError> {
         let mut shared = self.shared.lock().map_err(|_| {
-            AuthorizationActionError::SystemFailure("Authorization pool lock was poisoned".into())
+            AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
 
         let cur_state = shared
