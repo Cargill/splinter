@@ -228,9 +228,12 @@ where
                         Ok(CmMessage::AuthResult(auth_result)) => {
                             handle_auth_result(auth_result, &mut state, &mut subscribers);
                         }
-                        Ok(CmMessage::SendHeartbeats) => {
-                            send_heartbeats(&mut state, &mut subscribers)
-                        }
+                        Ok(CmMessage::SendHeartbeats) => send_heartbeats(
+                            &mut state,
+                            &mut subscribers,
+                            &*authorizer,
+                            resender.clone(),
+                        ),
                         Err(_) => {
                             warn!("All senders have disconnected");
                             break;
@@ -764,6 +767,8 @@ where
         &mut self,
         endpoint: &str,
         subscribers: &mut SubscriberMap,
+        authorizer: &dyn Authorizer,
+        internal_sender: Sender<CmMessage>,
     ) -> Result<(), ConnectionManagerError> {
         let mut meta = if let Some(meta) = self.connections.get_mut(endpoint) {
             meta.clone()
@@ -789,36 +794,21 @@ where
                     ))
                 })?;
 
-            // add new connection to mesh
-            self.life_cycle
-                .add(connection, meta.connection_id().to_string())
-                .map_err(|err| {
-                    ConnectionManagerError::ConnectionReconnectError(format!("{:?}", err))
-                })?;
-
-            // replace mesh id and reset reconnecting fields
-            match meta.extended_metadata {
-                ConnectionMetadataExt::Outbound {
-                    ref mut reconnecting,
-                    ref mut retry_frequency,
-                    ref mut last_connection_attempt,
-                    ref mut reconnection_attempts,
-                } => {
-                    *reconnecting = false;
-                    *retry_frequency = INITIAL_RETRY_FREQUENCY;
-                    *last_connection_attempt = Instant::now();
-                    *reconnection_attempts = 0;
-                }
-                // We checked earlier that this was an outbound connection
-                _ => unreachable!(),
+            let auth_endpoint = endpoint.to_string();
+            if let Err(err) = authorizer.authorize_connection(
+                meta.connection_id,
+                connection,
+                Box::new(move |auth_result| {
+                    internal_sender
+                        .send(CmMessage::AuthResult(AuthResult::Outbound {
+                            endpoint: auth_endpoint.clone(),
+                            auth_result,
+                        }))
+                        .map_err(Box::from)
+                }),
+            ) {
+                error!("Error authorizing {}: {}", endpoint, err);
             }
-
-            self.connections.insert(endpoint.to_string(), meta);
-
-            // Notify subscribers of success
-            subscribers.broadcast(ConnectionManagerNotification::Connected {
-                endpoint: endpoint.to_string(),
-            });
         } else {
             let reconnection_attempts = match meta.extended_metadata {
                 ConnectionMetadataExt::Outbound {
@@ -955,6 +945,8 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
+    authorizer: &dyn Authorizer,
+    internal_sender: Sender<CmMessage>,
 ) {
     let heartbeat_message = match create_heartbeat() {
         Ok(h) => h,
@@ -1022,7 +1014,12 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     }
 
     for endpoint in reconnections {
-        if let Err(err) = state.reconnect(&endpoint, subscribers) {
+        if let Err(err) = state.reconnect(
+            &endpoint,
+            subscribers,
+            &*authorizer,
+            internal_sender.clone(),
+        ) {
             error!("Reconnection attempt to {} failed: {:?}", endpoint, err);
         }
     }
@@ -1403,11 +1400,14 @@ mod tests {
         let reconnection_notification = subscriber
             .next()
             .expect("Cannot get message from subscriber");
-        assert!(
-            reconnection_notification
-                == ConnectionManagerNotification::Connected {
-                    endpoint: endpoint.clone(),
-                }
+
+        assert_eq!(
+            reconnection_notification,
+            ConnectionManagerNotification::Connected {
+                endpoint: endpoint.clone(),
+                connection_id: "test_id".to_string(),
+                identity: "some-peer".to_string()
+            }
         );
 
         tx.send(()).expect("Could not send completion signal");
