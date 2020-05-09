@@ -38,7 +38,7 @@ pub enum ConnectionManagerNotification {
     Disconnected {
         endpoint: String,
     },
-    ReconnectionFailed {
+    NonFatalConnectionError {
         endpoint: String,
         attempts: u64,
     },

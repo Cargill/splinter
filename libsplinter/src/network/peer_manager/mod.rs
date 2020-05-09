@@ -614,7 +614,7 @@ fn handle_notifications(
                 }
             }
         }
-        ConnectionManagerNotification::ReconnectionFailed { endpoint, attempts } => {
+        ConnectionManagerNotification::NonFatalConnectionError { endpoint, attempts } => {
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
             if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {

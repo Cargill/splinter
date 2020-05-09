@@ -841,7 +841,7 @@ where
             self.connections.insert(endpoint.to_string(), meta);
 
             // Notify subscribers of reconnection failure
-            subscribers.broadcast(ConnectionManagerNotification::ReconnectionFailed {
+            subscribers.broadcast(ConnectionManagerNotification::NonFatalConnectionError {
                 endpoint: endpoint.to_string(),
                 attempts: reconnection_attempts,
             });
