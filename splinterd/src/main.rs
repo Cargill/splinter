@@ -404,6 +404,23 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         }
     };
 
+    let proposals_location = match &config.storage() as &str {
+        "yaml" => state_dir
+            .join("circuit_proposals.yaml")
+            .to_str()
+            .ok_or_else(|| {
+                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
+            })?
+            .to_string(),
+        "memory" => "memory".to_string(),
+        _ => {
+            return Err(UserError::InvalidArgument(format!(
+                "storage type is not supported: {}",
+                config.storage()
+            )))
+        }
+    };
+
     let registry_directory = state_dir
         .to_str()
         .ok_or_else(|| {
@@ -430,6 +447,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     daemon_builder = daemon_builder
         .with_storage_location(storage_location)
+        .with_proposals_location(proposals_location)
         .with_registry_directory(registry_directory)
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
@@ -438,7 +456,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_node_id(node_id)
         .with_display_name(display_name)
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
-        .with_storage_type(String::from(config.storage()))
         .with_registries(config.registries().to_vec())
         .with_registry_auto_refresh(config.registry_auto_refresh())
         .with_registry_forced_refresh(config.registry_forced_refresh())

@@ -102,6 +102,7 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 
 pub struct SplinterDaemon {
     storage_location: String,
+    proposals_location: String,
     registry_directory: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
@@ -118,7 +119,6 @@ pub struct SplinterDaemon {
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
-    storage_type: String,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
@@ -413,8 +413,7 @@ impl SplinterDaemon {
             Box::new(signature_verifier),
             Box::new(registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
-            &self.storage_type,
-            &self.storage_location,
+            &self.proposals_location,
             Some(self.admin_timeout),
         )
         .map_err(|err| {
@@ -703,6 +702,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 #[derive(Default)]
 pub struct SplinterDaemonBuilder {
     storage_location: Option<String>,
+    proposals_location: Option<String>,
     registry_directory: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
@@ -718,7 +718,6 @@ pub struct SplinterDaemonBuilder {
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
     registry_forced_refresh: Option<u64>,
-    storage_type: Option<String>,
     heartbeat: Option<u64>,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
@@ -732,6 +731,11 @@ impl SplinterDaemonBuilder {
 
     pub fn with_storage_location(mut self, value: String) -> Self {
         self.storage_location = Some(value);
+        self
+    }
+
+    pub fn with_proposals_location(mut self, value: String) -> Self {
+        self.proposals_location = Some(value);
         self
     }
 
@@ -802,11 +806,6 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_storage_type(mut self, value: String) -> Self {
-        self.storage_type = Some(value);
-        self
-    }
-
     pub fn with_heartbeat(mut self, value: u64) -> Self {
         self.heartbeat = Some(value);
         self
@@ -834,6 +833,10 @@ impl SplinterDaemonBuilder {
 
         let storage_location = self.storage_location.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: storage_location".to_string())
+        })?;
+
+        let proposals_location = self.proposals_location.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: proposals_location".to_string())
         })?;
 
         let registry_directory = self.registry_directory.ok_or_else(|| {
@@ -888,12 +891,9 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: registry_forced_refresh".to_string())
         })?;
 
-        let storage_type = self.storage_type.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: storage_type".to_string())
-        })?;
-
         Ok(SplinterDaemon {
             storage_location,
+            proposals_location,
             service_endpoint,
             network_endpoints,
             advertised_endpoints,
@@ -910,7 +910,6 @@ impl SplinterDaemonBuilder {
             registry_auto_refresh,
             registry_forced_refresh,
             registry_directory,
-            storage_type,
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
