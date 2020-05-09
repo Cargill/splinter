@@ -517,8 +517,16 @@ pub mod tests {
 
             // Verify mesh received the same network echo back
             let envelope = mesh2.recv().expect("Cannot receive message");
-            let network_msg: ComponentMessage = protobuf::parse_from_bytes(&envelope.payload())
+            let mut network_msg: ComponentMessage = protobuf::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse ComponentMessage");
+
+            if network_msg.get_message_type() == ComponentMessageType::COMPONENT_HEARTBEAT {
+                // try to get the service message
+                let envelope = mesh2.recv().expect("Cannot receive message");
+                network_msg = protobuf::parse_from_bytes(&envelope.payload())
+                    .expect("Cannot parse ComponentMessage");
+            }
+
             assert_eq!(
                 network_msg.get_message_type(),
                 ComponentMessageType::SERVICE
