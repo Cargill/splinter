@@ -429,6 +429,7 @@ pub mod tests {
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+        ConnectionManagerNotification,
     };
     use crate::network::dispatch::{
         dispatch_channel, ConnectionId, DispatchError, DispatchLoopBuilder, Dispatcher, Handler,
@@ -556,8 +557,14 @@ pub mod tests {
         let dispatch_shutdown = dispatch_loop.shutdown_signaler();
 
         let conn = listener.accept().expect("Cannot accept connection");
+        let (sub_tx, sub_rx): (
+            Sender<ConnectionManagerNotification>,
+            Receiver<ConnectionManagerNotification>,
+        ) = channel();
+        connector.subscribe(sub_tx).expect("Unable to subscribe");
         connector.add_inbound_connection(conn).unwrap();
 
+        let _notification = sub_rx.recv().unwrap();
         // Wait for the remote to finish it's testing
         join_handle.join().unwrap();
 
