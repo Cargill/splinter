@@ -385,32 +385,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let transport = build_transport(&config)?;
 
-    let state_dir = Path::new(config.state_dir());
-
-    let storage_location = match &config.storage() as &str {
-        "yaml" => state_dir
-            .join("circuits.yaml")
-            .to_str()
-            .ok_or_else(|| {
-                UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
-            })?
-            .to_string(),
-        "memory" => "memory".to_string(),
-        _ => {
-            return Err(UserError::InvalidArgument(format!(
-                "storage type is not supported: {}",
-                config.storage()
-            )))
-        }
-    };
-
-    let registry_directory = state_dir
-        .to_str()
-        .ok_or_else(|| {
-            UserError::InvalidArgument("'state_dir' is not a valid UTF-8 string".into())
-        })?
-        .to_string();
-
     let rest_api_endpoint = config.bind();
 
     #[cfg(feature = "database")]
@@ -429,8 +403,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     let mut daemon_builder = SplinterDaemonBuilder::new();
 
     daemon_builder = daemon_builder
-        .with_storage_location(storage_location)
-        .with_registry_directory(registry_directory)
+        .with_state_dir(config.state_dir().to_string())
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
         .with_service_endpoint(String::from(config.service_endpoint()))

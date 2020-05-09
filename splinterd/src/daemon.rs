@@ -101,8 +101,7 @@ const HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::ServiceProcessorError>>;
 
 pub struct SplinterDaemon {
-    storage_location: String,
-    registry_directory: String,
+    state_dir: String,
     service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
@@ -129,13 +128,28 @@ impl SplinterDaemon {
         // Setup up ctrlc handling
         let running = Arc::new(AtomicBool::new(true));
 
-        // Load initial state from the configured storage location and create the new
-        // SplinterState from the retrieved circuit directory
-        let storage = get_storage(&self.storage_location, CircuitDirectory::new)
+        // Load initial state from the configured storage type and state directory, then create the
+        // new SplinterState from the retrieved circuit directory
+        let storage_location = match &self.storage_type as &str {
+            "yaml" => Path::new(&self.state_dir)
+                .join("circuits.yaml")
+                .to_str()
+                .ok_or_else(|| {
+                    StartError::StorageError("'state_dir' is not a valid UTF-8 string".into())
+                })?
+                .to_string(),
+            "memory" => "memory".to_string(),
+            _ => {
+                return Err(StartError::StorageError(format!(
+                    "storage type is not supported: {}",
+                    self.storage_type
+                )))
+            }
+        };
+        let storage = get_storage(&storage_location, CircuitDirectory::new)
             .map_err(StartError::StorageError)?;
-
         let circuit_directory = storage.read().clone();
-        let state = SplinterState::new(self.storage_location.to_string(), circuit_directory);
+        let state = SplinterState::new(storage_location, circuit_directory);
 
         // set up the listeners on the transport. This will set up listeners for different
         // transports based on the protocol prefix of the endpoint.
@@ -391,7 +405,7 @@ impl SplinterDaemon {
         let signature_verifier = SawtoothSecp256k1SignatureVerifier::new();
 
         let (registry, registry_shutdown) = create_registry(
-            &self.registry_directory,
+            &self.state_dir,
             &self.registries,
             self.registry_auto_refresh,
             self.registry_forced_refresh,
@@ -414,7 +428,7 @@ impl SplinterDaemon {
             Box::new(registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
             &self.storage_type,
-            &self.storage_location,
+            &self.state_dir,
             Some(self.admin_timeout),
         )
         .map_err(|err| {
@@ -702,8 +716,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 
 #[derive(Default)]
 pub struct SplinterDaemonBuilder {
-    storage_location: Option<String>,
-    registry_directory: Option<String>,
+    state_dir: Option<String>,
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -730,13 +743,8 @@ impl SplinterDaemonBuilder {
         Self::default()
     }
 
-    pub fn with_storage_location(mut self, value: String) -> Self {
-        self.storage_location = Some(value);
-        self
-    }
-
-    pub fn with_registry_directory(mut self, value: String) -> Self {
-        self.registry_directory = Some(value);
+    pub fn with_state_dir(mut self, value: String) -> Self {
+        self.state_dir = Some(value);
         self
     }
 
@@ -832,16 +840,12 @@ impl SplinterDaemonBuilder {
         let network = Network::new(mesh, heartbeat)
             .map_err(|err| CreateError::NetworkError(err.to_string()))?;
 
-        let storage_location = self.storage_location.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: storage_location".to_string())
-        })?;
-
-        let registry_directory = self.registry_directory.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: registry_directory".to_string())
+        let state_dir = self.state_dir.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: state_dir".to_string())
         })?;
 
         let service_endpoint = self.service_endpoint.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: service_location".to_string())
+            CreateError::MissingRequiredField("Missing field: service_endpoint".to_string())
         })?;
 
         let network_endpoints = self.network_endpoints.ok_or_else(|| {
@@ -893,7 +897,7 @@ impl SplinterDaemonBuilder {
         })?;
 
         Ok(SplinterDaemon {
-            storage_location,
+            state_dir,
             service_endpoint,
             network_endpoints,
             advertised_endpoints,
@@ -909,7 +913,6 @@ impl SplinterDaemonBuilder {
             registries: self.registries,
             registry_auto_refresh,
             registry_forced_refresh,
-            registry_directory,
             storage_type,
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
@@ -979,14 +982,14 @@ fn set_up_circuit_dispatcher(
 }
 
 fn create_registry(
-    registry_directory: &str,
+    state_dir: &str,
     registries: &[String],
     auto_refresh_interval: u64,
     forced_refresh_interval: u64,
 ) -> Result<(Box<dyn RwRegistry>, RegistryShutdownHandle), StartError> {
     let mut registry_shutdown_handle = RegistryShutdownHandle::new();
 
-    let local_registry_path = Path::new(registry_directory)
+    let local_registry_path = Path::new(state_dir)
         .join("local_registry.yaml")
         .to_str()
         .expect("path built from &str cannot be invalid")
@@ -1041,7 +1044,7 @@ fn create_registry(
                 };
                 match RemoteYamlRegistry::new(
                     registry,
-                    registry_directory,
+                    state_dir,
                     auto_refresh_interval,
                     forced_refresh_interval,
                 ) {
