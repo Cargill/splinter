@@ -20,7 +20,6 @@
 //! removed.
 
 use std::collections::HashMap;
-use std::{error, fmt};
 
 /// A map that will keep track of the number of times an id has been added, and only remove the
 /// id once the reference count is 0.
@@ -81,19 +80,6 @@ impl RefMap {
             self.references.insert(ref_id.into(), ref_count - 1);
             None
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct RefUpdateError {
-    pub id: String,
-}
-
-impl error::Error for RefUpdateError {}
-
-impl fmt::Display for RefUpdateError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unable to update ref id for {}", self.id)
     }
 }
 
