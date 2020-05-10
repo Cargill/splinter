@@ -78,7 +78,7 @@ impl fmt::Display for AuthorizationAction {
 pub(crate) enum AuthorizationActionError {
     AlreadyConnecting,
     InvalidMessageOrder(AuthorizationState, AuthorizationAction),
-    SystemFailure(String),
+    InternalError(String),
 }
 
 impl fmt::Display for AuthorizationActionError {
@@ -90,37 +90,37 @@ impl fmt::Display for AuthorizationActionError {
             AuthorizationActionError::InvalidMessageOrder(start, action) => {
                 write!(f, "Attempting to transition from {} via {}.", start, action)
             }
-            AuthorizationActionError::SystemFailure(msg) => f.write_str(&msg),
+            AuthorizationActionError::InternalError(msg) => f.write_str(&msg),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct AuthorizationPoolError(pub String);
+pub struct AuthorizationManagerError(pub String);
 
-impl std::error::Error for AuthorizationPoolError {}
+impl std::error::Error for AuthorizationManagerError {}
 
-impl fmt::Display for AuthorizationPoolError {
+impl fmt::Display for AuthorizationManagerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
 /// Manages authorization states for connections on a network.
-pub struct AuthorizationPool {
+pub struct AuthorizationManager {
     local_identity: String,
     thread_pool: ThreadPool,
     shared: Arc<Mutex<ManagedAuthorizations>>,
 }
 
-impl AuthorizationPool {
-    /// Constructs an AuthorizationPool
-    pub fn new(local_identity: String) -> Result<Self, AuthorizationPoolError> {
+impl AuthorizationManager {
+    /// Constructs an AuthorizationManager
+    pub fn new(local_identity: String) -> Result<Self, AuthorizationManagerError> {
         let thread_pool = ThreadPoolBuilder::new()
             .with_size(AUTHORIZATION_THREAD_POOL_SIZE)
-            .with_prefix("AuthorizationPool-".into())
+            .with_prefix("AuthorizationManager-".into())
             .build()
-            .map_err(|err| AuthorizationPoolError(err.to_string()))?;
+            .map_err(|err| AuthorizationManagerError(err.to_string()))?;
 
         let shared = Arc::new(Mutex::new(ManagedAuthorizations::new()));
 
@@ -141,8 +141,8 @@ impl AuthorizationPool {
         self.thread_pool.join_all()
     }
 
-    pub fn pool_authorizer(&self) -> PoolAuthorizer {
-        PoolAuthorizer {
+    pub fn authorization_connector(&self) -> AuthorizationConnector {
+        AuthorizationConnector {
             local_identity: self.local_identity.clone(),
             shared: Arc::clone(&self.shared),
             executor: self.thread_pool.executor(),
@@ -163,24 +163,24 @@ impl ShutdownSignaler {
 type Callback =
     Box<dyn Fn(ConnectionAuthorizationState) -> Result<(), Box<dyn std::error::Error>> + Send>;
 
-pub struct PoolAuthorizer {
+pub struct AuthorizationConnector {
     local_identity: String,
     shared: Arc<Mutex<ManagedAuthorizations>>,
     executor: pool::JobExecutor,
 }
 
-impl PoolAuthorizer {
+impl AuthorizationConnector {
     pub fn add_connection(
         &self,
         connection_id: String,
         connection: Box<dyn Connection>,
         on_complete_callback: Callback,
-    ) -> Result<(), AuthorizationPoolError> {
+    ) -> Result<(), AuthorizationManagerError> {
         let mut connection = connection;
 
         let (tx, rx) = mpsc::channel();
         let connection_shared = Arc::clone(&self.shared);
-        let state_machine = AuthorizationPoolStateMachine {
+        let state_machine = AuthorizationManagerStateMachine {
             shared: Arc::clone(&self.shared),
         };
         let msg_sender = AuthorizationMessageSender { sender: tx };
@@ -290,20 +290,20 @@ impl PoolAuthorizer {
     }
 }
 
-fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationPoolError> {
+fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
     let mut network_msg = NetworkMessage::new();
     network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
 
     let connect_msg = AuthorizationMessage::ConnectRequest(ConnectRequest::Bidirectional);
     network_msg.set_payload(
         IntoBytes::<authorization::AuthorizationMessage>::into_bytes(connect_msg).map_err(
-            |err| AuthorizationPoolError(format!("Unable to send connect request: {}", err)),
+            |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
         )?,
     );
 
-    network_msg
-        .write_to_bytes()
-        .map_err(|err| AuthorizationPoolError(format!("Unable to send connect request: {}", err)))
+    network_msg.write_to_bytes().map_err(|err| {
+        AuthorizationManagerError(format!("Unable to send connect request: {}", err))
+    })
 }
 
 #[derive(Clone)]
@@ -318,11 +318,11 @@ impl AuthorizationMessageSender {
 }
 
 #[derive(Clone, Default)]
-pub struct AuthorizationPoolStateMachine {
+pub struct AuthorizationManagerStateMachine {
     shared: Arc<Mutex<ManagedAuthorizations>>,
 }
 
-impl AuthorizationPoolStateMachine {
+impl AuthorizationManagerStateMachine {
     /// Transitions from one authorization state to another
     ///
     /// Errors
@@ -334,7 +334,7 @@ impl AuthorizationPoolStateMachine {
         action: AuthorizationAction,
     ) -> Result<AuthorizationState, AuthorizationActionError> {
         let mut shared = self.shared.lock().map_err(|_| {
-            AuthorizationActionError::SystemFailure("Authorization pool lock was poisoned".into())
+            AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
         })?;
 
         let cur_state = shared
@@ -449,7 +449,7 @@ pub(in crate::network) mod tests {
     use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
 
-    impl AuthorizationPool {
+    impl AuthorizationManager {
         /// A test friendly shutdown and wait method.
         pub fn shutdown_and_await(self) {
             self.shutdown_signaler().shutdown();

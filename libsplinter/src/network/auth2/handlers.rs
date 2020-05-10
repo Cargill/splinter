@@ -26,7 +26,7 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::protos::prelude::*;
 
 use super::{
-    AuthorizationAction, AuthorizationMessageSender, AuthorizationPoolStateMachine,
+    AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessageSender,
     AuthorizationState,
 };
 
@@ -39,7 +39,7 @@ use super::{
 /// The identity provided is sent to connections for Trust authorizations.
 pub fn create_authorization_dispatcher(
     identity: String,
-    auth_manager: AuthorizationPoolStateMachine,
+    auth_manager: AuthorizationManagerStateMachine,
     auth_msg_sender: impl MessageSender<ConnectionId> + Clone + 'static,
 ) -> Dispatcher<NetworkMessageType, ConnectionId> {
     let mut auth_dispatcher = Dispatcher::new(Box::new(auth_msg_sender.clone()));
@@ -127,11 +127,11 @@ impl Handler for AuthorizedHandler {
 ///
 /// Handler for the Connect Request Authorization Message Type
 struct ConnectRequestHandler {
-    auth_manager: AuthorizationPoolStateMachine,
+    auth_manager: AuthorizationManagerStateMachine,
 }
 
 impl ConnectRequestHandler {
-    fn new(auth_manager: AuthorizationPoolStateMachine) -> Self {
+    fn new(auth_manager: AuthorizationManagerStateMachine) -> Self {
         ConnectRequestHandler { auth_manager }
     }
 }
@@ -273,11 +273,11 @@ impl Handler for ConnectResponseHandler {
 
 /// Handler for the TrustRequest Authorization Message Type
 struct TrustRequestHandler {
-    auth_manager: AuthorizationPoolStateMachine,
+    auth_manager: AuthorizationManagerStateMachine,
 }
 
 impl TrustRequestHandler {
-    fn new(auth_manager: AuthorizationPoolStateMachine) -> Self {
+    fn new(auth_manager: AuthorizationManagerStateMachine) -> Self {
         TrustRequestHandler { auth_manager }
     }
 }
@@ -334,11 +334,11 @@ impl Handler for TrustRequestHandler {
 
 /// Handler for the Authorization Error Message Type
 struct AuthorizationErrorHandler {
-    auth_manager: AuthorizationPoolStateMachine,
+    auth_manager: AuthorizationManagerStateMachine,
 }
 
 impl AuthorizationErrorHandler {
-    fn new(auth_manager: AuthorizationPoolStateMachine) -> Self {
+    fn new(auth_manager: AuthorizationManagerStateMachine) -> Self {
         AuthorizationErrorHandler { auth_manager }
     }
 }
@@ -416,7 +416,7 @@ mod tests {
     ///    response.
     #[test]
     fn connect_request_dispatch() {
-        let auth_mgr = AuthorizationPoolStateMachine::default();
+        let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let dispatcher =
@@ -475,7 +475,7 @@ mod tests {
     /// 2) the trust request includes the local identity
     #[test]
     fn connect_response_dispatch() {
-        let auth_mgr = AuthorizationPoolStateMachine::default();
+        let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let dispatcher =
@@ -519,7 +519,7 @@ mod tests {
     /// 3). receiving an Authorize message, which is the result of successful authorization
     #[test]
     fn trust_request_dispatch() {
-        let auth_mgr = AuthorizationPoolStateMachine::default();
+        let auth_mgr = AuthorizationManagerStateMachine::default();
         let mock_sender = MockSender::new();
         let dispatch_sender = mock_sender.clone();
         let dispatcher =

@@ -1094,7 +1094,7 @@ mod tests {
 
     use crate::mesh::Mesh;
     use crate::network::auth2::tests::negotiation_connection_auth;
-    use crate::network::auth2::AuthorizationPool;
+    use crate::network::auth2::AuthorizationManager;
     use crate::transport::inproc::InprocTransport;
     use crate::transport::socket::TcpTransport;
 
@@ -1251,10 +1251,10 @@ mod tests {
             mesh.shutdown_signaler().shutdown();
         });
 
-        let authorization_pool = AuthorizationPool::new("test_identity".into())
+        let authorization_pool = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.pool_authorizer()),
+            Box::new(authorization_pool.authorization_connector()),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1311,10 +1311,10 @@ mod tests {
             mesh.shutdown_signaler().shutdown();
         });
 
-        let authorization_pool = AuthorizationPool::new("test_identity".into())
+        let authorization_pool = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.pool_authorizer()),
+            Box::new(authorization_pool.authorization_connector()),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             transport,
@@ -1448,10 +1448,10 @@ mod tests {
             mesh2.shutdown_signaler().shutdown();
         });
 
-        let authorization_pool = AuthorizationPool::new("test_identity".into())
+        let authorization_pool = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.pool_authorizer()),
+            Box::new(authorization_pool.authorization_connector()),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -1600,10 +1600,10 @@ mod tests {
         let endpoint = listener.endpoint();
 
         let mesh = Mesh::new(512, 128);
-        let authorization_pool = AuthorizationPool::new("test_identity".into())
+        let authorization_pool = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
         let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.pool_authorizer()),
+            Box::new(authorization_pool.authorization_connector()),
             mesh.get_life_cycle(),
             mesh.get_sender(),
             // The transport on this end doesn't matter for this test

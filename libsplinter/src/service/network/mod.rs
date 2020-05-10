@@ -123,16 +123,16 @@ impl ServiceConnectionManager {
     ///
     /// ```no_run
     /// # use splinter::mesh::Mesh;
-    /// # use splinter::network::auth2::AuthorizationPool;
+    /// # use splinter::network::auth2::AuthorizationManager;
     /// # use splinter::network::connection_manager::{Authorizer, ConnectionManager};
     /// # use splinter::service::network::ServiceConnectionManager;
     /// # use splinter::transport::inproc::InprocTransport;
     /// # let transport = InprocTransport::default();
     /// # let mesh = Mesh::new(1, 1);
-    /// # let authorization_pool = AuthorizationPool::new("test_identity".into()).unwrap();
-    /// # let authorizer: Box<dyn Authorizer> = Box::new(authorization_pool.pool_authorizer());
+    /// # let authorization_pool = AuthorizationManager::new("test_identity".into()).unwrap();
+    /// # let authorizer = Box::new(authorization_pool.authorization_connector());
     /// let mut cm = ConnectionManager::new(
-    ///     Box::new(authorization_pool.pool_authorizer()),
+    ///     authorizer,
     ///     mesh.get_life_cycle(),
     ///     mesh.get_sender(),
     ///     Box::new(transport),

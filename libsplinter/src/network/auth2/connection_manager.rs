@@ -17,9 +17,9 @@ use crate::network::connection_manager::{
 };
 use crate::transport::Connection;
 
-use super::{AuthorizationPoolError, ConnectionAuthorizationState, PoolAuthorizer};
+use super::{AuthorizationConnector, AuthorizationManagerError, ConnectionAuthorizationState};
 
-impl Authorizer for PoolAuthorizer {
+impl Authorizer for AuthorizationConnector {
     fn authorize_connection(
         &self,
         connection_id: String,
@@ -59,8 +59,8 @@ impl From<ConnectionAuthorizationState> for AuthorizationResult {
     }
 }
 
-impl From<AuthorizationPoolError> for AuthorizerError {
-    fn from(err: AuthorizationPoolError) -> Self {
+impl From<AuthorizationManagerError> for AuthorizerError {
+    fn from(err: AuthorizationManagerError) -> Self {
         AuthorizerError(err.to_string())
     }
 }
