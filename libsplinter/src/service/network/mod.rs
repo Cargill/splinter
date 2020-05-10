@@ -571,8 +571,20 @@ mod tests {
             .expect("Unable to add inbound connection");
 
         // wait to receive the notification
-        subscriber.next().unwrap();
-
+        let notification = subscriber.next().unwrap();
+        match notification {
+            ConnectionManagerNotification::InboundConnection {
+                endpoint, identity, ..
+            } => {
+                assert_eq!(endpoint, "inproc://test_service_connected".to_string());
+                assert_eq!(identity, "service-id".to_string());
+            }
+            _ => panic!(
+                "Received {:?} but should have been \
+                ConnectionManagerNotification::InboundConnection",
+                notification
+            ),
+        }
         let service_connector = service_conn_mgr.service_connector();
         let service_connections = service_connector
             .list_service_connections()
