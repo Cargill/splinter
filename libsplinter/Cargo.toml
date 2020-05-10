@@ -103,7 +103,6 @@ experimental = [
     "connection-manager",
     "connection-manager-notification-iter-try-next",
     "network-peer-manager",
-    "network-ref-map",
     "service-arg-validation",
     "service-network",
     "ws-transport",
@@ -119,8 +118,7 @@ circuit-template = []
 connection-manager = []
 connection-manager-notification-iter-try-next = ["connection-manager"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
-network-peer-manager = ["connection-manager", "network-ref-map"]
-network-ref-map = []
+network-peer-manager = ["connection-manager",]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
 registry-remote = ["reqwest", "registry"]
