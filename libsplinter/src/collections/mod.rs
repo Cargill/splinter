@@ -17,5 +17,5 @@
 mod bi_hash_map;
 mod ref_map;
 
-pub use bi_hash_map::BiHashMap;
+pub(crate) use bi_hash_map::BiHashMap;
 pub(crate) use ref_map::RefMap;

@@ -71,7 +71,7 @@ pub use crate::mesh::matrix::{
 use crate::mesh::outgoing::Outgoing;
 pub use crate::transport::matrix::ConnectionMatrixEnvelope as Envelope;
 
-pub use crate::collections::BiHashMap;
+use crate::collections::BiHashMap;
 use crate::mesh::reactor::Reactor;
 use crate::transport::Connection;
 
