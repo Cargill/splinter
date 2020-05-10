@@ -62,7 +62,7 @@ mod base62;
 pub mod biome;
 pub mod channel;
 pub mod circuit;
-pub mod collections;
+mod collections;
 pub mod consensus;
 #[cfg(feature = "diesel")]
 pub mod database;
