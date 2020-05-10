@@ -82,7 +82,6 @@ pub mod rest_api;
 pub mod service;
 pub mod signing;
 pub mod storage;
-#[cfg(feature = "connection-manager")]
 mod threading;
 pub mod transport;
 
