@@ -870,7 +870,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -889,8 +889,9 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -922,7 +923,8 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector.clone(), None);
+        let mut peer_manager = PeerManager::new(connector.clone(), None, Some(1));
+
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -949,8 +951,9 @@ pub mod tests {
             .expect("Unable to list connections")
             .is_empty());
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -981,7 +984,8 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector.clone(), None, Some(1));
+
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1006,8 +1010,9 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -1036,7 +1041,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1060,8 +1065,10 @@ pub mod tests {
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
-        peer_manager.shutdown_and_wait();
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -1101,7 +1108,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1144,8 +1151,10 @@ pub mod tests {
             peer_list,
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
-        peer_manager.shutdown_and_wait();
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -1183,7 +1192,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1223,8 +1232,10 @@ pub mod tests {
         assert!(peers.get_by_key("next_peer").is_some());
 
         assert!(peers.get_by_key("test_peer").is_some());
-        peer_manager.shutdown_and_wait();
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -1257,7 +1268,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
 
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
 
@@ -1291,8 +1302,10 @@ pub mod tests {
             .expect("Unable to get peer list");
 
         assert_eq!(peer_list, Vec::<String>::new());
-        peer_manager.shutdown_and_wait();
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
@@ -1370,7 +1383,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, Some(1));
+        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector.subscribe().expect("Unable to subscribe");
         let peer_ref = peer_connector
@@ -1411,9 +1424,11 @@ pub mod tests {
         );
 
         tx.send(()).unwrap();
+
         jh.join().unwrap();
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh1.shutdown_signaler().shutdown();
     }
@@ -1433,7 +1448,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1));
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_handle().unwrap().shutdown();
@@ -1504,8 +1519,9 @@ pub mod tests {
 
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
