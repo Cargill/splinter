@@ -41,5 +41,5 @@ message NetworkEcho {
     int32 time_to_live = 3;
 }
 
-// This messagE is used to keep connections alive
+// This message is used to keep connections alive
 message NetworkHeartbeat {}

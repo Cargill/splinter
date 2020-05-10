@@ -13,14 +13,19 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use crate::collections::BiHashMap;
 
 use super::error::PeerUpdateError;
 
+// Default intial value for how long to wait before retrying a peers endpoints
+const INITIAL_RETRY_FREQUENCY: u64 = 10;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum PeerStatus {
     Connected,
+    Pending,
     Disconnected { retry_attempts: u64 },
 }
 
@@ -31,6 +36,8 @@ pub struct PeerMetadata {
     pub endpoints: Vec<String>,
     pub active_endpoint: String,
     pub status: PeerStatus,
+    pub last_connection_attempt: Instant,
+    pub retry_frequency: u64,
 }
 
 pub struct PeerMap {
@@ -80,8 +87,10 @@ impl PeerMap {
             id: peer_id.clone(),
             endpoints: endpoints.clone(),
             active_endpoint,
-            status: PeerStatus::Connected,
+            status: PeerStatus::Pending,
             connection_id,
+            last_connection_attempt: Instant::now(),
+            retry_frequency: INITIAL_RETRY_FREQUENCY,
         };
 
         self.peers.insert(peer_id.clone(), peer_metadata);
@@ -91,14 +100,14 @@ impl PeerMap {
         }
     }
 
-    /// Remove a peer id and its endpoint. Returns the active_endpoint of the peer.
-    pub fn remove(&mut self, peer_id: &str) -> Option<String> {
+    /// Remove a peer id and its endpoint. Returns the PeerMetdata if the peer exists.
+    pub fn remove(&mut self, peer_id: &str) -> Option<PeerMetadata> {
         if let Some(peer_metadata) = self.peers.remove(&peer_id.to_string()) {
             for endpoint in peer_metadata.endpoints.iter() {
                 self.endpoints.remove(endpoint);
             }
 
-            Some(peer_metadata.active_endpoint)
+            Some(peer_metadata)
         } else {
             None
         }
@@ -141,6 +150,12 @@ impl PeerMap {
         self.peers
             .values()
             .find(|meta| meta.connection_id == connection_id)
+    }
+
+    pub fn get_pending(&self) -> impl Iterator<Item = (&String, &PeerMetadata)> {
+        self.peers
+            .iter()
+            .filter(|(_id, peer_meta)| peer_meta.status == PeerStatus::Pending)
     }
 }
 
@@ -219,7 +234,9 @@ pub mod tests {
     // Test that peer_metadata() return the correct PeerMetadata for the provided id
     //  1. Test that None is retured for a peer ID that does not exist
     //  2. Insert a peer
-    //  3. Validate the expected PeerMetadata is returned from peer_metadata()
+    //  3. Validate the expected PeerMetadata is returned from
+    //     get_peer_from_endpoint("test_endpoint1")
+    //  4. Validate same metadata is returned from get_peer_from_endpoint("test_endpoint2")
     #[test]
     fn test_get_peer_by_endpoint() {
         let mut peer_map = PeerMap::new();
@@ -234,28 +251,21 @@ pub mod tests {
             "test_endpoint2".to_string(),
         );
 
-        let peer_metadata = peer_map.get_peer_from_endpoint("test_endpoint1");
-        assert_eq!(
-            peer_metadata,
-            Some(&PeerMetadata {
-                id: "test_peer".to_string(),
-                connection_id: "connection_id".to_string(),
-                endpoints: vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
-                active_endpoint: "test_endpoint2".to_string(),
-                status: PeerStatus::Connected
-            })
-        );
+        let peer_metadata = peer_map
+            .get_peer_from_endpoint("test_endpoint1")
+            .expect("missing expected peer_metadata");
 
-        let peer_metadata = peer_map.get_peer_from_endpoint("test_endpoint2");
+        assert_eq!(peer_metadata.id, "test_peer".to_string());
         assert_eq!(
-            peer_metadata,
-            Some(&PeerMetadata {
-                id: "test_peer".to_string(),
-                connection_id: "connection_id".to_string(),
-                endpoints: vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
-                active_endpoint: "test_endpoint2".to_string(),
-                status: PeerStatus::Connected
-            })
+            peer_metadata.endpoints,
+            vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()]
+        );
+        assert_eq!(peer_metadata.active_endpoint, "test_endpoint2".to_string());
+        assert_eq!(peer_metadata.status, PeerStatus::Pending);
+
+        assert_eq!(
+            Some(peer_metadata),
+            peer_map.get_peer_from_endpoint("test_endpoint2")
         );
     }
 
@@ -275,30 +285,30 @@ pub mod tests {
         );
         assert!(peer_map.peers.contains_key("test_peer"));
 
-        let peer_metadata = peer_map.peers.get("test_peer");
+        let peer_metadata = peer_map
+            .peers
+            .get("test_peer")
+            .expect("Missing peer_metadata");
+        assert_eq!(peer_metadata.id, "test_peer".to_string());
         assert_eq!(
-            peer_metadata,
-            Some(&PeerMetadata {
-                id: "test_peer".to_string(),
-                connection_id: "connection_id".to_string(),
-                endpoints: vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
-                active_endpoint: "test_endpoint2".to_string(),
-                status: PeerStatus::Connected
-            })
+            peer_metadata.endpoints,
+            vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()]
         );
+        assert_eq!(peer_metadata.active_endpoint, "test_endpoint2".to_string());
+        assert_eq!(peer_metadata.status, PeerStatus::Pending);
     }
 
     // Test that a peer can be properly removed
     //  1. Test that removing a peer_id that is not in the peer map will return None
     //  2. Insert peer test_peer and verify id is in self.peers
-    //  3. Verify that the correct active endpoint is returned when removing test_peer
+    //  3. Verify that the correct peer_metadata is returned when removing test_peer
     #[test]
     fn test_remove_peer() {
         let mut peer_map = PeerMap::new();
 
-        let active_endpoint = peer_map.remove("test_peer");
+        let peer_metdata = peer_map.remove("test_peer");
 
-        assert_eq!(active_endpoint, None,);
+        assert_eq!(peer_metdata, None);
 
         peer_map.insert(
             "test_peer".to_string(),
@@ -308,10 +318,11 @@ pub mod tests {
         );
         assert!(peer_map.peers.contains_key("test_peer"));
 
-        let active_endpoint = peer_map.remove("test_peer");
+        let peer_metadata = peer_map.remove("test_peer").expect("Missing peer_metadata");
         assert!(!peer_map.peers.contains_key("test_peer"));
 
-        assert_eq!(active_endpoint, Some("test_endpoint2".to_string()),);
+        assert_eq!(peer_metadata.active_endpoint, "test_endpoint2".to_string());
+        assert_eq!(peer_metadata.id, "test_peer".to_string());
     }
 
     // Test that a peer can be updated
@@ -329,6 +340,8 @@ pub mod tests {
             endpoints: vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             active_endpoint: "test_endpoint1".to_string(),
             status: PeerStatus::Connected,
+            last_connection_attempt: Instant::now(),
+            retry_frequency: 10,
         };
 
         if let Ok(()) = peer_map.update_peer(no_peer_metadata) {
@@ -356,20 +369,24 @@ pub mod tests {
             .update_peer(peer_metadata)
             .expect("Unable to update endpoint");
 
-        let peer_metadata = peer_map.peers.get("test_peer");
+        let peer_metadata = peer_map
+            .peers
+            .get("test_peer")
+            .expect("Missing peer_metadata");
+
+        assert_eq!(peer_metadata.id, "test_peer".to_string());
         assert_eq!(
-            peer_metadata,
-            Some(&PeerMetadata {
-                id: "test_peer".to_string(),
-                endpoints: vec![
-                    "test_endpoint1".to_string(),
-                    "test_endpoint2".to_string(),
-                    "new_endpoint".to_string()
-                ],
-                connection_id: "connection_id".to_string(),
-                active_endpoint: "test_endpoint1".to_string(),
-                status: PeerStatus::Disconnected { retry_attempts: 5 },
-            })
+            peer_metadata.endpoints,
+            vec![
+                "test_endpoint1".to_string(),
+                "test_endpoint2".to_string(),
+                "new_endpoint".to_string()
+            ]
+        );
+        assert_eq!(peer_metadata.active_endpoint, "test_endpoint1".to_string());
+        assert_eq!(
+            peer_metadata.status,
+            PeerStatus::Disconnected { retry_attempts: 5 }
         );
     }
 }

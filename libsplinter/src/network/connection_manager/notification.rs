@@ -16,7 +16,6 @@ use std::sync::mpsc::Receiver;
 #[cfg(feature = "connection-manager-notification-iter-try-next")]
 use std::sync::mpsc::TryRecvError;
 
-#[cfg(feature = "connection-manager-notification-iter-try-next")]
 use super::error::ConnectionManagerError;
 
 /// Messages that will be dispatched to all subscription handlers
@@ -24,6 +23,12 @@ use super::error::ConnectionManagerError;
 pub enum ConnectionManagerNotification {
     Connected {
         endpoint: String,
+        connection_id: String,
+        identity: String,
+    },
+    FatalConnectionError {
+        endpoint: String,
+        error: ConnectionManagerError,
     },
     InboundConnection {
         endpoint: String,
@@ -33,7 +38,7 @@ pub enum ConnectionManagerNotification {
     Disconnected {
         endpoint: String,
     },
-    ReconnectionFailed {
+    NonFatalConnectionError {
         endpoint: String,
         attempts: u64,
     },
@@ -107,6 +112,8 @@ mod tests {
             for _ in 0..5 {
                 send.send(ConnectionManagerNotification::Connected {
                     endpoint: "tcp://localhost:3030".to_string(),
+                    identity: "test".to_string(),
+                    connection_id: "test_connection_id".to_string(),
                 })
                 .unwrap();
             }
@@ -117,7 +124,9 @@ mod tests {
             assert_eq!(
                 n,
                 ConnectionManagerNotification::Connected {
-                    endpoint: "tcp://localhost:3030".to_string()
+                    endpoint: "tcp://localhost:3030".to_string(),
+                    identity: "test".to_string(),
+                    connection_id: "test_connection_id".to_string(),
                 }
             );
             notifications_sent += 1;

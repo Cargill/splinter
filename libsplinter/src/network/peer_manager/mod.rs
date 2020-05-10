@@ -18,9 +18,11 @@ pub mod interconnect;
 mod notification;
 mod peer_map;
 
+use std::cmp::min;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
+use std::time::Instant;
 
 use self::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
@@ -34,13 +36,18 @@ use crate::network::peer_manager::connector::PeerRemover;
 pub use crate::network::peer_manager::notification::{
     PeerManagerNotification, PeerNotificationIter,
 };
-use crate::network::peer_manager::peer_map::{PeerMap, PeerMetadata, PeerStatus};
+use crate::network::peer_manager::peer_map::{PeerMap, PeerStatus};
+use crate::threading::pacemaker;
 
 use uuid::Uuid;
 
 // the number of retry attempts for an active endpoint before the PeerManager will try other
 // endpoints associated with a peer
 const DEFAULT_MAXIMUM_RETRY_ATTEMPTS: u64 = 5;
+// Default value of how often the Pacemaker should send RetryPending message
+const DEFAULT_PACEMAKER_INTERVAL: u64 = 10;
+// Default value for maximum time between retrying a peers endpoints
+const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
 
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerMessage {
@@ -48,6 +55,7 @@ pub(crate) enum PeerManagerMessage {
     Request(PeerManagerRequest),
     Subscribe(Sender<PeerManagerNotification>),
     InternalNotification(ConnectionManagerNotification),
+    RetryPending,
 }
 
 impl From<ConnectionManagerNotification> for PeerManagerMessage {
@@ -126,6 +134,7 @@ impl Drop for PeerRef {
 }
 
 /// An entry of unreferenced peers, that may connected externally, but not yet requested locally.
+#[derive(Debug)]
 struct UnreferencedPeer {
     endpoint: String,
     connection_id: String,
@@ -140,16 +149,19 @@ pub struct PeerManager {
     sender: Option<Sender<PeerManagerMessage>>,
     shutdown_handle: Option<ShutdownHandle>,
     max_retry_attempts: Option<u64>,
+    pacemaker: pacemaker::Pacemaker,
 }
 
 impl PeerManager {
     pub fn new(connector: Connector, max_retry_attempts: Option<u64>) -> Self {
+        let pacemaker = pacemaker::Pacemaker::new(DEFAULT_PACEMAKER_INTERVAL);
         PeerManager {
             connection_manager_connector: connector,
             join_handle: None,
             sender: None,
             shutdown_handle: None,
             max_retry_attempts,
+            pacemaker,
         }
     }
 
@@ -212,6 +224,9 @@ impl PeerManager {
                                 max_retry_attempts,
                             )
                         }
+                        Ok(PeerManagerMessage::RetryPending) => {
+                            retry_pending(&mut peers, connector.clone())
+                        }
                         Err(_) => {
                             warn!("All senders have disconnected");
                             break;
@@ -238,6 +253,10 @@ impl PeerManager {
                 )))
             }
         }
+
+        self.pacemaker
+            .start(sender.clone(), || PeerManagerMessage::RetryPending)
+            .map_err(|err| PeerManagerError::StartUpError(err.to_string()))?;
 
         self.shutdown_handle = Some(ShutdownHandle {
             sender: sender.clone(),
@@ -316,10 +335,7 @@ fn handle_request(
             }
         }
         PeerManagerRequest::AddUnidentified { endpoint, sender } => {
-            if sender
-                .send(add_unidentified(endpoint, connector, unreferenced_peers))
-                .is_err()
-            {
+            if sender.send(add_unidentified(endpoint, connector)).is_err() {
                 warn!("connector dropped before receiving result of adding unidentified peer");
             }
         }
@@ -420,67 +436,46 @@ fn add_peer(
 
     debug!("Attempting to peer with {}", peer_id);
     let connection_id = format!("{}", Uuid::new_v4());
-    // If new, try to create a connection
+
+    let mut active_endpoint = match endpoints.get(0) {
+        Some(endpoint) => endpoint.to_string(),
+        None => {
+            return Err(PeerRefAddError::AddError(format!(
+                "No endpoints provided for peer {}",
+                peer_id
+            )))
+        }
+    };
+
     for endpoint in endpoints.iter() {
         match connector.request_connection(&endpoint, &connection_id) {
-            Ok(identity) => {
-                if peer_id != identity {
-                    if let Err(err) = connector.remove_connection(&endpoint) {
-                        error!("Unable to clean up mismatched identity connection: {}", err);
-                    }
-                    // remove the reference created above
-                    ref_map.remove_ref(&peer_id);
-                    return Err(PeerRefAddError::AddError(format!(
-                        "Peer {} (via {}) presented a mismatched identity {}",
-                        peer_id, endpoint, identity
-                    )));
-                }
-
-                debug!("Peer {} connected via {}", peer_id, endpoint);
-                peers.insert(
-                    peer_id.clone(),
-                    connection_id,
-                    endpoints.clone(),
-                    endpoint.to_string(),
-                );
-                let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
-                return Ok(peer_ref);
+            Ok(()) => {
+                active_endpoint = endpoint.to_string();
+                break;
             }
+            // If the request_connection errored we will retry in the future
             Err(err) => {
-                warn!("Unable to connect to endpoint {}: {}", endpoint, err);
-                continue;
+                error!("Unable to request connection for peer {}: {}", peer_id, err);
             }
         }
     }
 
-    warn!("Unable to peer with {}", peer_id);
-    // remove the reference created above
-    ref_map.remove_ref(&peer_id);
-    // unable to connect to any of the endpoints provided
-    Err(PeerRefAddError::AddError(format!(
-        "Unable to connect any endpoint that was provided for peer {}",
-        peer_id
-    )))
+    peers.insert(
+        peer_id.clone(),
+        connection_id,
+        endpoints.to_vec(),
+        active_endpoint,
+    );
+    let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+    Ok(peer_ref)
 }
 
-fn add_unidentified(
-    endpoint: String,
-    connector: Connector,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
-) -> Result<(), PeerUnknownAddError> {
+// Request a connection, the resulting connection will be treated as an InboundConnection
+fn add_unidentified(endpoint: String, connector: Connector) -> Result<(), PeerUnknownAddError> {
     debug!("Attempting to peer with unidentified peer");
     let connection_id = format!("{}", Uuid::new_v4());
     match connector.request_connection(&endpoint, &connection_id) {
-        Ok(identity) => {
-            unreferenced_peers.insert(
-                identity,
-                UnreferencedPeer {
-                    connection_id,
-                    endpoint,
-                },
-            );
-            Ok(())
-        }
+        Ok(()) => Ok(()),
         Err(err) => {
             warn!("Unable to peer with unidentified peer: {}", endpoint);
             // unable to connect to any of the endpoints provided
@@ -507,18 +502,22 @@ fn remove_peer(
     // remove the reference
     let removed_peer = ref_map.remove_ref(&peer_id);
     if let Some(removed_peer) = removed_peer {
-        let active_endpoint = peers.remove(&removed_peer).ok_or_else(|| {
+        let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
             PeerRefRemoveError::RemoveError(format!(
                 "Peer {} has already been removed from the peer map",
                 peer_id
             ))
         })?;
 
-        match connector.remove_connection(&active_endpoint) {
+        // If the peer is pending or invalid there is no connection to remove
+        if peer_metadata.status == PeerStatus::Pending {
+            return Ok(());
+        }
+        match connector.remove_connection(&peer_metadata.active_endpoint) {
             Ok(Some(_)) => {
                 debug!(
                     "Peer {} has been removed and connection {} has been closed",
-                    peer_id, active_endpoint
+                    peer_id, peer_metadata.active_endpoint
                 );
                 Ok(())
             }
@@ -533,48 +532,6 @@ fn remove_peer(
     }
 }
 
-// If a connection has reached the retry limit before it could be reestablished, the peer manager
-// will try the peer's other endpoints.
-fn retry_endpoints(
-    peer_metadata: &mut PeerMetadata,
-    connector: Connector,
-) -> Result<bool, PeerManagerError> {
-    debug!("Trying to find active endpoint for {}", peer_metadata.id);
-    for endpoint in peer_metadata.endpoints.iter() {
-        match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
-            Ok(_identity) => {
-                debug!("Peered with {}: {}", peer_metadata.id, endpoint);
-                if endpoint != &peer_metadata.active_endpoint {
-                    // Remove old active endpoint from peer_manager
-                    match connector.remove_connection(&peer_metadata.active_endpoint) {
-                        Ok(Some(_)) => (),
-                        Ok(None) => (),
-                        Err(err) => {
-                            return Err(PeerManagerError::RetryEndpoints(format!(
-                                "Unable to remove active endpoint {} from connection manager: {}",
-                                &peer_metadata.active_endpoint, err
-                            )))
-                        }
-                    }
-                }
-                peer_metadata.active_endpoint = endpoint.to_string();
-                return Ok(true);
-            }
-            Err(err) => {
-                warn!("Unable to connect to endpoint {}: {}", endpoint, err);
-                continue;
-            }
-        }
-    }
-
-    warn!(
-        "Unable to find new active endpoint for peer {}",
-        peer_metadata.id
-    );
-    // unable to connect to any of the endpoints provided
-    Ok(false)
-}
-
 fn handle_notifications(
     notification: ConnectionManagerNotification,
     unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
@@ -584,22 +541,6 @@ fn handle_notifications(
     max_retry_attempts: u64,
 ) {
     match notification {
-        // If a connection has been successful, forward notification to subscribers
-        ConnectionManagerNotification::Connected { endpoint } => {
-            // if we have a corresponding peer for for endpoint, send notification; otherwise
-            // ignore
-            if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
-                let notification = PeerManagerNotification::Connected {
-                    peer: peer_metadata.id.to_string(),
-                };
-                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
-                // if a peer was previously disconnected, remove from disconnected list
-                peer_metadata.status = PeerStatus::Connected;
-                if let Err(err) = peers.update_peer(peer_metadata) {
-                    error!("Unable to update peer: {}", err);
-                }
-            }
-        }
         // If a connection has disconnected, forward notification to subscribers
         ConnectionManagerNotification::Disconnected { endpoint } => {
             if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
@@ -614,32 +555,30 @@ fn handle_notifications(
                 }
             }
         }
-        ConnectionManagerNotification::ReconnectionFailed { endpoint, attempts } => {
+        ConnectionManagerNotification::NonFatalConnectionError { endpoint, attempts } => {
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
             if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
                 if attempts >= max_retry_attempts {
-                    match retry_endpoints(&mut peer_metadata, connector) {
-                        Ok(true) => {
-                            peer_metadata.status = PeerStatus::Connected;
-                            let notification = PeerManagerNotification::Connected {
-                                peer: peer_metadata.id.to_string(),
-                            };
-                            subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+                    for endpoint in peer_metadata.endpoints.iter() {
+                        // do not retry the connection that is currently failing
+                        if endpoint == &peer_metadata.active_endpoint {
+                            continue;
                         }
-                        // if a new endpoint could not be found, reset timeout and try again later
-                        Ok(false) => {
-                            peer_metadata.status = PeerStatus::Disconnected {
-                                retry_attempts: attempts,
-                            };
-                        }
-                        Err(err) => {
-                            error!("Error returned from retry_endpoints: {}", err);
-                            peer_metadata.status = PeerStatus::Disconnected {
-                                retry_attempts: attempts,
-                            };
+                        match connector.request_connection(&endpoint, &peer_metadata.connection_id)
+                        {
+                            Ok(()) => break,
+                            Err(err) => error!(
+                                "Unable to request connection for peer {} at endpoint {}: {}",
+                                peer_metadata.id, endpoint, err
+                            ),
                         }
                     }
+
+                    peer_metadata.status = PeerStatus::Disconnected {
+                        retry_attempts: attempts,
+                    };
+
                     if let Err(err) = peers.update_peer(peer_metadata) {
                         error!("Unable to update peer: {}", err);
                     }
@@ -662,6 +601,217 @@ fn handle_notifications(
                     endpoint,
                 },
             );
+        }
+        ConnectionManagerNotification::Connected {
+            endpoint,
+            identity,
+            connection_id,
+        } => handle_connected(
+            endpoint,
+            identity,
+            connection_id,
+            unreferenced_peers,
+            peers,
+            connector,
+            subscribers,
+        ),
+        ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
+            handle_fatal_connection(endpoint, error.to_string(), peers, subscribers)
+        }
+    }
+}
+
+fn handle_connected(
+    endpoint: String,
+    identity: String,
+    connection_id: String,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    peers: &mut PeerMap,
+    connector: Connector,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+) {
+    if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
+        match peer_metadata.status {
+            PeerStatus::Connected => {
+                let notification = PeerManagerNotification::Connected {
+                    peer: peer_metadata.id.to_string(),
+                };
+                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            }
+            PeerStatus::Pending => {
+                if identity != peer_metadata.id {
+                    if let Err(err) = connector.remove_connection(&endpoint) {
+                        error!("Unable to clean up mismatched identity connection: {}", err);
+                    }
+
+                    // tell subscribers this Peer is currently disconnected
+                    let notification = PeerManagerNotification::Disconnected {
+                        peer: peer_metadata.id.to_string(),
+                    };
+
+                    subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+                    error!(
+                        "Peer {} (via {}) presented a mismatched identity {}",
+                        identity, endpoint, peer_metadata.id
+                    );
+
+                    // set its status to pending, this will cause the endpoints to be retried at
+                    // a later time
+                    peer_metadata.status = PeerStatus::Pending;
+                    if let Err(err) = peers.update_peer(peer_metadata) {
+                        error!("Unable to update peer: {}", err);
+                    }
+                    return;
+                }
+
+                peer_metadata.status = PeerStatus::Connected;
+
+                let notification = PeerManagerNotification::Connected {
+                    peer: peer_metadata.id.to_string(),
+                };
+
+                debug!("Peer {} connected via {}", peer_metadata.id, endpoint);
+                if let Err(err) = peers.update_peer(peer_metadata) {
+                    error!("Unable to update peer: {}", err);
+                }
+
+                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            }
+            PeerStatus::Disconnected { .. } => {
+                // remove old connection if it has been replaced
+                if endpoint != peer_metadata.active_endpoint {
+                    if let Err(err) = connector.remove_connection(&peer_metadata.active_endpoint) {
+                        error!(
+                            "Unable to remove connection for {}: {}",
+                            peer_metadata.active_endpoint, err
+                        );
+                    }
+                }
+
+                if identity != peer_metadata.id {
+                    if let Err(err) = connector.remove_connection(&endpoint) {
+                        error!("Unable to clean up mismatched identity connection: {}", err);
+                    }
+
+                    // tell subscribers this Peer is currently disconnected
+                    let notification = PeerManagerNotification::Disconnected {
+                        peer: peer_metadata.id.to_string(),
+                    };
+
+                    subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+                    error!(
+                        "Peer {} (via {}) presented a mismatched identity {}",
+                        identity, endpoint, peer_metadata.id
+                    );
+
+                    // reset retry settings
+                    peer_metadata.retry_frequency = min(
+                        peer_metadata.retry_frequency * 2,
+                        DEFAULT_MAXIMUM_RETRY_FREQUENCY,
+                    );
+                    peer_metadata.last_connection_attempt = Instant::now();
+                    // set its status to pending, this will cause the endpoints to be retried at
+                    // a later time
+                    peer_metadata.status = PeerStatus::Pending;
+                    if let Err(err) = peers.update_peer(peer_metadata) {
+                        error!("Unable to update peer: {}", err);
+                    }
+                    return;
+                }
+
+                peer_metadata.status = PeerStatus::Connected;
+                peer_metadata.active_endpoint = endpoint.clone();
+                let notification = PeerManagerNotification::Connected {
+                    peer: peer_metadata.id.to_string(),
+                };
+
+                debug!("Peer {} connected via {}", peer_metadata.id, endpoint);
+                if let Err(err) = peers.update_peer(peer_metadata) {
+                    error!("Unable to update peer: {}", err);
+                }
+
+                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            }
+        }
+    } else {
+        // Treat unknown peer as unreferenced
+        unreferenced_peers.insert(
+            identity,
+            UnreferencedPeer {
+                connection_id,
+                endpoint,
+            },
+        );
+    }
+}
+
+fn handle_fatal_connection(
+    endpoint: String,
+    error: String,
+    peers: &mut PeerMap,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+) {
+    if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
+        warn!(
+            "Peer {} is invalid: {}",
+            peer_metadata.id.to_string(),
+            error
+        );
+
+        // Tell subscribers this peer is disconnected
+        let notification = PeerManagerNotification::Disconnected {
+            peer: peer_metadata.id.to_string(),
+        };
+
+        // reset retry settings
+        peer_metadata.retry_frequency = min(
+            peer_metadata.retry_frequency * 2,
+            DEFAULT_MAXIMUM_RETRY_FREQUENCY,
+        );
+        peer_metadata.last_connection_attempt = Instant::now();
+
+        // set peer to pending so its endpoints will be retried in the future
+        peer_metadata.status = PeerStatus::Pending;
+        if let Err(err) = peers.update_peer(peer_metadata) {
+            error!("Unable to update peer: {}", err);
+        }
+
+        subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+    }
+}
+
+// If a pending peers retry retry_frequency has elapsed, retry their endpoints. If successful,
+// their active endpoint will be updated. The retry_frequency will be increased and
+// and last_connection_attempt reset.
+fn retry_pending(peers: &mut PeerMap, connector: Connector) {
+    let mut to_retry = Vec::new();
+    for (_, peer) in peers.get_pending() {
+        if peer.last_connection_attempt.elapsed().as_secs() > peer.retry_frequency {
+            to_retry.push(peer.clone());
+        }
+    }
+
+    for mut peer_metadata in to_retry {
+        for endpoint in peer_metadata.endpoints.iter() {
+            match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
+                Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
+                // If request_connection errored we will retry in the future
+                Err(err) => {
+                    error!(
+                        "Unable to request connection for peer {}: {}",
+                        peer_metadata.id, err
+                    );
+                }
+            }
+        }
+
+        peer_metadata.retry_frequency = min(
+            peer_metadata.retry_frequency * 2,
+            DEFAULT_MAXIMUM_RETRY_FREQUENCY,
+        );
+        peer_metadata.last_connection_attempt = Instant::now();
+        if let Err(err) = peers.update_peer(peer_metadata) {
+            error!("Unable to update peer: {}", err);
         }
     }
 }
@@ -686,6 +836,7 @@ pub mod tests {
     //
     // 1. add test_peer
     // 2. verify that the returned PeerRef contains the test_peer id
+    // 3. verify the the a Connected notification is received
     #[test]
     fn test_peer_manager_add_peer() {
         let mut transport = Box::new(InprocTransport::default());
@@ -707,11 +858,23 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
+
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                }
+        );
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_signaler().unwrap().shutdown();
         cm.await_shutdown();
@@ -722,8 +885,10 @@ pub mod tests {
     // requested, the connector returns an error.
     //
     // 1. add test_peer, whose identity is different_peer
-    // 2. verify that an AddPeer error is returned.
-    // 3. verify that the connection is removed.
+    // 2. verify that an AddPeer returns succesfully
+    // 4. validate a Disconnected notfication is returned,
+    // 5. drop peer ref
+    // 6. verify that the connection is removed.
     #[test]
     fn test_peer_manager_add_peer_identity_mismatch() {
         let mut transport = Box::new(InprocTransport::default());
@@ -745,10 +910,25 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector.clone(), None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
-        let peer_res =
-            peer_connector.add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()]);
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
 
-        assert!(matches!(peer_res, Err(PeerRefAddError::AddError(_))));
+        let peer_ref = peer_connector
+            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .expect("Unable to add peer");
+
+        assert_eq!(peer_ref.peer_id, "test_peer");
+
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Disconnected {
+                    peer: "test_peer".to_string(),
+                }
+        );
+
+        drop(peer_ref);
 
         assert!(connector
             .list_connections()
@@ -767,6 +947,7 @@ pub mod tests {
     // 1. add test_peer with two endpoints. The first endpoint will fail and cause the peer
     //    manager to try the second
     // 2. verify that the returned PeerRef contains the test_peer id
+    // 3. verify the the a Connected notification is received
     #[test]
     fn test_peer_manager_add_peer_endpoints() {
         let mut transport = Box::new(InprocTransport::default());
@@ -788,6 +969,9 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref(
                 "test_peer".to_string(),
@@ -799,6 +983,15 @@ pub mod tests {
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
+
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                }
+        );
+
         peer_manager.shutdown_and_wait();
         cm.shutdown_signaler().unwrap().shutdown();
         cm.await_shutdown();
@@ -808,7 +1001,8 @@ pub mod tests {
     // Test that the same peer can be added multiple times.
     //
     // 1. add test_peer
-    // 2. add the same peer, and see it is successful
+    // 2. verify the the a Connected notification is received
+    // 3. add the same peer, and see it is successful
     #[test]
     fn test_peer_manager_add_peer_multiple_times() {
         let mut transport = Box::new(InprocTransport::default());
@@ -830,11 +1024,22 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
+
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                }
+        );
 
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
@@ -850,9 +1055,11 @@ pub mod tests {
     // Test that list_peer returns the correct list of peers
     //
     // 1. add test_peer
-    // 2. add next_peer
-    // 3. call list_peers
-    // 4. verify that the sorted list of peers contains both test_peer and next_peer
+    // 2. verify the the a Connected notification is received
+    // 3. add next_peer
+    // 4. verify the the a Connected notification is received
+    // 5. call list_peers
+    // 6. verify that the sorted list of peers contains both test_peer and next_peer
     #[test]
     fn test_peer_manager_list_peer() {
         let mut transport = Box::new(InprocTransport::default());
@@ -879,17 +1086,36 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
         let peer_ref_1 = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref_1.peer_id, "test_peer");
 
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                }
+        );
+
         let peer_ref_2 = peer_connector
             .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref_2.peer_id, "next_peer");
+
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "next_peer".to_string(),
+                }
+        );
 
         let mut peer_list = peer_connector
             .list_peers()
@@ -939,17 +1165,36 @@ pub mod tests {
         let connector = cm.start().unwrap();
         let mut peer_manager = PeerManager::new(connector, None);
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
         let peer_ref_1 = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref_1.peer_id, "test_peer");
 
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                }
+        );
+
         let peer_ref_2 = peer_connector
             .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref_2.peer_id, "next_peer");
+
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "next_peer".to_string(),
+                }
+        );
 
         let peers = peer_connector
             .connection_ids()
@@ -997,11 +1242,21 @@ pub mod tests {
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
 
         {
+            let mut subscriber = peer_connector
+                .subscribe()
+                .expect("Unable to get subscriber");
             let peer_ref = peer_connector
                 .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
                 .expect("Unable to add peer");
 
             assert_eq!(peer_ref.peer_id, "test_peer");
+            let notification = subscriber.next().expect("Unable to get new notifications");
+            assert!(
+                notification
+                    == PeerManagerNotification::Connected {
+                        peer: "test_peer".to_string(),
+                    }
+            );
 
             let peer_list = peer_connector
                 .list_peers()
@@ -1085,7 +1340,7 @@ pub mod tests {
         });
 
         let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_peer")),
+            Box::new(NoopAuthorizer::new_multiple(&["test_peer", "test_peer"])),
             mesh1.get_life_cycle(),
             mesh1.get_sender(),
             transport,
@@ -1101,6 +1356,13 @@ pub mod tests {
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
+        let notification = subscriber.next().expect("Unable to get new notifications");
+        assert!(
+            notification
+                == PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                }
+        );
 
         // receive reconnecting attempt
         let disconnected_notification = subscriber
@@ -1180,8 +1442,12 @@ pub mod tests {
         let recv_connector = connector.clone();
         let jh = thread::spawn(move || {
             let connection = listener.accept().unwrap();
-
+            let mut subscriber = recv_connector
+                .subscription_iter()
+                .expect("unable to get subscriber");
             recv_connector.add_inbound_connection(connection).unwrap();
+            // wait for inbound connection notfication to come
+            subscriber.next().expect("unable to get notfication");
         });
 
         let mut peer_manager = PeerManager::new(connector, None);

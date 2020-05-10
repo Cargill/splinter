@@ -26,6 +26,11 @@ message ComponentMessage {
 
 enum ComponentMessageType  {
     UNSET_COMPONENT_MESSAGE_TYPE = 0;
+    // Mimics the NETWORK_HEARTBEAT
+    COMPONENT_HEARTBEAT = 2;
 
     SERVICE = 100;
 }
+
+// This message is used to keep connections alive
+message ComponentHeartbeat {}

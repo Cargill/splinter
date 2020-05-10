@@ -429,6 +429,7 @@ pub mod tests {
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
+        ConnectionManagerNotification,
     };
     use crate::network::dispatch::{
         dispatch_channel, ConnectionId, DispatchError, DispatchLoopBuilder, Dispatcher, Handler,
@@ -516,8 +517,16 @@ pub mod tests {
 
             // Verify mesh received the same network echo back
             let envelope = mesh2.recv().expect("Cannot receive message");
-            let network_msg: ComponentMessage = protobuf::parse_from_bytes(&envelope.payload())
+            let mut network_msg: ComponentMessage = protobuf::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse ComponentMessage");
+
+            if network_msg.get_message_type() == ComponentMessageType::COMPONENT_HEARTBEAT {
+                // try to get the service message
+                let envelope = mesh2.recv().expect("Cannot receive message");
+                network_msg = protobuf::parse_from_bytes(&envelope.payload())
+                    .expect("Cannot parse ComponentMessage");
+            }
+
             assert_eq!(
                 network_msg.get_message_type(),
                 ComponentMessageType::SERVICE
@@ -556,8 +565,14 @@ pub mod tests {
         let dispatch_shutdown = dispatch_loop.shutdown_signaler();
 
         let conn = listener.accept().expect("Cannot accept connection");
+        let (sub_tx, sub_rx): (
+            Sender<ConnectionManagerNotification>,
+            Receiver<ConnectionManagerNotification>,
+        ) = channel();
+        connector.subscribe(sub_tx).expect("Unable to subscribe");
         connector.add_inbound_connection(conn).unwrap();
 
+        let _notification = sub_rx.recv().unwrap();
         // Wait for the remote to finish it's testing
         join_handle.join().unwrap();
 
