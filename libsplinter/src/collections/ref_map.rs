@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A data structure for reference counting a set of strings.
+//!
+//! An Item can be added to `RefMap` with `add_ref`; each call to `add_ref` will increment in
+//! internal reference count associated with the `ref_id` given. When `remove_ref` is called,
+//! the reference count is decremented. If a reference count reaches zero, then the item is
+//! removed.
+
 use std::collections::HashMap;
 use std::{error, fmt};
 
@@ -23,12 +30,16 @@ pub struct RefMap {
 }
 
 impl RefMap {
+    /// Create a new `RefMap`
     pub fn new() -> Self {
         RefMap {
             references: HashMap::new(),
         }
     }
 
+    /// Increments the reference count for `ref_id`
+    ///
+    /// If `ref_id` does not already exit, it will be added.
     pub fn add_ref(&mut self, ref_id: String) -> u64 {
         if let Some(ref_count) = self.references.remove(&ref_id) {
             let new_ref_count = ref_count + 1;
@@ -40,7 +51,9 @@ impl RefMap {
         }
     }
 
-    /// remove_ref, return id if the peer id was removed
+    /// Decrements the referece count for `ref_id`
+    ///
+    /// If the internal reference count reaches zero, then `ref_id` will be removed.
     ///
     /// This method will panic if the id does not exist.
     pub fn remove_ref(&mut self, ref_id: &str) -> Option<String> {
