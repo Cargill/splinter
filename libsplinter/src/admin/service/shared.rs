@@ -1717,6 +1717,10 @@ impl AdminServiceShared {
             .map_err(AdminSharedError::from)
     }
 
+    pub fn get_nodes(&self) -> Result<BTreeMap<String, StateNode>, AdminSharedError> {
+        self.splinter_state.nodes().map_err(AdminSharedError::from)
+    }
+
     fn update_splinter_state(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
         let members: Vec<StateNode> = circuit
             .get_members()
