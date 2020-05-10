@@ -149,19 +149,16 @@ pub struct PeerManager {
     sender: Option<Sender<PeerManagerMessage>>,
     shutdown_handle: Option<ShutdownHandle>,
     max_retry_attempts: Option<u64>,
-    pacemaker: pacemaker::Pacemaker,
 }
 
 impl PeerManager {
     pub fn new(connector: Connector, max_retry_attempts: Option<u64>) -> Self {
-        let pacemaker = pacemaker::Pacemaker::new(DEFAULT_PACEMAKER_INTERVAL);
         PeerManager {
             connection_manager_connector: connector,
             join_handle: None,
             sender: None,
             shutdown_handle: None,
             max_retry_attempts,
-            pacemaker,
         }
     }
 
@@ -186,6 +183,15 @@ impl PeerManager {
                 err
             ))
         })?;
+
+        let pacemaker = pacemaker::Pacemaker::builder()
+            .with_interval(DEFAULT_PACEMAKER_INTERVAL)
+            .with_sender(sender.clone())
+            .with_message_factory(|| PeerManagerMessage::RetryPending)
+            .start()
+            .map_err(|err| PeerManagerError::StartUpError(err.to_string()))?;
+
+        let pacemaker_shutdown_signaler = pacemaker.shutdown_signaler();
 
         let max_retry_attempts = self
             .max_retry_attempts
@@ -240,6 +246,8 @@ impl PeerManager {
                         err
                     );
                 }
+
+                pacemaker.await_shutdown();
             });
 
         match join_handle {
@@ -254,12 +262,9 @@ impl PeerManager {
             }
         }
 
-        self.pacemaker
-            .start(sender.clone(), || PeerManagerMessage::RetryPending)
-            .map_err(|err| PeerManagerError::StartUpError(err.to_string()))?;
-
         self.shutdown_handle = Some(ShutdownHandle {
             sender: sender.clone(),
+            pacemaker_shutdown_signaler,
         });
         self.sender = Some(sender.clone());
         Ok(PeerManagerConnector::new(sender))
@@ -295,10 +300,12 @@ impl PeerManager {
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<PeerManagerMessage>,
+    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
 }
 
 impl ShutdownHandle {
     pub fn shutdown(&self) {
+        self.pacemaker_shutdown_signaler.shutdown();
         if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
             warn!("PeerManager is no longer running");
         }
