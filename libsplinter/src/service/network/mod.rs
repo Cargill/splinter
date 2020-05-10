@@ -585,13 +585,27 @@ mod tests {
                 notification
             ),
         }
+
         let service_connector = service_conn_mgr.service_connector();
-        let service_connections = service_connector
+
+        let mut service_connections = service_connector
             .list_service_connections()
             .expect("Unable to list service_connections");
 
-        assert_eq!(vec!["service-id"], service_connections);
+        let remaining_attempts = 5;
+        // Wait for service_manager to handle the notification
+        for _ in 0..remaining_attempts {
+            if !service_connections.is_empty() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
 
+            service_connections = service_connector
+                .list_service_connections()
+                .expect("Unable to list service_connections");
+        }
+
+        assert_eq!(vec!["service-id"], service_connections);
         let connection_id = service_connector
             .get_connection_id("service-id")
             .expect("Unable to get the connection_id");
