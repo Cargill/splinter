@@ -13,9 +13,7 @@
 // limitations under the License.
 
 mod bi_hash_map;
-#[cfg(feature = "network-ref-map")]
 mod ref_map;
 
 pub use bi_hash_map::BiHashMap;
-#[cfg(feature = "network-ref-map")]
 pub(crate) use ref_map::RefMap;

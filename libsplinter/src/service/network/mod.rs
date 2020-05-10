@@ -571,15 +571,41 @@ mod tests {
             .expect("Unable to add inbound connection");
 
         // wait to receive the notification
-        subscriber.next().unwrap();
+        let notification = subscriber.next().unwrap();
+        match notification {
+            ConnectionManagerNotification::InboundConnection {
+                endpoint, identity, ..
+            } => {
+                assert_eq!(endpoint, "inproc://test_service_connected".to_string());
+                assert_eq!(identity, "service-id".to_string());
+            }
+            _ => panic!(
+                "Received {:?} but should have been \
+                ConnectionManagerNotification::InboundConnection",
+                notification
+            ),
+        }
 
         let service_connector = service_conn_mgr.service_connector();
-        let service_connections = service_connector
+
+        let mut service_connections = service_connector
             .list_service_connections()
             .expect("Unable to list service_connections");
 
-        assert_eq!(vec!["service-id"], service_connections);
+        let remaining_attempts = 5;
+        // Wait for service_manager to handle the notification
+        for _ in 0..remaining_attempts {
+            if !service_connections.is_empty() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
 
+            service_connections = service_connector
+                .list_service_connections()
+                .expect("Unable to list service_connections");
+        }
+
+        assert_eq!(vec!["service-id"], service_connections);
         let connection_id = service_connector
             .get_connection_id("service-id")
             .expect("Unable to get the connection_id");
