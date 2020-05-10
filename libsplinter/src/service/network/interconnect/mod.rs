@@ -486,15 +486,15 @@ pub mod tests {
         let mesh1 = Mesh::new(512, 128);
         let mesh2 = Mesh::new(512, 128);
 
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test-service")),
-            mesh1.get_life_cycle(),
-            mesh1.get_sender(),
-            Box::new(transport.clone()),
-            Some(1),
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test-service")))
+            .with_matrix_life_cycle(mesh1.get_life_cycle())
+            .with_matrix_sender(mesh1.get_sender())
+            .with_transport(Box::new(transport.clone()))
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         let service_conn_mgr = ServiceConnectionManager::builder()
             .with_connector(connector.clone())
@@ -577,7 +577,7 @@ pub mod tests {
         join_handle.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
         dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
@@ -592,15 +592,15 @@ pub mod tests {
         let transport = Box::new(InprocTransport::default());
         let mesh = Mesh::new(512, 128);
 
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test-service")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            Some(1),
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test-service")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         let service_conn_mgr = ServiceConnectionManager::builder()
             .with_connector(connector.clone())
@@ -617,7 +617,7 @@ pub mod tests {
             .expect("Unable to build ServiceInterconnect");
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();

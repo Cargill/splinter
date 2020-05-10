@@ -129,17 +129,17 @@ impl ServiceConnectionManager {
     /// # use splinter::transport::inproc::InprocTransport;
     /// # let transport = InprocTransport::default();
     /// # let mesh = Mesh::new(1, 1);
-    /// # let authorization_pool = AuthorizationManager::new("test_identity".into()).unwrap();
-    /// # let authorizer = Box::new(authorization_pool.authorization_connector());
-    /// let mut cm = ConnectionManager::new(
-    ///     authorizer,
-    ///     mesh.get_life_cycle(),
-    ///     mesh.get_sender(),
-    ///     Box::new(transport),
-    ///     None,
-    ///     None,
-    /// );
-    /// let connector = cm.start().expect("Unable to start Connection Manager");
+    /// # let auth_mgr = AuthorizationManager::new("test_identity".into()).unwrap();
+    /// # let authorizer: Box<dyn Authorizer + Send> = Box::new(auth_mgr.authorization_connector());
+    /// let mut cm = ConnectionManager::builder()
+    ///     .with_authorizer(authorizer)
+    ///     .with_matrix_life_cycle(mesh.get_life_cycle())
+    ///     .with_matrix_sender(mesh.get_sender())
+    ///     .with_transport(Box::new(transport))
+    ///     .start()
+    ///     .expect("Unable to start Connection Manager");
+    ///
+    /// let connector = cm.connector();
     ///
     /// let service_connection_manager = ServiceConnectionManager::builder()
     ///     .with_connector(connector)
@@ -537,15 +537,15 @@ mod tests {
         let mut listener = transport.listen("inproc://test_service_connected").unwrap();
 
         let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("service-id")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            Box::new(transport.clone()),
-            None,
-            None,
-        );
-        let connector = cm.start().expect("Unable to start Connection Manager");
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("service-id")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(Box::new(transport.clone()))
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
         let (subs_tx, subs_rx) = mpsc::channel();
         connector
             .subscribe(subs_tx)
@@ -625,7 +625,7 @@ mod tests {
         jh.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
