@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::borrow::Borrow;
-use std::collections::hash_map::{Iter, Keys, Values};
+use std::collections::hash_map::Keys;
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -35,57 +35,8 @@ where
         }
     }
 
-    pub fn with_capacity(capacity: usize) -> Self {
-        BiHashMap {
-            kv_hash_map: HashMap::with_capacity(capacity),
-            vk_hash_map: HashMap::with_capacity(capacity),
-        }
-    }
-
-    pub fn capacity(&self) -> usize {
-        // both maps should have the same capacity
-        self.kv_hash_map.capacity()
-    }
-
-    pub fn reserve(&mut self, additional: usize) {
-        self.kv_hash_map.reserve(additional);
-        self.vk_hash_map.reserve(additional);
-    }
-
-    pub fn shrink_to_fit(&mut self) {
-        self.kv_hash_map.shrink_to_fit();
-        self.vk_hash_map.shrink_to_fit();
-    }
-
     pub fn keys(&self) -> Keys<K, V> {
         self.kv_hash_map.keys()
-    }
-
-    pub fn values(&self) -> Values<K, V> {
-        self.kv_hash_map.values()
-    }
-
-    pub fn iter_by_keys(&self) -> Iter<K, V> {
-        self.kv_hash_map.iter()
-    }
-
-    pub fn iter_by_values(&self) -> Iter<V, K> {
-        self.vk_hash_map.iter()
-    }
-
-    pub fn len(&self) -> usize {
-        // both maps should be the same size
-        self.kv_hash_map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        // both maps will be empty or not
-        self.kv_hash_map.is_empty()
-    }
-
-    pub fn clear(&mut self) {
-        self.kv_hash_map.clear();
-        self.vk_hash_map.clear();
     }
 
     pub fn get_by_key<Q: ?Sized>(&self, key: &Q) -> Option<&V>
@@ -102,22 +53,6 @@ where
         VQ: Hash + Eq,
     {
         self.vk_hash_map.get(value)
-    }
-
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq,
-    {
-        self.kv_hash_map.contains_key(key)
-    }
-
-    pub fn contains_value<VQ: ?Sized>(&self, value: &VQ) -> bool
-    where
-        V: Borrow<VQ>,
-        VQ: Hash + Eq,
-    {
-        self.vk_hash_map.contains_key(value)
     }
 
     // return any overridden values, always in (key, value) format
@@ -143,6 +78,7 @@ where
         None
     }
 
+    #[cfg(test)]
     // If the value is in the map, the removed key and value is returned otherwise None
     pub fn remove_by_value<VQ: ?Sized>(&mut self, value: &VQ) -> Option<(K, V)>
     where
@@ -165,39 +101,6 @@ pub mod tests {
     use super::*;
 
     #[test]
-    fn test_capacity() {
-        let map: BiHashMap<String, usize> = BiHashMap::new();
-        let capacity = map.capacity();
-        assert_eq!(capacity, 0);
-
-        let map_with_capacity: BiHashMap<String, usize> = BiHashMap::with_capacity(5);
-        let capacity = map_with_capacity.capacity();
-        assert!(capacity >= 5);
-    }
-
-    #[test]
-    fn test_reserve() {
-        let mut map: BiHashMap<String, usize> = BiHashMap::new();
-        let capacity = map.capacity();
-        assert_eq!(capacity, 0);
-
-        map.reserve(5);
-        let capacity = map.capacity();
-        assert!(capacity >= 5);
-    }
-
-    #[test]
-    fn test_shrink_to_fit() {
-        let mut map: BiHashMap<String, usize> = BiHashMap::with_capacity(100);
-        let capacity = map.capacity();
-        assert!(capacity >= 100);
-
-        map.shrink_to_fit();
-        let capacity = map.capacity();
-        assert_eq!(capacity, 0);
-    }
-
-    #[test]
     fn test_insert() {
         let mut map: BiHashMap<String, usize> = BiHashMap::new();
         assert_eq!((None, None), map.insert("ONE".to_string(), 1));
@@ -213,7 +116,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_keys_and_values() {
+    fn test_keys() {
         let mut map: BiHashMap<String, usize> = BiHashMap::new();
         map.insert("ONE".to_string(), 1);
         map.insert("TWO".to_string(), 2);
@@ -225,50 +128,6 @@ pub mod tests {
             keys,
             ["ONE".to_string(), "THREE".to_string(), "TWO".to_string()]
         );
-
-        let mut values: Vec<usize> = map.values().map(|value| value.clone()).collect();
-        values.sort();
-        assert_eq!(values, [1, 2, 3])
-    }
-
-    #[test]
-    fn test_iter_keys_and_values() {
-        let mut map: BiHashMap<String, usize> = BiHashMap::new();
-        map.insert("ONE".to_string(), 1);
-        map.insert("TWO".to_string(), 2);
-        map.insert("THREE".to_string(), 3);
-        let keys = vec!["ONE".to_string(), "THREE".to_string(), "TWO".to_string()];
-        let values = vec![1, 2, 3];
-
-        for (key, value) in map.iter_by_keys() {
-            assert!(keys.contains(key));
-            assert!(values.contains(value));
-        }
-
-        for (value, key) in map.iter_by_values() {
-            assert!(keys.contains(key));
-            assert!(values.contains(value));
-        }
-    }
-
-    #[test]
-    fn test_clear_and_is_empty() {
-        let mut map: BiHashMap<String, usize> = BiHashMap::new();
-
-        assert_eq!(map.len(), 0);
-        assert!(map.is_empty());
-
-        map.insert("ONE".to_string(), 1);
-        map.insert("TWO".to_string(), 2);
-        map.insert("THREE".to_string(), 3);
-
-        assert_eq!(map.len(), 3);
-        assert!(!map.is_empty());
-
-        map.clear();
-
-        assert_eq!(map.len(), 0);
-        assert!(map.is_empty());
     }
 
     #[test]
@@ -287,18 +146,6 @@ pub mod tests {
         assert_eq!(map.get_by_value(&2), Some(&"TWO".to_string()));
         assert_eq!(map.get_by_value(&3), Some(&"THREE".to_string()));
         assert_eq!(map.get_by_value(&4), None);
-    }
-
-    #[test]
-    fn test_contains_key_and_value() {
-        let mut map: BiHashMap<String, usize> = BiHashMap::new();
-        map.insert("ONE".to_string(), 1);
-
-        assert!(map.contains_key("ONE"));
-        assert!(map.contains_value(&1));
-
-        assert!(!map.contains_key("TWO"));
-        assert!(!map.contains_value(&2));
     }
 
     #[test]
