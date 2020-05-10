@@ -23,15 +23,11 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender};
-use protobuf::Message;
 use uuid::Uuid;
 
 use crate::channel;
 use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError};
 use crate::network::reply::InboundRouter;
-use crate::protos::authorization::{
-    AuthorizationMessage, AuthorizationMessageType, ConnectRequest, ConnectRequest_HandshakeMode,
-};
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitError, CircuitMessage, CircuitMessageType,
     ServiceConnectResponse, ServiceDisconnectResponse,
@@ -98,19 +94,6 @@ impl ServiceOrchestrator {
         let (inbound_sender, inbound_receiver) = crossbeam_channel::bounded(channel_capacity);
         let inbound_router = InboundRouter::new(Box::new(inbound_sender));
         let running = Arc::new(AtomicBool::new(true));
-
-        // Start the authorization process with the splinter node.
-        // If running over inproc connection, this is the only authorization message required.
-        let connect_request =
-            create_connect_request().map_err(|err| NewOrchestratorError(Box::new(err)))?;
-        mesh.send(Envelope::new(mesh_id.to_string(), connect_request))
-            .map_err(|err| NewOrchestratorError(Box::new(err)))?;
-
-        // Wait for the auth response.  Currently, this is on an inproc transport, so this will be
-        // an "ok" response
-        let _authed_response = mesh
-            .recv()
-            .map_err(|err| NewOrchestratorError(Box::new(err)))?;
 
         debug!("Orchestrator authorized");
 
@@ -379,22 +362,6 @@ impl<T> JoinHandles<T> {
 
         Ok(res)
     }
-}
-
-/// Helper function to build a ConnectRequest
-fn create_connect_request() -> Result<Vec<u8>, protobuf::ProtobufError> {
-    let mut connect_request = ConnectRequest::new();
-    connect_request.set_handshake_mode(ConnectRequest_HandshakeMode::UNIDIRECTIONAL);
-
-    let mut auth_msg_env = AuthorizationMessage::new();
-    auth_msg_env.set_message_type(AuthorizationMessageType::CONNECT_REQUEST);
-    auth_msg_env.set_payload(connect_request.write_to_bytes()?);
-
-    let mut network_msg = NetworkMessage::new();
-    network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-    network_msg.set_payload(auth_msg_env.write_to_bytes()?);
-
-    network_msg.write_to_bytes()
 }
 
 pub fn run_incoming_loop(

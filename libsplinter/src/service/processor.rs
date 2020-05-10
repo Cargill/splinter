@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crossbeam_channel::{Receiver, Sender};
-use protobuf::Message;
 use uuid::Uuid;
 
 use std::collections::HashMap;
@@ -25,9 +24,6 @@ use std::time::Duration;
 use crate::channel;
 use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError};
 use crate::network::reply::InboundRouter;
-use crate::protos::authorization::{
-    AuthorizationMessage, AuthorizationMessageType, ConnectRequest, ConnectRequest_HandshakeMode,
-};
 use crate::protos::circuit::{
     AdminDirectMessage, CircuitDirectMessage, CircuitError, CircuitMessage, CircuitMessageType,
     ServiceConnectResponse, ServiceDisconnectResponse,
@@ -151,24 +147,6 @@ impl ServiceProcessor {
         ),
         ServiceProcessorError,
     > {
-        // Starts the authorization process with the splinter node
-        // If running over inproc connection, this is the only authorization message required
-        let connect_request = create_connect_request()
-            .map_err(|err| process_err!(err, "unable to create connect request"))?;
-        self.mesh
-            .send(Envelope::new(
-                self.node_mesh_id.to_string(),
-                connect_request,
-            ))
-            .map_err(|err| process_err!(err, "unable to send connect request"))?;
-
-        // Wait for the auth response.  Currently, this is on an inproc transport, so this will be
-        // an "ok" response
-        let _authed_response = self
-            .mesh
-            .recv()
-            .map_err(|err| process_err!(err, "Unable to receive auth response"))?;
-
         for service in self.services.into_iter() {
             let mut shared_state = rwlock_write_unwrap!(self.shared_state);
             let service_id = service.service_id().to_string();
@@ -597,22 +575,6 @@ fn handle_admin_direct_msg(
     Ok(())
 }
 
-/// Helper function to build a ConnectRequest
-fn create_connect_request() -> Result<Vec<u8>, protobuf::ProtobufError> {
-    let mut connect_request = ConnectRequest::new();
-    connect_request.set_handshake_mode(ConnectRequest_HandshakeMode::UNIDIRECTIONAL);
-
-    let mut auth_msg_env = AuthorizationMessage::new();
-    auth_msg_env.set_message_type(AuthorizationMessageType::CONNECT_REQUEST);
-    auth_msg_env.set_payload(connect_request.write_to_bytes()?);
-
-    let mut network_msg = NetworkMessage::new();
-    network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-    network_msg.set_payload(auth_msg_env.write_to_bytes()?);
-
-    network_msg.write_to_bytes()
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -620,11 +582,10 @@ pub mod tests {
     use std::any::Any;
     use std::thread;
 
+    use protobuf::Message;
+
     use crate::network::Network;
-    use crate::protos::{
-        authorization::AuthorizedMessage,
-        circuit::{ServiceConnectRequest, ServiceConnectResponse_Status},
-    };
+    use crate::protos::circuit::{ServiceConnectRequest, ServiceConnectResponse_Status};
     use crate::service::error::{
         ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
     };
@@ -668,18 +629,6 @@ pub mod tests {
         network
             .add_peer("service_processor".to_string(), connection)
             .unwrap();
-
-        // Receive connect request from service
-        let auth_response = get_auth_msg(network.recv().unwrap().payload().to_vec());
-        assert_eq!(
-            auth_response.get_message_type(),
-            AuthorizationMessageType::CONNECT_REQUEST
-        );
-
-        // Send authorized response
-        network
-            .send("service_processor", &authorized_response())
-            .expect("Unable to send authorized response");
 
         // Receive service connect request and respond with ServiceConnectionResposne with status
         // OK
@@ -768,18 +717,6 @@ pub mod tests {
         network
             .add_peer("service_processor".to_string(), connection)
             .unwrap();
-
-        // Receive connect request from service
-        let auth_request = get_auth_msg(network.recv().unwrap().payload().to_vec());
-        assert_eq!(
-            auth_request.get_message_type(),
-            AuthorizationMessageType::CONNECT_REQUEST
-        );
-
-        // Send authorized response
-        network
-            .send("service_processor", &authorized_response())
-            .expect("Unable to send authorized response");
 
         // Receive service connect request and respond with ServiceConnectionResposne with status
         // OK
@@ -1087,13 +1024,6 @@ pub mod tests {
         Ok(msg)
     }
 
-    fn get_auth_msg(network_msg_bytes: Vec<u8>) -> AuthorizationMessage {
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&network_msg_bytes).unwrap();
-        let auth_msg: AuthorizationMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
-        auth_msg
-    }
-
     fn get_service_connect(network_msg_bytes: Vec<u8>) -> ServiceConnectRequest {
         let network_msg: NetworkMessage = protobuf::parse_from_bytes(&network_msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
@@ -1119,25 +1049,5 @@ pub mod tests {
         let direct_message: AdminDirectMessage =
             protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
         direct_message
-    }
-
-    fn authorized_response() -> Vec<u8> {
-        let msg_type = AuthorizationMessageType::AUTHORIZE;
-        let auth_msg = AuthorizedMessage::new();
-        let mut auth_msg_env = AuthorizationMessage::new();
-        auth_msg_env.set_message_type(msg_type);
-        auth_msg_env.set_payload(auth_msg.write_to_bytes().expect("unable to write to bytes"));
-
-        let mut network_msg = NetworkMessage::new();
-        network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-        network_msg.set_payload(
-            auth_msg_env
-                .write_to_bytes()
-                .expect("unable to write to bytes"),
-        );
-
-        network_msg
-            .write_to_bytes()
-            .expect("unable to write to bytes")
     }
 }
