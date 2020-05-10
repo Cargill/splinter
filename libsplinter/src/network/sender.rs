@@ -28,7 +28,6 @@ pub struct NetworkMessageSender {
 }
 
 impl NetworkMessageSender {
-    #[cfg(feature = "network-peer-manager")]
     pub(in crate::network) fn new(sender: Sender<SendRequest>) -> Self {
         NetworkMessageSender { sender }
     }

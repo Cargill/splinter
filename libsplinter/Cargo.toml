@@ -100,7 +100,6 @@ experimental = [
     "biome-notifications",
     "biome-user",
     "circuit-template",
-    "network-peer-manager",
     "service-arg-validation",
     "service-network",
     "ws-transport",
@@ -114,7 +113,6 @@ biome-notifications = ["biome"]
 biome-user = ["biome"]
 circuit-template = []
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
-network-peer-manager = []
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
 registry-remote = ["reqwest", "registry"]
