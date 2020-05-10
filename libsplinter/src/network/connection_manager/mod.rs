@@ -25,7 +25,7 @@ use std::time::Instant;
 use uuid::Uuid;
 
 pub use error::{AuthorizerError, ConnectionManagerError};
-pub use notification::{ConnectionManagerNotification, NotificationIter};
+pub use notification::ConnectionManagerNotification;
 use protobuf::Message;
 
 use crate::protos::network::{NetworkHeartbeat, NetworkMessage, NetworkMessageType};
@@ -346,19 +346,6 @@ impl Connector {
                 "The connection manager is no longer running".into(),
             )
         })?
-    }
-
-    /// Create an iterator over ConnectionManagerNotification events.
-    ///
-    /// # Errors
-    ///
-    /// Return a ConnectionManagerError if the notification iterator cannot be created.
-    pub fn subscription_iter(&self) -> Result<NotificationIter, ConnectionManagerError> {
-        let (send, recv) = channel();
-
-        self.subscribe(send)?;
-
-        Ok(NotificationIter { recv })
     }
 
     /// Subscribe to notifications for connection events.
@@ -1481,14 +1468,15 @@ mod tests {
                 }
         );
 
-        let mut subscriber = connector
-            .subscription_iter()
-            .expect("Cannot get subscriber");
+        let (subs_tx, subs_rx) = mpsc::channel();
+        connector.subscribe(subs_tx).expect("Cannot subscribe");
+        let mut subscriber = subs_rx.iter();
 
         // receive reconnecting attempt
-        let reconnecting_notification = subscriber
+        let reconnecting_notification: ConnectionManagerNotification = subscriber
             .next()
             .expect("Cannot get message from subscriber");
+
         assert!(
             reconnecting_notification
                 == ConnectionManagerNotification::Disconnected {
@@ -1551,16 +1539,16 @@ mod tests {
         });
         let connector = cm.start().expect("Unable to start ConnectionManager");
 
-        let mut subscriber = connector
-            .subscription_iter()
-            .expect("Cannot get subscriber");
+        let (subs_tx, subs_rx) = mpsc::channel();
+        connector.subscribe(subs_tx).expect("Cannot get subscriber");
 
         let connection = listener.accept().unwrap();
         connector
             .add_inbound_connection(connection)
             .expect("Unable to add inbound connection");
 
-        let notification = subscriber
+        let notification = subs_rx
+            .iter()
             .next()
             .expect("Cannot get message from subscriber");
         if let ConnectionManagerNotification::InboundConnection { endpoint, .. } = notification {
@@ -1629,9 +1617,8 @@ mod tests {
         });
         let connector = cm.start().expect("Unable to start ConnectionManager");
 
-        let mut subscriber = connector
-            .subscription_iter()
-            .expect("Cannot get subscriber");
+        let (subs_tx, subs_rx) = mpsc::channel();
+        connector.subscribe(subs_tx).expect("Cannot get subscriber");
 
         let connection = listener.accept().unwrap();
         let remote_endpoint = connection.remote_endpoint();
@@ -1639,7 +1626,8 @@ mod tests {
             .add_inbound_connection(connection)
             .expect("Unable to add inbound connection");
 
-        let notification = subscriber
+        let notification = subs_rx
+            .iter()
             .next()
             .expect("Cannot get message from subscriber");
 

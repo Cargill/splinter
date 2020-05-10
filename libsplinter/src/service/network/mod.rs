@@ -515,6 +515,7 @@ mod tests {
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError, ConnectionManager,
+        ConnectionManagerNotification,
     };
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
@@ -545,8 +546,9 @@ mod tests {
             None,
         );
         let connector = cm.start().expect("Unable to start Connection Manager");
-        let mut subscriber = connector
-            .subscription_iter()
+        let (subs_tx, subs_rx) = mpsc::channel();
+        connector
+            .subscribe(subs_tx)
             .expect("Unable to get subscriber");
 
         let (conn_tx, conn_rx) = mpsc::channel();
@@ -571,7 +573,7 @@ mod tests {
             .expect("Unable to add inbound connection");
 
         // wait to receive the notification
-        let notification = subscriber.next().unwrap();
+        let notification: ConnectionManagerNotification = subs_rx.recv().unwrap();
         match notification {
             ConnectionManagerNotification::InboundConnection {
                 endpoint, identity, ..
