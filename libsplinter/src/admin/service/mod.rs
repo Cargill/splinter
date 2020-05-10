@@ -239,7 +239,9 @@ impl AdminService {
     /// circuits should be initialized using the service orchestrator. This may not include all
     /// services if they are not supported locally. It is expected that some services will be
     /// started externally.
-    fn restart_services(&self) -> Result<(), ServiceStartError> {
+    ///
+    /// Also adds peer references for members of the circuits and proposals.
+    fn re_initialize_circuits(&self) -> Result<(), ServiceStartError> {
         let circuits = self
             .admin_service_shared
             .lock()
@@ -249,12 +251,40 @@ impl AdminService {
             .get_circuits()
             .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
 
+        let nodes = self
+            .admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .get_nodes()
+            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+
         let orchestrator = self.orchestrator.lock().map_err(|_| {
             ServiceStartError::PoisonedLock("the admin orchestrator lock was poisoned".into())
         })?;
-
+        let mut peer_refs = vec![];
         // start all services of the supported types
         for (circuit_name, circuit) in circuits.iter() {
+            // restart all peer in the circuit
+            for member in circuit.members() {
+                if member != &self.node_id {
+                    if let Some(node) = nodes.get(member) {
+                        let peer_ref = self
+                            .peer_connector
+                            .add_peer_ref(member.to_string(), node.endpoints().to_vec());
+
+                        if let Ok(peer_ref) = peer_ref {
+                            peer_refs.push(peer_ref);
+                        } else {
+                            info!("Unable to peer with {} at this time", member);
+                        }
+                    } else {
+                        error!("Missing node information for {}", member);
+                    }
+                }
+            }
+
             // Get all services this node is allowed to run and the orchestrator has a factory for
             let services = circuit
                 .roster()
@@ -294,6 +324,37 @@ impl AdminService {
             }
         }
 
+        let proposals = self
+            .admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .get_proposals();
+
+        for (_, proposal) in proposals.iter() {
+            // restart all peer in the circuit
+            for member in proposal.circuit.members.iter() {
+                if member.node_id != self.node_id {
+                    let peer_ref = self
+                        .peer_connector
+                        .add_peer_ref(member.node_id.to_string(), member.endpoints.to_vec());
+
+                    if let Ok(peer_ref) = peer_ref {
+                        peer_refs.push(peer_ref);
+                    } else {
+                        info!("Unable to peer with {} at this time", member.node_id);
+                    }
+                }
+            }
+        }
+
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .add_peer_refs(peer_refs);
         Ok(())
     }
 }
@@ -343,7 +404,7 @@ impl Service for AdminService {
             })?
             .set_proposal_sender(Some(proposal_sender));
 
-        self.restart_services()?;
+        self.re_initialize_circuits()?;
 
         self.admin_service_shared
             .lock()
