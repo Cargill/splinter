@@ -31,6 +31,10 @@ impl MultiTransport {
     pub fn new(transports: Vec<SendableTransport>) -> Self {
         Self { transports }
     }
+
+    pub fn add_transport(&mut self, transport: SendableTransport) {
+        self.transports.push(transport)
+    }
 }
 
 impl Transport for MultiTransport {

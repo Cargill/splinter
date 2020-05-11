@@ -24,6 +24,7 @@ use std::any::Any;
 #[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 use openssl::hash::{hash, MessageDigest};
@@ -33,10 +34,7 @@ use crate::circuit::SplinterState;
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
-use crate::network::{
-    auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
-    peer::PeerConnector,
-};
+use crate::network::peer_manager::{PeerManagerConnector, PeerManagerNotification};
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 use crate::protos::admin::{
@@ -150,6 +148,7 @@ pub struct AdminService {
     /// The coordinator timeout for the two-phase commit consensus engine
     coordinator_timeout: Duration,
     consensus: Option<AdminConsensusManager>,
+    peer_connector: PeerManagerConnector,
 }
 
 impl AdminService {
@@ -161,8 +160,7 @@ impl AdminService {
             String,
             Box<dyn ServiceArgValidator + Send>,
         >,
-        peer_connector: PeerConnector,
-        authorization_inquistor: Box<dyn AuthorizationInquisitor>,
+        peer_connector: PeerManagerConnector,
         splinter_state: SplinterState,
         signature_verifier: Box<dyn SignatureVerifier + Send>,
         key_verifier: Box<dyn AdminKeyVerifier>,
@@ -172,10 +170,13 @@ impl AdminService {
         // The coordinator timeout for the two-phase commit consensus engine; if `None`, the
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
-    ) -> Result<Self, ServiceError> {
+    ) -> Result<(Self, thread::JoinHandle<()>), ServiceError> {
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
         let orchestrator = Arc::new(Mutex::new(orchestrator));
+        let mut subscriber = peer_connector
+            .subscribe()
+            .map_err(|err| ServiceError::UnableToCreate(Box::new(err)))?;
 
         let new_service = Self {
             service_id: admin_service_id(node_id),
@@ -185,8 +186,7 @@ impl AdminService {
                 orchestrator.clone(),
                 #[cfg(feature = "service-arg-validation")]
                 service_arg_validators,
-                peer_connector,
-                authorization_inquistor,
+                peer_connector.clone(),
                 splinter_state,
                 signature_verifier,
                 key_verifier,
@@ -197,39 +197,32 @@ impl AdminService {
             orchestrator,
             coordinator_timeout,
             consensus: None,
+            peer_connector,
         };
 
-        let auth_callback_shared = Arc::clone(&new_service.admin_service_shared);
+        let peer_admin_shared = new_service.admin_service_shared.clone();
 
-        new_service
-            .admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceError::PoisonedLock(
-                    "The lock was poisoned while creating the service".into(),
-                )
-            })?
-            .auth_inquisitor()
-            .register_callback(Box::new(
-                move |peer_id: &str, state: PeerAuthorizationState| {
-                    let result = auth_callback_shared
-                        .lock()
-                        .map_err(|_| {
-                            AuthorizationCallbackError(
-                                "admin service shared lock was poisoned".into(),
-                            )
-                        })?
-                        .on_authorization_change(peer_id, state);
-                    if let Err(err) = result {
-                        error!("{}", err);
+        let notification_join_handle = thread::Builder::new()
+            .name("PeerManagerNotification Receiver".into())
+            .spawn(move || loop {
+                let notification = match subscriber.next() {
+                    Some(notification) => notification,
+                    None => {
+                        warn!("PeerManager has shutdown");
+                        break;
                     }
+                };
 
-                    Ok(())
-                },
-            ))
+                if let Ok(mut admin_shared) = peer_admin_shared.lock() {
+                    handle_peer_manager_notification(notification, &mut *admin_shared);
+                } else {
+                    error!("the admin shared lock was poisoned");
+                    break;
+                }
+            })
             .map_err(|err| ServiceError::UnableToCreate(Box::new(err)))?;
 
-        Ok(new_service)
+        Ok((new_service, notification_join_handle))
     }
 
     pub fn commands(&self) -> impl AdminCommands + Clone {
@@ -246,7 +239,9 @@ impl AdminService {
     /// circuits should be initialized using the service orchestrator. This may not include all
     /// services if they are not supported locally. It is expected that some services will be
     /// started externally.
-    fn restart_services(&self) -> Result<(), ServiceStartError> {
+    ///
+    /// Also adds peer references for members of the circuits and proposals.
+    fn re_initialize_circuits(&self) -> Result<(), ServiceStartError> {
         let circuits = self
             .admin_service_shared
             .lock()
@@ -256,12 +251,40 @@ impl AdminService {
             .get_circuits()
             .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
 
+        let nodes = self
+            .admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .get_nodes()
+            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+
         let orchestrator = self.orchestrator.lock().map_err(|_| {
             ServiceStartError::PoisonedLock("the admin orchestrator lock was poisoned".into())
         })?;
-
+        let mut peer_refs = vec![];
         // start all services of the supported types
         for (circuit_name, circuit) in circuits.iter() {
+            // restart all peer in the circuit
+            for member in circuit.members() {
+                if member != &self.node_id {
+                    if let Some(node) = nodes.get(member) {
+                        let peer_ref = self
+                            .peer_connector
+                            .add_peer_ref(member.to_string(), node.endpoints().to_vec());
+
+                        if let Ok(peer_ref) = peer_ref {
+                            peer_refs.push(peer_ref);
+                        } else {
+                            info!("Unable to peer with {} at this time", member);
+                        }
+                    } else {
+                        error!("Missing node information for {}", member);
+                    }
+                }
+            }
+
             // Get all services this node is allowed to run and the orchestrator has a factory for
             let services = circuit
                 .roster()
@@ -301,6 +324,37 @@ impl AdminService {
             }
         }
 
+        let proposals = self
+            .admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .get_proposals();
+
+        for (_, proposal) in proposals.iter() {
+            // restart all peer in the circuit
+            for member in proposal.circuit.members.iter() {
+                if member.node_id != self.node_id {
+                    let peer_ref = self
+                        .peer_connector
+                        .add_peer_ref(member.node_id.to_string(), member.endpoints.to_vec());
+
+                    if let Ok(peer_ref) = peer_ref {
+                        peer_refs.push(peer_ref);
+                    } else {
+                        info!("Unable to peer with {} at this time", member.node_id);
+                    }
+                }
+            }
+        }
+
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .add_peer_refs(peer_refs);
         Ok(())
     }
 }
@@ -350,7 +404,7 @@ impl Service for AdminService {
             })?
             .set_proposal_sender(Some(proposal_sender));
 
-        self.restart_services()?;
+        self.re_initialize_circuits()?;
 
         self.admin_service_shared
             .lock()
@@ -359,7 +413,6 @@ impl Service for AdminService {
             })?
             .add_services_to_directory()
             .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
-
         Ok(())
     }
 
@@ -523,6 +576,24 @@ impl Service for AdminService {
     }
 }
 
+fn handle_peer_manager_notification(
+    notification: PeerManagerNotification,
+    admin_shared: &mut AdminServiceShared,
+) {
+    match notification {
+        PeerManagerNotification::Connected { peer } => {
+            debug!("Peer {} has connected", peer);
+            if let Err(err) = admin_shared.on_peer_connected(&peer) {
+                error!("Error occurred while handling Connected: {}", err);
+            }
+        }
+        PeerManagerNotification::Disconnected { peer } => {
+            debug!("Peer {} has disconnected", peer);
+            admin_shared.on_peer_disconnected(peer);
+        }
+    }
+}
+
 #[derive(Clone)]
 struct AdminServiceCommands {
     shared: Arc<Mutex<AdminServiceShared>>,
@@ -620,28 +691,24 @@ fn supported_protocol_version(min: u32, max: u32) -> u32 {
 mod tests {
     use super::*;
 
-    use std::collections::VecDeque;
     use std::sync::mpsc::{channel, Sender};
     use std::time::{Duration, Instant};
 
     use crate::circuit::{directory::CircuitDirectory, SplinterState};
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
-    use crate::network::{auth::AuthorizationCallback, Network};
-    use crate::protos::{
-        admin,
-        authorization::{AuthorizationMessage, AuthorizationMessageType, AuthorizedMessage},
-        network::{NetworkMessage, NetworkMessageType},
-    };
+    use crate::network::auth2::AuthorizationManager;
+    use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
+    use crate::network::connection_manager::ConnectionManager;
+    use crate::network::peer_manager::PeerManager;
+    use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
     use crate::signing::{
         hash::{HashSigner, HashVerifier},
         Signer,
     };
     use crate::storage::get_storage;
-    use crate::transport::{
-        ConnectError, Connection, DisconnectError, RecvError, SendError, Transport,
-    };
+    use crate::transport::{inproc::InprocTransport, Transport};
 
     const PUB_KEY: &[u8] = &[
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -654,32 +721,61 @@ mod tests {
     /// messages.
     #[test]
     fn test_propose_circuit() {
-        let mesh = Mesh::new(4, 16);
-        let network = Network::new(mesh.clone(), 0).unwrap();
-        let mut transport = MockConnectingTransport::expect_connections(vec![
-            Ok(Box::new(MockConnection::new())),
-            Ok(Box::new(MockConnection::new())),
+        let mut transport = InprocTransport::default();
+        let mut orchestrator_transport = transport.clone();
+
+        let _listener = transport
+            .listen("inproc://otherplace:8000")
+            .expect("Unable to get listener");
+        let _orchestator_listener = transport
+            .listen("inproc://orchestator")
+            .expect("Unable to get listener");
+
+        let inproc_authorizer = InprocAuthorizer::new(vec![
+            (
+                "inproc://orchestator".to_string(),
+                "orchestator".to_string(),
+            ),
+            (
+                "inproc://otherplace:8000".to_string(),
+                "other-node".to_string(),
+            ),
         ]);
+
+        let authorization_manager = AuthorizationManager::new("test-node".into())
+            .expect("Unable to create authorization pool");
+        let mut authorizers = Authorizers::new();
+        authorizers.add_authorizer("inproc", inproc_authorizer);
+        authorizers.add_authorizer("", authorization_manager.authorization_connector());
+
+        let mesh = Mesh::new(2, 2);
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(authorizers))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(Box::new(transport.clone()))
+            .start()
+            .expect("Unable to start Connection Manager");
+        let connector = cm.connector();
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let peer_connector = peer_manager.start().expect("Cannot start PeerManager");
 
         let mut storage = get_storage("memory", CircuitDirectory::new).unwrap();
 
         let circuit_directory = storage.write().clone();
         let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let orchestrator_connection = transport
-            .connect("inproc://admin-service")
+        let orchestrator_connection = orchestrator_transport
+            .connect("inproc://orchestator")
             .expect("failed to create connection");
-        let orchestrator = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
+        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
 
-        let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
-        let mut admin_service = AdminService::new(
+        let (mut admin_service, _) = AdminService::new(
             "test-node".into(),
             orchestrator,
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier),
@@ -706,8 +802,8 @@ mod tests {
         proposed_circuit.set_comments("test circuit".into());
 
         proposed_circuit.set_members(protobuf::RepeatedField::from_vec(vec![
-            splinter_node("test-node", &["tcp://someplace:8000".into()]),
-            splinter_node("other-node", &["tcp://otherplace:8000".into()]),
+            splinter_node("test-node", &["inproc://someplace:8000".into()]),
+            splinter_node("other-node", &["inproc://otherplace:8000".into()]),
         ]));
         proposed_circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre", "test-node"),
@@ -720,7 +816,7 @@ mod tests {
         let mut header = admin::CircuitManagementPayload_Header::new();
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
         header.set_requester(PUB_KEY.into());
-        header.set_requester_node_id("test_node".to_string());
+        header.set_requester_node_id("test-node".to_string());
 
         let mut payload = admin::CircuitManagementPayload::new();
 
@@ -805,6 +901,11 @@ mod tests {
             proposed_circuit,
             envelope.take_circuit_create_request().take_circuit()
         );
+
+        peer_manager.shutdown_and_wait();
+        cm.shutdown_signaler().shutdown();
+        cm.await_shutdown();
+        mesh.shutdown_signaler().shutdown();
     }
 
     fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {
@@ -877,159 +978,6 @@ mod tests {
 
         fn clone_box(&self) -> Box<dyn ServiceNetworkSender> {
             Box::new(self.clone())
-        }
-    }
-
-    struct MockConnectingTransport {
-        connection_results: VecDeque<Result<Box<dyn Connection>, ConnectError>>,
-    }
-
-    impl MockConnectingTransport {
-        fn expect_connections(results: Vec<Result<Box<dyn Connection>, ConnectError>>) -> Self {
-            Self {
-                connection_results: results.into_iter().collect(),
-            }
-        }
-    }
-
-    impl Transport for MockConnectingTransport {
-        fn accepts(&self, _: &str) -> bool {
-            true
-        }
-
-        fn connect(&mut self, _: &str) -> Result<Box<dyn Connection>, ConnectError> {
-            self.connection_results
-                .pop_front()
-                .expect("No test result added to mock")
-        }
-
-        fn listen(
-            &mut self,
-            _: &str,
-        ) -> Result<Box<dyn crate::transport::Listener>, crate::transport::ListenError> {
-            panic!("MockConnectingTransport.listen unexpectedly called")
-        }
-    }
-
-    struct MockConnection {
-        auth_response: Option<Vec<u8>>,
-        evented: MockEvented,
-    }
-
-    impl MockConnection {
-        fn new() -> Self {
-            Self {
-                auth_response: Some(authorized_response()),
-                evented: MockEvented::new(),
-            }
-        }
-    }
-
-    impl Connection for MockConnection {
-        fn send(&mut self, _message: &[u8]) -> Result<(), SendError> {
-            Ok(())
-        }
-
-        fn recv(&mut self) -> Result<Vec<u8>, RecvError> {
-            Ok(self.auth_response.take().unwrap_or_else(|| vec![]))
-        }
-
-        fn remote_endpoint(&self) -> String {
-            String::from("MockConnection")
-        }
-
-        fn local_endpoint(&self) -> String {
-            String::from("MockConnection")
-        }
-
-        fn disconnect(&mut self) -> Result<(), DisconnectError> {
-            Ok(())
-        }
-
-        fn evented(&self) -> &dyn mio::Evented {
-            &self.evented
-        }
-    }
-
-    struct MockEvented {
-        registration: mio::Registration,
-        set_readiness: mio::SetReadiness,
-    }
-
-    impl MockEvented {
-        fn new() -> Self {
-            let (registration, set_readiness) = mio::Registration::new2();
-
-            Self {
-                registration,
-                set_readiness,
-            }
-        }
-    }
-
-    impl mio::Evented for MockEvented {
-        fn register(
-            &self,
-            poll: &mio::Poll,
-            token: mio::Token,
-            interest: mio::Ready,
-            opts: mio::PollOpt,
-        ) -> std::io::Result<()> {
-            self.registration.register(poll, token, interest, opts)?;
-            self.set_readiness.set_readiness(mio::Ready::readable())?;
-
-            Ok(())
-        }
-
-        fn reregister(
-            &self,
-            poll: &mio::Poll,
-            token: mio::Token,
-            interest: mio::Ready,
-            opts: mio::PollOpt,
-        ) -> std::io::Result<()> {
-            self.registration.reregister(poll, token, interest, opts)
-        }
-
-        fn deregister(&self, poll: &mio::Poll) -> std::io::Result<()> {
-            poll.deregister(&self.registration)
-        }
-    }
-
-    fn authorized_response() -> Vec<u8> {
-        let msg_type = AuthorizationMessageType::AUTHORIZE;
-        let auth_msg = AuthorizedMessage::new();
-        let mut auth_msg_env = AuthorizationMessage::new();
-        auth_msg_env.set_message_type(msg_type);
-        auth_msg_env.set_payload(auth_msg.write_to_bytes().expect("unable to write to bytes"));
-
-        let mut network_msg = NetworkMessage::new();
-        network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-        network_msg.set_payload(
-            auth_msg_env
-                .write_to_bytes()
-                .expect("unable to write to bytes"),
-        );
-
-        network_msg
-            .write_to_bytes()
-            .expect("unable to write to bytes")
-    }
-
-    struct MockAuthInquisitor;
-
-    impl AuthorizationInquisitor for MockAuthInquisitor {
-        fn is_authorized(&self, _: &str) -> bool {
-            true
-        }
-
-        fn register_callback(
-            &self,
-            _: Box<dyn AuthorizationCallback>,
-        ) -> Result<(), AuthorizationCallbackError> {
-            // The callback won't be called, as this test implementation indicates that all nodes
-            // are peered.
-            Ok(())
         }
     }
 

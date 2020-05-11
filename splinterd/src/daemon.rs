@@ -44,19 +44,21 @@ use splinter::circuit::{SplinterState, SplinterStateError};
 use splinter::database::{self, ConnectionPool};
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
-use splinter::network::auth::handlers::{
-    create_authorization_dispatcher, AuthorizationMessageHandler, NetworkAuthGuardHandler,
+use splinter::network::auth2::AuthorizationManager;
+use splinter::network::connection_manager::{
+    authorizers::Authorizers, authorizers::InprocAuthorizer, ConnectionManager, Connector,
 };
-use splinter::network::auth::AuthorizationManager;
-use splinter::network::dispatch::{DispatchLoopBuilder, DispatchMessageSender, Dispatcher};
+use splinter::network::dispatch::{
+    dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
+};
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::network::peer::PeerConnector;
-use splinter::network::{sender, sender::NetworkMessageSender};
-use splinter::network::{ConnectionError, Network, PeerUpdateError, RecvTimeoutError, SendError};
+use splinter::network::peer_manager::interconnect::PeerInterconnectBuilder;
+use splinter::network::peer_manager::PeerManager;
+use splinter::network::sender::NetworkMessageSender;
+use splinter::network::{ConnectionError, PeerUpdateError, SendError};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
-use splinter::protos::authorization::AuthorizationMessageType;
 use splinter::protos::circuit::CircuitMessageType;
-use splinter::protos::network::{NetworkMessage, NetworkMessageType};
+use splinter::protos::network::NetworkMessageType;
 use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
@@ -73,15 +75,11 @@ use splinter::service::{self, ServiceProcessor, ShutdownHandle};
 use splinter::signing::sawtooth::SawtoothSecp256k1SignatureVerifier;
 use splinter::storage::get_storage;
 use splinter::transport::{
-    multi::MultiTransport, AcceptError, ConnectError, Connection, Incoming, ListenError, Listener,
-    Transport,
+    inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
+    Incoming, ListenError, Listener, Transport,
 };
 
 use crate::routes;
-
-// Recv timeout in secs
-const TIMEOUT_SEC: u64 = 2;
-const INTERNAL_SERVICE_ADDRESS: &str = "inproc://internal-service";
 
 const ORCHESTRATOR_INCOMING_CAPACITY: usize = 8;
 const ORCHESTRATOR_OUTGOING_CAPACITY: usize = 8;
@@ -106,7 +104,7 @@ pub struct SplinterDaemon {
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
     initial_peers: Vec<String>,
-    network: Network,
+    mesh: Mesh,
     node_id: String,
     display_name: String,
     rest_api_endpoint: String,
@@ -121,12 +119,16 @@ pub struct SplinterDaemon {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    heartbeat: u64,
 }
 
 impl SplinterDaemon {
     pub fn start(&mut self, mut transport: MultiTransport) -> Result<(), StartError> {
         // Setup up ctrlc handling
         let running = Arc::new(AtomicBool::new(true));
+
+        let mut service_transport = InprocTransport::default();
+        transport.add_transport(Box::new(service_transport.clone()));
 
         // Load initial state from the configured storage type and state directory, then create the
         // new SplinterState from the retrieved circuit directory
@@ -173,62 +175,111 @@ impl SplinterDaemon {
             "Listening for service connections on {}",
             service_listener.endpoint()
         );
-        let internal_service_listener = transport.listen(INTERNAL_SERVICE_ADDRESS)?;
+        let mut internal_service_listeners = vec![];
+        internal_service_listeners.push(transport.listen("inproc://admin-service")?);
+        internal_service_listeners.push(transport.listen("inproc://orchestator")?);
+        #[cfg(feature = "health")]
+        internal_service_listeners.push(transport.listen("inproc://health_service")?);
+
+        info!("Starting SpinterNode with ID {}", self.node_id);
+        let authorization_manager =
+            AuthorizationManager::new(self.node_id.clone()).map_err(|err| {
+                StartError::NetworkError(format!("Unable to create authorization manager: {}", err))
+            })?;
+
+        // Allowing unused_mut because inproc_ids must be mutable if feature health is enabled
+        #[allow(unused_mut)]
+        let mut inproc_ids = vec![
+            (
+                "inproc://orchestator".to_string(),
+                format!("orchestator::{}", &self.node_id),
+            ),
+            (
+                "inproc://admin-service".to_string(),
+                admin_service_id(&self.node_id),
+            ),
+        ];
+
+        #[cfg(feature = "health")]
+        inproc_ids.push((
+            "inproc://health-service".to_string(),
+            format!("health::{}", &self.node_id),
+        ));
+
+        let inproc_authorizer = InprocAuthorizer::new(inproc_ids);
+
+        let mut authorizers = Authorizers::new();
+        authorizers.add_authorizer("inproc", inproc_authorizer);
+        authorizers.add_authorizer("", authorization_manager.authorization_connector());
+
+        let connection_manager = ConnectionManager::builder()
+            .with_authorizer(Box::new(authorizers))
+            .with_matrix_life_cycle(self.mesh.get_life_cycle())
+            .with_matrix_sender(self.mesh.get_sender())
+            .with_transport(Box::new(transport))
+            .with_heartbeat_interval(self.heartbeat)
+            .start()
+            .map_err(|err| {
+                StartError::NetworkError(format!("Unable to start connection manager: {}", err))
+            })?;
+        let connection_connector = connection_manager.connector();
+        let connection_manager_shutdown = connection_manager.shutdown_signaler();
+
+        let mut peer_manager = PeerManager::new(connection_connector.clone(), None, None);
+        let peer_connector = peer_manager.start().map_err(|err| {
+            StartError::NetworkError(format!("Unable to start peer manager: {}", err))
+        })?;
+        let peer_manager_shutdown = peer_manager.shutdown_handle();
 
         // Listen for services
         Self::listen_for_services(
-            self.network.clone(),
-            internal_service_listener,
-            vec![
-                format!("orchestator::{}", &self.node_id),
-                admin_service_id(&self.node_id),
-                format!("health::{}", &self.node_id),
-            ],
+            connection_connector.clone(),
+            internal_service_listeners,
             service_listener,
         );
 
         let orchestrator_connection =
-            transport.connect(INTERNAL_SERVICE_ADDRESS).map_err(|err| {
-                StartError::TransportError(format!(
-                    "unable to initiate orchestrator connection: {:?}",
-                    err
-                ))
-            })?;
+            service_transport
+                .connect("inproc://orchestator")
+                .map_err(|err| {
+                    StartError::TransportError(format!(
+                        "unable to initiate orchestrator connection: {:?}",
+                        err
+                    ))
+                })?;
 
         // set up inproc connections
-        let admin_connection = transport.connect(INTERNAL_SERVICE_ADDRESS).map_err(|err| {
-            StartError::AdminServiceError(format!(
-                "unable to initiate admin service connection: {:?}",
-                err
-            ))
-        })?;
-
-        #[cfg(feature = "health")]
-        let health_connection = transport.connect(INTERNAL_SERVICE_ADDRESS).map_err(|err| {
-            StartError::HealthServiceError(format!(
-                "unable to initiate health service connection: {:?}",
-                err
-            ))
-        })?;
-
-        let peer_connector = PeerConnector::new(self.network.clone(), Box::new(transport));
-        let auth_manager = AuthorizationManager::new(self.network.clone(), self.node_id.clone());
-
-        info!("Starting SpinterNode with ID {}", self.node_id);
-
-        let network_shutdown = self.network.shutdown_signaler();
-        let network = self.network.clone();
-        let network_message_queue = sender::Builder::new()
-            .with_network(network)
-            .build()
+        let admin_connection = service_transport
+            .connect("inproc://admin-service")
             .map_err(|err| {
-                StartError::NetworkError(format!(
-                    "Unable to create network message sender: {}",
+                StartError::AdminServiceError(format!(
+                    "unable to initiate admin service connection: {:?}",
                     err
                 ))
             })?;
-        let network_sender = network_message_queue.new_network_sender();
-        let sender_shutdown_signaler = network_message_queue.shutdown_signaler();
+
+        #[cfg(feature = "health")]
+        let health_connection = service_transport
+            .connect("inproc://health_service")
+            .map_err(|err| {
+                StartError::HealthServiceError(format!(
+                    "unable to initiate health service connection: {:?}",
+                    err
+                ))
+            })?;
+
+        let (network_dispatcher_sender, network_dispatch_receiver) = dispatch_channel();
+        let interconnect = PeerInterconnectBuilder::new()
+            .with_peer_connector(peer_connector.clone())
+            .with_message_receiver(self.mesh.get_receiver())
+            .with_message_sender(self.mesh.get_sender())
+            .with_network_dispatcher_sender(network_dispatcher_sender.clone())
+            .build()
+            .map_err(|err| {
+                StartError::NetworkError(format!("Unable to create peer interconnect: {}", err))
+            })?;
+
+        let network_sender = interconnect.new_network_sender();
 
         // Set up the Circuit dispatcher
         let circuit_dispatcher = set_up_circuit_dispatcher(
@@ -248,45 +299,28 @@ impl SplinterDaemon {
 
         let circuit_dispatcher_shutdown = circuit_dispatch_loop.shutdown_signaler();
 
-        // Set up the Auth dispatcher
-        let auth_dispatcher =
-            create_authorization_dispatcher(auth_manager.clone(), network_sender.clone());
-
-        let auth_dispatch_loop = DispatchLoopBuilder::new()
-            .with_dispatcher(auth_dispatcher)
-            .with_thread_name("AuthorizationDispatchLoop".to_string())
-            .build()
-            .map_err(|err| {
-                StartError::NetworkError(format!("Unable to create auth dispatch loop: {}", err))
-            })?;
-        let auth_dispatch_sender = auth_dispatch_loop.new_dispatcher_sender();
-        let auth_dispatcher_shutdown = auth_dispatch_loop.shutdown_signaler();
-
         // Set up the Network dispatcher
-        let network_dispatcher = set_up_network_dispatcher(
-            network_sender,
-            &self.node_id,
-            auth_manager.clone(),
-            circuit_dispatch_sender,
-            auth_dispatch_sender,
-        );
+        let network_dispatcher =
+            set_up_network_dispatcher(network_sender, &self.node_id, circuit_dispatch_sender);
+
         let network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(network_dispatcher)
             .with_thread_name("NetworkDispatchLoop".to_string())
+            .with_dispatch_channel((network_dispatcher_sender, network_dispatch_receiver))
             .build()
             .map_err(|err| {
                 StartError::NetworkError(format!("Unable to create network dispatch loop: {}", err))
             })?;
-
-        let network_dispatch_send = network_dispatch_loop.new_dispatcher_sender();
         let network_dispatcher_shutdown = network_dispatch_loop.shutdown_signaler();
+
+        let interconnect_shutdown_handle = interconnect.shutdown_handle();
 
         // setup threads to listen on the network ports and add incoming connections to the network
         // these threads will just be dropped on shutdown
         let _ = network_listeners
             .into_iter()
             .map(|mut network_listener| {
-                let network_clone = self.network.clone();
+                let connection_connector_clone = connection_connector.clone();
                 thread::spawn(move || {
                     for connection_result in network_listener.incoming() {
                         let connection = match connection_result {
@@ -304,90 +338,28 @@ impl SplinterDaemon {
                             }
                         };
                         debug!("Received connection from {}", connection.remote_endpoint());
-                        match network_clone.add_connection(connection) {
-                            Ok(peer_id) => debug!("Added connection with ID {}", peer_id),
-                            Err(err) => error!("Failed to add connection to network: {}", err),
-                        };
+                        connection_connector_clone
+                            .add_inbound_connection(connection)
+                            .map_err(|err| {
+                                StartError::NetworkError(format!(
+                                    "Unable to add inbound connection: {}",
+                                    err
+                                ))
+                            })?;
                     }
                     Ok(())
                 })
             })
             .collect::<Vec<_>>();
 
-        // For provided initial peers, try to connect to them
-        for peer in self.initial_peers.iter() {
-            if let Err(err) = peer_connector.connect_unidentified_peer(&peer) {
-                error!("Connect Error: {}", err);
+        for endpoint in self.initial_peers.iter() {
+            match peer_connector.add_unidentified_peer(endpoint.into()) {
+                Ok(_) => (),
+                Err(err) => error!("Connect Error: {}", err),
             }
         }
 
-        // For each node in the circuit_directory, try to connect and add them to the network
-        for (node_id, node) in state.nodes()?.iter() {
-            if node_id != &self.node_id {
-                if !node.endpoints().is_empty() {
-                    if let Err(err) = peer_connector.connect_peer(node_id, node.endpoints()) {
-                        debug!("Unable to connect to node: {} Error: {:?}", node_id, err);
-                    }
-                } else {
-                    debug!("node {} has no known endpoints", node_id);
-                }
-            }
-        }
-
-        let timeout = Duration::from_secs(TIMEOUT_SEC);
-
-        // start the recv loop
-        let main_loop_network = self.network.clone();
-        let main_loop_running = running.clone();
-        let main_loop_join_handle = thread::Builder::new()
-            .name("MainLoop".into())
-            .spawn(move || {
-                while main_loop_running.load(Ordering::SeqCst) {
-                    match main_loop_network.recv_timeout(timeout) {
-                        // This is where the message should be dispatched
-                        Ok(message) => {
-                            let mut msg: NetworkMessage =
-                                match protobuf::parse_from_bytes(message.payload()) {
-                                    Ok(msg) => msg,
-                                    Err(err) => {
-                                        warn!("Received invalid network message: {}", err);
-                                        continue;
-                                    }
-                                };
-
-                            trace!("Received message from {}: {:?}", message.peer_id(), msg);
-                            match network_dispatch_send.send(
-                                msg.get_message_type(),
-                                msg.take_payload(),
-                                message.peer_id().into(),
-                            ) {
-                                Ok(()) => (),
-                                Err((message_type, _, _)) => {
-                                    error!("Unable to dispatch message of type {:?}", message_type)
-                                }
-                            }
-                        }
-                        Err(RecvTimeoutError::Disconnected) => {
-                            // if the receiver has disconnected, shutdown
-                            warn!("Received Disconnected Error from Network");
-                            break;
-                        }
-                        Err(RecvTimeoutError::Shutdown) => {
-                            // if network has shutdown, shutdown
-                            warn!("Received Shutdown from Network");
-                            break;
-                        }
-                        Err(_) => {
-                            // Timeout or NoPeerError are ignored
-                            continue;
-                        }
-                    }
-                }
-                info!("Shutting down");
-            })
-            .map_err(|_| StartError::ThreadError("Unable to spawn main loop".into()))?;
-
-        let orchestrator = ServiceOrchestrator::new(
+        let (orchestrator, orchestator_join_handles) = ServiceOrchestrator::new(
             vec![Box::new(ScabbardFactory::new(
                 None,
                 None,
@@ -411,7 +383,7 @@ impl SplinterDaemon {
             self.registry_forced_refresh,
         )?;
 
-        let admin_service = AdminService::new(
+        let (admin_service, admin_notification_join) = AdminService::new(
             &self.node_id,
             orchestrator,
             #[cfg(feature = "service-arg-validation")]
@@ -422,7 +394,6 @@ impl SplinterDaemon {
                 validators
             },
             peer_connector,
-            Box::new(auth_manager),
             state.clone(),
             Box::new(signature_verifier),
             Box::new(registry.clone_box_as_reader()),
@@ -508,13 +479,10 @@ impl SplinterDaemon {
             if let Err(err) = rest_api_shutdown_handle.shutdown() {
                 error!("Unable to cleanly shut down REST API server: {}", err);
             }
-
-            auth_dispatcher_shutdown.shutdown();
             circuit_dispatcher_shutdown.shutdown();
             network_dispatcher_shutdown.shutdown();
-            network_shutdown.shutdown();
-            sender_shutdown_signaler.shutdown();
             registry_shutdown.shutdown();
+            interconnect_shutdown_handle.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
 
@@ -527,31 +495,35 @@ impl SplinterDaemon {
             let _ = health_service_processor_join_handle.join_all();
         }
 
-        main_loop_join_handle
-            .join()
-            .map_err(|_| StartError::ThreadError("Unable to join main loop".into()))?;
-
-        // Join network sender and dispatcher threads
+        // Join threads and shutdown network components
         let _ = rest_api_join_handle.join();
         let _ = service_processor_join_handle.join_all();
-
+        let _ = orchestator_join_handles.join_all();
+        if let Some(shutdown_handler) = peer_manager_shutdown {
+            shutdown_handler.shutdown();
+        }
+        peer_manager.await_shutdown();
+        let _ = admin_notification_join.join();
+        connection_manager_shutdown.shutdown();
+        connection_manager.await_shutdown();
+        self.mesh.shutdown_signaler().shutdown();
         Ok(())
     }
 
     fn listen_for_services(
-        network: Network,
-        mut internal_service_listener: Box<dyn Listener>,
-        internal_service_peer_ids: Vec<String>,
+        connection_connector: Connector,
+        internal_service_listeners: Vec<Box<dyn Listener>>,
         mut external_service_listener: Box<dyn Listener>,
     ) {
         // this thread will just be dropped on shutdown
         let _ = thread::spawn(move || {
             // accept the internal service connections
-            for service_peer_id in internal_service_peer_ids.into_iter() {
-                match internal_service_listener.incoming().next() {
+            for mut listener in internal_service_listeners.into_iter() {
+                match listener.incoming().next() {
                     Some(Ok(connection)) => {
-                        if let Err(err) = network.add_peer(service_peer_id.clone(), connection) {
-                            error!("Unable to add peer {}: {}", service_peer_id, err);
+                        let remote_endpoint = connection.remote_endpoint();
+                        if let Err(err) = connection_connector.add_inbound_connection(connection) {
+                            error!("Unable to add peer {}: {}", remote_endpoint, err)
                         }
                     }
                     Some(Err(err)) => {
@@ -578,7 +550,7 @@ impl SplinterDaemon {
                     "Received service connection from {}",
                     connection.remote_endpoint()
                 );
-                if let Err(err) = network.add_connection(connection) {
+                if let Err(err) = connection_connector.add_inbound_connection(connection) {
                     error!("Unable to add inbound service connection: {}", err);
                 }
             }
@@ -836,9 +808,11 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
         })?;
 
+        let node_id = self.node_id.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: node_id".to_string())
+        })?;
+
         let mesh = Mesh::new(512, 128);
-        let network = Network::new(mesh, heartbeat)
-            .map_err(|err| CreateError::NetworkError(err.to_string()))?;
 
         let state_dir = self.state_dir.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: state_dir".to_string())
@@ -858,10 +832,6 @@ impl SplinterDaemonBuilder {
 
         let initial_peers = self.initial_peers.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: initial_peers".to_string())
-        })?;
-
-        let node_id = self.node_id.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: node_id".to_string())
         })?;
 
         let display_name = self.display_name.ok_or_else(|| {
@@ -902,7 +872,7 @@ impl SplinterDaemonBuilder {
             network_endpoints,
             advertised_endpoints,
             initial_peers,
-            network,
+            mesh,
             node_id,
             display_name,
             rest_api_endpoint,
@@ -917,6 +887,7 @@ impl SplinterDaemonBuilder {
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
+            heartbeat,
         })
     }
 }
@@ -924,30 +895,19 @@ impl SplinterDaemonBuilder {
 fn set_up_network_dispatcher(
     network_sender: NetworkMessageSender,
     node_id: &str,
-    auth_manager: AuthorizationManager,
     circuit_sender: DispatchMessageSender<CircuitMessageType>,
-    auth_sender: DispatchMessageSender<AuthorizationMessageType>,
 ) -> Dispatcher<NetworkMessageType> {
     let mut dispatcher = Dispatcher::<NetworkMessageType>::new(Box::new(network_sender));
 
     let network_echo_handler = NetworkEchoHandler::new(node_id.to_string());
-    dispatcher.set_handler(Box::new(NetworkAuthGuardHandler::new(
-        auth_manager.clone(),
-        Box::new(network_echo_handler),
-    )));
+    dispatcher.set_handler(Box::new(network_echo_handler));
 
     let network_heartbeat_handler = NetworkHeartbeatHandler::new();
     // do not add auth guard
     dispatcher.set_handler(Box::new(network_heartbeat_handler));
 
     let circuit_message_handler = CircuitMessageHandler::new(circuit_sender);
-    dispatcher.set_handler(Box::new(NetworkAuthGuardHandler::new(
-        auth_manager,
-        Box::new(circuit_message_handler),
-    )));
-
-    let auth_message_handler = AuthorizationMessageHandler::new(auth_sender);
-    dispatcher.set_handler(Box::new(auth_message_handler));
+    dispatcher.set_handler(Box::new(circuit_message_handler));
 
     dispatcher
 }
@@ -1109,7 +1069,6 @@ impl RegistryShutdownHandle {
 #[derive(Debug)]
 pub enum CreateError {
     MissingRequiredField(String),
-    NetworkError(String),
 }
 
 impl Error for CreateError {}
@@ -1118,7 +1077,6 @@ impl fmt::Display for CreateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CreateError::MissingRequiredField(msg) => write!(f, "missing required field: {}", msg),
-            CreateError::NetworkError(msg) => write!(f, "network raised an error: {}", msg),
         }
     }
 }
@@ -1135,7 +1093,6 @@ pub enum StartError {
     #[cfg(feature = "health")]
     HealthServiceError(String),
     OrchestratorError(String),
-    ThreadError(String),
     StateError(String),
 }
 
@@ -1160,7 +1117,6 @@ impl fmt::Display for StartError {
             StartError::OrchestratorError(msg) => {
                 write!(f, "the orchestrator encountered an error: {}", msg)
             }
-            StartError::ThreadError(msg) => write!(f, "a thread encountered an error: {}", msg),
             StartError::StateError(msg) => write!(f, "{}", msg),
         }
     }

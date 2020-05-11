@@ -531,6 +531,7 @@ mod tests {
     /// Verify that it can be:
     /// * returned in a list of endpoints
     /// * retrieve the connection id for that endpoint
+    #[ignore]
     #[test]
     fn test_service_connected() {
         let mut transport = InprocTransport::default();

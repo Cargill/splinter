@@ -1103,8 +1103,8 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                         .send(metadata.connection_id.clone(), heartbeat_message.clone())
                     {
                         error!(
-                            "failed to send heartbeat: {:?} attempting reconnection",
-                            err
+                            "Outbound: failed to send heartbeat to {}: {:?} attempting reconnection",
+                            endpoint, err
                         );
 
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
@@ -1122,8 +1122,8 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                     matrix_sender.send(metadata.connection_id.clone(), heartbeat_message.clone())
                 {
                     error!(
-                        "failed to send heartbeat: {:?} attempting reconnection",
-                        err
+                        "Inbound: failed to send heartbeat to {}: {:?} ",
+                        endpoint, err,
                     );
 
                     if !*disconnected {

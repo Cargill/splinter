@@ -32,10 +32,7 @@ use crate::circuit::{
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
-use crate::network::{
-    auth::{AuthorizationCallbackError, AuthorizationInquisitor, PeerAuthorizationState},
-    peer::PeerConnector,
-};
+use crate::network::peer_manager::{PeerManagerConnector, PeerRef};
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 #[cfg(feature = "service-arg-validation")]
@@ -80,6 +77,7 @@ pub struct PendingPayload {
     pub missing_protocol_ids: Vec<String>,
     pub payload_type: PayloadType,
     pub message_sender: String,
+    pub members: Vec<String>,
 }
 
 enum CircuitProposalStatus {
@@ -161,13 +159,13 @@ pub struct AdminServiceShared {
     #[cfg(feature = "service-arg-validation")]
     service_arg_validators: HashMap<String, Box<dyn ServiceArgValidator + Send>>,
     // peer connector used to connect to new members listed in a circuit
-    peer_connector: PeerConnector,
-    // auth inquisitor
-    auth_inquisitor: Box<dyn AuthorizationInquisitor>,
+    peer_connector: PeerManagerConnector,
+    // PeerRef Map, peer_id to PeerRef, these PeerRef should be dropped when the peer is no longer
+    // needed
+    peer_refs: HashMap<String, Vec<PeerRef>>,
     // network sender is used to comunicated with other services on the splinter network
     network_sender: Option<Box<dyn ServiceNetworkSender>>,
-    // the CircuitManagementPayloads that require peers to be fully authorized before they can go
-    // through consensus
+    // the CircuitManagementPayloads that are waiting for members to be peered
     unpeered_payloads: Vec<PendingPayload>,
     // the CircuitManagementPayloads that require the peers' admin services to negotiate a protocol
     // version
@@ -205,8 +203,7 @@ impl AdminServiceShared {
             String,
             Box<dyn ServiceArgValidator + Send>,
         >,
-        peer_connector: PeerConnector,
-        auth_inquisitor: Box<dyn AuthorizationInquisitor>,
+        peer_connector: PeerManagerConnector,
         splinter_state: SplinterState,
         signature_verifier: Box<dyn SignatureVerifier + Send>,
         key_verifier: Box<dyn AdminKeyVerifier>,
@@ -230,6 +227,7 @@ impl AdminServiceShared {
         let event_mailbox = Mailbox::new(DurableBTreeSet::new_boxed_with_bound(
             std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
         ));
+
         Ok(AdminServiceShared {
             node_id,
             network_sender: None,
@@ -239,7 +237,7 @@ impl AdminServiceShared {
             #[cfg(feature = "service-arg-validation")]
             service_arg_validators,
             peer_connector,
-            auth_inquisitor,
+            peer_refs: HashMap::new(),
             unpeered_payloads: Vec::new(),
             pending_protocol_payloads: Vec::new(),
             service_protocols: HashMap::new(),
@@ -263,10 +261,6 @@ impl AdminServiceShared {
 
     pub fn network_sender(&self) -> &Option<Box<dyn ServiceNetworkSender>> {
         &self.network_sender
-    }
-
-    pub fn auth_inquisitor(&self) -> &dyn AuthorizationInquisitor {
-        &*self.auth_inquisitor
     }
 
     pub fn set_network_sender(&mut self, network_sender: Option<Box<dyn ServiceNetworkSender>>) {
@@ -305,6 +299,30 @@ impl AdminServiceShared {
 
     pub fn current_consensus_verifiers(&self) -> &Vec<String> {
         &self.current_consensus_verifiers
+    }
+
+    pub fn add_peer_ref(&mut self, peer_ref: PeerRef) {
+        if let Some(peer_ref_vec) = self.peer_refs.get_mut(peer_ref.peer_id()) {
+            peer_ref_vec.push(peer_ref);
+        } else {
+            self.peer_refs
+                .insert(peer_ref.peer_id().to_string(), vec![peer_ref]);
+        }
+    }
+
+    pub fn add_peer_refs(&mut self, peer_refs: Vec<PeerRef>) {
+        for peer_ref in peer_refs {
+            self.add_peer_ref(peer_ref);
+        }
+    }
+
+    pub fn remove_peer_ref(&mut self, peer_id: &str) {
+        if let Some(mut peer_ref_vec) = self.peer_refs.remove(peer_id) {
+            peer_ref_vec.pop();
+            if !peer_ref_vec.is_empty() {
+                self.peer_refs.insert(peer_id.to_string(), peer_ref_vec);
+            }
+        }
     }
 
     pub fn commit(&mut self) -> Result<(), AdminSharedError> {
@@ -400,8 +418,12 @@ impl AdminServiceShared {
                     }
                     Ok(CircuitProposalStatus::Rejected) => {
                         // remove circuit
-                        self.remove_proposal(&circuit_id)?;
-
+                        let proposal = self.remove_proposal(&circuit_id)?;
+                        if let Some(proposal) = proposal {
+                            for member in proposal.get_circuit_proposal().members.iter() {
+                                self.remove_peer_ref(member.get_node_id());
+                            }
+                        }
                         let circuit_proposal_proto =
                             messages::CircuitProposal::from_proto(circuit_proposal.clone())
                                 .map_err(AdminSharedError::InvalidMessageFormat)?;
@@ -461,7 +483,14 @@ impl AdminServiceShared {
                     &proposed_circuit,
                     signer_public_key,
                     requester_node_id,
-                )?;
+                )
+                .map_err(|err| {
+                    // remove peer_ref because we will not accept this proposal
+                    for member in proposed_circuit.get_members() {
+                        self.remove_peer_ref(member.get_node_id())
+                    }
+                    err
+                })?;
                 debug!("proposing {}", proposed_circuit.get_circuit_id());
 
                 let mut circuit_proposal = CircuitProposal::new();
@@ -513,7 +542,17 @@ impl AdminServiceShared {
                     signer_public_key,
                     &circuit_proposal,
                     header.get_requester_node_id(),
-                )?;
+                )
+                .map_err(|err| {
+                    if circuit_proposal.get_proposal_type() == CircuitProposal_ProposalType::CREATE
+                    {
+                        // remove peer_ref because we will not accept this proposal
+                        for member in circuit_proposal.get_circuit_proposal().get_members() {
+                            self.remove_peer_ref(member.get_node_id())
+                        }
+                    }
+                    err
+                })?;
                 // add vote to circuit_proposal
                 let mut vote_record = CircuitProposal_VoteRecord::new();
                 vote_record.set_public_key(signer_public_key.to_vec());
@@ -570,7 +609,7 @@ impl AdminServiceShared {
             .get_circuit()
             .get_members()
             .to_vec();
-        self.check_connected_peers_payload(&members, payload, message_sender)
+        self.check_connected_peers_payload_create(&members, payload, message_sender)
     }
 
     pub fn propose_vote(
@@ -599,88 +638,145 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        self.check_connected_peers_payload(
+        self.check_connected_peers_payload_vote(
             proposal.get_circuit_proposal().get_members(),
             payload,
             message_sender,
         )
     }
 
-    fn check_connected_peers_payload(
+    pub fn send_protocol_request(&mut self, node_id: &str) -> Result<(), ServiceError> {
+        if self
+            .service_protocols
+            .get(&admin_service_id(node_id))
+            .is_none()
+        {
+            // we will always have the network sender at this point
+            if let Some(ref network_sender) = self.network_sender {
+                debug!(
+                    "Sending service protocol request to {}",
+                    admin_service_id(node_id)
+                );
+                let mut request = ServiceProtocolVersionRequest::new();
+                request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
+                request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+                let mut msg = AdminMessage::new();
+                msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST);
+                msg.set_protocol_request(request);
+
+                let envelope_bytes = msg.write_to_bytes()?;
+                network_sender.send(&admin_service_id(node_id), &envelope_bytes)?;
+            }
+        } else {
+            debug!(
+                "Already agreed on protocol version with {}",
+                admin_service_id(node_id)
+            );
+        }
+        Ok(())
+    }
+
+    fn check_connected_peers_payload_vote(
         &mut self,
         members: &[SplinterNode],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
-        let mut unauthorized_peers = vec![];
         let mut missing_protocol_ids = vec![];
+        let mut pending_members = vec![];
         for node in members {
-            if self.node_id() != node.get_node_id() {
-                if self.auth_inquisitor.is_authorized(node.get_node_id()) {
-                    if self
-                        .service_protocols
-                        .get(&admin_service_id(node.get_node_id()))
-                        .is_none()
-                    {
-                        // we will always have the network sender at this point
-                        if let Some(ref network_sender) = self.network_sender {
-                            debug!("Sending service protocol request to {}", node.get_node_id());
-                            let mut request = ServiceProtocolVersionRequest::new();
-                            request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
-                            request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
-                            let mut msg = AdminMessage::new();
-                            msg.set_message_type(
-                                AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST,
-                            );
-                            msg.set_protocol_request(request);
-
-                            let envelope_bytes = msg.write_to_bytes()?;
-                            network_sender
-                                .send(&admin_service_id(node.get_node_id()), &envelope_bytes)?;
-                        }
-
-                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
-                    }
-
-                    continue;
-                }
-
-                debug!("Connecting to node {:?}", node);
-                self.peer_connector
-                    .connect_peer(node.get_node_id(), node.get_endpoints())
-                    .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
-
-                unauthorized_peers.push(node.get_node_id().into());
-                missing_protocol_ids.push(admin_service_id(node.get_node_id()));
+            if self.node_id() != node.get_node_id()
+                && self
+                    .service_protocols
+                    .get(&admin_service_id(node.get_node_id()))
+                    .is_none()
+            {
+                self.send_protocol_request(node.get_node_id())?;
+                missing_protocol_ids.push(admin_service_id(node.get_node_id()))
             }
+            pending_members.push(node.get_node_id().to_string());
         }
 
-        if unauthorized_peers.is_empty() && missing_protocol_ids.is_empty() {
+        if missing_protocol_ids.is_empty() {
             self.pending_circuit_payloads.push_back(payload);
-        } else if unauthorized_peers.is_empty() && !missing_protocol_ids.is_empty() {
+        } else {
             debug!(
                 "Members {:?} added; awaiting service protocol agreement before proceeding",
                 &missing_protocol_ids
             );
             self.pending_protocol_payloads.push(PendingPayload {
-                unpeered_ids: unauthorized_peers,
+                unpeered_ids: vec![],
                 missing_protocol_ids,
                 payload_type: PayloadType::Circuit(payload),
-                message_sender,
-            });
-        } else {
-            debug!(
-                "Members {:?} added; awaiting network authorization before proceeding",
-                &unauthorized_peers
-            );
-
-            self.unpeered_payloads.push(PendingPayload {
-                unpeered_ids: unauthorized_peers,
-                missing_protocol_ids,
-                payload_type: PayloadType::Circuit(payload),
+                members: pending_members,
                 message_sender,
             });
         }
+
+        Ok(())
+    }
+
+    fn check_connected_peers_payload_create(
+        &mut self,
+        members: &[SplinterNode],
+        payload: CircuitManagementPayload,
+        message_sender: String,
+    ) -> Result<(), ServiceError> {
+        let mut missing_protocol_ids = vec![];
+        let mut pending_peers = vec![];
+        let mut pending_members = vec![];
+        let mut added_peers: Vec<String> = vec![];
+        for node in members {
+            if self.node_id() != node.get_node_id() {
+                debug!("Referencing node {:?}", node);
+                let peer_ref = self
+                    .peer_connector
+                    .add_peer_ref(
+                        node.get_node_id().to_string(),
+                        node.get_endpoints().to_vec(),
+                    )
+                    .map_err(|err| {
+                        // remove all peer refs added for this proposal
+                        for node_id in added_peers.iter() {
+                            self.remove_peer_ref(node_id);
+                        }
+
+                        ServiceError::UnableToHandleMessage(Box::new(err))
+                    })?;
+
+                self.add_peer_ref(peer_ref);
+                added_peers.push(node.get_node_id().to_string());
+
+                // if we have a protocol the connection exists for the peer already
+                if self
+                    .service_protocols
+                    .get(&admin_service_id(node.get_node_id()))
+                    .is_none()
+                {
+                    pending_peers.push(node.get_node_id().to_string());
+                    missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                }
+            }
+            pending_members.push(node.get_node_id().to_string())
+        }
+
+        if missing_protocol_ids.is_empty() {
+            self.pending_circuit_payloads.push_back(payload);
+        } else {
+            debug!(
+                "Members {:?} added; awaiting peering and service protocol agreement before \
+                proceeding",
+                &missing_protocol_ids
+            );
+            self.unpeered_payloads.push(PendingPayload {
+                unpeered_ids: pending_peers,
+                missing_protocol_ids,
+                payload_type: PayloadType::Circuit(payload),
+                members: pending_members,
+                message_sender,
+            });
+        }
+
         Ok(())
     }
 
@@ -765,53 +861,49 @@ impl AdminServiceShared {
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
-        let mut unauthorized_peers = vec![];
         let mut missing_protocol_ids = vec![];
+        let mut pending_peers = vec![];
+        let mut added_peers: Vec<String> = vec![];
+        let mut pending_members = vec![];
         for node in payload
             .get_circuit_create_request()
             .get_circuit()
             .get_members()
         {
             if self.node_id() != node.get_node_id() {
-                if self.auth_inquisitor().is_authorized(node.get_node_id()) {
-                    if self
-                        .service_protocols
-                        .get(&admin_service_id(node.get_node_id()))
-                        .is_none()
-                    {
-                        // we will always have the network sender at this point
-                        if let Some(ref network_sender) = self.network_sender {
-                            debug!("Sending service protocol request to {}", node.get_node_id());
-                            let mut request = ServiceProtocolVersionRequest::new();
-                            request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
-                            request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
-                            let mut msg = AdminMessage::new();
-                            msg.set_message_type(
-                                AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST,
-                            );
-                            msg.set_protocol_request(request);
-
-                            let envelope_bytes = msg.write_to_bytes()?;
-                            network_sender
-                                .send(&admin_service_id(node.get_node_id()), &envelope_bytes)?;
+                debug!("Referencing node {:?}", node);
+                let peer_ref = self
+                    .peer_connector
+                    .add_peer_ref(
+                        node.get_node_id().to_string(),
+                        node.get_endpoints().to_vec(),
+                    )
+                    .map_err(|err| {
+                        // remove all peer refs added for this proposal
+                        for node_id in added_peers.iter() {
+                            self.remove_peer_ref(node_id);
                         }
 
-                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
-                    }
-                    continue;
+                        ServiceError::UnableToHandleMessage(Box::new(err))
+                    })?;
+
+                self.add_peer_ref(peer_ref);
+                added_peers.push(node.get_node_id().to_string());
+
+                // if we have a protocol the connection exists for the peer already
+                if self
+                    .service_protocols
+                    .get(&admin_service_id(node.get_node_id()))
+                    .is_none()
+                {
+                    pending_peers.push(node.get_node_id().to_string());
+                    missing_protocol_ids.push(admin_service_id(node.get_node_id()))
                 }
-
-                debug!("Connecting to node {:?}", node);
-                self.peer_connector
-                    .connect_peer(node.get_node_id(), node.get_endpoints())
-                    .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
-
-                unauthorized_peers.push(node.get_node_id().into());
-                missing_protocol_ids.push(admin_service_id(node.get_node_id()));
             }
+            pending_members.push(node.get_node_id().to_string())
         }
 
-        if unauthorized_peers.is_empty() && missing_protocol_ids.is_empty() {
+        if missing_protocol_ids.is_empty() {
             self.add_pending_consensus_proposal(proposal.id.clone(), (proposal.clone(), payload));
             self.proposal_sender
                 .as_ref()
@@ -821,29 +913,17 @@ impl AdminServiceShared {
                     message_sender.as_bytes().into(),
                 ))
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
-        } else if unauthorized_peers.is_empty() && !missing_protocol_ids.is_empty() {
+        } else {
             debug!(
                 "Members {:?} added; service protocol agreement before proceeding",
                 &missing_protocol_ids
             );
 
             self.pending_protocol_payloads.push(PendingPayload {
-                unpeered_ids: unauthorized_peers,
+                unpeered_ids: pending_peers,
                 missing_protocol_ids,
                 payload_type: PayloadType::Consensus(proposal.id.clone(), (proposal, payload)),
-                message_sender,
-            });
-            Ok(())
-        } else {
-            debug!(
-                "Members {:?} added; awaiting network authorization before proceeding",
-                &unauthorized_peers
-            );
-
-            self.unpeered_payloads.push(PendingPayload {
-                unpeered_ids: unauthorized_peers,
-                missing_protocol_ids,
-                payload_type: PayloadType::Consensus(proposal.id.clone(), (proposal, payload)),
+                members: pending_members,
                 message_sender,
             });
             Ok(())
@@ -900,34 +980,46 @@ impl AdminServiceShared {
         self.event_subscribers.clear();
     }
 
-    pub fn on_authorization_change(
-        &mut self,
-        peer_id: &str,
-        state: PeerAuthorizationState,
-    ) -> Result<(), AuthorizationCallbackError> {
+    pub fn on_peer_disconnected(&mut self, peer_id: String) {
+        self.service_protocols.remove(&admin_service_id(&peer_id));
+        let mut pending_protocol_payloads =
+            std::mem::replace(&mut self.pending_protocol_payloads, vec![]);
+
+        // Add peer back to any pending payloads
+        for pending_protocol_payload in pending_protocol_payloads.iter_mut() {
+            if pending_protocol_payload.members.contains(&peer_id) {
+                pending_protocol_payload
+                    .missing_protocol_ids
+                    .push(peer_id.to_string())
+            }
+        }
+
+        let (peering, protocol): (Vec<PendingPayload>, Vec<PendingPayload>) =
+            pending_protocol_payloads
+                .into_iter()
+                .partition(|pending_payload| {
+                    pending_payload.missing_protocol_ids.contains(&peer_id)
+                });
+
+        std::mem::replace(&mut self.pending_protocol_payloads, protocol);
+        // Add peer back to any pending payloads
         let mut unpeered_payloads = std::mem::replace(&mut self.unpeered_payloads, vec![]);
         for unpeered_payload in unpeered_payloads.iter_mut() {
-            match state {
-                PeerAuthorizationState::Authorized => {
-                    unpeered_payload
-                        .unpeered_ids
-                        .retain(|unpeered_id| unpeered_id != peer_id);
-                }
-                PeerAuthorizationState::Unauthorized => {
-                    if unpeered_payload
-                        .unpeered_ids
-                        .iter()
-                        .any(|unpeered_id| unpeered_id == peer_id)
-                    {
-                        warn!(
-                            "Dropping circuit request including peer {}, \
-                             due to authorization failure",
-                            peer_id
-                        );
-                        unpeered_payload.unpeered_ids.clear();
-                    }
-                }
+            if unpeered_payload.members.contains(&peer_id) {
+                unpeered_payload.unpeered_ids.push(peer_id.to_string())
             }
+        }
+        // add payloads that are not waiting on peer connection
+        unpeered_payloads.extend(peering);
+        std::mem::replace(&mut self.unpeered_payloads, unpeered_payloads);
+    }
+
+    pub fn on_peer_connected(&mut self, peer_id: &str) -> Result<(), AdminSharedError> {
+        let mut unpeered_payloads = std::mem::replace(&mut self.unpeered_payloads, vec![]);
+        for unpeered_payload in unpeered_payloads.iter_mut() {
+            unpeered_payload
+                .unpeered_ids
+                .retain(|unpeered_id| unpeered_id != peer_id);
         }
 
         let (fully_peered, still_unpeered): (Vec<PendingPayload>, Vec<PendingPayload>) =
@@ -936,49 +1028,57 @@ impl AdminServiceShared {
                 .partition(|unpeered_payload| unpeered_payload.unpeered_ids.is_empty());
 
         std::mem::replace(&mut self.unpeered_payloads, still_unpeered);
-        if state == PeerAuthorizationState::Authorized {
-            for peered_payload in fully_peered {
-                self.pending_protocol_payloads.push(peered_payload);
-            }
+        for peered_payload in fully_peered {
+            self.pending_protocol_payloads.push(peered_payload);
+        }
 
-            // Ignore own admin service
-            if peer_id == admin_service_id(self.node_id()) {
-                return Ok(());
-            }
+        // Ignore own admin service
+        if peer_id == admin_service_id(self.node_id()) {
+            return Ok(());
+        }
 
-            if let Some(ref network_sender) = self.network_sender {
-                debug!(
-                    "Sending service protocol request to {}",
-                    admin_service_id(peer_id)
-                );
-                let mut request = ServiceProtocolVersionRequest::new();
-                request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
-                request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
-                let mut msg = AdminMessage::new();
-                msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST);
-                msg.set_protocol_request(request);
+        // We have already received a service protocol request, don't sent another request
+        if self
+            .service_protocols
+            .get(&admin_service_id(peer_id))
+            .is_some()
+        {
+            return Ok(());
+        }
 
-                let envelope_bytes = msg.write_to_bytes().map_err(|err| {
-                    AuthorizationCallbackError(format!(
+        // Send protocol request
+        if let Some(ref network_sender) = self.network_sender {
+            debug!(
+                "Sending service protocol request to {}",
+                admin_service_id(peer_id)
+            );
+            let mut request = ServiceProtocolVersionRequest::new();
+            request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
+            request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+            let mut msg = AdminMessage::new();
+            msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST);
+            msg.set_protocol_request(request);
+
+            let envelope_bytes = msg.write_to_bytes().map_err(|err| {
+                AdminSharedError::ServiceProtocolError(format!(
+                    "Unable to send service protocol request: {}",
+                    err
+                ))
+            })?;
+
+            network_sender
+                .send(&admin_service_id(peer_id), &envelope_bytes)
+                .map_err(|err| {
+                    AdminSharedError::ServiceProtocolError(format!(
                         "Unable to send service protocol request: {}",
                         err
                     ))
                 })?;
-
-                network_sender
-                    .send(&admin_service_id(peer_id), &envelope_bytes)
-                    .map_err(|err| {
-                        AuthorizationCallbackError(format!(
-                            "Unable to send service protocol request: {}",
-                            err
-                        ))
-                    })?;
-            } else {
-                return Err(AuthorizationCallbackError(format!(
-                    "AdminService is not started {}",
-                    peer_id
-                )));
-            }
+        } else {
+            return Err(AdminSharedError::ServiceProtocolError(format!(
+                "AdminService is not started, can't sent request to {}",
+                peer_id
+            )));
         }
 
         Ok(())
@@ -1026,6 +1126,12 @@ impl AdminServiceShared {
         std::mem::replace(&mut self.pending_protocol_payloads, waiting);
 
         if protocol == 0 {
+            // if no agreed protocol, remove all peer refs for proposals
+            for pending_payload in ready {
+                for peer in pending_payload.members {
+                    self.remove_peer_ref(&peer);
+                }
+            }
             return Ok(());
         }
 
@@ -1611,6 +1717,10 @@ impl AdminServiceShared {
             .map_err(AdminSharedError::from)
     }
 
+    pub fn get_nodes(&self) -> Result<BTreeMap<String, StateNode>, AdminSharedError> {
+        self.splinter_state.nodes().map_err(AdminSharedError::from)
+    }
+
     fn update_splinter_state(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
         let members: Vec<StateNode> = circuit
             .get_members()
@@ -1790,17 +1900,20 @@ mod tests {
     use crate::admin::service::AdminKeyVerifierError;
     use crate::circuit::directory::CircuitDirectory;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
-    use crate::mesh::Mesh;
-    use crate::network::{
-        auth::{AuthorizationCallback, AuthorizationCallbackError},
-        Network,
+    use crate::mesh::{Envelope, Mesh};
+    use crate::network::auth2::AuthorizationManager;
+    use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
+    use crate::network::connection_manager::ConnectionManager;
+    use crate::network::peer_manager::{PeerManager, PeerManagerConnector};
+    use crate::protocol::authorization::{
+        AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
+        TrustRequest,
     };
     use crate::protos::admin;
     use crate::protos::admin::{SplinterNode, SplinterService};
-    use crate::protos::authorization::{
-        AuthorizationMessage, AuthorizationMessageType, AuthorizedMessage,
-    };
+    use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
+    use crate::protos::prelude::*;
     use crate::service::{ServiceMessageContext, ServiceSendError};
     use crate::signing::{
         hash::{HashSigner, HashVerifier},
@@ -1808,7 +1921,8 @@ mod tests {
     };
     use crate::storage::get_storage;
     use crate::transport::{
-        ConnectError, Connection, DisconnectError, RecvError, SendError, Transport,
+        inproc::InprocTransport, ConnectError, Connection, DisconnectError, RecvError, SendError,
+        Transport,
     };
 
     const PUB_KEY: &[u8] = &[
@@ -1821,20 +1935,26 @@ mod tests {
     /// Test that the CircuitManagementPayload is moved to the pending payloads when the peers are
     /// fully authorized.
     #[test]
-    fn test_auth_change() {
-        let mesh = Mesh::new(4, 16);
-        let network = Network::new(mesh.clone(), 0).unwrap();
-        let mut transport = MockConnectingTransport::expect_connections(vec![
-            Ok(Box::new(MockConnection::new())),
-            Ok(Box::new(MockConnection::new())),
-            Ok(Box::new(MockConnection::new())),
-        ]);
-        let orchestrator_connection = transport
-            .connect("inproc://admin-service")
+    fn test_protocol_agreement() {
+        let mut transport = InprocTransport::default();
+        let mut orchestrator_transport = transport.clone();
+
+        let mut other_listener = transport
+            .listen("inproc://otherplace:8000")
+            .expect("Unable to get listener");
+        let _test_listener = transport
+            .listen("inproc://someplace:8000")
+            .expect("Unable to get listener");
+        let _orchestator_listener = transport
+            .listen("inproc://orchestator")
+            .expect("Unable to get listener");
+
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(Some(transport));
+        let orchestrator_connection = orchestrator_transport
+            .connect("inproc://orchestator")
             .expect("failed to create connection");
-        let orchestrator = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
+        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
-        let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
         let state = setup_splinter_state();
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
@@ -1842,7 +1962,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -1865,8 +1984,8 @@ mod tests {
         circuit.set_comments("test circuit".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
-            splinter_node("test-node", &["tcp://someplace:8000".to_string()]),
-            splinter_node("other-node", &["tcp://otherplace:8000".to_string()]),
+            splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
+            splinter_node("other-node", &["inproc://otherplace:8000".to_string()]),
         ]));
         circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre"),
@@ -1885,23 +2004,38 @@ mod tests {
         payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
         payload.set_circuit_create_request(request);
 
+        // start up thread for other node
+        std::thread::spawn(move || {
+            let mesh = Mesh::new(2, 2);
+            let conn = other_listener.accept().unwrap();
+            mesh.add(conn, "my_peer_id".to_string()).unwrap();
+
+            handle_auth(&mesh, "my_peer_id", "other-node");
+
+            mesh.shutdown_signaler().shutdown();
+        });
+
         shared
             .propose_circuit(payload, "test".to_string())
             .expect("Proposal not accepted");
 
         // None of the proposed members are peered
-        assert_eq!(0, shared.pending_protocol_payloads.len());
+        assert_eq!(1, shared.unpeered_payloads.len());
         assert_eq!(0, shared.pending_circuit_payloads.len());
-        shared
-            .on_authorization_change("test-node", PeerAuthorizationState::Authorized)
-            .expect("received unexpected error");
 
-        // One node is still unpeered
-        assert_eq!(0, shared.pending_protocol_payloads.len());
-        assert_eq!(0, shared.pending_circuit_payloads.len());
+        // Set other-node to peered
         shared
-            .on_authorization_change("other-node", PeerAuthorizationState::Authorized)
-            .expect("received unexpected error");
+            .on_peer_connected("other-node")
+            .expect("Unable to set peer to peered");
+
+        // Still waitin on 1 peer
+        assert_eq!(1, shared.unpeered_payloads.len());
+        assert_eq!(0, shared.pending_circuit_payloads.len());
+
+        // Set other-node to peered
+        shared
+            .on_peer_connected("test-node")
+            .expect("Unable to set peer to peered");
 
         // We're fully peered, but need to wait for protocol to be agreed on
         assert_eq!(1, shared.pending_protocol_payloads.len());
@@ -1921,32 +2055,36 @@ mod tests {
         // We're fully peered and agreed on protocol, so the pending payload is now available
         assert_eq!(0, shared.pending_protocol_payloads.len());
         assert_eq!(1, shared.pending_circuit_payloads.len());
+        shutdown(mesh, cm, pm);
     }
 
-    /// Test that the CircuitManagementPayload message is dropped, if a node fails authorization.
+    /// Test that the CircuitManagementPayload message is dropped, if a node fails to match
+    /// protocol versions
     #[test]
-    fn test_unauth_change() {
-        let mesh = Mesh::new(4, 16);
-        let network = Network::new(mesh.clone(), 0).unwrap();
-        let mut transport = MockConnectingTransport::expect_connections(vec![
-            Ok(Box::new(MockConnection::new())),
-            Ok(Box::new(MockConnection::new())),
-            Ok(Box::new(MockConnection::new())),
-        ]);
-        let orchestrator_connection = transport
+    fn test_protocol_disagreement() {
+        let mut transport = InprocTransport::default();
+        let mut orchestrator_transport = transport.clone();
+
+        let _listener = transport
+            .listen("inproc://otherplace:8000")
+            .expect("Unable to get listener");
+        let _admin_listener = transport
+            .listen("inproc://admin-service")
+            .expect("Unable to get listener");
+
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(Some(transport));
+        let orchestrator_connection = orchestrator_transport
             .connect("inproc://admin-service")
             .expect("failed to create connection");
-        let orchestrator = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
+        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
-        let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
         let state = setup_splinter_state();
         let mut shared = AdminServiceShared::new(
-            "my_peer_id".into(),
+            "test-node".into(),
             Arc::new(Mutex::new(orchestrator)),
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -1968,8 +2106,8 @@ mod tests {
         circuit.set_comments("test circuit".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
-            splinter_node("test-node", &["tcp://someplace:8000".to_string()]),
-            splinter_node("other-node", &["tcp://otherplace:8000".to_string()]),
+            splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
+            splinter_node("other-node", &["inproc://otherplace:8000".to_string()]),
         ]));
         circuit.set_roster(protobuf::RepeatedField::from_vec(vec![
             splinter_service("0123", "sabre"),
@@ -1995,29 +2133,40 @@ mod tests {
         // None of the proposed members are peered
         assert_eq!(1, shared.unpeered_payloads.len());
         assert_eq!(0, shared.pending_circuit_payloads.len());
+
+        // Set other-node to peered
         shared
-            .on_authorization_change("test-node", PeerAuthorizationState::Unauthorized)
+            .on_peer_connected("other-node")
+            .expect("Unable to set peer to peered");
+
+        assert_eq!(0, shared.unpeered_payloads.len());
+        assert_eq!(1, shared.pending_protocol_payloads.len());
+        assert_eq!(0, shared.pending_circuit_payloads.len());
+        shared
+            .on_protocol_agreement("admin::other-node", 0)
             .expect("received unexpected error");
 
         // The message should be dropped
         assert_eq!(0, shared.pending_circuit_payloads.len());
-        assert_eq!(0, shared.unpeered_payloads.len());
+        assert_eq!(0, shared.pending_protocol_payloads.len());
 
+        // sent the service protocol request but not the payload
         assert_eq!(
-            0,
+            1,
             service_sender
                 .sent
                 .lock()
                 .expect("Network sender lock poisoned")
                 .len()
         );
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that a valid circuit is validated correctly
     fn test_validate_circuit_valid() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2026,7 +2175,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2040,6 +2188,8 @@ mod tests {
         if let Err(err) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been valid: {}", err);
         }
+
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2047,7 +2197,7 @@ mod tests {
     // invalid
     fn test_validate_circuit_signer_not_permitted() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2056,7 +2206,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::new(false)),
@@ -2070,6 +2219,7 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to requester node not being registered");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2077,7 +2227,7 @@ mod tests {
     // invalid
     fn test_validate_circuit_signer_key_invalid() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2086,7 +2236,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2106,6 +2255,7 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
             panic!("Should have been invalid due to key being too long");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2113,7 +2263,7 @@ mod tests {
     // members an error is returned
     fn test_validate_circuit_bad_node() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2122,7 +2272,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2143,13 +2292,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service having an allowed node not in members");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a service in its roster with too many allowed nodes
     fn test_validate_circuit_too_many_allowed_nodes() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2158,7 +2308,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2182,13 +2331,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service having too many allowed nodes");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a service with "" for a service id an error is returned
     fn test_validate_circuit_empty_service_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2197,7 +2347,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2218,13 +2367,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service's id being empty");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a service with an invalid service id an error is returned
     fn test_validate_circuit_invalid_service_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2233,7 +2383,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2254,13 +2403,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service's id being empty");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a service with duplicate service ids an error is returned
     fn test_validate_circuit_duplicate_service_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2269,7 +2419,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2295,13 +2444,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to service's id being a duplicate");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have any services in its roster an error is returned
     fn test_validate_circuit_empty_roster() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2310,7 +2460,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2325,13 +2474,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid due to empty roster");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have any nodes in its members an error is returned
     fn test_validate_circuit_empty_members() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2340,7 +2490,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2356,6 +2505,7 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid empty members");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2363,7 +2513,7 @@ mod tests {
     // returned
     fn test_validate_circuit_missing_local_node() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2372,7 +2522,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2392,6 +2541,7 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because node_a is not in members");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2399,7 +2549,7 @@ mod tests {
     // returned
     fn test_validate_circuit_empty_node_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2408,7 +2558,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2436,13 +2585,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because node_ is has an empty node id");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has duplicate members an error is returned
     fn test_validate_circuit_duplicate_members() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2451,7 +2601,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2479,13 +2628,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because there are duplicate members");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has an empty circuit id an error is returned
     fn test_validate_circuit_empty_circuit_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2494,7 +2644,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2510,13 +2659,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because the circuit ID is empty");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has an invalid circuit id an error is returned
     fn test_validate_circuit_invalid_circuit_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2525,7 +2675,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2541,13 +2690,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because the circuit ID is invalid");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a member with no endpoints an error is returned
     fn test_validate_circuit_no_endpoints() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2556,7 +2706,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2580,13 +2729,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because a member has no endpoints");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a member with an empty endpoint an error is returned
     fn test_validate_circuit_empty_endpoint() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2595,7 +2745,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2619,13 +2768,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because a member has an empty endpoint");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit has a member with a duplicate endpoint an error is returned
     fn test_validate_circuit_duplicate_endpoint() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2634,7 +2784,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2658,13 +2807,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because a member has a duplicate endpoint");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have authorization set an error is returned
     fn test_validate_circuit_no_authorization() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2673,7 +2823,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2689,13 +2838,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because authorizaiton type is unset");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have persistence set an error is returned
     fn test_validate_circuit_no_persitance() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2704,7 +2854,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2720,13 +2869,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because persistence type is unset");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have durability set an error is returned
     fn test_validate_circuit_unset_durability() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2735,7 +2885,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2751,13 +2900,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because durabilty type is unset");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have route type set an error is returned
     fn test_validate_circuit_no_routes() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2766,7 +2916,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2782,13 +2931,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because route type is unset");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that if a circuit does not have circuit_management_type set an error is returned
     fn test_validate_circuit_no_management_type() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2797,7 +2947,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2813,13 +2962,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
             panic!("Should have been invalid because route type is unset");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test that a valid circuit proposal vote comes back as valid
     fn test_validate_proposal_vote_valid() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2828,7 +2978,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2844,6 +2993,7 @@ mod tests {
         if let Err(err) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been valid: {}", err);
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2851,7 +3001,7 @@ mod tests {
     // invalid
     fn test_validate_proposal_vote_not_permitted() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2860,7 +3010,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::new(false)),
@@ -2876,13 +3025,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been invalid because voting node is not registered");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test if the voter is the original requester node the vote is invalid
     fn test_validate_proposal_vote_requester() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2891,7 +3041,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2907,13 +3056,14 @@ mod tests {
         if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_b") {
             panic!("Should have been invalid because voter is the requester");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
     // test if a voter has already voted on a proposal the new vote is invalid
     fn test_validate_proposal_vote_duplicate_vote() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2922,7 +3072,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2945,6 +3094,7 @@ mod tests {
         if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been invalid because node as already submited a vote");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2952,7 +3102,7 @@ mod tests {
     // the vote, the vote is invalid
     fn test_validate_proposal_vote_circuit_hash_mismatch() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let admin_shared = AdminServiceShared::new(
@@ -2961,7 +3111,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -2979,6 +3128,7 @@ mod tests {
         if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
             panic!("Should have been invalid because the circuit hash does not match");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -2986,7 +3136,7 @@ mod tests {
     // signature is empty.
     fn test_validate_circuit_management_payload_signature() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let shared = AdminServiceShared::new(
@@ -2995,7 +3145,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -3029,13 +3178,15 @@ mod tests {
         if let Err(_) = shared.validate_circuit_management_payload(&payload, &header) {
             panic!("Should have been valid");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
-    // test that the validate_circuit_management_payload method returns an error in case the header is empty.
+    // test that the validate_circuit_management_payload method returns an error in case the
+    // header is empty.
     fn test_validate_circuit_management_payload_header() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let shared = AdminServiceShared::new(
@@ -3044,7 +3195,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -3079,6 +3229,7 @@ mod tests {
         if let Err(_) = shared.validate_circuit_management_payload(&payload, &header) {
             panic!("Should have been valid");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -3086,7 +3237,7 @@ mod tests {
     // requester field is empty.
     fn test_validate_circuit_management_header_requester() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let shared = AdminServiceShared::new(
@@ -3095,7 +3246,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -3132,6 +3282,7 @@ mod tests {
         if let Err(_) = shared.validate_circuit_management_payload(&payload, &header) {
             panic!("Should have been valid");
         }
+        shutdown(mesh, cm, pm);
     }
 
     #[test]
@@ -3139,7 +3290,7 @@ mod tests {
     // field is empty.
     fn test_validate_circuit_management_header_requester_node_id() {
         let state = setup_splinter_state();
-        let peer_connector = setup_peer_connector();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
         let shared = AdminServiceShared::new(
@@ -3148,7 +3299,6 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(MockAuthInquisitor),
             state,
             Box::new(HashVerifier),
             Box::new(MockAdminKeyVerifier::default()),
@@ -3185,6 +3335,7 @@ mod tests {
         if let Err(_) = shared.validate_circuit_management_payload(&payload, &header) {
             panic!("Should have been valid");
         }
+        shutdown(mesh, cm, pm);
     }
 
     pub fn setup_test_circuit() -> Circuit {
@@ -3250,25 +3401,68 @@ mod tests {
         SplinterState::new("memory".to_string(), circuit_directory)
     }
 
-    fn setup_peer_connector() -> PeerConnector {
-        let mesh = Mesh::new(4, 16);
-        let network = Network::new(mesh.clone(), 0).unwrap();
-        let transport = MockConnectingTransport::expect_connections(vec![
-            Ok(Box::new(MockConnection::new())),
-            Ok(Box::new(MockConnection::new())),
+    fn setup_peer_connector(
+        inproct_transport: Option<InprocTransport>,
+    ) -> (Mesh, ConnectionManager, PeerManager, PeerManagerConnector) {
+        let transport = {
+            if let Some(transport) = inproct_transport {
+                transport
+            } else {
+                InprocTransport::default()
+            }
+        };
+
+        let mesh = Mesh::new(2, 2);
+        let inproc_authorizer = InprocAuthorizer::new(vec![
+            (
+                "inproc://orchestator".to_string(),
+                "orchestator".to_string(),
+            ),
+            (
+                "inproc://otherplace:8000".to_string(),
+                "other-node".to_string(),
+            ),
+            (
+                "inproc://someplace:8000".to_string(),
+                "test-node".to_string(),
+            ),
         ]);
-        let peer_connector = PeerConnector::new(network.clone(), Box::new(transport));
-        peer_connector
+
+        let authorization_manager = AuthorizationManager::new("test-node".into())
+            .expect("Unable to create authorization pool");
+        let mut authorizers = Authorizers::new();
+        authorizers.add_authorizer("inproc", inproc_authorizer);
+        authorizers.add_authorizer("", authorization_manager.authorization_connector());
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(authorizers))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(Box::new(transport.clone()))
+            .start()
+            .expect("Unable to start Connection Manager");
+        let connector = cm.connector();
+        let mut pm = PeerManager::new(connector, None, Some(1));
+        let peer_connector = pm.start().expect("Cannot start PeerManager");
+        (mesh, cm, pm, peer_connector)
+    }
+
+    fn shutdown(mesh: Mesh, cm: ConnectionManager, pm: PeerManager) {
+        pm.shutdown_handle().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
+        pm.await_shutdown();
+        cm.await_shutdown();
+        mesh.shutdown_signaler().shutdown();
     }
 
     fn setup_orchestrator() -> ServiceOrchestrator {
         let mut transport =
             MockConnectingTransport::expect_connections(vec![Ok(Box::new(MockConnection::new()))]);
         let orchestrator_connection = transport
-            .connect("inproc://admin-service")
+            .connect("inproc://orchestator-service")
             .expect("failed to create connection");
-        ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
-            .expect("failed to create orchestrator")
+        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
+            .expect("failed to create orchestrator");
+        orchestrator
     }
 
     fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {
@@ -3283,21 +3477,6 @@ mod tests {
         service.set_service_id(service_id.into());
         service.set_service_type(service_type.into());
         service
-    }
-
-    struct MockAuthInquisitor;
-
-    impl AuthorizationInquisitor for MockAuthInquisitor {
-        fn is_authorized(&self, _: &str) -> bool {
-            false
-        }
-
-        fn register_callback(
-            &self,
-            _: Box<dyn AuthorizationCallback>,
-        ) -> Result<(), AuthorizationCallbackError> {
-            unimplemented!();
-        }
     }
 
     struct MockConnectingTransport {
@@ -3332,14 +3511,12 @@ mod tests {
     }
 
     struct MockConnection {
-        auth_response: Option<Vec<u8>>,
         evented: MockEvented,
     }
 
     impl MockConnection {
         fn new() -> Self {
             Self {
-                auth_response: Some(authorized_response()),
                 evented: MockEvented::new(),
             }
         }
@@ -3351,7 +3528,7 @@ mod tests {
         }
 
         fn recv(&mut self) -> Result<Vec<u8>, RecvError> {
-            Ok(self.auth_response.take().unwrap_or_else(|| vec![]))
+            Ok(vec![])
         }
 
         fn remote_endpoint(&self) -> String {
@@ -3414,26 +3591,6 @@ mod tests {
         fn deregister(&self, poll: &mio::Poll) -> std::io::Result<()> {
             poll.deregister(&self.registration)
         }
-    }
-
-    fn authorized_response() -> Vec<u8> {
-        let msg_type = AuthorizationMessageType::AUTHORIZE;
-        let auth_msg = AuthorizedMessage::new();
-        let mut auth_msg_env = AuthorizationMessage::new();
-        auth_msg_env.set_message_type(msg_type);
-        auth_msg_env.set_payload(auth_msg.write_to_bytes().expect("unable to write to bytes"));
-
-        let mut network_msg = NetworkMessage::new();
-        network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
-        network_msg.set_payload(
-            auth_msg_env
-                .write_to_bytes()
-                .expect("unable to write to bytes"),
-        );
-
-        network_msg
-            .write_to_bytes()
-            .expect("unable to write to bytes")
     }
 
     #[derive(Clone, Debug)]
@@ -3509,5 +3666,52 @@ mod tests {
         fn is_permitted(&self, _node_id: &str, _key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
             Ok(self.0)
         }
+    }
+
+    fn handle_auth(mesh: &Mesh, connection_id: &str, identity: &str) {
+        let _env = mesh.recv().unwrap();
+        // send our own connect request
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::ConnectRequest(ConnectRequest::Unidirectional),
+        );
+        mesh.send(env).expect("Unable to send connect request");
+
+        let _env = mesh.recv().unwrap();
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::ConnectResponse(ConnectResponse {
+                accepted_authorization_types: vec![AuthorizationType::Trust],
+            }),
+        );
+        mesh.send(env).expect("Unable to send connect response");
+        let _env = mesh.recv().unwrap();
+
+        let env = write_auth_message(connection_id, AuthorizationMessage::Authorized(Authorized));
+        mesh.send(env).expect("unable to send authorized");
+
+        // send trust request
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::TrustRequest(TrustRequest {
+                identity: identity.to_string(),
+            }),
+        );
+        mesh.send(env).expect("Unable to send trust request");
+        let _env = mesh.recv().unwrap();
+    }
+
+    fn write_auth_message(connection_id: &str, auth_msg: AuthorizationMessage) -> Envelope {
+        let mut msg = NetworkMessage::new();
+        msg.set_message_type(NetworkMessageType::AUTHORIZATION);
+        msg.set_payload(
+            IntoBytes::<authorization::AuthorizationMessage>::into_bytes(auth_msg)
+                .expect("Unable to convert into bytes"),
+        );
+
+        Envelope::new(
+            connection_id.to_string(),
+            msg.write_to_bytes().expect("Unable to write to bytes"),
+        )
     }
 }

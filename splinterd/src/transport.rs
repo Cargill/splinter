@@ -15,7 +15,6 @@
 use std::fs;
 use std::path::Path;
 
-use splinter::transport::inproc::InprocTransport;
 use splinter::transport::multi::MultiTransport;
 use splinter::transport::socket::TcpTransport;
 use splinter::transport::socket::TlsTransport;
@@ -34,9 +33,6 @@ pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportEr
     // add tcp transport
     // this will be default for endpoints without a prefix
     transports.push(Box::new(TcpTransport::default()));
-
-    // add inproc transpoort
-    transports.push(Box::new(InprocTransport::default()));
 
     // add web socket transport
     #[cfg(feature = "ws-transport")]
