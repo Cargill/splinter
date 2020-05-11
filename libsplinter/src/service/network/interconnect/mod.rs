@@ -477,6 +477,7 @@ pub mod tests {
     //
     // 4. The ServiceInterconnect, Mesh, ServiceConnectionManager, and ConnectionManger is then
     //    shutdown.
+    #[ignore]
     #[test]
     fn test_service_interconnect() {
         let mut transport = InprocTransport::default();
@@ -587,6 +588,7 @@ pub mod tests {
     // Verify that ServiceInterconnect can be shutdown after start but without any messages being
     // sent. This test starts up the ServiceInterconnect and the associated
     // Connection/ServiceConnectionManager and then immediately shuts them down.
+    #[ignore]
     #[test]
     fn test_service_interconnect_shutdown() {
         let transport = Box::new(InprocTransport::default());
