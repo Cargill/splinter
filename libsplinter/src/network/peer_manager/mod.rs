@@ -442,7 +442,13 @@ fn add_peer(
         endpoint,
     }) = unreferenced_peers.remove(&peer_id)
     {
-        peers.insert(peer_id.clone(), connection_id, endpoints, endpoint);
+        peers.insert(
+            peer_id.clone(),
+            connection_id,
+            endpoints,
+            endpoint,
+            PeerStatus::Connected,
+        );
 
         let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
         return Ok(peer_ref);
@@ -479,6 +485,7 @@ fn add_peer(
         connection_id,
         endpoints.to_vec(),
         active_endpoint,
+        PeerStatus::Pending,
     );
     let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
     Ok(peer_ref)
