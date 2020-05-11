@@ -95,8 +95,6 @@ services:
         POSTGRES_USER: gameroom
         POSTGRES_PASSWORD: gameroom_example
         POSTGRES_DB: gameroom
-      volumes:
-        - "./database/tables:/docker-entrypoint-initdb.d"
 
     gameroom-app-acme:
       build:
@@ -323,4 +321,3 @@ services:
         POSTGRES_USER: admin
         POSTGRES_PASSWORD: admin
         POSTGRES_DB: splinter
-

@@ -83,7 +83,6 @@ services:
         POSTGRES_PASSWORD: gameroom_example
         POSTGRES_DB: gameroom
       volumes:
-        - "./database/tables:/docker-entrypoint-initdb.d"
         - acme-db:/var/lib/postgresql/data/
 
     gameroom-app-acme:
@@ -184,7 +183,6 @@ services:
         POSTGRES_PASSWORD: gameroom_example
         POSTGRES_DB: gameroom
       volumes:
-        - "./database/tables:/docker-entrypoint-initdb.d"
         - bubba-db:/var/lib/postgresql/data/
 
     gameroom-app-bubba:
@@ -271,4 +269,3 @@ services:
         POSTGRES_USER: admin
         POSTGRES_PASSWORD: admin
         POSTGRES_DB: splinter
-
