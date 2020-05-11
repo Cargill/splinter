@@ -149,16 +149,23 @@ pub struct PeerManager {
     sender: Option<Sender<PeerManagerMessage>>,
     shutdown_handle: Option<ShutdownHandle>,
     max_retry_attempts: Option<u64>,
+    retry_interval: u64,
 }
 
 impl PeerManager {
-    pub fn new(connector: Connector, max_retry_attempts: Option<u64>) -> Self {
+    pub fn new(
+        connector: Connector,
+        max_retry_attempts: Option<u64>,
+        retry_interval: Option<u64>,
+    ) -> Self {
+        let retry_interval = retry_interval.unwrap_or(DEFAULT_PACEMAKER_INTERVAL);
         PeerManager {
             connection_manager_connector: connector,
             join_handle: None,
             sender: None,
             shutdown_handle: None,
             max_retry_attempts,
+            retry_interval,
         }
     }
 
@@ -185,7 +192,7 @@ impl PeerManager {
         })?;
 
         let pacemaker = pacemaker::Pacemaker::builder()
-            .with_interval(DEFAULT_PACEMAKER_INTERVAL)
+            .with_interval(self.retry_interval)
             .with_sender(sender.clone())
             .with_message_factory(|| PeerManagerMessage::RetryPending)
             .start()
@@ -1429,7 +1436,10 @@ pub mod tests {
         let mut peer_manager = PeerManager::new(connector, None);
         peer_manager.start().expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
+        cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
     }
 
@@ -1467,7 +1477,7 @@ pub mod tests {
             subs_rx.recv().expect("unable to get notfication");
         });
 
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
 
         let _conn = transport.connect("inproc://test").unwrap();

@@ -96,17 +96,16 @@ where
             .name("Pacemaker".into())
             .spawn(move || {
                 info!("Starting heartbeat manager");
-
                 while running_clone.load(Ordering::SeqCst) {
-                    thread::sleep(Duration::from_secs(interval));
                     if let Err(err) = sender.send(new_message()) {
-                        error!(
-                            "Sender has disconnected before
+                        warn!(
+                            "Sender has disconnected before \
                             shutting down pacemaker {:?}",
                             err
                         );
                         break;
                     }
+                    thread::sleep(Duration::from_secs(interval));
                 }
             })
             .map_err(|err| PacemakerStartError(err.to_string()))?;

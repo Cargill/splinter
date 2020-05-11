@@ -475,7 +475,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let (send, recv) = channel();
 
@@ -515,8 +515,9 @@ pub mod tests {
         // trigger the thread shutdown
         tx.send(()).unwrap();
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
@@ -540,7 +541,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None);
+        let mut peer_manager = PeerManager::new(connector, None, Some(1));
         let peer_connector = peer_manager.start().expect("Cannot start PeerManager");
         let (dispatcher_sender, _dispatched_receiver) = dispatch_channel();
         let interconnect = PeerInterconnectBuilder::new()
@@ -551,8 +552,9 @@ pub mod tests {
             .build()
             .expect("Unable to build PeerInterconnect");
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
         interconnect.shutdown_and_wait();
