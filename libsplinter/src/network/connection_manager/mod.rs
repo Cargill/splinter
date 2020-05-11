@@ -150,66 +150,135 @@ enum AuthResult {
     },
 }
 
-pub struct ConnectionManager<T: 'static, U: 'static>
-where
-    T: ConnectionMatrixLifeCycle,
-    U: ConnectionMatrixSender,
-{
-    pacemaker: pacemaker::Pacemaker,
-    connection_state: Option<ConnectionManagerState<T, U>>,
+pub struct ConnectionManagerBuilder<T, U> {
     authorizer: Option<Box<dyn Authorizer + Send>>,
-    join_handle: Option<thread::JoinHandle<()>>,
-    sender: Option<Sender<CmMessage>>,
-    shutdown_signaler: Option<ShutdownSignaler>,
+    life_cycle: Option<T>,
+    matrix_sender: Option<U>,
+    transport: Option<Box<dyn Transport + Send>>,
+    heartbeat_interval: u64,
+    maximum_retry_frequency: u64,
 }
 
-impl<T, U> ConnectionManager<T, U>
-where
-    T: ConnectionMatrixLifeCycle,
-    U: ConnectionMatrixSender,
-{
-    pub fn new(
-        authorizer: Box<dyn Authorizer + Send>,
-        life_cycle: T,
-        matrix_sender: U,
-        transport: Box<dyn Transport + Send>,
-        heartbeat_interval: Option<u64>,
-        maximum_retry_frequency: Option<u64>,
-    ) -> Self {
-        let heartbeat = heartbeat_interval.unwrap_or(DEFAULT_HEARTBEAT_INTERVAL);
-        let retry_frequency = maximum_retry_frequency.unwrap_or(DEFAULT_MAXIMUM_RETRY_FREQUENCY);
-        let connection_state = Some(ConnectionManagerState::new(
-            life_cycle,
-            matrix_sender,
-            transport,
-            retry_frequency,
-        ));
-        let pacemaker = pacemaker::Pacemaker::new(heartbeat);
-
+impl<T, U> Default for ConnectionManagerBuilder<T, U> {
+    fn default() -> Self {
         Self {
-            authorizer: Some(authorizer),
-            pacemaker,
-            connection_state,
-            join_handle: None,
-            sender: None,
-            shutdown_signaler: None,
+            authorizer: None,
+            life_cycle: None,
+            matrix_sender: None,
+            transport: None,
+            heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
+            maximum_retry_frequency: DEFAULT_MAXIMUM_RETRY_FREQUENCY,
         }
     }
+}
 
-    pub fn start(&mut self) -> Result<Connector, ConnectionManagerError> {
+/// Constructs new `ConnectionManager` instances.
+///
+/// This builder is used to construct new connection manager instances.  A connection manager
+/// requires an authorizer, used to authorize connections, a connection matrix life-cycle, for
+/// adding and removing connections from a connection matrix, a connection matrix sender, for
+/// sending messages using a connection matrix.  It also has several optional configuration values,
+/// such as heartbeat interval and the maximum retry frequency.
+impl<T, U> ConnectionManagerBuilder<T, U>
+where
+    T: ConnectionMatrixLifeCycle + 'static,
+    U: ConnectionMatrixSender + 'static,
+{
+    /// Construct a new builder.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Set the authorizer instance to use with the resulting connection manager.
+    ///
+    /// All connections managed by the resulting instance will be passed through the authorizer
+    /// before being considered fully connected.
+    pub fn with_authorizer(mut self, authorizer: Box<dyn Authorizer + Send>) -> Self {
+        self.authorizer = Some(authorizer);
+        self
+    }
+
+    /// Set the connection matrix life-cycle for the resulting connection manager.
+    ///
+    /// All connections managed by the resulting instance will be added or removed from the given
+    /// `ConnectionMatrixLifeCycle`.
+    pub fn with_matrix_life_cycle(mut self, life_cycle: T) -> Self {
+        self.life_cycle = Some(life_cycle);
+        self
+    }
+
+    /// Set the connection matrix sender for the resulting connection manager.
+    ///
+    /// All heartbeat messages will be sent using the given `ConnectionMatrixSender`.
+    pub fn with_matrix_sender(mut self, matrix_sender: U) -> Self {
+        self.matrix_sender = Some(matrix_sender);
+        self
+    }
+
+    /// Set the transport for the resulting connection manager.
+    ///
+    /// All requested outbound connections will be created using the given `Transport` instance.
+    pub fn with_transport(mut self, transport: Box<dyn Transport + Send>) -> Self {
+        self.transport = Some(transport);
+        self
+    }
+
+    /// Set the optional heartbeat interval for the resulting connection manager.
+    pub fn with_heartbeat_interval(mut self, interval: u64) -> Self {
+        self.heartbeat_interval = interval;
+        self
+    }
+
+    /// Set the optional maximum retry frequency for the resulting connection manager.
+    ///
+    /// All outbound connections that are lost while managed by the resulting instance will be
+    /// retried up to this maximum.
+    pub fn with_maximum_retry_frequency(mut self, frequency: u64) -> Self {
+        self.maximum_retry_frequency = frequency;
+        self
+    }
+
+    /// Create a started connection manager instance.
+    ///
+    /// This function creates and starts a `ConnectionManager` instance, which includes a
+    /// background thread for managing the instance's state.
+    ///
+    /// # Errors
+    ///
+    /// A `ConnectionManagerError` is returned if a required property is not set or the background
+    /// thread fails to start.
+    pub fn start(mut self) -> Result<ConnectionManager, ConnectionManagerError> {
         let (sender, recv) = channel();
-        let mut state = self.connection_state.take().ok_or_else(|| {
-            ConnectionManagerError::StartUpError("Service has already started".into())
-        })?;
+        let heartbeat = self.heartbeat_interval;
+        let retry_frequency = self.maximum_retry_frequency;
 
-        let authorizer = self.authorizer.take().ok_or_else(|| {
-            ConnectionManagerError::StartUpError("Service has already started".into())
+        let authorizer = self
+            .authorizer
+            .take()
+            .ok_or_else(|| ConnectionManagerError::StartUpError("No authorizer provided".into()))?;
+
+        let transport = self
+            .transport
+            .take()
+            .ok_or_else(|| ConnectionManagerError::StartUpError("No transport provided".into()))?;
+
+        let matrix_sender = self.matrix_sender.take().ok_or_else(|| {
+            ConnectionManagerError::StartUpError("No matrix sender provided".into())
+        })?;
+        let life_cycle = self.life_cycle.take().ok_or_else(|| {
+            ConnectionManagerError::StartUpError("No matrix life cycle provided".into())
         })?;
 
         let resender = sender.clone();
         let join_handle = thread::Builder::new()
             .name("Connection Manager".into())
             .spawn(move || {
+                let mut state = ConnectionManagerState::new(
+                    life_cycle,
+                    matrix_sender,
+                    transport,
+                    retry_frequency,
+                );
                 let mut subscribers = SubscriberMap::new();
                 loop {
                     match recv.recv() {
@@ -240,33 +309,55 @@ where
                 }
             })?;
 
-        self.pacemaker
-            .start(sender.clone(), || CmMessage::SendHeartbeats)
+        let pacemaker = pacemaker::Pacemaker::builder()
+            .with_interval(heartbeat)
+            .with_sender(sender.clone())
+            .with_message_factory(|| CmMessage::SendHeartbeats)
+            .start()
             .map_err(|err| ConnectionManagerError::StartUpError(err.to_string()))?;
-        self.join_handle = Some(join_handle);
-        self.shutdown_signaler = Some(ShutdownSignaler {
-            sender: sender.clone(),
-            pacemaker_shutdown_signaler: self.pacemaker.shutdown_signaler().unwrap(),
-        });
-        self.sender = Some(sender.clone());
 
-        Ok(Connector { sender })
+        Ok(ConnectionManager {
+            join_handle,
+            pacemaker,
+            sender,
+        })
+    }
+}
+
+pub struct ConnectionManager {
+    pacemaker: pacemaker::Pacemaker,
+    join_handle: thread::JoinHandle<()>,
+    sender: Sender<CmMessage>,
+}
+
+impl ConnectionManager {
+    /// Construct a new `ConnectionManagerBuilder` for creating a new `ConnectionManager` instance.
+    pub fn builder<T, U>() -> ConnectionManagerBuilder<T, U>
+    where
+        T: ConnectionMatrixLifeCycle + 'static,
+        U: ConnectionMatrixSender + 'static,
+    {
+        ConnectionManagerBuilder::new()
     }
 
-    pub fn shutdown_signaler(&self) -> Option<ShutdownSignaler> {
-        self.shutdown_signaler.clone()
+    /// Create a new connector for performing client operations on this instance's state.
+    pub fn connector(&self) -> Connector {
+        Connector {
+            sender: self.sender.clone(),
+        }
+    }
+
+    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
+        ShutdownSignaler {
+            sender: self.sender.clone(),
+            pacemaker_shutdown_signaler: self.pacemaker.shutdown_signaler(),
+        }
     }
 
     pub fn await_shutdown(self) {
         self.pacemaker.await_shutdown();
 
-        let join_handle = if let Some(jh) = self.join_handle {
-            jh
-        } else {
-            return;
-        };
-
-        if let Err(err) = join_handle.join() {
+        if let Err(err) = self.join_handle.join() {
             error!(
                 "Connection manager thread did not shutdown correctly: {:?}",
                 err
@@ -1091,17 +1182,15 @@ mod tests {
         transport.listen("inproc://test").unwrap();
         let mesh = Mesh::new(512, 128);
 
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
 
-        cm.start().unwrap();
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
@@ -1115,21 +1204,21 @@ mod tests {
         });
 
         let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         connector
             .request_connection("inproc://test", "test_id")
             .expect("A connection could not be created");
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
@@ -1144,15 +1233,15 @@ mod tests {
         });
 
         let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         connector
             .request_connection("inproc://test", "test_id")
@@ -1162,7 +1251,7 @@ mod tests {
             .request_connection("inproc://test", "test_id")
             .expect("A connection could not be re-requested");
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
@@ -1179,15 +1268,15 @@ mod tests {
             mesh_clone.add(conn, "test_id".to_string()).unwrap();
         });
 
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            Some(1),
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         connector
             .request_connection("inproc://test", "test_id")
@@ -1202,7 +1291,7 @@ mod tests {
             NetworkMessageType::NETWORK_HEARTBEAT
         );
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
@@ -1238,26 +1327,26 @@ mod tests {
             mesh.shutdown_signaler().shutdown();
         });
 
-        let authorization_pool = AuthorizationManager::new("test_identity".into())
+        let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.authorization_connector()),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(auth_mgr.authorization_connector()))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+        let connector = cm.connector();
+
+        connector
+            .request_connection(&endpoint, "test_id")
+            .expect("A connection could not be created");
+
         let (sub_tx, sub_rx): (
             Sender<ConnectionManagerNotification>,
             mpsc::Receiver<ConnectionManagerNotification>,
         ) = channel();
         connector.subscribe(sub_tx).expect("Unable to respond.");
-
-        connector
-            .request_connection(&endpoint, "test_id")
-            .expect("A connection could not be created");
 
         // Validate that the connection completed authorization
         let notification = sub_rx.recv().expect("Cannot receive notification");
@@ -1273,9 +1362,9 @@ mod tests {
         // wait for completion
         rx.recv().expect("Did not receive completion signal");
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
-        authorization_pool.shutdown_and_await();
+        auth_mgr.shutdown_and_await();
     }
 
     #[test]
@@ -1298,17 +1387,16 @@ mod tests {
             mesh.shutdown_signaler().shutdown();
         });
 
-        let authorization_pool = AuthorizationManager::new("test_identity".into())
+        let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.authorization_connector()),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(auth_mgr.authorization_connector()))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+        let connector = cm.connector();
 
         let (sub_tx, sub_rx): (
             Sender<ConnectionManagerNotification>,
@@ -1351,9 +1439,9 @@ mod tests {
 
         tx.send(()).expect("Could not send completion signal");
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
-        authorization_pool.shutdown_and_await();
+        auth_mgr.shutdown_and_await();
     }
 
     #[test]
@@ -1361,22 +1449,22 @@ mod tests {
         let transport = Box::new(TcpTransport::default());
         let mesh = Mesh::new(512, 128);
 
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            transport,
-            None,
-            None,
-        );
-        let connector = cm.start().unwrap();
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         let endpoint_removed = connector
             .remove_connection("tcp://localhost:5000")
             .expect("Unable to remove connection");
 
         assert_eq!(None, endpoint_removed);
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
@@ -1435,17 +1523,16 @@ mod tests {
             mesh2.shutdown_signaler().shutdown();
         });
 
-        let authorization_pool = AuthorizationManager::new("test_identity".into())
+        let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.authorization_connector()),
-            mesh1.get_life_cycle(),
-            mesh1.get_sender(),
-            transport,
-            Some(1),
-            None,
-        );
-        let connector = cm.start().expect("Unable to start ConnectionManager");
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(auth_mgr.authorization_connector()))
+            .with_matrix_life_cycle(mesh1.get_life_cycle())
+            .with_matrix_sender(mesh1.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+        let connector = cm.connector();
 
         let (sub_tx, sub_rx): (
             Sender<ConnectionManagerNotification>,
@@ -1500,9 +1587,9 @@ mod tests {
 
         tx.send(()).expect("Could not send completion signal");
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
-        authorization_pool.shutdown_and_await();
+        auth_mgr.shutdown_and_await();
     }
 
     /// Test that an inbound connection may be added to the connection manager
@@ -1518,26 +1605,27 @@ mod tests {
             .expect("Cannot listen for connections");
 
         let mesh = Mesh::new(512, 128);
-        let mut cm = ConnectionManager::new(
-            Box::new(NoopAuthorizer::new("test_identity")),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            Box::new(transport.clone()),
-            Some(1),
-            None,
-        );
 
         let (conn_tx, conn_rx) = mpsc::channel();
 
+        let mut remote_transport = transport.clone();
         let jh = thread::spawn(move || {
-            let _connection = transport
+            let _connection = remote_transport
                 .connect("inproc://test_inbound_connection")
                 .unwrap();
 
             // block until done
             conn_rx.recv().unwrap();
         });
-        let connector = cm.start().expect("Unable to start ConnectionManager");
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(Box::new(transport))
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
 
         let (subs_tx, subs_rx) = mpsc::channel();
         connector.subscribe(subs_tx).expect("Cannot get subscriber");
@@ -1572,7 +1660,7 @@ mod tests {
         conn_tx.send(()).unwrap();
         jh.join().unwrap();
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
     }
 
@@ -1588,22 +1676,14 @@ mod tests {
         let endpoint = listener.endpoint();
 
         let mesh = Mesh::new(512, 128);
-        let authorization_pool = AuthorizationManager::new("test_identity".into())
+        let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let mut cm = ConnectionManager::new(
-            Box::new(authorization_pool.authorization_connector()),
-            mesh.get_life_cycle(),
-            mesh.get_sender(),
-            // The transport on this end doesn't matter for this test
-            Box::new(InprocTransport::default()),
-            Some(1),
-            None,
-        );
 
         let (conn_tx, conn_rx) = mpsc::channel();
         let server_endpoint = endpoint.clone();
         let jh = thread::spawn(move || {
             let mesh = Mesh::new(512, 128);
+            let mut transport = Box::new(TcpTransport::default());
             let connection = transport.connect(&server_endpoint).unwrap();
 
             mesh.add(connection, "test_id".into())
@@ -1615,7 +1695,15 @@ mod tests {
             conn_rx.recv().unwrap();
             mesh.shutdown_signaler().shutdown();
         });
-        let connector = cm.start().expect("Unable to start ConnectionManager");
+
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(auth_mgr.authorization_connector()))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport)
+            .start()
+            .expect("Unable to start Connection Manager");
+        let connector = cm.connector();
 
         let (subs_tx, subs_rx) = mpsc::channel();
         connector.subscribe(subs_tx).expect("Cannot get subscriber");
@@ -1651,9 +1739,9 @@ mod tests {
         conn_tx.send(()).unwrap();
         jh.join().unwrap();
 
-        cm.shutdown_signaler().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
-        authorization_pool.shutdown_and_await();
+        auth_mgr.shutdown_and_await();
     }
 
     struct NoopAuthorizer {
