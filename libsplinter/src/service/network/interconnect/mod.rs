@@ -429,14 +429,13 @@ pub mod tests {
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerError, ConnectionManager,
-        ConnectionManagerNotification,
     };
     use crate::network::dispatch::{
         dispatch_channel, ConnectionId, DispatchError, DispatchLoopBuilder, Dispatcher, Handler,
         MessageContext, MessageSender,
     };
     use crate::protos::service;
-    use crate::service::network::ServiceConnectionManager;
+    use crate::service::network::{ServiceConnectionManager, ServiceConnectionNotification};
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
     // Verify that the ServiceInterconnect properly receives messages from services, passes them to
@@ -477,7 +476,6 @@ pub mod tests {
     //
     // 4. The ServiceInterconnect, Mesh, ServiceConnectionManager, and ConnectionManger is then
     //    shutdown.
-    #[ignore]
     #[test]
     fn test_service_interconnect() {
         let mut transport = InprocTransport::default();
@@ -501,6 +499,12 @@ pub mod tests {
             .with_connector(connector.clone())
             .start()
             .expect("Unable to start service manager");
+
+        let service_connector = service_conn_mgr.service_connector();
+        let (sub_tx, sub_rx) = channel();
+        service_connector
+            .subscribe(sub_tx)
+            .expect("Unable to subscribe");
 
         // set up thread for the service
         let mut remote_inproc = transport.clone();
@@ -566,14 +570,9 @@ pub mod tests {
         let dispatch_shutdown = dispatch_loop.shutdown_signaler();
 
         let conn = listener.accept().expect("Cannot accept connection");
-        let (sub_tx, sub_rx): (
-            Sender<ConnectionManagerNotification>,
-            Receiver<ConnectionManagerNotification>,
-        ) = channel();
-        connector.subscribe(sub_tx).expect("Unable to subscribe");
         connector.add_inbound_connection(conn).unwrap();
 
-        let _notification = sub_rx.recv().unwrap();
+        let _notification: ServiceConnectionNotification = sub_rx.recv().unwrap();
         // Wait for the remote to finish it's testing
         join_handle.join().unwrap();
 
@@ -588,7 +587,6 @@ pub mod tests {
     // Verify that ServiceInterconnect can be shutdown after start but without any messages being
     // sent. This test starts up the ServiceInterconnect and the associated
     // Connection/ServiceConnectionManager and then immediately shuts them down.
-    #[ignore]
     #[test]
     fn test_service_interconnect_shutdown() {
         let transport = Box::new(InprocTransport::default());
