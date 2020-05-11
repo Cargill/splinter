@@ -359,7 +359,7 @@ impl SplinterDaemon {
             }
         }
 
-        let orchestrator = ServiceOrchestrator::new(
+        let (orchestrator, orchestator_join_handles) = ServiceOrchestrator::new(
             vec![Box::new(ScabbardFactory::new(
                 None,
                 None,

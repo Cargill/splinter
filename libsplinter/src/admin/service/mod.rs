@@ -767,7 +767,7 @@ mod tests {
         let orchestrator_connection = orchestrator_transport
             .connect("inproc://orchestator")
             .expect("failed to create connection");
-        let orchestrator = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
+        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
 
         let (mut admin_service, _) = AdminService::new(

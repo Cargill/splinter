@@ -72,19 +72,18 @@ pub struct ServiceOrchestrator {
     inbound_router: InboundRouter<CircuitMessageType>,
     /// `running` and `join_handles` are used to shutdown the orchestrator's background threads
     running: Arc<AtomicBool>,
-    join_handles: JoinHandles<Result<(), OrchestratorError>>,
 }
 
 impl ServiceOrchestrator {
     /// Create a new `ServiceOrchestrator`. This starts up 3 threads for relaying messages to and
-    /// from services.
+    /// from services. Returns the `ServiceOrchestrator` and the threads `JoinHandles`
     pub fn new(
         service_factories: Vec<Box<dyn ServiceFactory>>,
         connection: Box<dyn Connection>,
         incoming_capacity: usize,
         outgoing_capacity: usize,
         channel_capacity: usize,
-    ) -> Result<Self, NewOrchestratorError> {
+    ) -> Result<(Self, JoinHandles<Result<(), OrchestratorError>>), NewOrchestratorError> {
         let services = Arc::new(Mutex::new(HashMap::new()));
         let mesh = Mesh::new(incoming_capacity, outgoing_capacity);
         let mesh_id = format!("{}", Uuid::new_v4());
@@ -167,19 +166,21 @@ impl ServiceOrchestrator {
             supported_service_types.append(&mut service_types);
         }
 
-        Ok(Self {
-            services,
-            service_factories,
-            supported_service_types,
-            network_sender,
-            inbound_router,
-            running,
-            join_handles: JoinHandles::new(vec![
+        Ok((
+            Self {
+                services,
+                service_factories,
+                supported_service_types,
+                network_sender,
+                inbound_router,
+                running,
+            },
+            JoinHandles::new(vec![
                 incoming_join_handle,
                 inbound_join_handle,
                 outgoing_join_handle,
             ]),
-        })
+        ))
     }
 
     /// Initialize (create and start) a service according to the specified definition. The
@@ -253,7 +254,8 @@ impl ServiceOrchestrator {
         Ok(())
     }
 
-    /// Shut down (stop and destroy) all services managed by this `ServiceOrchestrator`.
+    /// Shut down (stop and destroy) all services managed by this `ServiceOrchestrator` and single
+    /// the `ServiceOrchestrator` to shutdown
     pub fn shutdown_all_services(&self) -> Result<(), ShutdownServiceError> {
         let mut services = self
             .services
@@ -272,6 +274,7 @@ impl ServiceOrchestrator {
                 ShutdownServiceError::ShutdownFailed((service_definition, Box::new(err)))
             })?;
         }
+        self.running.store(false, Ordering::SeqCst);
 
         Ok(())
     }
@@ -303,44 +306,6 @@ impl ServiceOrchestrator {
 
     pub fn supported_service_types(&self) -> &[String] {
         &self.supported_service_types
-    }
-
-    pub fn destroy(self) -> Result<(), OrchestratorError> {
-        let mut services = self
-            .services
-            .lock()
-            .map_err(|_| OrchestratorError::LockPoisoned)?;
-
-        for (_, managed_service) in services.drain() {
-            let ManagedService {
-                mut service,
-                registry,
-            } = managed_service;
-            service
-                .stop(&registry)
-                .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
-            service
-                .destroy()
-                .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
-        }
-
-        self.running.store(false, Ordering::SeqCst);
-
-        match self.join_handles.join_all() {
-            Ok(results) => results.iter().for_each(|res| {
-                if let Err(err) = res {
-                    error!(
-                        "Orchestrator background thread failed while running: {}",
-                        err
-                    )
-                }
-            }),
-            Err(err) => error!(
-                "Orchestrator failed to join background thread(s) cleanly: {:?}",
-                err
-            ),
-        };
-        Ok(())
     }
 }
 
