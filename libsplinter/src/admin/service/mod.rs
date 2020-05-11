@@ -697,7 +697,7 @@ mod tests {
     use crate::circuit::{directory::CircuitDirectory, SplinterState};
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
-    use crate::network::auth2::AuthorizationManager;
+    use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
     use crate::network::peer_manager::PeerManager;

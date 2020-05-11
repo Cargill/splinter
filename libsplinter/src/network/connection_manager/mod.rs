@@ -1171,8 +1171,8 @@ mod tests {
     use std::sync::mpsc;
 
     use crate::mesh::Mesh;
-    use crate::network::auth2::tests::negotiation_connection_auth;
-    use crate::network::auth2::AuthorizationManager;
+    use crate::network::auth::tests::negotiation_connection_auth;
+    use crate::network::auth::AuthorizationManager;
     use crate::transport::inproc::InprocTransport;
     use crate::transport::socket::TcpTransport;
 

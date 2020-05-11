@@ -123,7 +123,7 @@ impl ServiceConnectionManager {
     ///
     /// ```no_run
     /// # use splinter::mesh::Mesh;
-    /// # use splinter::network::auth2::AuthorizationManager;
+    /// # use splinter::network::auth::AuthorizationManager;
     /// # use splinter::network::connection_manager::{Authorizer, ConnectionManager};
     /// # use splinter::service::network::ServiceConnectionManager;
     /// # use splinter::transport::inproc::InprocTransport;

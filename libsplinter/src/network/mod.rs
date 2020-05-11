@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod auth2;
+pub mod auth;
 pub mod connection_manager;
 pub mod dispatch;
 pub mod handlers;
