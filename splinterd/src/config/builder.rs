@@ -194,14 +194,14 @@ impl ConfigBuilder {
                 Some(v) => Some((v, p.source())),
                 None => None,
             }),
-            bind: self
+            rest_api_endpoint: self
                 .partial_configs
                 .iter()
-                .find_map(|p| match p.bind() {
+                .find_map(|p| match p.rest_api_endpoint() {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 })
-                .ok_or_else(|| ConfigError::MissingValue("bind".to_string()))?,
+                .ok_or_else(|| ConfigError::MissingValue("rest api endpoint".to_string()))?,
             #[cfg(feature = "database")]
             database: self
                 .partial_configs
@@ -359,7 +359,7 @@ mod tests {
             config.display_name(),
             Some(EXAMPLE_DISPLAY_NAME.to_string())
         );
-        assert_eq!(config.bind(), None);
+        assert_eq!(config.rest_api_endpoint(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), Some(vec![]));
@@ -394,7 +394,7 @@ mod tests {
             .with_peers(Some(vec![]))
             .with_node_id(Some(EXAMPLE_NODE_ID.to_string()))
             .with_display_name(Some(EXAMPLE_DISPLAY_NAME.to_string()))
-            .with_bind(None)
+            .with_rest_api_endpoint(None)
             .with_registries(Some(vec![]))
             .with_heartbeat(None)
             .with_admin_timeout(None);

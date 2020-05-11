@@ -62,7 +62,7 @@ pub struct Config {
     peers: (Vec<String>, ConfigSource),
     node_id: Option<(String, ConfigSource)>,
     display_name: Option<(String, ConfigSource)>,
-    bind: (String, ConfigSource),
+    rest_api_endpoint: (String, ConfigSource),
     #[cfg(feature = "database")]
     database: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
@@ -144,8 +144,8 @@ impl Config {
         }
     }
 
-    pub fn bind(&self) -> &str {
-        &self.bind.0
+    pub fn rest_api_endpoint(&self) -> &str {
+        &self.rest_api_endpoint.0
     }
 
     #[cfg(feature = "database")]
@@ -263,8 +263,8 @@ impl Config {
         }
     }
 
-    fn bind_source(&self) -> &ConfigSource {
-        &self.bind.1
+    fn rest_api_endpoint_source(&self) -> &ConfigSource {
+        &self.rest_api_endpoint.1
     }
 
     #[cfg(feature = "database")]
@@ -388,9 +388,9 @@ impl Config {
             debug!("Config: display_name: {} (source: {:?})", name, source,);
         }
         debug!(
-            "Config: bind: {} (source: {:?})",
-            self.bind(),
-            self.bind_source()
+            "Config: rest_api_endpoint: {} (source: {:?})",
+            self.rest_api_endpoint(),
+            self.rest_api_endpoint_source()
         );
         debug!(
             "Config: registries: {:?} (source: {:?})",
@@ -546,7 +546,7 @@ mod tests {
         (@arg tls_server_cert: --("tls-server-cert") +takes_value)
         (@arg tls_server_key:  --("tls-server-key") +takes_value)
         (@arg tls_client_key:  --("tls-client-key") +takes_value)
-        (@arg bind: --("bind") +takes_value)
+        (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
         (@arg tls_insecure: --("tls-insecure"))
         (@arg no_tls: --("no-tls"))
         (@arg enable_biome: --("enable-biome")))
@@ -913,10 +913,13 @@ mod tests {
             ),
             (Some("Node 1"), Some(&ConfigSource::CommandLine))
         );
-        // The `DefaultPartialConfigBuilder` is the only config with a value for `bind` (source
-        // should be `Default`).
+        // The DefaultPartialConfigBuilder is the only config with a value for `rest_api_endpoint`
+        // (source should be Default).
         assert_eq!(
-            (final_config.bind(), final_config.bind_source()),
+            (
+                final_config.rest_api_endpoint(),
+                final_config.rest_api_endpoint_source()
+            ),
             ("127.0.0.1:8080", &ConfigSource::Default)
         );
         #[cfg(feature = "database")]

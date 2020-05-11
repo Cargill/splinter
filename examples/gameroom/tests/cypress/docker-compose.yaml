@@ -112,7 +112,7 @@ services:
               --database postgres://admin:admin@splinterd-db-node:5432/splinter \
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
-              --bind 0.0.0.0:8085 \
+              --rest-api-endpoint 0.0.0.0:8085 \
               --tls-insecure \
               --enable-biome
       "

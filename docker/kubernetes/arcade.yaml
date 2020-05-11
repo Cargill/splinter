@@ -123,7 +123,7 @@ items:
                 fi && \
                 splinterd -vv \
                 --registries file:///config/registry/registry.yaml \
-                --bind $HOSTNAME:8085 \
+                --rest-api-endpoint $HOSTNAME:8085 \
                 --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id acme \
                 --service-endpoint tcp://$HOSTNAME:8043 \
@@ -287,7 +287,7 @@ items:
                 fi && \
                 splinterd -vv \
                 --registries file:///config/registry/registry.yaml \
-                --bind $HOSTNAME:8085 \
+                --rest-api-endpoint $HOSTNAME:8085 \
                 --network-endpoints tcps://$HOSTNAME:8044 \
                 --node-id bubba \
                 --service-endpoint tcp://$HOSTNAME:8043 \

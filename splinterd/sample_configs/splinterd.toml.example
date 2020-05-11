@@ -41,7 +41,7 @@ network_endpoints = ["tcps://127.0.0.1:8044"]
 
 # Endpoint used for REST API communication
 # (default "127.0.0.1:8080")
-bind = "127.0.0.1:8080"
+rest_api_endpoint = "127.0.0.1:8080"
 
 # A list of splinter node endpoints the daemon will automatically
 # connect to on start up.

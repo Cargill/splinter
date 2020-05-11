@@ -36,7 +36,7 @@ storage = "memory"
 transport = "tls"
 
 # Rest api address.
-bind = "0.0.0.0:8085"
+rest_api_endpoint = "0.0.0.0:8085"
 
 # Splinter Registry file
 registries = ["file:///project/tests/sample_registry.yaml"]

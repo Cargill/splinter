@@ -33,4 +33,4 @@ peers = []
 storage = "yaml"
 
 # Rest api address.
-bind = "localhost:8085"
+rest_api_endpoint = "localhost:8085"

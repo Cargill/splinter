@@ -33,7 +33,7 @@ peers = []
 storage = "memory"
 
 # Rest api address.
-bind = "0.0.0.0:8080"
+rest_api_endpoint = "0.0.0.0:8080"
 
 # db address
 database = "postgres://splinter_admin:splinter_test@127.0.0.1:5432/splinter"

@@ -41,7 +41,7 @@ struct TomlConfig {
     peers: Option<Vec<String>>,
     node_id: Option<String>,
     display_name: Option<String>,
-    bind: Option<String>,
+    rest_api_endpoint: Option<String>,
     #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
@@ -64,6 +64,7 @@ struct TomlConfig {
     registry_auto_refresh_interval: Option<u64>,
     registry_forced_refresh_interval: Option<u64>,
     admin_service_coordinator_timeout: Option<u64>,
+    bind: Option<String>,
 }
 
 /// `PartialConfig` builder which holds values defined in a toml file.
@@ -126,7 +127,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_peers(self.toml_config.peers)
             .with_node_id(self.toml_config.node_id)
             .with_display_name(self.toml_config.display_name)
-            .with_bind(self.toml_config.bind)
+            .with_rest_api_endpoint(self.toml_config.rest_api_endpoint)
             .with_registries(self.toml_config.registries)
             .with_registry_auto_refresh(self.toml_config.registry_auto_refresh)
             .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
@@ -176,6 +177,9 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         if partial_config.admin_timeout().is_none() {
             partial_config = partial_config
                 .with_admin_timeout(self.toml_config.admin_service_coordinator_timeout)
+        }
+        if partial_config.rest_api_endpoint().is_none() {
+            partial_config = partial_config.with_rest_api_endpoint(self.toml_config.bind)
         }
 
         Ok(partial_config)
@@ -312,7 +316,7 @@ mod tests {
             config.display_name(),
             Some(EXAMPLE_DISPLAY_NAME.to_string())
         );
-        assert_eq!(config.bind(), None);
+        assert_eq!(config.rest_api_endpoint(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
@@ -349,7 +353,7 @@ mod tests {
         assert_eq!(config.peers(), None);
         assert_eq!(config.node_id(), None);
         assert_eq!(config.display_name(), None);
-        assert_eq!(config.bind(), None);
+        assert_eq!(config.rest_api_endpoint(), None);
         #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
