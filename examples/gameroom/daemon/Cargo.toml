@@ -53,7 +53,7 @@ scabbard = { path = "../../../services/scabbard/libscabbard", features = ["event
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-splinter = { path = "../../../libsplinter", features = ["biome", "events",  "postgres"]}
+splinter = { path = "../../../libsplinter", features = ["biome", "events", "postgres", "registry"]}
 tokio = "0.1"
 transact = "0.2"
 
