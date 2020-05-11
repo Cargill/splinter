@@ -24,6 +24,9 @@ use std::time::Duration;
 
 #[cfg(feature = "health")]
 use health::HealthService;
+#[cfg(feature = "service-arg-validation")]
+use scabbard::service::ScabbardArgValidator;
+use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
 #[cfg(feature = "biome")]
@@ -66,9 +69,6 @@ use splinter::registry::{
 use splinter::rest_api::{
     Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };
-#[cfg(feature = "service-arg-validation")]
-use splinter::service::scabbard::ScabbardArgValidator;
-use splinter::service::scabbard::ScabbardFactory;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{self, ServiceProcessor, ShutdownHandle};

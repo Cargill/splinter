@@ -15,15 +15,18 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::actix_web::{web, HttpResponse};
-use crate::futures::IntoFuture;
-use crate::protocol;
-use crate::rest_api::{
-    new_websocket_event_sender, ErrorResponse, EventSender, Method, ProtocolVersionRangeGuard,
-    Request,
+use actix_web::{web, HttpResponse};
+use futures::IntoFuture;
+use splinter::{
+    rest_api::{
+        new_websocket_event_sender, ErrorResponse, EventSender, Method, ProtocolVersionRangeGuard,
+        Request,
+    },
+    service::rest_api::ServiceEndpoint,
 };
-use crate::service::rest_api::ServiceEndpoint;
-use crate::service::scabbard::{
+
+use crate::protocol;
+use crate::service::{
     error::StateSubscriberError,
     state::{StateChangeEvent, StateSubscriber},
     Scabbard, SERVICE_TYPE,

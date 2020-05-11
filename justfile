@@ -17,7 +17,8 @@ crates := '\
     splinterd \
     cli \
     client \
-    services/scabbard \
+    services/scabbard/cli \
+    services/scabbard/libscabbard \
     services/health \
     examples/gameroom/database \
     examples/gameroom/daemon \

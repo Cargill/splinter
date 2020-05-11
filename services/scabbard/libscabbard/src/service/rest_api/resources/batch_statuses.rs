@@ -14,9 +14,7 @@
 
 use std::time::SystemTime;
 
-use crate::service::scabbard::state::{
-    BatchInfo, BatchStatus, InvalidTransaction, ValidTransaction,
-};
+use crate::service::state::{BatchInfo, BatchStatus, InvalidTransaction, ValidTransaction};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchInfoResponse<'a> {

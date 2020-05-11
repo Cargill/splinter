@@ -18,11 +18,14 @@ use std::path::Path;
 use std::time::Duration;
 
 #[cfg(feature = "service-arg-validation")]
-use crate::hex;
+use splinter::service::validation::{ServiceArgValidationError, ServiceArgValidator};
+use splinter::{
+    service::{FactoryCreateError, Service, ServiceFactory},
+    signing::SignatureVerifierFactory,
+};
+
 #[cfg(feature = "service-arg-validation")]
-use crate::service::validation::{ServiceArgValidationError, ServiceArgValidator};
-use crate::service::{FactoryCreateError, Service, ServiceFactory};
-use crate::signing::SignatureVerifierFactory;
+use crate::hex::parse_hex;
 
 use super::{Scabbard, SERVICE_TYPE};
 
@@ -81,7 +84,7 @@ impl ServiceArgValidator for ScabbardArgValidator {
         })?;
 
         for key in admin_keys {
-            let key_bytes = hex::parse_hex(&key).map_err(|_| {
+            let key_bytes = parse_hex(&key).map_err(|_| {
                 ServiceArgValidationError(format!(
                     "{} is not a valid hex-formatted public key",
                     key
@@ -99,6 +102,7 @@ impl ServiceArgValidator for ScabbardArgValidator {
         Ok(())
     }
 }
+
 impl ServiceFactory for ScabbardFactory {
     fn available_service_types(&self) -> &[String] {
         self.service_types.as_slice()
@@ -189,7 +193,7 @@ impl ServiceFactory for ScabbardFactory {
     /// * `rest-api-actix`
     ///
     /// [`ServiceEndpoint`]: ../rest_api/struct.ServiceEndpoint.html
-    fn get_rest_endpoints(&self) -> Vec<crate::service::rest_api::ServiceEndpoint> {
+    fn get_rest_endpoints(&self) -> Vec<splinter::service::rest_api::ServiceEndpoint> {
         // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
         // enabled
         #[allow(unused_mut)]
@@ -215,7 +219,7 @@ impl ServiceFactory for ScabbardFactory {
 mod tests {
     use super::*;
 
-    use crate::signing::hash::HashVerifier;
+    use splinter::signing::hash::HashVerifier;
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance.
     #[test]

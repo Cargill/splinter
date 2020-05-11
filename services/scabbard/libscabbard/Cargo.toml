@@ -1,0 +1,71 @@
+# Copyright 2018-2020 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[package]
+name = "scabbard"
+version = "0.3.17"
+authors = ["Cargill Incorporated"]
+edition = "2018"
+license = "Apache-2.0"
+description = """\
+    Scabbard is a Splinter service that runs the Sawtooth Sabre smart contract \
+    engine using Hyperledger Transact for state management. Scabbard uses \
+    two-phase consensus to reach agreement on transactions.
+"""
+
+[dependencies]
+actix-web = { version = "1.0", optional = true, default-features = false, features = ["flate2-zlib"] }
+futures = { version = "0.1", optional = true }
+log = "0.3.0"
+openssl = "0.10"
+protobuf = "2"
+reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
+sawtooth = { version = "0.3", default-features = false, features = ["lmdb-store", "receipt-store"] }
+sawtooth-sabre = "0.5"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+splinter = { path = "../../../libsplinter" }
+transact = { version = "0.2", features = ["sawtooth-compat"] }
+
+[dev-dependencies]
+tempdir = "0.3"
+transact = { version = "0.2", features = ["family-command", "sawtooth-compat"] }
+
+[build-dependencies]
+protoc-rust = "2.14"
+glob = "0.2"
+
+[features]
+default = []
+
+stable = [
+  "client",
+  "default",
+  "events",
+  "rest-api",
+  "rest-api-actix",
+]
+
+experimental = [
+  # The experimental feature extends stable:
+  "stable",
+  # The following features are experimental:
+]
+
+client = ["reqwest"]
+events = ["splinter/events"]
+rest-api = ["futures", "splinter/rest-api"]
+rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
+service-arg-validation = ["splinter/service-arg-validation"]

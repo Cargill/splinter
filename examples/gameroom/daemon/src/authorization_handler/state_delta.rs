@@ -23,7 +23,7 @@ use gameroom_database::{
     models::{NewXoGame, XoGame},
     ConnectionPool,
 };
-use splinter::service::scabbard::{StateChange, StateChangeEvent};
+use scabbard::service::{StateChange, StateChangeEvent};
 
 use crate::authorization_handler::sabre::{get_xo_contract_address, XO_PREFIX};
 use crate::authorization_handler::AppAuthHandlerError;

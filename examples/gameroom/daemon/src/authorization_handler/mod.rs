@@ -32,13 +32,13 @@ use gameroom_database::{
     },
     ConnectionPool,
 };
+use scabbard::{protocol::SCABBARD_PROTOCOL_VERSION, service::StateChangeEvent};
 use splinter::{
     admin::messages::{
         AdminServiceEvent, CircuitProposal, CreateCircuit, SplinterNode, SplinterService,
     },
     events::{Igniter, ParseBytes, ParseError, WebSocketClient, WebSocketError, WsResponse},
-    protocol,
-    service::scabbard::StateChangeEvent,
+    protocol::ADMIN_PROTOCOL_VERSION,
 };
 use state_delta::XoStateDeltaProcessor;
 
@@ -110,7 +110,7 @@ pub fn run(
 
     ws.header(
         "SplinterProtocolVersion",
-        protocol::ADMIN_PROTOCOL_VERSION.to_string(),
+        ADMIN_PROTOCOL_VERSION.to_string(),
     );
 
     ws.set_reconnect(RECONNECT);
@@ -418,7 +418,7 @@ fn process_admin_event(
 
             xo_ws.header(
                 "SplinterProtocolVersion",
-                protocol::SCABBARD_PROTOCOL_VERSION.to_string(),
+                SCABBARD_PROTOCOL_VERSION.to_string(),
             );
 
             let url_to_string = url.to_string();
@@ -517,7 +517,7 @@ fn resubscribe(
 
     ws.header(
         "SplinterProtocolVersion",
-        protocol::SCABBARD_PROTOCOL_VERSION.to_string(),
+        SCABBARD_PROTOCOL_VERSION.to_string(),
     );
 
     ws.on_error(move |err, ctx| {

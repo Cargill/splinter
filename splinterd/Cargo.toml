@@ -44,6 +44,13 @@ serde_derive = "1.0.80"
 tempdir = "0.3"
 toml = "0.5"
 
+[dependencies.scabbard]
+path = "../services/scabbard/libscabbard"
+features = [
+  "rest-api",
+  "rest-api-actix",
+]
+
 [dependencies.splinter]
 path = "../libsplinter"
 features = [
@@ -88,7 +95,10 @@ config-env-var = []
 config-toml = []
 database = ["splinter/postgres"]
 rest-api-cors = ["splinter/rest-api-cors"]
-service-arg-validation = ["splinter/service-arg-validation"]
+service-arg-validation = [
+    "scabbard/service-arg-validation",
+    "splinter/service-arg-validation",
+]
 ws-transport = ["splinter/ws-transport"]
 
 [package.metadata.deb]

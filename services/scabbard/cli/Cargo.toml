@@ -13,20 +13,20 @@
 # limitations under the License.
 
 [package]
-name = "scabbard"
+name = "scabbard-cli"
 version = "0.3.17"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 license = "Apache-2.0"
 description = """\
-    Splinter is a privacy-focused platform for distributed applications that \
-    provides a blockchain-inspired networking environment for communication \
-    and transactions between organizations.
+    Scabbard is a Splinter service that runs the Sawtooth Sabre smart contract \
+    engine using Hyperledger Transact for state management. Scabbard uses \
+    two-phase consensus to reach agreement on transactions.
 """
 
 [[bin]]
 name = "scabbard"
-path = "src/cli/main.rs"
+path = "src/main.rs"
 
 [dependencies]
 clap = "2"
@@ -36,7 +36,7 @@ log = "0.4"
 sabre-sdk = "0.5"
 sawtooth-sdk = { version = "0.4", features = ["transact-compat"] }
 transact = { version = "0.2", features = ["contract-archive"] }
-splinter = { path = "../../libsplinter", features = ["sawtooth-signing-compat", "scabbard-client"] }
+scabbard = { path = "../libscabbard", features = ["client"] }
 
 [dev-dependencies]
 serial_test = "0.3"
@@ -48,6 +48,9 @@ default = []
 stable = ["default"]
 
 experimental = [
+  # The experimental feature extends stable:
+  "stable",
+  # The following features are experimental:
   "contract",
   "contract-registry",
   "execute",

@@ -18,11 +18,13 @@ use transact::protocol::batch::BatchPair;
 use transact::protocol::transaction::{HashMethod, TransactionHeader};
 use transact::protos::FromBytes;
 
-use crate::consensus::ProposalId;
+use splinter::{
+    consensus::ProposalId,
+    service::ServiceNetworkSender,
+    signing::{hash::HashVerifier, SignatureVerifier},
+};
+
 use crate::hex::parse_hex;
-use crate::service::ServiceNetworkSender;
-use crate::signing::hash::HashVerifier;
-use crate::signing::SignatureVerifier;
 
 use super::error::ScabbardError;
 
