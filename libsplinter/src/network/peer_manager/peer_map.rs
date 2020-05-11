@@ -82,12 +82,13 @@ impl PeerMap {
         connection_id: String,
         endpoints: Vec<String>,
         active_endpoint: String,
+        status: PeerStatus,
     ) {
         let peer_metadata = PeerMetadata {
             id: peer_id.clone(),
             endpoints: endpoints.clone(),
             active_endpoint,
-            status: PeerStatus::Pending,
+            status,
             connection_id,
             last_connection_attempt: Instant::now(),
             retry_frequency: INITIAL_RETRY_FREQUENCY,
@@ -179,6 +180,7 @@ pub mod tests {
             "connection_id_1".to_string(),
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
+            PeerStatus::Connected,
         );
 
         peer_map.insert(
@@ -186,6 +188,7 @@ pub mod tests {
             "connection_id_2".to_string(),
             vec!["endpoint1".to_string(), "endpoint2".to_string()],
             "next_endpoint1".to_string(),
+            PeerStatus::Connected,
         );
 
         let mut peers = peer_map.peer_ids();
@@ -211,6 +214,7 @@ pub mod tests {
             "connection_id_1".to_string(),
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
+            PeerStatus::Connected,
         );
 
         peer_map.insert(
@@ -218,6 +222,7 @@ pub mod tests {
             "connection_id_2".to_string(),
             vec!["endpoint1".to_string(), "endpoint2".to_string()],
             "next_endpoint1".to_string(),
+            PeerStatus::Connected,
         );
 
         let peers = peer_map.connection_ids();
@@ -249,6 +254,7 @@ pub mod tests {
             "connection_id".to_string(),
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
+            PeerStatus::Pending,
         );
 
         let peer_metadata = peer_map
@@ -282,6 +288,7 @@ pub mod tests {
             "connection_id".to_string(),
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
+            PeerStatus::Pending,
         );
         assert!(peer_map.peers.contains_key("test_peer"));
 
@@ -315,6 +322,7 @@ pub mod tests {
             "connection_id".to_string(),
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
+            PeerStatus::Pending,
         );
         assert!(peer_map.peers.contains_key("test_peer"));
 
@@ -353,6 +361,7 @@ pub mod tests {
             "connection_id".to_string(),
             vec!["test_endpoint1".to_string(), "test_endpoint2".to_string()],
             "test_endpoint2".to_string(),
+            PeerStatus::Connected,
         );
         assert!(peer_map.peers.contains_key("test_peer"));
 

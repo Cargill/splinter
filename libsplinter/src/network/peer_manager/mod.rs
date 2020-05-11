@@ -442,7 +442,13 @@ fn add_peer(
         endpoint,
     }) = unreferenced_peers.remove(&peer_id)
     {
-        peers.insert(peer_id.clone(), connection_id, endpoints, endpoint);
+        peers.insert(
+            peer_id.clone(),
+            connection_id,
+            endpoints,
+            endpoint,
+            PeerStatus::Connected,
+        );
 
         let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
         return Ok(peer_ref);
@@ -479,6 +485,7 @@ fn add_peer(
         connection_id,
         endpoints.to_vec(),
         active_endpoint,
+        PeerStatus::Pending,
     );
     let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
     Ok(peer_ref)
@@ -608,13 +615,34 @@ fn handle_notifications(
                 "Received peer connection from {} (remote endpoint: {})",
                 identity, endpoint
             );
-            unreferenced_peers.insert(
-                identity,
-                UnreferencedPeer {
-                    connection_id,
-                    endpoint,
-                },
-            );
+
+            // If we got an inbound counnection for an existing peer, replace old connection with
+            // this new one.
+            if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
+                peer_metadata.status = PeerStatus::Connected;
+                peer_metadata.connection_id = connection_id;
+
+                if let Err(err) = connector.remove_connection(&peer_metadata.active_endpoint) {
+                    error!("Unable to clean up old connection: {}", err);
+                }
+                let notification = PeerManagerNotification::Connected {
+                    peer: peer_metadata.id.to_string(),
+                };
+                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+
+                peer_metadata.active_endpoint = endpoint;
+                if let Err(err) = peers.update_peer(peer_metadata) {
+                    error!("Unable to update peer: {}", err);
+                }
+            } else {
+                unreferenced_peers.insert(
+                    identity,
+                    UnreferencedPeer {
+                        connection_id,
+                        endpoint,
+                    },
+                );
+            }
         }
         ConnectionManagerNotification::Connected {
             endpoint,

@@ -294,7 +294,10 @@ where
                 }
             }
         } else {
-            error!("Received message from unknown peer");
+            error!(
+                "Received message from unknown peer with connection_id {}",
+                connection_id
+            );
         }
     }
 }
@@ -335,8 +338,27 @@ where
 
         // if peer exists, send message over the network
         if let Some(connection_id) = connection_id {
-            if let Err(err) = message_sender.send(connection_id, payload) {
-                error!("Unable to send message to {}: {}", recipient, err);
+            // If connection is missing, check with peer manager to see if connection id has
+            // changed and try to resend message. Otherwise remove cached connection_id.
+            if let Err(err) = message_sender.send(connection_id.to_string(), payload.to_vec()) {
+                if let Some(new_connection_id) =
+                    peer_connector.connection_id(&recipient).map_err(|err| {
+                        format!("Unable to get connection id for {}: {}", recipient, err)
+                    })?
+                {
+                    // if connection_id has changed replace it and try to send again
+                    if new_connection_id != connection_id {
+                        peer_id_to_connection_id
+                            .insert(recipient.clone(), new_connection_id.clone());
+                        if let Err(err) = message_sender.send(new_connection_id, payload) {
+                            error!("Unable to send message to {}: {}", recipient, err);
+                        }
+                    }
+                } else {
+                    error!("Unable to send message to {}: {}", recipient, err);
+                    // remove cached connection id, peer has gone away
+                    peer_id_to_connection_id.remove(&recipient);
+                }
             }
         } else {
             error!("Cannot send message, unknown peer: {}", recipient);
