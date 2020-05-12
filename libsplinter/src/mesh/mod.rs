@@ -140,9 +140,9 @@ impl Mesh {
         connection: Box<dyn Connection>,
         unique_id: String,
     ) -> Result<usize, AddError> {
+        let mut state = self.state.write().map_err(|_| AddError::PoisonedLock)?;
         let outgoing = self.ctrl.add(connection)?;
         let mesh_id = outgoing.id();
-        let mut state = self.state.write().map_err(|_| AddError::PoisonedLock)?;
 
         state.outgoings.insert(mesh_id, outgoing);
         state.unique_ids.insert(unique_id, mesh_id);
