@@ -38,7 +38,9 @@ const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
 pub(crate) enum AuthorizationState {
     Unknown,
     Connecting,
-    Authorized,
+    RemoteIdentified(String),
+    RemoteAccepted,
+    Authorized(String),
     Unauthorized,
 }
 
@@ -47,7 +49,9 @@ impl fmt::Display for AuthorizationState {
         f.write_str(match self {
             AuthorizationState::Unknown => "Unknown",
             AuthorizationState::Connecting => "Connecting",
-            AuthorizationState::Authorized => "Authorized",
+            AuthorizationState::RemoteIdentified(_) => "Remote Identified",
+            AuthorizationState::RemoteAccepted => "Remote Accepted",
+            AuthorizationState::Authorized(_) => "Authorized",
             AuthorizationState::Unauthorized => "Unauthorized",
         })
     }
@@ -61,6 +65,7 @@ pub(crate) enum AuthorizationAction {
     Connecting,
     TrustIdentifying(Identity),
     Unauthorizing,
+    RemoteAuthorizing,
 }
 
 impl fmt::Display for AuthorizationAction {
@@ -69,6 +74,7 @@ impl fmt::Display for AuthorizationAction {
             AuthorizationAction::Connecting => f.write_str("Connecting"),
             AuthorizationAction::TrustIdentifying(_) => f.write_str("TrustIdentifying"),
             AuthorizationAction::Unauthorizing => f.write_str("Unauthorizing"),
+            AuthorizationAction::RemoteAuthorizing => f.write_str("RemoteAuthorizing"),
         }
     }
 }
@@ -264,8 +270,8 @@ impl AuthorizationConnector {
                     }
                 };
 
-                if shared.is_complete(&connection_id).is_some() {
-                    break 'main shared.cleanup_connection_state(&connection_id);
+                if let Some(true) = shared.is_complete(&connection_id) {
+                    break 'main shared.take_connection_identity(&connection_id);
                 }
             };
 
@@ -281,6 +287,7 @@ impl AuthorizationConnector {
                     connection,
                 }
             };
+
             if let Err(err) = on_complete_callback(auth_state) {
                 error!("unable to pass auth result to callback: {}", err);
             }
@@ -339,20 +346,19 @@ impl AuthorizationManagerStateMachine {
 
         let cur_state = shared
             .states
-            .get(connection_id)
-            .unwrap_or(&AuthorizationState::Unknown);
-        match *cur_state {
+            .entry(connection_id.to_string())
+            .or_insert(AuthorizationState::Unknown);
+
+        if action == AuthorizationAction::Unauthorizing {
+            *cur_state = AuthorizationState::Unauthorized;
+            return Ok(AuthorizationState::Unauthorized);
+        }
+
+        match &*cur_state {
             AuthorizationState::Unknown => match action {
                 AuthorizationAction::Connecting => {
-                    // Here the decision for Challenges will be made.
-                    shared
-                        .states
-                        .insert(connection_id.to_string(), AuthorizationState::Connecting);
+                    *cur_state = AuthorizationState::Connecting;
                     Ok(AuthorizationState::Connecting)
-                }
-                AuthorizationAction::Unauthorizing => {
-                    shared.mark_complete(connection_id, None);
-                    Ok(AuthorizationState::Unauthorized)
                 }
                 _ => Err(AuthorizationActionError::InvalidMessageOrder(
                     AuthorizationState::Unknown,
@@ -362,24 +368,39 @@ impl AuthorizationManagerStateMachine {
             AuthorizationState::Connecting => match action {
                 AuthorizationAction::Connecting => Err(AuthorizationActionError::AlreadyConnecting),
                 AuthorizationAction::TrustIdentifying(identity) => {
+                    let new_state = AuthorizationState::RemoteIdentified(identity);
+                    *cur_state = new_state.clone();
                     // Verify pub key allowed
-                    shared.mark_complete(connection_id, Some(identity));
-                    Ok(AuthorizationState::Authorized)
+                    Ok(new_state)
                 }
-                AuthorizationAction::Unauthorizing => {
-                    shared.mark_complete(connection_id, None);
-
-                    Ok(AuthorizationState::Unauthorized)
-                }
-            },
-            AuthorizationState::Authorized => match action {
-                AuthorizationAction::Unauthorizing => {
-                    shared.mark_complete(connection_id, None);
-
-                    Ok(AuthorizationState::Unauthorized)
+                AuthorizationAction::RemoteAuthorizing => {
+                    *cur_state = AuthorizationState::RemoteAccepted;
+                    Ok(AuthorizationState::RemoteAccepted)
                 }
                 _ => Err(AuthorizationActionError::InvalidMessageOrder(
-                    AuthorizationState::Authorized,
+                    AuthorizationState::Connecting,
+                    action,
+                )),
+            },
+            AuthorizationState::RemoteIdentified(identity) => match action {
+                AuthorizationAction::RemoteAuthorizing => {
+                    let new_state = AuthorizationState::Authorized(identity.clone());
+                    *cur_state = new_state.clone();
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidMessageOrder(
+                    AuthorizationState::RemoteIdentified(identity.clone()),
+                    action,
+                )),
+            },
+            AuthorizationState::RemoteAccepted => match action {
+                AuthorizationAction::TrustIdentifying(identity) => {
+                    let new_state = AuthorizationState::Authorized(identity);
+                    *cur_state = new_state.clone();
+                    Ok(new_state)
+                }
+                _ => Err(AuthorizationActionError::InvalidMessageOrder(
+                    AuthorizationState::RemoteAccepted,
                     action,
                 )),
             },
@@ -394,32 +415,32 @@ impl AuthorizationManagerStateMachine {
 #[derive(Default)]
 struct ManagedAuthorizations {
     states: HashMap<String, AuthorizationState>,
-    complete_and_authorized: HashMap<String, Option<String>>,
 }
 
 impl ManagedAuthorizations {
     fn new() -> Self {
         Self {
             states: HashMap::new(),
-            complete_and_authorized: HashMap::new(),
         }
     }
 
-    fn cleanup_connection_state(&mut self, connection_id: &str) -> Option<String> {
-        self.states.remove(connection_id);
-        self.complete_and_authorized.remove(connection_id).flatten()
-    }
-
-    // Mark complete with an optional identity
-    fn mark_complete(&mut self, connection_id: &str, authorized_identity: Option<String>) {
-        self.complete_and_authorized
-            .insert(connection_id.to_string(), authorized_identity);
+    fn take_connection_identity(&mut self, connection_id: &str) -> Option<String> {
+        self.states
+            .remove(connection_id)
+            .and_then(|state| match state {
+                AuthorizationState::Authorized(identity) => Some(identity),
+                _ => None,
+            })
     }
 
     fn is_complete(&self, connection_id: &str) -> Option<bool> {
-        self.complete_and_authorized
+        self.states
             .get(connection_id)
-            .map(|ident| ident.is_some())
+            .and_then(|state| match state {
+                AuthorizationState::Authorized(_) => Some(true),
+                AuthorizationState::Unauthorized => Some(true),
+                _ => Some(false),
+            })
     }
 }
 
@@ -433,6 +454,26 @@ pub enum ConnectionAuthorizationState {
         connection_id: String,
         connection: Box<dyn Connection>,
     },
+}
+
+impl std::fmt::Debug for ConnectionAuthorizationState {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ConnectionAuthorizationState::Authorized {
+                connection_id,
+                identity,
+                ..
+            } => f
+                .debug_struct("Authorized")
+                .field("connection_id", connection_id)
+                .field("identity", identity)
+                .finish(),
+            ConnectionAuthorizationState::Unauthorized { connection_id, .. } => f
+                .debug_struct("Unauthorized")
+                .field("connection_id", connection_id)
+                .finish(),
+        }
+    }
 }
 
 #[cfg(test)]

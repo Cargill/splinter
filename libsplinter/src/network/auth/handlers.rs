@@ -26,8 +26,8 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::protos::prelude::*;
 
 use super::{
-    AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessageSender,
-    AuthorizationState,
+    AuthorizationAction, AuthorizationActionError, AuthorizationManagerStateMachine,
+    AuthorizationMessageSender, AuthorizationState,
 };
 
 /// Create a Dispatcher for Authorization messages
@@ -50,7 +50,7 @@ pub fn create_authorization_dispatcher(
 
     auth_dispatcher.set_handler(Box::new(TrustRequestHandler::new(auth_manager.clone())));
 
-    auth_dispatcher.set_handler(Box::new(AuthorizedHandler));
+    auth_dispatcher.set_handler(Box::new(AuthorizedHandler::new(auth_manager.clone())));
 
     auth_dispatcher.set_handler(Box::new(AuthorizationErrorHandler::new(auth_manager)));
 
@@ -103,7 +103,15 @@ impl Handler for AuthorizationMessageHandler {
     }
 }
 
-pub struct AuthorizedHandler;
+pub struct AuthorizedHandler {
+    auth_manager: AuthorizationManagerStateMachine,
+}
+
+impl AuthorizedHandler {
+    fn new(auth_manager: AuthorizationManagerStateMachine) -> Self {
+        Self { auth_manager }
+    }
+}
 
 impl Handler for AuthorizedHandler {
     type Source = ConnectionId;
@@ -120,10 +128,31 @@ impl Handler for AuthorizedHandler {
         context: &MessageContext<Self::Source, Self::MessageType>,
         _sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
-        debug!("Connection {} authorized", context.source_connection_id());
+        debug!(
+            "Received authorize message from {}",
+            context.source_connection_id()
+        );
+        match self.auth_manager.next_state(
+            context.source_connection_id(),
+            AuthorizationAction::RemoteAuthorizing,
+        ) {
+            Err(err) => {
+                warn!(
+                    "Ignoring authorize message from {}: {}",
+                    context.source_connection_id(),
+                    err
+                );
+            }
+
+            Ok(_) => {
+                debug!("Authorized by {}", context.source_connection_id());
+            }
+        }
+
         Ok(())
     }
 }
+
 ///
 /// Handler for the Connect Request Authorization Message Type
 struct ConnectRequestHandler {
@@ -156,9 +185,15 @@ impl Handler for ConnectRequestHandler {
             context.source_connection_id(),
             AuthorizationAction::Connecting,
         ) {
-            Err(err) => {
+            Err(AuthorizationActionError::AlreadyConnecting) => {
                 debug!(
-                    "Ignoring duplicate connect message from {}: {}",
+                    "Ignoring duplicate connect request from {}",
+                    context.source_connection_id(),
+                );
+            }
+            Err(err) => {
+                warn!(
+                    "Ignoring connect message from {}: {}",
                     context.source_connection_id(),
                     err
                 );
@@ -303,16 +338,18 @@ impl Handler for TrustRequestHandler {
             AuthorizationAction::TrustIdentifying(trust_request.identity),
         ) {
             Err(err) => {
-                debug!(
+                warn!(
                     "Ignoring trust request message from connection {}: {}",
                     context.source_connection_id(),
                     err
                 );
             }
-            Ok(AuthorizationState::Authorized) => {
+            Ok(AuthorizationState::RemoteIdentified(identity))
+            | Ok(AuthorizationState::Authorized(identity)) => {
                 debug!(
-                    "Sending Authorized message to connection {}",
-                    context.source_connection_id()
+                    "Sending Authorized message to connection {} after receiving identity {}",
+                    context.source_connection_id(),
+                    identity,
                 );
                 let auth_msg = AuthorizationMessage::Authorized(Authorized);
                 let mut msg = NetworkMessage::new();
