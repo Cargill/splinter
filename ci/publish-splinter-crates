@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Description:
-#   Builds an environment to publish libsplinter to crates.io.
+#   Builds an environment to publish libsplinter and libscabbard to crates.io.
 #   Your crates api token must be passed in as CARGO_CRED at runtime
 #   using Docker's -e option.
 
@@ -48,6 +48,11 @@ WORKDIR /project/splinter/libsplinter
 
 CMD cargo login $CARGO_CRED \
  && rm -f ../Cargo.lock ./Cargo.lock \
+ && cargo clean \
+ && cargo test \
+ && cargo publish \
+ && cd /project/splinter/services/scabbard/libscabbard \
+ && rm -f ../../../Cargo.lock ./Cargo.lock \
  && cargo clean \
  && cargo test \
  && cargo publish
