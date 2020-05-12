@@ -65,6 +65,7 @@ pub type SubscriberId = usize;
 type Subscriber =
     Box<dyn Fn(ConnectionManagerNotification) -> Result<(), Box<dyn std::error::Error>> + Send>;
 
+/// Responsible for broadcasting connection manager notifications.
 struct SubscriberMap {
     subscribers: HashMap<SubscriberId, Subscriber>,
     next_id: SubscriberId,
@@ -105,6 +106,7 @@ impl SubscriberMap {
     }
 }
 
+/// Messages handled by the connection manager.
 enum CmMessage {
     Shutdown,
     Request(CmRequest),
@@ -112,6 +114,7 @@ enum CmMessage {
     SendHeartbeats,
 }
 
+/// CmMessages sent by a Connector.
 enum CmRequest {
     RequestOutboundConnection {
         endpoint: String,
@@ -139,6 +142,8 @@ enum CmRequest {
     },
 }
 
+/// Messages sent to ConnectionState to report on the status of a connection
+/// authorization attempt.
 enum AuthResult {
     Outbound {
         endpoint: String,
@@ -328,6 +333,9 @@ where
     }
 }
 
+/// Creates, manages, and maintains connections. A connection manager
+/// guarantees that the connections it creates will be maintained via
+/// reconnections. This is not true for external connections.
 pub struct ConnectionManager {
     pacemaker: pacemaker::Pacemaker,
     join_handle: thread::JoinHandle<()>,
@@ -358,6 +366,9 @@ impl ConnectionManager {
         }
     }
 
+    /// Blocks until a connection manager has shutdown. This is meant to allow
+    /// a separate process to shutdown the connection manager via the shutdown
+    /// handle while another process waits for that process to complete.
     pub fn await_shutdown(self) {
         debug!("Shutting down connection manager pacemaker...");
         self.pacemaker.await_shutdown();
@@ -372,6 +383,8 @@ impl ConnectionManager {
     }
 }
 
+/// Connector is a client or handle to the connection manager and is used to
+/// send request to the connection manager.
 #[derive(Clone)]
 pub struct Connector {
     sender: Sender<CmMessage>,
@@ -387,7 +400,7 @@ impl Connector {
     ///
     /// # Errors
     ///
-    /// An error is returned if the connection cannot be created
+    /// An error is returned if the connection cannot be created.
     pub fn request_connection(
         &self,
         endpoint: &str,
@@ -413,15 +426,15 @@ impl Connector {
         })?
     }
 
-    /// Removes a connection
+    /// Removes a connection from a connection manager.
     ///
-    ///  # Returns
+    /// # Returns
     ///
-    ///  The endpoint, if the connection exists; None, otherwise.
+    /// The endpoint, if the connection exists; None, otherwise.
     ///
-    ///  # Errors
+    /// # Errors
     ///
-    ///  Returns a ConnectionManagerError if the query cannot be performed.
+    /// Returns a ConnectionManagerError if the query cannot be performed.
     pub fn remove_connection(
         &self,
         endpoint: &str,
@@ -486,6 +499,12 @@ impl Connector {
         })?
     }
 
+    /// Unsubscribe to connection manager notifications.
+    ///
+    /// # Errors
+    ///
+    /// Returns a ConnectionManagerError is the connection manager
+    /// has stopped running.
     pub fn unsubscribe(&self, subscriber_id: SubscriberId) -> Result<(), ConnectionManagerError> {
         let (sender, recv) = channel();
         self.sender
@@ -532,6 +551,12 @@ impl Connector {
         })?
     }
 
+    /// Add a new inbound connection.
+    ///
+    /// # Error
+    ///
+    /// Returns a ConnectionManagerError if the connection manager is
+    /// no longer running.
     pub fn add_inbound_connection(
         &self,
         connection: Box<dyn Connection>,
@@ -556,7 +581,7 @@ impl Connector {
     }
 }
 
-/// Signals shutdown to the ConnectionManager
+/// Sends a shutdown signal to the connection manager.
 #[derive(Clone)]
 pub struct ShutdownSignaler {
     sender: Sender<CmMessage>,
@@ -564,7 +589,7 @@ pub struct ShutdownSignaler {
 }
 
 impl ShutdownSignaler {
-    /// Signal the ConnectionManager to shutdown.
+    /// Signal the connection manager to shutdown.
     pub fn shutdown(self) {
         self.pacemaker_shutdown_signaler.shutdown();
 
@@ -574,6 +599,7 @@ impl ShutdownSignaler {
     }
 }
 
+/// Metadata describing a connection managed by the connection manager.
 #[derive(Clone, Debug)]
 struct ConnectionMetadata {
     connection_id: String,
@@ -600,6 +626,8 @@ impl ConnectionMetadata {
     }
 }
 
+/// Enum describing metadata that is specific to the two different connection
+/// types, outbound and inbound.
 #[derive(Clone, Debug)]
 enum ConnectionMetadataExt {
     Outbound {
@@ -613,6 +641,9 @@ enum ConnectionMetadataExt {
     },
 }
 
+/// Struct describing the connection manager's internal state and handling
+/// requests sent to the connection manager by its Connectors. Connection state
+/// is responsible for adding, removing, and authorizing connections.
 struct ConnectionManagerState<T, U>
 where
     T: ConnectionMatrixLifeCycle,
@@ -645,6 +676,7 @@ where
         }
     }
 
+    /// Adds a new connection as an inbound connection.
     fn add_inbound_connection(
         &mut self,
         connection: Box<dyn Connection>,
@@ -655,7 +687,7 @@ where
         let endpoint = connection.remote_endpoint();
         let id = Uuid::new_v4().to_string();
 
-        // add the connection to the authorization pool
+        // add the connection to the authorization pool.
         let auth_endpoint = endpoint;
         if let Err(err) = authorizer.authorize_connection(
             id,
@@ -682,6 +714,7 @@ where
         }
     }
 
+    /// Adds a new outbound connection.
     fn add_outbound_connection(
         &mut self,
         endpoint: &str,
@@ -694,7 +727,7 @@ where
         if let Some(connection) = self.connections.get(endpoint) {
             let identity = connection.identity().to_string();
             // if this connection not reconnecting or disconnected, send Connected
-            // notification
+            // notification.
             match connection.extended_metadata {
                 ConnectionMetadataExt::Outbound {
                     ref reconnecting, ..
@@ -724,7 +757,7 @@ where
         } else {
             match self.transport.connect(endpoint) {
                 Ok(connection) => {
-                    // add the connection to the authorization pool
+                    // add the connection to the authorization pool.
                     let auth_endpoint = endpoint.to_string();
                     if let Err(err) = authorizer.authorize_connection(
                         connection_id,
@@ -764,6 +797,18 @@ where
         }
     }
 
+    /// Adds outbound connection to matrix life cycle after the connection has
+    /// been authorized. These connections cannot be reconnected when dropped
+    /// or lost.
+    ///
+    /// # Returns
+    ///
+    /// A string representing the Connection ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns a connection manager error if the connection is unauthorized or
+    /// if the life cycle fails to add the connection.
     fn on_outbound_authorization_complete(
         &mut self,
         endpoint: String,
@@ -814,7 +859,7 @@ where
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
                 // If the connection is unauthorized, notify subscriber this is a bad connection
-                // and will not be added
+                // and will not be added.
                 subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
                     endpoint,
                     error: ConnectionManagerError::Unauthorized(connection_id),
@@ -823,6 +868,12 @@ where
         }
     }
 
+    /// Adds inbound connection to matrix life cycle after it has been authorized.
+    ///
+    /// # Errors
+    ///
+    /// Returns a connection manager error if the connection is unauthorized or
+    /// if the life cycle fails to add the connection.
     fn on_inbound_authorization_complete(
         &mut self,
         endpoint: String,
@@ -869,7 +920,7 @@ where
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
                 // If the connection is unauthorized, notify subscriber this is a bad connection
-                // and will not be added
+                // and will not be added.
                 subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
                     endpoint,
                     error: ConnectionManagerError::Unauthorized(connection_id),
@@ -878,6 +929,16 @@ where
         }
     }
 
+    /// Removes connection from state.
+    ///
+    /// # Returns
+    ///
+    /// Returns metadata for the connection if available.
+    ///
+    /// # Errors
+    ///
+    /// ConnectionManagerError if the connection cannot be removed from
+    /// the matrix life cycle.
     fn remove_connection(
         &mut self,
         endpoint: &str,
@@ -902,6 +963,12 @@ where
         Ok(Some(meta))
     }
 
+    /// Handles reconnection operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns ConnectionManagerError if reconnection operation fails due to
+    /// an error caused by the matrix life cycle.
     fn reconnect(
         &mut self,
         endpoint: &str,
@@ -991,6 +1058,7 @@ where
     }
 }
 
+/// Auxiliary method for handling requests sent to the connection manager.
 fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     req: CmRequest,
     state: &mut ConnectionManagerState<T, U>,
@@ -1053,6 +1121,7 @@ fn handle_request<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     };
 }
 
+/// Auxiliary method for handling CmManager::AuthResult messages sent to connection manager.
 fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     auth_result: AuthResult,
     state: &mut ConnectionManagerState<T, U>,
@@ -1074,6 +1143,8 @@ fn handle_auth_result<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     }
 }
 
+/// Auxiliary method for handling CmManager::SendHeartBeats messages sent to
+/// connection manager.
 fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     state: &mut ConnectionManagerState<T, U>,
     subscribers: &mut SubscriberMap,
@@ -1157,6 +1228,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
     }
 }
 
+/// Creates NetworkHeartbeat message and serializes it into a byte array.
 fn create_heartbeat() -> Result<Vec<u8>, ConnectionManagerError> {
     let heartbeat = NetworkHeartbeat::new().write_to_bytes().map_err(|_| {
         ConnectionManagerError::HeartbeatError("cannot create NetworkHeartbeat message".to_string())
