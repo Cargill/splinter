@@ -148,7 +148,7 @@ pub struct PeerManager {
     join_handle: Option<thread::JoinHandle<()>>,
     sender: Option<Sender<PeerManagerMessage>>,
     shutdown_handle: Option<ShutdownHandle>,
-    max_retry_attempts: Option<u64>,
+    max_retry_attempts: u64,
     retry_interval: u64,
 }
 
@@ -158,14 +158,13 @@ impl PeerManager {
         max_retry_attempts: Option<u64>,
         retry_interval: Option<u64>,
     ) -> Self {
-        let retry_interval = retry_interval.unwrap_or(DEFAULT_PACEMAKER_INTERVAL);
         PeerManager {
             connection_manager_connector: connector,
             join_handle: None,
             sender: None,
             shutdown_handle: None,
-            max_retry_attempts,
-            retry_interval,
+            max_retry_attempts: max_retry_attempts.unwrap_or(DEFAULT_MAXIMUM_RETRY_ATTEMPTS),
+            retry_interval: retry_interval.unwrap_or(DEFAULT_PACEMAKER_INTERVAL),
         }
     }
 
@@ -173,6 +172,11 @@ impl PeerManager {
     ///
     /// Returns a PeerManagerConnector that can be used to send requests to the PeerManager.
     pub fn start(&mut self) -> Result<PeerManagerConnector, PeerManagerError> {
+        debug!(
+            "Starting peer manager with retry_interval={}s, max_retry_attempts={}",
+            &self.retry_interval, &self.max_retry_attempts
+        );
+
         let (sender, recv) = channel();
         if self.sender.is_some() {
             return Err(PeerManagerError::StartUpError(
@@ -203,10 +207,8 @@ impl PeerManager {
             .map_err(|err| PeerManagerError::StartUpError(err.to_string()))?;
 
         let pacemaker_shutdown_signaler = pacemaker.shutdown_signaler();
+        let max_retry_attempts = self.max_retry_attempts;
 
-        let max_retry_attempts = self
-            .max_retry_attempts
-            .unwrap_or(DEFAULT_MAXIMUM_RETRY_ATTEMPTS);
         let join_handle = thread::Builder::new()
             .name("Peer Manager".into())
             .spawn(move || {
@@ -288,15 +290,18 @@ impl PeerManager {
     }
 
     pub fn await_shutdown(self) {
+        debug!("Shutting down peer manager...");
         let join_handle = if let Some(jh) = self.join_handle {
             jh
         } else {
+            debug!("Shutting down peer manager (complete, no threads existed)");
             return;
         };
 
         if let Err(err) = join_handle.join() {
             error!("Peer manager thread did not shutdown correctly: {:?}", err);
         }
+        debug!("Shutting down peer manager (complete)");
     }
 
     pub fn shutdown_and_wait(self) {

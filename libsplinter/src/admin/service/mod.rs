@@ -209,7 +209,7 @@ impl AdminService {
                 let notification = match subscriber.next() {
                     Some(notification) => notification,
                     None => {
-                        warn!("PeerManager has shutdown");
+                        warn!("Admin service received None while listening to peer manager notifications, indicating remote thread has shutdown");
                         break;
                     }
                 };
