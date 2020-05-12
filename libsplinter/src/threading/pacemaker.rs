@@ -18,7 +18,7 @@ use std::sync::{
     Arc,
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::error::PacemakerStartError;
 
@@ -95,16 +95,23 @@ where
         let join_handle = thread::Builder::new()
             .name("Pacemaker".into())
             .spawn(move || {
+                let mut start = Instant::now();
+                let loop_duration = Duration::from_secs(1);
+                let pace_duration = Duration::from_secs(interval);
+
                 while running_clone.load(Ordering::SeqCst) {
-                    if let Err(err) = sender.send(new_message()) {
-                        warn!(
-                            "Sender has disconnected before \
-                            shutting down pacemaker {:?}",
-                            err
-                        );
-                        break;
+                    if start.elapsed() >= pace_duration {
+                        start = Instant::now();
+                        if let Err(err) = sender.send(new_message()) {
+                            warn!(
+                                "Sender has disconnected before \
+                                shutting down pacemaker {:?}",
+                                err
+                            );
+                            break;
+                        }
                     }
-                    thread::sleep(Duration::from_secs(interval));
+                    thread::sleep(loop_duration);
                 }
             })
             .map_err(|err| PacemakerStartError(err.to_string()))?;
