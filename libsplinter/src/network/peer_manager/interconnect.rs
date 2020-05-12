@@ -397,7 +397,7 @@ pub mod tests {
         dispatch_channel, DispatchError, DispatchLoopBuilder, Dispatcher, Handler, MessageContext,
         MessageSender, PeerId,
     };
-    use crate::network::peer_manager::PeerManager;
+    use crate::network::peer_manager::{PeerManager, PeerManagerNotification};
     use crate::protos::network::NetworkEcho;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
@@ -523,14 +523,26 @@ pub mod tests {
 
         let dispatch_shutdown = network_dispatch_loop.shutdown_signaler();
 
+        let mut subscriber = peer_connector
+            .subscribe()
+            .expect("Unable to get subscriber");
+
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["test".to_string()])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id, "test_peer");
 
-        // wait to be told to shutdown, timeout after 2 seconds
-        let test_timeout = std::time::Duration::from_secs(2);
+        let notification = subscriber.next().expect("Unable to get notification");
+        assert_eq!(
+            notification,
+            PeerManagerNotification::Connected {
+                peer: "test_peer".to_string()
+            }
+        );
+
+        // wait to be told to shutdown, timeout after 60 seconds
+        let test_timeout = std::time::Duration::from_secs(60);
         recv.recv_timeout(test_timeout)
             .expect("Failed to receive message");
 
