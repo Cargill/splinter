@@ -97,9 +97,11 @@ impl Listener for TcpListener {
         let frame_version = FrameNegotiation::inbound(FrameVersion::V1)
             .negotiate(&mut stream)
             .map_err(|err| match err {
-                FrameError::UnsupportedVersion => AcceptError::ProtocolError(
-                    "Unable to connect; local version not supported by remote".into(),
-                ),
+                FrameError::UnsupportedVersion => AcceptError::ProtocolError(format!(
+                    "Local {} protocol version {} not supported by remote",
+                    PROTOCOL_PREFIX,
+                    FrameVersion::V1
+                )),
                 FrameError::IoError(err) => AcceptError::from(err),
                 err => AcceptError::ProtocolError(format!("Unexpected protocol error: {}", err)),
             })?;

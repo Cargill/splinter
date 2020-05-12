@@ -70,6 +70,12 @@ pub enum FrameVersion {
     V1 = 1,
 }
 
+impl std::fmt::Display for FrameVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "v{}", *self as u32)
+    }
+}
+
 /// A complete Frame of transmitted data.
 ///
 /// This struct owns the data that has been transmitted.  It is essentially a receiving frame.
