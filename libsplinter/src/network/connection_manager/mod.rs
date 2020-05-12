@@ -858,6 +858,9 @@ where
                 });
             }
             AuthorizationResult::Unauthorized { connection_id, .. } => {
+                if self.connections.remove(&endpoint).is_some() {
+                    warn!("Reconnecting connection failed authorization");
+                }
                 // If the connection is unauthorized, notify subscriber this is a bad connection
                 // and will not be added.
                 subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
