@@ -198,7 +198,7 @@ impl Worker {
 
                     match msg {
                         Message::NewJob(job) => {
-                            debug!("Worker {} received job; executing.", id);
+                            trace!("Worker {} received job; executing.", id);
                             job.call_box();
                         }
                         Message::Terminate => {
