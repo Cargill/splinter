@@ -12,25 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod handlers;
+mod connection_manager;
+mod handlers;
+mod pool;
 
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{
-    mpsc::{channel, Receiver},
-    Arc, Mutex,
-};
+use std::sync::{mpsc, Arc, Mutex};
 
-use crate::network::Network;
+use protobuf::Message;
+
+use crate::protocol::authorization::{AuthorizationMessage, ConnectRequest};
+use crate::protos::authorization;
+use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::protos::prelude::*;
+use crate::transport::{Connection, RecvError};
+
+use self::handlers::create_authorization_dispatcher;
+use self::pool::{ThreadPool, ThreadPoolBuilder};
+
+const AUTHORIZATION_THREAD_POOL_SIZE: usize = 8;
 
 /// The states of a connection during authorization.
 #[derive(PartialEq, Debug, Clone)]
-enum AuthorizationState {
+pub(crate) enum AuthorizationState {
     Unknown,
     Connecting,
     Authorized,
     Unauthorized,
-    Internal,
 }
 
 impl fmt::Display for AuthorizationState {
@@ -40,16 +49,15 @@ impl fmt::Display for AuthorizationState {
             AuthorizationState::Connecting => "Connecting",
             AuthorizationState::Authorized => "Authorized",
             AuthorizationState::Unauthorized => "Unauthorized",
-            AuthorizationState::Internal => "Internal",
         })
     }
 }
 
 type Identity = String;
 
-/// The state transitions that can be applied on an connection during authorization.
+/// The state transitions that can be applied on a connection during authorization.
 #[derive(PartialEq, Debug)]
-enum AuthorizationAction {
+pub(crate) enum AuthorizationAction {
     Connecting,
     TrustIdentifying(Identity),
     Unauthorizing,
@@ -57,20 +65,20 @@ enum AuthorizationAction {
 
 impl fmt::Display for AuthorizationAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match self {
-            AuthorizationAction::Connecting => "Connecting",
-            AuthorizationAction::TrustIdentifying(_) => "TrustIdentifying",
-            AuthorizationAction::Unauthorizing => "Unauthorizing",
-        })
+        match self {
+            AuthorizationAction::Connecting => f.write_str("Connecting"),
+            AuthorizationAction::TrustIdentifying(_) => f.write_str("TrustIdentifying"),
+            AuthorizationAction::Unauthorizing => f.write_str("Unauthorizing"),
+        }
     }
 }
 
 /// The errors that may occur for a connection during authorization.
 #[derive(PartialEq, Debug)]
-enum AuthorizationActionError {
+pub(crate) enum AuthorizationActionError {
     AlreadyConnecting,
     InvalidMessageOrder(AuthorizationState, AuthorizationAction),
-    ConnectionLost,
+    InternalError(String),
 }
 
 impl fmt::Display for AuthorizationActionError {
@@ -82,113 +90,268 @@ impl fmt::Display for AuthorizationActionError {
             AuthorizationActionError::InvalidMessageOrder(start, action) => {
                 write!(f, "Attempting to transition from {} via {}.", start, action)
             }
-            AuthorizationActionError::ConnectionLost => {
-                f.write_str("Connection lost while authorizing peer")
-            }
+            AuthorizationActionError::InternalError(msg) => f.write_str(&msg),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct AuthorizationCallbackError(pub String);
+pub struct AuthorizationManagerError(pub String);
 
-impl std::error::Error for AuthorizationCallbackError {}
+impl std::error::Error for AuthorizationManagerError {}
 
-impl fmt::Display for AuthorizationCallbackError {
+impl fmt::Display for AuthorizationManagerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "unable to register callback: {}", self.0)
+        f.write_str(&self.0)
     }
 }
 
-pub trait AuthorizationInquisitor: Send {
-    /// Register a callback to receive notifications about peer authorization statuses.
-    fn register_callback(
-        &self,
-        callback: Box<dyn AuthorizationCallback>,
-    ) -> Result<(), AuthorizationCallbackError>;
-
-    /// Indicates whether or not a peer is authorized.
-    fn is_authorized(&self, peer_id: &str) -> bool;
-}
-
 /// Manages authorization states for connections on a network.
-#[derive(Clone)]
 pub struct AuthorizationManager {
+    local_identity: String,
+    thread_pool: ThreadPool,
     shared: Arc<Mutex<ManagedAuthorizations>>,
-    network: Network,
-    identity: Identity,
 }
 
 impl AuthorizationManager {
     /// Constructs an AuthorizationManager
-    pub fn new(network: Network, identity: Identity) -> Self {
-        let (disconnect_send, disconnect_receive) = channel();
-        let shared = Arc::new(Mutex::new(ManagedAuthorizations::new(disconnect_receive)));
+    pub fn new(local_identity: String) -> Result<Self, AuthorizationManagerError> {
+        let thread_pool = ThreadPoolBuilder::new()
+            .with_size(AUTHORIZATION_THREAD_POOL_SIZE)
+            .with_prefix("AuthorizationManager-".into())
+            .build()
+            .map_err(|err| AuthorizationManagerError(err.to_string()))?;
 
-        network.add_disconnect_listener(Box::new(move |peer_id: &str| {
-            match disconnect_send.send(peer_id.to_string()) {
-                Ok(()) => (),
-                Err(_) => error!("unable to notify authorization manager of disconnection"),
-            }
-        }));
+        let shared = Arc::new(Mutex::new(ManagedAuthorizations::new()));
 
-        AuthorizationManager {
+        Ok(Self {
+            thread_pool,
             shared,
-            network,
-            identity,
+            local_identity,
+        })
+    }
+
+    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
+        ShutdownSignaler {
+            thread_pool_signaler: self.thread_pool.shutdown_signaler(),
         }
     }
 
+    pub fn wait_for_shutdown(self) {
+        self.thread_pool.join_all()
+    }
+
+    pub fn authorization_connector(&self) -> AuthorizationConnector {
+        AuthorizationConnector {
+            local_identity: self.local_identity.clone(),
+            shared: Arc::clone(&self.shared),
+            executor: self.thread_pool.executor(),
+        }
+    }
+}
+
+pub struct ShutdownSignaler {
+    thread_pool_signaler: pool::ShutdownSignaler,
+}
+
+impl ShutdownSignaler {
+    pub fn shutdown(&self) {
+        self.thread_pool_signaler.shutdown();
+    }
+}
+
+type Callback =
+    Box<dyn Fn(ConnectionAuthorizationState) -> Result<(), Box<dyn std::error::Error>> + Send>;
+
+pub struct AuthorizationConnector {
+    local_identity: String,
+    shared: Arc<Mutex<ManagedAuthorizations>>,
+    executor: pool::JobExecutor,
+}
+
+impl AuthorizationConnector {
+    pub fn add_connection(
+        &self,
+        connection_id: String,
+        connection: Box<dyn Connection>,
+        on_complete_callback: Callback,
+    ) -> Result<(), AuthorizationManagerError> {
+        let mut connection = connection;
+
+        let (tx, rx) = mpsc::channel();
+        let connection_shared = Arc::clone(&self.shared);
+        let state_machine = AuthorizationManagerStateMachine {
+            shared: Arc::clone(&self.shared),
+        };
+        let msg_sender = AuthorizationMessageSender { sender: tx };
+        let dispatcher =
+            create_authorization_dispatcher(self.local_identity.clone(), state_machine, msg_sender);
+        self.executor.execute(move || {
+            let connect_request_bytes = match connect_msg_bytes() {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    error!(
+                        "Unable to create connect request for {}; aborting auth: {}",
+                        &connection_id, err
+                    );
+                    return;
+                }
+            };
+            if let Err(err) = connection.send(&connect_request_bytes) {
+                error!(
+                    "Unable to send connect request to {}; aborting auth: {}",
+                    &connection_id, err
+                );
+                return;
+            }
+
+            let authed_identity = 'main: loop {
+                match connection.recv() {
+                    Ok(bytes) => {
+                        let mut msg: NetworkMessage = match protobuf::parse_from_bytes(&bytes) {
+                            Ok(msg) => msg,
+                            Err(err) => {
+                                warn!("Received invalid network message: {}", err);
+                                continue;
+                            }
+                        };
+
+                        let message_type = msg.get_message_type();
+                        if let Err(err) = dispatcher.dispatch(
+                            connection_id.clone().into(),
+                            &message_type,
+                            msg.take_payload(),
+                        ) {
+                            error!(
+                                "Unable to dispatch message of type {:?}: {}",
+                                message_type, err
+                            );
+                        }
+                    }
+                    Err(RecvError::Disconnected) => {
+                        error!("Connection unexpectedly disconnected; aborting authorization");
+                        break 'main None;
+                    }
+                    Err(RecvError::IoError(err)) => {
+                        error!("Unable to authorize connection due to I/O error: {}", err);
+                        break 'main None;
+                    }
+                    Err(RecvError::ProtocolError(msg)) => {
+                        error!(
+                            "Unable to authorize connection due to protocol error: {}",
+                            msg
+                        );
+                        break 'main None;
+                    }
+                    Err(RecvError::WouldBlock) => continue,
+                }
+
+                while let Ok(outgoing) = rx.try_recv() {
+                    match connection.send(&outgoing) {
+                        Ok(()) => (),
+                        Err(err) => {
+                            error!("Unable to send outgoing message; aborting auth: {}", err);
+                            break 'main None;
+                        }
+                    }
+                }
+
+                let mut shared = match connection_shared.lock() {
+                    Ok(shared) => shared,
+                    Err(_) => {
+                        error!("connection authorization lock poisoned; aborting auth");
+                        break 'main None;
+                    }
+                };
+
+                if shared.is_complete(&connection_id).is_some() {
+                    break 'main shared.cleanup_connection_state(&connection_id);
+                }
+            };
+
+            let auth_state = if let Some(identity) = authed_identity {
+                ConnectionAuthorizationState::Authorized {
+                    connection_id,
+                    connection,
+                    identity,
+                }
+            } else {
+                ConnectionAuthorizationState::Unauthorized {
+                    connection_id,
+                    connection,
+                }
+            };
+            if let Err(err) = on_complete_callback(auth_state) {
+                error!("unable to pass auth result to callback: {}", err);
+            }
+        });
+
+        Ok(())
+    }
+}
+
+fn connect_msg_bytes() -> Result<Vec<u8>, AuthorizationManagerError> {
+    let mut network_msg = NetworkMessage::new();
+    network_msg.set_message_type(NetworkMessageType::AUTHORIZATION);
+
+    let connect_msg = AuthorizationMessage::ConnectRequest(ConnectRequest::Bidirectional);
+    network_msg.set_payload(
+        IntoBytes::<authorization::AuthorizationMessage>::into_bytes(connect_msg).map_err(
+            |err| AuthorizationManagerError(format!("Unable to send connect request: {}", err)),
+        )?,
+    );
+
+    network_msg.write_to_bytes().map_err(|err| {
+        AuthorizationManagerError(format!("Unable to send connect request: {}", err))
+    })
+}
+
+#[derive(Clone)]
+pub struct AuthorizationMessageSender {
+    sender: mpsc::Sender<Vec<u8>>,
+}
+
+impl AuthorizationMessageSender {
+    pub fn send(&self, msg: Vec<u8>) -> Result<(), Vec<u8>> {
+        self.sender.send(msg).map_err(|err| err.0)
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct AuthorizationManagerStateMachine {
+    shared: Arc<Mutex<ManagedAuthorizations>>,
+}
+
+impl AuthorizationManagerStateMachine {
     /// Transitions from one authorization state to another
     ///
     /// Errors
     ///
     /// The errors are error messages that should be returned on the appropriate message
-    fn next_state(
+    pub(crate) fn next_state(
         &self,
-        peer_id: &str,
+        connection_id: &str,
         action: AuthorizationAction,
     ) -> Result<AuthorizationState, AuthorizationActionError> {
-        let mut shared = mutex_lock_unwrap!(self.shared);
-
-        // drain the removals
-        let removals = shared.disconnect_receiver.try_iter().collect::<Vec<_>>();
-        for peer_id in removals.into_iter() {
-            shared.states.remove(&peer_id);
-        }
+        let mut shared = self.shared.lock().map_err(|_| {
+            AuthorizationActionError::InternalError("Authorization pool lock was poisoned".into())
+        })?;
 
         let cur_state = shared
             .states
-            .get(peer_id)
+            .get(connection_id)
             .unwrap_or(&AuthorizationState::Unknown);
         match *cur_state {
             AuthorizationState::Unknown => match action {
                 AuthorizationAction::Connecting => {
-                    if let Some(endpoint) = self.network.get_peer_endpoint(peer_id) {
-                        if endpoint.contains("inproc") {
-                            // Automatically authorize inproc connections
-                            debug!("Authorize inproc connection: {}", peer_id);
-                            shared
-                                .states
-                                .insert(peer_id.to_string(), AuthorizationState::Internal);
-                            Self::notify_callbacks(
-                                &shared.callbacks,
-                                peer_id,
-                                PeerAuthorizationState::Authorized,
-                            );
-                            return Ok(AuthorizationState::Internal);
-                        }
-                    }
                     // Here the decision for Challenges will be made.
                     shared
                         .states
-                        .insert(peer_id.to_string(), AuthorizationState::Connecting);
+                        .insert(connection_id.to_string(), AuthorizationState::Connecting);
                     Ok(AuthorizationState::Connecting)
                 }
                 AuthorizationAction::Unauthorizing => {
-                    self.network
-                        .remove_connection(&peer_id.to_string())
-                        .map_err(|_| AuthorizationActionError::ConnectionLost)?;
+                    shared.mark_complete(connection_id, None);
                     Ok(AuthorizationState::Unauthorized)
                 }
                 _ => Err(AuthorizationActionError::InvalidMessageOrder(
@@ -198,46 +361,21 @@ impl AuthorizationManager {
             },
             AuthorizationState::Connecting => match action {
                 AuthorizationAction::Connecting => Err(AuthorizationActionError::AlreadyConnecting),
-                AuthorizationAction::TrustIdentifying(new_peer_id) => {
+                AuthorizationAction::TrustIdentifying(identity) => {
                     // Verify pub key allowed
-                    shared.states.remove(peer_id);
-                    self.network
-                        .update_peer_id(peer_id.to_string(), new_peer_id.clone())
-                        .map_err(|_| AuthorizationActionError::ConnectionLost)?;
-                    shared
-                        .states
-                        .insert(new_peer_id.clone(), AuthorizationState::Authorized);
-                    Self::notify_callbacks(
-                        &shared.callbacks,
-                        &new_peer_id,
-                        PeerAuthorizationState::Authorized,
-                    );
+                    shared.mark_complete(connection_id, Some(identity));
                     Ok(AuthorizationState::Authorized)
                 }
                 AuthorizationAction::Unauthorizing => {
-                    shared.states.remove(peer_id);
-                    self.network
-                        .remove_connection(&peer_id.to_string())
-                        .map_err(|_| AuthorizationActionError::ConnectionLost)?;
-                    Self::notify_callbacks(
-                        &shared.callbacks,
-                        peer_id,
-                        PeerAuthorizationState::Unauthorized,
-                    );
+                    shared.mark_complete(connection_id, None);
+
                     Ok(AuthorizationState::Unauthorized)
                 }
             },
             AuthorizationState::Authorized => match action {
                 AuthorizationAction::Unauthorizing => {
-                    shared.states.remove(peer_id);
-                    self.network
-                        .remove_connection(&peer_id.to_string())
-                        .map_err(|_| AuthorizationActionError::ConnectionLost)?;
-                    Self::notify_callbacks(
-                        &shared.callbacks,
-                        peer_id,
-                        PeerAuthorizationState::Unauthorized,
-                    );
+                    shared.mark_complete(connection_id, None);
+
                     Ok(AuthorizationState::Unauthorized)
                 }
                 _ => Err(AuthorizationActionError::InvalidMessageOrder(
@@ -251,407 +389,163 @@ impl AuthorizationManager {
             )),
         }
     }
-
-    fn notify_callbacks(
-        callbacks: &[Box<dyn AuthorizationCallback>],
-        peer_id: &str,
-        state: PeerAuthorizationState,
-    ) {
-        for callback in callbacks {
-            if let Err(err) = callback.on_authorization_change(peer_id, state.clone()) {
-                error!("Unable to call authorization change callback: {}", err);
-            }
-        }
-    }
 }
 
-impl AuthorizationInquisitor for AuthorizationManager {
-    fn register_callback(
-        &self,
-        callback: Box<dyn AuthorizationCallback>,
-    ) -> Result<(), AuthorizationCallbackError> {
-        let mut shared = self
-            .shared
-            .lock()
-            .map_err(|_| AuthorizationCallbackError("shared state lock was poisoned".into()))?;
-
-        shared.callbacks.push(callback);
-
-        Ok(())
-    }
-
-    fn is_authorized(&self, peer_id: &str) -> bool {
-        let mut shared = mutex_lock_unwrap!(self.shared);
-
-        // drain the removals
-        let removals = shared.disconnect_receiver.try_iter().collect::<Vec<_>>();
-        for peer_id in removals.into_iter() {
-            shared.states.remove(&peer_id);
-        }
-
-        if let Some(state) = shared.states.get(peer_id) {
-            state == &AuthorizationState::Authorized || state == &AuthorizationState::Internal
-        } else {
-            false
-        }
-    }
-}
-
+#[derive(Default)]
 struct ManagedAuthorizations {
     states: HashMap<String, AuthorizationState>,
-    callbacks: Vec<Box<dyn AuthorizationCallback>>,
-    disconnect_receiver: Receiver<String>,
+    complete_and_authorized: HashMap<String, Option<String>>,
 }
 
 impl ManagedAuthorizations {
-    fn new(disconnect_receiver: Receiver<String>) -> Self {
+    fn new() -> Self {
         Self {
-            states: Default::default(),
-            callbacks: Default::default(),
-            disconnect_receiver,
+            states: HashMap::new(),
+            complete_and_authorized: HashMap::new(),
         }
     }
-}
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum PeerAuthorizationState {
-    Authorized,
-    Unauthorized,
-}
-
-/// A callback for changes in a peer's authorization state.
-pub trait AuthorizationCallback: Send {
-    /// This function is called when a peer's state changes to Authorized or Unauthorized.
-    fn on_authorization_change(
-        &self,
-        peer_id: &str,
-        state: PeerAuthorizationState,
-    ) -> Result<(), AuthorizationCallbackError>;
-}
-
-impl<F> AuthorizationCallback for F
-where
-    F: Fn(&str, PeerAuthorizationState) -> Result<(), AuthorizationCallbackError> + Send,
-{
-    fn on_authorization_change(
-        &self,
-        peer_id: &str,
-        state: PeerAuthorizationState,
-    ) -> Result<(), AuthorizationCallbackError> {
-        (*self)(peer_id, state)
+    fn cleanup_connection_state(&mut self, connection_id: &str) -> Option<String> {
+        self.states.remove(connection_id);
+        self.complete_and_authorized.remove(connection_id).flatten()
     }
+
+    // Mark complete with an optional identity
+    fn mark_complete(&mut self, connection_id: &str, authorized_identity: Option<String>) {
+        self.complete_and_authorized
+            .insert(connection_id.to_string(), authorized_identity);
+    }
+
+    fn is_complete(&self, connection_id: &str) -> Option<bool> {
+        self.complete_and_authorized
+            .get(connection_id)
+            .map(|ident| ident.is_some())
+    }
+}
+
+pub enum ConnectionAuthorizationState {
+    Authorized {
+        connection_id: String,
+        identity: String,
+        connection: Box<dyn Connection>,
+    },
+    Unauthorized {
+        connection_id: String,
+        connection: Box<dyn Connection>,
+    },
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::network) mod tests {
     use super::*;
 
-    use std::sync::{Arc, Mutex};
+    use protobuf::Message;
 
-    use crate::mesh::Mesh;
-    use crate::network::Network;
-    use crate::transport::{
-        ConnectError, Connection, DisconnectError, RecvError, SendError, Transport,
+    use crate::mesh::{Envelope, Mesh};
+    use crate::protocol::authorization::{
+        AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
+        TrustRequest,
     };
+    use crate::protos::authorization;
+    use crate::protos::network::{NetworkMessage, NetworkMessageType};
 
-    /// This test runs through the trust authorization state machine happy path. It traverses
-    /// through each state, Unknown -> Connecting -> Authorized and verifies that the response
-    /// for is_authorized is correct at each stage.
-    #[test]
-    fn trust_state_machine_valid() {
-        let (network, peer_id) = create_network_with_initial_temp_peer();
-
-        let auth_manager = AuthorizationManager::new(network.clone(), "mock_identity".into());
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        assert_eq!(
-            Ok(AuthorizationState::Connecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        // verify that it cannot be connected again.
-        assert_eq!(
-            Err(AuthorizationActionError::AlreadyConnecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        // Supply the TrustIdentifying action and verify that it is authorized
-        let new_peer_id = "abcd".to_string();
-        assert_eq!(
-            Ok(AuthorizationState::Authorized),
-            auth_manager.next_state(
-                &peer_id,
-                AuthorizationAction::TrustIdentifying(new_peer_id.clone())
-            )
-        );
-        // we no longer have the temp id
-        assert!(!auth_manager.is_authorized(&peer_id));
-        // but we now have the new identified peer
-        assert!(auth_manager.is_authorized(&new_peer_id));
-        assert_eq!(vec![new_peer_id.clone()], network.peer_ids());
-    }
-
-    /// This test begins a connection, and then unauthorizes the peer.  Verify that the auth
-    /// manager reports the correct value for is_authorized, and that the peer is removed.
-    #[test]
-    fn trust_state_machine_unauthorize_while_connecting() {
-        let (network, peer_id) = create_network_with_initial_temp_peer();
-
-        let auth_manager = AuthorizationManager::new(network.clone(), "mock_identity".into());
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-        assert_eq!(
-            Ok(AuthorizationState::Connecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-
-        assert_eq!(
-            Ok(AuthorizationState::Unauthorized),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Unauthorizing)
-        );
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-        let empty_vec: Vec<String> = Vec::with_capacity(0);
-        assert_eq!(empty_vec, network.peer_ids());
-    }
-
-    /// This test begins a connection, trusts it, and then unauthorizes the peer.  Verify that
-    /// the auth manager reports the correct values for is_authorized, and that the peer is removed.
-    #[test]
-    fn trust_state_machine_unauthorize_when_authorized() {
-        let (network, peer_id) = create_network_with_initial_temp_peer();
-
-        let auth_manager = AuthorizationManager::new(network.clone(), "mock_identity".into());
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-        assert_eq!(
-            Ok(AuthorizationState::Connecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-        let new_peer_id = "abcd".to_string();
-        assert_eq!(
-            Ok(AuthorizationState::Authorized),
-            auth_manager.next_state(
-                &peer_id,
-                AuthorizationAction::TrustIdentifying(new_peer_id.clone())
-            )
-        );
-        assert!(!auth_manager.is_authorized(&peer_id));
-        assert!(auth_manager.is_authorized(&new_peer_id));
-        assert_eq!(vec![new_peer_id.clone()], network.peer_ids());
-
-        assert_eq!(
-            Ok(AuthorizationState::Unauthorized),
-            auth_manager.next_state(&new_peer_id, AuthorizationAction::Unauthorizing)
-        );
-
-        assert!(!auth_manager.is_authorized(&new_peer_id));
-        let empty_vec: Vec<String> = Vec::with_capacity(0);
-        assert_eq!(empty_vec, network.peer_ids());
-    }
-
-    /// This test begins a connection, trust it, and notifies a callback of the authorized state.
-    /// It should not be notified of intermediate states.
-    #[test]
-    fn trust_state_machine_notify_callbacks() {
-        let (network, peer_id) = create_network_with_initial_temp_peer();
-
-        let auth_manager = AuthorizationManager::new(network.clone(), "mock_identity".into());
-        let notifications = Arc::new(Mutex::new(vec![]));
-
-        let callback_values = notifications.clone();
-        auth_manager
-            .register_callback(Box::new(
-                move |peer_id: &str, state: PeerAuthorizationState| {
-                    callback_values
-                        .lock()
-                        .expect("callback values poisoned")
-                        .push((peer_id.to_string(), state.clone()));
-
-                    Ok(())
-                },
-            ))
-            .expect("The callback failed to be registered");
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        assert_eq!(
-            Ok(AuthorizationState::Connecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        // Supply the TrustIdentifying action and verify that it is authorized
-        let new_peer_id = "abcd".to_string();
-        assert_eq!(
-            Ok(AuthorizationState::Authorized),
-            auth_manager.next_state(
-                &peer_id,
-                AuthorizationAction::TrustIdentifying(new_peer_id.clone())
-            )
-        );
-        // we now have the new identified peer
-        assert!(auth_manager.is_authorized(&new_peer_id));
-        assert_eq!(vec![new_peer_id.clone()], network.peer_ids());
-
-        assert_eq!(
-            Some(("abcd".to_string(), PeerAuthorizationState::Authorized)),
-            notifications
-                .lock()
-                .expect("callback values posioned")
-                .pop()
-        );
-    }
-
-    /// This test verifies that a connection that is authorized, if has disconnected, can begin the
-    /// authorization process over again.
-    #[test]
-    fn disconnection_notification_allows_reauth() {
-        let (network, peer_id) = create_network_with_initial_temp_peer();
-
-        let auth_manager = AuthorizationManager::new(network.clone(), "mock_identity".into());
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        assert_eq!(
-            Ok(AuthorizationState::Connecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        // verify that it cannot be connected again.
-        assert_eq!(
-            Err(AuthorizationActionError::AlreadyConnecting),
-            auth_manager.next_state(&peer_id, AuthorizationAction::Connecting)
-        );
-        assert!(!auth_manager.is_authorized(&peer_id));
-
-        // Supply the TrustIdentifying action and verify that it is authorized
-        let new_peer_id = "abcd".to_string();
-        assert_eq!(
-            Ok(AuthorizationState::Authorized),
-            auth_manager.next_state(
-                &peer_id,
-                AuthorizationAction::TrustIdentifying(new_peer_id.clone())
-            )
-        );
-        assert!(auth_manager.is_authorized(&new_peer_id));
-
-        // verify that it cannot be connected again.
-        assert_eq!(
-            Err(AuthorizationActionError::InvalidMessageOrder(
-                AuthorizationState::Authorized,
-                AuthorizationAction::Connecting
-            )),
-            auth_manager.next_state(&new_peer_id, AuthorizationAction::Connecting)
-        );
-
-        network
-            .remove_connection(&new_peer_id)
-            .expect("Unable to remove peer");
-
-        // verify that it can be connected again.
-        assert_eq!(
-            Ok(AuthorizationState::Connecting),
-            auth_manager.next_state(&new_peer_id, AuthorizationAction::Connecting)
-        );
-    }
-
-    fn create_network_with_initial_temp_peer() -> (Network, String) {
-        let network = Network::new(Mesh::new(5, 5), 0).unwrap();
-
-        let mut transport = MockConnectingTransport;
-        let connection = transport
-            .connect("local")
-            .expect("Unable to create the connection");
-
-        network
-            .add_connection(connection)
-            .expect("Unable to add connection to network");
-
-        // We only have one peer, so we can grab this id as the temp id.
-        let peer_id = network.peer_ids()[0].clone();
-
-        (network, peer_id)
-    }
-
-    struct MockConnectingTransport;
-
-    impl Transport for MockConnectingTransport {
-        fn accepts(&self, _: &str) -> bool {
-            true
-        }
-
-        fn connect(&mut self, _: &str) -> Result<Box<dyn Connection>, ConnectError> {
-            Ok(Box::new(MockConnection))
-        }
-
-        fn listen(
-            &mut self,
-            _: &str,
-        ) -> Result<Box<dyn crate::transport::Listener>, crate::transport::ListenError> {
-            unimplemented!()
+    impl AuthorizationManager {
+        /// A test friendly shutdown and wait method.
+        pub fn shutdown_and_await(self) {
+            self.shutdown_signaler().shutdown();
+            self.wait_for_shutdown();
         }
     }
 
-    struct MockConnection;
+    pub(in crate::network) fn negotiation_connection_auth(
+        mesh: &Mesh,
+        connection_id: &str,
+        expected_identity: &str,
+    ) {
+        let env = mesh.recv().expect("unable to receive from mesh");
 
-    impl Connection for MockConnection {
-        fn send(&mut self, _message: &[u8]) -> Result<(), SendError> {
-            Ok(())
-        }
+        // receive the connect request from the connection manager
+        assert_eq!(connection_id, env.id());
+        let connect_request = read_auth_message(env.payload());
+        assert!(matches!(
+            connect_request,
+            AuthorizationMessage::ConnectRequest(ConnectRequest::Bidirectional)
+        ));
 
-        fn recv(&mut self) -> Result<Vec<u8>, RecvError> {
-            unimplemented!()
-        }
+        // send our own connect request
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::ConnectRequest(ConnectRequest::Unidirectional),
+        );
+        mesh.send(env).expect("Unable to send connect response");
 
-        fn remote_endpoint(&self) -> String {
-            String::from("MockConnection")
-        }
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::ConnectResponse(ConnectResponse {
+                accepted_authorization_types: vec![AuthorizationType::Trust],
+            }),
+        );
+        mesh.send(env).expect("Unable to send connect response");
 
-        fn local_endpoint(&self) -> String {
-            String::from("MockConnection")
-        }
+        // receive the connect response
+        let env = mesh.recv().expect("unable to receive from mesh");
+        assert_eq!(connection_id, env.id());
+        let connect_response = read_auth_message(env.payload());
+        assert!(matches!(
+            connect_response,
+            AuthorizationMessage::ConnectResponse(_)
+        ));
 
-        fn disconnect(&mut self) -> Result<(), DisconnectError> {
-            Ok(())
-        }
+        // receive the trust request
+        let env = mesh.recv().expect("unable to receive from mesh");
+        assert_eq!(connection_id, env.id());
+        let trust_request = read_auth_message(env.payload());
+        assert!(matches!(
+            trust_request,
+            AuthorizationMessage::TrustRequest(TrustRequest { .. })
+        ));
 
-        fn evented(&self) -> &dyn mio::Evented {
-            &MockEvented
-        }
+        // send authorized
+        let env = write_auth_message(connection_id, AuthorizationMessage::Authorized(Authorized));
+        mesh.send(env).expect("unable to send authorized");
+
+        // send trust request
+        let env = write_auth_message(
+            connection_id,
+            AuthorizationMessage::TrustRequest(TrustRequest {
+                identity: expected_identity.to_string(),
+            }),
+        );
+        mesh.send(env).expect("unable to send authorized");
+
+        // receive authorized
+        let env = mesh.recv().expect("unable to receive from mesh");
+        assert_eq!(connection_id, env.id());
+        let trust_request = read_auth_message(env.payload());
+        assert!(matches!(trust_request, AuthorizationMessage::Authorized(_)));
     }
 
-    struct MockEvented;
+    fn read_auth_message(bytes: &[u8]) -> AuthorizationMessage {
+        let msg: NetworkMessage =
+            protobuf::parse_from_bytes(bytes).expect("Cannot parse network message");
 
-    impl mio::Evented for MockEvented {
-        fn register(
-            &self,
-            _poll: &mio::Poll,
-            _token: mio::Token,
-            _interest: mio::Ready,
-            _opts: mio::PollOpt,
-        ) -> std::io::Result<()> {
-            Ok(())
-        }
+        assert_eq!(NetworkMessageType::AUTHORIZATION, msg.get_message_type());
 
-        fn reregister(
-            &self,
-            _poll: &mio::Poll,
-            _token: mio::Token,
-            _interest: mio::Ready,
-            _opts: mio::PollOpt,
-        ) -> std::io::Result<()> {
-            Ok(())
-        }
+        FromBytes::<authorization::AuthorizationMessage>::from_bytes(msg.get_payload())
+            .expect("Unable to parse bytes")
+    }
 
-        fn deregister(&self, _poll: &mio::Poll) -> std::io::Result<()> {
-            Ok(())
-        }
+    fn write_auth_message(connection_id: &str, auth_msg: AuthorizationMessage) -> Envelope {
+        let mut msg = NetworkMessage::new();
+        msg.set_message_type(NetworkMessageType::AUTHORIZATION);
+        msg.set_payload(
+            IntoBytes::<authorization::AuthorizationMessage>::into_bytes(auth_msg)
+                .expect("Unable to convert into bytes"),
+        );
+
+        Envelope::new(
+            connection_id.to_string(),
+            msg.write_to_bytes().expect("Unable to write to bytes"),
+        )
     }
 }

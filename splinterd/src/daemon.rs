@@ -47,7 +47,7 @@ use splinter::circuit::{SplinterState, SplinterStateError};
 use splinter::database::{self, ConnectionPool};
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
-use splinter::network::auth2::AuthorizationManager;
+use splinter::network::auth::AuthorizationManager;
 use splinter::network::connection_manager::{
     authorizers::Authorizers, authorizers::InprocAuthorizer, ConnectionManager, Connector,
 };
