@@ -26,8 +26,8 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::protos::prelude::*;
 
 use super::{
-    AuthorizationAction, AuthorizationManagerStateMachine, AuthorizationMessageSender,
-    AuthorizationState,
+    AuthorizationAction, AuthorizationActionError, AuthorizationManagerStateMachine,
+    AuthorizationMessageSender, AuthorizationState,
 };
 
 /// Create a Dispatcher for Authorization messages
@@ -137,7 +137,7 @@ impl Handler for AuthorizedHandler {
             AuthorizationAction::RemoteAuthorizing,
         ) {
             Err(err) => {
-                debug!(
+                warn!(
                     "Ignoring authorize message from {}: {}",
                     context.source_connection_id(),
                     err
@@ -185,9 +185,15 @@ impl Handler for ConnectRequestHandler {
             context.source_connection_id(),
             AuthorizationAction::Connecting,
         ) {
-            Err(err) => {
+            Err(AuthorizationActionError::AlreadyConnecting) => {
                 debug!(
-                    "Ignoring duplicate connect message from {}: {}",
+                    "Ignoring duplicate connect request from {}",
+                    context.source_connection_id(),
+                );
+            }
+            Err(err) => {
+                warn!(
+                    "Ignoring connect message from {}: {}",
                     context.source_connection_id(),
                     err
                 );
@@ -332,7 +338,7 @@ impl Handler for TrustRequestHandler {
             AuthorizationAction::TrustIdentifying(trust_request.identity),
         ) {
             Err(err) => {
-                debug!(
+                warn!(
                     "Ignoring trust request message from connection {}: {}",
                     context.source_connection_id(),
                     err
