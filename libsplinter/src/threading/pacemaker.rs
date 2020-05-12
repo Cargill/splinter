@@ -95,7 +95,6 @@ where
         let join_handle = thread::Builder::new()
             .name("Pacemaker".into())
             .spawn(move || {
-                info!("Starting heartbeat manager");
                 while running_clone.load(Ordering::SeqCst) {
                     if let Err(err) = sender.send(new_message()) {
                         warn!(

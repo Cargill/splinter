@@ -309,6 +309,10 @@ where
                 }
             })?;
 
+        debug!(
+            "Starting connection manager pacemaker with interval of {}s",
+            heartbeat
+        );
         let pacemaker = pacemaker::Pacemaker::builder()
             .with_interval(heartbeat)
             .with_sender(sender.clone())
@@ -355,7 +359,9 @@ impl ConnectionManager {
     }
 
     pub fn await_shutdown(self) {
+        debug!("Shutting down connection manager pacemaker...");
         self.pacemaker.await_shutdown();
+        debug!("Shutting down connection manager pacemaker (complete)");
 
         if let Err(err) = self.join_handle.join() {
             error!(

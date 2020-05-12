@@ -56,19 +56,23 @@ impl PeerInterconnect {
 
     /// waits for the send and receive thread to shutdown
     pub fn await_shutdown(self) {
+        debug!("Shutting down peer interconnect receiver...");
         if let Err(err) = self.send_join_handle.join() {
             error!(
                 "Peer interconnect send thread did not shutdown correctly: {:?}",
                 err
             );
         };
+        debug!("Shutting down peer interconnect receiver (complete)");
 
+        debug!("Shutting down peer interconnect sender...");
         if let Err(err) = self.recv_join_handle.join() {
             error!(
                 "Peer interconnect recv thread did not shutdown correctly: {:?}",
                 err
             );
         }
+        debug!("Shutting down peer interconnect sender (complete)");
     }
 
     /// Call shutdown on the shutdown handle and then waits for the PeerInterconnect threads to
@@ -179,6 +183,7 @@ where
         })?;
 
         let recv_peer_lookup = peer_lookup_provider.peer_lookup();
+        debug!("Starting peer interconnect receiver");
         let recv_join_handle = thread::Builder::new()
             .name("PeerInterconnect Receiver".into())
             .spawn(move || {
@@ -202,6 +207,7 @@ where
             .message_sender
             .take()
             .ok_or_else(|| PeerInterconnectError::StartUpError("Already started".to_string()))?;
+        debug!("Starting peer interconnect sender");
         let send_join_handle = thread::Builder::new()
             .name("PeerInterconnect Sender".into())
             .spawn(move || {

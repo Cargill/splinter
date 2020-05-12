@@ -202,13 +202,14 @@ impl AdminService {
 
         let peer_admin_shared = new_service.admin_service_shared.clone();
 
+        debug!("Starting admin service's peer manager notification receiver");
         let notification_join_handle = thread::Builder::new()
             .name("PeerManagerNotification Receiver".into())
             .spawn(move || loop {
                 let notification = match subscriber.next() {
                     Some(notification) => notification,
                     None => {
-                        warn!("PeerManager has shutdown");
+                        warn!("Admin service received None while listening to peer manager notifications, indicating remote thread has shutdown");
                         break;
                     }
                 };

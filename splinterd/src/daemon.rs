@@ -503,7 +503,9 @@ impl SplinterDaemon {
             shutdown_handler.shutdown();
         }
         peer_manager.await_shutdown();
+        debug!("Shutting down admin service's peer manager notification receiver...");
         let _ = admin_notification_join.join();
+        debug!("Shutting down admin service's peer manager notification receiver (complete)");
         connection_manager_shutdown.shutdown();
         connection_manager.await_shutdown();
         self.mesh.shutdown_signaler().shutdown();
