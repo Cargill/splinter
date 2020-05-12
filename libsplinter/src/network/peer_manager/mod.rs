@@ -191,6 +191,10 @@ impl PeerManager {
             ))
         })?;
 
+        debug!(
+            "Starting peer manager pacemaker with interval of {}s",
+            &self.retry_interval
+        );
         let pacemaker = pacemaker::Pacemaker::builder()
             .with_interval(self.retry_interval)
             .with_sender(sender.clone())
@@ -254,7 +258,9 @@ impl PeerManager {
                     );
                 }
 
+                debug!("Shutting down peer manager pacemaker...");
                 pacemaker.await_shutdown();
+                debug!("Shutting down peer manager pacemaker (complete)");
             });
 
         match join_handle {
