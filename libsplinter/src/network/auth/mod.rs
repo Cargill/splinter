@@ -456,6 +456,26 @@ pub enum ConnectionAuthorizationState {
     },
 }
 
+impl std::fmt::Debug for ConnectionAuthorizationState {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ConnectionAuthorizationState::Authorized {
+                connection_id,
+                identity,
+                ..
+            } => f
+                .debug_struct("Authorized")
+                .field("connection_id", connection_id)
+                .field("identity", identity)
+                .finish(),
+            ConnectionAuthorizationState::Unauthorized { connection_id, .. } => f
+                .debug_struct("Unauthorized")
+                .field("connection_id", connection_id)
+                .finish(),
+        }
+    }
+}
+
 #[cfg(test)]
 pub(in crate::network) mod tests {
     use super::*;
