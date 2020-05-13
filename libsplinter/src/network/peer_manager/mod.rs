@@ -150,6 +150,7 @@ pub struct PeerManager {
     shutdown_handle: Option<ShutdownHandle>,
     max_retry_attempts: u64,
     retry_interval: u64,
+    identity: String,
 }
 
 impl PeerManager {
@@ -157,6 +158,7 @@ impl PeerManager {
         connector: Connector,
         max_retry_attempts: Option<u64>,
         retry_interval: Option<u64>,
+        identity: String,
     ) -> Self {
         PeerManager {
             connection_manager_connector: connector,
@@ -165,6 +167,7 @@ impl PeerManager {
             shutdown_handle: None,
             max_retry_attempts: max_retry_attempts.unwrap_or(DEFAULT_MAXIMUM_RETRY_ATTEMPTS),
             retry_interval: retry_interval.unwrap_or(DEFAULT_PACEMAKER_INTERVAL),
+            identity,
         }
     }
 
@@ -909,7 +912,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -962,7 +965,8 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector.clone(), None, Some(1));
+        let mut peer_manager =
+            PeerManager::new(connector.clone(), None, Some(1), "my_id".to_string());
 
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
@@ -1023,7 +1027,8 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector.clone(), None, Some(1));
+        let mut peer_manager =
+            PeerManager::new(connector.clone(), None, Some(1), "my_id".to_string());
 
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
@@ -1080,7 +1085,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1147,7 +1152,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1231,7 +1236,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector
             .subscribe()
@@ -1307,7 +1312,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
 
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
 
@@ -1418,11 +1423,12 @@ pub mod tests {
             .with_matrix_life_cycle(mesh1.get_life_cycle())
             .with_matrix_sender(mesh1.get_sender())
             .with_transport(transport)
+            .with_heartbeat_interval(1)
             .start()
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1));
+        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let mut subscriber = peer_connector.subscribe().expect("Unable to subscribe");
         let peer_ref = peer_connector
@@ -1487,7 +1493,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1));
+        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1), "my_id".to_string());
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_handle().unwrap().shutdown();
@@ -1527,11 +1533,11 @@ pub mod tests {
                 .subscribe(subs_tx)
                 .expect("unable to get subscriber");
             recv_connector.add_inbound_connection(connection).unwrap();
-            // wait for inbound connection notfication to come
-            subs_rx.recv().expect("unable to get notfication");
+            // wait for inbound connection notification to come
+            subs_rx.recv().expect("unable to get notification");
         });
 
-        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1));
+        let mut peer_manager = PeerManager::new(connector, Some(1), Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
 
         let _conn = transport.connect("inproc://test").unwrap();

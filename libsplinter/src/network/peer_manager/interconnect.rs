@@ -503,7 +503,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
         let (send, recv) = channel();
 
@@ -581,7 +581,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1));
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = peer_manager.start().expect("Cannot start PeerManager");
         let (dispatcher_sender, _dispatched_receiver) = dispatch_channel();
         let interconnect = PeerInterconnectBuilder::new()
