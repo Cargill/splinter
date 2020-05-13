@@ -121,7 +121,7 @@ impl Scabbard {
         })
     }
 
-    /// Fetch the value at the given `address` in the Scabbard service's state. Returns `None` if
+    /// Fetch the value at the given `address` in the scabbard service's state. Returns `None` if
     /// the `address` is not set.
     pub fn get_state_at_address(&self, address: &str) -> Result<Option<Vec<u8>>, ScabbardError> {
         Ok(self
@@ -131,7 +131,7 @@ impl Scabbard {
             .get_state_at_address(address)?)
     }
 
-    /// Fetch a list of entries in the Scabbard service's state. If a `prefix` is provided, only
+    /// Fetch a list of entries in the scabbard service's state. If a `prefix` is provided, only
     /// return entries whose addresses are under the given address prefix. If no `prefix` is
     /// provided, return all state entries.
     pub fn get_state_with_prefix(&self, prefix: Option<&str>) -> Result<StateIter, ScabbardError> {

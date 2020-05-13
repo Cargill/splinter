@@ -85,7 +85,7 @@ impl ScabbardClient {
         }
     }
 
-    /// Get the value at the given `address` in state for the Scabbard instance with the given
+    /// Get the value at the given `address` in state for the scabbard instance with the given
     /// `service_id`. Returns `None` if there is no entry at the given address.
     ///
     /// # Errors
@@ -142,7 +142,7 @@ impl ScabbardClient {
         }
     }
 
-    /// Get all entries under the given address `prefix` in state for the Scabbard instance with
+    /// Get all entries under the given address `prefix` in state for the scabbard instance with
     /// the given `service_id`.
     ///
     /// # Errors
