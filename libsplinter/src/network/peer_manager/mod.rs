@@ -1053,7 +1053,7 @@ pub mod tests {
     //
     // 1. add test_peer, whose identity is different_peer
     // 2. verify that an AddPeer returns succesfully
-    // 4. validate a Disconnected notfication is returned,
+    // 4. validate a Disconnected notification is returned,
     // 5. drop peer ref
     // 6. verify that the connection is removed.
     #[test]
@@ -1473,7 +1473,7 @@ pub mod tests {
     // 3. disconnect the connection made to test_peer
     // 4. verify that subscribers will receive a Disconnected notification
     // 5. drop the listener for the first endpoint to force the attempt on the second endpoint
-    // 6. verify that subscribers will receive a Connected notfication when the new active endpoint
+    // 6. verify that subscribers will receive a Connected notification when the new active endpoint
     //    is successfully connected to.
     #[test]
     fn test_peer_manager_update_active_endpoint() {

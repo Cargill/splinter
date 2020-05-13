@@ -444,7 +444,7 @@ pub mod tests {
     //
     // 4. After the peer running in the thread has sucessfully received the NetworkEcho response
     //    it will send another NetworkEcho with "shutdown_string" bytes. This will cause the
-    //    Handler to send a shutdown notication that will shutdown the test.
+    //    Handler to send a shutdown notification that will shutdown the test.
     //
     //    If the shutdown message is not received after 2 seconds, the test will fail.
     //
