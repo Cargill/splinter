@@ -89,25 +89,25 @@ export default class GameInfoPanel extends Vue {
         if (publicKey === this.gameInfo.playerOne) {
           return 'Your turn';
         } else {
-          return `${this.gameInfo.playerOne.substring(0,6)}'s turn`;
+          return `${this.gameInfo.playerOne.substring(0, 6)}'s turn`;
         }
       case(GameStatus.PlayerTwoNext):
         if (publicKey === this.gameInfo.playerTwo) {
           return 'Your turn';
         } else {
-          return `${this.gameInfo.playerTwo.substring(0,6)}'s turn`;
+          return `${this.gameInfo.playerTwo.substring(0, 6)}'s turn`;
         }
       case(GameStatus.PlayerOneWin):
         if (publicKey === this.gameInfo.playerOne) {
           return 'You won';
         } else {
-          return `${this.gameInfo.playerOne.substring(0,6)} won`;
+          return `${this.gameInfo.playerOne.substring(0, 6)} won`;
         }
       case(GameStatus.PlayerTwoWin):
         if (publicKey === this.gameInfo.playerTwo) {
           return 'You won';
         } else {
-          return `${this.gameInfo.playerTwo.substring(0,6)} won`;
+          return `${this.gameInfo.playerTwo.substring(0, 6)} won`;
         }
       case(GameStatus.Tie): return 'Game resulted in a draw';
     }

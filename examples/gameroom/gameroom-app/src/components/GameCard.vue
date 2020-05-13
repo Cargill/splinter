@@ -116,20 +116,20 @@ export default class GameCard extends Vue {
     }
 
     if (this.game.game_status === 'P1-WIN') {
-      return `${this.game.player_1.substring(0,6)} won`;
+      return `${this.game.player_1.substring(0, 6)} won`;
     }
     if (this.game.game_status === 'P2-WIN') {
-      return `${this.game.player_2.substring(0,6)} won`;
+      return `${this.game.player_2.substring(0, 6)} won`;
     }
     return 'Archived';
   }
 
   processWatchStatus(): string {
     if (this.game.game_status === 'P1-NEXT') {
-      return `${this.game.player_1.substring(0,6)}\'s turn`;
+      return `${this.game.player_1.substring(0, 6)}\'s turn`;
     }
     if (this.game.game_status === 'P2-NEXT') {
-      return `${this.game.player_2.substring(0,6)}\'s turn`;
+      return `${this.game.player_2.substring(0, 6)}\'s turn`;
     }
     return 'Watch';
   }
