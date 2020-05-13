@@ -322,11 +322,12 @@ impl SplinterDaemon {
             .map(|mut network_listener| {
                 let connection_connector_clone = connection_connector.clone();
                 thread::spawn(move || {
+                    let endpoint = network_listener.endpoint();
                     for connection_result in network_listener.incoming() {
                         let connection = match connection_result {
                             Ok(connection) => connection,
                             Err(AcceptError::ProtocolError(msg)) => {
-                                warn!("Failed to accept connection due to {}", msg);
+                                warn!("Failed to accept connection on {}: {}", endpoint, msg);
                                 continue;
                             }
                             Err(AcceptError::IoError(err)) => {
