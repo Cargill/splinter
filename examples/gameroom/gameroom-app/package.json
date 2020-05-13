@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@types/node": "^12.12.6",
-    "@types/protobufjs": "^6.0.0",
     "@types/request-promise": "^4.1.44",
     "@types/sjcl": "^1.0.28",
     "axios": "^0.19.0",
