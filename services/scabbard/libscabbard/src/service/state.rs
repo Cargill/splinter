@@ -236,8 +236,11 @@ impl ScabbardState {
             .execute(scheduler.take_task_iterator()?, scheduler.new_notifier()?)?;
 
         // Get the results and shutdown the scheduler
-        let batch_result = result_rx
-            .recv_timeout(Duration::from_secs(EXECUTION_TIMEOUT))
+        let recv_result = result_rx.recv_timeout(Duration::from_secs(EXECUTION_TIMEOUT));
+
+        scheduler.shutdown();
+
+        let batch_result = recv_result
             .map_err(|_| ScabbardStateError("failed to receive result in reasonable time".into()))?
             .ok_or_else(|| ScabbardStateError("no result returned from executor".into()))?;
 
@@ -256,8 +259,6 @@ impl ScabbardState {
                 )),
             })
             .collect::<Result<Vec<_>, _>>()?;
-
-        scheduler.shutdown();
 
         // Save the results and compute the resulting state root
         let state_root = MerkleState::new(self.db.clone()).compute_state_id(
