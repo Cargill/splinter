@@ -37,7 +37,6 @@ impl Cors {
 
     /// Initialize the CORS preflight check with "*" domains.
     pub fn new_allow_any() -> Self {
-        debug!("Creating CORS with whitelist: '*'");
         Cors::new(vec!["*".into()])
     }
 }
