@@ -203,6 +203,47 @@ impl ScabbardClient {
             )))
         }
     }
+
+    /// Get the current state root hash of the scabbard instance with the given `service_id`.
+    pub fn get_current_state_root(
+        &self,
+        service_id: &ServiceId,
+    ) -> Result<String, ScabbardClientError> {
+        let url = Url::parse(&format!(
+            "{}/scabbard/{}/{}/state_root",
+            &self.url,
+            service_id.circuit(),
+            service_id.service_id()
+        ))
+        .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
+
+        let request = Client::new().get(url);
+        let response = request
+            .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
+            .send()
+            .map_err(|err| ScabbardClientError::new_with_source("request failed", err.into()))?;
+
+        if response.status().is_success() {
+            response.json().map_err(|err| {
+                ScabbardClientError::new_with_source(
+                    "failed to deserialize response body",
+                    err.into(),
+                )
+            })
+        } else {
+            let status = response.status();
+            let msg: ErrorResponse = response.json().map_err(|err| {
+                ScabbardClientError::new_with_source(
+                    "failed to deserialize error response body",
+                    err.into(),
+                )
+            })?;
+            Err(ScabbardClientError::new(&format!(
+                "failed to get current state root: {}: {}",
+                status, msg
+            )))
+        }
+    }
 }
 
 /// Using the given `base_url` and `batch_link` to check batch statuses, `wait` the given duration
@@ -471,11 +512,13 @@ mod tests {
     use crate::protocol::{
         SCABBARD_ADD_BATCHES_PROTOCOL_MIN, SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
         SCABBARD_GET_STATE_PROTOCOL_MIN, SCABBARD_LIST_STATE_PROTOCOL_MIN,
+        SCABBARD_STATE_ROOT_PROTOCOL_MIN,
     };
 
     const MOCK_CIRCUIT_ID: &str = "01234-abcde";
     const MOCK_SERVICE_ID: &str = "ABCD";
     const MOCK_BATCH_ID: &str = "batch_id";
+    const MOCK_STATE_ROOT_HASH: &str = "abcd";
 
     /// Verify that a `ServiceId` can be correctly parsed from a fully-qualified service ID string.
     #[test]
@@ -630,6 +673,33 @@ mod tests {
         // Verify that an error response code results in an error being returned
         resource_manager.internal_server_error(true);
         assert!(client.get_state_with_prefix(&service_id, None).is_err());
+        resource_manager.internal_server_error(false);
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    /// Verify that the `ScabbardClient::get_current_state_root` method works properly.
+    #[test]
+    fn get_current_state_root() {
+        let mut resource_manager = ResourceManager::new();
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(resource_manager.resources());
+
+        let client = ScabbardClient::new(&format!("http://{}", bind_url));
+        let service_id = ServiceId::new(MOCK_CIRCUIT_ID, MOCK_SERVICE_ID);
+
+        // Verify that a request returns the right value
+        let state_root_hash = client
+            .get_current_state_root(&service_id)
+            .expect("Failed to get state root hash");
+        assert_eq!(&state_root_hash, MOCK_STATE_ROOT_HASH);
+
+        // Verify that an error response code results in an error being returned
+        resource_manager.internal_server_error(true);
+        assert!(client.get_current_state_root(&service_id).is_err());
         resource_manager.internal_server_error(false);
 
         shutdown_handle
@@ -807,6 +877,28 @@ mod tests {
                     }
                 });
             resources.push(state);
+
+            let internal_server_error_clone = internal_server_error.clone();
+            let state_root = Resource::build(&format!("{}/state_root", scabbard_base))
+                .add_request_guard(ProtocolVersionRangeGuard::new(
+                    SCABBARD_STATE_ROOT_PROTOCOL_MIN,
+                    SCABBARD_PROTOCOL_VERSION,
+                ))
+                .add_method(Method::Get, move |_, _| {
+                    if internal_server_error_clone.load(Ordering::SeqCst) {
+                        let response = ErrorResponse {
+                            message: "Request failed".into(),
+                        };
+                        Box::new(
+                            HttpResponse::InternalServerError()
+                                .json(response)
+                                .into_future(),
+                        )
+                    } else {
+                        Box::new(HttpResponse::Ok().json(MOCK_STATE_ROOT_HASH).into_future())
+                    }
+                });
+            resources.push(state_root);
 
             Self {
                 resources,

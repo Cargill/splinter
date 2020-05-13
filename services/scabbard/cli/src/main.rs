@@ -29,7 +29,8 @@ use std::time::Duration;
     feature = "namespace",
     feature = "namespace-permission",
     feature = "contract-registry",
-    feature = "smart-permissions"
+    feature = "smart-permissions",
+    feature = "state"
 ))]
 use clap::SubCommand;
 use clap::{App, AppSettings, Arg};
@@ -721,6 +722,34 @@ fn run() -> Result<(), CliError> {
         );
     }
 
+    #[cfg(feature = "state")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("state")
+                .about("Get scabbard state information")
+                .subcommand(
+                    SubCommand::with_name("root")
+                        .about("Get the current state root hash")
+                        .args(&[
+                            Arg::with_name("url")
+                                .help("URL to the scabbard REST API")
+                                .short("U")
+                                .long("url")
+                                .takes_value(true)
+                                .default_value("http://localhost:8008"),
+                            Arg::with_name("service-id")
+                                .long_help(
+                                    "Fully-qualified service ID of the scabbard service (must be \
+                                     of the form 'circuit_id::service_id')",
+                                )
+                                .long("service-id")
+                                .takes_value(true)
+                                .required(true),
+                        ]),
+                ),
+        );
+    }
+
     let matches = app.get_matches();
 
     let log_level = match matches.occurrences_of("verbose") {
@@ -1370,6 +1399,24 @@ fn run() -> Result<(), CliError> {
                     .build(&signer)?;
 
                 Ok(client.submit(&service_id, vec![batch], Some(Duration::from_secs(wait)))?)
+            }
+            _ => Err(CliError::InvalidSubcommand),
+        },
+        ("state", Some(matches)) => match matches.subcommand() {
+            ("root", Some(matches)) => {
+                let url = matches.value_of("url").expect("default not set for --url");
+                let client = ScabbardClient::new(url);
+
+                let full_service_id = matches
+                    .value_of("service-id")
+                    .ok_or_else(|| CliError::MissingArgument("service-id".into()))?;
+                let service_id = ServiceId::from_string(full_service_id)?;
+
+                let state_root_hash = client.get_current_state_root(&service_id)?;
+
+                println!("{}", state_root_hash);
+
+                Ok(())
             }
             _ => Err(CliError::InvalidSubcommand),
         },

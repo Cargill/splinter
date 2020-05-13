@@ -57,6 +57,7 @@ experimental = [
   "namespace",
   "namespace-permission",
   "smart-permissions",
+  "state",
 ]
 
 contract = []
@@ -65,6 +66,7 @@ execute = []
 namespace = []
 namespace-permission = []
 smart-permissions = []
+state = []
 
 [package.metadata.deb]
 maintainer = "The Splinter Team"

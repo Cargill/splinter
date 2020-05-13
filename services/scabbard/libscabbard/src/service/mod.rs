@@ -142,6 +142,16 @@ impl Scabbard {
             .get_state_with_prefix(prefix)?)
     }
 
+    /// Get the current state root hash of the scabbard service's state.
+    pub fn get_current_state_root(&self) -> Result<String, ScabbardError> {
+        Ok(self
+            .state
+            .lock()
+            .map_err(|_| ScabbardError::LockPoisoned)?
+            .current_state_root()
+            .to_string())
+    }
+
     pub fn add_batches(&self, batches: Vec<BatchPair>) -> Result<Option<String>, ScabbardError> {
         let mut shared = self
             .shared
