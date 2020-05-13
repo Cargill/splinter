@@ -249,7 +249,7 @@ impl Internal {
         // If the last attempt to refresh the cache wasn't successful, try again
         if !self.last_refresh_successful {
             match self.refresh_cache() {
-                Ok(_) => debug!("Successfully refreshed remote registy '{}'", self.url),
+                Ok(_) => debug!("Successfully refreshed remote registry '{}'", self.url),
                 // Last attempt also failed, so just log with DEBUG to keep the WARN logs clean
                 Err(err) => debug!("Failed to refresh remote registry '{}': {}", self.url, err),
             }
@@ -261,7 +261,10 @@ impl Internal {
             .unwrap_or(false)
         {
             match self.refresh_cache() {
-                Ok(_) => debug!("Forced refresh of remote registy '{}' successful", self.url),
+                Ok(_) => debug!(
+                    "Forced refresh of remote registry '{}' successful",
+                    self.url
+                ),
                 // Already checked that the previous attempt was successful (previous branch of the
                 // if/else), so log as WARN to indicate that something's changed
                 Err(err) => warn!(
@@ -353,7 +356,7 @@ fn automatic_refresh_loop(
         let previous_refresh_successful = internal.last_refresh_successful;
 
         match internal.refresh_cache() {
-            Ok(_) => debug!("Automatic refresh of remote registy '{}' successful", url),
+            Ok(_) => debug!("Automatic refresh of remote registry '{}' successful", url),
             Err(err) => {
                 // If the previous attempt was successful, log with WARN because
                 // something changed; if the previous attempt also failed, just log
