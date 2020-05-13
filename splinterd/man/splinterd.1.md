@@ -135,7 +135,8 @@ OPTIONS
 
 `-n`, `--network-endpoints` `NETWORK-ENDPOINT`
 : Specifies the endpoint for daemon-to-daemon communication between Splinter
-  nodes, using the format `tcp://ip:port`. (Default: 127.0.0.1:8044.)
+  nodes, using the format `protocol_prefix://ip:port`.
+  (Default: tcps://127.0.0.1:8044.)
 
   Specify multiple endpoints in a comma-separated list or with separate
   `-n` or `--network-endpoint` options.
@@ -175,7 +176,7 @@ OPTIONS
 
 `--service-endpoint SERVICE-ENDPOINT`
 : Specifies the endpoint for service-to-daemon communication, using the format
-  `tcp://ip:port`. (Default: `127.0.0.1:8043`.)
+  `tcp://ip:port`. (Default: `tcp://127.0.0.1:8043`.)
 
 `--storage STORAGE-TYPE`
 : Specifies whether to store circuit state in memory or in a local YAML file.

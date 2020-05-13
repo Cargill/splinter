@@ -29,8 +29,8 @@ const TLS_SERVER_KEY: &str = "private/server.key";
 const TLS_CA_FILE: &str = "ca.pem";
 
 const REST_API_ENDPOINT: &str = "127.0.0.1:8080";
-const SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
-const NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+const SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
+const NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
 #[cfg(feature = "database")]
 const DATABASE: &str = "127.0.0.1:5432";
 

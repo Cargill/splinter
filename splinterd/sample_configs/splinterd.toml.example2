@@ -30,13 +30,13 @@ display_name = "node_345"
 # Endpoint used for service to daemon communication.
 # Use a protocol prefix to enforce the connection type, using the format
 # `protocol_prefix://ip:port`
-# (default "127.0.0.1:8043")
+# (default "tcp://127.0.0.1:8043")
 service_endpoint = "127.0.0.1:8045"
 
 # Endpoints used for daemon to daemon communication.
 # Use a protocol prefix to enforce the connection type, using the format
 # `protocol_prefix://ip:port`
-# (default ["127.0.0.1:8044"])
+# (default ["tcps://127.0.0.1:8044"])
 network_endpoints = ["tcps://127.0.0.1:8046"]
 
 # Endpoint used for REST API communication

@@ -484,8 +484,8 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "private/client.key";
     static EXAMPLE_SERVER_CERT: &str = "server.crt";
     static EXAMPLE_SERVER_KEY: &str = "private/server.key";
-    static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
-    static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
+    static EXAMPLE_SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
+    static EXAMPLE_NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
     static EXAMPLE_NODE_ID: &str = "012";
     static EXAMPLE_DISPLAY_NAME: &str = "Node 1";

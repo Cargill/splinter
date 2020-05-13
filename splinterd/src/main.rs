@@ -388,6 +388,17 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let config = create_config(config_file_path, matches.clone())?;
 
+    if config.no_tls() {
+        for network_endpoint in config.network_endpoints() {
+            if network_endpoint.starts_with("tcps://") {
+                return Err(UserError::InvalidArgument(format!(
+                    "TLS is disabled, thus endpoint {} is invalid",
+                    network_endpoint,
+                )));
+            }
+        }
+    }
+
     let transport = build_transport(&config)?;
 
     let rest_api_endpoint = config.rest_api_endpoint();
