@@ -411,7 +411,7 @@ impl ServiceConnectionAgent {
                     status: ConnectionStatus::Connected,
                 });
             }
-            ConnectionManagerNotification::Disconnected { endpoint } => {
+            ConnectionManagerNotification::Disconnected { endpoint, .. } => {
                 if let Some(info) = self.services.get_connection_info_by_endpoint_mut(&endpoint) {
                     info.status = ConnectionStatus::Disconnected;
                 }
@@ -421,7 +421,9 @@ impl ServiceConnectionAgent {
                     info.status = ConnectionStatus::Connected;
                 }
             }
-            ConnectionManagerNotification::NonFatalConnectionError { endpoint, attempts } => {
+            ConnectionManagerNotification::NonFatalConnectionError {
+                endpoint, attempts, ..
+            } => {
                 if let Some(info) = self.services.remove_connection_by_endoint(&endpoint) {
                     error!(
                         "Failed to reconnect to service processor {} after {}] attempts; removing",

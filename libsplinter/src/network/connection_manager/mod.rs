@@ -1036,13 +1036,14 @@ where
                 // We checked earlier that this was an outbound connection
                 _ => unreachable!(),
             };
-
+            let identity = meta.identity.to_string();
             self.connections.insert(endpoint.to_string(), meta);
 
             // Notify subscribers of reconnection failure
             subscribers.broadcast(ConnectionManagerNotification::NonFatalConnectionError {
                 endpoint: endpoint.to_string(),
                 attempts: reconnection_attempts,
+                identity,
             });
         }
         Ok(())
@@ -1189,6 +1190,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
 
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
                             endpoint: endpoint.clone(),
+                            identity: metadata.identity.to_string(),
                         });
                         reconnections.push(endpoint.to_string());
                     }
@@ -1210,6 +1212,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                         *disconnected = true;
                         subscribers.broadcast(ConnectionManagerNotification::Disconnected {
                             endpoint: endpoint.clone(),
+                            identity: metadata.identity.to_string(),
                         });
                     }
                 } else {
@@ -1649,6 +1652,7 @@ mod tests {
             reconnecting_notification
                 == ConnectionManagerNotification::Disconnected {
                     endpoint: endpoint.clone(),
+                    identity: "some-peer".to_string()
                 }
         );
 
