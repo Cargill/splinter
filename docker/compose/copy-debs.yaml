@@ -34,17 +34,6 @@ services:
         cp /tmp/*.deb /build/debs
       "
 
-# ---==== examples ====---
-
-  private_xo:
-    image: private_xo:${ISOLATION_ID}
-    volumes:
-      - ../../build/debs:/build/debs
-    command: |
-      bash -c "
-        cp /tmp/*.deb /build/debs
-      "
-
 # ---==== gameroom components ====---
 
   gameroomd:

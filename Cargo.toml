@@ -19,7 +19,6 @@ members = [
     "client",
     "libsplinter",
     "splinterd",
-    "examples/private_xo",
     "examples/gameroom/cli",
     "examples/gameroom/database",
     "examples/gameroom/daemon",

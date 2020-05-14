@@ -30,11 +30,6 @@
 /cli/Cargo.lock
 /cli/packaging/man/*.1
 
-/examples/private_xo/target
-/examples/private_xo/Cargo.lock
-/examples/private_xo/demo_state/local_registry.yaml
-/examples/private_xo/demo_state/circuit_proposals.yaml
-
 /examples/gameroom/database/target
 /examples/gameroom/database/Cargo.lock
 

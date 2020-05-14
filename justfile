@@ -23,7 +23,6 @@ crates := '\
     examples/gameroom/database \
     examples/gameroom/daemon \
     examples/gameroom/cli \
-    examples/private_xo \
     '
 
 features := '\
