@@ -169,7 +169,9 @@ impl Transport for TlsTransport {
         };
 
         Ok(Box::new(TlsListener {
-            listener: TcpListener::bind(address)?,
+            listener: TcpListener::bind(address).map_err(|err| {
+                ListenError::IoError(format!("Failed to bind to {}", address), err)
+            })?,
             acceptor: self.acceptor.clone(),
         }))
     }

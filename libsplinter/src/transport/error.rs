@@ -110,14 +110,14 @@ impl From<io::Error> for DisconnectError {
 
 #[derive(Debug)]
 pub enum ListenError {
-    IoError(io::Error),
+    IoError(String, io::Error),
     ProtocolError(String),
 }
 
 impl Error for ListenError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            ListenError::IoError(err) => Some(err),
+            ListenError::IoError(_, err) => Some(err),
             ListenError::ProtocolError(_) => None,
         }
     }
@@ -126,15 +126,9 @@ impl Error for ListenError {
 impl std::fmt::Display for ListenError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ListenError::IoError(err) => write!(f, "io error occurred: {}", err),
+            ListenError::IoError(msg, err) => write!(f, "io error occurred: {}: {}", msg, err),
             ListenError::ProtocolError(err) => write!(f, "protocol error occurred: {}", err),
         }
-    }
-}
-
-impl From<io::Error> for ListenError {
-    fn from(io_error: io::Error) -> Self {
-        ListenError::IoError(io_error)
     }
 }
 
