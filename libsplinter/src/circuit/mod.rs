@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "service-network")]
+pub mod component;
 pub mod directory;
 pub mod handlers;
 pub mod service;
