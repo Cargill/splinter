@@ -55,4 +55,4 @@ CMD cargo login $CARGO_CRED \
  && rm -f ../../../Cargo.lock ./Cargo.lock \
  && cargo clean \
  && cargo test \
- && cargo publish
+ && cargo publish --allow-dirty

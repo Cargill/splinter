@@ -13,5 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+top_dir=$(cd $(dirname $(dirname $0)) && pwd)
+
+export VERSION=AUTO_STRICT
+export REPO_VERSION=$($top_dir/bin/get_version)
+
 docker build -f ci/publish-splinter-crates -t publish-splinter-crates ci/
+sed -i'' -e "s/splinter = {.*$/splinter\ =\ \"$REPO_VERSION\"/" services/scabbard/libscabbard/Cargo.toml
 docker run --rm -v $(pwd):/project/splinter -e CARGO_CRED=$CARGO_TOKEN publish-splinter-crates
