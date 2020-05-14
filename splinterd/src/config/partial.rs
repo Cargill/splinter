@@ -41,6 +41,7 @@ pub struct PartialConfig {
     tls_client_key: Option<String>,
     tls_server_cert: Option<String>,
     tls_server_key: Option<String>,
+    #[cfg(feature = "service-endpoint")]
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -77,6 +78,7 @@ impl PartialConfig {
             tls_client_key: None,
             tls_server_cert: None,
             tls_server_key: None,
+            #[cfg(feature = "service-endpoint")]
             service_endpoint: None,
             network_endpoints: None,
             advertised_endpoints: None,
@@ -137,6 +139,7 @@ impl PartialConfig {
         self.tls_server_key.clone()
     }
 
+    #[cfg(feature = "service-endpoint")]
     pub fn service_endpoint(&self) -> Option<String> {
         self.service_endpoint.clone()
     }
@@ -317,6 +320,7 @@ impl PartialConfig {
     ///
     /// * `service_endpoint` - Endpoint used for service to daemon communication.
     ///
+    #[cfg(feature = "service-endpoint")]
     pub fn with_service_endpoint(mut self, service_endpoint: Option<String>) -> Self {
         self.service_endpoint = service_endpoint;
         self

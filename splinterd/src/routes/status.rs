@@ -19,6 +19,7 @@ use splinter::futures::{Future, IntoFuture};
 struct Status {
     node_id: String,
     display_name: String,
+    #[cfg(feature = "service-endpoint")]
     service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
@@ -28,13 +29,14 @@ struct Status {
 pub fn get_status(
     node_id: String,
     display_name: String,
-    service_endpoint: String,
+    #[cfg(feature = "service-endpoint")] service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let status = Status {
         node_id,
         display_name,
+        #[cfg(feature = "service-endpoint")]
         service_endpoint,
         network_endpoints,
         advertised_endpoints,

@@ -56,6 +56,7 @@ pub struct Config {
     tls_client_key: (String, ConfigSource),
     tls_server_cert: (String, ConfigSource),
     tls_server_key: (String, ConfigSource),
+    #[cfg(feature = "service-endpoint")]
     service_endpoint: (String, ConfigSource),
     network_endpoints: (Vec<String>, ConfigSource),
     advertised_endpoints: (Vec<String>, ConfigSource),
@@ -112,6 +113,7 @@ impl Config {
         &self.tls_server_key.0
     }
 
+    #[cfg(feature = "service-endpoint")]
     pub fn service_endpoint(&self) -> &str {
         &self.service_endpoint.0
     }
@@ -231,6 +233,7 @@ impl Config {
         &self.tls_server_key.1
     }
 
+    #[cfg(feature = "service-endpoint")]
     fn service_endpoint_source(&self) -> &ConfigSource {
         &self.service_endpoint.1
     }
@@ -361,6 +364,7 @@ impl Config {
             self.tls_server_key(),
             self.tls_server_key_source()
         );
+        #[cfg(feature = "service-endpoint")]
         debug!(
             "Config: service_endpoint: {} (source: {:?})",
             self.service_endpoint(),
@@ -484,6 +488,7 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "private/client.key";
     static EXAMPLE_SERVER_CERT: &str = "server.crt";
     static EXAMPLE_SERVER_KEY: &str = "private/server.key";
+    #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
@@ -511,6 +516,7 @@ mod tests {
                 EXAMPLE_SERVER_CERT.to_string(),
             ),
             ("tls_server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
+            #[cfg(feature = "service-endpoint")]
             (
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
@@ -643,7 +649,9 @@ mod tests {
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoint",
             EXAMPLE_ADVERTISED_ENDPOINT,
+            #[cfg(feature = "service-endpoint")]
             "--service-endpoint",
+            #[cfg(feature = "service-endpoint")]
             EXAMPLE_SERVICE_ENDPOINT,
             "--tls-ca-file",
             EXAMPLE_CA_CERTS,
@@ -855,6 +863,7 @@ mod tests {
         // Both the `DefaultPartialConfigBuilder` and `TomlPartialConfigBuilder` had values for
         // `service_endpoint`, but the `TomlPartialConfigBuilder` value should have precedence
         // (source should be `Toml`).
+        #[cfg(feature = "service-endpoint")]
         assert_eq!(
             (
                 final_config.service_endpoint(),

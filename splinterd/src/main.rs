@@ -195,8 +195,6 @@ fn main() {
           "Human-readable name for the node")
         (@arg storage: --("storage") +takes_value
           "Storage type used for the node; defaults to yaml")
-        (@arg service_endpoint: --("service-endpoint") +takes_value
-          "Endpoint that service will connect to, tcp://ip:port")
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
             "How often remote Splinter registries should attempt to fetch upstream changes in the \
@@ -244,6 +242,13 @@ fn main() {
                 .takes_value(true)
                 .multiple(true)
                 .alias("network-endpoint"),
+        )
+        .arg(
+            Arg::with_name("service_endpoint")
+                .long("service-endpoint")
+                .long_help("Endpoint that service will connect to, tcp://ip:port")
+                .takes_value(true)
+                .hidden(!cfg!(feature = "service-endpoint")),
         )
         .arg(
             Arg::with_name("rest_api_endpoint")
@@ -422,7 +427,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_state_dir(config.state_dir().to_string())
         .with_network_endpoints(config.network_endpoints().to_vec())
         .with_advertised_endpoints(config.advertised_endpoints().to_vec())
-        .with_service_endpoint(String::from(config.service_endpoint()))
         .with_initial_peers(config.peers().to_vec())
         .with_node_id(node_id)
         .with_display_name(display_name)
@@ -433,6 +437,21 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_registry_forced_refresh(config.registry_forced_refresh())
         .with_heartbeat(config.heartbeat())
         .with_admin_timeout(admin_timeout);
+
+    #[cfg(feature = "service-endpoint")]
+    {
+        daemon_builder =
+            daemon_builder.with_service_endpoint(String::from(config.service_endpoint()))
+    }
+    #[cfg(not(feature = "service-endpoint"))]
+    {
+        if matches.is_present("service_endpoint") {
+            warn!(
+                "--service-endpoint is an experimental feature.  It is enabled by building \
+                splinterd with the features \"service-endpoint\" enabled"
+            );
+        }
+    }
 
     #[cfg(feature = "database")]
     {
