@@ -582,28 +582,14 @@ fn handle_notifications(
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
-        ConnectionManagerNotification::Disconnected { endpoint, identity } => {
-            if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
-                if endpoint != peer_metadata.active_endpoint {
-                    warn!(
-                        "Received disconnection notification for peer {} with \
-                        different endpoint {}",
-                        identity, endpoint
-                    );
-                    return;
-                }
-                info!("Peer {} is currenlty disconnected", identity);
-                let notification = PeerManagerNotification::Disconnected {
-                    peer: peer_metadata.id.to_string(),
-                };
-                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
-                // set peer to disconnected
-                peer_metadata.status = PeerStatus::Disconnected { retry_attempts: 1 };
-                if let Err(err) = peers.update_peer(peer_metadata) {
-                    error!("Unable to update peer: {}", err);
-                }
-            }
-        }
+        ConnectionManagerNotification::Disconnected { endpoint, identity } => handle_disconnection(
+            endpoint,
+            identity,
+            unreferenced_peers,
+            peers,
+            connector,
+            subscribers,
+        ),
         ConnectionManagerNotification::NonFatalConnectionError {
             endpoint,
             attempts,
@@ -678,6 +664,72 @@ fn handle_notifications(
         ),
         ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
             handle_fatal_connection(endpoint, error.to_string(), peers, subscribers)
+        }
+    }
+}
+
+fn handle_disconnection(
+    endpoint: String,
+    identity: String,
+    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    peers: &mut PeerMap,
+    connector: Connector,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+) {
+    if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
+        if endpoint != peer_metadata.active_endpoint {
+            warn!(
+                "Received disconnection notification for peer {} with \
+                different endpoint {}",
+                identity, endpoint
+            );
+            return;
+        }
+
+        let notification = PeerManagerNotification::Disconnected {
+            peer: peer_metadata.id.to_string(),
+        };
+        info!("Peer {} is currently disconnected", identity);
+        if peer_metadata.endpoints.contains(&endpoint) {
+            // allow peer manager to retry connection to that endpoint until the retry max is
+            // reached
+
+            // set peer to disconnected
+            peer_metadata.status = PeerStatus::Disconnected { retry_attempts: 1 };
+            if let Err(err) = peers.update_peer(peer_metadata) {
+                error!("Unable to update peer: {}", err);
+            }
+        } else {
+            // the disconnected endpoint is an inbound connection. This connection should
+            // be removed, peer set to pending and the endpoints in the peer metadata
+            // should be tried
+            if let Err(err) = connector.remove_connection(&peer_metadata.active_endpoint) {
+                error!("Unable to clean up old connection: {}", err);
+            }
+
+            info!("Attempting to find available endpoint for {}", identity);
+            for endpoint in peer_metadata.endpoints.iter() {
+                match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
+                    Ok(()) => break,
+                    Err(err) => error!(
+                        "Unable to request connection for peer {} at endpoint {}: {}",
+                        peer_metadata.id, endpoint, err
+                    ),
+                }
+            }
+            peer_metadata.status = PeerStatus::Pending;
+            if let Err(err) = peers.update_peer(peer_metadata) {
+                error!("Unable to update peer: {}", err);
+            }
+        }
+        subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+    } else {
+        // check for unrefrenced peer and remove if it has disconnected
+        debug!("Removing disconnected peer: {}", identity);
+        if let Some(unref_peer) = unreferenced_peers.remove(&identity) {
+            if let Err(err) = connector.remove_connection(&unref_peer.endpoint) {
+                error!("Unable to clean up old connection: {}", err);
+            }
         }
     }
 }
