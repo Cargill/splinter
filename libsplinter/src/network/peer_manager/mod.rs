@@ -48,6 +48,8 @@ const DEFAULT_MAXIMUM_RETRY_ATTEMPTS: u64 = 5;
 const DEFAULT_PACEMAKER_INTERVAL: u64 = 10;
 // Default value for maximum time between retrying a peers endpoints
 const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
+// Default intial value for how long to wait before retrying a peers endpoints
+const INITIAL_RETRY_FREQUENCY: u64 = 10;
 
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerMessage {
@@ -215,7 +217,7 @@ impl PeerManager {
         let join_handle = thread::Builder::new()
             .name("Peer Manager".into())
             .spawn(move || {
-                let mut peers = PeerMap::new();
+                let mut peers = PeerMap::new(INITIAL_RETRY_FREQUENCY);
                 // a map of identities to unreferenced peers.
                 let mut unreferenced_peers = HashMap::new();
                 let mut ref_map = RefMap::new();
