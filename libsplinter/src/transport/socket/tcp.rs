@@ -81,7 +81,9 @@ impl Transport for TcpTransport {
         };
 
         Ok(Box::new(TcpListener {
-            listener: StdTcpListener::bind(address)?,
+            listener: StdTcpListener::bind(address).map_err(|err| {
+                ListenError::IoError(format!("Failed to bind to {}", address), err)
+            })?,
         }))
     }
 }

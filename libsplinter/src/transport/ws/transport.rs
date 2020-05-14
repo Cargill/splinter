@@ -126,8 +126,14 @@ impl Transport for WsTransport {
             bind
         };
 
-        let server: Server<NoTlsAcceptor> = Server::bind(address)?;
-        let local_endpoint = format!("ws://{}", server.local_addr()?);
+        let server: Server<NoTlsAcceptor> = Server::bind(address)
+            .map_err(|err| ListenError::IoError(format!("Failed to bind to {}", address), err))?;
+        let local_endpoint = format!(
+            "ws://{}",
+            server.local_addr().map_err(|err| {
+                ListenError::IoError("Failed to get local address".into(), err)
+            })?
+        );
 
         Ok(Box::new(WsListener::new(server, local_endpoint)))
     }
