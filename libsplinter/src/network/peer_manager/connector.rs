@@ -189,7 +189,7 @@ impl PeerManagerConnector {
 
     /// Subscribe to PeerManager notifications.
     ///
-    /// Returns a PeerNotificationIter that can be used to receive notications about connected and
+    /// Returns a PeerNotificationIter that can be used to receive notifications about connected and
     /// disconnected peers
     pub fn subscribe(&self) -> Result<PeerNotificationIter, PeerManagerError> {
         let (send, recv) = channel();

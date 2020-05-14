@@ -225,7 +225,12 @@ impl SplinterDaemon {
         let connection_connector = connection_manager.connector();
         let connection_manager_shutdown = connection_manager.shutdown_signaler();
 
-        let mut peer_manager = PeerManager::new(connection_connector.clone(), None, None);
+        let mut peer_manager = PeerManager::new(
+            connection_connector.clone(),
+            None,
+            None,
+            self.node_id.to_string(),
+        );
         let peer_connector = peer_manager.start().map_err(|err| {
             StartError::NetworkError(format!("Unable to start peer manager: {}", err))
         })?;

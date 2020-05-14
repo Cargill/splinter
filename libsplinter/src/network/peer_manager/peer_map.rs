@@ -19,9 +19,6 @@ use crate::collections::BiHashMap;
 
 use super::error::PeerUpdateError;
 
-// Default intial value for how long to wait before retrying a peers endpoints
-const INITIAL_RETRY_FREQUENCY: u64 = 10;
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum PeerStatus {
     Connected,
@@ -44,16 +41,18 @@ pub struct PeerMap {
     peers: HashMap<String, PeerMetadata>,
     // Endpoint to peer id
     endpoints: HashMap<String, String>,
+    initial_retry_frequency: u64,
 }
 
 /// A map of Peer IDs to peer metadata, which also maintains a redirect table for updated peer IDs.
 ///
 /// Peer metadata includes the peer_id, the list of endpoints and the current active endpoint.
 impl PeerMap {
-    pub fn new() -> Self {
+    pub fn new(initial_retry_frequency: u64) -> Self {
         PeerMap {
             peers: HashMap::new(),
             endpoints: HashMap::new(),
+            initial_retry_frequency,
         }
     }
 
@@ -91,7 +90,7 @@ impl PeerMap {
             status,
             connection_id,
             last_connection_attempt: Instant::now(),
-            retry_frequency: INITIAL_RETRY_FREQUENCY,
+            retry_frequency: self.initial_retry_frequency,
         };
 
         self.peers.insert(peer_id.clone(), peer_metadata);
@@ -170,7 +169,7 @@ pub mod tests {
     //  3. Update the first peer and test the updated peer id is returned in place of the old id.
     #[test]
     fn test_get_peer_ids() {
-        let mut peer_map = PeerMap::new();
+        let mut peer_map = PeerMap::new(10);
 
         let peers = peer_map.peer_ids();
         assert_eq!(peers, Vec::<String>::new());
@@ -204,7 +203,7 @@ pub mod tests {
     //  2. Add two peers and test that their ids are returned from connection_ids()
     #[test]
     fn test_get_connection_ids() {
-        let mut peer_map = PeerMap::new();
+        let mut peer_map = PeerMap::new(10);
 
         let peers = peer_map.peer_ids();
         assert_eq!(peers, Vec::<String>::new());
@@ -244,7 +243,7 @@ pub mod tests {
     //  4. Validate same metadata is returned from get_peer_from_endpoint("test_endpoint2")
     #[test]
     fn test_get_peer_by_endpoint() {
-        let mut peer_map = PeerMap::new();
+        let mut peer_map = PeerMap::new(10);
 
         let peer_metadata = peer_map.get_peer_from_endpoint("bad_endpoint");
         assert_eq!(peer_metadata, None);
@@ -281,7 +280,7 @@ pub mod tests {
     //  3. Check that the correct metadata is returned from self.peers.get()
     #[test]
     fn test_insert_peer() {
-        let mut peer_map = PeerMap::new();
+        let mut peer_map = PeerMap::new(10);
 
         peer_map.insert(
             "test_peer".to_string(),
@@ -311,7 +310,7 @@ pub mod tests {
     //  3. Verify that the correct peer_metadata is returned when removing test_peer
     #[test]
     fn test_remove_peer() {
-        let mut peer_map = PeerMap::new();
+        let mut peer_map = PeerMap::new(10);
 
         let peer_metdata = peer_map.remove("test_peer");
 
@@ -341,7 +340,7 @@ pub mod tests {
     //  4. Check that the peer's metadata now points to test_endpoint1 and the peer is disconnected
     #[test]
     fn test_get_update_active_endpoint() {
-        let mut peer_map = PeerMap::new();
+        let mut peer_map = PeerMap::new(10);
         let no_peer_metadata = PeerMetadata {
             id: "test_peer".to_string(),
             connection_id: "connection_id".to_string(),

@@ -3441,7 +3441,7 @@ mod tests {
             .start()
             .expect("Unable to start Connection Manager");
         let connector = cm.connector();
-        let mut pm = PeerManager::new(connector, None, Some(1));
+        let mut pm = PeerManager::new(connector, None, Some(1), "my_id".to_string());
         let peer_connector = pm.start().expect("Cannot start PeerManager");
         (mesh, cm, pm, peer_connector)
     }

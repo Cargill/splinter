@@ -33,9 +33,11 @@ pub enum ConnectionManagerNotification {
     },
     Disconnected {
         endpoint: String,
+        identity: String,
     },
     NonFatalConnectionError {
         endpoint: String,
         attempts: u64,
+        identity: String,
     },
 }
