@@ -34,8 +34,6 @@ services:
             (cd examples/gameroom/cli && cargo test --features stable) &&
             (cd examples/gameroom/daemon && cargo test --features stable) &&
             (cd examples/gameroom/database && cargo test --features stable) &&
-            (cd examples/private_counter/cli && cargo test --features stable) &&
-            (cd examples/private_counter/service && cargo test --features stable) &&
             (cd examples/private_xo && cargo test --features stable) &&
             (cd libsplinter && cargo test --features stable) &&
             (cd services/health && cargo test --features stable) &&
@@ -48,8 +46,6 @@ services:
             (cd examples/gameroom/cli && cargo test --features experimental) &&
             (cd examples/gameroom/daemon && cargo test --features experimental) &&
             (cd examples/gameroom/database && cargo test --features experimental) &&
-            (cd examples/private_counter/cli && cargo test --features experimental) &&
-            (cd examples/private_counter/service && cargo test --features experimental) &&
             (cd examples/private_xo && cargo test --features experimental) &&
             (cd libsplinter && cargo test --features experimental) &&
             (cd services/health && cargo test --features experimental) &&

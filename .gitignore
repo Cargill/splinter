@@ -35,11 +35,6 @@
 /examples/private_xo/demo_state/local_registry.yaml
 /examples/private_xo/demo_state/circuit_proposals.yaml
 
-/examples/private_counter/service/target
-/examples/private_counter/service/Cargo.lock
-/examples/private_counter/demo_state/local_registry.yaml
-/examples/private_counter/demo_state/circuit_proposals.yaml
-
 /examples/gameroom/database/target
 /examples/gameroom/database/Cargo.lock
 

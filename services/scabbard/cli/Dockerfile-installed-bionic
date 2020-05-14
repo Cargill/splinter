@@ -35,10 +35,6 @@ COPY examples/gameroom/daemon/Cargo.toml \
      /build/examples/gameroom/daemon/Cargo.toml
 COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
-COPY examples/private_counter/cli/Cargo.toml \
-     /build/examples/private_counter/cli/Cargo.toml
-COPY examples/private_counter/service/Cargo.toml \
-     /build/examples/private_counter/service/Cargo.toml
 COPY examples/private_xo/Cargo.toml /build/examples/private_xo/Cargo.toml
 
 # Copy over source files

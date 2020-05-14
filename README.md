@@ -114,9 +114,6 @@ building with default features, unset the evironment variable:
 Splinter includes several example applications that you can run as demos. The
 README in each directory explains how to run the demo.
 
-- [Private Counter](examples/private_counter/): Three services communicate over
-  a circuit to increment a shared counter.
-
 - [Private XO](examples/private_xo/): Two services talk over a circuit to play
   a private game of tic tac toe (XO).
 

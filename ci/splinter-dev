@@ -61,10 +61,6 @@ RUN USER=root cargo new --bin examples/gameroom/cli
 RUN USER=root cargo new --bin examples/gameroom/daemon
 RUN USER=root cargo new --bin examples/gameroom/database
 
-# Create empty Cargo projects for private counter
-RUN USER=root cargo new --bin examples/private_counter/cli
-RUN USER=root cargo new --bin examples/private_counter/service
-
 # Create empty Cargo projects for private xo
 RUN USER=root cargo new --bin examples/private_xo
 
@@ -94,10 +90,6 @@ COPY examples/gameroom/daemon/Cargo.toml \
      /build/examples/gameroom/daemon/Cargo.toml
 COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
-COPY examples/private_counter/cli/Cargo.toml \
-     /build/examples/private_counter/cli/Cargo.toml
-COPY examples/private_counter/service/Cargo.toml \
-     /build/examples/private_counter/service/Cargo.toml
 COPY examples/private_xo/Cargo.toml /build/examples/private_xo/Cargo.toml
 
 # Do release builds for each Cargo.toml
@@ -110,8 +102,6 @@ RUN rm \
     target/release/gameroomd* \
     target/release/health* \
     target/release/libsplinter* \
-    target/release/pcounter* \
-    target/release/private-counter* \
     target/release/private-xo* \
     target/release/scabbard* \
     target/release/splinter-cli* \
@@ -120,8 +110,6 @@ RUN rm \
     target/release/deps/gameroomd* \
     target/release/deps/health* \
     target/release/deps/libsplinter* \
-    target/release/deps/pcounter* \
-    target/release/deps/private_counter* \
     target/release/deps/private_xo* \
     target/release/deps/scabbard* \
     target/release/deps/splinter_cli* \

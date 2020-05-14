@@ -636,7 +636,7 @@ For upgrade information, see [Upgrading to Splinter 0.3.15 from Splinter 0.3.14]
 ### Miscellaneous
 
 * Update the examples
-  [private_counter](https://github.com/Cargill/splinter/tree/master/examples/private_counter)
+  [private_counter](https://github.com/Cargill/splinter/tree/v0.3.15/examples/private_counter)
   and [private_xo](https://github.com/Cargill/splinter/tree/master/examples/private_xo)
   to be compatible with Splinter version 0.3.15.
 
