@@ -174,10 +174,6 @@ OPTIONS
 
   This option overrides the `SPLINTER_STATE_DIR` environment variable, if set.
 
-`--service-endpoint SERVICE-ENDPOINT`
-: Specifies the endpoint for service-to-daemon communication, using the format
-  `tcp://ip:port`. (Default: `tcp://127.0.0.1:8043`.)
-
 `--storage STORAGE-TYPE`
 : Specifies whether to store circuit state in memory or in a local YAML file.
   *STORAGE-TYPE* can be `memory` or `yaml` (the default). For `yaml`, the file
