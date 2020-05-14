@@ -403,7 +403,7 @@ pub mod tests {
         dispatch_channel, DispatchError, DispatchLoopBuilder, Dispatcher, Handler, MessageContext,
         MessageSender, PeerId,
     };
-    use crate::network::peer_manager::{PeerManager, PeerManagerNotification};
+    use crate::peer::{PeerManager, PeerManagerNotification};
     use crate::protos::network::NetworkEcho;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 

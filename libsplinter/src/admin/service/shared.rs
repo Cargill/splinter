@@ -32,8 +32,8 @@ use crate::circuit::{
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
-use crate::network::peer_manager::{PeerManagerConnector, PeerRef};
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
+use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 #[cfg(feature = "service-arg-validation")]
 use crate::protos::admin::SplinterService;
@@ -1904,7 +1904,7 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
-    use crate::network::peer_manager::{PeerManager, PeerManagerConnector};
+    use crate::peer::{PeerManager, PeerManagerConnector};
     use crate::protocol::authorization::{
         AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
         TrustRequest,

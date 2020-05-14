@@ -55,11 +55,11 @@ use splinter::network::dispatch::{
     dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
 };
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::network::peer_manager::interconnect::PeerInterconnectBuilder;
-use splinter::network::peer_manager::PeerManager;
 use splinter::network::sender::NetworkMessageSender;
 use splinter::network::{ConnectionError, PeerUpdateError, SendError};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
+use splinter::peer::interconnect::PeerInterconnectBuilder;
+use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;
 use splinter::protos::network::NetworkMessageType;
 use splinter::registry::{

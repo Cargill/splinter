@@ -31,12 +31,10 @@ use self::error::{
 use crate::collections::{BiHashMap, RefMap};
 use crate::network::connection_manager::ConnectionManagerNotification;
 use crate::network::connection_manager::Connector;
-pub use crate::network::peer_manager::connector::PeerManagerConnector;
-use crate::network::peer_manager::connector::PeerRemover;
-pub use crate::network::peer_manager::notification::{
-    PeerManagerNotification, PeerNotificationIter,
-};
-use crate::network::peer_manager::peer_map::{PeerMap, PeerStatus};
+pub use crate::peer::connector::PeerManagerConnector;
+use crate::peer::connector::PeerRemover;
+pub use crate::peer::notification::{PeerManagerNotification, PeerNotificationIter};
+use crate::peer::peer_map::{PeerMap, PeerStatus};
 use crate::threading::pacemaker;
 
 use uuid::Uuid;
