@@ -35,6 +35,7 @@ struct TomlConfig {
     tls_client_key: Option<String>,
     tls_server_cert: Option<String>,
     tls_server_key: Option<String>,
+    #[cfg(feature = "service-endpoint")]
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -121,7 +122,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_tls_client_key(self.toml_config.tls_client_key)
             .with_tls_server_cert(self.toml_config.tls_server_cert)
             .with_tls_server_key(self.toml_config.tls_server_key)
-            .with_service_endpoint(self.toml_config.service_endpoint)
             .with_network_endpoints(self.toml_config.network_endpoints)
             .with_advertised_endpoints(self.toml_config.advertised_endpoints)
             .with_peers(self.toml_config.peers)
@@ -133,6 +133,11 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
             .with_heartbeat(self.toml_config.heartbeat)
             .with_admin_timeout(self.toml_config.admin_timeout);
+
+        #[cfg(feature = "service-endpoint")]
+        {
+            partial_config = partial_config.with_service_endpoint(self.toml_config.service_endpoint)
+        }
 
         #[cfg(feature = "database")]
         {
@@ -205,6 +210,7 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
     static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NODE_ID: &str = "012";
     static EXAMPLE_DISPLAY_NAME: &str = "Node 1";
@@ -228,6 +234,7 @@ mod tests {
                 EXAMPLE_SERVER_CERT.to_string(),
             ),
             ("tls_server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
+            #[cfg(feature = "service-endpoint")]
             (
                 "service_endpoint".to_string(),
                 EXAMPLE_SERVICE_ENDPOINT.to_string(),
@@ -304,6 +311,7 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
@@ -347,6 +355,7 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "service-endpoint")]
         assert_eq!(config.service_endpoint(), None);
         assert_eq!(config.network_endpoints(), None);
         assert_eq!(config.advertised_endpoints(), None);

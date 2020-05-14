@@ -29,6 +29,7 @@ const TLS_SERVER_KEY: &str = "private/server.key";
 const TLS_CA_FILE: &str = "ca.pem";
 
 const REST_API_ENDPOINT: &str = "127.0.0.1:8080";
+#[cfg(feature = "service-endpoint")]
 const SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
 const NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
 #[cfg(feature = "database")]
@@ -61,7 +62,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_tls_client_key(Some(String::from(TLS_CLIENT_KEY)))
             .with_tls_server_cert(Some(String::from(TLS_SERVER_CERT)))
             .with_tls_server_key(Some(String::from(TLS_SERVER_KEY)))
-            .with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
             .with_network_endpoints(Some(vec![String::from(NETWORK_ENDPOINT)]))
             .with_peers(Some(vec![]))
             .with_rest_api_endpoint(Some(String::from(REST_API_ENDPOINT)))
@@ -74,6 +74,11 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_tls_insecure(Some(false))
             .with_no_tls(Some(false));
 
+        #[cfg(feature = "service-endpoint")]
+        {
+            partial_config =
+                partial_config.with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
+        }
         #[cfg(feature = "biome")]
         {
             partial_config = partial_config.with_enable_biome(Some(false));
@@ -109,6 +114,7 @@ mod tests {
             Some(String::from(TLS_SERVER_CERT))
         );
         assert_eq!(config.tls_server_key(), Some(String::from(TLS_SERVER_KEY)));
+        #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),
             Some(String::from(SERVICE_ENDPOINT))

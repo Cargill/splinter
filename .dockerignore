@@ -24,18 +24,6 @@
 /cli/target
 /cli/Cargo.lock
 
-/examples/private_xo/target
-/examples/private_xo/Cargo.lock
-
-/examples/private_counter/service/target
-/examples/private_counter/service/Cargo.lock
-
-/examples/private_counter/cli/target
-/examples/private_counter/cli/Cargo.lock
-
-/examples/private_xo/target
-/examples/private_xo/Cargo.lock
-
 /examples/gameroom/database/target
 /examples/gameroom/database/Cargo.lock
 

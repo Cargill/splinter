@@ -54,7 +54,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             .with_tls_client_key(self.matches.value_of("tls_client_key").map(String::from))
             .with_tls_server_cert(self.matches.value_of("tls_server_cert").map(String::from))
             .with_tls_server_key(self.matches.value_of("tls_server_key").map(String::from))
-            .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
             .with_network_endpoints(
                 self.matches
                     .values_of("network_endpoints")
@@ -92,6 +91,12 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 None
             })
             .with_state_dir(self.matches.value_of("state_dir").map(String::from));
+
+        #[cfg(feature = "service-endpoint")]
+        {
+            partial_config = partial_config
+                .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
+        }
 
         #[cfg(feature = "biome")]
         {
@@ -134,6 +139,7 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
     static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
@@ -162,6 +168,7 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
@@ -244,7 +251,9 @@ mod tests {
             EXAMPLE_NETWORK_ENDPOINT,
             "--advertised-endpoints",
             EXAMPLE_ADVERTISED_ENDPOINT,
+            #[cfg(feature = "service-endpoint")]
             "--service-endpoint",
+            #[cfg(feature = "service-endpoint")]
             EXAMPLE_SERVICE_ENDPOINT,
             "--tls-ca-file",
             EXAMPLE_CA_CERTS,

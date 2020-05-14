@@ -177,7 +177,6 @@ services:
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-acme.toml -vv \
               --database postgres://admin:admin@splinterd-db-acme:5432/splinter \
-              --service-endpoint tcp://0.0.0.0:8043 \
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-acme:8044 \
               --rest-api-endpoint 0.0.0.0:8085 \
@@ -300,7 +299,6 @@ services:
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
               --database postgres://admin:admin@splinterd-db-bubba:5432/splinter \
-              --service-endpoint tcp://0.0.0.0:8043 \
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-bubba:8044 \
               --rest-api-endpoint 0.0.0.0:8085 \

@@ -100,6 +100,7 @@ type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::Service
 
 pub struct SplinterDaemon {
     state_dir: String,
+    #[cfg(feature = "service-endpoint")]
     service_endpoint: String,
     network_endpoints: Vec<String>,
     advertised_endpoints: Vec<String>,
@@ -170,11 +171,15 @@ impl SplinterDaemon {
                 .map(|listener| listener.endpoint())
                 .collect::<Vec<_>>(),
         );
+
+        #[cfg(feature = "service-endpoint")]
         let service_listener = transport.listen(&self.service_endpoint)?;
+        #[cfg(feature = "service-endpoint")]
         debug!(
             "Listening for service connections on {}",
             service_listener.endpoint()
         );
+
         let mut internal_service_listeners = vec![];
         internal_service_listeners.push(transport.listen("inproc://admin-service")?);
         internal_service_listeners.push(transport.listen("inproc://orchestator")?);
@@ -240,6 +245,7 @@ impl SplinterDaemon {
         Self::listen_for_services(
             connection_connector.clone(),
             internal_service_listeners,
+            #[cfg(feature = "service-endpoint")]
             service_listener,
         );
 
@@ -414,6 +420,7 @@ impl SplinterDaemon {
 
         let node_id = self.node_id.clone();
         let display_name = self.display_name.clone();
+        #[cfg(feature = "service-endpoint")]
         let service_endpoint = self.service_endpoint.clone();
         let network_endpoints = self.network_endpoints.clone();
         let advertised_endpoints = self.advertised_endpoints.clone();
@@ -433,6 +440,7 @@ impl SplinterDaemon {
                     routes::get_status(
                         node_id.clone(),
                         display_name.clone(),
+                        #[cfg(feature = "service-endpoint")]
                         service_endpoint.clone(),
                         network_endpoints.clone(),
                         advertised_endpoints.clone(),
@@ -521,7 +529,7 @@ impl SplinterDaemon {
     fn listen_for_services(
         connection_connector: Connector,
         internal_service_listeners: Vec<Box<dyn Listener>>,
-        mut external_service_listener: Box<dyn Listener>,
+        #[cfg(feature = "service-endpoint")] mut external_service_listener: Box<dyn Listener>,
     ) {
         // this thread will just be dropped on shutdown
         let _ = thread::spawn(move || {
@@ -544,24 +552,28 @@ impl SplinterDaemon {
                 }
             }
 
-            for connection_result in external_service_listener.incoming() {
-                let connection = match connection_result {
-                    Ok(connection) => connection,
-                    Err(err) => {
-                        return Err(StartError::TransportError(format!(
-                            "Accept Error: {:?}",
-                            err
-                        )));
+            #[cfg(feature = "service-endpoint")]
+            {
+                for connection_result in external_service_listener.incoming() {
+                    let connection = match connection_result {
+                        Ok(connection) => connection,
+                        Err(err) => {
+                            return Err(StartError::TransportError(format!(
+                                "Accept Error: {:?}",
+                                err
+                            )));
+                        }
+                    };
+                    debug!(
+                        "Received service connection from {}",
+                        connection.remote_endpoint()
+                    );
+                    if let Err(err) = connection_connector.add_inbound_connection(connection) {
+                        error!("Unable to add inbound service connection: {}", err);
                     }
-                };
-                debug!(
-                    "Received service connection from {}",
-                    connection.remote_endpoint()
-                );
-                if let Err(err) = connection_connector.add_inbound_connection(connection) {
-                    error!("Unable to add inbound service connection: {}", err);
                 }
             }
+
             Ok(())
         });
     }
@@ -697,6 +709,7 @@ fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartErr
 #[derive(Default)]
 pub struct SplinterDaemonBuilder {
     state_dir: Option<String>,
+    #[cfg(feature = "service-endpoint")]
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
     advertised_endpoints: Option<Vec<String>>,
@@ -728,6 +741,7 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "service-endpoint")]
     pub fn with_service_endpoint(mut self, value: String) -> Self {
         self.service_endpoint = Some(value);
         self
@@ -826,6 +840,7 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: state_dir".to_string())
         })?;
 
+        #[cfg(feature = "service-endpoint")]
         let service_endpoint = self.service_endpoint.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: service_endpoint".to_string())
         })?;
@@ -876,6 +891,7 @@ impl SplinterDaemonBuilder {
 
         Ok(SplinterDaemon {
             state_dir,
+            #[cfg(feature = "service-endpoint")]
             service_endpoint,
             network_endpoints,
             advertised_endpoints,

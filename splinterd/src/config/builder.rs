@@ -157,6 +157,7 @@ impl ConfigBuilder {
             tls_client_key,
             tls_server_cert,
             tls_server_key,
+            #[cfg(feature = "service-endpoint")]
             service_endpoint: self
                 .partial_configs
                 .iter()
@@ -314,6 +315,7 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "/etc/splinter/certs/client.key";
     static EXAMPLE_SERVER_CERT: &str = "/etc/splinter/certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "/etc/splinter/certs/server.key";
+    #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
     static EXAMPLE_ADVERTISED_ENDPOINT: &str = "localhost:8044";
@@ -341,6 +343,7 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),
             Some(EXAMPLE_SERVICE_ENDPOINT.to_string())
@@ -388,7 +391,6 @@ mod tests {
             .with_tls_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()))
             .with_tls_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()))
             .with_tls_server_key(Some(EXAMPLE_SERVER_KEY.to_string()))
-            .with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()))
             .with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]))
             .with_advertised_endpoints(Some(vec![EXAMPLE_ADVERTISED_ENDPOINT.to_string()]))
             .with_peers(Some(vec![]))
@@ -398,6 +400,12 @@ mod tests {
             .with_registries(Some(vec![]))
             .with_heartbeat(None)
             .with_admin_timeout(None);
+
+        #[cfg(feature = "service-endpoint")]
+        {
+            partial_config =
+                partial_config.with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()))
+        }
         // Compare the generated `PartialConfig` object against the expected values.
         assert_config_values(partial_config);
     }
@@ -422,8 +430,12 @@ mod tests {
         partial_config = partial_config.with_tls_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()));
         partial_config = partial_config.with_tls_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()));
         partial_config = partial_config.with_tls_server_key(Some(EXAMPLE_SERVER_KEY.to_string()));
-        partial_config =
-            partial_config.with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()));
+
+        #[cfg(feature = "service-endpoint")]
+        {
+            partial_config =
+                partial_config.with_service_endpoint(Some(EXAMPLE_SERVICE_ENDPOINT.to_string()));
+        }
         partial_config =
             partial_config.with_network_endpoints(Some(vec![EXAMPLE_NETWORK_ENDPOINT.to_string()]));
         partial_config = partial_config

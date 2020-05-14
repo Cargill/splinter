@@ -88,8 +88,8 @@ library), `splinterd` (the splinter daemon), the CLI, the client, and all
 examples in the `examples` directory.
 
 To build individual components, run `cargo build` in the component directories.
-For example, to build only the Private XO demo, navigate to
-`examples/private_xo`, then run `cargo build`.
+For example, to build only the splinter library, navigate to
+`libsplinter`, then run `cargo build`.
 
 To build Splinter using Docker, run
 `docker-compose -f docker-compose-installed.yaml build` from the root
@@ -100,8 +100,8 @@ directory.
 
 To build individual components using Docker, run
 `docker-compose -f docker-compose-installed.yaml build <component>`
-from the root directory. For example, to build only the Private XO demo,
-run `docker-compose -f docker-compose-installed.yaml build private_xo`.
+from the root directory. For example, to build only the splinter daemon,
+run `docker-compose -f docker-compose-installed.yaml build splinterd`.
 
 To use Docker to build Splinter with experimental features enabled, set an
 enviroment variable in your shell before running the build commands. For
@@ -113,12 +113,6 @@ building with default features, unset the evironment variable:
 
 Splinter includes several example applications that you can run as demos. The
 README in each directory explains how to run the demo.
-
-- [Private Counter](examples/private_counter/): Three services communicate over
-  a circuit to increment a shared counter.
-
-- [Private XO](examples/private_xo/): Two services talk over a circuit to play
-  a private game of tic tac toe (XO).
 
 - [Gameroom](examples/gameroom/): Web application that allows you to set up a
   dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).

@@ -18,9 +18,6 @@ version = "1"
 
 node_id = "bubba-node-000"
 
-# Endpoint used for service to daemon communication.
-service_endpoint = "127.0.0.1:8043"
-
 # Endpoints used for daemon to daemon communication.
 network_endpoints = ["tcps://127.0.0.1:8044"]
 

@@ -46,38 +46,6 @@ services:
     image: ${REGISTRY}${NAMESPACE}splinterd:${ISOLATION_ID}
     container_name: splinterd
 
-# ---==== examples ====---
-
-  private_xo:
-    build:
-      context: .
-      dockerfile: examples/private_xo/Dockerfile-installed-${DISTRO}
-      args:
-      - CARGO_ARGS=${CARGO_ARGS}
-      - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}private_xo:${ISOLATION_ID}
-    container_name: private_xo
-
-  private_counter_cli:
-    build:
-      context: .
-      dockerfile: examples/private_counter/cli/Dockerfile-installed-${DISTRO}
-      args:
-      - CARGO_ARGS=${CARGO_ARGS}
-      - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}private_counter_cli:${ISOLATION_ID}
-    container_name: private_counter_cli
-
-  private_counter_service:
-    build:
-      context: .
-      dockerfile: examples/private_counter/service/Dockerfile-installed-${DISTRO}
-      args:
-      - CARGO_ARGS=${CARGO_ARGS}
-      - REPO_VERSION=${REPO_VERSION}
-    image: ${REGISTRY}${NAMESPACE}private_counter_service:${ISOLATION_ID}
-    container_name: private_counter_service
-
 # ---==== gameroom components ====---
 
   gameroomd:

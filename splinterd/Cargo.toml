@@ -83,6 +83,7 @@ experimental = [
     # The following features are experimental:
     "health",
     "service-arg-validation",
+    "service-endpoint",
     "ws-transport",
 ]
 
@@ -99,6 +100,7 @@ service-arg-validation = [
     "scabbard/service-arg-validation",
     "splinter/service-arg-validation",
 ]
+service-endpoint = []
 ws-transport = ["splinter/ws-transport"]
 
 [package.metadata.deb]
