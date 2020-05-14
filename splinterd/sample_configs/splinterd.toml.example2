@@ -27,12 +27,6 @@ node_id = "345"
 # (default "Node {node_id}")
 display_name = "node_345"
 
-# Endpoint used for service to daemon communication.
-# Use a protocol prefix to enforce the connection type, using the format
-# `protocol_prefix://ip:port`
-# (default "tcp://127.0.0.1:8043")
-service_endpoint = "127.0.0.1:8045"
-
 # Endpoints used for daemon to daemon communication.
 # Use a protocol prefix to enforce the connection type, using the format
 # `protocol_prefix://ip:port`

@@ -15,9 +15,6 @@
 # Friendly identifier for this node. Must be unique on the network
 node_id = "acme-node-000"
 
-# Endpoint used for service to daemon communication
-service_endpoint = "tcp://localhost:8043"
-
 # Endpoints used for daemon to daemon communication. Transport type is
 # determined by the protocol prefix. Use tcp:// for TCP connections and tcps://
 # for TLS connections
