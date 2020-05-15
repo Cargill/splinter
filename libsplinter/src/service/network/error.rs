@@ -135,3 +135,67 @@ impl fmt::Display for ServiceRemoveInstanceError {
         }
     }
 }
+
+#[derive(Debug)]
+pub enum ServiceForwardingError {
+    /// The sending service is not in the circuit.
+    SenderNotInCircuit,
+
+    /// The receiving service is not in the circuit.
+    RecipientNotInCircuit,
+
+    /// The sending service is not registered.
+    SenderNotRegistered,
+
+    /// The receiving service is not registered.
+    RecipientNotRegistered,
+
+    /// The specified circuit does not exist.
+    CircuitDoesNotExist,
+
+    /// An internal error has occurred while forwarding the message.
+    InternalError {
+        context: String,
+        source: Option<Box<dyn Error + Send>>,
+    },
+}
+
+impl Error for ServiceForwardingError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ServiceForwardingError::InternalError {
+                source: Some(ref err),
+                ..
+            } => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ServiceForwardingError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ServiceForwardingError::CircuitDoesNotExist => f.write_str("circuit does not exist"),
+            ServiceForwardingError::SenderNotInCircuit => {
+                f.write_str("sending service is not in the circuit")
+            }
+            ServiceForwardingError::RecipientNotInCircuit => {
+                f.write_str("receiving service is not in the circuit")
+            }
+            ServiceForwardingError::SenderNotRegistered => {
+                f.write_str("sending service is not registered")
+            }
+            ServiceForwardingError::RecipientNotRegistered => {
+                f.write_str("receiving service is not registered")
+            }
+            ServiceForwardingError::InternalError {
+                context,
+                source: Some(ref err),
+            } => write!(f, "{}: {}", context, err),
+            ServiceForwardingError::InternalError {
+                context,
+                source: None,
+            } => f.write_str(&context),
+        }
+    }
+}

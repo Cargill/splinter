@@ -25,10 +25,13 @@ use std::thread;
 
 use crate::circuit::service::ServiceId;
 use crate::network::connection_manager::{ConnectionManagerNotification, Connector};
+use crate::protocol::service::ServiceProcessorMessage;
 
 use self::error::ServiceConnectionAgentError;
 pub use self::error::ServiceConnectionError;
-pub use self::error::{ServiceAddInstanceError, ServiceRemoveInstanceError};
+pub use self::error::{
+    ServiceAddInstanceError, ServiceForwardingError, ServiceRemoveInstanceError,
+};
 
 pub type SubscriberId = usize;
 type Subscriber =
@@ -114,6 +117,36 @@ pub trait ServiceInstances {
         service_id: ServiceId,
         component_id: String,
     ) -> Result<(), ServiceRemoveInstanceError>;
+}
+
+/// A component that may forward the message from a service instance to either other parts of the
+/// system or the network.
+///
+/// The implementation may require that the service is registered with the system.
+pub trait ServiceMessageForwarder {
+    /// Forward the given message from the service.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ServiceForwardingError` if the service is not registered, or an internal error
+    /// prevents the message from being forwarded.
+    fn forward(
+        &self,
+        service_id: &ServiceId,
+        service_msg: ServiceProcessorMessage,
+    ) -> Result<ForwardResult, ServiceForwardingError>;
+}
+
+/// A Forward result indicates whether or not a message has been forwarded, or should be re-routed
+/// locally.
+pub enum ForwardResult {
+    /// The message was successully forwarded on.
+    Sent,
+
+    /// The message should be forwarded locally.
+    ///
+    /// This tuple includes the component id and the original attempted message.
+    LocalReReroute(String, ServiceProcessorMessage),
 }
 
 /// Constructs new ServiceConnectionManager structs.
