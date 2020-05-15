@@ -1,5 +1,103 @@
 # Release Notes
 
+## Changes in Splinter 0.3.18
+
+### Deprecations and Breaking Changes
+
+* The default network endpoint for `splinterd` now contains a TLS protocol
+  prefix, `tcps://`. When starting `splinterd` with the `--no-tls` flag, a valid
+  TCP endpoint must be provided (with the `network_endpoint` configuration
+    setting or `--network-endpoint`  command option). Using the default network
+    endpoint with the TLS protocol prefix will cause `splinterd` to fail.
+
+* The `splinterd`  `service-endpoint` configuration setting and
+  `service_endpoint` command option are now available only with the experimental
+  `service-endpoint` feature. The command option and config setting no longer
+  have an effect if the `service-endpoint` feature is not enabled.
+
+* The `PeerManager` and its related components have been moved to the
+  `splinter::peer` module.
+
+For upgrade information, see
+[Upgrading to Splinter 0.3.18 from Splinter 0.3.17](https://github.com/Cargill/splinter-docs/blob/master/docs/upgrading/splinter-v0.3.18-from-v0.3.17.md).
+
+### libsplinter
+
+* Fix a bug where the Transact scheduler was not shut down if a transaction was
+  invalid.
+
+* Update the peer manager to handle the case where two peers connect to each
+  other simultaneously.
+
+* Fix a bug where a failure to authorize on peer reconnection would result in
+  retrying authorization indefinitely. This failure now causes the connection to
+  be removed.
+
+* Update the peer manager to remove inbound connections for a peer when it is
+  disconnected, then retry connecting to the peer's endpoints.
+
+* Updated `GET /ws/admin/register/{type}` endpoint to check if the admin service
+  is running before creating a websocket connection. If it is not running, the
+  endpoint now returns a 503 service unavailable response.
+
+* Add `on_reconnect` callback to `WebsocketClient` that is called before
+  attempting to reconnect to a server.
+
+### splinterd
+
+* Change the default service and network endpoints from TCP to TLS and require a
+  valid TCP endpoint when using the `--no-tls` flag.
+
+* Add the experimental `service-endpoint` feature and use it to guard the
+  `--service-endpoint` CLI option and `service_endpoint` configuration setting.
+  The option and setting no longer have an effect if the `service-endpoint`
+  feature is not enabled.
+
+* Remove the following features as compilation options so they are always
+  compiled:
+    - `config-command-line`
+    - `config-default`
+    - `config-env-var`
+    - `config-toml`
+
+### Splinter CLI
+
+* Set crate dependencies to log level `Warn` to reduce noise in the logs.
+
+### Scabbard
+
+* Add the following to support checking a scabbard service's current state root
+  hash:
+    - `ScabbardState::current_state_root` method
+    - `Scabbard::get_current_state_root` method
+    - `GET /state_root` REST API endpoint
+    - `ScabbardClient::get_current_state_root` method
+    - `scabbard state root` CLI subcommand
+
+### Gameroom
+
+* Update gameroom application to wait for `/submit` response and display any
+  error messages from the response.
+
+* Update docker compose files to use static IP addresses for all containers.
+  This fixes a bug where proxy IP addresses would become out-of-date when
+  containers were restarted.
+
+* Fix a bug that made it impossible to create new gamerooms after an instance of
+  gameroomd reconnected to a previously restarted splinter node.
+
+### Private Counter and Private XO
+
+* Remove the Private Counter and Private XO example applications from the
+  `splinter` repository. These applications are incomplete examples that were
+  maintained primarily to test external services; external services are now
+  considered experimental, so the applications are no longer needed.
+
+### Miscellaneous
+
+* Update several error and log messages to be more descriptive.
+
+
 ## Changes in Splinter 0.3.17
 
 ### Highlights
