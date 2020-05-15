@@ -74,7 +74,6 @@ pub struct ServerError {
 pub struct NodeStatus {
     pub node_id: String,
     pub display_name: String,
-    pub service_endpoint: String,
     pub network_endpoints: Vec<String>,
     pub advertised_endpoints: Vec<String>,
     pub version: String,
