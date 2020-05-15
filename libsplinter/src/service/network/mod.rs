@@ -27,6 +27,7 @@ use crate::network::connection_manager::{ConnectionManagerNotification, Connecto
 
 use self::error::ServiceConnectionAgentError;
 pub use self::error::ServiceConnectionError;
+pub use self::error::{ServiceAddInstanceError, ServiceRemoveInstanceError};
 
 pub type SubscriberId = usize;
 type Subscriber =

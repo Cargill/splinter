@@ -36,3 +36,102 @@ impl fmt::Display for ServiceConnectionError {
         f.write_str(&self.0)
     }
 }
+
+/// Errors that may occur on registration.
+#[derive(Debug)]
+pub enum ServiceAddInstanceError {
+    /// The service is not allowed to register for the given circuit on this node.
+    NotAllowed,
+    /// The service is already registered.
+    AlreadyRegistered,
+    /// The service does not belong to the specified circuit.
+    NotInCircuit,
+    /// The specified circuit does not exist.
+    CircuitDoesNotExist,
+    /// An internal error has occurred while processing the service registration.
+    InternalError {
+        context: String,
+        source: Option<Box<dyn std::error::Error + Send>>,
+    },
+}
+
+impl Error for ServiceAddInstanceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ServiceAddInstanceError::InternalError {
+                source: Some(ref err),
+                ..
+            } => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ServiceAddInstanceError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ServiceAddInstanceError::NotAllowed => f.write_str("service not allowed on this node"),
+            ServiceAddInstanceError::AlreadyRegistered => f.write_str("service already registered"),
+            ServiceAddInstanceError::NotInCircuit => f.write_str("service is not in the circuit"),
+            ServiceAddInstanceError::CircuitDoesNotExist => f.write_str("circuit does not exist"),
+            ServiceAddInstanceError::InternalError {
+                context,
+                source: Some(ref err),
+            } => write!(f, "{}: {}", context, err),
+            ServiceAddInstanceError::InternalError {
+                context,
+                source: None,
+            } => f.write_str(&context),
+        }
+    }
+}
+
+/// Errors that may occur on deregistration.
+#[derive(Debug)]
+pub enum ServiceRemoveInstanceError {
+    /// The service is not currently registered with this node.
+    NotRegistered,
+    /// The service does not belong to the specified circuit.
+    NotInCircuit,
+    /// The specified circuit does not exist.
+    CircuitDoesNotExist,
+    /// An internal error has occurred while processing the service deregistration.
+    InternalError {
+        context: String,
+        source: Option<Box<dyn std::error::Error + Send>>,
+    },
+}
+
+impl Error for ServiceRemoveInstanceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ServiceRemoveInstanceError::InternalError {
+                source: Some(ref err),
+                ..
+            } => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ServiceRemoveInstanceError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ServiceRemoveInstanceError::NotRegistered => f.write_str("service is not registered"),
+            ServiceRemoveInstanceError::NotInCircuit => {
+                f.write_str("service is not in the circuit")
+            }
+            ServiceRemoveInstanceError::CircuitDoesNotExist => {
+                f.write_str("circuit does not exist")
+            }
+            ServiceRemoveInstanceError::InternalError {
+                context,
+                source: Some(ref err),
+            } => write!(f, "{}: {}", context, err),
+            ServiceRemoveInstanceError::InternalError {
+                context,
+                source: None,
+            } => f.write_str(&context),
+        }
+    }
+}
