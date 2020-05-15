@@ -2,83 +2,38 @@
 
 # Splinter
 
-Splinter is a privacy-focused platform for distributed applications that provides
-a blockchain-inspired networking environment for communication and transactions
-between organizations. Splinter lets you combine blockchain-related technologies
--- such as smart contracts and consensus engines -- to build a wide variety
-of architectural patterns.
+Splinter is a privacy-focused platform for distributed applications that
+provides a blockchain-inspired networking environment for communication and
+transactions between organizations. Splinter lets you combine blockchain-related
+technologies -- such as smart contracts and consensus engines -- to build a wide
+variety of architectural patterns.
 
- &hercon; [Features](#features-and-concepts) &hercon; [Building Splinter](#building-splinter) &hercon; [Demos](#demos) &hercon; [License](#license) &hercon;
+## Useful Links
 
-## Features and Concepts
+* [Splinter documentation](https://github.com/Cargill/splinter-docs/blob/master/docs/index.md)
 
-Splinter allows the same network to do two-party private communication,
-multi-party private communication, and network-wide multi-party shared state,
-all managed with consensus. A Splinter network enables multi-party or two-party
-private conversations between nodes using circuits and services.
+* [Release notes](RELEASE_NOTES.md)
 
-  - A _**node**_ is the foundational runtime that allows an organization to 
-  participate in the network.
-
-  - A _**circuit**_ is a virtual network within the broader Splinter network that 
-  safely and securely enforces privacy scope boundaries.
-
-  - A _**service**_ is an endpoint within a circuit that sends and receives
-  private messages.
-
-A Splinter application provides a set of distributed services that can
-communicate with each other across a Splinter circuit.
-
-![Splinter private circuits with shared state](assets/diagram-splinter-circuits+3companies.svg)
-
-**Splinter is designed for privacy**
-
-The key concepts of Splinter are fundamentally anchored to privacy.
-
-   - _**Circuits**_ define scope and visibility domains.
-   - _**Shared state**_, a database updated by smart contracts, is visible only
-     to the services within a circuit.
-
-**Splinter is distributed and flexible**
-
-Splinter works across a network 
-
-   - _**State agreement**_ is achieved via the Merkle-radix tree in
-     [Hyperledger Transact](https://github.com/hyperledger/transact/),
-     allowing multiple services to prove they have the same data down to the 
-	 last bit, cryptographically.
-   - _**Consensus**_ is provided for creating real distributed applications.
-     Splinter currently includes **two-phase commit** for 2- or 3-party
-     conversations.
-   - _**Connections**_ are dynamically constructed between nodes as circuits are
-     created.
+* Gameroom example application:
+    - [Running the Gameroom demo with
+      Docker](https://github.com/Cargill/splinter/tree/master/examples/gameroom/README.md)
+    - [Running the Gameroom demo in
+      Kubernetes](https://github.com/Cargill/splinter/blob/master/docker/kubernetes/README.md)
 
 
-![Splinter smart contract deployment at runtime](assets/diagram-splinter-smartcontractdeployment.svg)
+* Other Splinter repositories:
+    - [splinter-saplingjs](https://github.com/Cargill/splinter-saplingjs)
+    - [splinter-canopyjs](https://github.com/Cargill/splinter-canopyjs)
+    - [splinter-ui](https://github.com/Cargill/splinter-ui)
+    - [splinter-docs](https://github.com/Cargill/splinter-docs)
 
-**Splinter is agile with smart contracts**
 
-   - Smart contracts _**capture business logic**_ for processing transactions.
-   - _**Runtime deployment**_ of smart contracts means no need to upgrade the
-     Splinter software stack to add business logic.
-   - _**Sandboxed WebAssembly smart contracts**_ keep the network safe and
-     ensure determinism.
-   - _**Scabbard**_, an out-of-the-box Splinter service that runs
-     [Sawtooth Sabre](https://github.com/hyperledger/sawtooth-sabre)
-     smart contracts across nodes, coordinated with consensus.
+* Related projects:
 
-**Splinter is designed for applications**
+    - [Hyperledger Grid](https://github.com/hyperledger/grid/)
+    - [Hyperledger Transact](https://github.com/hyperledger/transact/)
+    - [Sawtooth Sabre](https://github.com/hyperledger/sawtooth-sabre/)
 
-   - _**State delta export**_ allows an application to materialize the
-     Merkle-radix tree database to another database such as PostgreSQL.
-     Applications can read from the materialized database (just like any other
-     web application).
-   - _**Admin services**_ provide applications with a REST API to dynamically
-     create new circuits, based on business need.
-   - _**Authorization**_ for circuit management can be delegated to application
-     code and defined by business policies.
-
-![Two-party Splinter circuit](assets/diagram-splinter-twopartycircuit.svg)
 
 ## Building Splinter
 
@@ -104,22 +59,15 @@ from the root directory. For example, to build only the splinter daemon,
 run `docker-compose -f docker-compose-installed.yaml build splinterd`.
 
 To use Docker to build Splinter with experimental features enabled, set an
-enviroment variable in your shell before running the build commands. For
-example: `export 'CARGO_ARGS=-- --features experimental'`. To go back to
-building with default features, unset the evironment variable:
-`unset CARGO_ARGS`
-
-## Demos
-
-Splinter includes several example applications that you can run as demos. The
-README in each directory explains how to run the demo.
-
-- [Gameroom](examples/gameroom/): Web application that allows you to set up a
-  dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).
+environment variable in your shell before running the build commands. (For
+example: `export 'CARGO_ARGS=-- --features experimental'`.) To go back to
+building with default features, unset the environment variable
+(`unset CARGO_ARGS`).
 
 ## License
 
-Splinter software is licensed under the [Apache License Version 2.0](LICENSE) software license.
+Splinter software is licensed under the [Apache License Version 2.0](LICENSE)
+software license.
 
 ## Code of Conduct
 
