@@ -17,7 +17,6 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::network::dispatch::DispatchMessageSender;
-use crate::network::sender::{NetworkMessageSender, SendRequest};
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::transport::matrix::{
     ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixSender,
@@ -25,6 +24,33 @@ use crate::transport::matrix::{
 
 use super::connector::{PeerLookup, PeerLookupProvider};
 use super::error::PeerInterconnectError;
+
+// Message to send to the network message sender with the recipient and payload
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum SendRequest {
+    Shutdown,
+    Message { recipient: String, payload: Vec<u8> },
+}
+
+#[derive(Clone)]
+pub struct NetworkMessageSender {
+    sender: Sender<SendRequest>,
+}
+
+impl NetworkMessageSender {
+    pub(crate) fn new(sender: Sender<SendRequest>) -> Self {
+        NetworkMessageSender { sender }
+    }
+
+    pub fn send(&self, recipient: String, payload: Vec<u8>) -> Result<(), (String, Vec<u8>)> {
+        self.sender
+            .send(SendRequest::Message { recipient, payload })
+            .map_err(|err| match err.0 {
+                SendRequest::Message { recipient, payload } => (recipient, payload),
+                SendRequest::Shutdown => unreachable!(), // we didn't send this
+            })
+    }
+}
 
 /// PeerInterconnect will receive incoming messages from peers and dispatch them to the
 /// NetworkMessageType handlers. It will also receive messages from handlers that need to be

@@ -55,9 +55,9 @@ use splinter::network::dispatch::{
     dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
 };
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::network::sender::NetworkMessageSender;
 use splinter::network::{ConnectionError, PeerUpdateError, SendError};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
+use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
 use splinter::peer::PeerManager;
 use splinter::protos::circuit::CircuitMessageType;

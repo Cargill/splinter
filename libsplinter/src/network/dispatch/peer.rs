@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::network::sender::NetworkMessageSender;
+use crate::peer::interconnect::NetworkMessageSender;
 
 use super::{MessageSender, PeerId};
 
