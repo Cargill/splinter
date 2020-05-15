@@ -14,33 +14,7 @@
 use std::sync::mpsc::{channel, Sender};
 
 use crate::network::Network;
-
-// Message to send to the network message sender with the recipient and payload
-#[derive(Clone, Debug, PartialEq)]
-pub(in crate::network) enum SendRequest {
-    Shutdown,
-    Message { recipient: String, payload: Vec<u8> },
-}
-
-#[derive(Clone)]
-pub struct NetworkMessageSender {
-    sender: Sender<SendRequest>,
-}
-
-impl NetworkMessageSender {
-    pub(in crate::network) fn new(sender: Sender<SendRequest>) -> Self {
-        NetworkMessageSender { sender }
-    }
-
-    pub fn send(&self, recipient: String, payload: Vec<u8>) -> Result<(), (String, Vec<u8>)> {
-        self.sender
-            .send(SendRequest::Message { recipient, payload })
-            .map_err(|err| match err.0 {
-                SendRequest::Message { recipient, payload } => (recipient, payload),
-                SendRequest::Shutdown => unreachable!(), // we didn't send this
-            })
-    }
-}
+use crate::peer::interconnect::{NetworkMessageSender, SendRequest};
 
 pub struct ShutdownSignaler {
     sender: Sender<SendRequest>,
@@ -121,9 +95,7 @@ impl NetworkMessageSendQueue {
     }
 
     pub fn new_network_sender(&self) -> NetworkMessageSender {
-        NetworkMessageSender {
-            sender: self.sender.clone(),
-        }
+        NetworkMessageSender::new(self.sender.clone())
     }
 
     pub fn shutdown_signaler(&self) -> ShutdownSignaler {

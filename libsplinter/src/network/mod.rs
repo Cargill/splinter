@@ -18,7 +18,6 @@ pub mod dispatch;
 pub mod handlers;
 pub mod peer;
 
-pub mod peer_manager;
 pub(crate) mod reply;
 pub mod sender;
 

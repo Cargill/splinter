@@ -34,8 +34,8 @@ use crate::circuit::SplinterState;
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
-use crate::network::peer_manager::{PeerManagerConnector, PeerManagerNotification};
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
+use crate::peer::{PeerManagerConnector, PeerManagerNotification};
 use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
@@ -701,7 +701,7 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
-    use crate::network::peer_manager::PeerManager;
+    use crate::peer::PeerManager;
     use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
     use crate::signing::{

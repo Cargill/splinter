@@ -73,6 +73,7 @@ pub mod keys;
 pub mod mesh;
 pub mod network;
 pub mod orchestrator;
+pub mod peer;
 pub mod protocol;
 pub mod protos;
 #[cfg(feature = "registry")]
