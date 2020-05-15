@@ -20,15 +20,16 @@ use crate::network::dispatch::{
 };
 use crate::protocol::component::ComponentMessage;
 use crate::protocol::service::{
-    ConnectResponseStatus, DisconnectResponseStatus, ServiceConnectResponse,
-    ServiceDisconnectResponse, ServiceMessage, ServiceMessagePayload,
+    ConnectResponseStatus, DisconnectResponseStatus, ErrorKind, ServiceConnectResponse,
+    ServiceDisconnectResponse, ServiceErrorMessage, ServiceMessage, ServiceMessagePayload,
+    ServiceProcessorMessage,
 };
 use crate::protos::component;
 use crate::protos::prelude::*;
 use crate::protos::service;
 
-use super::error::{ServiceAddInstanceError, ServiceRemoveInstanceError};
-use super::ServiceInstances;
+use super::error::{ServiceAddInstanceError, ServiceForwardingError, ServiceRemoveInstanceError};
+use super::{ForwardResult, ServiceInstances, ServiceMessageForwarder};
 
 /// Dispatch handler for the service message envelope.
 pub struct ServiceMessageHandler {
@@ -249,6 +250,116 @@ impl Handler for ServiceDisconnectRequestHandler {
     }
 }
 
+/// Dispatch handler for the `ServiceProcessorMessage` messages.
+///
+/// The messages received by this handler are forwarded to other parts of the system or the network
+/// by the provided `ServiceMessageForwarder`.
+pub struct ServiceProcessorMessageHandler {
+    msg_forwarder: Box<dyn ServiceMessageForwarder + Send>,
+}
+
+impl ServiceProcessorMessageHandler {
+    /// Construct a new handler with a given service message forwarder.
+    pub fn new(msg_forwarder: Box<dyn ServiceMessageForwarder + Send>) -> Self {
+        Self { msg_forwarder }
+    }
+}
+
+impl Handler for ServiceProcessorMessageHandler {
+    type Source = ConnectionId;
+    type MessageType = service::ServiceMessageType;
+    type Message = service::ServiceProcessorMessage;
+
+    fn match_type(&self) -> Self::MessageType {
+        service::ServiceMessageType::SM_SERVICE_PROCESSOR_MESSAGE
+    }
+
+    fn handle(
+        &self,
+        msg: Self::Message,
+        context: &MessageContext<Self::Source, Self::MessageType>,
+        sender: &dyn MessageSender<Self::Source>,
+    ) -> Result<(), DispatchError> {
+        let service_id: &ServiceId = context.get_parent_context().ok_or_else(|| {
+            DispatchError::HandleError(
+                "Service Disconnect Request not provided with service ID from envelope.".into(),
+            )
+        })?;
+
+        let service_msg: ServiceProcessorMessage = msg.into_native()?;
+        let correlation_id = service_msg.correlation_id.clone();
+        match self.msg_forwarder.forward(service_id, service_msg) {
+            Ok(ForwardResult::Sent) => Ok(()),
+            Ok(ForwardResult::LocalReReroute(component_id, msg)) => {
+                let local_fwd = ComponentMessage::Service(ServiceMessage {
+                    circuit: service_id.circuit().to_string(),
+                    service_id: msg.recipient.clone(),
+                    payload: ServiceMessagePayload::ServiceProcessorMessage(msg),
+                });
+                sender
+                    .send(
+                        component_id.into(),
+                        IntoBytes::<component::ComponentMessage>::into_bytes(local_fwd)?,
+                    )
+                    .map_err(|(recipient, msg)| {
+                        DispatchError::NetworkSendError((recipient.into(), msg))
+                    })
+            }
+            Err(err) => {
+                let (error_kind, error_message) = match err {
+                    ServiceForwardingError::SenderNotRegistered => (
+                        ErrorKind::SenderNotInDirectory,
+                        "Sender is not registered".to_string(),
+                    ),
+                    ServiceForwardingError::RecipientNotRegistered => (
+                        ErrorKind::RecipientNotInDirectory,
+                        "Recipient is not registered".to_string(),
+                    ),
+                    ServiceForwardingError::SenderNotInCircuit => (
+                        ErrorKind::SenderNotInCircuit,
+                        "Sender is not in the specified circuit".to_string(),
+                    ),
+                    ServiceForwardingError::RecipientNotInCircuit => (
+                        ErrorKind::RecipientNotInCircuit,
+                        "Recipient is not the specified circuit".to_string(),
+                    ),
+                    ServiceForwardingError::CircuitDoesNotExist => (
+                        ErrorKind::CircuitDoesNotExist,
+                        format!("Circuit {} does not exist", service_id.circuit()),
+                    ),
+                    internal_err @ ServiceForwardingError::InternalError { .. } => {
+                        error!("Unable to forward message: {}", internal_err);
+
+                        (
+                            ErrorKind::Internal,
+                            "An internal error occurred".to_string(),
+                        )
+                    }
+                };
+
+                let (circuit, service_id) = service_id.clone().into_parts();
+                let msg = ComponentMessage::Service(ServiceMessage {
+                    circuit,
+                    service_id,
+                    payload: ServiceMessagePayload::ServiceErrorMessage(ServiceErrorMessage {
+                        error_kind,
+                        error_message,
+                        correlation_id,
+                    }),
+                });
+                sender
+                    .send(
+                        context.source_id().clone(),
+                        IntoBytes::<component::ComponentMessage>::into_bytes(msg)?,
+                    )
+                    .map_err(|(recipient, msg)| {
+                        DispatchError::NetworkSendError((recipient.into(), msg))
+                    })
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,6 +370,7 @@ mod tests {
     use protobuf::Message;
 
     use crate::network::dispatch::Dispatcher;
+    use crate::protocol::service::ServiceProcessorMessage;
 
     // Test that service connection request is properly handled and sends a response with an OK
     // status, if the registration is successful.
@@ -751,6 +863,45 @@ mod tests {
         );
     }
 
+    // Test that a service processor message is properly forwarded through the provided message
+    // forwarding instance.
+    #[test]
+    fn test_service_processor_message() {
+        let message_forwarder = MockServiceMessageForwarder::default();
+        let mock_sender = MockMessageSender::default();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender));
+
+        let service_processor_msg_handler =
+            ServiceProcessorMessageHandler::new(Box::new(message_forwarder.clone()));
+        dispatcher.set_handler(Box::new(service_processor_msg_handler));
+
+        let mut service_processor_msg = service::ServiceProcessorMessage::new();
+        service_processor_msg.set_recipient("target-peer".into());
+        service_processor_msg.set_sender("source-peer".into());
+        service_processor_msg.set_payload(b"service-bytes".to_vec());
+
+        dispatcher
+            .dispatch_with_parent_context(
+                "service-component".into(),
+                &service::ServiceMessageType::SM_SERVICE_PROCESSOR_MESSAGE,
+                service_processor_msg.write_to_bytes().unwrap(),
+                Box::new(ServiceId::new("test-circuit".into(), "test-service".into())),
+            )
+            .expect("unable to dispatch message");
+
+        let (service_id, msg) = message_forwarder
+            .pop_forwarded()
+            .expect("a message was not fowarded");
+
+        assert_eq!(
+            ServiceId::new("test-circuit".into(), "test-service".into()),
+            service_id
+        );
+        assert_eq!("target-peer", &msg.recipient);
+        assert_eq!("source-peer", &msg.sender);
+        assert_eq!(b"service-bytes".to_vec(), msg.payload);
+    }
+
     #[derive(Clone, Default)]
     struct MockServiceInstances {
         add_result: Arc<Mutex<Option<Result<(), ServiceAddInstanceError>>>>,
@@ -856,6 +1007,35 @@ mod tests {
                 .push_back((recipient, message));
 
             Ok(())
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockServiceMessageForwarder {
+        messages: Arc<Mutex<VecDeque<(ServiceId, ServiceProcessorMessage)>>>,
+    }
+
+    impl MockServiceMessageForwarder {
+        fn pop_forwarded(&self) -> Option<(ServiceId, ServiceProcessorMessage)> {
+            self.messages
+                .lock()
+                .expect("test forwarder lock was poisoned")
+                .pop_front()
+        }
+    }
+
+    impl ServiceMessageForwarder for MockServiceMessageForwarder {
+        fn forward(
+            &self,
+            service_id: &ServiceId,
+            service_msg: ServiceProcessorMessage,
+        ) -> Result<ForwardResult, ServiceForwardingError> {
+            self.messages
+                .lock()
+                .expect("test sender lock was poisoned")
+                .push_back((service_id.clone(), service_msg));
+
+            Ok(ForwardResult::Sent)
         }
     }
 
