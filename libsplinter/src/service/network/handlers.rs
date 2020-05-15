@@ -28,6 +28,7 @@ use crate::protos::prelude::*;
 use crate::protos::service;
 
 use super::error::{ServiceAddInstanceError, ServiceRemoveInstanceError};
+use super::ServiceInstances;
 
 /// Dispatch handler for the service message envelope.
 pub struct ServiceMessageHandler {
@@ -75,36 +76,6 @@ impl Handler for ServiceMessageHandler {
                 ))
             })
     }
-}
-
-/// A mapping of service instances and the component responsible for it.  This can be used to add
-/// or remove service connection information.
-pub trait ServiceInstances {
-    /// Add a service instance.
-    ///
-    /// This method should create an association of the service with the given component id.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `ServiceAddInstanceError` if the service cannot be added.
-    fn add_service_instance(
-        &self,
-        service_id: ServiceId,
-        component_id: String,
-    ) -> Result<(), ServiceAddInstanceError>;
-
-    /// Remove a service instance.
-    ///
-    /// This method should remove the association of the service with the given component id.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `ServiceRemoveInstanceError` if the service cannot be removed.
-    fn remove_service_instance(
-        &self,
-        service_id: ServiceId,
-        component_id: String,
-    ) -> Result<(), ServiceRemoveInstanceError>;
 }
 
 /// Dispatch handler for `ServiceConnectRequest` messages.

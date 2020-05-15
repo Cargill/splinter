@@ -16,7 +16,7 @@
 
 use crate::circuit::service::{Service, ServiceId, SplinterNode};
 use crate::circuit::{ServiceDefinition, SplinterState};
-use crate::service::network::handlers::{
+use crate::service::network::{
     ServiceAddInstanceError, ServiceInstances, ServiceRemoveInstanceError,
 };
 
