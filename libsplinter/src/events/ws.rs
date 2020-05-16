@@ -138,6 +138,7 @@ pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {
     on_message: Arc<dyn Fn(Context<T>, T) -> WsResponse + Send + Sync + 'static>,
     on_open: Option<Arc<dyn Fn(Context<T>) -> WsResponse + Send + Sync + 'static>>,
     on_error: Option<Arc<OnErrorHandle<T>>>,
+    on_reconnect: Option<Arc<dyn Fn(&mut WebSocketClient<T>) + Send + Sync + 'static>>,
     reconnect: bool,
     reconnect_limit: u64,
     timeout: u64,
@@ -151,6 +152,7 @@ impl<T: ParseBytes<T> + 'static> Clone for WebSocketClient<T> {
             on_message: self.on_message.clone(),
             on_open: self.on_open.clone(),
             on_error: self.on_error.clone(),
+            on_reconnect: self.on_reconnect.clone(),
             reconnect: self.reconnect,
             reconnect_limit: self.reconnect_limit,
             timeout: self.timeout,
@@ -169,6 +171,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             on_message: Arc::new(on_message),
             on_open: None,
             on_error: None,
+            on_reconnect: None,
             reconnect: DEFAULT_RECONNECT,
             reconnect_limit: DEFAULT_RECONNECT_LIMIT,
             timeout: DEFAULT_TIMEOUT,
@@ -230,6 +233,17 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         F: Fn(&WebSocketError, Context<T>) -> Result<(), WebSocketError> + Send + Sync + 'static,
     {
         self.on_error = Some(Arc::new(on_error));
+    }
+
+    /// Adds optional `on_reconnect` closure. This closure will be called each time the websocket
+    /// attempts to reconnect to the server. It's intended to allow the websocket client properties
+    /// to be modified before attempting a reconnect or to allow additional checks to be performed
+    /// before reconnecting.
+    pub fn on_reconnect<F>(&mut self, on_reconnect: F)
+    where
+        F: Fn(&mut WebSocketClient<T>) + Send + Sync + 'static,
+    {
+        self.on_reconnect = Some(Arc::new(on_reconnect));
     }
 
     /// Returns `Listen` for WebSocket.
@@ -551,7 +565,16 @@ impl<T: ParseBytes<T> + 'static> Context<T> {
     pub fn try_reconnect(&mut self) -> Result<(), WebSocketError> {
         // Check that the ws is configure for automatic reconnect attempts and that the number
         // of reconnect attempts hasn't exceeded the maximum configure
+
         if self.ws.reconnect && self.reconnect_count < self.ws.reconnect_limit {
+            let on_reconnect = self
+                .ws
+                .on_reconnect
+                .clone()
+                .unwrap_or_else(|| Arc::new(|_| ()));
+
+            on_reconnect(&mut self.ws);
+
             self.reconnect()
         } else {
             let error_message = if self.ws.reconnect {
