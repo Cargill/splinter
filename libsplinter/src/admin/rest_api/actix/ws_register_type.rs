@@ -18,7 +18,9 @@ use std::collections::HashMap;
 use std::time;
 
 use crate::admin::messages::AdminServiceEvent;
-use crate::admin::service::{AdminCommands, AdminServiceEventSubscriber, AdminSubscriberError};
+use crate::admin::service::{
+    AdminCommands, AdminServiceEventSubscriber, AdminServiceStatus, AdminSubscriberError,
+};
 use crate::protocol;
 use crate::rest_api::{
     new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request, Resource,
@@ -33,6 +35,16 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
             protocol::ADMIN_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |request, payload| {
+            let status = if let Ok(status) = admin_commands.admin_service_status() {
+                status
+            } else {
+                return Box::new(HttpResponse::InternalServerError().finish().into_future());
+            };
+
+            if status != AdminServiceStatus::Running {
+                warn!("Admin service is not running");
+                return Box::new(HttpResponse::ServiceUnavailable().finish().into_future());
+            }
             let circuit_management_type = if let Some(t) = request.match_info().get("type") {
                 t.to_string()
             } else {
