@@ -145,6 +145,34 @@ pub fn run(
     ws.set_reconnect_limit(RECONNECT_LIMIT);
     ws.set_timeout(CONNECTION_TIMEOUT);
 
+    let on_reconnect_url = splinterd_url.clone();
+    ws.on_reconnect(move |ws| {
+        debug!("Authorization handler attempting reconnect");
+        match db_conn.get() {
+            Ok(conn) => {
+                let url = helpers::get_last_updated_proposal_time(&conn)
+                    .unwrap_or_else(|err| {
+                        warn!("Proposal time could not be retrieved {}", err);
+                        None
+                    })
+                    .map(|time| {
+                        format!(
+                            "{}/ws/admin/register/gameroom?last={}",
+                            on_reconnect_url,
+                            time.duration_since(SystemTime::UNIX_EPOCH)
+                                .map(|duration| duration.as_millis())
+                                .unwrap_or(0)
+                        )
+                    })
+                    .unwrap_or_else(|| format!("{}/ws/admin/register/gameroom", on_reconnect_url));
+
+                ws.set_url(&url);
+            }
+            Err(err) => {
+                error!("Failed to retrieve database connection: {}", err);
+            }
+        }
+    });
     ws.on_error(move |err, ctx| {
         error!("An error occured while listening for admin events {}", err);
         match err {
