@@ -239,13 +239,17 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             .clone()
             .unwrap_or_else(|| Arc::new(|_| WsResponse::Empty));
         let on_message = self.on_message.clone();
+        let on_error = self
+            .on_error
+            .clone()
+            .unwrap_or_else(|| Arc::new(|_, _| Ok(())));
 
         let mut context_timeout = context.clone();
         let timeout = self.timeout;
 
-        let running_connection1 = running.clone();
-        let running_connection2 = running.clone();
+        let running_connection = running.clone();
         let mut context_connection = context.clone();
+        let connection_failed_context = context.clone();
 
         debug!("starting: {}", url);
 
@@ -270,10 +274,14 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                 .and_then(move |res| {
                     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
                         error!("The server didn't upgrade: {}", res.status());
-                    }
-                    if res.status() == StatusCode::NOT_FOUND {
-                        // The requested resource doesn't exist, so no need to keep trying
-                        running_connection1.store(false, Ordering::SeqCst);
+                        if let Err(err) = on_error(
+                            &WebSocketError::ConnectError(format!(
+                            "Received status code {:?} while attempting to establish a connection"
+                        , res.status())),
+                            connection_failed_context,
+                        ) {
+                            error!("Failed to establish a connection {:?}", err);
+                        }
                     }
                     debug!("response: {:?}", res);
 
@@ -282,12 +290,12 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                 .timeout(Duration::from_secs(timeout))
                 .map_err(move |err| {
                     // If not running anymore, don't try reconnecting
-                    if running_connection2.load(Ordering::SeqCst) {
+                    if running_connection.load(Ordering::SeqCst) {
                         if let Err(err) = context_connection.try_reconnect() {
                             error!("Context returned an error  {}", err);
                         }
 
-                        running_connection2.store(false, Ordering::SeqCst);
+                        running_connection.store(false, Ordering::SeqCst);
                     }
                     WebSocketError::ConnectError(format!("Failed to connect: {}", err))
                 })
