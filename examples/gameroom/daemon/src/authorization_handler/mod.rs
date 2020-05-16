@@ -529,29 +529,13 @@ fn process_admin_event(
                     WsResponse::Empty
                 }
             });
-            xo_ws.set_reconnect(RECONNECT);
-            xo_ws.set_reconnect_limit(RECONNECT_LIMIT);
-            xo_ws.set_timeout(CONNECTION_TIMEOUT);
 
-            xo_ws.on_error(move |err, ctx| {
+            xo_ws.on_error(move |err, _| {
                 error!(
                     "An error occured while listening for scabbard events {}",
                     err
                 );
-                match err {
-                    WebSocketError::ParserError { .. } => {
-                        debug!("Protocol error, closing connection");
-                        Ok(())
-                    }
-                    WebSocketError::ReconnectError(_) => {
-                        debug!("Failed to reconnect. Closing WebSocket.");
-                        Ok(())
-                    }
-                    _ => {
-                        debug!("Attempting to restart connection");
-                        ctx.start_ws()
-                    }
-                }
+                Ok(())
             });
 
             igniter.start_ws(&xo_ws).map_err(AppAuthHandlerError::from)
@@ -603,18 +587,12 @@ fn resubscribe(
         SCABBARD_PROTOCOL_VERSION.to_string(),
     );
 
-    ws.on_error(move |err, ctx| {
+    ws.on_error(move |err, _| {
         error!(
             "An error occured while listening for scabbard events {}",
             err
         );
-        if let WebSocketError::ParserError { .. } = err {
-            debug!("Protocol error, closing connection");
-            Ok(())
-        } else {
-            debug!("Attempting to restart connection");
-            ctx.start_ws()
-        }
+        Ok(())
     });
 
     ws
