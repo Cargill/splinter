@@ -249,6 +249,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
     /// Returns `Listen` for WebSocket.
     pub fn listen(&self, mut context: Context<T>) -> Result<Listen, WebSocketError> {
         let url = self.url.clone();
+        let reconnect = self.reconnect;
         let (cmd_sender, cmd_receiver) = channel(1);
         let running = Arc::new(AtomicBool::new(true));
         let running_clone = running.clone();
@@ -415,15 +416,18 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                                         trace!("Received Pong {}", msg);
                                         ConnectionStatus::Open
                                     }
-                                    WebSocketClientCmd::Frame(Frame::Close(msg)) => {
-                                        debug!("Received close message {:?}", msg);
-                                        let result = do_shutdown(
-                                            &mut blocking_sink,
-                                            CloseCode::Normal,
-                                            running_clone.clone(),
-                                        )
-                                        .map_err(WebSocketError::from);
-                                        ConnectionStatus::Close(result)
+                                    WebSocketClientCmd::Frame(Frame::Close(_)) => {
+                                        if !reconnect {
+                                            let result = do_shutdown(
+                                                &mut blocking_sink,
+                                                CloseCode::Normal,
+                                                running_clone.clone(),
+                                            )
+                                            .map_err(WebSocketError::from);
+                                            ConnectionStatus::Close(result)
+                                        } else {
+                                            ConnectionStatus::Close(Ok(()))
+                                        }
                                     }
                                     WebSocketClientCmd::Stop => {
                                         closed = true;
