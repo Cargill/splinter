@@ -192,6 +192,10 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         self.timeout = timeout
     }
 
+    pub fn set_url(&mut self, url: &str) {
+        self.url = url.to_string();
+    }
+
     pub fn header(&mut self, header: &str, value: String) {
         self.additional_headers.insert(header.into(), value);
     }
