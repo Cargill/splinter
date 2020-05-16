@@ -77,11 +77,6 @@ pub fn run(
     igniter: Igniter,
 ) -> Result<(), AppAuthHandlerError> {
     let pool = db_conn.get()?;
-    helpers::fetch_active_gamerooms(&pool, &node_id)?
-        .iter()
-        .map(|gameroom| resubscribe(&splinterd_url, gameroom, &db_conn))
-        .try_for_each(|ws| igniter.start_ws(&ws))?;
-
     let registration_route = helpers::get_last_updated_proposal_time(&pool)?
         .map(|time| {
             format!(
@@ -94,17 +89,50 @@ pub fn run(
         })
         .unwrap_or_else(|| format!("{}/ws/admin/register/gameroom", splinterd_url));
 
+    let ws_url = splinterd_url.clone();
+    let ws_node_id = node_id.clone();
+    let ws_db_conn = db_conn.clone();
     let mut ws = WebSocketClient::new(&registration_route, move |ctx, event| {
         if let Err(err) = process_admin_event(
             event,
-            &db_conn,
-            &node_id,
+            &ws_db_conn,
+            &ws_node_id,
             &private_key,
-            &splinterd_url,
+            &ws_url,
             ctx.igniter(),
         ) {
             error!("Failed to process admin event: {}", err);
         }
+        WsResponse::Empty
+    });
+
+    let on_open_db_conn = db_conn.clone();
+    let on_open_igniter = igniter.clone();
+    let on_open_url = splinterd_url.clone();
+    ws.on_open(move |_| {
+        let conn = match on_open_db_conn.get() {
+            Ok(conn) => conn,
+            Err(err) => {
+                error!("Failed to create database connection: {}", err);
+                return WsResponse::Empty;
+            }
+        };
+
+        let gamerooms = match helpers::fetch_active_gamerooms(&conn, &node_id) {
+            Ok(gamerooms) => gamerooms,
+            Err(err) => {
+                error!("Failed to retrieve active gamerooms: {}", err);
+                return WsResponse::Empty;
+            }
+        };
+
+        for gameroom in gamerooms.iter() {
+            let ws = resubscribe(&on_open_url, gameroom, &on_open_db_conn);
+            if let Err(err) = on_open_igniter.start_ws(&ws) {
+                error!("Failed to resubscribe to active gameroom: {}", err);
+            }
+        }
+
         WsResponse::Empty
     });
 
