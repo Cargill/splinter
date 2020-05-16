@@ -21,7 +21,8 @@ pub mod sabre;
 mod state_delta;
 
 use std::fmt::Write;
-use std::time::{Duration, SystemTime};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime};
 
 use diesel::connection::Connection;
 use gameroom_database::{
@@ -173,20 +174,46 @@ pub fn run(
             }
         }
     });
+
+    let on_error_url = splinterd_url.clone();
     ws.on_error(move |err, ctx| {
         error!("An error occured while listening for admin events {}", err);
         match err {
             WebSocketError::ParserError { .. } => {
-                debug!("Protocol error, closing connection");
+                error!("Protocol error, closing connection");
                 Ok(())
             }
             WebSocketError::ReconnectError(_) => {
-                debug!("Failed to reconnect. Closing WebSocket.");
+                error!("Failed to reconnect. Closing WebSocket.");
                 Ok(())
             }
             _ => {
-                debug!("Attempting to restart connection");
-                ctx.start_ws()
+                let now = Instant::now();
+
+                debug!("Checking for splinterd server");
+                while now.elapsed() <= Duration::from_secs(30) {
+                    match reqwest::blocking::get(&format!(
+                        "{}/ws/admin/register/gameroom",
+                        on_error_url
+                    )) {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                debug!(
+                                    "splinterd server {} available reconnecting..",
+                                    splinterd_url
+                                );
+                                return ctx.start_ws();
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Error occurred trying to detect splinterd server: {}", err);
+                            break;
+                        }
+                    }
+
+                    thread::sleep(Duration::from_secs(1));
+                }
+                Ok(())
             }
         }
     });
