@@ -216,7 +216,7 @@ pub trait RegistryReader: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `predicates` - A list of of predicates to be applied to the resulting list. These are
+    /// * `predicates` - A list of predicates to be applied to the resulting list. These are
     /// applied as an AND, from a query perspective. If the list is empty, it is the equivalent of
     /// no predicates (i.e. return all).
     fn list_nodes<'a, 'b: 'a>(
@@ -228,7 +228,7 @@ pub trait RegistryReader: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `predicates` - A list of of predicates to be applied before counting the nodes. These are
+    /// * `predicates` - A list of predicates to be applied before counting the nodes. These are
     /// applied as an AND, from a query perspective. If the list is empty, it is the equivalent of
     /// no predicates (i.e. return all).
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError>;
