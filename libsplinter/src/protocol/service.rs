@@ -37,6 +37,7 @@ pub enum ServiceMessagePayload {
     DisconnectRequest(ServiceDisconnectRequest),
     DisconnectResponse(ServiceDisconnectResponse),
     ServiceProcessorMessage(ServiceProcessorMessage),
+    ServiceErrorMessage(ServiceErrorMessage),
 }
 
 /// This message is sent by a service processor component to connect to a splinter node.
@@ -96,6 +97,24 @@ pub struct ServiceProcessorMessage {
     pub recipient: String,
     /// The opaque payload.
     pub payload: Vec<u8>,
+}
+
+pub struct ServiceErrorMessage {
+    /// Kind of the service-related error that was encountered.
+    pub error_kind: ErrorKind,
+    /// Explanation of the error.
+    pub error_message: String,
+    /// ID used to correlate the response with this request.
+    pub correlation_id: Option<String>,
+}
+
+pub enum ErrorKind {
+    Internal,
+    CircuitDoesNotExist,
+    RecipientNotInCircuit,
+    SenderNotInCircuit,
+    RecipientNotInDirectory,
+    SenderNotInDirectory,
 }
 
 impl FromProto<service::SMConnectRequest> for ServiceConnectRequest {
@@ -282,6 +301,56 @@ impl FromNative<ServiceProcessorMessage> for service::ServiceProcessorMessage {
     }
 }
 
+impl FromProto<service::ServiceErrorMessage> for ServiceErrorMessage {
+    fn from_proto(mut msg: service::ServiceErrorMessage) -> Result<Self, ProtoConversionError> {
+        let correlation_id = if !msg.get_correlation_id().is_empty() {
+            Some(msg.take_correlation_id())
+        } else {
+            None
+        };
+
+        use service::ServiceErrorMessage_Error::*;
+        let error_kind = match msg.get_error() {
+            SM_ERROR_INTERNAL_ERROR => ErrorKind::Internal,
+            SM_ERROR_CIRCUIT_DOES_NOT_EXIST => ErrorKind::CircuitDoesNotExist,
+            SM_ERROR_RECIPIENT_NOT_IN_CIRCUIT_ROSTER => ErrorKind::RecipientNotInCircuit,
+            SM_ERROR_SENDER_NOT_IN_CIRCUIT_ROSTER => ErrorKind::SenderNotInCircuit,
+            SM_ERROR_RECIPIENT_NOT_IN_DIRECTORY => ErrorKind::RecipientNotInDirectory,
+            SM_ERROR_SENDER_NOT_IN_DIRECTORY => ErrorKind::SenderNotInDirectory,
+            UNSET_SERVICE_ERROR_TYPE => {
+                return Err(ProtoConversionError::InvalidTypeError(
+                    "missing error".into(),
+                ))
+            }
+        };
+
+        Ok(Self {
+            error_message: msg.take_error_message(),
+            error_kind,
+            correlation_id,
+        })
+    }
+}
+
+impl FromNative<ServiceErrorMessage> for service::ServiceErrorMessage {
+    fn from_native(msg: ServiceErrorMessage) -> Result<Self, ProtoConversionError> {
+        let mut proto_msg = service::ServiceErrorMessage::new();
+        use service::ServiceErrorMessage_Error::*;
+        proto_msg.set_error(match msg.error_kind {
+            ErrorKind::Internal => SM_ERROR_INTERNAL_ERROR,
+            ErrorKind::CircuitDoesNotExist => SM_ERROR_CIRCUIT_DOES_NOT_EXIST,
+            ErrorKind::RecipientNotInCircuit => SM_ERROR_RECIPIENT_NOT_IN_CIRCUIT_ROSTER,
+            ErrorKind::SenderNotInCircuit => SM_ERROR_SENDER_NOT_IN_CIRCUIT_ROSTER,
+            ErrorKind::RecipientNotInDirectory => SM_ERROR_RECIPIENT_NOT_IN_DIRECTORY,
+            ErrorKind::SenderNotInDirectory => SM_ERROR_SENDER_NOT_IN_DIRECTORY,
+        });
+        proto_msg.set_error_message(msg.error_message);
+        proto_msg.set_correlation_id(msg.correlation_id.unwrap_or_else(|| "".into()));
+
+        Ok(proto_msg)
+    }
+}
+
 impl FromProto<service::ServiceMessage> for ServiceMessage {
     fn from_proto(mut msg: service::ServiceMessage) -> Result<Self, ProtoConversionError> {
         let circuit = msg.take_circuit();
@@ -312,6 +381,11 @@ impl FromProto<service::ServiceMessage> for ServiceMessage {
                 ServiceMessagePayload::ServiceProcessorMessage(FromBytes::<
                     service::ServiceProcessorMessage,
                 >::from_bytes(bytes)?)
+            }
+            SM_SERVICE_ERROR_MESSAGE => {
+                ServiceMessagePayload::ServiceErrorMessage(
+                    FromBytes::<service::ServiceErrorMessage>::from_bytes(bytes)?,
+                )
             }
             UNSET_SERVICE_MESSAGE_TYPE => {
                 return Err(ProtoConversionError::InvalidTypeError(
@@ -357,6 +431,10 @@ impl FromNative<ServiceMessage> for service::ServiceMessage {
                 proto_msg.set_payload(IntoBytes::<service::ServiceProcessorMessage>::into_bytes(
                     msg,
                 )?);
+            }
+            ServiceMessagePayload::ServiceErrorMessage(msg) => {
+                proto_msg.set_message_type(SM_SERVICE_ERROR_MESSAGE);
+                proto_msg.set_payload(IntoBytes::<service::ServiceErrorMessage>::into_bytes(msg)?);
             }
         }
 

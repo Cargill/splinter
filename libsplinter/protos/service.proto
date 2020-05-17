@@ -31,6 +31,8 @@ message ServiceMessage {
 enum ServiceMessageType {
     UNSET_SERVICE_MESSAGE_TYPE = 0;
 
+    SM_SERVICE_ERROR_MESSAGE = 1;
+
     // Registration-related messages
     SM_SERVICE_CONNECT_REQUEST = 100;
     SM_SERVICE_CONNECT_RESPONSE = 101;
@@ -103,4 +105,26 @@ message ServiceProcessorMessage {
 
     // ID used to correlate the response with this request (optional)
     string correlation_id = 4;
+}
+
+message ServiceErrorMessage {
+    enum Error {
+        UNSET_SERVICE_ERROR_TYPE = 0;
+
+        SM_ERROR_INTERNAL_ERROR = 1;
+        SM_ERROR_CIRCUIT_DOES_NOT_EXIST = 2;
+        SM_ERROR_RECIPIENT_NOT_IN_CIRCUIT_ROSTER = 3;
+        SM_ERROR_SENDER_NOT_IN_CIRCUIT_ROSTER = 4;
+        SM_ERROR_RECIPIENT_NOT_IN_DIRECTORY = 5;
+        SM_ERROR_SENDER_NOT_IN_DIRECTORY = 6;
+    }
+
+    // Kind of the service-related error that was encountered
+    Error error = 1;
+
+    // Explanation of the error
+    string error_message = 2;
+
+    // ID used to correlate the response with this request (optional)
+    string correlation_id = 3;
 }
