@@ -97,6 +97,9 @@ pub struct ServiceProcessorMessage {
     pub recipient: String,
     /// The opaque payload.
     pub payload: Vec<u8>,
+
+    /// ID used to correlate the response with this request.
+    pub correlation_id: Option<String>,
 }
 
 pub struct ServiceErrorMessage {
@@ -282,10 +285,16 @@ impl FromNative<ServiceDisconnectResponse> for service::SMDisconnectResponse {
 
 impl FromProto<service::ServiceProcessorMessage> for ServiceProcessorMessage {
     fn from_proto(mut msg: service::ServiceProcessorMessage) -> Result<Self, ProtoConversionError> {
+        let correlation_id = if !msg.get_correlation_id().is_empty() {
+            Some(msg.take_correlation_id())
+        } else {
+            None
+        };
         Ok(Self {
             sender: msg.take_sender(),
             recipient: msg.take_recipient(),
             payload: msg.take_payload(),
+            correlation_id,
         })
     }
 }
@@ -296,6 +305,7 @@ impl FromNative<ServiceProcessorMessage> for service::ServiceProcessorMessage {
         proto_msg.set_sender(msg.sender);
         proto_msg.set_recipient(msg.recipient);
         proto_msg.set_payload(msg.payload);
+        proto_msg.set_correlation_id(msg.correlation_id.unwrap_or_else(|| "".into()));
 
         Ok(proto_msg)
     }
