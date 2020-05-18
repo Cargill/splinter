@@ -99,6 +99,11 @@ const router = new Router({
           name: 'server-error',
           component: () => import('@/views/ServerError.vue'),
         },
+        {
+          path: '/request-error',
+          name: 'request-error',
+          component: () => import('@/views/RequestError.vue'),
+        },
       ],
     },
   ],
