@@ -79,6 +79,10 @@ pub(crate) enum PeerManagerRequest {
         peer_id: String,
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
+    RemovePeerByEndpoint {
+        endpoint: String,
+        sender: Sender<Result<(), PeerRefRemoveError>>,
+    },
     ListPeers {
         sender: Sender<Result<Vec<String>, PeerListError>>,
     },
@@ -383,6 +387,14 @@ fn handle_request(
                 warn!("connector dropped before receiving result of removing peer");
             }
         }
+        PeerManagerRequest::RemovePeerByEndpoint { endpoint, sender } => {
+            if sender
+                .send(remove_peer_by_endpoint(endpoint, connector, peers, ref_map))
+                .is_err()
+            {
+                warn!("connector dropped before receiving result of removing peer");
+            }
+        }
         PeerManagerRequest::ListPeers { sender } => {
             if sender.send(Ok(peers.peer_ids())).is_err() {
                 warn!("connector dropped before receiving result of list peers");
@@ -555,6 +567,60 @@ fn remove_peer(
                 debug!(
                     "Peer {} has been removed and connection {} has been closed",
                     peer_id, peer_metadata.active_endpoint
+                );
+                Ok(())
+            }
+            Ok(None) => Err(PeerRefRemoveError::RemoveError(
+                "No connection to remove, something has gone wrong".to_string(),
+            )),
+            Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
+        }
+    } else {
+        // if the peer has not been fully removed, return OK
+        Ok(())
+    }
+}
+
+fn remove_peer_by_endpoint(
+    endpoint: String,
+    connector: Connector,
+    peers: &mut PeerMap,
+    ref_map: &mut RefMap,
+) -> Result<(), PeerRefRemoveError> {
+    let peer_metadata = match peers.get_peer_from_endpoint(&endpoint) {
+        Some(peer_metadata) => peer_metadata,
+        None => {
+            return Err(PeerRefRemoveError::RemoveError(format!(
+                "Peer with endpoint {} has already been removed from the peer map",
+                endpoint
+            )))
+        }
+    };
+
+    debug!(
+        "Removing peer {} by endpoint: {}",
+        peer_metadata.id, endpoint
+    );
+    // remove the reference
+    let removed_peer = ref_map.remove_ref(&peer_metadata.id);
+    if let Some(removed_peer) = removed_peer {
+        let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
+            PeerRefRemoveError::RemoveError(format!(
+                "Peer with endpoint {} has already been removed from the peer map",
+                endpoint
+            ))
+        })?;
+
+        // If the peer is pending there is no connection to remove
+        if peer_metadata.status == PeerStatus::Pending {
+            return Ok(());
+        }
+
+        match connector.remove_connection(&peer_metadata.active_endpoint) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Peer {} has been removed and connection {} has been closed",
+                    peer_metadata.id, peer_metadata.active_endpoint
                 );
                 Ok(())
             }
