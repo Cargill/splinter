@@ -308,6 +308,7 @@ impl PeerManager {
                                 &mut subscribers,
                                 max_retry_attempts,
                                 &identity,
+                                &mut ref_map,
                             )
                         }
                         Ok(PeerManagerMessage::RetryPending) => {
@@ -764,6 +765,9 @@ fn remove_peer_by_endpoint(
     }
 }
 
+// Allow clippy errors for too_many_arguments. The arguments are required
+// to avoid needing a lock in the PeerManager.
+#[allow(clippy::too_many_arguments)]
 fn handle_notifications(
     notification: ConnectionManagerNotification,
     unreferenced_peers: &mut UnreferencedPeerState,
@@ -772,6 +776,7 @@ fn handle_notifications(
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
     max_retry_attempts: u64,
     local_identity: &str,
+    ref_map: &mut RefMap,
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
@@ -854,6 +859,7 @@ fn handle_notifications(
             connector,
             subscribers,
             local_identity,
+            ref_map,
         ),
         ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
             handle_fatal_connection(endpoint, error.to_string(), peers, subscribers)
@@ -1036,6 +1042,7 @@ fn handle_connected(
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
     local_identity: &str,
+    ref_map: &mut RefMap,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
         match peer_metadata.status {
@@ -1136,7 +1143,25 @@ fn handle_connected(
         // notify subscribers we are connected
         subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
     } else {
-        debug!("Adding unrefrenced peer for {}", identity);
+        debug!("Adding peer {} by endpoint {}", identity, endpoint);
+
+        // if this endpoint has been requested, add this connection to peers with the provided
+        // endpoint
+        if unreferenced_peers.requested_endpoints.contains(&endpoint) {
+            ref_map.add_ref(identity.to_string());
+            peers.insert(
+                identity.to_string(),
+                connection_id,
+                vec![endpoint.to_string()],
+                endpoint,
+                PeerStatus::Connected,
+            );
+
+            let notification = PeerManagerNotification::Connected { peer: identity };
+            subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            return;
+        }
+
         // Treat unknown peer as unreferenced
         if let Some(old_peer) = unreferenced_peers.peers.insert(
             identity,
