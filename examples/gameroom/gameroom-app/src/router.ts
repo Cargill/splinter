@@ -94,6 +94,11 @@ const router = new Router({
           name: 'not-found',
           component: () => import('@/views/NotFound.vue'),
         },
+        {
+          path: '/server-error',
+          name: 'server-error',
+          component: () => import('@/views/ServerError.vue'),
+        },
       ],
     },
   ],
