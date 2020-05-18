@@ -56,15 +56,6 @@ impl RefMap {
     ///
     /// This method will panic if the id does not exist.
     pub fn remove_ref(&mut self, ref_id: &str) -> Option<String> {
-        // check if id is for a current id or a redirect
-        if !self.references.contains_key(ref_id) {
-            // if the id is not in the reference or redirects, the reference does not exist
-            panic!(
-                "Trying to remove a reference that does not exist: {}",
-                ref_id
-            )
-        }
-
         let ref_count = match self.references.remove(ref_id) {
             Some(ref_count) => ref_count,
             None => panic!(
@@ -74,7 +65,6 @@ impl RefMap {
         };
 
         if ref_count == 1 {
-            self.references.remove(ref_id);
             Some(ref_id.into())
         } else {
             self.references.insert(ref_id.into(), ref_count - 1);
