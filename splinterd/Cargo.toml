@@ -66,10 +66,6 @@ default = [
     "biome",
     "biome-credentials",
     "biome-key-management",
-    "config-command-line",
-    "config-default",
-    "config-env-var",
-    "config-toml",
 ]
 
 stable = [
@@ -90,10 +86,6 @@ experimental = [
 biome = ["splinter/biome", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]
-config-default = []
-config-command-line = []
-config-env-var = []
-config-toml = []
 database = ["splinter/postgres"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [

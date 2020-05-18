@@ -19,26 +19,18 @@
 //! sources to be combined into a final `Config` object.
 
 mod builder;
-#[cfg(feature = "config-command-line")]
 mod clap;
-#[cfg(feature = "config-default")]
 mod default;
-#[cfg(feature = "config-env-var")]
 mod env;
 mod error;
 mod partial;
-#[cfg(feature = "config-toml")]
 mod toml;
 
 use std::time::Duration;
 
-#[cfg(feature = "config-command-line")]
 pub use crate::config::clap::ClapPartialConfigBuilder;
-#[cfg(feature = "config-default")]
 pub use crate::config::default::DefaultPartialConfigBuilder;
-#[cfg(feature = "config-env-var")]
 pub use crate::config::env::EnvPartialConfigBuilder;
-#[cfg(feature = "config-toml")]
 pub use crate::config::toml::TomlPartialConfigBuilder;
 pub use builder::{ConfigBuilder, PartialConfigBuilder};
 pub use error::ConfigError;
@@ -460,7 +452,6 @@ impl Config {
     }
 }
 
-#[cfg(feature = "default")]
 #[cfg(test)]
 mod tests {
     use super::*;

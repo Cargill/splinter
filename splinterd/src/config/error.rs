@@ -14,7 +14,6 @@
 
 use std::error::Error;
 use std::fmt;
-#[cfg(feature = "config-env-var")]
 use std::io;
 
 use toml::de::Error as TomlError;
@@ -22,17 +21,11 @@ use toml::de::Error as TomlError;
 #[derive(Debug)]
 /// General error type used during `Config` contruction.
 pub enum ConfigError {
-    #[cfg(feature = "config-toml")]
-    ReadError {
-        file: String,
-        err: io::Error,
-    },
+    ReadError { file: String, err: io::Error },
     TomlParseError(TomlError),
     InvalidArgument(clap::Error),
     MissingValue(String),
-    #[cfg(feature = "config-toml")]
     InvalidVersion(String),
-    #[cfg(feature = "config-env-var")]
     StdError(io::Error),
 }
 
@@ -51,14 +44,11 @@ impl From<clap::Error> for ConfigError {
 impl Error for ConfigError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            #[cfg(feature = "config-toml")]
             ConfigError::ReadError { err, .. } => Some(err),
             ConfigError::TomlParseError(source) => Some(source),
             ConfigError::InvalidArgument(source) => Some(source),
             ConfigError::MissingValue(_) => None,
-            #[cfg(feature = "config-toml")]
             ConfigError::InvalidVersion(_) => None,
-            #[cfg(feature = "config-env-var")]
             ConfigError::StdError(source) => Some(source),
         }
     }
@@ -67,16 +57,13 @@ impl Error for ConfigError {
 impl fmt::Display for ConfigError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            #[cfg(feature = "config-toml")]
             ConfigError::ReadError { file, err } => write!(f, "{}: {}", err, file),
             ConfigError::TomlParseError(source) => write!(f, "Invalid File Format: {}", source),
             ConfigError::InvalidArgument(source) => {
                 write!(f, "Unable to parse command line argument: {}", source)
             }
             ConfigError::MissingValue(msg) => write!(f, "Configuration value must be set: {}", msg),
-            #[cfg(feature = "config-toml")]
             ConfigError::InvalidVersion(msg) => write!(f, "{}", msg),
-            #[cfg(feature = "config-env-var")]
             ConfigError::StdError(source) => write!(f, "{}", source),
         }
     }
