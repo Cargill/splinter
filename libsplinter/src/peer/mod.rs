@@ -925,7 +925,7 @@ fn handle_disconnection(
         }
         subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
     } else {
-        // check for unrefrenced peer and remove if it has disconnected
+        // check for unreferenced peer and remove if it has disconnected
         debug!("Removing disconnected peer: {}", identity);
         if let Some(unref_peer) = unreferenced_peers.peers.remove(&identity) {
             if let Err(err) = connector.remove_connection(&unref_peer.endpoint) {
