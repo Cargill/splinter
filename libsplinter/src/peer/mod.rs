@@ -75,7 +75,7 @@ pub(crate) enum PeerManagerRequest {
     },
     AddUnidentified {
         endpoint: String,
-        sender: Sender<Result<(), PeerUnknownAddError>>,
+        sender: Sender<Result<EndpointPeerRef, PeerUnknownAddError>>,
     },
     RemovePeer {
         peer_id: String,
@@ -427,7 +427,17 @@ fn handle_request(
             }
         }
         PeerManagerRequest::AddUnidentified { endpoint, sender } => {
-            if sender.send(add_unidentified(endpoint, connector)).is_err() {
+            if sender
+                .send(add_unidentified(
+                    endpoint,
+                    connector,
+                    unreferenced_peers,
+                    peer_remover,
+                    peers,
+                    ref_map,
+                ))
+                .is_err()
+            {
                 warn!("connector dropped before receiving result of adding unidentified peer");
             }
         }
@@ -627,19 +637,31 @@ fn add_peer(
 }
 
 // Request a connection, the resulting connection will be treated as an InboundConnection
-fn add_unidentified(endpoint: String, connector: Connector) -> Result<(), PeerUnknownAddError> {
-    debug!("Attempting to peer with unidentified peer");
-    let connection_id = format!("{}", Uuid::new_v4());
-    match connector.request_connection(&endpoint, &connection_id) {
-        Ok(()) => Ok(()),
-        Err(err) => {
-            warn!("Unable to peer with unidentified peer: {}", endpoint);
-            // unable to connect to any of the endpoints provided
-            Err(PeerUnknownAddError::AddError(format!(
-                "Unable to connect to endpoint {} that was provided for unidentified peer: {}",
-                endpoint, err
-            )))
-        }
+fn add_unidentified(
+    endpoint: String,
+    connector: Connector,
+    unreferenced_peers: &mut UnreferencedPeerState,
+    peer_remover: &PeerRemover,
+    peers: &PeerMap,
+    ref_map: &mut RefMap,
+) -> Result<EndpointPeerRef, PeerUnknownAddError> {
+    debug!("Attempting to peer with peer by endpoint {}", endpoint);
+    if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
+        // if there is peer in the peer_map, there is reference in the ref map
+        ref_map.add_ref(peer_metadata.id.to_string());
+        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
+    } else {
+        let connection_id = format!("{}", Uuid::new_v4());
+        match connector.request_connection(&endpoint, &connection_id) {
+            Ok(()) => (),
+            Err(err) => {
+                warn!("Unable to peer with peer at {}: {}", endpoint, err);
+            }
+        };
+        unreferenced_peers
+            .requested_endpoints
+            .push(endpoint.to_string());
+        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
     }
 }
 

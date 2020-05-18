@@ -21,7 +21,7 @@ use super::error::{
     PeerRefRemoveError, PeerUnknownAddError,
 };
 use super::notification::PeerNotificationIter;
-use super::PeerRef;
+use super::{EndpointPeerRef, PeerRef};
 use super::{PeerManagerMessage, PeerManagerRequest};
 
 /// The PeerLookup trait provides an interface for looking up details about individual peer
@@ -104,8 +104,11 @@ impl PeerManagerConnector {
     ///
     /// * `endpoint` - The endpoint associated with the peer.
     ///
-    /// Returns Ok() if the unidentified peer was added
-    pub fn add_unidentified_peer(&self, endpoint: String) -> Result<(), PeerUnknownAddError> {
+    /// Returns Ok(EndpointPeerRef) if the unidentified peer was added
+    pub fn add_unidentified_peer(
+        &self,
+        endpoint: String,
+    ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
         let (sender, recv) = channel();
 
         let message =
