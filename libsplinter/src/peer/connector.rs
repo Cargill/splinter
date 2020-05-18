@@ -284,6 +284,27 @@ impl PeerRemover {
         recv.recv()
             .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
     }
+
+    pub fn remove_peer_ref_by_endpoint(&self, endpoint: &str) -> Result<(), PeerRefRemoveError> {
+        let (sender, recv) = channel();
+
+        let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeerByEndpoint {
+            endpoint: endpoint.to_string(),
+            sender,
+        });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerRefRemoveError::InternalError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
+    }
 }
 
 impl PartialEq for PeerRemover {
