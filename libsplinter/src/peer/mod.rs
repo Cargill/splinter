@@ -137,6 +137,40 @@ impl Drop for PeerRef {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct EndpointPeerRef {
+    endpoint: String,
+    peer_remover: PeerRemover,
+}
+
+impl EndpointPeerRef {
+    pub(super) fn new(endpoint: String, peer_remover: PeerRemover) -> Self {
+        EndpointPeerRef {
+            endpoint,
+            peer_remover,
+        }
+    }
+
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+}
+
+impl Drop for EndpointPeerRef {
+    fn drop(&mut self) {
+        match self
+            .peer_remover
+            .remove_peer_ref_by_endpoint(&self.endpoint)
+        {
+            Ok(_) => (),
+            Err(err) => error!(
+                "Unable to remove reference to peer with endpoint {} on drop: {}",
+                self.endpoint, err
+            ),
+        }
+    }
+}
+
 /// An entry of unreferenced peers, that may connected externally, but not yet requested locally.
 #[derive(Debug)]
 struct UnreferencedPeer {
