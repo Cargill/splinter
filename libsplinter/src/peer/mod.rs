@@ -606,10 +606,12 @@ fn add_peer(
     let mut active_endpoint = match endpoints.get(0) {
         Some(endpoint) => endpoint.to_string(),
         None => {
+            // remove ref we just added
+            ref_map.remove_ref(&peer_id);
             return Err(PeerRefAddError::AddError(format!(
                 "No endpoints provided for peer {}",
                 peer_id
-            )))
+            )));
         }
     };
 
