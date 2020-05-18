@@ -690,7 +690,7 @@ fn remove_peer(
             ))
         })?;
 
-        // If the peer is pending or invalid there is no connection to remove
+        // If the peer is pending there is no connection to remove
         if peer_metadata.status == PeerStatus::Pending {
             return Ok(());
         }
