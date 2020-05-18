@@ -364,9 +364,11 @@ impl SplinterDaemon {
             })
             .collect::<Vec<_>>();
 
+        // hold on to peer refs for the peers provided to ensure the connections are kept around
+        let mut peer_refs = vec![];
         for endpoint in self.initial_peers.iter() {
             match peer_connector.add_unidentified_peer(endpoint.into()) {
-                Ok(_) => (),
+                Ok(peer_ref) => peer_refs.push(peer_ref),
                 Err(err) => error!("Connect Error: {}", err),
             }
         }
