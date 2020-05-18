@@ -43,6 +43,9 @@ For upgrade information, see
 * Add `on_reconnect` callback to `WebsocketClient` that is called before
   attempting to reconnect to a server.
 
+* Move the peer manager from the `splinter::network::peer_manager` module to the
+  `splinter::peer` module.
+
 ### splinterd
 
 * Change the default service and network endpoints from TCP to TLS and require a
