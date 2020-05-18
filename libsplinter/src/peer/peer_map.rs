@@ -157,6 +157,10 @@ impl PeerMap {
             .iter()
             .filter(|(_id, peer_meta)| peer_meta.status == PeerStatus::Pending)
     }
+
+    pub fn contains_endpoint(&self, endpoint: &str) -> bool {
+        self.endpoints.contains_key(endpoint)
+    }
 }
 
 #[cfg(test)]
