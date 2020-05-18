@@ -11,9 +11,12 @@ application, see the [Gameroom Technical
 Walkthrough](https://files.splinter.dev/docs/Gameroom_Walkthrough-Splinter_v0.3.4.pdf)
 (PDF).
 
-## How to Run the Gameroom Demo
+## Running the Gameroom Demo with Docker
 
-**Note:** This demo uses the Sabre smart contract engine provided in
+**Note:** For the Kubernetes instructions, see [Running the Gameroom demo in
+Kubernetes](https://github.com/Cargill/splinter/blob/master/docker/kubernetes/README.md).
+
+This demo uses the Sabre smart contract engine provided in
 [Sawtooth Sabre](https://github.com/hyperledger/sawtooth-sabre) and the XO smart
 contract provided in the [Hyperledger Sawtooth Rust
 SDK](https://github.com/hyperledger/sawtooth-sdk-rust/tree/master/examples/xo_rust).
