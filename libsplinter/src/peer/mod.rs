@@ -1765,6 +1765,95 @@ pub mod tests {
         mesh.shutdown_signaler().shutdown();
     }
 
+    // Test that when a EndpointPeerRef is dropped, a remove peer request is properly sent and the
+    // peer is removed
+    //
+    //
+    // 1. add unidentified peer with endpoint inproc://test
+    // 2. add test_peer
+    // 4. call list peers
+    // 5. verify that the peer list contains test_peer
+    // 6. drop the PeerRef
+    // 7. call list peers
+    // 8. verify that the peer list still contains test_peer
+    // 9. drop endpoint peer_ref
+    // 10. call list peers
+    // 11. verify that the new peer list is empty
+    #[test]
+    fn test_peer_manager_drop_endpoint_peer_ref() {
+        let mut transport = Box::new(InprocTransport::default());
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mesh = Mesh::new(512, 128);
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport.clone())
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        // let (finish_tx, fininsh_rx) = channel();
+        let connector = cm.connector();
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
+
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+
+        {
+            let mut subscriber = peer_connector
+                .subscribe()
+                .expect("Unable to get subscriber");
+            let endpoint_peer_ref = peer_connector
+                .add_unidentified_peer("inproc://test".to_string())
+                .expect("Unable to add peer by endpoint");
+            assert_eq!(endpoint_peer_ref.endpoint(), "inproc://test".to_string());
+            let notification = subscriber.next().expect("Unable to get new notifications");
+            assert!(
+                notification
+                    == PeerManagerNotification::Connected {
+                        peer: "test_peer".to_string(),
+                    }
+            );
+
+            let peer_ref = peer_connector
+                .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+                .expect("Unable to add peer");
+
+            assert_eq!(peer_ref.peer_id, "test_peer");
+
+            let peer_list = peer_connector
+                .list_peers()
+                .expect("Unable to get peer list");
+
+            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+
+            drop(peer_ref);
+
+            let peer_list = peer_connector
+                .list_peers()
+                .expect("Unable to get peer list");
+
+            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+        }
+        // drop endpoint_peer_ref
+
+        let peer_list = peer_connector
+            .list_peers()
+            .expect("Unable to get peer list");
+
+        assert_eq!(peer_list, Vec::<String>::new());
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
+        cm.await_shutdown();
+        mesh.shutdown_signaler().shutdown();
+    }
+
     // Test that if a peer's endpoint disconnects and does not reconnect during a set timeout, the
     // PeerManager will retry the peers list of endpoints trying to find an endpoint that is
     // available.
