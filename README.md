@@ -111,11 +111,12 @@ building with default features, unset the environment variable:
 
 ## Demos
 
-Splinter includes several example applications that you can run as demos. The
-README in each directory explains how to run the demo.
+Splinter includes an example application that you can run as a demo.
+[Gameroom](examples/gameroom/) is a web application that allows you to set up a
+dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).
 
-- [Gameroom](examples/gameroom/): Web application that allows you to set up a
-  dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).
+For more information, see the [Gameroom
+README](https://github.com/Cargill/splinter/tree/master/examples/gameroom/README.md).
 
 ## License
 
