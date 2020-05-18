@@ -524,8 +524,51 @@ fn add_peer(
 
     // if this is not a new peer, return success
     if new_ref_count > 1 {
-        let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
-        return Ok(peer_ref);
+        if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_id).cloned() {
+            if peer_metadata.endpoints.len() == 1 && endpoints.len() > 1 {
+                // this should always be true
+                if let Some(endpoint) = peer_metadata.endpoints.get(0) {
+                    // if peer was add by endpoint, its peer metadata should be updated to include
+                    // the full list of endpoints in this request
+                    if unreferenced_peers.requested_endpoints.contains(endpoint)
+                        && endpoints.contains(&endpoint)
+                    {
+                        info!(
+                            "Updating peer {} to include endpoints {:?}",
+                            peer_id, endpoints
+                        );
+                        peer_metadata.endpoints = endpoints;
+                        peers.update_peer(peer_metadata.clone()).map_err(|err| {
+                            PeerRefAddError::AddError(format!(
+                                "Unable to update peer {}:{}",
+                                peer_id, err
+                            ))
+                        })?
+                    } else {
+                        // remove ref we just added
+                        ref_map.remove_ref(&peer_id);
+                        return Err(PeerRefAddError::AddError(format!(
+                            "Mismatch betwen existing and requested peer endpoints: {:?} does not \
+                            contain {}",
+                            endpoints, endpoint
+                        )));
+                    }
+                } else {
+                    return Err(PeerRefAddError::AddError(format!(
+                        "Peer {} does not have any endpoints",
+                        peer_id
+                    )));
+                }
+            }
+
+            let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+            return Ok(peer_ref);
+        } else {
+            return Err(PeerRefAddError::AddError(format!(
+                "A reference exists for peer {} but missing peer metadata",
+                peer_id
+            )));
+        }
     };
 
     // if it is a unreferenced peer, promote it to a fully-referenced peer
