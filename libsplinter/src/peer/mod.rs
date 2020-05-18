@@ -1013,7 +1013,7 @@ fn handle_inbound_connection(
             }
         }
     } else {
-        debug!("Adding unrefrenced peer for {}", identity);
+        debug!("Adding peer with id: {}", identity);
 
         if let Some(old_peer) = unreferenced_peers.peers.insert(
             identity,
@@ -1022,8 +1022,8 @@ fn handle_inbound_connection(
                 endpoint: endpoint.to_string(),
             },
         ) {
-            debug!("Removing old unreferenced peer connection");
             if old_peer.endpoint != endpoint {
+                debug!("Removing old peer connection for {}", old_peer.endpoint);
                 if let Err(err) = connector.remove_connection(&old_peer.endpoint) {
                     error!("Unable to clean up old connection: {}", err);
                 }
@@ -1172,8 +1172,8 @@ fn handle_connected(
                 endpoint: endpoint.to_string(),
             },
         ) {
-            debug!("Removing old unreferenced peer connection");
             if old_peer.endpoint != endpoint {
+                debug!("Removing old peer connection for {}", old_peer.endpoint);
                 if let Err(err) = connector.remove_connection(&old_peer.endpoint) {
                     error!("Unable to clean up old connection: {}", err);
                 }
