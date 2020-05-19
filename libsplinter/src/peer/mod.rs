@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures and implementations for managing Splinter peers.
+//!
+//! The public interface includes the structs [`PeerManager`], [`PeerManagerConnector`],
+//! [`PeerInterconnect`] and the enum [`PeerManagerNotification`].
+//!
+//! [`PeerManager`]: struct.PeerManager.html
+//! [`PeerManagerConnector`]: connector/struct.PeerManagerConnector.html
+//! [`PeerInterconnect`]: interconnect/struct.PeerInterconnect.html
+//! [`PeerManagerNotification`]: notification/enum.PeerManagerNotification.html
+
 mod connector;
 mod error;
 pub mod interconnect;
@@ -51,21 +61,29 @@ const INITIAL_RETRY_FREQUENCY: u64 = 10;
 // How often to retry connecting to requested peers without id
 const REQUESTED_ENDPOINTS_RETRY_FREQUENCY: u64 = 60;
 
+/// Internal messages to drive management
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerMessage {
+    /// Notifies the `PeerManger` it should shutdown
     Shutdown,
+    /// Sent from the `PeerManagerConnector` to add peers
     Request(PeerManagerRequest),
+    /// Used to subscribe to `PeerManagerNotification`
     Subscribe(Sender<PeerManagerNotification>),
+    /// Passes `ConnectionManagerNotification` to the `PeerManger` for handling
     InternalNotification(ConnectionManagerNotification),
+    /// Notifies the `PeerManager` it should retry connecting to pending peers
     RetryPending,
 }
 
+/// Converts `ConnectionManagerNotification` into `PeerManagerMessage::InternalNotification`
 impl From<ConnectionManagerNotification> for PeerManagerMessage {
     fn from(notification: ConnectionManagerNotification) -> Self {
         PeerManagerMessage::InternalNotification(notification)
     }
 }
 
+/// The requests that will be handled by the `PeerManager`
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerRequest {
     AddPeer {
@@ -104,10 +122,9 @@ pub(crate) enum PeerManagerRequest {
     },
 }
 
-/// A PeerRef is used to keep track of peer references. When dropped, the PeerRef will send
-/// a request to the PeerManager to remove a reference to the peer, thus removing the peer if no
-/// more references exists.
-
+/// Used to keep track of peer references. When dropped, the `PeerRef` will send a request to the
+/// `PeerManager` to remove a reference to the peer, thus removing the peer if no more references
+/// exists.
 #[derive(Debug, PartialEq)]
 pub struct PeerRef {
     peer_id: String,
@@ -115,6 +132,7 @@ pub struct PeerRef {
 }
 
 impl PeerRef {
+    /// Creates a new `PeerRef`
     pub(super) fn new(peer_id: String, peer_remover: PeerRemover) -> Self {
         PeerRef {
             peer_id,
@@ -122,6 +140,7 @@ impl PeerRef {
         }
     }
 
+    /// Returns the peer ID this reference is for
     pub fn peer_id(&self) -> &str {
         &self.peer_id
     }
@@ -139,6 +158,9 @@ impl Drop for PeerRef {
     }
 }
 
+/// Used to keep track of peer references that are created only with an endpoint. When dropped, a
+/// request is sent to the `PeerManager` to remove a reference to the peer, thus removing the peer
+/// if no more references exists.
 #[derive(Debug, PartialEq)]
 pub struct EndpointPeerRef {
     endpoint: String,
@@ -146,6 +168,7 @@ pub struct EndpointPeerRef {
 }
 
 impl EndpointPeerRef {
+    /// Creates a new `EndpointPeerRef`
     pub(super) fn new(endpoint: String, peer_remover: PeerRemover) -> Self {
         EndpointPeerRef {
             endpoint,
@@ -153,6 +176,7 @@ impl EndpointPeerRef {
         }
     }
 
+    /// Returns the endpoint of the peer this reference is for
     pub fn endpoint(&self) -> &str {
         &self.endpoint
     }
@@ -201,9 +225,9 @@ impl UnreferencedPeerState {
     }
 }
 
-/// The PeerManager is in charge of keeping track of peers and their ref count, as well as
-/// requesting connections from the ConnectionManager. If a peer has disconnected, the PeerManager
-/// will also try the peer's other endpoints until one is successful.
+/// The `PeerManager` is in charge of keeping track of peers and their ref count, as well as
+/// requesting connections from the `ConnectionManager`. If a peer has disconnected, the
+/// `PeerManager` will also try the peer's other endpoints until one is successful.
 pub struct PeerManager {
     connection_manager_connector: Connector,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -215,6 +239,17 @@ pub struct PeerManager {
 }
 
 impl PeerManager {
+    /// Creates a new `PeerManager`
+    ///
+    /// # Arguments
+    ///
+    /// * `connector` - The `Connector` to the `ConnectionManager` that will handle the connections
+    ///     requested by the `PeerManager`
+    /// * `max_retry_attempts` - the number of retry attempts for an active endpoint before the
+    ///    `PeerManager` will try other endpoints associated with a peer
+    /// * `retry_interval` - how often (in seconds) the `Pacemaker` should notify the `PeerManger`
+    ///    to retry pending peers
+    /// * `identity` - the unique ID of the node this `PeerManager` belongs to
     pub fn new(
         connector: Connector,
         max_retry_attempts: Option<u64>,
@@ -232,9 +267,12 @@ impl PeerManager {
         }
     }
 
-    /// Start the PeerManager
+    /// Starts the `PeerManager`
     ///
-    /// Returns a PeerManagerConnector that can be used to send requests to the PeerManager.
+    /// Starts up a thread that will handle incoming requests to add, remove and get peers. Also
+    /// handles notifications from the `ConnectionManager`.
+    ///
+    /// Returns a `PeerManagerConnector` that can be used to send requests to the `PeerManager`.
     pub fn start(&mut self) -> Result<PeerManagerConnector, PeerManagerError> {
         debug!(
             "Starting peer manager with retry_interval={}s, max_retry_attempts={}",
@@ -354,10 +392,12 @@ impl PeerManager {
         Ok(PeerManagerConnector::new(sender))
     }
 
+    /// Returns a `ShutdownHandle` for this `PeerManager`
     pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
         self.shutdown_handle.clone()
     }
 
+    /// Waits for the `PeerManager` thread to shutdown
     pub fn await_shutdown(self) {
         debug!("Shutting down peer manager...");
         let join_handle = if let Some(jh) = self.join_handle {
@@ -373,6 +413,7 @@ impl PeerManager {
         debug!("Shutting down peer manager (complete)");
     }
 
+    /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
     pub fn shutdown_and_wait(self) {
         if let Some(sh) = self.shutdown_handle.clone() {
             sh.shutdown();
@@ -384,6 +425,7 @@ impl PeerManager {
     }
 }
 
+/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<PeerManagerMessage>,
@@ -391,6 +433,7 @@ pub struct ShutdownHandle {
 }
 
 impl ShutdownHandle {
+    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
     pub fn shutdown(&self) {
         self.pacemaker_shutdown_signaler.shutdown();
         if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
