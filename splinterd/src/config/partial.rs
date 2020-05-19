@@ -215,7 +215,6 @@ impl PartialConfig {
         self.whitelist.clone()
     }
 
-    #[cfg(feature = "config-env-var")]
     /// Adds a `config_dir` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -227,7 +226,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `storage` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -239,7 +237,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_cert_dir` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -251,7 +248,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_ca_file` value to the  `PartialConfig` object.
     ///
     /// # Arguments
@@ -263,7 +259,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_client_cert` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -276,7 +271,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_client_key` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -288,7 +282,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_server_cert` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -301,7 +294,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_server_key` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -313,7 +305,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `service_endpoint` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -326,7 +317,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `network_endpoints` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -338,7 +328,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `advertised_endpoints` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -350,7 +339,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `peers` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -362,7 +350,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `node_id` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -374,7 +361,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `display_name` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -385,8 +371,6 @@ impl PartialConfig {
         self.display_name = display_name;
         self
     }
-
-    #[allow(dead_code)]
 
     /// Adds a `rest_api_endpoint` value to the PartialConfig object.
     ///
@@ -412,7 +396,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `registries` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -424,7 +407,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `registry_auto_refresh` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -437,7 +419,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `registry_forced_refresh` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -450,7 +431,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `heartbeat` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -462,7 +442,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `timeout` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -478,7 +457,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `state_dir` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -490,7 +468,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `tls_insecure` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -502,7 +479,6 @@ impl PartialConfig {
         self
     }
 
-    #[allow(dead_code)]
     /// Adds a `no-tls` value to the `PartialConfig` object.
     ///
     /// # Arguments

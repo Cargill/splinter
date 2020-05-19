@@ -16,7 +16,6 @@
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[cfg(feature = "config-command-line")]
 #[macro_use]
 extern crate clap;
 
@@ -30,19 +29,10 @@ use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use log::Record;
 use rand::{thread_rng, Rng};
 
-#[cfg(feature = "config-command-line")]
-use crate::config::ClapPartialConfigBuilder;
-#[cfg(feature = "config-toml")]
-use crate::config::ConfigError;
-#[cfg(feature = "config-default")]
-use crate::config::DefaultPartialConfigBuilder;
-#[cfg(feature = "config-env-var")]
-use crate::config::EnvPartialConfigBuilder;
-#[cfg(feature = "default")]
-use crate::config::PartialConfigBuilder;
-#[cfg(feature = "config-toml")]
-use crate::config::TomlPartialConfigBuilder;
-use crate::config::{Config, ConfigBuilder};
+use crate::config::{
+    ClapPartialConfigBuilder, Config, ConfigBuilder, ConfigError, DefaultPartialConfigBuilder,
+    EnvPartialConfigBuilder, PartialConfigBuilder, TomlPartialConfigBuilder,
+};
 use crate::daemon::SplinterDaemonBuilder;
 use clap::{clap_app, crate_version};
 use clap::{Arg, ArgMatches};
@@ -57,43 +47,29 @@ use error::UserError;
 use transport::build_transport;
 
 fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Config, UserError> {
-    #[cfg(feature = "default")]
     let mut builder = ConfigBuilder::new();
-    #[cfg(not(feature = "default"))]
-    let builder = ConfigBuilder::new();
 
-    #[cfg(feature = "config-command-line")]
-    {
-        let clap_config = ClapPartialConfigBuilder::new(_matches).build()?;
-        builder = builder.with_partial_config(clap_config);
+    let clap_config = ClapPartialConfigBuilder::new(_matches).build()?;
+    builder = builder.with_partial_config(clap_config);
+
+    if let Some(file) = _toml_path {
+        debug!("Loading config toml file: {:?}", fs::canonicalize(file)?);
+        let toml_string = fs::read_to_string(file).map_err(|err| ConfigError::ReadError {
+            file: String::from(file),
+            err,
+        })?;
+        let toml_config = TomlPartialConfigBuilder::new(toml_string, String::from(file))
+            .map_err(UserError::ConfigError)?
+            .build()?;
+        builder = builder.with_partial_config(toml_config);
     }
 
-    #[cfg(feature = "config-toml")]
-    {
-        if let Some(file) = _toml_path {
-            debug!("Loading config toml file: {:?}", fs::canonicalize(file)?);
-            let toml_string = fs::read_to_string(file).map_err(|err| ConfigError::ReadError {
-                file: String::from(file),
-                err,
-            })?;
-            let toml_config = TomlPartialConfigBuilder::new(toml_string, String::from(file))
-                .map_err(UserError::ConfigError)?
-                .build()?;
-            builder = builder.with_partial_config(toml_config);
-        }
-    }
+    let env_config = EnvPartialConfigBuilder::new().build()?;
+    builder = builder.with_partial_config(env_config);
 
-    #[cfg(feature = "config-env-var")]
-    {
-        let env_config = EnvPartialConfigBuilder::new().build()?;
-        builder = builder.with_partial_config(env_config);
-    }
+    let default_config = DefaultPartialConfigBuilder::new().build()?;
+    builder = builder.with_partial_config(default_config);
 
-    #[cfg(feature = "config-default")]
-    {
-        let default_config = DefaultPartialConfigBuilder::new().build()?;
-        builder = builder.with_partial_config(default_config);
-    }
     builder
         .build()
         .map_err(|e| UserError::MissingArgument(e.to_string()))
