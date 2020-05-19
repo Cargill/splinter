@@ -27,6 +27,62 @@ use crate::network::connection_manager::{ConnectionManagerNotification, Connecto
 use self::error::ServiceConnectionAgentError;
 pub use self::error::ServiceConnectionError;
 
+pub type SubscriberId = usize;
+type Subscriber =
+    Box<dyn Fn(ServiceConnectionNotification) -> Result<(), Box<dyn std::error::Error>> + Send>;
+
+struct SubscriberMap {
+    subscribers: HashMap<SubscriberId, Subscriber>,
+    next_id: SubscriberId,
+}
+
+impl SubscriberMap {
+    fn new() -> Self {
+        Self {
+            subscribers: HashMap::new(),
+            next_id: 0,
+        }
+    }
+
+    fn notify_all(&mut self, notification: ServiceConnectionNotification) {
+        let mut failures = vec![];
+        for (id, callback) in self.subscribers.iter() {
+            if let Err(err) = (*callback)(notification.clone()) {
+                failures.push(*id);
+                debug!("Dropping subscriber ({}): {}", id, err);
+            }
+        }
+
+        for id in failures {
+            self.subscribers.remove(&id);
+        }
+    }
+
+    fn add_subscriber(&mut self, subscriber: Subscriber) -> SubscriberId {
+        let subscriber_id = self.next_id;
+        self.next_id += 1;
+        self.subscribers.insert(subscriber_id, subscriber);
+
+        subscriber_id
+    }
+
+    fn remove_subscriber(&mut self, subscriber_id: SubscriberId) {
+        self.subscribers.remove(&subscriber_id);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ServiceConnectionNotification {
+    Connected {
+        service_id: String,
+        endpoint: String,
+    },
+    Disconnected {
+        service_id: String,
+        endpoint: String,
+    },
+}
+
 /// Constructs new ServiceConnectionManager structs.
 ///
 /// At build time, this has initialized the background threads required for running this process.
@@ -102,6 +158,14 @@ enum AgentMessage {
     GetIdentity {
         connection_id: String,
         reply_sender: Sender<Result<Option<String>, ServiceConnectionError>>,
+    },
+    Subscribe {
+        subscriber: Subscriber,
+        reply_sender: Sender<Result<SubscriberId, ServiceConnectionError>>,
+    },
+    Unsubscribe {
+        subscriber_id: SubscriberId,
+        reply_sender: Sender<Result<(), ServiceConnectionError>>,
     },
     Shutdown,
 }
@@ -283,6 +347,32 @@ impl ServiceConnector {
             }
         )
     }
+
+    pub fn subscribe<T>(
+        &self,
+        subscriber: Sender<T>,
+    ) -> Result<SubscriberId, ServiceConnectionError>
+    where
+        T: From<ServiceConnectionNotification> + Send + 'static,
+    {
+        agent_msg!(
+            self.sender,
+            Subscribe {
+                subscriber: Box::new(move |notification| {
+                    subscriber.send(T::from(notification)).map_err(Box::from)
+                }),
+            }
+        )
+    }
+
+    pub fn unsubscribe(&self, subscriber_id: SubscriberId) -> Result<(), ServiceConnectionError> {
+        agent_msg!(
+            self.sender,
+            Unsubscribe {
+                subscriber_id: subscriber_id,
+            }
+        )
+    }
 }
 
 pub struct ShutdownSignaler {
@@ -318,6 +408,7 @@ enum ConnectionStatus {
 struct ServiceConnectionAgent {
     services: ServiceConnectionMap,
     receiver: Receiver<AgentMessage>,
+    subscribers: SubscriberMap,
 }
 
 impl ServiceConnectionAgent {
@@ -325,6 +416,7 @@ impl ServiceConnectionAgent {
         Self {
             services: ServiceConnectionMap::new(),
             receiver,
+            subscribers: SubscriberMap::new(),
         }
     }
 
@@ -349,6 +441,14 @@ impl ServiceConnectionAgent {
                 }) => {
                     self.get_identity_for_connection_id(&connection_id, reply_sender)?;
                 }
+                Ok(AgentMessage::Subscribe {
+                    subscriber,
+                    reply_sender,
+                }) => self.add_subscriber(subscriber, reply_sender)?,
+                Ok(AgentMessage::Unsubscribe {
+                    subscriber_id,
+                    reply_sender,
+                }) => self.remove_subscriber(subscriber_id, reply_sender)?,
                 Ok(AgentMessage::Shutdown) => break Ok(()),
                 Err(_) => {
                     break Err(ServiceConnectionAgentError(
@@ -357,6 +457,24 @@ impl ServiceConnectionAgent {
                 }
             }
         }
+    }
+
+    fn add_subscriber(
+        &mut self,
+        subscriber: Subscriber,
+        reply_sender: Sender<Result<SubscriberId, ServiceConnectionError>>,
+    ) -> Result<(), ServiceConnectionAgentError> {
+        let subscriber_id = self.subscribers.add_subscriber(subscriber);
+        agent_reply!(reply_sender, Ok(subscriber_id))
+    }
+
+    fn remove_subscriber(
+        &mut self,
+        subscriber_id: SubscriberId,
+        reply_sender: Sender<Result<(), ServiceConnectionError>>,
+    ) -> Result<(), ServiceConnectionAgentError> {
+        self.subscribers.remove_subscriber(subscriber_id);
+        agent_reply!(reply_sender, Ok(()))
     }
 
     fn list_services(
@@ -405,20 +523,36 @@ impl ServiceConnectionAgent {
                 identity,
             } => {
                 self.services.add_connection(ServiceConnectionInfo {
-                    endpoint,
+                    endpoint: endpoint.clone(),
                     connection_id,
-                    identity,
+                    identity: identity.clone(),
                     status: ConnectionStatus::Connected,
                 });
+
+                self.subscribers
+                    .notify_all(ServiceConnectionNotification::Connected {
+                        service_id: identity,
+                        endpoint,
+                    })
             }
             ConnectionManagerNotification::Disconnected { endpoint, .. } => {
                 if let Some(info) = self.services.get_connection_info_by_endpoint_mut(&endpoint) {
                     info.status = ConnectionStatus::Disconnected;
+                    self.subscribers
+                        .notify_all(ServiceConnectionNotification::Disconnected {
+                            service_id: info.identity.clone(),
+                            endpoint,
+                        });
                 }
             }
             ConnectionManagerNotification::Connected { endpoint, .. } => {
                 if let Some(info) = self.services.get_connection_info_by_endpoint_mut(&endpoint) {
                     info.status = ConnectionStatus::Connected;
+                    self.subscribers
+                        .notify_all(ServiceConnectionNotification::Connected {
+                            service_id: info.identity.clone(),
+                            endpoint,
+                        });
                 }
             }
             ConnectionManagerNotification::NonFatalConnectionError {
@@ -517,7 +651,6 @@ mod tests {
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError, ConnectionManager,
-        ConnectionManagerNotification,
     };
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
@@ -533,7 +666,6 @@ mod tests {
     /// Verify that it can be:
     /// * returned in a list of endpoints
     /// * retrieve the connection id for that endpoint
-    #[ignore]
     #[test]
     fn test_service_connected() {
         let mut transport = InprocTransport::default();
@@ -549,10 +681,6 @@ mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let (subs_tx, subs_rx) = mpsc::channel();
-        connector
-            .subscribe(subs_tx)
-            .expect("Unable to get subscriber");
 
         let (conn_tx, conn_rx) = mpsc::channel();
 
@@ -570,45 +698,33 @@ mod tests {
             .start()
             .expect("Unable to start service manager");
 
+        let service_connector = service_conn_mgr.service_connector();
+        let (subs_tx, subs_rx) = mpsc::channel();
+        service_connector
+            .subscribe(subs_tx)
+            .expect("Unable to get subscriber");
+
         let connection = listener.accept().unwrap();
         connector
             .add_inbound_connection(connection)
             .expect("Unable to add inbound connection");
 
         // wait to receive the notification
-        let notification: ConnectionManagerNotification = subs_rx.recv().unwrap();
+        let notification: ServiceConnectionNotification = subs_rx.recv().unwrap();
         match notification {
-            ConnectionManagerNotification::InboundConnection {
-                endpoint, identity, ..
+            ServiceConnectionNotification::Connected {
+                endpoint,
+                service_id,
             } => {
                 assert_eq!(endpoint, "inproc://test_service_connected".to_string());
-                assert_eq!(identity, "service-id".to_string());
+                assert_eq!(service_id, "service-id".to_string());
             }
-            _ => panic!(
-                "Received {:?} but should have been \
-                ConnectionManagerNotification::InboundConnection",
-                notification
-            ),
+            _ => panic!("Unexpected notification: {:?}", notification),
         }
 
-        let service_connector = service_conn_mgr.service_connector();
-
-        let mut service_connections = service_connector
+        let service_connections = service_connector
             .list_service_connections()
             .expect("Unable to list service_connections");
-
-        let remaining_attempts = 5;
-        // Wait for service_manager to handle the notification
-        for _ in 0..remaining_attempts {
-            if !service_connections.is_empty() {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-
-            service_connections = service_connector
-                .list_service_connections()
-                .expect("Unable to list service_connections");
-        }
 
         assert_eq!(vec!["service-id"], service_connections);
         let connection_id = service_connector
