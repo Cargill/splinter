@@ -55,7 +55,6 @@ use splinter::network::dispatch::{
     dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
 };
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::network::{ConnectionError, PeerUpdateError, SendError};
 use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
@@ -1167,24 +1166,6 @@ impl From<AcceptError> for StartError {
 impl From<ConnectError> for StartError {
     fn from(connect_error: ConnectError) -> Self {
         StartError::TransportError(format!("Connect Error: {:?}", connect_error))
-    }
-}
-
-impl From<ConnectionError> for StartError {
-    fn from(connection_error: ConnectionError) -> Self {
-        StartError::NetworkError(connection_error.to_string())
-    }
-}
-
-impl From<SendError> for StartError {
-    fn from(send_error: SendError) -> Self {
-        StartError::NetworkError(send_error.to_string())
-    }
-}
-
-impl From<PeerUpdateError> for StartError {
-    fn from(update_error: PeerUpdateError) -> Self {
-        StartError::NetworkError(update_error.to_string())
     }
 }
 
