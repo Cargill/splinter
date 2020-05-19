@@ -62,7 +62,6 @@ async function http(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.responseType = 'json';
     request.open(method, `/api${url}`);
     if (headerFn) {
       headerFn(request);
@@ -71,7 +70,8 @@ async function http(
       if (request.status >= 200 && request.status < 300) {
         resolve(request.response);
       } else {
-        console.error(request.response.message);
+        const responseBody = JSON.parse(request.responseText);
+        console.error(responseBody.message);
         if (request.status >= 400 && request.status < 500) {
           reject('Failed to send request. Contact the administrator for help.');
         } else {
