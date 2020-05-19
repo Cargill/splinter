@@ -51,6 +51,12 @@ impl From<String> for PeerId {
     }
 }
 
+impl From<&String> for PeerId {
+    fn from(s: &String) -> PeerId {
+        PeerId(s.clone())
+    }
+}
+
 impl From<&str> for PeerId {
     fn from(s: &str) -> PeerId {
         PeerId(s.into())
@@ -86,6 +92,12 @@ impl std::ops::Deref for ConnectionId {
 impl From<String> for ConnectionId {
     fn from(s: String) -> ConnectionId {
         ConnectionId(s)
+    }
+}
+
+impl From<&String> for ConnectionId {
+    fn from(s: &String) -> ConnectionId {
+        ConnectionId(s.clone())
     }
 }
 
