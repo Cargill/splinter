@@ -14,6 +14,13 @@
 
 version: "3.7"
 
+networks:
+  gameroom:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
 volumes:
   cargo-registry:
   registry:
@@ -32,6 +39,9 @@ services:
           args:
             - CARGO_ARGS=${CARGO_ARGS}
             - REPO_VERSION=${REPO_VERSION}
+        networks:
+          gameroom:
+            ipv4_address: 172.28.1.1
         volumes:
           - registry:/registry
         command: |
@@ -73,6 +83,9 @@ services:
         - 80
       ports:
           - "8099:80"
+      networks:
+        gameroom:
+          ipv4_address: 172.28.1.2
       volumes:
         - registry:/usr/local/apache2/htdocs
 
@@ -85,6 +98,9 @@ services:
         args:
           - REPO_VERSION=${REPO_VERSION}
       restart: always
+      networks:
+        gameroom:
+          ipv4_address: 172.28.2.1
       volumes:
         - acme-db:/var/lib/postgresql/data
       expose:
@@ -105,6 +121,9 @@ services:
           REPO_VERSION: ${REPO_VERSION}
       image: gameroom-app-acme
       container_name: gameroom-app-acme
+      networks:
+        gameroom:
+          ipv4_address: 172.28.2.2
       environment:
         - VUE_APP_BRAND=acme
       expose:
@@ -121,6 +140,9 @@ services:
           args:
             - CARGO_ARGS=${CARGO_ARGS}
             - REPO_VERSION=${REPO_VERSION}
+        networks:
+          gameroom:
+            ipv4_address: 172.28.2.3
         volumes:
           - cargo-registry:/root/.cargo/registry
         expose:
@@ -164,6 +186,9 @@ services:
         - 8085
       ports:
         - 8088:8085
+      networks:
+        gameroom:
+          ipv4_address: 172.28.2.4
       volumes:
         - acme-var:/var/lib/splinter
         - ./splinterd-config:/configs
@@ -193,6 +218,9 @@ services:
         - 5432
       ports:
         - "5435:5432"
+      networks:
+        gameroom:
+          ipv4_address: 172.28.2.5
       environment:
         POSTGRES_USER: admin
         POSTGRES_PASSWORD: admin
@@ -207,6 +235,9 @@ services:
         args:
           - REPO_VERSION=${REPO_VERSION}
       restart: always
+      networks:
+        gameroom:
+          ipv4_address: 172.28.3.1
       volumes:
         - bubba-db:/var/lib/postgresql/data
       expose:
@@ -227,6 +258,9 @@ services:
           REPO_VERSION: ${REPO_VERSION}
       image: gameroom-app-bubba
       container_name: gameroom-app-bubba
+      networks:
+        gameroom:
+          ipv4_address: 172.28.3.2
       environment:
         - VUE_APP_BRAND=bubba
       expose:
@@ -243,6 +277,9 @@ services:
           args:
             - CARGO_ARGS=${CARGO_ARGS}
             - REPO_VERSION=${REPO_VERSION}
+        networks:
+          gameroom:
+            ipv4_address: 172.28.3.3
         volumes:
           - cargo-registry:/root/.cargo/registry
         expose:
@@ -286,6 +323,9 @@ services:
         - 8085
       ports:
         - 8089:8085
+      networks:
+        gameroom:
+          ipv4_address: 172.28.3.4
       volumes:
         - ./splinterd-config:/configs
         - bubba-var:/var/lib/splinter
@@ -315,6 +355,9 @@ services:
         - 5432
       ports:
         - "5434:5432"
+      networks:
+        gameroom:
+          ipv4_address: 172.28.3.5
       environment:
         POSTGRES_USER: admin
         POSTGRES_PASSWORD: admin
