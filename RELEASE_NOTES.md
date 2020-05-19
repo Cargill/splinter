@@ -1518,7 +1518,7 @@ builds.
 
 ### Highlights
 
-* Completion of the two-phase-commit consensus algorithm with deterministic
+* Completion of the two-phase commit consensus algorithm with deterministic
   coordination
 * Continued progress towards dynamically generating circuits, including
   dynamic peering and circuit proposal validation
@@ -1529,16 +1529,16 @@ builds.
 
 * Add a service orchestration implementation
 * Add Scabbard service factory 
-* Implement a deterministic two-phase-commit coordinator
-* Reorder the commit/reject process for the two-phase-commit coordinator. The
+* Implement a deterministic two-phase commit coordinator
+* Reorder the commit/reject process for the two-phase commit coordinator. The
   coordinator now tells proposal manager to commit/reject before broadcasting
   the corresponding message to other verifiers.
-* Refactor two-phase-commit complete_coordination. Move the process of 
+* Refactor two-phase commit complete_coordination. Move the process of 
   finishing the coordination of a proposal in two-phase commit to a single
   function to reduce duplication.
-* Implement a two-phase-commit timeout for consensus proposals
-* Update the two-phase-commit algorithm to ignore duplicate proposals
-* Allow dynamic verifiers for a single instance of two-phase-commit consensus
+* Implement a two-phase commit timeout for consensus proposals
+* Update the two-phase commit algorithm to ignore duplicate proposals
+* Allow dynamic verifiers for a single instance of two-phase commit consensus
 * Add an Authorization Inquisitor trait for inspecting peer authorization state
 * Add the ability to queue messages from unauthorized peers and unpeered nodes
   to the admin service

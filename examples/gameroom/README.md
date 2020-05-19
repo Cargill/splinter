@@ -2,7 +2,7 @@
 
 Gameroom is an example Splinter application that allows you to set up private,
 multi-party circuits (called "gamerooms") and play tic tac toe with shared
-state, as managed by two-phase-commit consensus between the participants. This
+state, as managed by two-phase commit consensus between the participants. This
 example application, as configured, sets up Splinter nodes for two imaginary
 organizations: Acme Corporation and Bubba Bakery.
 
