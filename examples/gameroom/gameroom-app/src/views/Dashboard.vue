@@ -151,7 +151,7 @@ export default class Dashboard extends Vue {
         this.submitting = true;
         const member = this.newGameroom.member ? this.newGameroom.member.identity : '';
         try {
-          this.$store.dispatch('gamerooms/proposeGameroom', {
+          await this.$store.dispatch('gamerooms/proposeGameroom', {
             alias: this.newGameroom.alias,
             members: [member],
           });
