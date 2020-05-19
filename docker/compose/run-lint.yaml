@@ -47,7 +47,9 @@ services:
          echo \"Running clippy on experimental features...\" && \
          (cd libsplinter && cargo clippy --features experimental -- -D warnings) && \
          (cd splinterd && cargo clippy --features experimental -- -D warnings) && \
-         (cd cli && cargo clippy --features experimental -- -D warnings)
+         (cd cli && cargo clippy --features experimental -- -D warnings) && \
+         (cd services/scabbard/cli && cargo clippy --features experimental -- -D warnings) && \
+         (cd services/scabbard/libscabbard && cargo clippy --features experimental -- -D warnings)
       "
 
   lint-gameroom-client:
