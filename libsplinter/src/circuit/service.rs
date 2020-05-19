@@ -29,6 +29,19 @@ impl ServiceId {
             service_id,
         }
     }
+
+    pub fn circuit(&self) -> &str {
+        &self.circuit_name
+    }
+
+    pub fn service_id(&self) -> &str {
+        &self.service_id
+    }
+
+    /// Decompose this ServiceId into a tuple of (<circuit name>, <service id>).
+    pub fn into_parts(self) -> (String, String) {
+        (self.circuit_name, self.service_id)
+    }
 }
 
 impl fmt::Display for ServiceId {

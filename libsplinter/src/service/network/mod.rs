@@ -16,6 +16,7 @@
 //! with services processors over connections.
 
 mod error;
+pub mod handlers;
 pub mod interconnect;
 
 use std::collections::{BTreeMap, HashMap};

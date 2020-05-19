@@ -15,6 +15,8 @@
 //! Protocol versions for various endpoints provided by splinter.
 
 pub mod authorization;
+pub mod component;
+pub mod service;
 
 pub const ADMIN_PROTOCOL_VERSION: u32 = 1;
 
