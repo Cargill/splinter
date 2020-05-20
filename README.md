@@ -116,7 +116,7 @@ Splinter includes an example application that you can run as a demo.
 dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).
 
 For more information, see the [Gameroom
-README](https://github.com/Cargill/splinter/tree/master/examples/gameroom/README.md).
+README](https://github.com/Cargill/splinter/tree/0-4/examples/gameroom/README.md).
 
 ## License
 
