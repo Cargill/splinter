@@ -216,6 +216,11 @@ impl ScabbardState {
         ))
     }
 
+    /// Get the current state root hash.
+    pub fn current_state_root(&self) -> &str {
+        &self.current_state_root
+    }
+
     pub fn prepare_change(&mut self, batch: BatchPair) -> Result<String, ScabbardStateError> {
         // Setup the transact scheduler
         let (result_tx, result_rx) = std::sync::mpsc::channel();

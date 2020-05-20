@@ -182,11 +182,12 @@ impl ServiceFactory for ScabbardFactory {
     /// The `Scabbard` services created by the `ScabbardFactory` provide the following REST API
     /// endpoints as [`ServiceEndpoint`]s:
     ///
-    /// * `POST /batches` - Add one or more batches to Scabbard's queue
+    /// * `POST /batches` - Add one or more batches to scabbard's queue
     /// * `GET /batch_statuses` - Get the status of one or more batches
-    /// * `GET /ws/subscribe` - Subscribe to Scabbard state-delta events
-    /// * `GET /state/{address}` - Get a value from Scabbard's state
-    /// * `GET /state` - Get multiple Scabbard state entries
+    /// * `GET /ws/subscribe` - Subscribe to scabbard state-delta events
+    /// * `GET /state/{address}` - Get a value from scabbard's state
+    /// * `GET /state` - Get multiple scabbard state entries
+    /// * `GET /state_root` - Get the current state root hash of scabbard's state
     ///
     /// These endpoints are only available if the following REST API backend feature is enabled:
     ///
@@ -208,6 +209,7 @@ impl ServiceFactory for ScabbardFactory {
                 actix::batch_statuses::make_get_batch_status_endpoint(),
                 actix::state_address::make_get_state_at_address_endpoint(),
                 actix::state::make_get_state_with_prefix_endpoint(),
+                actix::state_root::make_get_state_root_endpoint(),
             ])
         }
 

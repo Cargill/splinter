@@ -16,4 +16,5 @@ pub mod batch_statuses;
 pub mod batches;
 pub mod state;
 pub mod state_address;
+pub mod state_root;
 pub mod ws_subscribe;
