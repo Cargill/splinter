@@ -65,6 +65,9 @@ COPY --from=builder /build/target/debian/scabbard-cli_*.deb /tmp
 COPY --from=builder /commit-hash /commit-hash
 
 RUN apt-get update \
- && apt-get install -y curl \
+ && apt-get install -y \
+    curl \
+    man \
+ && mandb \
  && dpkg --unpack /tmp/scabbard-cli_*.deb \
  && apt-get -f -y install

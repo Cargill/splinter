@@ -59,4 +59,8 @@ smart-permissions = []
 [package.metadata.deb]
 maintainer = "The Splinter Team"
 depends = "$auto"
+assets = [
+    ["packaging/man/*.1", "/usr/share/man/man1", "644"],
+    ["target/release/scabbard", "/usr/bin/scabbard", "755"]
+]
 maintainer-scripts = "packaging/ubuntu"
