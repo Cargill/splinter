@@ -21,7 +21,7 @@ license = "Apache-2.0"
 description = """\
     Gameroom is an example Splinter application that allows you to set up \
     private, multi-party circuits (called "gamerooms") and play tic tac toe \
-    with shared state, as managed by two-phase-commit consensus between the \
+    with shared state, as managed by two-phase commit consensus between the \
     participants.
 """
 
