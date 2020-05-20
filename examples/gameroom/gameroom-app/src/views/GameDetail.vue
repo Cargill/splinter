@@ -94,8 +94,9 @@ function setSelectedGameroom(to: any, next: any) {
   });
 }
 
-function listGames(to: any, next: any) {
-  store.dispatch('games/listGames', to.params.id).then(() => {
+async function listGames(to: any, next: any) {
+  try {
+    await store.dispatch('games/listGames', to.params.id).then(() => {
       const selectedGame = store.getters['games/getGames'].find(
         (game: Game) => game.game_name_hash === to.params.gameNameHash);
       if (selectedGame) {
@@ -103,7 +104,17 @@ function listGames(to: any, next: any) {
       } else {
         next({ name: 'not-found' });
       }
-  });
+    });
+  } catch (e) {
+    store.commit('pageLoading/setPageLoadingComplete');
+    if (e.response.status === 404) {
+      next({ name: 'not-found' });
+    } else if (e.response.status >= 500 || e.response.status < 600) {
+      next({ name: 'server-error' });
+    } else {
+      next({ name: 'request-error' });
+    }
+  }
 }
 
 </script>
