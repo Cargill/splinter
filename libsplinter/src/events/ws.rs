@@ -138,6 +138,7 @@ pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {
     on_message: Arc<dyn Fn(Context<T>, T) -> WsResponse + Send + Sync + 'static>,
     on_open: Option<Arc<dyn Fn(Context<T>) -> WsResponse + Send + Sync + 'static>>,
     on_error: Option<Arc<OnErrorHandle<T>>>,
+    on_reconnect: Option<Arc<dyn Fn(&mut WebSocketClient<T>) + Send + Sync + 'static>>,
     reconnect: bool,
     reconnect_limit: u64,
     timeout: u64,
@@ -151,6 +152,7 @@ impl<T: ParseBytes<T> + 'static> Clone for WebSocketClient<T> {
             on_message: self.on_message.clone(),
             on_open: self.on_open.clone(),
             on_error: self.on_error.clone(),
+            on_reconnect: self.on_reconnect.clone(),
             reconnect: self.reconnect,
             reconnect_limit: self.reconnect_limit,
             timeout: self.timeout,
@@ -169,6 +171,7 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             on_message: Arc::new(on_message),
             on_open: None,
             on_error: None,
+            on_reconnect: None,
             reconnect: DEFAULT_RECONNECT,
             reconnect_limit: DEFAULT_RECONNECT_LIMIT,
             timeout: DEFAULT_TIMEOUT,
@@ -190,6 +193,10 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
 
     pub fn set_timeout(&mut self, timeout: u64) {
         self.timeout = timeout
+    }
+
+    pub fn set_url(&mut self, url: &str) {
+        self.url = url.to_string();
     }
 
     pub fn header(&mut self, header: &str, value: String) {
@@ -228,9 +235,21 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         self.on_error = Some(Arc::new(on_error));
     }
 
+    /// Adds optional `on_reconnect` closure. This closure will be called each time the websocket
+    /// attempts to reconnect to the server. It's intended to allow the websocket client properties
+    /// to be modified before attempting a reconnect or to allow additional checks to be performed
+    /// before reconnecting.
+    pub fn on_reconnect<F>(&mut self, on_reconnect: F)
+    where
+        F: Fn(&mut WebSocketClient<T>) + Send + Sync + 'static,
+    {
+        self.on_reconnect = Some(Arc::new(on_reconnect));
+    }
+
     /// Returns `Listen` for WebSocket.
     pub fn listen(&self, mut context: Context<T>) -> Result<Listen, WebSocketError> {
         let url = self.url.clone();
+        let reconnect = self.reconnect;
         let (cmd_sender, cmd_receiver) = channel(1);
         let running = Arc::new(AtomicBool::new(true));
         let running_clone = running.clone();
@@ -239,13 +258,17 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
             .clone()
             .unwrap_or_else(|| Arc::new(|_| WsResponse::Empty));
         let on_message = self.on_message.clone();
+        let on_error = self
+            .on_error
+            .clone()
+            .unwrap_or_else(|| Arc::new(|_, _| Ok(())));
 
         let mut context_timeout = context.clone();
         let timeout = self.timeout;
 
-        let running_connection1 = running.clone();
-        let running_connection2 = running.clone();
+        let running_connection = running.clone();
         let mut context_connection = context.clone();
+        let connection_failed_context = context.clone();
 
         debug!("starting: {}", url);
 
@@ -270,10 +293,14 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                 .and_then(move |res| {
                     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
                         error!("The server didn't upgrade: {}", res.status());
-                    }
-                    if res.status() == StatusCode::NOT_FOUND {
-                        // The requested resource doesn't exist, so no need to keep trying
-                        running_connection1.store(false, Ordering::SeqCst);
+                        if let Err(err) = on_error(
+                            &WebSocketError::ConnectError(format!(
+                            "Received status code {:?} while attempting to establish a connection"
+                        , res.status())),
+                            connection_failed_context,
+                        ) {
+                            error!("Failed to establish a connection {:?}", err);
+                        }
                     }
                     debug!("response: {:?}", res);
 
@@ -282,12 +309,12 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                 .timeout(Duration::from_secs(timeout))
                 .map_err(move |err| {
                     // If not running anymore, don't try reconnecting
-                    if running_connection2.load(Ordering::SeqCst) {
+                    if running_connection.load(Ordering::SeqCst) {
                         if let Err(err) = context_connection.try_reconnect() {
                             error!("Context returned an error  {}", err);
                         }
 
-                        running_connection2.store(false, Ordering::SeqCst);
+                        running_connection.store(false, Ordering::SeqCst);
                     }
                     WebSocketError::ConnectError(format!("Failed to connect: {}", err))
                 })
@@ -389,15 +416,18 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
                                         trace!("Received Pong {}", msg);
                                         ConnectionStatus::Open
                                     }
-                                    WebSocketClientCmd::Frame(Frame::Close(msg)) => {
-                                        debug!("Received close message {:?}", msg);
-                                        let result = do_shutdown(
-                                            &mut blocking_sink,
-                                            CloseCode::Normal,
-                                            running_clone.clone(),
-                                        )
-                                        .map_err(WebSocketError::from);
-                                        ConnectionStatus::Close(result)
+                                    WebSocketClientCmd::Frame(Frame::Close(_)) => {
+                                        if !reconnect {
+                                            let result = do_shutdown(
+                                                &mut blocking_sink,
+                                                CloseCode::Normal,
+                                                running_clone.clone(),
+                                            )
+                                            .map_err(WebSocketError::from);
+                                            ConnectionStatus::Close(result)
+                                        } else {
+                                            ConnectionStatus::Close(Ok(()))
+                                        }
                                     }
                                     WebSocketClientCmd::Stop => {
                                         closed = true;
@@ -539,7 +569,16 @@ impl<T: ParseBytes<T> + 'static> Context<T> {
     pub fn try_reconnect(&mut self) -> Result<(), WebSocketError> {
         // Check that the ws is configure for automatic reconnect attempts and that the number
         // of reconnect attempts hasn't exceeded the maximum configure
+
         if self.ws.reconnect && self.reconnect_count < self.ws.reconnect_limit {
+            let on_reconnect = self
+                .ws
+                .on_reconnect
+                .clone()
+                .unwrap_or_else(|| Arc::new(|_| ()));
+
+            on_reconnect(&mut self.ws);
+
             self.reconnect()
         } else {
             let error_message = if self.ws.reconnect {

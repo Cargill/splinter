@@ -21,7 +21,8 @@ pub mod sabre;
 mod state_delta;
 
 use std::fmt::Write;
-use std::time::{Duration, SystemTime};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime};
 
 use diesel::connection::Connection;
 use gameroom_database::{
@@ -77,11 +78,6 @@ pub fn run(
     igniter: Igniter,
 ) -> Result<(), AppAuthHandlerError> {
     let pool = db_conn.get()?;
-    helpers::fetch_active_gamerooms(&pool, &node_id)?
-        .iter()
-        .map(|gameroom| resubscribe(&splinterd_url, gameroom, &db_conn))
-        .try_for_each(|ws| igniter.start_ws(&ws))?;
-
     let registration_route = helpers::get_last_updated_proposal_time(&pool)?
         .map(|time| {
             format!(
@@ -94,17 +90,50 @@ pub fn run(
         })
         .unwrap_or_else(|| format!("{}/ws/admin/register/gameroom", splinterd_url));
 
+    let ws_url = splinterd_url.clone();
+    let ws_node_id = node_id.clone();
+    let ws_db_conn = db_conn.clone();
     let mut ws = WebSocketClient::new(&registration_route, move |ctx, event| {
         if let Err(err) = process_admin_event(
             event,
-            &db_conn,
-            &node_id,
+            &ws_db_conn,
+            &ws_node_id,
             &private_key,
-            &splinterd_url,
+            &ws_url,
             ctx.igniter(),
         ) {
             error!("Failed to process admin event: {}", err);
         }
+        WsResponse::Empty
+    });
+
+    let on_open_db_conn = db_conn.clone();
+    let on_open_igniter = igniter.clone();
+    let on_open_url = splinterd_url.clone();
+    ws.on_open(move |_| {
+        let conn = match on_open_db_conn.get() {
+            Ok(conn) => conn,
+            Err(err) => {
+                error!("Failed to create database connection: {}", err);
+                return WsResponse::Empty;
+            }
+        };
+
+        let gamerooms = match helpers::fetch_active_gamerooms(&conn, &node_id) {
+            Ok(gamerooms) => gamerooms,
+            Err(err) => {
+                error!("Failed to retrieve active gamerooms: {}", err);
+                return WsResponse::Empty;
+            }
+        };
+
+        for gameroom in gamerooms.iter() {
+            let ws = resubscribe(&on_open_url, gameroom, &on_open_db_conn);
+            if let Err(err) = on_open_igniter.start_ws(&ws) {
+                error!("Failed to resubscribe to active gameroom: {}", err);
+            }
+        }
+
         WsResponse::Empty
     });
 
@@ -117,20 +146,74 @@ pub fn run(
     ws.set_reconnect_limit(RECONNECT_LIMIT);
     ws.set_timeout(CONNECTION_TIMEOUT);
 
+    let on_reconnect_url = splinterd_url.clone();
+    ws.on_reconnect(move |ws| {
+        debug!("Authorization handler attempting reconnect");
+        match db_conn.get() {
+            Ok(conn) => {
+                let url = helpers::get_last_updated_proposal_time(&conn)
+                    .unwrap_or_else(|err| {
+                        warn!("Proposal time could not be retrieved {}", err);
+                        None
+                    })
+                    .map(|time| {
+                        format!(
+                            "{}/ws/admin/register/gameroom?last={}",
+                            on_reconnect_url,
+                            time.duration_since(SystemTime::UNIX_EPOCH)
+                                .map(|duration| duration.as_millis())
+                                .unwrap_or(0)
+                        )
+                    })
+                    .unwrap_or_else(|| format!("{}/ws/admin/register/gameroom", on_reconnect_url));
+
+                ws.set_url(&url);
+            }
+            Err(err) => {
+                error!("Failed to retrieve database connection: {}", err);
+            }
+        }
+    });
+
+    let on_error_url = splinterd_url.clone();
     ws.on_error(move |err, ctx| {
         error!("An error occured while listening for admin events {}", err);
         match err {
             WebSocketError::ParserError { .. } => {
-                debug!("Protocol error, closing connection");
+                error!("Protocol error, closing connection");
                 Ok(())
             }
             WebSocketError::ReconnectError(_) => {
-                debug!("Failed to reconnect. Closing WebSocket.");
+                error!("Failed to reconnect. Closing WebSocket.");
                 Ok(())
             }
             _ => {
-                debug!("Attempting to restart connection");
-                ctx.start_ws()
+                let now = Instant::now();
+
+                debug!("Checking for splinterd server");
+                while now.elapsed() <= Duration::from_secs(30) {
+                    match reqwest::blocking::get(&format!(
+                        "{}/ws/admin/register/gameroom",
+                        on_error_url
+                    )) {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                debug!(
+                                    "splinterd server {} available reconnecting..",
+                                    splinterd_url
+                                );
+                                return ctx.start_ws();
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Error occurred trying to detect splinterd server: {}", err);
+                            break;
+                        }
+                    }
+
+                    thread::sleep(Duration::from_secs(1));
+                }
+                Ok(())
             }
         }
     });
@@ -446,29 +529,13 @@ fn process_admin_event(
                     WsResponse::Empty
                 }
             });
-            xo_ws.set_reconnect(RECONNECT);
-            xo_ws.set_reconnect_limit(RECONNECT_LIMIT);
-            xo_ws.set_timeout(CONNECTION_TIMEOUT);
 
-            xo_ws.on_error(move |err, ctx| {
+            xo_ws.on_error(move |err, _| {
                 error!(
                     "An error occured while listening for scabbard events {}",
                     err
                 );
-                match err {
-                    WebSocketError::ParserError { .. } => {
-                        debug!("Protocol error, closing connection");
-                        Ok(())
-                    }
-                    WebSocketError::ReconnectError(_) => {
-                        debug!("Failed to reconnect. Closing WebSocket.");
-                        Ok(())
-                    }
-                    _ => {
-                        debug!("Attempting to restart connection");
-                        ctx.start_ws()
-                    }
-                }
+                Ok(())
             });
 
             igniter.start_ws(&xo_ws).map_err(AppAuthHandlerError::from)
@@ -520,18 +587,12 @@ fn resubscribe(
         SCABBARD_PROTOCOL_VERSION.to_string(),
     );
 
-    ws.on_error(move |err, ctx| {
+    ws.on_error(move |err, _| {
         error!(
             "An error occured while listening for scabbard events {}",
             err
         );
-        if let WebSocketError::ParserError { .. } = err {
-            debug!("Protocol error, closing connection");
-            Ok(())
-        } else {
-            debug!("Attempting to restart connection");
-            ctx.start_ws()
-        }
+        Ok(())
     });
 
     ws

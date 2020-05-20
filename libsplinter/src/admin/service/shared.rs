@@ -72,6 +72,14 @@ pub enum PayloadType {
     Consensus(ProposalId, (Proposal, CircuitManagementPayload)),
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum AdminServiceStatus {
+    NotRunning,
+    Running,
+    ShuttingDown,
+    Shutdown,
+}
+
 pub struct PendingPayload {
     pub unpeered_ids: Vec<String>,
     pub missing_protocol_ids: Vec<String>,
@@ -192,6 +200,8 @@ pub struct AdminServiceShared {
     key_verifier: Box<dyn AdminKeyVerifier>,
     key_permission_manager: Box<dyn KeyPermissionManager>,
     proposal_sender: Option<Sender<ProposalUpdate>>,
+
+    admin_service_status: AdminServiceStatus,
 }
 
 impl AdminServiceShared {
@@ -252,6 +262,7 @@ impl AdminServiceShared {
             key_verifier,
             key_permission_manager,
             proposal_sender: None,
+            admin_service_status: AdminServiceStatus::NotRunning,
         })
     }
 
@@ -323,6 +334,25 @@ impl AdminServiceShared {
                 self.peer_refs.insert(peer_id.to_string(), peer_ref_vec);
             }
         }
+    }
+
+    pub fn change_status(&mut self) {
+        match self.admin_service_status {
+            AdminServiceStatus::NotRunning => {
+                self.admin_service_status = AdminServiceStatus::Running
+            }
+            AdminServiceStatus::Running => {
+                self.admin_service_status = AdminServiceStatus::ShuttingDown
+            }
+            AdminServiceStatus::ShuttingDown => {
+                self.admin_service_status = AdminServiceStatus::Shutdown
+            }
+            AdminServiceStatus::Shutdown => (),
+        }
+    }
+
+    pub fn admin_service_status(&self) -> AdminServiceStatus {
+        self.admin_service_status
     }
 
     pub fn commit(&mut self) -> Result<(), AdminSharedError> {

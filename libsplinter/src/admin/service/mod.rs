@@ -58,6 +58,7 @@ use self::shared::AdminServiceShared;
 pub use self::error::AdminKeyVerifierError;
 pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
+pub use self::shared::AdminServiceStatus;
 
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
@@ -86,6 +87,8 @@ pub trait AdminCommands: Send + Sync {
         since_timestamp: &SystemTime,
         event_type: &str,
     ) -> Result<Events, AdminServiceError>;
+
+    fn admin_service_status(&self) -> Result<AdminServiceStatus, AdminServiceError>;
 
     fn clone_boxed(&self) -> Box<dyn AdminCommands>;
 }
@@ -414,6 +417,14 @@ impl Service for AdminService {
             })?
             .add_services_to_directory()
             .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .change_status();
+
         Ok(())
     }
 
@@ -430,13 +441,26 @@ impl Service for AdminService {
             .shutdown()
             .map_err(|err| ServiceStopError::Internal(Box::new(err)))?;
 
-        let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
-            ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
-        })?;
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .remove_all_event_subscribers();
 
-        admin_service_shared.set_network_sender(None);
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .change_status();
 
-        admin_service_shared.remove_all_event_subscribers();
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .set_network_sender(None);
 
         self.orchestrator
             .lock()
@@ -445,6 +469,13 @@ impl Service for AdminService {
             })?
             .shutdown_all_services()
             .map_err(|err| ServiceStopError::Internal(Box::new(err)))?;
+
+        self.admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .change_status();
 
         info!("Admin service stopped and disconnected");
 
@@ -642,6 +673,14 @@ impl AdminCommands for AdminServiceCommands {
             .map_err(|err| {
                 AdminServiceError::general_error_with_source("Unable to get events", Box::new(err))
             })
+    }
+
+    fn admin_service_status(&self) -> Result<AdminServiceStatus, AdminServiceError> {
+        Ok(self
+            .shared
+            .lock()
+            .map_err(|_| AdminServiceError::general_error("Admin shared lock was lock poisoned"))?
+            .admin_service_status())
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminCommands> {
