@@ -2,11 +2,11 @@
 
 # Splinter
 
-Splinter is a privacy-focused platform for distributed applications that provides
-a blockchain-inspired networking environment for communication and transactions
-between organizations. Splinter lets you combine blockchain-related technologies
--- such as smart contracts and consensus engines -- to build a wide variety
-of architectural patterns.
+Splinter is a privacy-focused platform for distributed applications that
+provides a blockchain-inspired networking environment for communication and
+transactions between organizations. Splinter lets you combine blockchain-related
+technologies -- such as smart contracts and consensus engines -- to build a wide
+variety of architectural patterns.
 
  &hercon; [Features](#features-and-concepts) &hercon; [Building Splinter](#building-splinter) &hercon; [Demos](#demos) &hercon; [License](#license) &hercon;
 
@@ -17,11 +17,11 @@ multi-party private communication, and network-wide multi-party shared state,
 all managed with consensus. A Splinter network enables multi-party or two-party
 private conversations between nodes using circuits and services.
 
-  - A _**node**_ is the foundational runtime that allows an organization to 
+  - A _**node**_ is the foundational runtime that allows an organization to
   participate in the network.
 
-  - A _**circuit**_ is a virtual network within the broader Splinter network that 
-  safely and securely enforces privacy scope boundaries.
+  - A _**circuit**_ is a virtual network within the broader Splinter network
+  that safely and securely enforces privacy scope boundaries.
 
   - A _**service**_ is an endpoint within a circuit that sends and receives
   private messages.
@@ -41,11 +41,11 @@ The key concepts of Splinter are fundamentally anchored to privacy.
 
 **Splinter is distributed and flexible**
 
-Splinter works across a network 
+Splinter works across a network
 
    - _**State agreement**_ is achieved via the Merkle-radix tree in
      [Hyperledger Transact](https://github.com/hyperledger/transact/),
-     allowing multiple services to prove they have the same data down to the 
+     allowing multiple services to prove they have the same data down to the
 	 last bit, cryptographically.
    - _**Consensus**_ is provided for creating real distributed applications.
      Splinter currently includes **two-phase commit** for 2- or 3-party
@@ -104,18 +104,19 @@ from the root directory. For example, to build only the splinter daemon,
 run `docker-compose -f docker-compose-installed.yaml build splinterd`.
 
 To use Docker to build Splinter with experimental features enabled, set an
-enviroment variable in your shell before running the build commands. For
+environment variable in your shell before running the build commands. For
 example: `export 'CARGO_ARGS=-- --features experimental'`. To go back to
-building with default features, unset the evironment variable:
+building with default features, unset the environment variable:
 `unset CARGO_ARGS`
 
 ## Demos
 
-Splinter includes several example applications that you can run as demos. The
-README in each directory explains how to run the demo.
+Splinter includes an example application that you can run as a demo.
+[Gameroom](examples/gameroom/) is a web application that allows you to set up a
+dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).
 
-- [Gameroom](examples/gameroom/): Web application that allows you to set up a
-  dynamic multi-party circuit (called a "gameroom") and play tic tac toe (XO).
+For more information, see the [Gameroom
+README](https://github.com/Cargill/splinter/tree/master/examples/gameroom/README.md).
 
 ## License
 
