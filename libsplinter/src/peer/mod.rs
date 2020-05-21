@@ -294,6 +294,7 @@ impl PeerManager {
                                 &mut peers,
                                 &peer_remover,
                                 &mut ref_map,
+                                &mut subscribers,
                             );
                         }
                         Ok(PeerManagerMessage::Subscribe(sender)) => {
@@ -405,6 +406,7 @@ fn handle_request(
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
 ) {
     match request {
         PeerManagerRequest::AddPeer {
@@ -421,6 +423,7 @@ fn handle_request(
                     peers,
                     peer_remover,
                     ref_map,
+                    subscribers,
                 ))
                 .is_err()
             {
@@ -522,6 +525,9 @@ fn handle_request(
     };
 }
 
+// Allow clippy errors for too_many_arguments. The arguments are required
+// to avoid needing a lock in the PeerManager.
+#[allow(clippy::too_many_arguments)]
 fn add_peer(
     peer_id: String,
     endpoints: Vec<String>,
@@ -530,6 +536,7 @@ fn add_peer(
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
 ) -> Result<PeerRef, PeerRefAddError> {
     let new_ref_count = ref_map.add_ref(peer_id.to_string());
 
@@ -570,6 +577,15 @@ fn add_peer(
                         peer_id
                     )));
                 }
+            }
+
+            // notify subscribers this peer is connected
+            if peer_metadata.status == PeerStatus::Connected {
+                // Update peer for new state
+                let notification = PeerManagerNotification::Connected {
+                    peer: peer_id.to_string(),
+                };
+                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
             }
 
             let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
