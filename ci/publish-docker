@@ -52,7 +52,7 @@ else
         true
     fi
 fi
-echo "Publishing master images for an untagged build"
+echo "Publishing images for an untagged build"
 echo "ISOLATION_ID is: $ISOLATION_ID"
 
 docker-compose -f docker-compose-installed.yaml build

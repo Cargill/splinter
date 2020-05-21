@@ -70,9 +70,9 @@ jobs:
         - docker login -u splintercommunity -p $DOCKER_TOKEN
       deploy:
         - provider: script
-          script: bash ci/publish-docker master
+          script: bash ci/publish-docker 0.4-dev
           on:
-            branch: master
+            branch: 0-4
         - provider: script
           script: bash ci/publish-docker
           on:
