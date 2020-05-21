@@ -32,9 +32,6 @@ then
     # Push to dockerhub with just major/minor e.g. (1.2)
     ISOLATION_ID=${REPO_VERSION%.*} docker-compose -f docker-compose-installed.yaml build
     ISOLATION_ID=${REPO_VERSION%.*} docker-compose -f docker-compose-installed.yaml push
-    # Push to dockerhub with "latest"
-    ISOLATION_ID="latest" docker-compose -f docker-compose-installed.yaml build
-    ISOLATION_ID="latest" docker-compose -f docker-compose-installed.yaml push
     exit 0
 fi
 
