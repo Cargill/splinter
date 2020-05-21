@@ -44,8 +44,12 @@ impl Handler for AdminDirectMessageHandler {
         sender: &dyn MessageSender<Self::Source>,
     ) -> Result<(), DispatchError> {
         debug!(
-            "Handle Admin Direct Message {} on {} ({} => {}) [{} byte{}]",
-            msg.get_correlation_id(),
+            "Handle Admin Direct Message {}on {} ({} => {}) [{} byte{}]",
+            if msg.get_correlation_id().is_empty() {
+                "".to_string()
+            } else {
+                format!("{} ", msg.get_correlation_id())
+            },
             msg.get_circuit(),
             msg.get_sender(),
             msg.get_recipient(),
