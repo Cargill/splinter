@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Collections used within this crate.
+#[derive(Debug, PartialEq)]
+pub struct RefMapRemoveError(pub String);
 
-mod bi_hash_map;
-mod error;
-mod ref_map;
+impl std::error::Error for RefMapRemoveError {}
 
-pub(crate) use bi_hash_map::BiHashMap;
-pub(crate) use ref_map::RefMap;
+impl std::fmt::Display for RefMapRemoveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}

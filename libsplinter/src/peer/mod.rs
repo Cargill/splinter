@@ -607,7 +607,13 @@ fn add_peer(
                         })?
                     } else {
                         // remove ref we just added
-                        ref_map.remove_ref(&peer_id);
+                        if let Err(err) = ref_map.remove_ref(&peer_id) {
+                            error!(
+                                "Unable to remove ref that was just added for peer {}: {}",
+                                peer_id, err
+                            );
+                        };
+
                         return Err(PeerRefAddError::AddError(format!(
                             "Mismatch betwen existing and requested peer endpoints: {:?} does not \
                             contain {}",
@@ -666,7 +672,12 @@ fn add_peer(
         Some(endpoint) => endpoint.to_string(),
         None => {
             // remove ref we just added
-            ref_map.remove_ref(&peer_id);
+            if let Err(err) = ref_map.remove_ref(&peer_id) {
+                error!(
+                    "Unable to remove ref that was just added for peer {}: {}",
+                    peer_id, err
+                );
+            };
             return Err(PeerRefAddError::AddError(format!(
                 "No endpoints provided for peer {}",
                 peer_id
@@ -740,7 +751,14 @@ fn remove_peer(
     unreferenced_peers.peers.remove(&peer_id);
 
     // remove the reference
-    let removed_peer = ref_map.remove_ref(&peer_id);
+    let removed_peer = match ref_map.remove_ref(&peer_id) {
+        Ok(removed_peer) => removed_peer,
+        Err(err) => return Err(PeerRefRemoveError::RemoveError(format!(
+            "Failed to remove ref for peer {} from ref map: {}",
+            peer_id, err
+        )))
+    };
+
     if let Some(removed_peer) = removed_peer {
         let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
             PeerRefRemoveError::RemoveError(format!(
@@ -793,7 +811,13 @@ fn remove_peer_by_endpoint(
         peer_metadata.id, endpoint
     );
     // remove the reference
-    let removed_peer = ref_map.remove_ref(&peer_metadata.id);
+    let removed_peer = match ref_map.remove_ref(&peer_metadata.id) {
+        Ok(removed_peer) => removed_peer,
+        Err(err) => return Err(PeerRefRemoveError::RemoveError(format!(
+            "Failed to remove ref for peer {} from ref map: {}",
+            peer_metadata.id, err
+        )))
+    };
     if let Some(removed_peer) = removed_peer {
         let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
             PeerRefRemoveError::RemoveError(format!(
