@@ -235,6 +235,7 @@ impl SplinterDaemon {
             None,
             None,
             self.node_id.to_string(),
+            false,
         );
         let peer_connector = peer_manager.start().map_err(|err| {
             StartError::NetworkError(format!("Unable to start peer manager: {}", err))
