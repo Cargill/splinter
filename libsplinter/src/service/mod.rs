@@ -40,7 +40,6 @@ mod factory;
 #[cfg(feature = "service-network")]
 pub mod network;
 mod processor;
-mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 mod sender;
@@ -50,10 +49,10 @@ pub mod validation;
 use std::any::Any;
 
 pub use factory::ServiceFactory;
+pub use processor::registry::StandardServiceNetworkRegistry;
 pub use processor::JoinHandles;
 pub use processor::ServiceProcessor;
 pub use processor::ShutdownHandle;
-pub use registry::StandardServiceNetworkRegistry;
 
 pub use error::{
     FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,

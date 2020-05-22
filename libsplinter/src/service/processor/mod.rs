@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub(crate) mod registry;
+
 use crossbeam_channel::{Receiver, Sender};
 use uuid::Uuid;
 
@@ -30,11 +32,12 @@ use crate::protos::circuit::{
 };
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::error::ServiceProcessorError;
-use crate::service::registry::StandardServiceNetworkRegistry;
 use crate::service::sender::{ProcessorMessage, ServiceMessage};
 use crate::service::{Service, ServiceMessageContext};
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
+
+use self::registry::StandardServiceNetworkRegistry;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
