@@ -86,6 +86,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("contract")
                 .about("List, show, or upload a Sabre smart contract")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("upload")
                         .about("Upload a Sabre contract")
@@ -262,6 +263,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("ns")
                 .about("Create, update, or delete a Sabre namespace")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("create")
                         .about("Create a Sabre namespace")
@@ -454,6 +456,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("cr")
                 .about("Create, update, or delete a Sabre contract registry")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("create")
                         .about("Create a Sabre contract registry")
@@ -587,6 +590,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("sp")
                 .about("Create, update or delete smart permissions")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("create")
                         .about("Create a smart permission")
@@ -727,6 +731,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("state")
                 .about("Get scabbard state information")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("root")
                         .about("Get the current state root hash")
