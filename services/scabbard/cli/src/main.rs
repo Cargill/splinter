@@ -122,7 +122,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -147,7 +147,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -174,7 +174,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -239,7 +239,7 @@ fn run() -> Result<(), CliError> {
                         .short("U")
                         .long("url")
                         .takes_value(true)
-                        .default_value("http://localhost:8008"),
+                        .default_value("http://localhost:8080"),
                     Arg::with_name("service-id")
                         .long_help(
                             "Fully-qualified service ID of the scabbard service (must be of the \
@@ -290,7 +290,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -334,7 +334,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -371,7 +371,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -431,7 +431,7 @@ fn run() -> Result<(), CliError> {
                         .short("U")
                         .long("url")
                         .takes_value(true)
-                        .default_value("http://localhost:8008"),
+                        .default_value("http://localhost:8080"),
                     Arg::with_name("service-id")
                         .long_help(
                             "Fully-qualified service ID of the scabbard service (must be of the \
@@ -482,7 +482,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -526,7 +526,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -563,7 +563,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -617,7 +617,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -663,7 +663,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -703,7 +703,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -736,7 +736,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
