@@ -269,10 +269,10 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("namespace")
                                 .help("A global state address prefix (namespace)")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this namespace")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this namespace")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -313,10 +313,10 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("namespace")
                                 .help("A global state address prefix (namespace)")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this namespace")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this namespace")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -461,10 +461,10 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("name")
                                 .help("Name of the contracts in the registry")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this contract registry")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this contract registry")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -505,10 +505,10 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("name")
                                 .help("Name of the contracts in the registry")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this contract registry")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this contract registry")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -994,8 +994,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("namespace")
                     .ok_or_else(|| CliError::MissingArgument("namespace".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1035,8 +1035,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("namespace")
                     .ok_or_else(|| CliError::MissingArgument("namespace".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1166,8 +1166,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("name")
                     .ok_or_else(|| CliError::MissingArgument("name".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1207,8 +1207,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("name")
                     .ok_or_else(|| CliError::MissingArgument("name".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
