@@ -24,6 +24,12 @@
 /cli/target
 /cli/Cargo.lock
 
+/services/scabbard/cli/target
+/services/scabbard/cli/Cargo.lock
+
+/services/scabbard/libscabbard/target
+/services/scabbard/libscabbard/Cargo.lock
+
 /examples/gameroom/database/target
 /examples/gameroom/database/Cargo.lock
 
