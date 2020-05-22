@@ -93,10 +93,8 @@ fn run() -> Result<(), CliError> {
                         .args(&[
                             Arg::with_name("scar")
                                 .long_help(
-                                    "The name and version requirement of the .scar to upload, in \
-                                     the format 'name:version_req'. The contract name must not \
-                                     include underscores, '_'. The version requirement can \
-                                     be any valid semver requirement string.",
+                                    "Name and version requirement of the smart contract archive \
+                                     (scar) file to upload",
                                 )
                                 .required(true),
                             Arg::with_name("path")
@@ -187,7 +185,7 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("contract")
                                 .help(
                                     "Name and version of the smart contract in the form \
-                                     'name:verion'",
+                                     'name:version'",
                                 )
                                 .takes_value(true)
                                 .required(true),
