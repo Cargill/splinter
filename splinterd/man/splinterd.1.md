@@ -314,6 +314,13 @@ ENVIRONMENT VARIABLES
   set to `yaml`. (See `--storage`.) By default, this file is stored in
   `/var/lib/splinter`.
 
+**SPLINTER_STRICT_REF_COUNT**
+: Turns on strict peer reference counting. If `SPLINTER_STRICT_REF_COUNT`is set
+  to `true` and the peer manager tries to remove a peer reference that does not
+  exist, the Splinter daemon will panic. By default, the daemon does not panic
+  and instead logs an error. This environment variable is intended for
+  development and testing.
+
 FILES
 =====
 

@@ -299,6 +299,14 @@ impl ConfigBuilder {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 }),
+            strict_ref_counts: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.strict_ref_counts() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                })
+                .ok_or_else(|| ConfigError::MissingValue("strict_ref_counts".to_string()))?,
         })
     }
 }
