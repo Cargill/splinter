@@ -70,6 +70,7 @@ pub struct Config {
     enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
+    strict_ref_counts: (bool, ConfigSource),
 }
 
 impl Config {
@@ -193,6 +194,10 @@ impl Config {
         }
     }
 
+    pub fn strict_ref_counts(&self) -> bool {
+        self.strict_ref_counts.0
+    }
+
     pub fn config_dir_source(&self) -> &ConfigSource {
         &self.config_dir.1
     }
@@ -311,6 +316,10 @@ impl Config {
         } else {
             None
         }
+    }
+
+    fn strict_ref_counts_source(&self) -> &ConfigSource {
+        &self.strict_ref_counts.1
     }
 
     #[allow(clippy::cognitive_complexity)]
@@ -442,6 +451,11 @@ impl Config {
         );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
+        debug!(
+            "Config: strict_ref_counts: {:?} (source: {:?})",
+            self.strict_ref_counts(),
+            self.strict_ref_counts_source()
+        );
     }
 
     #[cfg(feature = "rest-api-cors")]

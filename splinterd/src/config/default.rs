@@ -72,7 +72,8 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_admin_timeout(Some(ADMIN_TIMEOUT))
             .with_state_dir(Some(String::from(STATE_DIR)))
             .with_tls_insecure(Some(false))
-            .with_no_tls(Some(false));
+            .with_no_tls(Some(false))
+            .with_strict_ref_counts(Some(false));
 
         #[cfg(feature = "service-endpoint")]
         {
