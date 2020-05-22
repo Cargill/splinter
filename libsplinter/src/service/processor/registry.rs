@@ -22,9 +22,10 @@ use crate::protos::circuit::{
     ServiceDisconnectResponse_Status,
 };
 use crate::service::error::{ServiceConnectionError, ServiceDisconnectionError};
-use crate::service::sender::create_message;
-use crate::service::sender::{AdminServiceNetworkSender, StandardServiceNetworkSender};
 use crate::service::{ServiceNetworkRegistry, ServiceNetworkSender};
+
+use super::sender::create_message;
+use super::sender::{AdminServiceNetworkSender, StandardServiceNetworkSender};
 
 const ADMIN_CIRCUIT_NAME: &str = "admin";
 

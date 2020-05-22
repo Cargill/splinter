@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub(crate) mod registry;
+mod sender;
+
 use crossbeam_channel::{Receiver, Sender};
 use uuid::Uuid;
 
@@ -30,11 +33,12 @@ use crate::protos::circuit::{
 };
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::error::ServiceProcessorError;
-use crate::service::registry::StandardServiceNetworkRegistry;
-use crate::service::sender::{ProcessorMessage, ServiceMessage};
 use crate::service::{Service, ServiceMessageContext};
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
+
+use self::registry::StandardServiceNetworkRegistry;
+use self::sender::{ProcessorMessage, ServiceMessage};
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
@@ -589,10 +593,11 @@ pub mod tests {
     use crate::service::error::{
         ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
     };
-    use crate::service::sender::create_message;
     use crate::service::{ServiceNetworkRegistry, ServiceNetworkSender};
     use crate::transport::inproc::InprocTransport;
     use crate::transport::Transport;
+
+    use super::sender::create_message;
 
     #[test]
     // This test uses a MockService that will call the corresponding network_sender function.
