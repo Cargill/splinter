@@ -42,7 +42,6 @@ pub mod network;
 mod processor;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
-mod sender;
 #[cfg(feature = "service-arg-validation")]
 pub mod validation;
 
