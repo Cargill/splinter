@@ -21,7 +21,7 @@ use super::error::{
     PeerRefRemoveError, PeerUnknownAddError,
 };
 use super::notification::PeerNotificationIter;
-use super::PeerRef;
+use super::{EndpointPeerRef, PeerRef};
 use super::{PeerManagerMessage, PeerManagerRequest};
 
 /// The PeerLookup trait provides an interface for looking up details about individual peer
@@ -104,8 +104,11 @@ impl PeerManagerConnector {
     ///
     /// * `endpoint` - The endpoint associated with the peer.
     ///
-    /// Returns Ok() if the unidentified peer was added
-    pub fn add_unidentified_peer(&self, endpoint: String) -> Result<(), PeerUnknownAddError> {
+    /// Returns Ok(EndpointPeerRef) if the unidentified peer was added
+    pub fn add_unidentified_peer(
+        &self,
+        endpoint: String,
+    ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
         let (sender, recv) = channel();
 
         let message =
@@ -269,6 +272,27 @@ impl PeerRemover {
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeer {
             peer_id: peer_id.to_string(),
+            sender,
+        });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerRefRemoveError::InternalError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
+    }
+
+    pub fn remove_peer_ref_by_endpoint(&self, endpoint: &str) -> Result<(), PeerRefRemoveError> {
+        let (sender, recv) = channel();
+
+        let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeerByEndpoint {
+            endpoint: endpoint.to_string(),
             sender,
         });
 
