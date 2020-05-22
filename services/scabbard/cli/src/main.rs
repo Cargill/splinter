@@ -787,15 +787,9 @@ fn run() -> Result<(), CliError> {
                 let scar = matches
                     .value_of("scar")
                     .ok_or_else(|| CliError::MissingArgument("scar".into()))?;
-                let mut split = scar.splitn(2, ':');
-                let name = split.next().ok_or_else(|| {
+                let (name, version) = parse_name_version(scar).ok_or_else(|| {
                     CliError::InvalidArgument(
-                        "'scar' argument must be in the format 'name:version'".into(),
-                    )
-                })?;
-                let version = split.next().ok_or_else(|| {
-                    CliError::InvalidArgument(
-                        "'scar' argument must be in the format 'name:version'".into(),
+                        "'scar' argument must be of the form 'name:version'".into(),
                     )
                 })?;
 
@@ -881,13 +875,9 @@ fn run() -> Result<(), CliError> {
                 let contract = matches
                     .value_of("contract")
                     .ok_or_else(|| CliError::MissingArgument("contract".into()))?;
-                let name_version = contract.splitn(2, ':').collect::<Vec<_>>();
-                let name = name_version.get(0).ok_or_else(|| {
-                    CliError::InvalidArgument("contract invalid: cannot be empty".into())
-                })?;
-                let version = name_version.get(1).ok_or_else(|| {
+                let (name, version) = parse_name_version(contract).ok_or_else(|| {
                     CliError::InvalidArgument(
-                        "contract invalid: must be of the form 'name:version'".into(),
+                        "--contract must be of the form 'name:version'".into(),
                     )
                 })?;
 
@@ -943,12 +933,9 @@ fn run() -> Result<(), CliError> {
             let contract = matches
                 .value_of("contract")
                 .ok_or_else(|| CliError::MissingArgument("contract".into()))?;
-            let (name, version) = match contract.splitn(2, ':').collect::<Vec<_>>() {
-                v if v.len() == 2 => Ok((v[0], v[1])),
-                _ => Err(CliError::InvalidArgument(
-                    "--contract must be of the form 'name:version'".into(),
-                )),
-            }?;
+            let (name, version) = parse_name_version(contract).ok_or_else(|| {
+                CliError::InvalidArgument("--contract must be of the form 'name:version'".into())
+            })?;
 
             let inputs = matches
                 .values_of("inputs")
@@ -1447,6 +1434,14 @@ fn log_format(
     record: &Record,
 ) -> Result<(), std::io::Error> {
     write!(w, "{}", record.args(),)
+}
+
+/// Attempts to parse the given string as "name:version" and return the two values.
+fn parse_name_version(name_version_string: &str) -> Option<(&str, &str)> {
+    match name_version_string.splitn(2, ':').collect::<Vec<_>>() {
+        v if v.len() == 2 => Some((v[0], v[1])),
+        _ => None,
+    }
 }
 
 /// Load the contents of a file into a bytes vector.
