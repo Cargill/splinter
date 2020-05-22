@@ -30,6 +30,13 @@
 /cli/Cargo.lock
 /cli/packaging/man/*.1
 
+/services/scabbard/cli/target
+/services/scabbard/cli/Cargo.lock
+/services/scabbard/cli/packaging/man/*.1
+
+/services/scabbard/libscabbard/target
+/services/scabbard/libscabbard/Cargo.lock
+
 /examples/gameroom/database/target
 /examples/gameroom/database/Cargo.lock
 
