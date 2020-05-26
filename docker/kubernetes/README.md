@@ -1,7 +1,7 @@
 # Running the Gameroom Demo in Kubernetes
 
 This procedure explains how to run the
-[Gameroom demo](https://github.com/Cargill/splinter/tree/master/examples/gameroom)
+[Gameroom demo](https://github.com/Cargill/splinter/tree/0-4/examples/gameroom)
 with
 [Kubernetes](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/).
 This environment uses [Minikube](https://kubernetes.io/docs/setup/minikube/) to
@@ -30,7 +30,7 @@ walkthrough. For installation instructions, see the
 
 1. Run a Job to generate user keys.
 
-   `$ kubectl apply -f https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/create-gameroom-keys.yaml`
+   `$ kubectl apply -f https://raw.githubusercontent.com/Cargill/splinter/0-4/docker/kubernetes/create-gameroom-keys.yaml`
 
 1. View the output from the Job.
 
@@ -53,7 +53,7 @@ walkthrough. For installation instructions, see the
 
 ### Step 2: Update the Splinter registry template
 
-1. Download the Splinter registry template, [registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/registry.yaml).
+1. Download the Splinter registry template, [registry.yaml](https://raw.githubusercontent.com/Cargill/splinter/0-4/docker/kubernetes/registry.yaml).
 
 1. Edit `registry.yaml` to add the public key values created above.
 
@@ -142,7 +142,7 @@ walkthrough. For installation instructions, see the
 1. Apply the `arcade.yaml` manifest.
 
    ```
-   $ kubectl apply -f https://raw.githubusercontent.com/Cargill/splinter/master/docker/kubernetes/arcade.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/Cargill/splinter/0-4/docker/kubernetes/arcade.yaml
 
    deployment.apps/acme created
    service/acme-splinterd created

@@ -27,9 +27,9 @@ TOML configuration file containing `splinterd` settings, instead of using
 command-line options. (Any options on the command line will override those in
 the configuration file.) The file name must end with a `.toml` extension, such
 as `splinterd.toml`). For examples, see
-[splinterd/packaging/splinterd.toml.example](https://github.com/Cargill/splinter/blob/master/splinterd/packaging/splinterd.toml.example)
+[splinterd/packaging/splinterd.toml.example](https://github.com/Cargill/splinter/blob/0-4/splinterd/packaging/splinterd.toml.example)
 and
-[splinterd/sample_configs](https://github.com/Cargill/splinter/tree/master/splinterd/sample_configs)
+[splinterd/sample_configs](https://github.com/Cargill/splinter/tree/0-4/splinterd/sample_configs)
 in the `splinter` repository.
 
 **Connection Types**
@@ -107,9 +107,9 @@ OPTIONS
 : Specifies the path and file name for a `splinterd` configuration file, which
   is a TOML file that contains `splinterd` settings. (The file name must end
   with a `.toml` extension.) For examples, see
-  [splinterd/packaging/splinterd.toml.example](https://github.com/Cargill/splinter/blob/master/splinterd/packaging/splinterd.toml.example)
+  [splinterd/packaging/splinterd.toml.example](https://github.com/Cargill/splinter/blob/0-4/splinterd/packaging/splinterd.toml.example)
   and
-  [splinter/splinterd/sample_configs](https://github.com/Cargill/splinter/tree/master/splinterd/sample_configs)
+  [splinter/splinterd/sample_configs](https://github.com/Cargill/splinter/tree/0-4/splinterd/sample_configs)
   in the `splinter` repository.
 
   Any options on the command line will override the settings in the
