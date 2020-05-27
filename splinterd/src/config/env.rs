@@ -24,6 +24,7 @@ const CONFIG_DIR_ENV: &str = "SPLINTER_CONFIG_DIR";
 const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const CERT_DIR_ENV: &str = "SPLINTER_CERT_DIR";
 const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
+const SPLINTER_STRICT_REF_COUNT_ENV: &str = "SPLINTER_STRICT_REF_COUNT";
 
 pub struct EnvPartialConfigBuilder;
 
@@ -79,10 +80,20 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
             }
             _ => None,
         };
+
+        let strict_ref_counts = match env::var(SPLINTER_STRICT_REF_COUNT_ENV).ok() {
+            Some(value) => {
+                let t: bool = value.parse().unwrap_or(false);
+                Some(t)
+            }
+            None => Some(false),
+        };
+
         Ok(PartialConfig::new(ConfigSource::Environment)
             .with_config_dir(config_dir_env)
             .with_tls_cert_dir(tls_cert_dir_env)
-            .with_state_dir(state_dir_env))
+            .with_state_dir(state_dir_env)
+            .with_strict_ref_counts(strict_ref_counts))
     }
 }
 

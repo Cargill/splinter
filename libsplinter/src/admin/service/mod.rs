@@ -797,7 +797,8 @@ mod tests {
             .start()
             .expect("Unable to start Connection Manager");
         let connector = cm.connector();
-        let mut peer_manager = PeerManager::new(connector, None, Some(1), "test-node".to_string());
+        let mut peer_manager =
+            PeerManager::new(connector, None, Some(1), "test-node".to_string(), true);
         let peer_connector = peer_manager.start().expect("Cannot start PeerManager");
 
         let mut storage = get_storage("memory", CircuitDirectory::new).unwrap();

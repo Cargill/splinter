@@ -21,6 +21,8 @@
 
 use std::collections::HashMap;
 
+use super::error::RefMapRemoveError;
+
 /// A map that will keep track of the number of times an id has been added, and only remove the
 /// id once the reference count is 0.
 pub struct RefMap {
@@ -55,20 +57,22 @@ impl RefMap {
     /// If the internal reference count reaches zero, then `ref_id` will be removed.
     ///
     /// This method will panic if the id does not exist.
-    pub fn remove_ref(&mut self, ref_id: &str) -> Option<String> {
+    pub fn remove_ref(&mut self, ref_id: &str) -> Result<Option<String>, RefMapRemoveError> {
         let ref_count = match self.references.remove(ref_id) {
             Some(ref_count) => ref_count,
-            None => panic!(
-                "Trying to remove a reference that does not exist: {}",
-                ref_id
-            ),
+            None => {
+                return Err(RefMapRemoveError(format!(
+                    "Trying to remove a reference that does not exist: {}",
+                    ref_id
+                )))
+            }
         };
 
         if ref_count == 1 {
-            Some(ref_id.into())
+            Ok(Some(ref_id.into()))
         } else {
             self.references.insert(ref_id.into(), ref_count - 1);
-            None
+            Ok(None)
         }
     }
 }
@@ -108,20 +112,22 @@ pub mod tests {
         assert_eq!(ref_count, 2);
 
         let id = ref_map.remove_ref("test_id");
-        assert_eq!(id, None);
+        assert_eq!(id, Ok(None));
 
         assert_eq!(ref_map.references.get("test_id").cloned(), Some(1 as u64));
 
         let id = ref_map.remove_ref("test_id");
-        assert_eq!(id, Some("test_id".to_string()));
+        assert_eq!(id, Ok(Some("test_id".to_string())));
         assert_eq!(ref_map.references.get("test_id"), None);
     }
 
-    // That that if a remove_ref is removed, when the reference does not exist, a panic occurs
+    // That that if a remove_ref is removed, when the reference does not exist, an error is
+    // returned
     #[test]
-    #[should_panic]
-    fn test_remove_ref_panic() {
+    fn test_remove_ref_err() {
         let mut ref_map = RefMap::new();
-        ref_map.remove_ref("test_id");
+        if let Ok(_) = ref_map.remove_ref("test_id") {
+            panic!("remove_ref should have returned an error");
+        }
     }
 }

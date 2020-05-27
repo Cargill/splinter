@@ -121,6 +121,7 @@ pub struct SplinterDaemon {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     heartbeat: u64,
+    strict_ref_counts: bool,
 }
 
 impl SplinterDaemon {
@@ -235,6 +236,7 @@ impl SplinterDaemon {
             None,
             None,
             self.node_id.to_string(),
+            self.strict_ref_counts,
         );
         let peer_connector = peer_manager.start().map_err(|err| {
             StartError::NetworkError(format!("Unable to start peer manager: {}", err))
@@ -731,6 +733,7 @@ pub struct SplinterDaemonBuilder {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    strict_ref_counts: Option<bool>,
 }
 
 impl SplinterDaemonBuilder {
@@ -827,6 +830,11 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    pub fn with_strict_ref_counts(mut self, strict_ref_counts: bool) -> Self {
+        self.strict_ref_counts = Some(strict_ref_counts);
+        self
+    }
+
     pub fn build(self) -> Result<SplinterDaemon, CreateError> {
         let heartbeat = self.heartbeat.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: heartbeat".to_string())
@@ -891,6 +899,10 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: storage_type".to_string())
         })?;
 
+        let strict_ref_counts = self.strict_ref_counts.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: strict_ref_counts".to_string())
+        })?;
+
         Ok(SplinterDaemon {
             state_dir,
             #[cfg(feature = "service-endpoint")]
@@ -914,6 +926,7 @@ impl SplinterDaemonBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
             heartbeat,
+            strict_ref_counts,
         })
     }
 }

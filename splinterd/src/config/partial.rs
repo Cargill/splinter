@@ -63,6 +63,7 @@ pub struct PartialConfig {
     enable_biome: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    strict_ref_counts: Option<bool>,
 }
 
 impl PartialConfig {
@@ -100,6 +101,7 @@ impl PartialConfig {
             enable_biome: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
+            strict_ref_counts: None,
         }
     }
 
@@ -213,6 +215,10 @@ impl PartialConfig {
     #[cfg(feature = "rest-api-cors")]
     pub fn whitelist(&self) -> Option<Vec<String>> {
         self.whitelist.clone()
+    }
+
+    pub fn strict_ref_counts(&self) -> Option<bool> {
+        self.strict_ref_counts
     }
 
     /// Adds a `config_dir` value to the `PartialConfig` object.
@@ -511,6 +517,17 @@ impl PartialConfig {
     ///
     pub fn with_whitelist(mut self, whitelist: Option<Vec<String>>) -> Self {
         self.whitelist = whitelist;
+        self
+    }
+
+    /// Adds a `strict_ref_counts` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `strict_ref_counts` - Turns on panics if peer reference counting fails
+    ///
+    pub fn with_strict_ref_counts(mut self, strict_ref_counts: Option<bool>) -> Self {
+        self.strict_ref_counts = strict_ref_counts;
         self
     }
 }
