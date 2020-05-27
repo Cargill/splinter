@@ -49,7 +49,7 @@ use crate::threading::pacemaker;
 
 use uuid::Uuid;
 
-// the number of retry attempts for an active endpoint before the PeerManager will try other
+// The number of retry attempts for an active endpoint before the PeerManager will try other
 // endpoints associated with a peer
 const DEFAULT_MAXIMUM_RETRY_ATTEMPTS: u64 = 5;
 // Default value of how often the Pacemaker should send RetryPending message
@@ -58,7 +58,7 @@ const DEFAULT_PACEMAKER_INTERVAL: u64 = 10;
 const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
 // Default intial value for how long to wait before retrying a peers endpoints
 const INITIAL_RETRY_FREQUENCY: u64 = 10;
-// How often to retry connecting to requested peers without id
+// How often to retry connecting to requested peers without ID
 const REQUESTED_ENDPOINTS_RETRY_FREQUENCY: u64 = 60;
 
 /// Internal messages to drive management
@@ -124,7 +124,7 @@ pub(crate) enum PeerManagerRequest {
 
 /// Used to keep track of peer references. When dropped, the `PeerRef` will send a request to the
 /// `PeerManager` to remove a reference to the peer, thus removing the peer if no more references
-/// exists.
+/// exist.
 #[derive(Debug, PartialEq)]
 pub struct PeerRef {
     peer_id: String,
@@ -160,7 +160,7 @@ impl Drop for PeerRef {
 
 /// Used to keep track of peer references that are created only with an endpoint. When dropped, a
 /// request is sent to the `PeerManager` to remove a reference to the peer, thus removing the peer
-/// if no more references exists.
+/// if no more references exist.
 #[derive(Debug, PartialEq)]
 pub struct EndpointPeerRef {
     endpoint: String,
@@ -197,7 +197,8 @@ impl Drop for EndpointPeerRef {
     }
 }
 
-/// An entry of unreferenced peers, that may connected externally, but not yet requested locally.
+/// An entry of unreferenced peers, that may have connected externally, but have not yet been
+/// requested locally.
 #[derive(Debug)]
 struct UnreferencedPeer {
     endpoint: String,
@@ -206,11 +207,11 @@ struct UnreferencedPeer {
 
 struct UnreferencedPeerState {
     peers: HashMap<String, UnreferencedPeer>,
-    // the list of endpoints that have been requested without an id
+    // The list of endpoints that have been requested without an ID
     requested_endpoints: Vec<String>,
-    // last time the unsuccessful requested endpoints have been retried
+    // Last time connection to the requested endpoints was tried
     last_connection_attempt: Instant,
-    // how often to retry to connection to requested endpoints
+    // How often to try to connect to requested endpoints
     retry_frequency: u64,
 }
 
@@ -225,7 +226,7 @@ impl UnreferencedPeerState {
     }
 }
 
-/// The `PeerManager` is in charge of keeping track of peers and their ref count, as well as
+/// The `PeerManager` is in charge of keeping track of peers and their reference counts, as well as
 /// requesting connections from the `ConnectionManager`. If a peer has disconnected, the
 /// `PeerManager` will also try the peer's other endpoints until one is successful.
 pub struct PeerManager {
@@ -245,12 +246,14 @@ impl PeerManager {
     /// # Arguments
     ///
     /// * `connector` - The `Connector` to the `ConnectionManager` that will handle the connections
-    ///     requested by the `PeerManager`
-    /// * `max_retry_attempts` - the number of retry attempts for an active endpoint before the
+    ///    requested by the `PeerManager`
+    /// * `max_retry_attempts` - The number of retry attempts for an active endpoint before the
     ///    `PeerManager` will try other endpoints associated with a peer
-    /// * `retry_interval` - how often (in seconds) the `Pacemaker` should notify the `PeerManger`
+    /// * `retry_interval` - How often (in seconds) the `Pacemaker` should notify the `PeerManager`
     ///    to retry pending peers
-    /// * `identity` - the unique ID of the node this `PeerManager` belongs to
+    /// * `identity` - The unique ID of the node this `PeerManager` belongs to
+    /// * `strict_ref_counts` - Determines whether or not to panic when attempting to remove a
+    ///   reference to peer that is not referenced.
     pub fn new(
         connector: Connector,
         max_retry_attempts: Option<u64>,
@@ -606,8 +609,8 @@ fn add_peer(
             if peer_metadata.endpoints.len() == 1 && endpoints.len() > 1 {
                 // this should always be true
                 if let Some(endpoint) = peer_metadata.endpoints.get(0) {
-                    // if peer was add by endpoint, its peer metadata should be updated to include
-                    // the full list of endpoints in this request
+                    // if peer was added by endpoint, its peer metadata should be updated to
+                    // include the full list of endpoints in this request
                     if unreferenced_peers.requested_endpoints.contains(endpoint)
                         && endpoints.contains(&endpoint)
                     {
@@ -664,7 +667,7 @@ fn add_peer(
         }
     };
 
-    // if it is a unreferenced peer, promote it to a fully-referenced peer
+    // if it is an unreferenced peer, promote it to a fully-referenced peer
     if let Some(UnreferencedPeer {
         connection_id,
         endpoint,
@@ -774,7 +777,7 @@ fn remove_peer(
         Err(err) => {
             if strict_ref_counts {
                 panic!(
-                    "Trying to remove a reference that does not exist {}",
+                    "Trying to remove a reference that does not exist: {}",
                     peer_id
                 );
             } else {
@@ -844,7 +847,7 @@ fn remove_peer_by_endpoint(
         Err(err) => {
             if strict_ref_counts {
                 panic!(
-                    "Trying to remove a reference that does not exist {}",
+                    "Trying to remove a reference that does not exist: {}",
                     peer_metadata.id
                 );
             } else {
@@ -1337,7 +1340,7 @@ fn handle_fatal_connection(
     }
 }
 
-// If a pending peers retry retry_frequency has elapsed, retry their endpoints. If successful,
+// If a pending peer's retry_frequency has elapsed, retry their endpoints. If successful,
 // their active endpoint will be updated. The retry_frequency will be increased and
 // and last_connection_attempt reset.
 fn retry_pending(
@@ -1739,7 +1742,7 @@ pub mod tests {
         mesh.shutdown_signaler().shutdown();
     }
 
-    // Test that list_peer returns the correct list of peers
+    // Test that list_peer returns the correct list of connection IDs
     //
     // 1. add test_peer
     // 2. add next_peer
@@ -1894,7 +1897,6 @@ pub mod tests {
 
     // Test that when a EndpointPeerRef is dropped, a remove peer request is properly sent and the
     // peer is removed
-    //
     //
     // 1. add unidentified peer with endpoint inproc://test
     // 2. add test_peer
