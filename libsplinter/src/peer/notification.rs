@@ -19,15 +19,18 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 /// subscription handlers
 #[derive(Debug, PartialEq, Clone)]
 pub enum PeerManagerNotification {
+    /// Notifies subscribers that a peer is connected. Includes the peer ID of the connected peer.
     Connected { peer: String },
+    /// Notifies subscribers that a peer is disconnected. Include the peer ID of the disconnected
+    /// peer.
     Disconnected { peer: String },
 }
 
-/// PeerNotificationIter is used to receive notfications from the PeerManager. The notifications
+/// `PeerNotificationIter` is used to receive notfications from the `PeerManager`. The notifications
 /// include:
-/// - PeerManagerNotification::Disconnected: peer disconnected and reconnection
+/// - `PeerManagerNotification::Disconnected`: peer disconnected and reconnection
 ///     is being attempted.
-/// - PeerManagerNotification::Connected: reconnection to peer was successful
+/// - `PeerManagerNotification::Connected`: reconnection to peer was successful
 pub struct PeerNotificationIter {
     pub(super) recv: Receiver<PeerManagerNotification>,
 }

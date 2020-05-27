@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures and implementations for managing Splinter peers.
+//!
+//! The public interface includes the structs [`PeerManager`], [`PeerManagerConnector`],
+//! [`PeerInterconnect`] and the enum [`PeerManagerNotification`].
+//!
+//! [`PeerManager`]: struct.PeerManager.html
+//! [`PeerManagerConnector`]: connector/struct.PeerManagerConnector.html
+//! [`PeerInterconnect`]: interconnect/struct.PeerInterconnect.html
+//! [`PeerManagerNotification`]: notification/enum.PeerManagerNotification.html
+
 mod connector;
 mod error;
 pub mod interconnect;
@@ -48,22 +58,32 @@ const DEFAULT_PACEMAKER_INTERVAL: u64 = 10;
 const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
 // Default intial value for how long to wait before retrying a peers endpoints
 const INITIAL_RETRY_FREQUENCY: u64 = 10;
+// How often to retry connecting to requested peers without id
+const REQUESTED_ENDPOINTS_RETRY_FREQUENCY: u64 = 60;
 
+/// Internal messages to drive management
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerMessage {
+    /// Notifies the `PeerManger` it should shutdown
     Shutdown,
+    /// Sent from the `PeerManagerConnector` to add peers
     Request(PeerManagerRequest),
+    /// Used to subscribe to `PeerManagerNotification`
     Subscribe(Sender<PeerManagerNotification>),
+    /// Passes `ConnectionManagerNotification` to the `PeerManger` for handling
     InternalNotification(ConnectionManagerNotification),
+    /// Notifies the `PeerManager` it should retry connecting to pending peers
     RetryPending,
 }
 
+/// Converts `ConnectionManagerNotification` into `PeerManagerMessage::InternalNotification`
 impl From<ConnectionManagerNotification> for PeerManagerMessage {
     fn from(notification: ConnectionManagerNotification) -> Self {
         PeerManagerMessage::InternalNotification(notification)
     }
 }
 
+/// The requests that will be handled by the `PeerManager`
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerRequest {
     AddPeer {
@@ -73,10 +93,14 @@ pub(crate) enum PeerManagerRequest {
     },
     AddUnidentified {
         endpoint: String,
-        sender: Sender<Result<(), PeerUnknownAddError>>,
+        sender: Sender<Result<EndpointPeerRef, PeerUnknownAddError>>,
     },
     RemovePeer {
         peer_id: String,
+        sender: Sender<Result<(), PeerRefRemoveError>>,
+    },
+    RemovePeerByEndpoint {
+        endpoint: String,
         sender: Sender<Result<(), PeerRefRemoveError>>,
     },
     ListPeers {
@@ -98,10 +122,9 @@ pub(crate) enum PeerManagerRequest {
     },
 }
 
-/// A PeerRef is used to keep track of peer references. When dropped, the PeerRef will send
-/// a request to the PeerManager to remove a reference to the peer, thus removing the peer if no
-/// more references exists.
-
+/// Used to keep track of peer references. When dropped, the `PeerRef` will send a request to the
+/// `PeerManager` to remove a reference to the peer, thus removing the peer if no more references
+/// exists.
 #[derive(Debug, PartialEq)]
 pub struct PeerRef {
     peer_id: String,
@@ -109,6 +132,7 @@ pub struct PeerRef {
 }
 
 impl PeerRef {
+    /// Creates a new `PeerRef`
     pub(super) fn new(peer_id: String, peer_remover: PeerRemover) -> Self {
         PeerRef {
             peer_id,
@@ -116,6 +140,7 @@ impl PeerRef {
         }
     }
 
+    /// Returns the peer ID this reference is for
     pub fn peer_id(&self) -> &str {
         &self.peer_id
     }
@@ -133,6 +158,45 @@ impl Drop for PeerRef {
     }
 }
 
+/// Used to keep track of peer references that are created only with an endpoint. When dropped, a
+/// request is sent to the `PeerManager` to remove a reference to the peer, thus removing the peer
+/// if no more references exists.
+#[derive(Debug, PartialEq)]
+pub struct EndpointPeerRef {
+    endpoint: String,
+    peer_remover: PeerRemover,
+}
+
+impl EndpointPeerRef {
+    /// Creates a new `EndpointPeerRef`
+    pub(super) fn new(endpoint: String, peer_remover: PeerRemover) -> Self {
+        EndpointPeerRef {
+            endpoint,
+            peer_remover,
+        }
+    }
+
+    /// Returns the endpoint of the peer this reference is for
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+}
+
+impl Drop for EndpointPeerRef {
+    fn drop(&mut self) {
+        match self
+            .peer_remover
+            .remove_peer_ref_by_endpoint(&self.endpoint)
+        {
+            Ok(_) => (),
+            Err(err) => error!(
+                "Unable to remove reference to peer with endpoint {} on drop: {}",
+                self.endpoint, err
+            ),
+        }
+    }
+}
+
 /// An entry of unreferenced peers, that may connected externally, but not yet requested locally.
 #[derive(Debug)]
 struct UnreferencedPeer {
@@ -140,9 +204,30 @@ struct UnreferencedPeer {
     connection_id: String,
 }
 
-/// The PeerManager is in charge of keeping track of peers and their ref count, as well as
-/// requesting connections from the ConnectionManager. If a peer has disconnected, the PeerManager
-/// will also try the peer's other endpoints until one is successful.
+struct UnreferencedPeerState {
+    peers: HashMap<String, UnreferencedPeer>,
+    // the list of endpoints that have been requested without an id
+    requested_endpoints: Vec<String>,
+    // last time the unsuccessful requested endpoints have been retried
+    last_connection_attempt: Instant,
+    // how often to retry to connection to requested endpoints
+    retry_frequency: u64,
+}
+
+impl UnreferencedPeerState {
+    fn new() -> Self {
+        UnreferencedPeerState {
+            peers: HashMap::default(),
+            requested_endpoints: Vec::default(),
+            last_connection_attempt: Instant::now(),
+            retry_frequency: REQUESTED_ENDPOINTS_RETRY_FREQUENCY,
+        }
+    }
+}
+
+/// The `PeerManager` is in charge of keeping track of peers and their ref count, as well as
+/// requesting connections from the `ConnectionManager`. If a peer has disconnected, the
+/// `PeerManager` will also try the peer's other endpoints until one is successful.
 pub struct PeerManager {
     connection_manager_connector: Connector,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -154,6 +239,17 @@ pub struct PeerManager {
 }
 
 impl PeerManager {
+    /// Creates a new `PeerManager`
+    ///
+    /// # Arguments
+    ///
+    /// * `connector` - The `Connector` to the `ConnectionManager` that will handle the connections
+    ///     requested by the `PeerManager`
+    /// * `max_retry_attempts` - the number of retry attempts for an active endpoint before the
+    ///    `PeerManager` will try other endpoints associated with a peer
+    /// * `retry_interval` - how often (in seconds) the `Pacemaker` should notify the `PeerManger`
+    ///    to retry pending peers
+    /// * `identity` - the unique ID of the node this `PeerManager` belongs to
     pub fn new(
         connector: Connector,
         max_retry_attempts: Option<u64>,
@@ -171,9 +267,12 @@ impl PeerManager {
         }
     }
 
-    /// Start the PeerManager
+    /// Starts the `PeerManager`
     ///
-    /// Returns a PeerManagerConnector that can be used to send requests to the PeerManager.
+    /// Starts up a thread that will handle incoming requests to add, remove and get peers. Also
+    /// handles notifications from the `ConnectionManager`.
+    ///
+    /// Returns a `PeerManagerConnector` that can be used to send requests to the `PeerManager`.
     pub fn start(&mut self) -> Result<PeerManagerConnector, PeerManagerError> {
         debug!(
             "Starting peer manager with retry_interval={}s, max_retry_attempts={}",
@@ -218,7 +317,8 @@ impl PeerManager {
             .spawn(move || {
                 let mut peers = PeerMap::new(INITIAL_RETRY_FREQUENCY);
                 // a map of identities to unreferenced peers.
-                let mut unreferenced_peers = HashMap::new();
+                // and a list of endpoints that should be turned into peers
+                let mut unreferenced_peers = UnreferencedPeerState::new();
                 let mut ref_map = RefMap::new();
                 let mut subscribers = Vec::new();
                 loop {
@@ -232,6 +332,7 @@ impl PeerManager {
                                 &mut peers,
                                 &peer_remover,
                                 &mut ref_map,
+                                &mut subscribers,
                             );
                         }
                         Ok(PeerManagerMessage::Subscribe(sender)) => {
@@ -246,10 +347,11 @@ impl PeerManager {
                                 &mut subscribers,
                                 max_retry_attempts,
                                 &identity,
+                                &mut ref_map,
                             )
                         }
                         Ok(PeerManagerMessage::RetryPending) => {
-                            retry_pending(&mut peers, connector.clone())
+                            retry_pending(&mut peers, connector.clone(), &mut unreferenced_peers)
                         }
                         Err(_) => {
                             warn!("All senders have disconnected");
@@ -290,10 +392,12 @@ impl PeerManager {
         Ok(PeerManagerConnector::new(sender))
     }
 
+    /// Returns a `ShutdownHandle` for this `PeerManager`
     pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
         self.shutdown_handle.clone()
     }
 
+    /// Waits for the `PeerManager` thread to shutdown
     pub fn await_shutdown(self) {
         debug!("Shutting down peer manager...");
         let join_handle = if let Some(jh) = self.join_handle {
@@ -309,6 +413,7 @@ impl PeerManager {
         debug!("Shutting down peer manager (complete)");
     }
 
+    /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
     pub fn shutdown_and_wait(self) {
         if let Some(sh) = self.shutdown_handle.clone() {
             sh.shutdown();
@@ -320,6 +425,7 @@ impl PeerManager {
     }
 }
 
+/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<PeerManagerMessage>,
@@ -327,6 +433,7 @@ pub struct ShutdownHandle {
 }
 
 impl ShutdownHandle {
+    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
     pub fn shutdown(&self) {
         self.pacemaker_shutdown_signaler.shutdown();
         if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
@@ -338,10 +445,11 @@ impl ShutdownHandle {
 fn handle_request(
     request: PeerManagerRequest,
     connector: Connector,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
 ) {
     match request {
         PeerManagerRequest::AddPeer {
@@ -358,6 +466,7 @@ fn handle_request(
                     peers,
                     peer_remover,
                     ref_map,
+                    subscribers,
                 ))
                 .is_err()
             {
@@ -365,7 +474,17 @@ fn handle_request(
             }
         }
         PeerManagerRequest::AddUnidentified { endpoint, sender } => {
-            if sender.send(add_unidentified(endpoint, connector)).is_err() {
+            if sender
+                .send(add_unidentified(
+                    endpoint,
+                    connector,
+                    unreferenced_peers,
+                    peer_remover,
+                    peers,
+                    ref_map,
+                ))
+                .is_err()
+            {
                 warn!("connector dropped before receiving result of adding unidentified peer");
             }
         }
@@ -383,6 +502,14 @@ fn handle_request(
                 warn!("connector dropped before receiving result of removing peer");
             }
         }
+        PeerManagerRequest::RemovePeerByEndpoint { endpoint, sender } => {
+            if sender
+                .send(remove_peer_by_endpoint(endpoint, connector, peers, ref_map))
+                .is_err()
+            {
+                warn!("connector dropped before receiving result of removing peer");
+            }
+        }
         PeerManagerRequest::ListPeers { sender } => {
             if sender.send(Ok(peers.peer_ids())).is_err() {
                 warn!("connector dropped before receiving result of list peers");
@@ -390,7 +517,11 @@ fn handle_request(
         }
 
         PeerManagerRequest::ListUnreferencedPeers { sender } => {
-            let peer_ids = unreferenced_peers.keys().map(|s| s.to_owned()).collect();
+            let peer_ids = unreferenced_peers
+                .peers
+                .keys()
+                .map(|s| s.to_owned())
+                .collect();
             if sender.send(Ok(peer_ids)).is_err() {
                 warn!("connector dropped before receiving result of list unreferenced peers");
             }
@@ -406,6 +537,7 @@ fn handle_request(
                 .map(|meta| meta.connection_id.clone())
                 .or_else(|| {
                     unreferenced_peers
+                        .peers
                         .get(&peer_id)
                         .map(|meta| meta.connection_id.clone())
                 });
@@ -423,6 +555,7 @@ fn handle_request(
                 .map(|meta| meta.id.clone())
                 .or_else(|| {
                     unreferenced_peers
+                        .peers
                         .iter()
                         .find(|(_, meta)| meta.connection_id == connection_id)
                         .map(|(peer_id, _)| peer_id.clone())
@@ -435,28 +568,84 @@ fn handle_request(
     };
 }
 
+// Allow clippy errors for too_many_arguments. The arguments are required
+// to avoid needing a lock in the PeerManager.
+#[allow(clippy::too_many_arguments)]
 fn add_peer(
     peer_id: String,
     endpoints: Vec<String>,
     connector: Connector,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
+    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
 ) -> Result<PeerRef, PeerRefAddError> {
     let new_ref_count = ref_map.add_ref(peer_id.to_string());
 
     // if this is not a new peer, return success
     if new_ref_count > 1 {
-        let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
-        return Ok(peer_ref);
+        if let Some(mut peer_metadata) = peers.get_by_peer_id(&peer_id).cloned() {
+            if peer_metadata.endpoints.len() == 1 && endpoints.len() > 1 {
+                // this should always be true
+                if let Some(endpoint) = peer_metadata.endpoints.get(0) {
+                    // if peer was add by endpoint, its peer metadata should be updated to include
+                    // the full list of endpoints in this request
+                    if unreferenced_peers.requested_endpoints.contains(endpoint)
+                        && endpoints.contains(&endpoint)
+                    {
+                        info!(
+                            "Updating peer {} to include endpoints {:?}",
+                            peer_id, endpoints
+                        );
+                        peer_metadata.endpoints = endpoints;
+                        peers.update_peer(peer_metadata.clone()).map_err(|err| {
+                            PeerRefAddError::AddError(format!(
+                                "Unable to update peer {}:{}",
+                                peer_id, err
+                            ))
+                        })?
+                    } else {
+                        // remove ref we just added
+                        ref_map.remove_ref(&peer_id);
+                        return Err(PeerRefAddError::AddError(format!(
+                            "Mismatch betwen existing and requested peer endpoints: {:?} does not \
+                            contain {}",
+                            endpoints, endpoint
+                        )));
+                    }
+                } else {
+                    return Err(PeerRefAddError::AddError(format!(
+                        "Peer {} does not have any endpoints",
+                        peer_id
+                    )));
+                }
+            }
+
+            // notify subscribers this peer is connected
+            if peer_metadata.status == PeerStatus::Connected {
+                // Update peer for new state
+                let notification = PeerManagerNotification::Connected {
+                    peer: peer_id.to_string(),
+                };
+                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            }
+
+            let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
+            return Ok(peer_ref);
+        } else {
+            return Err(PeerRefAddError::AddError(format!(
+                "A reference exists for peer {} but missing peer metadata",
+                peer_id
+            )));
+        }
     };
 
     // if it is a unreferenced peer, promote it to a fully-referenced peer
     if let Some(UnreferencedPeer {
         connection_id,
         endpoint,
-    }) = unreferenced_peers.remove(&peer_id)
+    }) = unreferenced_peers.peers.remove(&peer_id)
     {
         peers.insert(
             peer_id.clone(),
@@ -476,10 +665,12 @@ fn add_peer(
     let mut active_endpoint = match endpoints.get(0) {
         Some(endpoint) => endpoint.to_string(),
         None => {
+            // remove ref we just added
+            ref_map.remove_ref(&peer_id);
             return Err(PeerRefAddError::AddError(format!(
                 "No endpoints provided for peer {}",
                 peer_id
-            )))
+            )));
         }
     };
 
@@ -508,33 +699,45 @@ fn add_peer(
 }
 
 // Request a connection, the resulting connection will be treated as an InboundConnection
-fn add_unidentified(endpoint: String, connector: Connector) -> Result<(), PeerUnknownAddError> {
-    debug!("Attempting to peer with unidentified peer");
-    let connection_id = format!("{}", Uuid::new_v4());
-    match connector.request_connection(&endpoint, &connection_id) {
-        Ok(()) => Ok(()),
-        Err(err) => {
-            warn!("Unable to peer with unidentified peer: {}", endpoint);
-            // unable to connect to any of the endpoints provided
-            Err(PeerUnknownAddError::AddError(format!(
-                "Unable to connect to endpoint {} that was provided for unidentified peer: {}",
-                endpoint, err
-            )))
-        }
+fn add_unidentified(
+    endpoint: String,
+    connector: Connector,
+    unreferenced_peers: &mut UnreferencedPeerState,
+    peer_remover: &PeerRemover,
+    peers: &PeerMap,
+    ref_map: &mut RefMap,
+) -> Result<EndpointPeerRef, PeerUnknownAddError> {
+    debug!("Attempting to peer with peer by endpoint {}", endpoint);
+    if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
+        // if there is peer in the peer_map, there is reference in the ref map
+        ref_map.add_ref(peer_metadata.id.to_string());
+        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
+    } else {
+        let connection_id = format!("{}", Uuid::new_v4());
+        match connector.request_connection(&endpoint, &connection_id) {
+            Ok(()) => (),
+            Err(err) => {
+                warn!("Unable to peer with peer at {}: {}", endpoint, err);
+            }
+        };
+        unreferenced_peers
+            .requested_endpoints
+            .push(endpoint.to_string());
+        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
     }
 }
 
 fn remove_peer(
     peer_id: String,
     connector: Connector,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     ref_map: &mut RefMap,
 ) -> Result<(), PeerRefRemoveError> {
     debug!("Removing peer: {}", peer_id);
 
     // remove from the unreferenced peers, if it is there.
-    unreferenced_peers.remove(&peer_id);
+    unreferenced_peers.peers.remove(&peer_id);
 
     // remove the reference
     let removed_peer = ref_map.remove_ref(&peer_id);
@@ -546,7 +749,7 @@ fn remove_peer(
             ))
         })?;
 
-        // If the peer is pending or invalid there is no connection to remove
+        // If the peer is pending there is no connection to remove
         if peer_metadata.status == PeerStatus::Pending {
             return Ok(());
         }
@@ -569,14 +772,72 @@ fn remove_peer(
     }
 }
 
+fn remove_peer_by_endpoint(
+    endpoint: String,
+    connector: Connector,
+    peers: &mut PeerMap,
+    ref_map: &mut RefMap,
+) -> Result<(), PeerRefRemoveError> {
+    let peer_metadata = match peers.get_peer_from_endpoint(&endpoint) {
+        Some(peer_metadata) => peer_metadata,
+        None => {
+            return Err(PeerRefRemoveError::RemoveError(format!(
+                "Peer with endpoint {} has already been removed from the peer map",
+                endpoint
+            )))
+        }
+    };
+
+    debug!(
+        "Removing peer {} by endpoint: {}",
+        peer_metadata.id, endpoint
+    );
+    // remove the reference
+    let removed_peer = ref_map.remove_ref(&peer_metadata.id);
+    if let Some(removed_peer) = removed_peer {
+        let peer_metadata = peers.remove(&removed_peer).ok_or_else(|| {
+            PeerRefRemoveError::RemoveError(format!(
+                "Peer with endpoint {} has already been removed from the peer map",
+                endpoint
+            ))
+        })?;
+
+        // If the peer is pending there is no connection to remove
+        if peer_metadata.status == PeerStatus::Pending {
+            return Ok(());
+        }
+
+        match connector.remove_connection(&peer_metadata.active_endpoint) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Peer {} has been removed and connection {} has been closed",
+                    peer_metadata.id, peer_metadata.active_endpoint
+                );
+                Ok(())
+            }
+            Ok(None) => Err(PeerRefRemoveError::RemoveError(
+                "No connection to remove, something has gone wrong".to_string(),
+            )),
+            Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
+        }
+    } else {
+        // if the peer has not been fully removed, return OK
+        Ok(())
+    }
+}
+
+// Allow clippy errors for too_many_arguments. The arguments are required
+// to avoid needing a lock in the PeerManager.
+#[allow(clippy::too_many_arguments)]
 fn handle_notifications(
     notification: ConnectionManagerNotification,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
     max_retry_attempts: u64,
     local_identity: &str,
+    ref_map: &mut RefMap,
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
@@ -659,6 +920,7 @@ fn handle_notifications(
             connector,
             subscribers,
             local_identity,
+            ref_map,
         ),
         ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
             handle_fatal_connection(endpoint, error.to_string(), peers, subscribers)
@@ -669,7 +931,7 @@ fn handle_notifications(
 fn handle_disconnection(
     endpoint: String,
     identity: String,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
@@ -722,9 +984,9 @@ fn handle_disconnection(
         }
         subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
     } else {
-        // check for unrefrenced peer and remove if it has disconnected
+        // check for unreferenced peer and remove if it has disconnected
         debug!("Removing disconnected peer: {}", identity);
-        if let Some(unref_peer) = unreferenced_peers.remove(&identity) {
+        if let Some(unref_peer) = unreferenced_peers.peers.remove(&identity) {
             if let Err(err) = connector.remove_connection(&unref_peer.endpoint) {
                 error!("Unable to clean up old connection: {}", err);
             }
@@ -739,7 +1001,7 @@ fn handle_inbound_connection(
     endpoint: String,
     identity: String,
     connection_id: String,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
@@ -810,17 +1072,17 @@ fn handle_inbound_connection(
             }
         }
     } else {
-        debug!("Adding unrefrenced peer for {}", identity);
+        debug!("Adding peer with id: {}", identity);
 
-        if let Some(old_peer) = unreferenced_peers.insert(
+        if let Some(old_peer) = unreferenced_peers.peers.insert(
             identity,
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
             },
         ) {
-            debug!("Removing old unreferenced peer connection");
             if old_peer.endpoint != endpoint {
+                debug!("Removing old peer connection for {}", old_peer.endpoint);
                 if let Err(err) = connector.remove_connection(&old_peer.endpoint) {
                     error!("Unable to clean up old connection: {}", err);
                 }
@@ -836,11 +1098,12 @@ fn handle_connected(
     endpoint: String,
     identity: String,
     connection_id: String,
-    unreferenced_peers: &mut HashMap<String, UnreferencedPeer>,
+    unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
     local_identity: &str,
+    ref_map: &mut RefMap,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
         match peer_metadata.status {
@@ -941,17 +1204,35 @@ fn handle_connected(
         // notify subscribers we are connected
         subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
     } else {
-        debug!("Adding unrefrenced peer for {}", identity);
+        debug!("Adding peer {} by endpoint {}", identity, endpoint);
+
+        // if this endpoint has been requested, add this connection to peers with the provided
+        // endpoint
+        if unreferenced_peers.requested_endpoints.contains(&endpoint) {
+            ref_map.add_ref(identity.to_string());
+            peers.insert(
+                identity.to_string(),
+                connection_id,
+                vec![endpoint.to_string()],
+                endpoint,
+                PeerStatus::Connected,
+            );
+
+            let notification = PeerManagerNotification::Connected { peer: identity };
+            subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            return;
+        }
+
         // Treat unknown peer as unreferenced
-        if let Some(old_peer) = unreferenced_peers.insert(
+        if let Some(old_peer) = unreferenced_peers.peers.insert(
             identity,
             UnreferencedPeer {
                 connection_id,
                 endpoint: endpoint.to_string(),
             },
         ) {
-            debug!("Removing old unreferenced peer connection");
             if old_peer.endpoint != endpoint {
+                debug!("Removing old peer connection for {}", old_peer.endpoint);
                 if let Err(err) = connector.remove_connection(&old_peer.endpoint) {
                     error!("Unable to clean up old connection: {}", err);
                 }
@@ -998,7 +1279,11 @@ fn handle_fatal_connection(
 // If a pending peers retry retry_frequency has elapsed, retry their endpoints. If successful,
 // their active endpoint will be updated. The retry_frequency will be increased and
 // and last_connection_attempt reset.
-fn retry_pending(peers: &mut PeerMap, connector: Connector) {
+fn retry_pending(
+    peers: &mut PeerMap,
+    connector: Connector,
+    unreferenced_peers: &mut UnreferencedPeerState,
+) {
     let mut to_retry = Vec::new();
     for (_, peer) in peers.get_pending() {
         if peer.last_connection_attempt.elapsed().as_secs() > peer.retry_frequency {
@@ -1029,6 +1314,33 @@ fn retry_pending(peers: &mut PeerMap, connector: Connector) {
         if let Err(err) = peers.update_peer(peer_metadata) {
             error!("Unable to update peer: {}", err);
         }
+    }
+
+    if unreferenced_peers
+        .last_connection_attempt
+        .elapsed()
+        .as_secs()
+        > unreferenced_peers.retry_frequency
+    {
+        for endpoint in unreferenced_peers.requested_endpoints.iter() {
+            if peers.contains_endpoint(endpoint) {
+                continue;
+            }
+            debug!("Attempting to peer with peer by {}", endpoint);
+            let connection_id = format!("{}", Uuid::new_v4());
+            match connector.request_connection(&endpoint, &connection_id) {
+                Ok(()) => (),
+                // If request_connection errored we will retry in the future
+                Err(err) => {
+                    error!(
+                        "Unable to request connection for peer endpoint {}: {}",
+                        endpoint, err
+                    );
+                }
+            }
+        }
+
+        unreferenced_peers.last_connection_attempt = Instant::now();
     }
 }
 
@@ -1500,6 +1812,95 @@ pub mod tests {
             assert_eq!(peer_list, vec!["test_peer".to_string()]);
         }
         // drop peer_ref
+
+        let peer_list = peer_connector
+            .list_peers()
+            .expect("Unable to get peer list");
+
+        assert_eq!(peer_list, Vec::<String>::new());
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
+        cm.await_shutdown();
+        mesh.shutdown_signaler().shutdown();
+    }
+
+    // Test that when a EndpointPeerRef is dropped, a remove peer request is properly sent and the
+    // peer is removed
+    //
+    //
+    // 1. add unidentified peer with endpoint inproc://test
+    // 2. add test_peer
+    // 4. call list peers
+    // 5. verify that the peer list contains test_peer
+    // 6. drop the PeerRef
+    // 7. call list peers
+    // 8. verify that the peer list still contains test_peer
+    // 9. drop endpoint peer_ref
+    // 10. call list peers
+    // 11. verify that the new peer list is empty
+    #[test]
+    fn test_peer_manager_drop_endpoint_peer_ref() {
+        let mut transport = Box::new(InprocTransport::default());
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mesh = Mesh::new(512, 128);
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport.clone())
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        // let (finish_tx, fininsh_rx) = channel();
+        let connector = cm.connector();
+        let mut peer_manager = PeerManager::new(connector, None, Some(1), "my_id".to_string());
+
+        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+
+        {
+            let mut subscriber = peer_connector
+                .subscribe()
+                .expect("Unable to get subscriber");
+            let endpoint_peer_ref = peer_connector
+                .add_unidentified_peer("inproc://test".to_string())
+                .expect("Unable to add peer by endpoint");
+            assert_eq!(endpoint_peer_ref.endpoint(), "inproc://test".to_string());
+            let notification = subscriber.next().expect("Unable to get new notifications");
+            assert!(
+                notification
+                    == PeerManagerNotification::Connected {
+                        peer: "test_peer".to_string(),
+                    }
+            );
+
+            let peer_ref = peer_connector
+                .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+                .expect("Unable to add peer");
+
+            assert_eq!(peer_ref.peer_id, "test_peer");
+
+            let peer_list = peer_connector
+                .list_peers()
+                .expect("Unable to get peer list");
+
+            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+
+            drop(peer_ref);
+
+            let peer_list = peer_connector
+                .list_peers()
+                .expect("Unable to get peer list");
+
+            assert_eq!(peer_list, vec!["test_peer".to_string()]);
+        }
+        // drop endpoint_peer_ref
 
         let peer_list = peer_connector
             .list_peers()

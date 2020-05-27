@@ -32,16 +32,28 @@ pub(crate) enum SendRequest {
     Message { recipient: String, payload: Vec<u8> },
 }
 
+/// A sender for outgoing messages that will be sent to peers.
 #[derive(Clone)]
 pub struct NetworkMessageSender {
     sender: Sender<SendRequest>,
 }
 
 impl NetworkMessageSender {
+    /// Creates a new `NetworkMessageSender`
+    ///
+    /// # Arguments
+    ///
+    /// * `sender` - a `Sender` that takes a `SendRequest`
     pub(crate) fn new(sender: Sender<SendRequest>) -> Self {
         NetworkMessageSender { sender }
     }
 
+    /// Sends a message to a specified peer
+    ///
+    /// # Arguments
+    ///
+    /// * `recipient` - the peer ID the messsage is for
+    /// * `payload` - the bytes of the message that should be sent
     pub fn send(&self, recipient: String, payload: Vec<u8>) -> Result<(), (String, Vec<u8>)> {
         self.sender
             .send(SendRequest::Message { recipient, payload })
@@ -52,13 +64,13 @@ impl NetworkMessageSender {
     }
 }
 
-/// PeerInterconnect will receive incoming messages from peers and dispatch them to the
-/// NetworkMessageType handlers. It will also receive messages from handlers that need to be
+/// `PeerInterconnect` will receive incoming messages from peers and dispatch them to the
+/// `NetworkMessageType` handlers. It will also receive messages from handlers that need to be
 /// sent to other peers.
 ///
 /// When an incoming message is received, the connection_id is converted to a peer_id. The reverse
 /// is done for an outgoing message. If a message is received from an unknown connection, the
-/// PeerInterconnect will request the current peers from the PeerManager and update the local map
+/// `PeerInterconnect` will request the current peers from the PeerManager and update the local map
 /// of peers.
 pub struct PeerInterconnect {
     // sender that will be wrapped in a NetworkMessageSender and given to Dispatchers for sending
@@ -70,17 +82,17 @@ pub struct PeerInterconnect {
 }
 
 impl PeerInterconnect {
-    /// get a new NetworkMessageSender that can be used to send messages to peers.
+    /// Creates a new `NetworkMessageSender` that can be used to send messages to peers.
     pub fn new_network_sender(&self) -> NetworkMessageSender {
         NetworkMessageSender::new(self.dispatched_sender.clone())
     }
 
-    /// Returns a ShutdownHandle that can be used to shutdown PeerInterconnect
+    /// Returns a `ShutdownHandle` that can be used to shutdown `PeerInterconnect`
     pub fn shutdown_handle(&self) -> ShutdownHandle {
         self.shutdown_handle.clone()
     }
 
-    /// waits for the send and receive thread to shutdown
+    /// Waits for the send and receive thread to shutdown
     pub fn await_shutdown(self) {
         debug!("Shutting down peer interconnect receiver...");
         if let Err(err) = self.send_join_handle.join() {
@@ -101,7 +113,7 @@ impl PeerInterconnect {
         debug!("Shutting down peer interconnect sender (complete)");
     }
 
-    /// Call shutdown on the shutdown handle and then waits for the PeerInterconnect threads to
+    /// Calls shutdown on the shutdown handle and then waits for the `PeerInterconnect` threads to
     /// finish
     pub fn shutdown_and_wait(self) {
         self.shutdown_handle().shutdown();
@@ -109,6 +121,7 @@ impl PeerInterconnect {
     }
 }
 
+/// A builder for creating a `PeerInterconnect`
 #[derive(Default)]
 pub struct PeerInterconnectBuilder<T: 'static, U: 'static, P>
 where
@@ -132,7 +145,7 @@ where
     U: ConnectionMatrixSender,
     P: PeerLookupProvider + 'static,
 {
-    /// Creats an empty builder for a PeerInterconnect
+    /// Creates an empty builder for a `PeerInterconnect`
     pub fn new() -> Self {
         PeerInterconnectBuilder {
             peer_lookup_provider: None,
@@ -142,44 +155,44 @@ where
         }
     }
 
-    /// Add a PeerLookupProvider to PeerInterconnectBuilder
+    /// Adds a `PeerLookupProvider` to `PeerInterconnectBuilder`
     ///
     /// # Arguments
     ///
-    /// * `peer_lookup_provider` - a PeerLookupProvider that will be used to facilitate getting the
-    ///   peer ids and connection ids for messages.
+    /// * `peer_lookup_provider` - a `PeerLookupProvider` that will be used to facilitate getting
+    ///     the peer IDs and connection IDs for messages.
     pub fn with_peer_connector(mut self, peer_lookup_provider: P) -> Self {
         self.peer_lookup_provider = Some(peer_lookup_provider);
         self
     }
 
-    /// Add a ConnectionMatrixReceiver to PeerInterconnectBuilder
+    /// Adds a `ConnectionMatrixReceiver` to `PeerInterconnectBuilder`
     ///
     /// # Arguments
     ///
-    /// * `message_receiver` - a ConnectionMatrixReceiver that will be used to receive messages
+    /// * `message_receiver` - a `ConnectionMatrixReceiver` that will be used to receive messages
     /// from peers
     pub fn with_message_receiver(mut self, message_receiver: T) -> Self {
         self.message_receiver = Some(message_receiver);
         self
     }
 
-    /// Add a ConnectionMatrixSender to PeerInterconnectBuilder
+    /// Adds a `ConnectionMatrixSender` to `PeerInterconnectBuilder`
     ///
     /// # Arguments
     ///
-    /// * `message_sender` - a ConnectionMatrixSender that will be used to send messages to peers
+    /// * `message_sender` - a `ConnectionMatrixSender` that will be used to send messages to peers
     pub fn with_message_sender(mut self, message_sender: U) -> Self {
         self.message_sender = Some(message_sender);
         self
     }
 
-    /// Add a DispatchMessageSender for NetworkMessageType to PeerInterconnectBuilder
+    /// Adds a `DispatchMessageSender` for `NetworkMessageType` to `PeerInterconnectBuilder`
     ///
     /// # Arguments
     ///
-    /// * `network_dispatcher_sender` - a DispatchMessageSender<NetworkMessageType> to dispatch
-    ///     NetworkMessages
+    /// * `network_dispatcher_sender` - a `DispatchMessageSender<NetworkMessageType>` to dispatch
+    ///    `NetworkMessages`
     pub fn with_network_dispatcher_sender(
         mut self,
         network_dispatcher_sender: DispatchMessageSender<NetworkMessageType>,
@@ -188,10 +201,10 @@ where
         self
     }
 
-    /// Build the PeerInterconnect. This function will start up threads to send and recv messages
+    /// Builds the `PeerInterconnect`. This function will start up threads to send and recv messages
     /// from the peers.
     ///
-    /// Returns the PeerInterconnect object that can be used to get network message senders and
+    /// Returns the `PeerInterconnect` object that can be used to get network message senders and
     /// shutdown message threads.
     pub fn build(&mut self) -> Result<PeerInterconnect, PeerInterconnectError> {
         let (dispatched_sender, dispatched_receiver) = channel();
@@ -291,7 +304,7 @@ where
             Some(peer_id.to_owned())
         } else if let Some(peer_id) = peer_connector
             .peer_id(connection_id)
-            .map_err(|err| format!("Unable to get peer id for {}: {}", connection_id, err))?
+            .map_err(|err| format!("Unable to get peer ID for {}: {}", connection_id, err))?
         {
             connection_id_to_peer_id.insert(connection_id.to_string(), peer_id.clone());
             Some(peer_id)
@@ -360,7 +373,7 @@ where
             Some(connection_id.to_owned())
         } else if let Some(connection_id) = peer_connector
             .connection_id(&recipient)
-            .map_err(|err| format!("Unable to get connection id for {}: {}", recipient, err))?
+            .map_err(|err| format!("Unable to get connection ID for {}: {}", recipient, err))?
         {
             peer_id_to_connection_id.insert(recipient.clone(), connection_id.clone());
             Some(connection_id)
@@ -375,7 +388,7 @@ where
             if let Err(err) = message_sender.send(connection_id.to_string(), payload.to_vec()) {
                 if let Some(new_connection_id) =
                     peer_connector.connection_id(&recipient).map_err(|err| {
-                        format!("Unable to get connection id for {}: {}", recipient, err)
+                        format!("Unable to get connection ID for {}: {}", recipient, err)
                     })?
                 {
                     // if connection_id has changed replace it and try to send again
@@ -398,14 +411,15 @@ where
     }
 }
 
+/// Handle for shutting down the `PeerInterconnect`
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<SendRequest>,
 }
 
 impl ShutdownHandle {
-    /// Sends a shutdown notifications to PeerInterconnect and the associated dipatcher thread and
-    /// ConnectionMatrix
+    /// Sends a shutdown notification to `PeerInterconnect` and the associated dipatcher thread
+    /// and `ConnectionMatrix`
     pub fn shutdown(&self) {
         if self.sender.send(SendRequest::Shutdown).is_err() {
             warn!("Peer Interconnect is no longer running");

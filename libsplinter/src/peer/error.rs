@@ -14,11 +14,13 @@
 
 use std::{error, fmt};
 
+/// Errors that could be raised by the `PeerManager`
 #[derive(Debug, PartialEq)]
 pub enum PeerManagerError {
+    /// `PeerManager` start up failed
     StartUpError(String),
+    /// Error raised when a message failed to send
     SendMessageError(String),
-    RetryEndpoints(String),
 }
 
 impl error::Error for PeerManagerError {}
@@ -28,19 +30,18 @@ impl fmt::Display for PeerManagerError {
         match self {
             PeerManagerError::StartUpError(msg) => write!(f, "{}", msg),
             PeerManagerError::SendMessageError(msg) => write!(f, "{}", msg),
-            PeerManagerError::RetryEndpoints(msg) => write!(
-                f,
-                "Error occured while trying to find new active endpoint: {}",
-                msg
-            ),
         }
     }
 }
 
+/// Errors that could be raised when requesting a peer is added
 #[derive(Debug, PartialEq)]
 pub enum PeerRefAddError {
+    /// Internal `PeerManager` error
     InternalError(String),
+    /// Unable to receive response
     ReceiveError(String),
+    /// Unable to add requested peer
     AddError(String),
 }
 
@@ -58,10 +59,14 @@ impl fmt::Display for PeerRefAddError {
     }
 }
 
+/// Errors that could be raised when requesting a peer is added without a peer ID
 #[derive(Debug, PartialEq)]
 pub enum PeerUnknownAddError {
+    /// Internal `PeerManager` error
     InternalError(String),
+    /// Unable to receive response
     ReceiveError(String),
+    /// Unable to add requested peer
     AddError(String),
 }
 
@@ -83,10 +88,14 @@ impl fmt::Display for PeerUnknownAddError {
     }
 }
 
+/// Errors that could be raised when requesting a peer is removed
 #[derive(Debug, PartialEq)]
 pub enum PeerRefRemoveError {
+    /// Internal `PeerManager` error
     InternalError(String),
+    /// Unable to receive response
     ReceiveError(String),
+    /// Unable to remove requested peer
     RemoveError(String),
 }
 
@@ -104,10 +113,14 @@ impl fmt::Display for PeerRefRemoveError {
     }
 }
 
+/// Errors that could be raised when requesting a list of peers
 #[derive(Debug, PartialEq)]
 pub enum PeerListError {
+    /// Internal `PeerManager`error
     InternalError(String),
+    /// Unable to receive response
     ReceiveError(String),
+    /// Unable to get current list of peers
     ListError(String),
 }
 
@@ -125,10 +138,14 @@ impl fmt::Display for PeerListError {
     }
 }
 
+/// Errors that could be raised when requesting a peer's connection ID
 #[derive(Debug, PartialEq)]
 pub enum PeerConnectionIdError {
+    /// Internal `PeerManager` error
     InternalError(String),
+    /// Unable to receive response
     ReceiveError(String),
+    /// Unable to get peer's connection ID
     ListError(String),
 }
 
@@ -150,6 +167,7 @@ impl fmt::Display for PeerConnectionIdError {
     }
 }
 
+/// Errors raised by trying to update a peer
 #[derive(Debug)]
 pub struct PeerUpdateError(pub String);
 
@@ -161,8 +179,10 @@ impl fmt::Display for PeerUpdateError {
     }
 }
 
+/// Errors that could be raised by `PeerInterconnect`
 #[derive(Debug, PartialEq)]
 pub enum PeerInterconnectError {
+    /// `PeerInterconnect` start up failed
     StartUpError(String),
 }
 
@@ -178,6 +198,7 @@ impl fmt::Display for PeerInterconnectError {
     }
 }
 
+/// Errors that could be raised when looking up a peer
 #[derive(Debug)]
 pub struct PeerLookupError(pub String);
 

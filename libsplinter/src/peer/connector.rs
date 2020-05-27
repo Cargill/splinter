@@ -21,24 +21,24 @@ use super::error::{
     PeerRefRemoveError, PeerUnknownAddError,
 };
 use super::notification::PeerNotificationIter;
-use super::PeerRef;
+use super::{EndpointPeerRef, PeerRef};
 use super::{PeerManagerMessage, PeerManagerRequest};
 
-/// The PeerLookup trait provides an interface for looking up details about individual peer
+/// The `PeerLookup` trait provides an interface for looking up details about individual peer
 /// connections.
 pub trait PeerLookup: Send {
-    /// Retrieves the connection id for a given peer id, if found.
+    /// Retrieves the connection ID for a given peer ID, if found.
     ///
     /// # Errors
     ///
-    /// Returns a PeerLookupError if the connection id cannot be retrieved.
+    /// Returns a `PeerLookupError` if the connection ID cannot be retrieved.
     fn connection_id(&self, peer_id: &str) -> Result<Option<String>, PeerLookupError>;
 
-    /// Retrieves the peer id for a given connection id, if found.
+    /// Retrieves the peer ID for a given connection ID, if found.
     ///
     /// # Errors
     ///
-    /// Returns a PeerLookupError if the peer id cannot be retrieved.
+    /// Returns a `PeerLookupError` if the peer ID cannot be retrieved.
     fn peer_id(&self, connection_id: &str) -> Result<Option<String>, PeerLookupError>;
 }
 
@@ -46,7 +46,7 @@ pub trait PeerLookupProvider {
     fn peer_lookup(&self) -> Box<dyn PeerLookup>;
 }
 
-/// The PeerManagerConnector will be used to make requests to the PeerManager.
+/// The `PeerManagerConnector` will be used to make requests to the `PeerManager`.
 ///
 /// The connector includes functions to add a new peer reference, update a peer and list the
 /// existing peers.
@@ -60,17 +60,17 @@ impl PeerManagerConnector {
         PeerManagerConnector { sender }
     }
 
-    /// Request that a peer is added to the PeerManager. If a peer already exists, the peer's ref
-    /// count will be incremented
+    /// Requests that a peer is added to the `PeerManager`. If a peer already exists, the peer's
+    /// reference count will be incremented
     ///
     /// # Arguments
     ///
-    /// * `peer_id` -  The unique id for the peer.
+    /// * `peer_id` -  The unique ID for the peer.
     /// * `endpoints` -  The list of endpoints associated with the peer. The list should be in
     ///     preference order, with the first endpoint being the first attempted.
     ///
-    /// Returns a PeerRef, that when dropped, will automatically send a removal request to the
-    /// PeerManager.
+    /// Returns a `PeerRef`, that when dropped, will automatically send a removal request to the
+    /// `PeerManager`.
     pub fn add_peer_ref(
         &self,
         peer_id: String,
@@ -97,15 +97,18 @@ impl PeerManagerConnector {
             .map_err(|err| PeerRefAddError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Request that a peer is added to the PeerManager. This function should be used when the
-    /// peer id is unknown.
+    /// Requests that a peer is added to the `PeerManager`. This function should be used when the
+    /// peer ID is unknown.
     ///
     /// # Arguments
     ///
     /// * `endpoint` - The endpoint associated with the peer.
     ///
-    /// Returns Ok() if the unidentified peer was added
-    pub fn add_unidentified_peer(&self, endpoint: String) -> Result<(), PeerUnknownAddError> {
+    /// Returns `Ok(EndpointPeerRef)` if the unidentified peer was added
+    pub fn add_unidentified_peer(
+        &self,
+        endpoint: String,
+    ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
         let (sender, recv) = channel();
 
         let message =
@@ -124,9 +127,9 @@ impl PeerManagerConnector {
             .map_err(|err| PeerUnknownAddError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Request the list of currently connected peers.
+    /// Requests the list of currently connected peers.
     ///
-    /// Returns the list of peer ids.
+    /// Returns the list of peer IDs.
     pub fn list_peers(&self) -> Result<Vec<String>, PeerListError> {
         let (sender, recv) = channel();
         let message = PeerManagerMessage::Request(PeerManagerRequest::ListPeers { sender });
@@ -144,7 +147,7 @@ impl PeerManagerConnector {
             .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Request the list of unreferenced peers.
+    /// Requests the list of unreferenced peers.
     ///
     /// Unreferenced peers are those peers that have successfully connected from a remote node, but
     /// have not yet be referenced by a circuit.  These peers are available to be promoted to fully
@@ -167,9 +170,9 @@ impl PeerManagerConnector {
             .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Request the map of currently connected peers to connection id
+    /// Requests the map of currently connected peers to connection ID
     ///
-    /// Returns a map of peer id to connection id
+    /// Returns a map of peer ID to connection ID
     pub fn connection_ids(&self) -> Result<BiHashMap<String, String>, PeerConnectionIdError> {
         let (sender, recv) = channel();
         let message = PeerManagerMessage::Request(PeerManagerRequest::ConnectionIds { sender });
@@ -187,10 +190,10 @@ impl PeerManagerConnector {
             .map_err(|err| PeerConnectionIdError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Subscribe to PeerManager notifications.
+    /// Subscribes to `PeerManager` notifications.
     ///
-    /// Returns a PeerNotificationIter that can be used to receive notifications about connected and
-    /// disconnected peers
+    /// Returns a `PeerNotificationIter` that can be used to receive notifications about connected
+    /// and disconnected peers
     pub fn subscribe(&self) -> Result<PeerNotificationIter, PeerManagerError> {
         let (send, recv) = channel();
         match self.sender.send(PeerManagerMessage::Subscribe(send)) {
@@ -250,8 +253,8 @@ impl PeerLookupProvider for PeerManagerConnector {
     }
 }
 
-/// The PeerRemover will be used in the PeerRef to decrement the reference count for a peer when
-/// the PeerRef is dropped.
+/// The `PeerRemover` will be used in the `PeerRef` to decrement the reference count for a peer when
+/// the `PeerRef` is dropped.
 #[derive(Clone, Debug)]
 pub(crate) struct PeerRemover {
     pub sender: Sender<PeerManagerMessage>,
@@ -260,15 +263,42 @@ pub(crate) struct PeerRemover {
 impl PeerRemover {
     /// This function will only be called when the PeerRef is dropped.
     ///
-    /// Sends a request to the PeerManager to remove a peer.
+    /// Sends a request to the `PeerManager` to remove a peer.
     ///
     /// # Arguments
-    /// * `peer_id` - the peer_id of the PeerRef that has been dropped
+    /// * `peer_id` - the peer ID of the `PeerRef` that has been dropped
     pub fn remove_peer_ref(&self, peer_id: &str) -> Result<(), PeerRefRemoveError> {
         let (sender, recv) = channel();
 
         let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeer {
             peer_id: peer_id.to_string(),
+            sender,
+        });
+
+        match self.sender.send(message) {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(PeerRefRemoveError::InternalError(
+                    "Unable to send message to PeerManager, receiver dropped".to_string(),
+                ))
+            }
+        };
+
+        recv.recv()
+            .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
+    }
+
+    /// Sends a request to the `PeerManager` to remove a peer.
+    ///
+    /// This function will only be called when the `EndpointPeerRef` is dropped.
+    ///
+    /// # Arguments
+    /// * `endpoint` - the endpoint of the `EndpointPeerRef` that has been dropped
+    pub fn remove_peer_ref_by_endpoint(&self, endpoint: &str) -> Result<(), PeerRefRemoveError> {
+        let (sender, recv) = channel();
+
+        let message = PeerManagerMessage::Request(PeerManagerRequest::RemovePeerByEndpoint {
+            endpoint: endpoint.to_string(),
             sender,
         });
 

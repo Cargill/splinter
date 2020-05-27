@@ -56,7 +56,7 @@ impl PeerMap {
         }
     }
 
-    /// Returns the current list of peer ids.
+    /// Returns the current list of peer IDs.
     pub fn peer_ids(&self) -> Vec<String> {
         self.peers
             .iter()
@@ -64,7 +64,7 @@ impl PeerMap {
             .collect()
     }
 
-    /// Returns the current map of peer ids to connection_ids
+    /// Returns the current map of peer IDs to connection_ids
     pub fn connection_ids(&self) -> BiHashMap<String, String> {
         let mut peer_to_connection_id = BiHashMap::new();
         for (peer, metadata) in self.peers.iter() {
@@ -74,7 +74,7 @@ impl PeerMap {
         peer_to_connection_id
     }
 
-    /// Insert a new peer id and endpoints
+    /// Insert a new peer ID and endpoints
     pub fn insert(
         &mut self,
         peer_id: String,
@@ -100,7 +100,7 @@ impl PeerMap {
         }
     }
 
-    /// Remove a peer id and its endpoint. Returns the PeerMetdata if the peer exists.
+    /// Remove a peer ID and its endpoint. Returns the PeerMetdata if the peer exists.
     pub fn remove(&mut self, peer_id: &str) -> Option<PeerMetadata> {
         if let Some(peer_metadata) = self.peers.remove(&peer_id.to_string()) {
             for endpoint in peer_metadata.endpoints.iter() {
@@ -133,7 +133,7 @@ impl PeerMap {
         }
     }
 
-    /// Returns the endpoint for the given peer id
+    /// Returns the endpoint for the given peer ID
     pub fn get_peer_from_endpoint(&self, endpoint: &str) -> Option<&PeerMetadata> {
         if let Some(peer) = self.endpoints.get(endpoint) {
             self.peers.get(peer)
@@ -156,6 +156,10 @@ impl PeerMap {
         self.peers
             .iter()
             .filter(|(_id, peer_meta)| peer_meta.status == PeerStatus::Pending)
+    }
+
+    pub fn contains_endpoint(&self, endpoint: &str) -> bool {
+        self.endpoints.contains_key(endpoint)
     }
 }
 
