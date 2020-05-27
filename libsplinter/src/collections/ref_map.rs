@@ -14,19 +14,18 @@
 
 //! A data structure for reference counting a set of strings.
 //!
-//! An Item can be added to `RefMap` with `add_ref`; each call to `add_ref` will increment in
-//! internal reference count associated with the `ref_id` given. When `remove_ref` is called,
-//! the reference count is decremented. If a reference count reaches zero, then the item is
-//! removed.
+//! An item can be added to `RefMap` with `add_ref`; each call to `add_ref` will increment the
+//! internal reference count associated with the given `ref_id`. When `remove_ref` is called, the
+//! reference count is decremented. If a reference count reaches zero, then the item is removed.
 
 use std::collections::HashMap;
 
 use super::error::RefMapRemoveError;
 
-/// A map that will keep track of the number of times an id has been added, and only remove the
-/// id once the reference count is 0.
+/// A map that will keep track of the number of times an ID has been added, and only remove the ID
+/// once the reference count is 0.
 pub struct RefMap {
-    // id to reference count
+    // ID to reference count
     references: HashMap<String, u64>,
 }
 
@@ -55,8 +54,6 @@ impl RefMap {
     /// Decrements the referece count for `ref_id`
     ///
     /// If the internal reference count reaches zero, then `ref_id` will be removed.
-    ///
-    /// This method will panic if the id does not exist.
     pub fn remove_ref(&mut self, ref_id: &str) -> Result<Option<String>, RefMapRemoveError> {
         let ref_count = match self.references.remove(ref_id) {
             Some(ref_count) => ref_count,
@@ -81,8 +78,8 @@ impl RefMap {
 pub mod tests {
     use super::*;
 
-    // Test that the reference count is set to 1 if the id is new. If the same id is added, again
-    // the reference count is incremented.
+    // Test that the reference count is set to 1 if the ID is new. If the same ID is added, the
+    // reference count is incremented again.
     #[test]
     fn test_add_ref() {
         let mut ref_map = RefMap::new();
@@ -96,12 +93,12 @@ pub mod tests {
         assert_eq!(ref_count, 1);
     }
 
-    // Test that when removing a reference, if the ref count is greater than 1, the ref count is
-    // is decremented and None is retured to notify that caller that the reference has not be fully
-    // removed.
+    // Test that when removing a reference, if the reference count is greater than 1, the reference
+    // count is decremented and `None` is retured to notify that caller that the reference has not
+    // been fully removed.
     //
-    // Then test that if the ref count is 1, the reference is removed and the id is retured, to
-    // tell the caller the reference has been removed.
+    // Then test that if the reference count is 1, the reference is removed and the ID is retured
+    // to tell the caller the reference has been removed.
     #[test]
     fn test_remove_ref() {
         let mut ref_map = RefMap::new();
@@ -121,8 +118,7 @@ pub mod tests {
         assert_eq!(ref_map.references.get("test_id"), None);
     }
 
-    // That that if a remove_ref is removed, when the reference does not exist, an error is
-    // returned
+    // Test that if `remove_ref` is called with a reference does not exist, an error is returned.
     #[test]
     fn test_remove_ref_err() {
         let mut ref_map = RefMap::new();
