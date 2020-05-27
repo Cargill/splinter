@@ -34,10 +34,8 @@ use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Instant;
 
-use self::error::{
-    PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
-    PeerRefRemoveError, PeerUnknownAddError,
-};
+use uuid::Uuid;
+
 use crate::collections::{BiHashMap, RefMap};
 use crate::network::connection_manager::ConnectionManagerNotification;
 use crate::network::connection_manager::Connector;
@@ -47,7 +45,10 @@ pub use crate::peer::notification::{PeerManagerNotification, PeerNotificationIte
 use crate::peer::peer_map::{PeerMap, PeerStatus};
 use crate::threading::pacemaker;
 
-use uuid::Uuid;
+use self::error::{
+    PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
+    PeerRefRemoveError, PeerUnknownAddError,
+};
 
 // The number of retry attempts for an active endpoint before the PeerManager will try other
 // endpoints associated with a peer
