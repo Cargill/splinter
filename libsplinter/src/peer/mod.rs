@@ -484,7 +484,7 @@ fn handle_request(
                 ))
                 .is_err()
             {
-                warn!("connector dropped before receiving result of adding peer");
+                warn!("Connector dropped before receiving result of adding peer");
             }
         }
         PeerManagerRequest::AddUnidentified { endpoint, sender } => {
@@ -499,7 +499,7 @@ fn handle_request(
                 ))
                 .is_err()
             {
-                warn!("connector dropped before receiving result of adding unidentified peer");
+                warn!("Connector dropped before receiving result of adding unidentified peer");
             }
         }
         PeerManagerRequest::RemovePeer { peer_id, sender } => {
@@ -514,7 +514,7 @@ fn handle_request(
                 ))
                 .is_err()
             {
-                warn!("connector dropped before receiving result of removing peer");
+                warn!("Connector dropped before receiving result of removing peer");
             }
         }
         PeerManagerRequest::RemovePeerByEndpoint { endpoint, sender } => {
@@ -528,12 +528,12 @@ fn handle_request(
                 ))
                 .is_err()
             {
-                warn!("connector dropped before receiving result of removing peer");
+                warn!("Connector dropped before receiving result of removing peer");
             }
         }
         PeerManagerRequest::ListPeers { sender } => {
             if sender.send(Ok(peers.peer_ids())).is_err() {
-                warn!("connector dropped before receiving result of list peers");
+                warn!("Connector dropped before receiving result of list peers");
             }
         }
 
@@ -544,12 +544,12 @@ fn handle_request(
                 .map(|s| s.to_owned())
                 .collect();
             if sender.send(Ok(peer_ids)).is_err() {
-                warn!("connector dropped before receiving result of list unreferenced peers");
+                warn!("Connector dropped before receiving result of list unreferenced peers");
             }
         }
         PeerManagerRequest::ConnectionIds { sender } => {
             if sender.send(Ok(peers.connection_ids())).is_err() {
-                warn!("connector dropped before receiving result of connection ids");
+                warn!("Connector dropped before receiving result of connection IDs");
             }
         }
         PeerManagerRequest::GetConnectionId { peer_id, sender } => {
@@ -564,7 +564,7 @@ fn handle_request(
                 });
 
             if sender.send(Ok(connection_id)).is_err() {
-                warn!("connector dropped before receiving result of get connection id");
+                warn!("Connector dropped before receiving result of getting connection ID");
             }
         }
         PeerManagerRequest::GetPeerId {
@@ -583,7 +583,7 @@ fn handle_request(
                 });
 
             if sender.send(Ok(peer_id)).is_err() {
-                warn!("connector dropped before receiving result of get peer id");
+                warn!("Connector dropped before receiving result of getting peer ID");
             }
         }
     };
@@ -622,7 +622,7 @@ fn add_peer(
                         peer_metadata.endpoints = endpoints;
                         peers.update_peer(peer_metadata.clone()).map_err(|err| {
                             PeerRefAddError::AddError(format!(
-                                "Unable to update peer {}:{}",
+                                "Unable to update peer {}: {}",
                                 peer_id, err
                             ))
                         })?
