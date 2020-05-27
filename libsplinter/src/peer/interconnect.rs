@@ -25,7 +25,7 @@ use crate::transport::matrix::{
 use super::connector::{PeerLookup, PeerLookupProvider};
 use super::error::PeerInterconnectError;
 
-// Message to send to the network message sender with the recipient and payload
+/// Message to send to the network message sender with the recipient and payload
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum SendRequest {
     Shutdown,
@@ -48,7 +48,7 @@ impl NetworkMessageSender {
         NetworkMessageSender { sender }
     }
 
-    /// Sends a message to a specified peer
+    /// Sends a message to the specified peer
     ///
     /// # Arguments
     ///
@@ -68,10 +68,10 @@ impl NetworkMessageSender {
 /// `NetworkMessageType` handlers. It will also receive messages from handlers that need to be
 /// sent to other peers.
 ///
-/// When an incoming message is received, the connection_id is converted to a peer_id. The reverse
+/// When an incoming message is received, the connection ID is converted to a peer ID. The reverse
 /// is done for an outgoing message. If a message is received from an unknown connection, the
-/// `PeerInterconnect` will request the current peers from the PeerManager and update the local map
-/// of peers.
+/// `PeerInterconnect` will request the current peers from the `PeerManager` and update the local
+/// map of peers.
 pub struct PeerInterconnect {
     // sender that will be wrapped in a NetworkMessageSender and given to Dispatchers for sending
     // messages to peers
@@ -160,7 +160,7 @@ where
     /// # Arguments
     ///
     /// * `peer_lookup_provider` - a `PeerLookupProvider` that will be used to facilitate getting
-    ///     the peer IDs and connection IDs for messages.
+    ///   the peer IDs and connection IDs for messages.
     pub fn with_peer_connector(mut self, peer_lookup_provider: P) -> Self {
         self.peer_lookup_provider = Some(peer_lookup_provider);
         self
@@ -171,7 +171,7 @@ where
     /// # Arguments
     ///
     /// * `message_receiver` - a `ConnectionMatrixReceiver` that will be used to receive messages
-    /// from peers
+    ///   from peers
     pub fn with_message_receiver(mut self, message_receiver: T) -> Self {
         self.message_receiver = Some(message_receiver);
         self
@@ -192,7 +192,7 @@ where
     /// # Arguments
     ///
     /// * `network_dispatcher_sender` - a `DispatchMessageSender<NetworkMessageType>` to dispatch
-    ///    `NetworkMessages`
+    ///   `NetworkMessages`
     pub fn with_network_dispatcher_sender(
         mut self,
         network_dispatcher_sender: DispatchMessageSender<NetworkMessageType>,

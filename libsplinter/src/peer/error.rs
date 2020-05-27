@@ -19,7 +19,7 @@ use std::{error, fmt};
 pub enum PeerManagerError {
     /// `PeerManager` start up failed
     StartUpError(String),
-    /// Error raised when a message failed to send
+    /// A message failed to send
     SendMessageError(String),
 }
 

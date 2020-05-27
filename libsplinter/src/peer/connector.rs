@@ -63,14 +63,14 @@ impl PeerManagerConnector {
     /// Requests that a peer is added to the `PeerManager`. If a peer already exists, the peer's
     /// reference count will be incremented
     ///
+    /// Returns a `PeerRef` that, when dropped, will automatically send a removal request to the
+    /// `PeerManager`.
+    ///
     /// # Arguments
     ///
     /// * `peer_id` -  The unique ID for the peer.
     /// * `endpoints` -  The list of endpoints associated with the peer. The list should be in
-    ///     preference order, with the first endpoint being the first attempted.
-    ///
-    /// Returns a `PeerRef`, that when dropped, will automatically send a removal request to the
-    /// `PeerManager`.
+    ///   order of preference, with the first endpoint being the first attempted.
     pub fn add_peer_ref(
         &self,
         peer_id: String,
@@ -100,11 +100,11 @@ impl PeerManagerConnector {
     /// Requests that a peer is added to the `PeerManager`. This function should be used when the
     /// peer ID is unknown.
     ///
+    /// Returns `Ok(EndpointPeerRef)` if the unidentified peer was added
+    ///
     /// # Arguments
     ///
     /// * `endpoint` - The endpoint associated with the peer.
-    ///
-    /// Returns `Ok(EndpointPeerRef)` if the unidentified peer was added
     pub fn add_unidentified_peer(
         &self,
         endpoint: String,
@@ -150,8 +150,8 @@ impl PeerManagerConnector {
     /// Requests the list of unreferenced peers.
     ///
     /// Unreferenced peers are those peers that have successfully connected from a remote node, but
-    /// have not yet be referenced by a circuit.  These peers are available to be promoted to fully
-    /// refrerenced peers.
+    /// have not yet been referenced by a circuit. These peers are available to be promoted to
+    /// fully refrerenced peers.
     pub fn list_unreferenced_peers(&self) -> Result<Vec<String>, PeerListError> {
         let (sender, recv) = channel();
         let message =
@@ -170,9 +170,9 @@ impl PeerManagerConnector {
             .map_err(|err| PeerListError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Requests the map of currently connected peers to connection ID
+    /// Requests the map of currently connected peers to connection IDs
     ///
-    /// Returns a map of peer ID to connection ID
+    /// Returns a map of peer IDs to connection IDs
     pub fn connection_ids(&self) -> Result<BiHashMap<String, String>, PeerConnectionIdError> {
         let (sender, recv) = channel();
         let message = PeerManagerMessage::Request(PeerManagerRequest::ConnectionIds { sender });
@@ -253,7 +253,7 @@ impl PeerLookupProvider for PeerManagerConnector {
     }
 }
 
-/// The `PeerRemover` will be used in the `PeerRef` to decrement the reference count for a peer when
+/// The `PeerRemover` will be used by `PeerRef` to decrement the reference count for a peer when
 /// the `PeerRef` is dropped.
 #[derive(Clone, Debug)]
 pub(crate) struct PeerRemover {
@@ -261,9 +261,9 @@ pub(crate) struct PeerRemover {
 }
 
 impl PeerRemover {
-    /// This function will only be called when the PeerRef is dropped.
-    ///
     /// Sends a request to the `PeerManager` to remove a peer.
+    ///
+    /// This function will only be called when the PeerRef is dropped.
     ///
     /// # Arguments
     /// * `peer_id` - the peer ID of the `PeerRef` that has been dropped
@@ -288,7 +288,7 @@ impl PeerRemover {
             .map_err(|err| PeerRefRemoveError::ReceiveError(format!("{:?}", err)))?
     }
 
-    /// Sends a request to the `PeerManager` to remove a peer.
+    /// Sends a request to the `PeerManager` to remove a peer by its endpoint.
     ///
     /// This function will only be called when the `EndpointPeerRef` is dropped.
     ///
