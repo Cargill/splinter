@@ -86,16 +86,15 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("contract")
                 .about("List, show, or upload a Sabre smart contract")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("upload")
                         .about("Upload a Sabre contract")
                         .args(&[
                             Arg::with_name("scar")
                                 .long_help(
-                                    "The name and version requirement of the .scar to upload, in \
-                                     the format 'name:version_req'. The contract name must not \
-                                     include underscores, '_'. The version requirement can \
-                                     be any valid semver requirement string.",
+                                    "Name and version requirement of the smart contract archive \
+                                     (scar) file to upload",
                                 )
                                 .required(true),
                             Arg::with_name("path")
@@ -122,7 +121,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -147,7 +146,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -174,7 +173,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -186,7 +185,7 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("contract")
                                 .help(
                                     "Name and version of the smart contract in the form \
-                                     'name:verion'",
+                                     'name:version'",
                                 )
                                 .takes_value(true)
                                 .required(true),
@@ -239,7 +238,7 @@ fn run() -> Result<(), CliError> {
                         .short("U")
                         .long("url")
                         .takes_value(true)
-                        .default_value("http://localhost:8008"),
+                        .default_value("http://localhost:8080"),
                     Arg::with_name("service-id")
                         .long_help(
                             "Fully-qualified service ID of the scabbard service (must be of the \
@@ -262,6 +261,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("ns")
                 .about("Create, update, or delete a Sabre namespace")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("create")
                         .about("Create a Sabre namespace")
@@ -269,10 +269,10 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("namespace")
                                 .help("A global state address prefix (namespace)")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this namespace")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this namespace")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -290,7 +290,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -313,10 +313,10 @@ fn run() -> Result<(), CliError> {
                             Arg::with_name("namespace")
                                 .help("A global state address prefix (namespace)")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this namespace")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this namespace")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -334,7 +334,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -371,7 +371,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -431,7 +431,7 @@ fn run() -> Result<(), CliError> {
                         .short("U")
                         .long("url")
                         .takes_value(true)
-                        .default_value("http://localhost:8008"),
+                        .default_value("http://localhost:8080"),
                     Arg::with_name("service-id")
                         .long_help(
                             "Fully-qualified service ID of the scabbard service (must be of the \
@@ -454,17 +454,18 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("cr")
                 .about("Create, update, or delete a Sabre contract registry")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("create")
                         .about("Create a Sabre contract registry")
                         .args(&[
                             Arg::with_name("name")
-                                .help("Name of the contracts in the registry")
+                                .help("Name of the contract")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this contract registry")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this contract registry")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -482,7 +483,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -503,12 +504,12 @@ fn run() -> Result<(), CliError> {
                         .about("Update an existing Sabre contract registry")
                         .args(&[
                             Arg::with_name("name")
-                                .help("Name of the contracts in the registry")
+                                .help("Name of the contract")
                                 .required(true),
-                            Arg::with_name("owner")
-                                .help("Owner of this contract registry")
+                            Arg::with_name("owners")
+                                .help("Public keys of the owners of this contract registry")
                                 .short("O")
-                                .long("owner")
+                                .long("owners")
                                 .required(true)
                                 .takes_value(true)
                                 .multiple(true),
@@ -526,7 +527,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -547,7 +548,7 @@ fn run() -> Result<(), CliError> {
                         .about("Delete a Sabre contract registry")
                         .args(&[
                             Arg::with_name("name")
-                                .help("name of the contracts in the registry")
+                                .help("Name of the contract")
                                 .required(true),
                             Arg::with_name("key")
                                 .long_help(
@@ -563,7 +564,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -587,6 +588,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("sp")
                 .about("Create, update or delete smart permissions")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("create")
                         .about("Create a smart permission")
@@ -617,7 +619,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -663,7 +665,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -703,7 +705,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -727,6 +729,7 @@ fn run() -> Result<(), CliError> {
         app = app.subcommand(
             SubCommand::with_name("state")
                 .about("Get scabbard state information")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("root")
                         .about("Get the current state root hash")
@@ -736,7 +739,7 @@ fn run() -> Result<(), CliError> {
                                 .short("U")
                                 .long("url")
                                 .takes_value(true)
-                                .default_value("http://localhost:8008"),
+                                .default_value("http://localhost:8080"),
                             Arg::with_name("service-id")
                                 .long_help(
                                     "Fully-qualified service ID of the scabbard service (must be \
@@ -787,15 +790,9 @@ fn run() -> Result<(), CliError> {
                 let scar = matches
                     .value_of("scar")
                     .ok_or_else(|| CliError::MissingArgument("scar".into()))?;
-                let mut split = scar.splitn(2, ':');
-                let name = split.next().ok_or_else(|| {
+                let (name, version) = parse_name_version(scar).ok_or_else(|| {
                     CliError::InvalidArgument(
-                        "'scar' argument must be in the format 'name:version'".into(),
-                    )
-                })?;
-                let version = split.next().ok_or_else(|| {
-                    CliError::InvalidArgument(
-                        "'scar' argument must be in the format 'name:version'".into(),
+                        "'scar' argument must be of the form 'name:version'".into(),
                     )
                 })?;
 
@@ -881,13 +878,9 @@ fn run() -> Result<(), CliError> {
                 let contract = matches
                     .value_of("contract")
                     .ok_or_else(|| CliError::MissingArgument("contract".into()))?;
-                let name_version = contract.splitn(2, ':').collect::<Vec<_>>();
-                let name = name_version.get(0).ok_or_else(|| {
-                    CliError::InvalidArgument("contract invalid: cannot be empty".into())
-                })?;
-                let version = name_version.get(1).ok_or_else(|| {
+                let (name, version) = parse_name_version(contract).ok_or_else(|| {
                     CliError::InvalidArgument(
-                        "contract invalid: must be of the form 'name:version'".into(),
+                        "--contract must be of the form 'name:version'".into(),
                     )
                 })?;
 
@@ -943,12 +936,9 @@ fn run() -> Result<(), CliError> {
             let contract = matches
                 .value_of("contract")
                 .ok_or_else(|| CliError::MissingArgument("contract".into()))?;
-            let (name, version) = match contract.splitn(2, ':').collect::<Vec<_>>() {
-                v if v.len() == 2 => Ok((v[0], v[1])),
-                _ => Err(CliError::InvalidArgument(
-                    "--contract must be of the form 'name:version'".into(),
-                )),
-            }?;
+            let (name, version) = parse_name_version(contract).ok_or_else(|| {
+                CliError::InvalidArgument("--contract must be of the form 'name:version'".into())
+            })?;
 
             let inputs = matches
                 .values_of("inputs")
@@ -1007,8 +997,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("namespace")
                     .ok_or_else(|| CliError::MissingArgument("namespace".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1048,8 +1038,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("namespace")
                     .ok_or_else(|| CliError::MissingArgument("namespace".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1179,8 +1169,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("name")
                     .ok_or_else(|| CliError::MissingArgument("name".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1220,8 +1210,8 @@ fn run() -> Result<(), CliError> {
                     .value_of("name")
                     .ok_or_else(|| CliError::MissingArgument("name".into()))?;
                 let owners = matches
-                    .values_of("owner")
-                    .ok_or_else(|| CliError::MissingArgument("owner".into()))?
+                    .values_of("owners")
+                    .ok_or_else(|| CliError::MissingArgument("owners".into()))?
                     .map(String::from)
                     .collect();
 
@@ -1447,6 +1437,14 @@ fn log_format(
     record: &Record,
 ) -> Result<(), std::io::Error> {
     write!(w, "{}", record.args(),)
+}
+
+/// Attempts to parse the given string as "name:version" and return the two values.
+fn parse_name_version(name_version_string: &str) -> Option<(&str, &str)> {
+    match name_version_string.splitn(2, ':').collect::<Vec<_>>() {
+        v if v.len() == 2 => Some((v[0], v[1])),
+        _ => None,
+    }
 }
 
 /// Load the contents of a file into a bytes vector.
