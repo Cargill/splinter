@@ -1,5 +1,81 @@
 # Release Notes
 
+## Changes in Splinter 0.3.19
+
+### Highlights
+
+* A stable 0-4 branch has been created for 0.4 pre-release work. Work on the 0.3
+  release will continue on the 0-4 branch until a 0.4 release.
+
+* The PeerManager can be configured to either panic or return an error if a
+  non-existing peer reference is requested to be removed.
+
+* The following subcommands of the scabbard CLI have been stabilized:
+  - `contract list`
+  - `contract show`
+  - `contract upload`
+  - `exec`
+  - `ns create`
+  - `ns delete`
+  - `ns update`
+  - `perm`
+  - `cr create`
+  - `cr delete`
+  - `cr update`
+  - `state root`
+
+### Deprecations and Breaking Changes
+
+* The old `Network` struct has been replaced by the use of PeerManager and
+  PeerInterconnect. The `Network` struct and the associated components are
+  deprecated. They are now only available behind the `test` features and are no
+  longer a part of the public API. Once all tests have been updated to not use
+  `Network`, it will be removed.
+
+### libsplinter
+
+* Update the treatment of peers created by `add_unidentified_peer` to be the
+  same as peers added with `add_peer`. This change allows automatic reconnection
+  for peers that were added with the `splinterd` `--peers` CLI option or `peers`
+  configuration setting.
+
+* Improve the Rust API documentation for `splinter::peer`, including information
+  for `PeerManager` and `PeerInterconnect`.
+
+* Explicitly set the verify mode for `TLS transport`. The defaults are not
+  always sufficient for rejecting a connection with a peer who has self-signed
+  certificates. This commit sets the verify modes of the TLS transport to
+  `SslVerifyMode::PEER` and `SslVerifyMode::FAIL_IF_NO_PEER_CERT`. For more
+  information see https://www.openssl.org/docs/man1.1.0/man3/SSL_CTX_set_verify.html
+
+* Update `RefMap::remove_ref` to return an error instead of a panic if the
+  reference has already been removed. This allows `PeerManager` to decide if it
+  should panic if `RefMap::ref_remove` returns an error depending on the value
+  of `strict_ref_count`.
+
+* Improve the Rust API documentation for `splinter::collections::ref_map`.
+
+### splinterd
+
+ *  Add the  `SPLINTER_STRICT_REF_COUNT` environment variable to splinterd.
+  Setting `SPLINTER_STRICT_REF_COUNT=true` while running `splinterd` will set
+  `strict_ref_count` to true in the `PeerManager`. This will cause `splinterd`
+  to panic if a non-existing peer reference is requested to be removed.
+
+### Gameroom
+
+* The gameroom docker-compose file that uses DockerHub images now uses 0.4-dev
+  instead of master.
+
+* Update the error handling in the Gameroom client to display the original error
+  from the response.
+
+### Miscellaneous
+
+* Add files generated for the `/services/scabbard/cli` and
+  `/services/scabbard/libscabbard` crates to the repository's `.gitignore` and
+  `.dockerignore`.
+
 ## Changes in Splinter 0.3.18
 
 ### Deprecations and Breaking Changes
