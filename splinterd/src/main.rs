@@ -412,7 +412,8 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_registry_auto_refresh(config.registry_auto_refresh())
         .with_registry_forced_refresh(config.registry_forced_refresh())
         .with_heartbeat(config.heartbeat())
-        .with_admin_timeout(admin_timeout);
+        .with_admin_timeout(admin_timeout)
+        .with_strict_ref_counts(config.strict_ref_counts());
 
     #[cfg(feature = "service-endpoint")]
     {
