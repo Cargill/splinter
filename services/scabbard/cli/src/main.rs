@@ -460,7 +460,7 @@ fn run() -> Result<(), CliError> {
                         .about("Create a Sabre contract registry")
                         .args(&[
                             Arg::with_name("name")
-                                .help("Name of the contracts in the registry")
+                                .help("Name of the contract")
                                 .required(true),
                             Arg::with_name("owners")
                                 .help("Public keys of the owners of this contract registry")
@@ -504,7 +504,7 @@ fn run() -> Result<(), CliError> {
                         .about("Update an existing Sabre contract registry")
                         .args(&[
                             Arg::with_name("name")
-                                .help("Name of the contracts in the registry")
+                                .help("Name of the contract")
                                 .required(true),
                             Arg::with_name("owners")
                                 .help("Public keys of the owners of this contract registry")
@@ -548,7 +548,7 @@ fn run() -> Result<(), CliError> {
                         .about("Delete a Sabre contract registry")
                         .args(&[
                             Arg::with_name("name")
-                                .help("name of the contracts in the registry")
+                                .help("Name of the contract")
                                 .required(true),
                             Arg::with_name("key")
                                 .long_help(
