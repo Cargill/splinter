@@ -23,15 +23,6 @@ use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[cfg(any(
-    feature = "contract",
-    feature = "execute",
-    feature = "namespace",
-    feature = "namespace-permission",
-    feature = "contract-registry",
-    feature = "smart-permissions",
-    feature = "state"
-))]
 use clap::SubCommand;
 use clap::{App, AppSettings, Arg};
 use flexi_logger::{DeferredNow, LogSpecBuilder, Logger};
@@ -79,11 +70,8 @@ fn run() -> Result<(), CliError> {
                 .short("v")
                 .global(true)
                 .multiple(true),
-        );
-
-    #[cfg(feature = "contract")]
-    {
-        app = app.subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("contract")
                 .about("List, show, or upload a Sabre smart contract")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -191,12 +179,8 @@ fn run() -> Result<(), CliError> {
                                 .required(true),
                         ]),
                 ),
-        );
-    }
-
-    #[cfg(feature = "execute")]
-    {
-        app = app.subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("exec")
                 .about("Execute a Sabre contract")
                 .args(&[
@@ -253,12 +237,8 @@ fn run() -> Result<(), CliError> {
                         .takes_value(true)
                         .default_value("300"),
                 ]),
-        );
-    }
-
-    #[cfg(feature = "namespace")]
-    {
-        app = app.subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("ns")
                 .about("Create, update, or delete a Sabre namespace")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -387,12 +367,8 @@ fn run() -> Result<(), CliError> {
                                 .default_value("300"),
                         ]),
                 ),
-        );
-    }
-
-    #[cfg(feature = "namespace-permission")]
-    {
-        app = app.subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("perm")
                 .about("Set or delete a Sabre namespace permission")
                 .args(&[
@@ -446,12 +422,8 @@ fn run() -> Result<(), CliError> {
                         .takes_value(true)
                         .default_value("300"),
                 ]),
-        );
-    }
-
-    #[cfg(feature = "contract-registry")]
-    {
-        app = app.subcommand(
+        )
+        .subcommand(
             SubCommand::with_name("cr")
                 .about("Create, update, or delete a Sabre contract registry")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -580,8 +552,32 @@ fn run() -> Result<(), CliError> {
                                 .default_value("300"),
                         ]),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name("state")
+                .about("Get scabbard state information")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand(
+                    SubCommand::with_name("root")
+                        .about("Get the current state root hash")
+                        .args(&[
+                            Arg::with_name("url")
+                                .help("URL to the scabbard REST API")
+                                .short("U")
+                                .long("url")
+                                .takes_value(true)
+                                .default_value("http://localhost:8080"),
+                            Arg::with_name("service-id")
+                                .long_help(
+                                    "Fully-qualified service ID of the scabbard service (must be \
+                                     of the form 'circuit_id::service_id')",
+                                )
+                                .long("service-id")
+                                .takes_value(true)
+                                .required(true),
+                        ]),
+                ),
         );
-    }
 
     #[cfg(feature = "smart-permissions")]
     {
@@ -719,35 +715,6 @@ fn run() -> Result<(), CliError> {
                                 .long("wait")
                                 .takes_value(true)
                                 .default_value("300"),
-                        ]),
-                ),
-        );
-    }
-
-    #[cfg(feature = "state")]
-    {
-        app = app.subcommand(
-            SubCommand::with_name("state")
-                .about("Get scabbard state information")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommand(
-                    SubCommand::with_name("root")
-                        .about("Get the current state root hash")
-                        .args(&[
-                            Arg::with_name("url")
-                                .help("URL to the scabbard REST API")
-                                .short("U")
-                                .long("url")
-                                .takes_value(true)
-                                .default_value("http://localhost:8080"),
-                            Arg::with_name("service-id")
-                                .long_help(
-                                    "Fully-qualified service ID of the scabbard service (must be \
-                                     of the form 'circuit_id::service_id')",
-                                )
-                                .long("service-id")
-                                .takes_value(true)
-                                .required(true),
                         ]),
                 ),
         );
