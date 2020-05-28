@@ -132,7 +132,14 @@ import Loading from '@/components/Loading.vue';
           await store.dispatch('games/listGames', to.params.id);
           next();
         } catch (e) {
-          next({ name: 'not-found' });
+          store.commit('pageLoading/setPageLoadingComplete');
+          if (e.response.status === 404) {
+            next({ name: 'not-found' });
+          } else if (e.response.status >= 500 || e.response.status < 600) {
+            next({ name: 'server-error' });
+          } else {
+            next({ name: 'request-error' });
+          }
         }
       }
 
@@ -144,7 +151,14 @@ import Loading from '@/components/Loading.vue';
           await store.dispatch('games/listGames', to.params.id);
           next();
         } catch (e) {
-          next({ name: 'not-found' });
+          store.commit('pageLoading/setPageLoadingComplete');
+          if (e.response.status === 404) {
+            next({ name: 'not-found' });
+          } else if (e.response.status >= 500 || e.response.status < 600) {
+            next({ name: 'server-error' });
+          } else {
+            next({ name: 'request-error' });
+          }
         }
       }
 
