@@ -51,22 +51,10 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
-  "contract",
-  "contract-registry",
-  "execute",
-  "namespace",
-  "namespace-permission",
   "smart-permissions",
-  "state",
 ]
 
-contract = []
-contract-registry = []
-execute = []
-namespace = []
-namespace-permission = []
 smart-permissions = []
-state = []
 
 [package.metadata.deb]
 maintainer = "The Splinter Team"
