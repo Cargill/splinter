@@ -46,7 +46,7 @@ pub struct PeerMap {
 
 /// A map of Peer IDs to peer metadata, which also maintains a redirect table for updated peer IDs.
 ///
-/// Peer metadata includes the peer_id, the list of endpoints and the current active endpoint.
+/// Peer metadata includes the peer ID, the list of endpoints and the current active endpoint.
 impl PeerMap {
     pub fn new(initial_retry_frequency: u64) -> Self {
         PeerMap {
@@ -56,7 +56,7 @@ impl PeerMap {
         }
     }
 
-    /// Returns the current list of peer IDs.
+    /// Returns the current list of peer IDs
     pub fn peer_ids(&self) -> Vec<String> {
         self.peers
             .iter()
@@ -64,7 +64,7 @@ impl PeerMap {
             .collect()
     }
 
-    /// Returns the current map of peer IDs to connection_ids
+    /// Returns the current map of peer IDs to connection IDs
     pub fn connection_ids(&self) -> BiHashMap<String, String> {
         let mut peer_to_connection_id = BiHashMap::new();
         for (peer, metadata) in self.peers.iter() {
@@ -74,7 +74,7 @@ impl PeerMap {
         peer_to_connection_id
     }
 
-    /// Insert a new peer ID and endpoints
+    /// Inserts a new peer ID and endpoints
     pub fn insert(
         &mut self,
         peer_id: String,
@@ -100,7 +100,7 @@ impl PeerMap {
         }
     }
 
-    /// Remove a peer ID and its endpoint. Returns the PeerMetdata if the peer exists.
+    /// Removes a peer ID and its endpoints. Returns the `PeerMetdata` if the peer exists.
     pub fn remove(&mut self, peer_id: &str) -> Option<PeerMetadata> {
         if let Some(peer_metadata) = self.peers.remove(&peer_id.to_string()) {
             for endpoint in peer_metadata.endpoints.iter() {
@@ -112,7 +112,8 @@ impl PeerMap {
             None
         }
     }
-    /// Updates an existing peer, all fields can be updated except peer_id.
+
+    /// Updates an existing peer. All fields can be updated except `peer_id`.
     pub fn update_peer(&mut self, peer_metadata: PeerMetadata) -> Result<(), PeerUpdateError> {
         // Only valid if the peer already exists
         if self.peers.contains_key(&peer_metadata.id) {
