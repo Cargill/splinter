@@ -52,6 +52,7 @@ CMD cargo login $CARGO_CRED \
  && cargo test \
  && cargo publish \
  && cd /project/splinter/services/scabbard/libscabbard \
+ && sed -i'' -e "s/splinter = {.*$/splinter\ =\ \"$REPO_VERSION\"/" Cargo.toml \
  && rm -f ../../../Cargo.lock ./Cargo.lock \
  && cargo clean \
  && cargo test \
