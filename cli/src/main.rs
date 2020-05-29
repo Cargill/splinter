@@ -84,6 +84,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         (@setting SubcommandRequiredElseHelp)
         (@subcommand admin =>
             (about: "Administrative commands")
+            (@setting SubcommandRequiredElseHelp)
             (@subcommand keygen =>
                 (about: "Generates secp256k1 keys to use when signing circuit proposals")
                 (@arg key_name: +takes_value "Name of the key to create; defaults to \"splinter\"")
@@ -509,6 +510,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     app = app.subcommand(
         SubCommand::with_name("registry")
             .about("Splinter registry commands")
+            .setting(AppSettings::SubcommandRequiredElseHelp)
             .subcommand(
                 SubCommand::with_name("build")
                     .about("Add a node to a YAML file")
@@ -549,6 +551,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         app = app.subcommand(
             SubCommand::with_name("health")
                 .about("Displays information about network health")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("status")
                         .about(
@@ -571,6 +574,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         app = app.subcommand(
             SubCommand::with_name("database")
                 .about("Database commands")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("migrate")
                         .about("Runs database migrations for the enabled Splinter features")
