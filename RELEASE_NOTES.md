@@ -1,5 +1,23 @@
 # Release Notes
 
+## Changes in Splinter 0.4.0
+
+### Highlights
+
+* The Splinter v0.4 release commits to API stability. Changes in future v0.4.x
+  releases will be backward compatible with release v0.4, so that application
+  developers can rely on the existing behavior and features of the Splinter
+  APIs. For overview information, see [Splinter
+  Releases](https://www.splinter.dev/releases/).
+
+* This release includes all changes in 0.3.19.
+
+### Splinter CLI
+
+  * Add the SubcommandRequireOrHelp setting to all top-level subcommands that
+  did not have the setting. This will display help text if the command does not
+  include any of the child subcommands.
+
 ## Changes in Splinter 0.3.19
 
 ### Highlights
