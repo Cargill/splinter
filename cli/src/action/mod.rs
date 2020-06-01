@@ -34,7 +34,7 @@ use clap::ArgMatches;
 
 use super::error::CliError;
 
-const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8085";
+const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8080";
 const SPLINTER_REST_API_URL_ENV: &str = "SPLINTER_REST_API_URL";
 
 /// A CLI Command Action.
