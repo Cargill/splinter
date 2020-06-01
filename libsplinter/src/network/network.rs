@@ -330,7 +330,7 @@ impl Network {
             }
         };
 
-        Ok(NetworkMessageWrapper::new(peer_id, envelope.take_payload()))
+        Ok(NetworkMessageWrapper::new(peer_id, Vec::from(envelope)))
     }
 
     pub fn recv_timeout(
@@ -348,7 +348,7 @@ impl Network {
             }
         };
 
-        Ok(NetworkMessageWrapper::new(peer_id, envelope.take_payload()))
+        Ok(NetworkMessageWrapper::new(peer_id, Vec::from(envelope)))
     }
 
     pub fn shutdown_signaler(&self) -> MeshShutdownSignaler {

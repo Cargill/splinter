@@ -169,13 +169,13 @@ impl Mesh {
     /// Send the envelope on the mesh.
     ///
     /// This is a convenience function and is equivalent to
-    /// `mesh.outgoing(envelope.id()).send(envelope.take_payload())`.
+    /// `mesh.outgoing(envelope.id()).send(Vec::from(envelope))`.
     pub fn send(&self, envelope: Envelope) -> Result<(), SendError> {
         let state = &self.state.read().map_err(|_| SendError::PoisonedLock)?;
         let id = envelope.id().to_string();
         if let Some(mesh_id) = state.unique_ids.get_by_key(&id) {
             match state.outgoings.get(mesh_id) {
-                Some(ref outgoing) => match outgoing.send(envelope.take_payload()) {
+                Some(ref outgoing) => match outgoing.send(Vec::from(envelope)) {
                     Ok(()) => Ok(()),
                     Err(err) => Err(SendError::from_outgoing_send_error(err, id)),
                 },

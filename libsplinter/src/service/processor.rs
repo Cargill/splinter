@@ -184,7 +184,7 @@ impl ServiceProcessor {
                     while incoming_running.load(Ordering::SeqCst) {
                         let timeout = Duration::from_secs(TIMEOUT_SEC);
                         let message_bytes = match incoming_mesh.recv_timeout(timeout) {
-                            Ok(envelope) => envelope.take_payload(),
+                            Ok(envelope) => Vec::from(envelope),
                             Err(MeshRecvTimeoutError::Timeout) => continue,
                             Err(MeshRecvTimeoutError::Disconnected) => {
                                 error!("Mesh Disconnected");
