@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use clap::ArgMatches;
+use reqwest::StatusCode;
 use serde_json::Value;
 
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
@@ -20,6 +21,10 @@ use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 use crate::error::CliError;
 
 pub struct StatusAction;
+
+const SPLINTERD_MISSING_HEALTH_STATUS: &str = "The health status endpoint was not found. \
+                                               The specified splinter daemon has not enabled this \
+                                               feature.";
 
 impl Action for StatusAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
@@ -29,15 +34,37 @@ impl Action for StatusAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-        let status: Value = reqwest::blocking::get(&format!("{}/health/status", url))
-            .and_then(|res| res.json())
-            .map_err(|err| CliError::ActionError(format!("{:?}", err)))?;
-
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&status)
-                .map_err(|_| CliError::ActionError("Failed to serialize response".into()))?
-        );
-        Ok(())
+        reqwest::blocking::get(&format!("{}/health/status", url))
+            .map_err(|err| match err.status() {
+                Some(StatusCode::NOT_FOUND) => {
+                    CliError::ActionError(SPLINTERD_MISSING_HEALTH_STATUS.into())
+                }
+                Some(status_code) => CliError::ActionError(format!(
+                    "The server failed to respond({}).",
+                    status_code.as_u16()
+                )),
+                _ => CliError::ActionError(format!("Unable to contact the server at {}", url)),
+            })
+            .and_then(|res| match res.status() {
+                StatusCode::OK => res.json().map_err(|_| {
+                    CliError::ActionError("The server failed to send a valid response".into())
+                }),
+                StatusCode::NOT_FOUND => Err(CliError::ActionError(
+                    SPLINTERD_MISSING_HEALTH_STATUS.into(),
+                )),
+                status_code => Err(CliError::ActionError(format!(
+                    "The server failed to respond({}).",
+                    status_code.as_u16()
+                ))),
+            })
+            .and_then(|status: Value| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&status).map_err(|_| CliError::ActionError(
+                        "Failed to serialize response".into()
+                    ))?
+                );
+                Ok(())
+            })
     }
 }
