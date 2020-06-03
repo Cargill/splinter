@@ -268,53 +268,53 @@ impl From<protobuf::error::ProtobufError> for DispatchError {
 mod tests {
 
     use super::*;
+
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
     use crate::circuit::directory::CircuitDirectory;
     use crate::circuit::{AuthorizationType, Circuit, DurabilityType, PersistenceType, RouteType};
-    use crate::mesh::Mesh;
     use crate::network::dispatch::Dispatcher;
-    use crate::network::sender;
-    use crate::network::{Network, NetworkMessageWrapper};
     use crate::protos::circuit::CircuitMessage;
     use crate::protos::network::NetworkMessage;
     use crate::storage::get_storage;
-    use crate::transport::inproc::InprocTransport;
-    use crate::transport::{Listener, Transport};
 
     #[test]
     // Test that if the circuit does not exist, a ServiceConnectResponse is returned with
     // a ERROR_CIRCUIT_DOES_NOT_EXIST
     fn test_service_connect_request_handler_no_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let storage = get_storage("memory", CircuitDirectory::new).unwrap();
-                let circuit_directory = storage.read().clone();
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
-                let handler = ServiceConnectRequestHandler::new(
-                    "123".to_string(),
-                    vec!["127.0.0.1:0".to_string()],
-                    state,
-                );
+        let storage = get_storage("memory", CircuitDirectory::new).unwrap();
+        let circuit_directory = storage.read().clone();
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let handler = ServiceConnectRequestHandler::new(
+            "123".to_string(),
+            vec!["127.0.0.1:0".to_string()],
+            state,
+        );
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut connect_request = ServiceConnectRequest::new();
-                connect_request.set_circuit("alpha".into());
-                connect_request.set_service_id("abc".into());
-                let connect_bytes = connect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut connect_request = ServiceConnectRequest::new();
+        connect_request.set_circuit("alpha".into());
+        connect_request.set_service_id("abc".into());
+        let connect_bytes = connect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "abc".into(),
-                        &CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                        connect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "abc".into(),
+                &CircuitMessageType::SERVICE_CONNECT_REQUEST,
+                connect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc",
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -331,40 +331,41 @@ mod tests {
     // Test that if the service is not in circuit, a ServiceConnectResponse is returned with
     // a ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY
     fn test_service_connect_request_handler_not_in_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("BAD".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = build_circuit();
+        let circuit = build_circuit();
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
-                let handler = ServiceConnectRequestHandler::new(
-                    "123".to_string(),
-                    vec!["127.0.0.1:0".to_string()],
-                    state,
-                );
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let handler = ServiceConnectRequestHandler::new(
+            "123".to_string(),
+            vec!["127.0.0.1:0".to_string()],
+            state,
+        );
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut connect_request = ServiceConnectRequest::new();
-                connect_request.set_circuit("alpha".into());
-                connect_request.set_service_id("BAD".into());
-                let connect_bytes = connect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut connect_request = ServiceConnectRequest::new();
+        connect_request.set_circuit("alpha".into());
+        connect_request.set_service_id("BAD".into());
+        let connect_bytes = connect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "BAD".into(),
-                        &CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                        connect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "BAD".into(),
+                &CircuitMessageType::SERVICE_CONNECT_REQUEST,
+                connect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "BAD",
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "BAD");
@@ -381,43 +382,44 @@ mod tests {
     // Test that if the service is in a circuit and not connected, a ServiceConnectResponse is
     // returned with an OK
     fn test_service_connect_request_handler() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = build_circuit();
+        let circuit = build_circuit();
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
-                let handler = ServiceConnectRequestHandler::new(
-                    "123".to_string(),
-                    vec!["127.0.0.1:0".to_string()],
-                    state.clone(),
-                );
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let handler = ServiceConnectRequestHandler::new(
+            "123".to_string(),
+            vec!["127.0.0.1:0".to_string()],
+            state.clone(),
+        );
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut connect_request = ServiceConnectRequest::new();
-                connect_request.set_circuit("alpha".into());
-                connect_request.set_service_id("abc".into());
-                let connect_bytes = connect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut connect_request = ServiceConnectRequest::new();
+        connect_request.set_circuit("alpha".into());
+        connect_request.set_service_id("abc".into());
+        let connect_bytes = connect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "abc".into(),
-                        &CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                        connect_bytes.clone(),
-                    )
-                    .unwrap();
+        dispatcher
+            .dispatch(
+                "abc".into(),
+                &CircuitMessageType::SERVICE_CONNECT_REQUEST,
+                connect_bytes.clone(),
+            )
+            .unwrap();
 
-                let id = ServiceId::new("alpha".into(), "abc".into());
-                assert!(state.get_service(&id).unwrap().is_some());
-            },
-            "123",
+        let id = ServiceId::new("alpha".into(), "abc".into());
+        assert!(state.get_service(&id).unwrap().is_some());
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc",
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -431,46 +433,46 @@ mod tests {
     // Test that if the service is in a circuit and already connected, a ServiceConnectResponse is
     // returned with an ERROR_SERVICE_ALREADY_REGISTERED
     fn test_service_connect_request_handler_already_connected() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = build_circuit();
+        let circuit = build_circuit();
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service =
-                    Service::new("abc".to_string(), Some("abc_network".to_string()), node);
-                let id = ServiceId::new("alpha".into(), "abc".into());
-                state.add_service(id.clone(), service).unwrap();
-                let handler = ServiceConnectRequestHandler::new(
-                    "123".to_string(),
-                    vec!["127.0.0.1:0".to_string()],
-                    state,
-                );
+        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service = Service::new("abc".to_string(), Some("abc_network".to_string()), node);
+        let id = ServiceId::new("alpha".into(), "abc".into());
+        state.add_service(id.clone(), service).unwrap();
+        let handler = ServiceConnectRequestHandler::new(
+            "123".to_string(),
+            vec!["127.0.0.1:0".to_string()],
+            state,
+        );
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut connect_request = ServiceConnectRequest::new();
-                connect_request.set_circuit("alpha".into());
-                connect_request.set_service_id("abc".into());
-                let connect_bytes = connect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut connect_request = ServiceConnectRequest::new();
+        connect_request.set_circuit("alpha".into());
+        connect_request.set_service_id("abc".into());
+        let connect_bytes = connect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "abc".into(),
-                        &CircuitMessageType::SERVICE_CONNECT_REQUEST,
-                        connect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "abc".into(),
+                &CircuitMessageType::SERVICE_CONNECT_REQUEST,
+                connect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc",
             CircuitMessageType::SERVICE_CONNECT_RESPONSE,
             |msg: ServiceConnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -487,33 +489,34 @@ mod tests {
     // Test that if the circuit does not exist, a ServiceDisconnectResponse is returned with
     // a ERROR_CIRCUIT_DOES_NOT_EXIST
     fn test_service_disconnect_request_handler_no_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let storage = get_storage("memory", CircuitDirectory::new).unwrap();
-                let circuit_directory = storage.read().clone();
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
-                let handler = ServiceDisconnectRequestHandler::new(state);
+        let storage = get_storage("memory", CircuitDirectory::new).unwrap();
+        let circuit_directory = storage.read().clone();
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let handler = ServiceDisconnectRequestHandler::new(state);
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut disconnect_request = ServiceDisconnectRequest::new();
-                disconnect_request.set_circuit("alpha".into());
-                disconnect_request.set_service_id("abc".into());
-                let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut disconnect_request = ServiceDisconnectRequest::new();
+        disconnect_request.set_circuit("alpha".into());
+        disconnect_request.set_service_id("abc".into());
+        let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "abc".into(),
-                        &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                        disconnect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "abc".into(),
+                &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
+                disconnect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc",
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -530,36 +533,37 @@ mod tests {
     // Test that if the service is not in circuit, a ServiceDisconnectResponse is returned with
     // a ERROR_SERVICE_NOT_IN_CIRCUIT_REGISTRY
     fn test_service_disconnect_request_handler_not_in_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("BAD".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = build_circuit();
+        let circuit = build_circuit();
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
-                let handler = ServiceDisconnectRequestHandler::new(state);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let handler = ServiceDisconnectRequestHandler::new(state);
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut disconnect_request = ServiceDisconnectRequest::new();
-                disconnect_request.set_circuit("alpha".into());
-                disconnect_request.set_service_id("BAD".into());
-                let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut disconnect_request = ServiceDisconnectRequest::new();
+        disconnect_request.set_circuit("alpha".into());
+        disconnect_request.set_service_id("BAD".into());
+        let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "BAD".into(),
-                        &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                        disconnect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "BAD".into(),
+                &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
+                disconnect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "BAD",
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "BAD");
@@ -576,43 +580,43 @@ mod tests {
     // Test that if the service is in a circuit and already connected, a ServiceDisconnectResponse
     // is returned with an OK.
     fn test_service_disconnect_request_handler() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = build_circuit();
+        let circuit = build_circuit();
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service =
-                    Service::new("abc".to_string(), Some("abc_network".to_string()), node);
-                let id = ServiceId::new("alpha".into(), "abc".into());
-                state.add_service(id.clone(), service).unwrap();
+        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service = Service::new("abc".to_string(), Some("abc_network".to_string()), node);
+        let id = ServiceId::new("alpha".into(), "abc".into());
+        state.add_service(id.clone(), service).unwrap();
 
-                let handler = ServiceDisconnectRequestHandler::new(state.clone());
+        let handler = ServiceDisconnectRequestHandler::new(state.clone());
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut disconnect_request = ServiceDisconnectRequest::new();
-                disconnect_request.set_circuit("alpha".into());
-                disconnect_request.set_service_id("abc".into());
-                let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut disconnect_request = ServiceDisconnectRequest::new();
+        disconnect_request.set_circuit("alpha".into());
+        disconnect_request.set_service_id("abc".into());
+        let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "abc".into(),
-                        &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                        disconnect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "abc".into(),
+                &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
+                disconnect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc",
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -626,37 +630,38 @@ mod tests {
     // Test that if the service is in a circuit and not connected, a ServiceDisconnectResponse
     // is returned with an ERROR_SERVICE_NOT_REGISTERED
     fn test_service_disconnect_request_handler_not_connected() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = build_circuit();
+        let circuit = build_circuit();
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let handler = ServiceDisconnectRequestHandler::new(state);
+        let handler = ServiceDisconnectRequestHandler::new(state);
 
-                dispatcher.set_handler(Box::new(handler));
-                let mut disconnect_request = ServiceDisconnectRequest::new();
-                disconnect_request.set_circuit("alpha".into());
-                disconnect_request.set_service_id("abc".into());
-                let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
+        dispatcher.set_handler(Box::new(handler));
+        let mut disconnect_request = ServiceDisconnectRequest::new();
+        disconnect_request.set_circuit("alpha".into());
+        disconnect_request.set_service_id("abc".into());
+        let disconnect_bytes = disconnect_request.write_to_bytes().unwrap();
 
-                dispatcher
-                    .dispatch(
-                        "abc".into(),
-                        &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
-                        disconnect_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "123",
+        dispatcher
+            .dispatch(
+                "abc".into(),
+                &CircuitMessageType::SERVICE_DISCONNECT_REQUEST,
+                disconnect_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc",
             CircuitMessageType::SERVICE_DISCONNECT_RESPONSE,
             |msg: ServiceDisconnectResponse| {
                 assert_eq!(msg.get_service_id(), "abc");
@@ -693,71 +698,49 @@ mod tests {
         circuit
     }
 
-    // Helper function for running the tests. This function starts up two networks, a transport
-    // and a dispatcher. The function is passed the test to run, and the expected message that
-    // will be should be returned.
-    fn run_test<F: 'static, M: protobuf::Message, A>(
-        test: F,
-        expected_sender: &str,
-        expected_circuit_msg_type: CircuitMessageType,
-        detail_assertions: A,
-    ) where
-        F: Fn(Box<dyn Listener>, Dispatcher<CircuitMessageType>, Network) -> () + Send,
-        A: Fn(M),
-    {
-        // Set up dispatcher and mock sender
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
-        let mut inproc_transport = InprocTransport::default();
-        let dispatcher = Dispatcher::new(Box::new(network_sender));
-        let listener = inproc_transport
-            .listen("inproc://service_handler")
-            .expect("Cannot get listener");
-
-        std::thread::spawn(move || test(listener, dispatcher, network1));
-
-        let mesh2 = Mesh::new(1, 1);
-        let network2 = Network::new(mesh2.clone(), 0).unwrap();
-        let connection = inproc_transport
-            .connect("inproc://service_handler")
-            .expect("Unable to connect to inproc");
-        network2
-            .add_peer("123".to_string(), connection)
-            .expect("Unable to add peer");
-        let network_message = network2
-            .recv()
-            .expect("Unable to receive message over the network");
-
-        assert_network_message(
-            network_message,
-            expected_sender,
-            expected_circuit_msg_type,
-            detail_assertions,
-        )
-    }
-
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
-        network_message: NetworkMessageWrapper,
-        expected_sender: &str,
+        message: Vec<u8>,
+        recipient: String,
+        expected_recipient: &str,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {
-        assert_eq!(expected_sender, network_message.peer_id());
+        assert_eq!(expected_recipient, &recipient);
 
-        let network_msg: NetworkMessage =
-            protobuf::parse_from_bytes(network_message.payload()).unwrap();
+        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&message).unwrap();
         let circuit_msg: CircuitMessage =
             protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
         assert_eq!(expected_circuit_msg_type, circuit_msg.get_message_type(),);
         let circuit_msg: M = protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         detail_assertions(circuit_msg);
+    }
+
+    #[derive(Clone)]
+    struct MockSender {
+        outbound: Arc<Mutex<VecDeque<(PeerId, Vec<u8>)>>>,
+    }
+
+    impl MockSender {
+        fn new() -> Self {
+            Self {
+                outbound: Arc::new(Mutex::new(VecDeque::new())),
+            }
+        }
+
+        fn next_outbound(&self) -> Option<(PeerId, Vec<u8>)> {
+            self.outbound.lock().expect("lock was poisoned").pop_front()
+        }
+    }
+
+    impl MessageSender<PeerId> for MockSender {
+        fn send(&self, id: PeerId, message: Vec<u8>) -> Result<(), (PeerId, Vec<u8>)> {
+            self.outbound
+                .lock()
+                .expect("lock was poisoned")
+                .push_back((id, message));
+
+            Ok(())
+        }
     }
 }

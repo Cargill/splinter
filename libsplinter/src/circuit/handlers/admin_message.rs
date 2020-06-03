@@ -181,67 +181,64 @@ fn is_admin_service_id(service_id: &str) -> bool {
 mod tests {
     use super::*;
 
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
     use crate::circuit::directory::CircuitDirectory;
     use crate::circuit::{AuthorizationType, Circuit, DurabilityType, PersistenceType, RouteType};
-    use crate::mesh::Mesh;
     use crate::network::dispatch::Dispatcher;
-    use crate::network::sender;
-    use crate::network::{Network, NetworkMessageWrapper};
     use crate::protos::circuit::CircuitMessage;
     use crate::protos::network::NetworkMessage;
-    use crate::transport::inproc::InprocTransport;
-    use crate::transport::{Listener, Transport};
-
     /// Send a message from a non-admin service. Expect that the message is ignored and an error
     /// is returned to sender.
     #[test]
     fn test_ignore_non_admin_sender() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("5678".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        // Add circuit and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["1234".into(), "5678".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("admin_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                // Add circuit and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["1234".into(), "5678".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("admin_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let handler = AdminDirectMessageHandler::new("1234".into(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(Box::new(handler));
+        let mut direct_message = AdminDirectMessage::new();
+        direct_message.set_circuit("admin".into());
+        direct_message.set_sender("abc".into());
+        direct_message.set_recipient("admin::1234".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("random_corr_id".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                let mut direct_message = AdminDirectMessage::new();
-                direct_message.set_circuit("admin".into());
-                direct_message.set_sender("abc".into());
-                direct_message.set_recipient("admin::1234".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("random_corr_id".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        assert_eq!(
+            Ok(()),
+            dispatcher.dispatch(
+                "5678".into(),
+                &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                direct_bytes
+            )
+        );
 
-                assert_eq!(
-                    Ok(()),
-                    dispatcher.dispatch(
-                        "5678".into(),
-                        &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
-                        direct_bytes
-                    )
-                );
-            },
-            "1234",
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "5678",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |error_msg: CircuitError| {
                 assert_eq!(error_msg.get_service_id(), "abc");
@@ -258,51 +255,52 @@ mod tests {
     /// returned to sender.
     #[test]
     fn test_ignore_non_admin_recipient() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("5678".to_string(), connection)
-                    .expect("Unable to add peer");
-                // Add circuit and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["1234".into(), "5678".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("admin_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        // Add circuit and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["1234".into(), "5678".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("admin_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(Box::new(handler));
+        let handler = AdminDirectMessageHandler::new("1234".into(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                let mut direct_message = AdminDirectMessage::new();
-                direct_message.set_circuit("admin".into());
-                direct_message.set_sender("admin::5678".into());
-                direct_message.set_recipient("def".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("random_corr_id".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        let mut direct_message = AdminDirectMessage::new();
+        direct_message.set_circuit("admin".into());
+        direct_message.set_sender("admin::5678".into());
+        direct_message.set_recipient("def".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("random_corr_id".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                assert_eq!(
-                    Ok(()),
-                    dispatcher.dispatch(
-                        "5678".into(),
-                        &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
-                        direct_bytes
-                    )
-                );
-            },
-            "1234",
+        assert_eq!(
+            Ok(()),
+            dispatcher.dispatch(
+                "5678".into(),
+                &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                direct_bytes
+            )
+        );
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "5678",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |error_msg: CircuitError| {
                 assert_eq!(error_msg.get_service_id(), "admin::5678");
@@ -319,51 +317,51 @@ mod tests {
     /// sent to the current node's target admin service.
     #[test]
     fn test_send_admin_direct_message_via_standard_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("5678".to_string(), connection)
-                    .expect("Unable to add peer");
-                // Add circuit and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["1234".into(), "5678".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("admin_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        // Add circuit and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["1234".into(), "5678".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("admin_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(Box::new(handler));
+        let handler = AdminDirectMessageHandler::new("1234".into(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                let mut direct_message = AdminDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("admin::1234".into());
-                direct_message.set_recipient("admin::5678".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("random_corr_id".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        let mut direct_message = AdminDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("admin::1234".into());
+        direct_message.set_recipient("admin::5678".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("random_corr_id".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                assert_eq!(
-                    Ok(()),
-                    dispatcher.dispatch(
-                        "1234".into(),
-                        &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
-                        direct_bytes
-                    )
-                );
-            },
-            "1234",
+        assert_eq!(
+            Ok(()),
+            dispatcher.dispatch(
+                "1234".into(),
+                &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                direct_bytes
+            )
+        );
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "5678",
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "alpha");
@@ -379,37 +377,38 @@ mod tests {
     /// sent to the appropriate node that hosts the target admin service.
     #[test]
     fn test_send_admin_direct_message_via_admin_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("5678".to_string(), connection)
-                    .expect("Unable to add peer");
-                let circuit_directory = CircuitDirectory::new();
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let circuit_directory = CircuitDirectory::new();
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(Box::new(handler));
+        let handler = AdminDirectMessageHandler::new("1234".into(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                let mut direct_message = AdminDirectMessage::new();
-                direct_message.set_circuit("admin".into());
-                direct_message.set_sender("admin::1234".into());
-                direct_message.set_recipient("admin::5678".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("random_corr_id".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        let mut direct_message = AdminDirectMessage::new();
+        direct_message.set_circuit("admin".into());
+        direct_message.set_sender("admin::1234".into());
+        direct_message.set_recipient("admin::5678".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("random_corr_id".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                assert_eq!(
-                    Ok(()),
-                    dispatcher.dispatch(
-                        "1234".into(),
-                        &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
-                        direct_bytes
-                    )
-                );
-            },
-            "1234",
+        assert_eq!(
+            Ok(()),
+            dispatcher.dispatch(
+                "1234".into(),
+                &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                direct_bytes
+            )
+        );
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "5678",
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "admin");
@@ -425,37 +424,37 @@ mod tests {
     /// sent to the current node's target admin service.
     #[test]
     fn test_send_admin_direct_message_via_admin_circuit_to_local_service() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("admin::1234".to_string(), connection)
-                    .expect("Unable to add peer");
-                let circuit_directory = CircuitDirectory::new();
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
+        let circuit_directory = CircuitDirectory::new();
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let handler = AdminDirectMessageHandler::new("1234".into(), state);
-                dispatcher.set_handler(Box::new(handler));
+        let handler = AdminDirectMessageHandler::new("1234".into(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                let mut direct_message = AdminDirectMessage::new();
-                direct_message.set_circuit("admin".into());
-                direct_message.set_sender("admin::5678".into());
-                direct_message.set_recipient("admin::1234".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("random_corr_id".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        let mut direct_message = AdminDirectMessage::new();
+        direct_message.set_circuit("admin".into());
+        direct_message.set_sender("admin::5678".into());
+        direct_message.set_recipient("admin::1234".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("random_corr_id".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                assert_eq!(
-                    Ok(()),
-                    dispatcher.dispatch(
-                        "1234".into(),
-                        &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
-                        direct_bytes
-                    )
-                );
-            },
-            "1234",
+        assert_eq!(
+            Ok(()),
+            dispatcher.dispatch(
+                "1234".into(),
+                &CircuitMessageType::ADMIN_DIRECT_MESSAGE,
+                direct_bytes
+            )
+        );
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "admin::1234",
             CircuitMessageType::ADMIN_DIRECT_MESSAGE,
             |msg: AdminDirectMessage| {
                 assert_eq!(msg.get_circuit(), "admin");
@@ -467,71 +466,49 @@ mod tests {
         )
     }
 
-    // Helper function for running the tests. This function starts up two networks, a transport
-    // and a dispatcher. The function is passed the test to run, and the expected message that
-    // will be should be returned.
-    fn run_test<F: 'static, M: protobuf::Message, A>(
-        test: F,
-        expected_sender: &str,
-        expected_circuit_msg_type: CircuitMessageType,
-        detail_assertions: A,
-    ) where
-        F: Fn(Box<dyn Listener>, Dispatcher<CircuitMessageType>, Network) -> () + Send,
-        A: Fn(M),
-    {
-        // Set up dispatcher and mock sender
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
-        let mut inproc_transport = InprocTransport::default();
-        let dispatcher = Dispatcher::new(Box::new(network_sender));
-        let listener = inproc_transport
-            .listen("inproc://admin_message")
-            .expect("Cannot get listener");
-
-        std::thread::spawn(move || test(listener, dispatcher, network1));
-
-        let mesh2 = Mesh::new(1, 1);
-        let network2 = Network::new(mesh2.clone(), 0).unwrap();
-        let connection = inproc_transport
-            .connect("inproc://admin_message")
-            .expect("Unable to connect to inproc");
-        network2
-            .add_peer("1234".to_string(), connection)
-            .expect("Unable to add peer");
-        let network_message = network2
-            .recv()
-            .expect("Unable to receive message over the network");
-
-        assert_network_message(
-            network_message,
-            expected_sender,
-            expected_circuit_msg_type,
-            detail_assertions,
-        )
-    }
-
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
-        network_message: NetworkMessageWrapper,
-        expected_sender: &str,
+        message: Vec<u8>,
+        recipient: String,
+        expected_recipient: &str,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {
-        assert_eq!(expected_sender, network_message.peer_id());
+        assert_eq!(expected_recipient, &recipient);
 
-        let network_msg: NetworkMessage =
-            protobuf::parse_from_bytes(network_message.payload()).unwrap();
+        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&message).unwrap();
         let circuit_msg: CircuitMessage =
             protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
         assert_eq!(expected_circuit_msg_type, circuit_msg.get_message_type(),);
         let circuit_msg: M = protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         detail_assertions(circuit_msg);
+    }
+
+    #[derive(Clone)]
+    struct MockSender {
+        outbound: Arc<Mutex<VecDeque<(PeerId, Vec<u8>)>>>,
+    }
+
+    impl MockSender {
+        fn new() -> Self {
+            Self {
+                outbound: Arc::new(Mutex::new(VecDeque::new())),
+            }
+        }
+
+        fn next_outbound(&self) -> Option<(PeerId, Vec<u8>)> {
+            self.outbound.lock().expect("lock was poisoned").pop_front()
+        }
+    }
+
+    impl MessageSender<PeerId> for MockSender {
+        fn send(&self, id: PeerId, message: Vec<u8>) -> Result<(), (PeerId, Vec<u8>)> {
+            self.outbound
+                .lock()
+                .expect("lock was poisoned")
+                .push_back((id, message));
+
+            Ok(())
+        }
     }
 }
