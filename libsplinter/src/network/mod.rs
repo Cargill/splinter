@@ -17,14 +17,3 @@ pub mod connection_manager;
 pub mod dispatch;
 pub mod handlers;
 pub(crate) mod reply;
-
-// Theses modules are deprecated and will be removed
-#[cfg(test)]
-mod network;
-#[cfg(test)]
-pub mod peer;
-#[cfg(test)]
-pub mod sender;
-
-#[cfg(test)]
-pub(crate) use self::network::{Network, NetworkMessageWrapper};
