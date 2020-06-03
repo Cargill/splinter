@@ -72,8 +72,13 @@ impl ConnectionMatrixEnvelope {
     }
 
     /// Returns the bytes of the payload while consuming the `ConnectionMatrixEnvelope`
-    #[deprecated(since = "0.4.1", note = "Please use Vec::from instead")]
+    #[deprecated(since = "0.4.1", note = "Please use into_inner() instead")]
     pub fn take_payload(self) -> Vec<u8> {
+        self.payload
+    }
+
+    /// Returns the payload and consumes the ConnectionMatrixEnvelope
+    pub fn into_inner(self) -> Vec<u8> {
         self.payload
     }
 }
