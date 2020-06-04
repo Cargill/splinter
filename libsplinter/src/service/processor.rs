@@ -273,7 +273,7 @@ impl ServiceProcessor {
                     Ok(())
                 })?;
 
-        let shutdown_shared_state = self.shared_state.clone();
+        let shutdown_shared_state = self.shared_state;
         // Creates the shutdown handle that will be called by the process starting up the
         // Service processor
         let do_shutdown = Box::new(move || {
