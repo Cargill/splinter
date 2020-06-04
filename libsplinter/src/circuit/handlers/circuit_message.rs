@@ -75,10 +75,7 @@ mod tests {
     use std::{thread, time};
 
     use super::*;
-    use crate::mesh::Mesh;
     use crate::network::dispatch::{DispatchLoopBuilder, Dispatcher};
-    use crate::network::sender;
-    use crate::network::Network;
     use crate::protos::circuit::ServiceConnectRequest;
     use crate::protos::network::NetworkMessageType;
 
@@ -87,16 +84,7 @@ mod tests {
     #[test]
     // Test that circuit message is sent to the circuit dispatch sender
     fn test_circuit_message_handler() {
-        // Set up dispatcher and mock sender
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
+        let network_sender = MockSender::default();
         let mut network_dispatcher = Dispatcher::new(Box::new(network_sender.clone()));
 
         let mut circuit_dispatcher = Dispatcher::new(Box::new(network_sender));
@@ -170,6 +158,15 @@ mod tests {
                 .write()
                 .unwrap()
                 .push(message.get_service_id().to_string());
+            Ok(())
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockSender {}
+
+    impl MessageSender<PeerId> for MockSender {
+        fn send(&self, _id: PeerId, _message: Vec<u8>) -> Result<(), (PeerId, Vec<u8>)> {
             Ok(())
         }
     }
