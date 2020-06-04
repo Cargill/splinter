@@ -1315,8 +1315,7 @@ fn handle_fatal_connection(
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
         warn!(
             "Peer {} encountered a fatal connection error: {}",
-            peer_metadata.id.to_string(),
-            error
+            peer_metadata.id, error
         );
 
         // Tell subscribers this peer is disconnected
