@@ -68,7 +68,7 @@ impl ScabbardShared {
     }
 
     pub fn network_sender(&self) -> Option<&dyn ServiceNetworkSender> {
-        self.network_sender.as_ref().map(|b| &**b)
+        self.network_sender.as_deref()
     }
 
     pub fn set_network_sender(&mut self, sender: Box<dyn ServiceNetworkSender>) {
