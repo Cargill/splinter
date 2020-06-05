@@ -45,6 +45,8 @@
 
 /examples/gameroom/gameroom-app/src/compiled_protos.json
 
+/services/scabbard/cli/packaging/man/*.1
+
 /tests/Cargo.lock
 /tests/target
 
