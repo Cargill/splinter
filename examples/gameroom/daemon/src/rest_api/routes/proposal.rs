@@ -172,7 +172,7 @@ fn list_proposals_from_db(
             .into_iter()
             .fold(HashMap::new(), |mut acc, member| {
                 acc.entry(member.circuit_id.to_string())
-                    .or_insert_with(|| vec![])
+                    .or_insert_with(Vec::new)
                     .push(member);
                 acc
             });
@@ -184,7 +184,7 @@ fn list_proposals_from_db(
                 proposal,
                 proposal_members
                     .remove(&circuit_id)
-                    .unwrap_or_else(|| vec![]),
+                    .unwrap_or_else(Vec::new),
             )
         })
         .collect::<Vec<ApiGameroomProposal>>();
