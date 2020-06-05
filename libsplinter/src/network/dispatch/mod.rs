@@ -396,9 +396,6 @@ mod tests {
 
     use protobuf::Message;
 
-    use crate::mesh::Mesh;
-    use crate::network::sender;
-    use crate::network::Network;
     use crate::protos::network::{NetworkEcho, NetworkMessageType};
 
     /// Verify that messages can be dispatched to handlers via the trait.
@@ -410,15 +407,7 @@ mod tests {
     /// * Dispatch a message of the expected type and verify that it was called
     #[test]
     fn dispatch_to_handler() {
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
+        let network_sender = MockSender::default();
         let mut dispatcher = Dispatcher::new(Box::new(network_sender));
 
         let handler = NetworkEchoHandler::default();
@@ -456,14 +445,7 @@ mod tests {
     /// * Join the thread and verify the dispatched message was handled
     #[test]
     fn move_dispatcher_to_thread() {
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
+        let network_sender = MockSender::default();
         let mut dispatcher = Dispatcher::new(Box::new(network_sender));
 
         let handler = NetworkEchoHandler::default();
@@ -515,6 +497,15 @@ mod tests {
         ) -> Result<(), DispatchError> {
             let echo_string = String::from_utf8(message.get_payload().to_vec()).unwrap();
             self.echos.lock().unwrap().push(echo_string);
+            Ok(())
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockSender {}
+
+    impl MessageSender<PeerId> for MockSender {
+        fn send(&self, _id: PeerId, _message: Vec<u8>) -> Result<(), (PeerId, Vec<u8>)> {
             Ok(())
         }
     }

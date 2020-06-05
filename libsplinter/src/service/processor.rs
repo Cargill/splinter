@@ -184,7 +184,7 @@ impl ServiceProcessor {
                     while incoming_running.load(Ordering::SeqCst) {
                         let timeout = Duration::from_secs(TIMEOUT_SEC);
                         let message_bytes = match incoming_mesh.recv_timeout(timeout) {
-                            Ok(envelope) => envelope.take_payload(),
+                            Ok(envelope) => Vec::from(envelope),
                             Err(MeshRecvTimeoutError::Timeout) => continue,
                             Err(MeshRecvTimeoutError::Disconnected) => {
                                 error!("Mesh Disconnected");
@@ -584,7 +584,7 @@ pub mod tests {
 
     use protobuf::Message;
 
-    use crate::network::Network;
+    use crate::mesh::Mesh;
     use crate::protos::circuit::{ServiceConnectRequest, ServiceConnectResponse_Status};
     use crate::service::error::{
         ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
@@ -592,6 +592,7 @@ pub mod tests {
     use crate::service::sender::create_message;
     use crate::service::{ServiceNetworkRegistry, ServiceNetworkSender};
     use crate::transport::inproc::InprocTransport;
+    use crate::transport::matrix::ConnectionMatrixSender;
     use crate::transport::Transport;
 
     #[test]
@@ -606,7 +607,7 @@ pub mod tests {
         let r = running.clone();
 
         let mesh = Mesh::new(512, 128);
-        let network = Network::new(mesh.clone(), 0).unwrap();
+        let mesh_sender = mesh.get_sender();
 
         thread::Builder::new()
             .name("standard_direct_message".to_string())
@@ -626,13 +627,12 @@ pub mod tests {
         // this part of the test mimics the splinter daemon sending message to the connected
         // service
         let connection = inproc_listener.accept().unwrap();
-        network
-            .add_peer("service_processor".to_string(), connection)
+        mesh.add(connection, "service_processor".to_string())
             .unwrap();
 
         // Receive service connect request and respond with ServiceConnectionResposne with status
         // OK
-        let mut service_request = get_service_connect(network.recv().unwrap().payload().to_vec());
+        let mut service_request = get_service_connect(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(service_request.get_service_id(), "mock_service");
         assert_eq!(service_request.get_circuit(), "alpha");
 
@@ -641,26 +641,27 @@ pub mod tests {
             "alpha".to_string(),
         )
         .unwrap();
-        network
-            .send("service_processor", &service_response)
+        mesh_sender
+            .send("service_processor".to_string(), service_response)
             .unwrap();
 
         // request the mock service sends a message without caring about correlation id
         let send_msg = create_circuit_direct_msg(b"send".to_vec()).unwrap();
-        network.send("service_processor", &send_msg).unwrap();
+        mesh_sender
+            .send("service_processor".to_string(), send_msg)
+            .unwrap();
 
-        let send_response = get_circuit_direct_msg(network.recv().unwrap().payload().to_vec());
+        let send_response = get_circuit_direct_msg(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(send_response.get_payload(), b"send_response");
 
         // request the mock service send_and_await a message and blocks until correlation id is
         // returned
         let send_and_await_msg = create_circuit_direct_msg(b"send_and_await".to_vec()).unwrap();
-        network
-            .send("service_processor", &send_and_await_msg)
+        mesh_sender
+            .send("service_processor".to_string(), send_and_await_msg)
             .unwrap();
 
-        let mut waiting_response =
-            get_circuit_direct_msg(network.recv().unwrap().payload().to_vec());
+        let mut waiting_response = get_circuit_direct_msg(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(waiting_response.get_payload(), b"waiting for response");
 
         // respond to send_and_await
@@ -669,7 +670,9 @@ pub mod tests {
             waiting_response.take_correlation_id(),
         )
         .unwrap();
-        network.send("service_processor", &wait_response).unwrap();
+        mesh_sender
+            .send("service_processor".to_string(), wait_response)
+            .unwrap();
 
         // reply to this provided message
         let reply_request = create_circuit_direct_msg_with_correlation_id(
@@ -677,9 +680,11 @@ pub mod tests {
             "reply_correlation_id".to_string(),
         )
         .unwrap();
-        network.send("service_processor", &reply_request).unwrap();
+        mesh_sender
+            .send("service_processor".to_string(), reply_request)
+            .unwrap();
 
-        let reply_response = get_circuit_direct_msg(network.recv().unwrap().payload().to_vec());
+        let reply_response = get_circuit_direct_msg(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(reply_response.get_payload(), b"reply response");
         assert_eq!(reply_response.get_correlation_id(), "reply_correlation_id");
 
@@ -694,7 +699,7 @@ pub mod tests {
         let r = running.clone();
 
         let mesh = Mesh::new(512, 128);
-        let network = Network::new(mesh.clone(), 0).unwrap();
+        let mesh_sender = mesh.get_sender();
 
         thread::Builder::new()
             .name("test_admin_direct_message".to_string())
@@ -714,13 +719,12 @@ pub mod tests {
         // this part of the test mimics the splinter daemon sending message to the connected
         // service
         let connection = inproc_listener.accept().unwrap();
-        network
-            .add_peer("service_processor".to_string(), connection)
+        mesh.add(connection, "service_processor".to_string())
             .unwrap();
 
         // Receive service connect request and respond with ServiceConnectionResposne with status
         // OK
-        let mut service_request = get_service_connect(network.recv().unwrap().payload().to_vec());
+        let mut service_request = get_service_connect(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(service_request.get_service_id(), "mock_service");
         assert_eq!(service_request.get_circuit(), "admin");
 
@@ -729,25 +733,27 @@ pub mod tests {
             "admin".to_string(),
         )
         .unwrap();
-        network
-            .send("service_processor", &service_response)
+        mesh_sender
+            .send("service_processor".to_string(), service_response)
             .unwrap();
 
         // request the mock service sends a message without caring about correlation id
         let send_msg = create_admin_direct_msg(b"send".to_vec()).unwrap();
-        network.send("service_processor", &send_msg).unwrap();
+        mesh_sender
+            .send("service_processor".to_string(), send_msg)
+            .unwrap();
 
-        let send_response = get_admin_direct_msg(network.recv().unwrap().payload().to_vec());
+        let send_response = get_admin_direct_msg(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(send_response.get_payload(), b"send_response");
 
         // request the mock service send_and_await a message and blocks until correlation id is
         // returned
         let send_and_await_msg = create_admin_direct_msg(b"send_and_await".to_vec()).unwrap();
-        network
-            .send("service_processor", &send_and_await_msg)
+        mesh_sender
+            .send("service_processor".to_string(), send_and_await_msg)
             .unwrap();
 
-        let mut waiting_response = get_admin_direct_msg(network.recv().unwrap().payload().to_vec());
+        let mut waiting_response = get_admin_direct_msg(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(waiting_response.get_payload(), b"waiting for response");
 
         // respond to send_and_await
@@ -756,7 +762,9 @@ pub mod tests {
             waiting_response.take_correlation_id(),
         )
         .unwrap();
-        network.send("service_processor", &wait_response).unwrap();
+        mesh_sender
+            .send("service_processor".to_string(), wait_response)
+            .unwrap();
 
         // reply to this provided message
         let reply_request = create_admin_direct_msg_with_correlation_id(
@@ -764,9 +772,11 @@ pub mod tests {
             "reply_correlation_id".to_string(),
         )
         .unwrap();
-        network.send("service_processor", &reply_request).unwrap();
+        mesh_sender
+            .send("service_processor".to_string(), reply_request)
+            .unwrap();
 
-        let reply_response = get_admin_direct_msg(network.recv().unwrap().payload().to_vec());
+        let reply_response = get_admin_direct_msg(mesh.recv().unwrap().payload().to_vec());
         assert_eq!(reply_response.get_payload(), b"reply response");
         assert_eq!(reply_response.get_correlation_id(), "reply_correlation_id");
 

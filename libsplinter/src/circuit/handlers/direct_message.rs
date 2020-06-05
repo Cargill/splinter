@@ -221,83 +221,82 @@ impl CircuitDirectMessageHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
     use crate::circuit::directory::CircuitDirectory;
     use crate::circuit::service::{Service, SplinterNode};
     use crate::circuit::{AuthorizationType, Circuit, DurabilityType, PersistenceType, RouteType};
-    use crate::mesh::Mesh;
     use crate::network::dispatch::Dispatcher;
-    use crate::network::sender;
-    use crate::network::{Network, NetworkMessageWrapper};
     use crate::protos::circuit::CircuitMessage;
     use crate::protos::network::NetworkMessage;
-    use crate::transport::inproc::InprocTransport;
-    use crate::transport::{Listener, Transport};
 
     // Test that a direct message will be properly sent to the service if the message is meant for
     // a service connected to the receiving node
     #[test]
     fn test_circuit_direct_message_handler_service() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("abc_network".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                // Add circuit and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["123".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("circuit_direct_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // Add circuit and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["123".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("circuit_direct_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service_abc = Service::new(
-                    "abc".to_string(),
-                    Some("abc_network".to_string()),
-                    node.clone(),
-                );
-                let service_def =
-                    Service::new("def".to_string(), Some("def_network".to_string()), node);
-                let abc_id = ServiceId::new("alpha".into(), "abc".into());
-                let def_id = ServiceId::new("alpha".into(), "def".into());
-                state.add_service(abc_id, service_abc).unwrap();
-                state.add_service(def_id, service_def).unwrap();
+        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service_abc = Service::new(
+            "abc".to_string(),
+            Some("abc_network".to_string()),
+            node.clone(),
+        );
+        let service_def = Service::new("def".to_string(), Some("def_network".to_string()), node);
+        let abc_id = ServiceId::new("alpha".into(), "abc".into());
+        let def_id = ServiceId::new("alpha".into(), "def".into());
+        state.add_service(abc_id, service_abc).unwrap();
+        state.add_service(def_id, service_def).unwrap();
 
-                // Add direct message handler to the the dispatcher
-                let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
-                dispatcher.set_handler(Box::new(handler));
+        // Add direct message handler to the the dispatcher
+        let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                // Create the direct message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // Create the direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatch the direct message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatch the direct message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "abc_network",
             CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
             |msg: CircuitDirectMessage| {
                 assert_eq!(msg.get_sender(), "def");
@@ -313,69 +312,68 @@ mod tests {
     // connected to
     #[test]
     fn test_circuit_direct_message_handler_node() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("123".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                // Add circuit and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["123".into(), "345".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("circuit_direct_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // Add circuit and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["123".into(), "345".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("circuit_direct_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node_123 =
-                    SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let node_345 =
-                    SplinterNode::new("345".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_123 = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_345 = SplinterNode::new("345".to_string(), vec!["123.0.0.1:0".to_string()]);
 
-                let service_abc =
-                    Service::new("abc".to_string(), Some("abc_network".to_string()), node_123);
-                let service_def =
-                    Service::new("def".to_string(), Some("def_network".to_string()), node_345);
-                let abc_id = ServiceId::new("alpha".into(), "abc".into());
-                let def_id = ServiceId::new("alpha".into(), "def".into());
-                state.add_service(abc_id, service_abc).unwrap();
-                state.add_service(def_id, service_def).unwrap();
+        let service_abc =
+            Service::new("abc".to_string(), Some("abc_network".to_string()), node_123);
+        let service_def =
+            Service::new("def".to_string(), Some("def_network".to_string()), node_345);
+        let abc_id = ServiceId::new("alpha".into(), "abc".into());
+        let def_id = ServiceId::new("alpha".into(), "def".into());
+        state.add_service(abc_id, service_abc).unwrap();
+        state.add_service(def_id, service_def).unwrap();
 
-                // Add direct message handler to dispatcher
-                let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        // Add direct message handler to dispatcher
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
 
-                dispatcher.set_handler(Box::new(handler));
+        dispatcher.set_handler(Box::new(handler));
 
-                // create dispatch message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // create dispatch message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatch the message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatch the message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "123",
             CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
             |msg: CircuitDirectMessage| {
                 assert_eq!(msg.get_sender(), "def");
@@ -390,64 +388,65 @@ mod tests {
     // Test that an error message is returned if the sender is not connected to the circuit
     #[test]
     fn test_circuit_direct_message_handler_sender_not_in_directory() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("def".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                // add the circuit and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["123".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("circuit_direct_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // add the circuit and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["123".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("circuit_direct_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service_abc = Service::new(
-                    "abc".to_string(),
-                    Some("abc_network".to_string()),
-                    node.clone(),
-                );
-                let id = ServiceId::new("alpha".into(), "abc".into());
-                state.add_service(id.clone(), service_abc).unwrap();
+        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service_abc = Service::new(
+            "abc".to_string(),
+            Some("abc_network".to_string()),
+            node.clone(),
+        );
+        let id = ServiceId::new("alpha".into(), "abc".into());
+        state.add_service(id.clone(), service_abc).unwrap();
 
-                // add direct message handler to the dispatcher
-                let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
+        // add direct message handler to the dispatcher
+        let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
 
-                dispatcher.set_handler(Box::new(handler));
+        dispatcher.set_handler(Box::new(handler));
 
-                // create direct message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // create direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatcher message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatcher message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "def",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -463,63 +462,64 @@ mod tests {
     // Test that an error message is returned if the sender is not in the circuit roster
     #[test]
     fn test_circuit_direct_message_handler_sender_not_in_circuit_roster() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("def".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["123".into()])
-                    .with_roster(vec!["abc".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("circuit_direct_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["123".into()])
+            .with_roster(vec!["abc".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("circuit_direct_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service_abc = Service::new(
-                    "abc".to_string(),
-                    Some("abc_network".to_string()),
-                    node.clone(),
-                );
-                let id = ServiceId::new("alpha".into(), "abc".into());
-                state.add_service(id.clone(), service_abc).unwrap();
+        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service_abc = Service::new(
+            "abc".to_string(),
+            Some("abc_network".to_string()),
+            node.clone(),
+        );
+        let id = ServiceId::new("alpha".into(), "abc".into());
+        state.add_service(id.clone(), service_abc).unwrap();
 
-                // add direct message handler to the dispatcher
-                let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
+        // add direct message handler to the dispatcher
+        let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
 
-                dispatcher.set_handler(Box::new(handler));
+        dispatcher.set_handler(Box::new(handler));
 
-                // create direct message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // create direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatcher message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatcher message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "def",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -535,61 +535,61 @@ mod tests {
     // Test that if the recipient is not connected a circuit error message is sent back
     #[test]
     fn test_circuit_direct_message_handler_recipient_not_in_directory() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("def".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                // add circuits and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["123".into(), "345".into()])
-                    .with_roster(vec!["abc".into(), "def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("circuit_direct_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // add circuits and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["123".into(), "345".into()])
+            .with_roster(vec!["abc".into(), "def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("circuit_direct_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node_345 =
-                    SplinterNode::new("345".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service_def =
-                    Service::new("def".to_string(), Some("def_network".to_string()), node_345);
-                let id = ServiceId::new("alpha".into(), "def".into());
-                state.add_service(id.clone(), service_def).unwrap();
+        let node_345 = SplinterNode::new("345".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service_def =
+            Service::new("def".to_string(), Some("def_network".to_string()), node_345);
+        let id = ServiceId::new("alpha".into(), "def".into());
+        state.add_service(id.clone(), service_def).unwrap();
 
-                // add handler to dispatcher
-                let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-                dispatcher.set_handler(Box::new(handler));
+        // add handler to dispatcher
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                // create direct message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // create direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatch message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatch message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "def",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -605,61 +605,61 @@ mod tests {
     // Test that an error message is returned if the recipient is not in the circuit roster
     #[test]
     fn test_circuit_direct_message_handler_recipient_not_in_circuit_roster() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("def".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                // add circuits and service to splinter state
-                let circuit = Circuit::builder()
-                    .with_id("alpha".into())
-                    .with_auth(AuthorizationType::Trust)
-                    .with_members(vec!["123".into(), "345".into()])
-                    .with_roster(vec!["def".into()])
-                    .with_persistence(PersistenceType::Any)
-                    .with_durability(DurabilityType::NoDurability)
-                    .with_routes(RouteType::Any)
-                    .with_circuit_management_type("circuit_direct_test_app".into())
-                    .build()
-                    .expect("Should have built a correct circuit");
+        // add circuits and service to splinter state
+        let circuit = Circuit::builder()
+            .with_id("alpha".into())
+            .with_auth(AuthorizationType::Trust)
+            .with_members(vec!["123".into(), "345".into()])
+            .with_roster(vec!["def".into()])
+            .with_persistence(PersistenceType::Any)
+            .with_durability(DurabilityType::NoDurability)
+            .with_routes(RouteType::Any)
+            .with_circuit_management_type("circuit_direct_test_app".into())
+            .build()
+            .expect("Should have built a correct circuit");
 
-                let mut circuit_directory = CircuitDirectory::new();
-                circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let mut circuit_directory = CircuitDirectory::new();
+        circuit_directory.add_circuit("alpha".to_string(), circuit);
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                let node_345 =
-                    SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-                let service_def =
-                    Service::new("def".to_string(), Some("def_network".to_string()), node_345);
-                let id = ServiceId::new("alpha".into(), "def".into());
-                state.add_service(id.clone(), service_def).unwrap();
+        let node_345 = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let service_def =
+            Service::new("def".to_string(), Some("def_network".to_string()), node_345);
+        let id = ServiceId::new("alpha".into(), "def".into());
+        state.add_service(id.clone(), service_def).unwrap();
 
-                // add direct message handler
-                let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-                dispatcher.set_handler(Box::new(handler));
+        // add direct message handler
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                // create direct message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // create direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatch message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatch message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "def",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -675,41 +675,42 @@ mod tests {
     // Test that an error message is returned if the circuit does not exist
     #[test]
     fn test_circuit_direct_message_handler_no_circuit() {
-        run_test(
-            |mut listener, mut dispatcher, network1| {
-                let connection = listener.accept().expect("Cannot accept connection");
-                network1
-                    .add_peer("def".to_string(), connection)
-                    .expect("Unable to add peer");
+        // Set up dispatcher and mock sender
+        let mock_sender = MockSender::new();
+        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-                // create empty splinter state
-                let circuit_directory = CircuitDirectory::new();
+        // create empty splinter state
+        let circuit_directory = CircuitDirectory::new();
 
-                let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let state = SplinterState::new("memory".to_string(), circuit_directory);
 
-                // add direct message handler to the dispatcher
-                let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-                dispatcher.set_handler(Box::new(handler));
+        // add direct message handler to the dispatcher
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        dispatcher.set_handler(Box::new(handler));
 
-                // create direct message
-                let mut direct_message = CircuitDirectMessage::new();
-                direct_message.set_circuit("alpha".into());
-                direct_message.set_sender("def".into());
-                direct_message.set_recipient("abc".into());
-                direct_message.set_payload(b"test".to_vec());
-                direct_message.set_correlation_id("1234".into());
-                let direct_bytes = direct_message.write_to_bytes().unwrap();
+        // create direct message
+        let mut direct_message = CircuitDirectMessage::new();
+        direct_message.set_circuit("alpha".into());
+        direct_message.set_sender("def".into());
+        direct_message.set_recipient("abc".into());
+        direct_message.set_payload(b"test".to_vec());
+        direct_message.set_correlation_id("1234".into());
+        let direct_bytes = direct_message.write_to_bytes().unwrap();
 
-                // dispatch message
-                dispatcher
-                    .dispatch(
-                        "def".into(),
-                        &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                        direct_bytes.clone(),
-                    )
-                    .unwrap();
-            },
-            "345",
+        // dispatch message
+        dispatcher
+            .dispatch(
+                "def".into(),
+                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
+                direct_bytes.clone(),
+            )
+            .unwrap();
+
+        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
+        assert_network_message(
+            message,
+            id.into(),
+            "def",
             CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
             |msg: CircuitError| {
                 assert_eq!(msg.get_service_id(), "def");
@@ -722,71 +723,49 @@ mod tests {
         )
     }
 
-    // Helper function for running the tests. This function starts up two networks, a transport
-    // and a dispatcher. The function is passed the test to run, and the expected message that
-    // will be should be returned.
-    fn run_test<F: 'static, M: protobuf::Message, A>(
-        test: F,
-        expected_sender: &str,
-        expected_circuit_msg_type: CircuitMessageType,
-        detail_assertions: A,
-    ) where
-        F: Fn(Box<dyn Listener>, Dispatcher<CircuitMessageType>, Network) -> () + Send,
-        A: Fn(M),
-    {
-        // Set up dispatcher and mock sender
-        let mesh1 = Mesh::new(1, 1);
-        let network1 = Network::new(mesh1.clone(), 0).unwrap();
-
-        let network_message_queue = sender::Builder::new()
-            .with_network(network1.clone())
-            .build()
-            .expect("Unable to create queue");
-        let network_sender = network_message_queue.new_network_sender();
-
-        let mut inproc_transport = InprocTransport::default();
-        let dispatcher = Dispatcher::new(Box::new(network_sender));
-        let listener = inproc_transport
-            .listen("inproc://direct_message")
-            .expect("Cannot get listener");
-
-        std::thread::spawn(move || test(listener, dispatcher, network1));
-
-        let mesh2 = Mesh::new(1, 1);
-        let network2 = Network::new(mesh2.clone(), 0).unwrap();
-        let connection = inproc_transport
-            .connect("inproc://direct_message")
-            .expect("Unable to connect to inproc");
-        network2
-            .add_peer("345".to_string(), connection)
-            .expect("Unable to add peer");
-        let network_message = network2
-            .recv()
-            .expect("Unable to receive message over the network");
-
-        assert_network_message(
-            network_message,
-            expected_sender,
-            expected_circuit_msg_type,
-            detail_assertions,
-        )
-    }
-
     fn assert_network_message<M: protobuf::Message, F: Fn(M)>(
-        network_message: NetworkMessageWrapper,
-        expected_sender: &str,
+        message: Vec<u8>,
+        recipient: String,
+        expected_recipient: &str,
         expected_circuit_msg_type: CircuitMessageType,
         detail_assertions: F,
     ) {
-        assert_eq!(expected_sender, network_message.peer_id());
+        assert_eq!(expected_recipient, &recipient);
 
-        let network_msg: NetworkMessage =
-            protobuf::parse_from_bytes(network_message.payload()).unwrap();
+        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&message).unwrap();
         let circuit_msg: CircuitMessage =
             protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
         assert_eq!(expected_circuit_msg_type, circuit_msg.get_message_type(),);
         let circuit_msg: M = protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         detail_assertions(circuit_msg);
+    }
+
+    #[derive(Clone)]
+    struct MockSender {
+        outbound: Arc<Mutex<VecDeque<(PeerId, Vec<u8>)>>>,
+    }
+
+    impl MockSender {
+        fn new() -> Self {
+            Self {
+                outbound: Arc::new(Mutex::new(VecDeque::new())),
+            }
+        }
+
+        fn next_outbound(&self) -> Option<(PeerId, Vec<u8>)> {
+            self.outbound.lock().expect("lock was poisoned").pop_front()
+        }
+    }
+
+    impl MessageSender<PeerId> for MockSender {
+        fn send(&self, id: PeerId, message: Vec<u8>) -> Result<(), (PeerId, Vec<u8>)> {
+            self.outbound
+                .lock()
+                .expect("lock was poisoned")
+                .push_back((id, message));
+
+            Ok(())
+        }
     }
 }
