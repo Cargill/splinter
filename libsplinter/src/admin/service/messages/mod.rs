@@ -342,7 +342,7 @@ impl CircuitProposal {
         proposal.set_circuit_proposal(circuit_request.take_circuit());
         proposal.set_votes(RepeatedField::from_vec(votes));
         proposal.set_requester(self.requester.to_vec());
-        proposal.set_requester_node_id(self.requester_node_id.to_string());
+        proposal.set_requester_node_id(self.requester_node_id);
 
         Ok(proposal)
     }
