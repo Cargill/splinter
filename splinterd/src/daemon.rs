@@ -230,16 +230,16 @@ impl SplinterDaemon {
         let connection_connector = connection_manager.connector();
         let connection_manager_shutdown = connection_manager.shutdown_signaler();
 
-        let mut peer_manager = PeerManager::new(
-            connection_connector.clone(),
-            None,
-            None,
-            self.node_id.to_string(),
-            self.strict_ref_counts,
-        );
-        let peer_connector = peer_manager.start().map_err(|err| {
-            StartError::NetworkError(format!("Unable to start peer manager: {}", err))
-        })?;
+        let peer_manager = PeerManager::builder()
+            .with_connector(connection_connector.clone())
+            .with_identity(self.node_id.to_string())
+            .with_strict_ref_counts(self.strict_ref_counts)
+            .start()
+            .map_err(|err| {
+                StartError::NetworkError(format!("Unable to start peer manager: {}", err))
+            })?;
+
+        let peer_connector = peer_manager.connector();
         let peer_manager_shutdown = peer_manager.shutdown_handle();
 
         // Listen for services

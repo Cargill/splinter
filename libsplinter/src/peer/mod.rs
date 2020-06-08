@@ -22,6 +22,7 @@
 //! [`PeerInterconnect`]: interconnect/struct.PeerInterconnect.html
 //! [`PeerManagerNotification`]: notification/enum.PeerManagerNotification.html
 
+mod builder;
 mod connector;
 mod error;
 pub mod interconnect;
@@ -40,25 +41,22 @@ use uuid::Uuid;
 use crate::collections::{BiHashMap, RefMap};
 use crate::network::connection_manager::ConnectionManagerNotification;
 use crate::network::connection_manager::Connector;
-pub use crate::peer::connector::PeerManagerConnector;
-use crate::peer::connector::PeerRemover;
-pub use crate::peer::notification::{PeerManagerNotification, PeerNotificationIter};
-use crate::peer::peer_map::{PeerMap, PeerStatus};
 use crate::threading::pacemaker;
 
+pub use self::builder::PeerManagerBuilder;
+pub use self::connector::PeerManagerConnector;
+use self::connector::PeerRemover;
 use self::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
     PeerRefRemoveError, PeerUnknownAddError,
 };
+pub use self::notification::{PeerManagerNotification, PeerNotificationIter};
+use self::peer_map::{PeerMap, PeerStatus};
+pub use self::peer_ref::{EndpointPeerRef, PeerRef};
 
-// The number of retry attempts for an active endpoint before the PeerManager will try other
-// endpoints associated with a peer
-const DEFAULT_MAXIMUM_RETRY_ATTEMPTS: u64 = 5;
-// Default value of how often the Pacemaker should send RetryPending message
-const DEFAULT_PACEMAKER_INTERVAL: u64 = 10;
-// Default value for maximum time between retrying a peers endpoints
+// Default value for maximum time between retrying a peer's endpoints
 const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
-// Default intial value for how long to wait before retrying a peers endpoints
+// Default initial value for how long to wait before retrying a peer's endpoints
 const INITIAL_RETRY_FREQUENCY: u64 = 10;
 // How often to retry connecting to requested peers without ID
 const REQUESTED_ENDPOINTS_RETRY_FREQUENCY: u64 = 60;
@@ -128,14 +126,9 @@ pub(crate) enum PeerManagerRequest {
 /// requesting connections from the `ConnectionManager`. If a peer has disconnected, the
 /// `PeerManager` will also try the peer's other endpoints until one is successful.
 pub struct PeerManager {
-    connection_manager_connector: Connector,
-    join_handle: Option<thread::JoinHandle<()>>,
-    sender: Option<Sender<PeerManagerMessage>>,
-    shutdown_handle: Option<ShutdownHandle>,
-    max_retry_attempts: u64,
-    retry_interval: u64,
-    identity: String,
-    strict_ref_counts: bool,
+    join_handle: thread::JoinHandle<()>,
+    sender: Sender<PeerManagerMessage>,
+    shutdown_handle: ShutdownHandle,
 }
 
 impl PeerManager {
@@ -152,6 +145,7 @@ impl PeerManager {
     /// * `identity` - The unique ID of the node this `PeerManager` belongs to
     /// * `strict_ref_counts` - Determines whether or not to panic when attempting to remove a
     ///   reference to peer that is not referenced.
+    #[deprecated(since = "0.4.1", note = "Please use PeerManagerBuilder instead")]
     pub fn new(
         connector: Connector,
         max_retry_attempts: Option<u64>,
@@ -159,16 +153,28 @@ impl PeerManager {
         identity: String,
         strict_ref_counts: bool,
     ) -> Self {
-        PeerManager {
-            connection_manager_connector: connector,
-            join_handle: None,
-            sender: None,
-            shutdown_handle: None,
-            max_retry_attempts: max_retry_attempts.unwrap_or(DEFAULT_MAXIMUM_RETRY_ATTEMPTS),
-            retry_interval: retry_interval.unwrap_or(DEFAULT_PACEMAKER_INTERVAL),
-            identity,
-            strict_ref_counts,
+        let mut builder = PeerManagerBuilder::default()
+            .with_connector(connector)
+            .with_identity(identity)
+            .with_strict_ref_counts(strict_ref_counts);
+
+        if let Some(max_retry) = max_retry_attempts {
+            builder = builder.with_max_retry_attempts(max_retry);
         }
+
+        if let Some(retry_interval) = retry_interval {
+            builder = builder.with_retry_interval(retry_interval);
+        }
+
+        // This should never fail due to the required values of the new function
+        builder
+            .start()
+            .expect("Building the PeerManager failed unexpectedly")
+    }
+
+    /// Construct a new `PeerManagerBuilder` for creating a new `PeerManager` instance.
+    pub fn builder() -> PeerManagerBuilder {
+        PeerManagerBuilder::default()
     }
 
     /// Starts the `PeerManager`
@@ -177,20 +183,55 @@ impl PeerManager {
     /// handles notifications from the `ConnectionManager`.
     ///
     /// Returns a `PeerManagerConnector` that can be used to send requests to the `PeerManager`.
+    #[deprecated(
+        since = "0.4.1",
+        note = "Please use connector() instead. The PeerManagerBuilder starts up the PeerManager \
+         now"
+    )]
     pub fn start(&mut self) -> Result<PeerManagerConnector, PeerManagerError> {
+        Ok(PeerManagerConnector::new(self.sender.clone()))
+    }
+
+    pub fn connector(&self) -> PeerManagerConnector {
+        PeerManagerConnector::new(self.sender.clone())
+    }
+
+    /// Returns a `ShutdownHandle` for this `PeerManager`
+    pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
+        Some(self.shutdown_handle.clone())
+    }
+
+    /// Waits for the `PeerManager` thread to shutdown
+    pub fn await_shutdown(self) {
+        debug!("Shutting down peer manager...");
+        if let Err(err) = self.join_handle.join() {
+            error!("Peer manager thread did not shutdown correctly: {:?}", err);
+        }
+        debug!("Shutting down peer manager (complete)");
+    }
+
+    /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
+    pub fn shutdown_and_wait(self) {
+        self.shutdown_handle.shutdown();
+        self.await_shutdown();
+    }
+
+    /// Private constructor used by the builder to start the peer manager
+    fn build(
+        retry_interval: u64,
+        max_retry_attempts: u64,
+        strict_ref_counts: bool,
+        identity: String,
+        connector: Connector,
+    ) -> Result<PeerManager, PeerManagerError> {
         debug!(
             "Starting peer manager with retry_interval={}s, max_retry_attempts={} and \
             strict_ref_counts={}",
-            &self.retry_interval, &self.max_retry_attempts, &self.strict_ref_counts
+            retry_interval, max_retry_attempts, strict_ref_counts
         );
 
         let (sender, recv) = channel();
-        if self.sender.is_some() {
-            return Err(PeerManagerError::StartUpError(
-                "PeerManager has already been started".to_string(),
-            ));
-        }
-        let connector = self.connection_manager_connector.clone();
+
         let peer_remover = PeerRemover {
             sender: sender.clone(),
         };
@@ -204,20 +245,18 @@ impl PeerManager {
 
         debug!(
             "Starting peer manager pacemaker with interval of {}s",
-            &self.retry_interval
+            retry_interval
         );
+
         let pacemaker = pacemaker::Pacemaker::builder()
-            .with_interval(self.retry_interval)
+            .with_interval(retry_interval)
             .with_sender(sender.clone())
             .with_message_factory(|| PeerManagerMessage::RetryPending)
             .start()
             .map_err(|err| PeerManagerError::StartUpError(err.to_string()))?;
 
         let pacemaker_shutdown_signaler = pacemaker.shutdown_signaler();
-        let max_retry_attempts = self.max_retry_attempts;
 
-        let identity = self.identity.to_string();
-        let strict_ref_counts = self.strict_ref_counts;
         let join_handle = thread::Builder::new()
             .name("Peer Manager".into())
             .spawn(move || {
@@ -277,58 +316,24 @@ impl PeerManager {
                 debug!("Shutting down peer manager pacemaker...");
                 pacemaker.await_shutdown();
                 debug!("Shutting down peer manager pacemaker (complete)");
-            });
-
-        match join_handle {
-            Ok(join_handle) => {
-                self.join_handle = Some(join_handle);
-            }
-            Err(err) => {
-                return Err(PeerManagerError::StartUpError(format!(
+            })
+            .map_err(|err| {
+                PeerManagerError::StartUpError(format!(
                     "Unable to start PeerManager thread {}",
                     err
-                )))
-            }
-        }
+                ))
+            })?;
 
-        self.shutdown_handle = Some(ShutdownHandle {
+        let shutdown_handle = ShutdownHandle {
             sender: sender.clone(),
             pacemaker_shutdown_signaler,
-        });
-        self.sender = Some(sender.clone());
-        Ok(PeerManagerConnector::new(sender))
-    }
-
-    /// Returns a `ShutdownHandle` for this `PeerManager`
-    pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        self.shutdown_handle.clone()
-    }
-
-    /// Waits for the `PeerManager` thread to shutdown
-    pub fn await_shutdown(self) {
-        debug!("Shutting down peer manager...");
-        let join_handle = if let Some(jh) = self.join_handle {
-            jh
-        } else {
-            debug!("Shutting down peer manager (complete, no threads existed)");
-            return;
         };
 
-        if let Err(err) = join_handle.join() {
-            error!("Peer manager thread did not shutdown correctly: {:?}", err);
-        }
-        debug!("Shutting down peer manager (complete)");
-    }
-
-    /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
-    pub fn shutdown_and_wait(self) {
-        if let Some(sh) = self.shutdown_handle.clone() {
-            sh.shutdown();
-        } else {
-            return;
-        }
-
-        self.await_shutdown();
+        Ok(PeerManager {
+            shutdown_handle,
+            join_handle,
+            sender,
+        })
     }
 }
 
@@ -484,6 +489,35 @@ fn handle_request(
             }
         }
     };
+}
+
+/// An entry of unreferenced peers, that may have connected externally, but have not yet been
+/// requested locally.
+#[derive(Debug)]
+struct UnreferencedPeer {
+    endpoint: String,
+    connection_id: String,
+}
+
+struct UnreferencedPeerState {
+    peers: HashMap<String, UnreferencedPeer>,
+    // The list of endpoints that have been requested without an ID
+    requested_endpoints: Vec<String>,
+    // Last time connection to the requested endpoints was tried
+    last_connection_attempt: Instant,
+    // How often to try to connect to requested endpoints
+    retry_frequency: u64,
+}
+
+impl UnreferencedPeerState {
+    fn new() -> Self {
+        UnreferencedPeerState {
+            peers: HashMap::default(),
+            requested_endpoints: Vec::default(),
+            last_connection_attempt: Instant::now(),
+            retry_frequency: REQUESTED_ENDPOINTS_RETRY_FREQUENCY,
+        }
+    }
 }
 
 // Allow clippy errors for too_many_arguments. The arguments are required
@@ -1345,9 +1379,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector
             .subscribe()
             .expect("Unable to get subscriber");
@@ -1355,7 +1394,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1399,10 +1438,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector.clone(), None, Some(1), "my_id".to_string(), true);
-
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector.clone())
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector
             .subscribe()
             .expect("Unable to get subscriber");
@@ -1411,7 +1454,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1461,10 +1504,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector.clone(), None, Some(1), "my_id".to_string(), true);
-
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector
             .subscribe()
             .expect("Unable to get subscriber");
@@ -1478,7 +1525,7 @@ pub mod tests {
             )
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1519,9 +1566,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector
             .subscribe()
             .expect("Unable to get subscriber");
@@ -1529,7 +1581,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1543,7 +1595,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
@@ -1587,9 +1639,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector
             .subscribe()
             .expect("Unable to get subscriber");
@@ -1597,7 +1654,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_1.peer_id, "test_peer");
+        assert_eq!(peer_ref_1.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1611,7 +1668,7 @@ pub mod tests {
             .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_2.peer_id, "next_peer");
+        assert_eq!(peer_ref_2.peer_id(), "next_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1672,9 +1729,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector
             .subscribe()
             .expect("Unable to get subscriber");
@@ -1682,7 +1744,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_1.peer_id, "test_peer");
+        assert_eq!(peer_ref_1.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1696,7 +1758,7 @@ pub mod tests {
             .add_peer_ref("next_peer".to_string(), vec!["inproc://test_2".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref_2.peer_id, "next_peer");
+        assert_eq!(peer_ref_2.peer_id(), "next_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -1749,10 +1811,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
 
         {
             let mut subscriber = peer_connector
@@ -1762,7 +1828,7 @@ pub mod tests {
                 .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
                 .expect("Unable to add peer");
 
-            assert_eq!(peer_ref.peer_id, "test_peer");
+            assert_eq!(peer_ref.peer_id(), "test_peer");
             let notification = subscriber.next().expect("Unable to get new notifications");
             assert!(
                 notification
@@ -1825,10 +1891,14 @@ pub mod tests {
 
         // let (finish_tx, fininsh_rx) = channel();
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
 
         {
             let mut subscriber = peer_connector
@@ -1850,7 +1920,7 @@ pub mod tests {
                 .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
                 .expect("Unable to add peer");
 
-            assert_eq!(peer_ref.peer_id, "test_peer");
+            assert_eq!(peer_ref.peer_id(), "test_peer");
 
             let peer_list = peer_connector
                 .list_peers()
@@ -1955,15 +2025,21 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, Some(1), Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_max_retry_attempts(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let mut subscriber = peer_connector.subscribe().expect("Unable to subscribe");
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec![endpoint, endpoint2])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get new notifications");
         assert!(
@@ -2021,9 +2097,13 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, Some(1), Some(1), "my_id".to_string(), true);
-        peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
 
         peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();
@@ -2066,9 +2146,14 @@ pub mod tests {
             subs_rx.recv().expect("unable to get notification");
         });
 
-        let mut peer_manager =
-            PeerManager::new(connector, Some(1), Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
 
         let _conn = transport.connect("inproc://test").unwrap();
 
@@ -2086,13 +2171,45 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let peer_list = peer_connector
             .list_peers()
             .expect("Unable to get peer list");
 
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
+        cm.await_shutdown();
+        mesh.shutdown_signaler().shutdown();
+    }
+
+    // Test that the PeerManager can be started with the deprecated PeerManager::new() and
+    // PeerManger.start() function. This tests intentionally uses deprecated methods so the
+    // deprecated warnings are ignored.
+    #[test]
+    fn test_peer_manager_no_builder() {
+        let transport = Box::new(InprocTransport::default());
+
+        let mesh = Mesh::new(512, 128);
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport.clone())
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
+
+        #[allow(deprecated)]
+        let mut peer_manager =
+            PeerManager::new(connector, Some(1), Some(1), "my_id".to_string(), true);
+
+        #[allow(deprecated)]
+        peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_handle().unwrap().shutdown();
         cm.shutdown_signaler().shutdown();

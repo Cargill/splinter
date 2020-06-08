@@ -543,9 +543,16 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start peer_manager");
+
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
+
         let (send, recv) = channel();
 
         let (dispatcher_sender, dispatcher_receiver) = dispatch_channel();
@@ -578,7 +585,7 @@ pub mod tests {
             .add_peer_ref("test_peer".to_string(), vec!["test".to_string()])
             .expect("Unable to add peer");
 
-        assert_eq!(peer_ref.peer_id, "test_peer");
+        assert_eq!(peer_ref.peer_id(), "test_peer");
 
         let notification = subscriber.next().expect("Unable to get notification");
         assert_eq!(
@@ -622,9 +629,14 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let mut peer_manager =
-            PeerManager::new(connector, None, Some(1), "my_id".to_string(), true);
-        let peer_connector = peer_manager.start().expect("Cannot start PeerManager");
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
         let (dispatcher_sender, _dispatched_receiver) = dispatch_channel();
         let interconnect = PeerInterconnectBuilder::new()
             .with_peer_connector(peer_connector)
