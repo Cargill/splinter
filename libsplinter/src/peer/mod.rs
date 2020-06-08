@@ -27,6 +27,7 @@ mod error;
 pub mod interconnect;
 mod notification;
 mod peer_map;
+mod peer_ref;
 
 use std::cmp::min;
 use std::collections::HashMap;
@@ -121,110 +122,6 @@ pub(crate) enum PeerManagerRequest {
         connection_id: String,
         sender: Sender<Result<Option<String>, PeerLookupError>>,
     },
-}
-
-/// Used to keep track of peer references. When dropped, the `PeerRef` will send a request to the
-/// `PeerManager` to remove a reference to the peer, thus removing the peer if no more references
-/// exist.
-#[derive(Debug, PartialEq)]
-pub struct PeerRef {
-    peer_id: String,
-    peer_remover: PeerRemover,
-}
-
-impl PeerRef {
-    /// Creates a new `PeerRef`
-    pub(super) fn new(peer_id: String, peer_remover: PeerRemover) -> Self {
-        PeerRef {
-            peer_id,
-            peer_remover,
-        }
-    }
-
-    /// Returns the peer ID this reference is for
-    pub fn peer_id(&self) -> &str {
-        &self.peer_id
-    }
-}
-
-impl Drop for PeerRef {
-    fn drop(&mut self) {
-        match self.peer_remover.remove_peer_ref(&self.peer_id) {
-            Ok(_) => (),
-            Err(err) => error!(
-                "Unable to remove reference to {} on drop: {}",
-                self.peer_id, err
-            ),
-        }
-    }
-}
-
-/// Used to keep track of peer references that are created only with an endpoint. When dropped, a
-/// request is sent to the `PeerManager` to remove a reference to the peer, thus removing the peer
-/// if no more references exist.
-#[derive(Debug, PartialEq)]
-pub struct EndpointPeerRef {
-    endpoint: String,
-    peer_remover: PeerRemover,
-}
-
-impl EndpointPeerRef {
-    /// Creates a new `EndpointPeerRef`
-    pub(super) fn new(endpoint: String, peer_remover: PeerRemover) -> Self {
-        EndpointPeerRef {
-            endpoint,
-            peer_remover,
-        }
-    }
-
-    /// Returns the endpoint of the peer this reference is for
-    pub fn endpoint(&self) -> &str {
-        &self.endpoint
-    }
-}
-
-impl Drop for EndpointPeerRef {
-    fn drop(&mut self) {
-        match self
-            .peer_remover
-            .remove_peer_ref_by_endpoint(&self.endpoint)
-        {
-            Ok(_) => (),
-            Err(err) => error!(
-                "Unable to remove reference to peer with endpoint {} on drop: {}",
-                self.endpoint, err
-            ),
-        }
-    }
-}
-
-/// An entry of unreferenced peers, that may have connected externally, but have not yet been
-/// requested locally.
-#[derive(Debug)]
-struct UnreferencedPeer {
-    endpoint: String,
-    connection_id: String,
-}
-
-struct UnreferencedPeerState {
-    peers: HashMap<String, UnreferencedPeer>,
-    // The list of endpoints that have been requested without an ID
-    requested_endpoints: Vec<String>,
-    // Last time connection to the requested endpoints was tried
-    last_connection_attempt: Instant,
-    // How often to try to connect to requested endpoints
-    retry_frequency: u64,
-}
-
-impl UnreferencedPeerState {
-    fn new() -> Self {
-        UnreferencedPeerState {
-            peers: HashMap::default(),
-            requested_endpoints: Vec::default(),
-            last_connection_attempt: Instant::now(),
-            retry_frequency: REQUESTED_ENDPOINTS_RETRY_FREQUENCY,
-        }
-    }
 }
 
 /// The `PeerManager` is in charge of keeping track of peers and their reference counts, as well as
