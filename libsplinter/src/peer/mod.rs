@@ -54,13 +54,6 @@ pub use self::notification::{PeerManagerNotification, PeerNotificationIter};
 use self::peer_map::{PeerMap, PeerStatus};
 pub use self::peer_ref::{EndpointPeerRef, PeerRef};
 
-// Default value for maximum time between retrying a peer's endpoints
-const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
-// Default initial value for how long to wait before retrying a peer's endpoints
-const INITIAL_RETRY_FREQUENCY: u64 = 10;
-// How often to retry connecting to requested peers without ID
-const REQUESTED_ENDPOINTS_RETRY_FREQUENCY: u64 = 60;
-
 /// Internal messages to drive management
 #[derive(Debug, Clone)]
 pub(crate) enum PeerManagerMessage {
@@ -217,17 +210,29 @@ impl PeerManager {
     }
 
     /// Private constructor used by the builder to start the peer manager
+    #[allow(clippy::too_many_arguments)]
+    // Allow clippy errors for too_many_arguments. This method is private and is in support of the
+    // PeerManagerBuilder.
     fn build(
         retry_interval: u64,
         max_retry_attempts: u64,
         strict_ref_counts: bool,
         identity: String,
         connector: Connector,
+        retry_frequency: u64,
+        max_retry_frequency: u64,
+        endpoint_retry_frequency: u64,
     ) -> Result<PeerManager, PeerManagerError> {
         debug!(
-            "Starting peer manager with retry_interval={}s, max_retry_attempts={} and \
-            strict_ref_counts={}",
-            retry_interval, max_retry_attempts, strict_ref_counts
+            "Starting peer manager with retry_interval={}s, max_retry_attempts={} \
+            strict_ref_counts={}, retry_frequency={}, max_retry_frequency={}, and \
+            endpoint_retry_frequency={}",
+            retry_interval,
+            max_retry_attempts,
+            strict_ref_counts,
+            retry_frequency,
+            max_retry_frequency,
+            endpoint_retry_frequency,
         );
 
         let (sender, recv) = channel();
@@ -260,10 +265,10 @@ impl PeerManager {
         let join_handle = thread::Builder::new()
             .name("Peer Manager".into())
             .spawn(move || {
-                let mut peers = PeerMap::new(INITIAL_RETRY_FREQUENCY);
+                let mut peers = PeerMap::new(retry_frequency);
                 // a map of identities to unreferenced peers.
                 // and a list of endpoints that should be turned into peers
-                let mut unreferenced_peers = UnreferencedPeerState::new();
+                let mut unreferenced_peers = UnreferencedPeerState::new(endpoint_retry_frequency);
                 let mut ref_map = RefMap::new();
                 let mut subscribers = Vec::new();
                 loop {
@@ -294,11 +299,15 @@ impl PeerManager {
                                 max_retry_attempts,
                                 &identity,
                                 &mut ref_map,
+                                retry_frequency,
                             )
                         }
-                        Ok(PeerManagerMessage::RetryPending) => {
-                            retry_pending(&mut peers, connector.clone(), &mut unreferenced_peers)
-                        }
+                        Ok(PeerManagerMessage::RetryPending) => retry_pending(
+                            &mut peers,
+                            connector.clone(),
+                            &mut unreferenced_peers,
+                            max_retry_frequency,
+                        ),
                         Err(_) => {
                             warn!("All senders have disconnected");
                             break;
@@ -510,12 +519,12 @@ struct UnreferencedPeerState {
 }
 
 impl UnreferencedPeerState {
-    fn new() -> Self {
+    fn new(retry_frequency: u64) -> Self {
         UnreferencedPeerState {
             peers: HashMap::default(),
             requested_endpoints: Vec::default(),
             last_connection_attempt: Instant::now(),
-            retry_frequency: REQUESTED_ENDPOINTS_RETRY_FREQUENCY,
+            retry_frequency,
         }
     }
 }
@@ -834,6 +843,7 @@ fn handle_notifications(
     max_retry_attempts: u64,
     local_identity: &str,
     ref_map: &mut RefMap,
+    retry_frequency: u64,
 ) {
     match notification {
         // If a connection has disconnected, forward notification to subscribers
@@ -902,6 +912,7 @@ fn handle_notifications(
             connector,
             subscribers,
             local_identity,
+            retry_frequency,
         ),
         ConnectionManagerNotification::Connected {
             endpoint,
@@ -917,9 +928,16 @@ fn handle_notifications(
             subscribers,
             local_identity,
             ref_map,
+            retry_frequency,
         ),
         ConnectionManagerNotification::FatalConnectionError { endpoint, error } => {
-            handle_fatal_connection(endpoint, error.to_string(), peers, subscribers)
+            handle_fatal_connection(
+                endpoint,
+                error.to_string(),
+                peers,
+                subscribers,
+                max_retry_attempts,
+            )
         }
     }
 }
@@ -1002,6 +1020,7 @@ fn handle_inbound_connection(
     connector: Connector,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
     local_identity: &str,
+    retry_frequency: u64,
 ) {
     info!(
         "Received peer connection from {} (remote endpoint: {})",
@@ -1047,7 +1066,7 @@ fn handle_inbound_connection(
         peer_metadata.status = PeerStatus::Connected;
         peer_metadata.connection_id = connection_id;
         // reset retry settings
-        peer_metadata.retry_frequency = INITIAL_RETRY_FREQUENCY;
+        peer_metadata.retry_frequency = retry_frequency;
         peer_metadata.last_connection_attempt = Instant::now();
 
         let notification = PeerManagerNotification::Connected {
@@ -1100,6 +1119,7 @@ fn handle_connected(
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
     local_identity: &str,
     ref_map: &mut RefMap,
+    retry_frequency: u64,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
         match peer_metadata.status {
@@ -1183,7 +1203,7 @@ fn handle_connected(
         peer_metadata.status = PeerStatus::Connected;
         peer_metadata.connection_id = connection_id;
         // reset retry settings
-        peer_metadata.retry_frequency = INITIAL_RETRY_FREQUENCY;
+        peer_metadata.retry_frequency = retry_frequency;
         peer_metadata.last_connection_attempt = Instant::now();
 
         if let Err(err) = peers.update_peer(peer_metadata) {
@@ -1242,6 +1262,7 @@ fn handle_fatal_connection(
     error: String,
     peers: &mut PeerMap,
     subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    max_retry_frequency: u64,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
         warn!(
@@ -1255,10 +1276,7 @@ fn handle_fatal_connection(
         };
 
         // reset retry settings
-        peer_metadata.retry_frequency = min(
-            peer_metadata.retry_frequency * 2,
-            DEFAULT_MAXIMUM_RETRY_FREQUENCY,
-        );
+        peer_metadata.retry_frequency = min(peer_metadata.retry_frequency * 2, max_retry_frequency);
         peer_metadata.last_connection_attempt = Instant::now();
 
         // set peer to pending so its endpoints will be retried in the future
@@ -1278,6 +1296,7 @@ fn retry_pending(
     peers: &mut PeerMap,
     connector: Connector,
     unreferenced_peers: &mut UnreferencedPeerState,
+    max_retry_frequency: u64,
 ) {
     let mut to_retry = Vec::new();
     for (_, peer) in peers.get_pending() {
@@ -1301,10 +1320,7 @@ fn retry_pending(
             }
         }
 
-        peer_metadata.retry_frequency = min(
-            peer_metadata.retry_frequency * 2,
-            DEFAULT_MAXIMUM_RETRY_FREQUENCY,
-        );
+        peer_metadata.retry_frequency = min(peer_metadata.retry_frequency * 2, max_retry_frequency);
         peer_metadata.last_connection_attempt = Instant::now();
         if let Err(err) = peers.update_peer(peer_metadata) {
             error!("Unable to update peer: {}", err);
