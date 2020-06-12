@@ -8,6 +8,9 @@ transactions between organizations. Splinter lets you combine blockchain-related
 technologies -- such as smart contracts and consensus engines -- to build a wide
 variety of architectural patterns.
 
+See [splinter.dev](https://www.splinter.dev/) for Splinter documentation,
+release notes, and community information.
+
  &hercon; [Features](#features-and-concepts) &hercon; [Building Splinter](#building-splinter) &hercon; [Demos](#demos) &hercon; [License](#license) &hercon;
 
 ## Features and Concepts
