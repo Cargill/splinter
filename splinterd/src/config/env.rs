@@ -102,6 +102,10 @@ mod tests {
     use super::*;
 
     #[test]
+    // This test intermittently fails due to interaction with other tests that set the environment
+    // variables used within. It also fails to reset the environment variables to their original
+    // values.
+    #[ignore]
     /// This test verifies that a `PartialConfig` object, constructed from the
     /// `EnvPartialConfigBuilder` module, contains the correct values using the following steps:
     ///
