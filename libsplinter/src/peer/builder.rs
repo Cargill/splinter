@@ -26,12 +26,21 @@ const DEFAULT_PACEMAKER_INTERVAL: u64 = 10;
 // The number of retry attempts for an active endpoint before the PeerManager will try other
 // endpoints associated with a peer
 const DEFAULT_MAXIMUM_RETRY_ATTEMPTS: u64 = 5;
+// Default initial value for how long to wait before retrying a peer's endpoints
+const INITIAL_RETRY_FREQUENCY: u64 = 10;
+// Default value for maximum time between retrying a peer's endpoints
+const DEFAULT_MAXIMUM_RETRY_FREQUENCY: u64 = 300;
+// How often to retry connecting to requested peers without ID
+const REQUESTED_ENDPOINTS_RETRY_FREQUENCY: u64 = 60;
 
 #[derive(Default)]
 pub struct PeerManagerBuilder {
     connector: Option<Connector>,
     max_retry_attempts: Option<u64>,
     retry_interval: Option<u64>,
+    retry_frequency: Option<u64>,
+    max_retry_frequency: Option<u64>,
+    endpoint_retry_frequency: Option<u64>,
     identity: Option<String>,
     strict_ref_counts: Option<bool>,
 }
@@ -75,6 +84,33 @@ impl PeerManagerBuilder {
         self
     }
 
+    /// Set the initial retry_frequency to use with the resulting `PeerManager`.
+    ///
+    /// How often (in seconds) the `PeerManager` will wait before retrying a pending
+    /// peer's endpoints
+    pub fn with_retry_frequency(mut self, retry_frequency: u64) -> Self {
+        self.retry_frequency = Some(retry_frequency);
+        self
+    }
+
+    /// Set the max_retry_frequency to use with the resulting `PeerManager`.
+    ///
+    /// The maximum time (in seconds) the `PeerManager` will wait before retrying a pending
+    /// peer's endpoints
+    pub fn with_max_retry_frequency(mut self, retry_frequency: u64) -> Self {
+        self.max_retry_frequency = Some(retry_frequency);
+        self
+    }
+
+    /// Set the initial endpoint_retry_frequency to use with the resulting `PeerManager`.
+    ///
+    /// How often (in seconds) the `PeerManager` will wait before retrying a pending
+    /// requested endpoint that does not have an ID
+    pub fn with_endpoint_retry_frequency(mut self, retry_frequency: u64) -> Self {
+        self.endpoint_retry_frequency = Some(retry_frequency);
+        self
+    }
+
     /// Set the identity to use with the resulting `PeerManager`.
     ///
     /// The unique ID of the node this `PeerManager` belongs to.
@@ -110,6 +146,13 @@ impl PeerManagerBuilder {
         let connector = self.connector.take().ok_or_else(|| {
             PeerManagerError::StartUpError("Missing required value `connector`".to_string())
         })?;
+        let retry_frequency = self.retry_frequency.unwrap_or(INITIAL_RETRY_FREQUENCY);
+        let max_retry_frequency = self
+            .max_retry_frequency
+            .unwrap_or(DEFAULT_MAXIMUM_RETRY_FREQUENCY);
+        let endpoint_retry_frequency = self
+            .endpoint_retry_frequency
+            .unwrap_or(REQUESTED_ENDPOINTS_RETRY_FREQUENCY);
 
         PeerManager::build(
             retry_interval,
@@ -117,6 +160,9 @@ impl PeerManagerBuilder {
             strict_ref_counts,
             identity,
             connector,
+            retry_frequency,
+            max_retry_frequency,
+            endpoint_retry_frequency,
         )
     }
 }
