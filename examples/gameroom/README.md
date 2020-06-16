@@ -11,6 +11,9 @@ application, see the [Gameroom Technical
 Walkthrough](https://files.splinter.dev/docs/Gameroom_Walkthrough-Splinter_v0.3.4.pdf)
 (PDF).
 
+See [splinter.dev](https://www.splinter.dev/) for Splinter documentation,
+release notes, and community information.
+
 ## Running the Gameroom Demo with Docker
 
 **Note:** For the Kubernetes instructions, see [Running the Gameroom demo in
