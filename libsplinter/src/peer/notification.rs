@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::error::PeerManagerError;
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, TryRecvError};
+
+use super::error::PeerManagerError;
 
 /// Messages that will be dispatched to all subscription handlers
 #[derive(Debug, PartialEq, Clone)]
@@ -58,6 +60,51 @@ impl Iterator for PeerNotificationIter {
                 None
             }
         }
+    }
+}
+
+pub type SubscriberId = usize;
+pub(super) type Subscriber =
+    Box<dyn Fn(PeerManagerNotification) -> Result<(), Box<dyn std::error::Error>> + Send>;
+
+/// Responsible for broadcasting peer manager notifications.
+pub(super) struct SubscriberMap {
+    subscribers: HashMap<SubscriberId, Subscriber>,
+    next_id: SubscriberId,
+}
+
+impl SubscriberMap {
+    pub fn new() -> Self {
+        Self {
+            subscribers: HashMap::new(),
+            next_id: 0,
+        }
+    }
+
+    pub fn broadcast(&mut self, notification: PeerManagerNotification) {
+        let mut failures = vec![];
+        for (id, callback) in self.subscribers.iter() {
+            if let Err(err) = (*callback)(notification.clone()) {
+                failures.push(*id);
+                debug!("Dropping subscriber ({}): {}", id, err);
+            }
+        }
+
+        for id in failures {
+            self.subscribers.remove(&id);
+        }
+    }
+
+    pub fn add_subscriber(&mut self, subscriber: Subscriber) -> SubscriberId {
+        let subscriber_id = self.next_id;
+        self.next_id += 1;
+        self.subscribers.insert(subscriber_id, subscriber);
+
+        subscriber_id
+    }
+
+    pub fn remove_subscriber(&mut self, subscriber_id: SubscriberId) {
+        self.subscribers.remove(&subscriber_id);
     }
 }
 

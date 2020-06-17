@@ -23,7 +23,7 @@ mod shared;
 use std::any::Any;
 #[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
@@ -177,8 +177,9 @@ impl AdminService {
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
         let orchestrator = Arc::new(Mutex::new(orchestrator));
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (sender, receiver) = channel();
+        peer_connector
+            .subscribe_sender(sender)
             .map_err(|err| ServiceError::UnableToCreate(Box::new(err)))?;
 
         let new_service = Self {
@@ -209,10 +210,13 @@ impl AdminService {
         let notification_join_handle = thread::Builder::new()
             .name("PeerManagerNotification Receiver".into())
             .spawn(move || loop {
-                let notification = match subscriber.next() {
-                    Some(notification) => notification,
-                    None => {
-                        warn!("Admin service received None while listening to peer manager notifications, indicating remote thread has shutdown");
+                let notification = match receiver.recv() {
+                    Ok(notification) => notification,
+                    Err(_) => {
+                        warn!(
+                            "Admin service received an error while listening to peer manager \
+                            notifications, indicating remote thread has shutdown"
+                        );
                         break;
                     }
                 };

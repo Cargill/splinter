@@ -50,12 +50,12 @@ use self::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
     PeerRefRemoveError, PeerUnknownAddError,
 };
-pub use self::notification::{PeerManagerNotification, PeerNotificationIter};
+pub use self::notification::{PeerManagerNotification, PeerNotificationIter, SubscriberId};
+use self::notification::{Subscriber, SubscriberMap};
 use self::peer_map::{PeerMap, PeerStatus};
 pub use self::peer_ref::{EndpointPeerRef, PeerRef};
 
 /// Internal messages to drive management
-#[derive(Debug, Clone)]
 pub(crate) enum PeerManagerMessage {
     /// Notifies the `PeerManger` it should shutdown
     Shutdown,
@@ -77,7 +77,6 @@ impl From<ConnectionManagerNotification> for PeerManagerMessage {
 }
 
 /// The requests that will be handled by the `PeerManager`
-#[derive(Debug, Clone)]
 pub(crate) enum PeerManagerRequest {
     AddPeer {
         peer_id: String,
@@ -112,6 +111,14 @@ pub(crate) enum PeerManagerRequest {
     GetPeerId {
         connection_id: String,
         sender: Sender<Result<Option<String>, PeerLookupError>>,
+    },
+    Subscribe {
+        sender: Sender<Result<SubscriberId, PeerManagerError>>,
+        callback: Subscriber,
+    },
+    Unsubscribe {
+        subscriber_id: SubscriberId,
+        sender: Sender<Result<(), PeerManagerError>>,
     },
 }
 
@@ -270,7 +277,7 @@ impl PeerManager {
                 // and a list of endpoints that should be turned into peers
                 let mut unreferenced_peers = UnreferencedPeerState::new(endpoint_retry_frequency);
                 let mut ref_map = RefMap::new();
-                let mut subscribers = Vec::new();
+                let mut subscribers = SubscriberMap::new();
                 loop {
                     match recv.recv() {
                         Ok(PeerManagerMessage::Shutdown) => break,
@@ -287,7 +294,10 @@ impl PeerManager {
                             );
                         }
                         Ok(PeerManagerMessage::Subscribe(sender)) => {
-                            subscribers.push(sender);
+                            // drop subscriber id because it will not be sent back
+                            subscribers.add_subscriber(Box::new(move |notification| {
+                                sender.send(notification).map_err(Box::from)
+                            }));
                         }
                         Ok(PeerManagerMessage::InternalNotification(notification)) => {
                             handle_notifications(
@@ -373,7 +383,7 @@ fn handle_request(
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
     strict_ref_counts: bool,
 ) {
     match request {
@@ -497,6 +507,21 @@ fn handle_request(
                 warn!("Connector dropped before receiving result of getting peer ID");
             }
         }
+        PeerManagerRequest::Subscribe { sender, callback } => {
+            let subscriber_id = subscribers.add_subscriber(callback);
+            if sender.send(Ok(subscriber_id)).is_err() {
+                warn!("connector dropped before receiving result of remove connection");
+            }
+        }
+        PeerManagerRequest::Unsubscribe {
+            sender,
+            subscriber_id,
+        } => {
+            subscribers.remove_subscriber(subscriber_id);
+            if sender.send(Ok(())).is_err() {
+                warn!("connector dropped before receiving result of remove connection");
+            }
+        }
     };
 }
 
@@ -540,7 +565,7 @@ fn add_peer(
     peers: &mut PeerMap,
     peer_remover: &PeerRemover,
     ref_map: &mut RefMap,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
 ) -> Result<PeerRef, PeerRefAddError> {
     let new_ref_count = ref_map.add_ref(peer_id.to_string());
 
@@ -595,7 +620,7 @@ fn add_peer(
                 let notification = PeerManagerNotification::Connected {
                     peer: peer_id.to_string(),
                 };
-                subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+                subscribers.broadcast(notification);
             }
 
             let peer_ref = PeerRef::new(peer_id, peer_remover.clone());
@@ -839,7 +864,7 @@ fn handle_notifications(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
     max_retry_attempts: u64,
     local_identity: &str,
     ref_map: &mut RefMap,
@@ -948,7 +973,7 @@ fn handle_disconnection(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
 ) {
     if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
         if endpoint != peer_metadata.active_endpoint {
@@ -996,7 +1021,7 @@ fn handle_disconnection(
                 error!("Unable to update peer: {}", err);
             }
         }
-        subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+        subscribers.broadcast(notification);
     } else {
         // check for unreferenced peer and remove if it has disconnected
         debug!("Removing disconnected peer: {}", identity);
@@ -1018,7 +1043,7 @@ fn handle_inbound_connection(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
     local_identity: &str,
     retry_frequency: u64,
 ) {
@@ -1078,7 +1103,7 @@ fn handle_inbound_connection(
             error!("Unable to update peer: {}", err);
         }
 
-        subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+        subscribers.broadcast(notification);
 
         // if peer is pending there is no connection to remove
         if endpoint != old_endpoint && starting_status != PeerStatus::Pending {
@@ -1116,7 +1141,7 @@ fn handle_connected(
     unreferenced_peers: &mut UnreferencedPeerState,
     peers: &mut PeerMap,
     connector: Connector,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
     local_identity: &str,
     ref_map: &mut RefMap,
     retry_frequency: u64,
@@ -1188,7 +1213,7 @@ fn handle_connected(
                 error!("Unable to update peer: {}", err);
             }
 
-            subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            subscribers.broadcast(notification);
             return;
         }
 
@@ -1218,7 +1243,7 @@ fn handle_connected(
         }
 
         // notify subscribers we are connected
-        subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+        subscribers.broadcast(notification);
     } else {
         debug!("Adding peer {} by endpoint {}", identity, endpoint);
 
@@ -1235,7 +1260,7 @@ fn handle_connected(
             );
 
             let notification = PeerManagerNotification::Connected { peer: identity };
-            subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+            subscribers.broadcast(notification);
             return;
         }
 
@@ -1261,7 +1286,7 @@ fn handle_fatal_connection(
     endpoint: String,
     error: String,
     peers: &mut PeerMap,
-    subscribers: &mut Vec<Sender<PeerManagerNotification>>,
+    subscribers: &mut SubscriberMap,
     max_retry_frequency: u64,
 ) {
     if let Some(mut peer_metadata) = peers.get_peer_from_endpoint(&endpoint).cloned() {
@@ -1285,7 +1310,7 @@ fn handle_fatal_connection(
             error!("Unable to update peer: {}", err);
         }
 
-        subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
+        subscribers.broadcast(notification);
     }
 }
 
@@ -1361,6 +1386,7 @@ pub mod tests {
 
     use std::collections::VecDeque;
     use std::sync::mpsc;
+    use std::time::Duration;
 
     use crate::mesh::Mesh;
     use crate::network::connection_manager::{
@@ -1403,8 +1429,12 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
@@ -1412,7 +1442,11 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1462,8 +1496,12 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(tx)
             .expect("Unable to get subscriber");
 
         let peer_ref = peer_connector
@@ -1472,7 +1510,11 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Disconnected {
@@ -1528,8 +1570,12 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref(
@@ -1543,7 +1589,11 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1590,8 +1640,12 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
@@ -1599,7 +1653,11 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1663,8 +1721,12 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref_1 = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
@@ -1672,7 +1734,11 @@ pub mod tests {
 
         assert_eq!(peer_ref_1.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1686,7 +1752,9 @@ pub mod tests {
 
         assert_eq!(peer_ref_2.peer_id(), "next_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1753,8 +1821,12 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(tx)
             .expect("Unable to get subscriber");
         let peer_ref_1 = peer_connector
             .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
@@ -1762,7 +1834,11 @@ pub mod tests {
 
         assert_eq!(peer_ref_1.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1776,7 +1852,9 @@ pub mod tests {
 
         assert_eq!(peer_ref_2.peer_id(), "next_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -1837,15 +1915,24 @@ pub mod tests {
         let peer_connector = peer_manager.connector();
 
         {
-            let mut subscriber = peer_connector
-                .subscribe()
+            let (tx, notification_rx): (
+                Sender<PeerManagerNotification>,
+                mpsc::Receiver<PeerManagerNotification>,
+            ) = channel();
+            peer_connector
+                .subscribe_sender(tx)
                 .expect("Unable to get subscriber");
             let peer_ref = peer_connector
                 .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
                 .expect("Unable to add peer");
 
             assert_eq!(peer_ref.peer_id(), "test_peer");
-            let notification = subscriber.next().expect("Unable to get new notifications");
+
+            // timeout after 60 seconds
+            let timeout = Duration::from_secs(60);
+            let notification = notification_rx
+                .recv_timeout(timeout)
+                .expect("Unable to get new notifications");
             assert!(
                 notification
                     == PeerManagerNotification::Connected {
@@ -1917,14 +2004,22 @@ pub mod tests {
         let peer_connector = peer_manager.connector();
 
         {
-            let mut subscriber = peer_connector
-                .subscribe()
+            let (tx, notification_rx): (
+                Sender<PeerManagerNotification>,
+                mpsc::Receiver<PeerManagerNotification>,
+            ) = channel();
+            peer_connector
+                .subscribe_sender(tx)
                 .expect("Unable to get subscriber");
             let endpoint_peer_ref = peer_connector
                 .add_unidentified_peer("inproc://test".to_string())
                 .expect("Unable to add peer by endpoint");
             assert_eq!(endpoint_peer_ref.endpoint(), "inproc://test".to_string());
-            let notification = subscriber.next().expect("Unable to get new notifications");
+            // timeout after 60 seconds
+            let timeout = Duration::from_secs(60);
+            let notification = notification_rx
+                .recv_timeout(timeout)
+                .expect("Unable to get new notifications");
             assert!(
                 notification
                     == PeerManagerNotification::Connected {
@@ -2050,14 +2145,24 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
-        let mut subscriber = peer_connector.subscribe().expect("Unable to subscribe");
+        let (notification_tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(notification_tx)
+            .expect("Unable to get subscriber");
         let peer_ref = peer_connector
             .add_peer_ref("test_peer".to_string(), vec![endpoint, endpoint2])
             .expect("Unable to add peer");
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get new notifications");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert!(
             notification
                 == PeerManagerNotification::Connected {
@@ -2066,8 +2171,8 @@ pub mod tests {
         );
 
         // receive reconnecting attempt
-        let disconnected_notification = subscriber
-            .next()
+        let disconnected_notification = notification_rx
+            .recv_timeout(timeout)
             .expect("Cannot get message from subscriber");
         assert!(
             disconnected_notification
@@ -2077,8 +2182,8 @@ pub mod tests {
         );
 
         // receive notifications that the peer is connected to new endpoint
-        let connected_notification = subscriber
-            .next()
+        let connected_notification = notification_rx
+            .recv_timeout(timeout)
             .expect("Cannot get message from subscriber");
 
         assert!(
@@ -2232,6 +2337,78 @@ pub mod tests {
         peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
+    }
+
+    // Test that a subscriber can convert the PeerManagerNotification to another type
+    //
+    // 1. add test_peer
+    // 2. verify that the returned PeerRef contains the test_peer id
+    // 3. verify the the a Connected notification is received and is converted to a TestEnum
+    #[test]
+    fn test_peer_manager_notifciation_convert() {
+        let mut transport = Box::new(InprocTransport::default());
+        let mut listener = transport.listen("inproc://test").unwrap();
+
+        thread::spawn(move || {
+            listener.accept().unwrap();
+        });
+
+        let mesh = Mesh::new(512, 128);
+        let cm = ConnectionManager::builder()
+            .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
+            .with_matrix_life_cycle(mesh.get_life_cycle())
+            .with_matrix_sender(mesh.get_sender())
+            .with_transport(transport.clone())
+            .start()
+            .expect("Unable to start Connection Manager");
+
+        let connector = cm.connector();
+        let peer_manager = PeerManager::builder()
+            .with_connector(connector)
+            .with_retry_interval(1)
+            .with_identity("my_id".to_string())
+            .with_strict_ref_counts(true)
+            .start()
+            .expect("Cannot start peer_manager");
+        let peer_connector = peer_manager.connector();
+        let (tx, notification_rx): (Sender<TestEnum>, mpsc::Receiver<TestEnum>) = channel();
+        peer_connector
+            .subscribe_sender(tx)
+            .expect("Unable to get subscriber");
+        let peer_ref = peer_connector
+            .add_peer_ref("test_peer".to_string(), vec!["inproc://test".to_string()])
+            .expect("Unable to add peer");
+
+        assert_eq!(peer_ref.peer_id(), "test_peer");
+
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
+        assert!(
+            notification
+                == TestEnum::Notification(PeerManagerNotification::Connected {
+                    peer: "test_peer".to_string(),
+                })
+        );
+
+        peer_manager.shutdown_handle().unwrap().shutdown();
+        cm.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
+        cm.await_shutdown();
+        mesh.shutdown_signaler().shutdown();
+    }
+
+    #[derive(PartialEq)]
+    enum TestEnum {
+        Notification(PeerManagerNotification),
+    }
+    /// Converts `PeerManagerNotification` into `Test_Enum::Notification(PeerManagerNotification)`
+    impl From<PeerManagerNotification> for TestEnum {
+        fn from(notification: PeerManagerNotification) -> Self {
+            TestEnum::Notification(notification)
+        }
     }
 
     struct NoopAuthorizer {
