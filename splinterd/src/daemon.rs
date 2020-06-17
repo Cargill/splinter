@@ -476,6 +476,24 @@ impl SplinterDaemon {
             }
         }
 
+        let mut health_service_processor_join_handle: Option<_> = None;
+        #[cfg(feature = "health")]
+        {
+            let health_service = HealthService::new(&self.node_id);
+            rest_api_builder = rest_api_builder.add_resources(health_service.resources());
+
+            health_service_processor_join_handle.replace(start_health_service(
+                health_connection,
+                health_service,
+                Arc::clone(&running),
+            )?);
+        }
+
+        #[cfg(not(feature = "health"))]
+        {
+            health_service_processor_join_handle.replace(());
+        }
+
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
         let (admin_shutdown_handle, service_processor_join_handle) =
@@ -505,11 +523,16 @@ impl SplinterDaemon {
 
         #[cfg(feature = "health")]
         {
-            let health_service = HealthService::new(&self.node_id);
-            let health_service_processor_join_handle =
-                start_health_service(health_connection, health_service, Arc::clone(&running))?;
-
-            let _ = health_service_processor_join_handle.join_all();
+            let _ = health_service_processor_join_handle
+                .expect(
+                    "The join handle was not configured correctly, which indicates a feature \
+                    compile error",
+                )
+                .join_all();
+        }
+        #[cfg(not(feature = "health"))]
+        {
+            let _ = health_service_processor_join_handle.take();
         }
 
         // Join threads and shutdown network components
