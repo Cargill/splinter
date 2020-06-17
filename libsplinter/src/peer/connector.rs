@@ -20,7 +20,7 @@ use super::error::{
     PeerConnectionIdError, PeerListError, PeerLookupError, PeerManagerError, PeerRefAddError,
     PeerRefRemoveError, PeerUnknownAddError,
 };
-use super::notification::PeerNotificationIter;
+use super::notification::{PeerManagerNotification, PeerNotificationIter, SubscriberId};
 use super::{EndpointPeerRef, PeerRef};
 use super::{PeerManagerMessage, PeerManagerRequest};
 
@@ -194,6 +194,7 @@ impl PeerManagerConnector {
     ///
     /// Returns a `PeerNotificationIter` that can be used to receive notifications about connected
     /// and disconnected peers
+    #[deprecated(since = "0.4.1", note = "please use `subscribe_sender` instead")]
     pub fn subscribe(&self) -> Result<PeerNotificationIter, PeerManagerError> {
         let (send, recv) = channel();
         match self.sender.send(PeerManagerMessage::Subscribe(send)) {
@@ -202,6 +203,66 @@ impl PeerManagerConnector {
                 "The peer manager is no longer running".into(),
             )),
         }
+    }
+
+    /// Subscribe to notifications for peer events.
+    ///
+    /// `PeerManagerNotification` instances will be transformed via type `T`'s implementation
+    /// of `From<PeerManagerNotification>` and passed to the given sender.
+    ///
+    /// # Returns
+    ///
+    /// The subscriber ID that can be used for unsubscribing the given sender.
+    ///
+    /// # Errors
+    ///
+    /// Return a `PeerManagerError` if the subscriber cannot be registered via the
+    /// `PeerManagerConnector` instance.
+    pub fn subscribe_sender<T>(
+        &self,
+        subscriber: Sender<T>,
+    ) -> Result<SubscriberId, PeerManagerError>
+    where
+        T: From<PeerManagerNotification> + Send + 'static,
+    {
+        let (sender, recv) = channel();
+        self.sender
+            .send(PeerManagerMessage::Request(PeerManagerRequest::Subscribe {
+                sender,
+                callback: Box::new(move |notification| {
+                    subscriber.send(T::from(notification)).map_err(Box::from)
+                }),
+            }))
+            .map_err(|_| {
+                PeerManagerError::SendMessageError("The peer manager is no longer running".into())
+            })?;
+
+        recv.recv().map_err(|_| {
+            PeerManagerError::SendMessageError("The peer manager is no longer running".into())
+        })?
+    }
+
+    /// Unsubscribe from `PeerManagerNotification`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `PeerManagerError` if the `PeerManager` has stopped running.
+    pub fn unsubscribe(&self, subscriber_id: SubscriberId) -> Result<(), PeerManagerError> {
+        let (sender, recv) = channel();
+        self.sender
+            .send(PeerManagerMessage::Request(
+                PeerManagerRequest::Unsubscribe {
+                    subscriber_id,
+                    sender,
+                },
+            ))
+            .map_err(|_| {
+                PeerManagerError::SendMessageError("The peer manager is no longer running".into())
+            })?;
+
+        recv.recv().map_err(|_| {
+            PeerManagerError::SendMessageError("The peer manager is no longer running".into())
+        })?
     }
 }
 

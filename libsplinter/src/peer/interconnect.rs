@@ -434,6 +434,7 @@ pub mod tests {
     use protobuf::Message;
 
     use std::sync::mpsc::{self, Sender};
+    use std::time::Duration;
 
     use crate::mesh::{Envelope, Mesh};
     use crate::network::connection_manager::{
@@ -577,8 +578,12 @@ pub mod tests {
 
         let dispatch_shutdown = network_dispatch_loop.shutdown_signaler();
 
-        let mut subscriber = peer_connector
-            .subscribe()
+        let (notification_tx, notification_rx): (
+            Sender<PeerManagerNotification>,
+            mpsc::Receiver<PeerManagerNotification>,
+        ) = channel();
+        peer_connector
+            .subscribe_sender(notification_tx)
             .expect("Unable to get subscriber");
 
         let peer_ref = peer_connector
@@ -587,7 +592,11 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        let notification = subscriber.next().expect("Unable to get notification");
+        // timeout after 60 seconds
+        let timeout = Duration::from_secs(60);
+        let notification = notification_rx
+            .recv_timeout(timeout)
+            .expect("Unable to get new notifications");
         assert_eq!(
             notification,
             PeerManagerNotification::Connected {
