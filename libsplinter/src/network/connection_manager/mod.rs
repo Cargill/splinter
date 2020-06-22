@@ -323,7 +323,7 @@ impl Connector {
     ///
     /// # Errors
     ///
-    /// Returns a ConnectionManagerError is the connection manager
+    /// Returns a ConnectionManagerError if the connection manager
     /// has stopped running.
     pub fn unsubscribe(&self, subscriber_id: SubscriberId) -> Result<(), ConnectionManagerError> {
         let (sender, recv) = channel();
