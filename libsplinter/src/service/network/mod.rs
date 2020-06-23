@@ -366,6 +366,7 @@ impl ServiceConnector {
         )
     }
 
+    #[allow(clippy::redundant_field_names)]
     pub fn unsubscribe(&self, subscriber_id: SubscriberId) -> Result<(), ServiceConnectionError> {
         agent_msg!(
             self.sender,
