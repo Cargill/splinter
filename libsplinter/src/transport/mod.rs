@@ -42,7 +42,6 @@ pub mod multi;
 #[deprecated(since = "0.3.14", note = "please use splinter::transport::socket")]
 pub mod raw;
 pub mod socket;
-#[deprecated(since = "0.3.14", note = "please use splinter::transport::socket")]
 pub mod tls;
 #[cfg(feature = "ws-transport")]
 pub mod ws;
