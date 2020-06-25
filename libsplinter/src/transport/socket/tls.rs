@@ -349,101 +349,14 @@ impl From<OpensslError> for DisconnectError {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
     use crate::transport::tests;
-    use openssl::asn1::Asn1Time;
-    use openssl::bn::{BigNum, MsbOption};
-    use openssl::hash::MessageDigest;
-    use openssl::pkey::{PKey, PKeyRef, Private};
-    use openssl::rsa::Rsa;
-    use openssl::x509::extension::{BasicConstraints, ExtendedKeyUsage, KeyUsage};
-    use openssl::x509::{X509NameBuilder, X509Ref, X509};
+    use crate::transport::tls::tests::{make_ca_cert, make_ca_signed_cert};
+
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
     use tempdir::TempDir;
-
-    // Make a certificate and private key for the Certificate Authority
-    fn make_ca_cert() -> (PKey<Private>, X509) {
-        let rsa = Rsa::generate(2048).unwrap();
-        let privkey = PKey::from_rsa(rsa).unwrap();
-
-        let mut x509_name = X509NameBuilder::new().unwrap();
-        x509_name.append_entry_by_text("CN", "ca test").unwrap();
-        let x509_name = x509_name.build();
-
-        let mut cert_builder = X509::builder().unwrap();
-        cert_builder.set_version(2).unwrap();
-        cert_builder.set_subject_name(&x509_name).unwrap();
-        cert_builder.set_issuer_name(&x509_name).unwrap();
-        cert_builder.set_pubkey(&privkey).unwrap();
-
-        let not_before = Asn1Time::days_from_now(0).unwrap();
-        cert_builder.set_not_before(&not_before).unwrap();
-        let not_after = Asn1Time::days_from_now(365).unwrap();
-        cert_builder.set_not_after(&not_after).unwrap();
-
-        cert_builder
-            .append_extension(BasicConstraints::new().critical().ca().build().unwrap())
-            .unwrap();
-        cert_builder
-            .append_extension(KeyUsage::new().key_cert_sign().build().unwrap())
-            .unwrap();
-
-        cert_builder
-            .sign(&privkey, MessageDigest::sha256())
-            .unwrap();
-        let cert = cert_builder.build();
-
-        (privkey, cert)
-    }
-
-    // Make a certificate and private key signed by the given CA cert and private key
-    fn make_ca_signed_cert(
-        ca_cert: &X509Ref,
-        ca_privkey: &PKeyRef<Private>,
-    ) -> (PKey<Private>, X509) {
-        let rsa = Rsa::generate(2048).unwrap();
-        let privkey = PKey::from_rsa(rsa).unwrap();
-
-        let mut x509_name = X509NameBuilder::new().unwrap();
-        x509_name.append_entry_by_text("CN", "localhost").unwrap();
-        let x509_name = x509_name.build();
-
-        let mut cert_builder = X509::builder().unwrap();
-        cert_builder.set_version(2).unwrap();
-        let serial_number = {
-            let mut serial = BigNum::new().unwrap();
-            serial.rand(159, MsbOption::MAYBE_ZERO, false).unwrap();
-            serial.to_asn1_integer().unwrap()
-        };
-        cert_builder.set_serial_number(&serial_number).unwrap();
-        cert_builder.set_subject_name(&x509_name).unwrap();
-        cert_builder
-            .set_issuer_name(ca_cert.subject_name())
-            .unwrap();
-        cert_builder.set_pubkey(&privkey).unwrap();
-        let not_before = Asn1Time::days_from_now(0).unwrap();
-        cert_builder.set_not_before(&not_before).unwrap();
-        let not_after = Asn1Time::days_from_now(365).unwrap();
-        cert_builder.set_not_after(&not_after).unwrap();
-
-        cert_builder
-            .append_extension(
-                ExtendedKeyUsage::new()
-                    .server_auth()
-                    .client_auth()
-                    .build()
-                    .unwrap(),
-            )
-            .unwrap();
-
-        cert_builder
-            .sign(&ca_privkey, MessageDigest::sha256())
-            .unwrap();
-        let cert = cert_builder.build();
-
-        (privkey, cert)
-    }
 
     fn write_file(mut temp_dir: PathBuf, file_name: &str, bytes: &[u8]) -> String {
         temp_dir.push(file_name);
