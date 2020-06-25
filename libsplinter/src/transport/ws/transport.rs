@@ -12,19 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::net::{TcpListener, TcpStream};
+use std::net::{Ipv4Addr, Ipv6Addr, TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
 
-use mio::net::TcpStream as MioTcpStream;
+use openssl::error::ErrorStack;
+use openssl::ssl::{SslAcceptor, SslConnector};
 use tungstenite::{client, handshake::HandshakeError};
+use url::{ParseError, Url};
 
+use crate::transport::tls::{build_acceptor, build_connector, TlsConfig};
 use crate::transport::{ConnectError, Connection, ListenError, Listener, Transport};
 
 use super::connection::WsConnection;
 use super::listener::WsListener;
 
-pub(super) const PROTOCOL_PREFIX: &str = "ws://";
+pub(super) const WS_PROTOCOL_PREFIX: &str = "ws://";
+pub(super) const WSS_PROTOCOL_PREFIX: &str = "wss://";
+
+struct TlsInner {
+    acceptor: SslAcceptor,
+    connector: SslConnector,
+}
 
 /// A WebSocket-based `Transport`.
 ///
@@ -39,7 +48,7 @@ pub(super) const PROTOCOL_PREFIX: &str = "ws://";
 /// use splinter::transport::ws::WsTransport;
 ///
 /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let mut transport = WsTransport::default();
+///     let mut transport = WsTransport::new(None)?;
 ///
 ///     // Connect to a remote endpoint starting wtih `ws://`.
 ///     let mut connection = transport.connect("ws://127.0.0.1:5555")?;
@@ -64,7 +73,7 @@ pub(super) const PROTOCOL_PREFIX: &str = "ws://";
 /// use splinter::transport::ws::WsTransport;
 ///
 /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let mut transport = WsTransport::default();
+///     let mut transport = WsTransport::new(None)?;
 ///
 ///     // Create a listener, which will bind to the port
 ///     let mut listener = transport.listen("ws://127.0.0.1:5555")?;
@@ -85,83 +94,176 @@ pub(super) const PROTOCOL_PREFIX: &str = "ws://";
 /// }
 /// ```
 #[derive(Default)]
-pub struct WsTransport {}
+pub struct WsTransport {
+    tls_inner: Option<TlsInner>,
+}
+
+impl WsTransport {
+    pub fn new(config: Option<&TlsConfig>) -> Result<Self, WsInitError> {
+        if let Some(conf) = config {
+            Ok(WsTransport {
+                tls_inner: Some(TlsInner {
+                    acceptor: build_acceptor(&conf)?,
+                    connector: build_connector(&conf)?,
+                }),
+            })
+        } else {
+            Ok(WsTransport { tls_inner: None })
+        }
+    }
+}
+
+fn endpoint_to_dns_name(endpoint: &str) -> Result<String, ParseError> {
+    let mut address = String::from("wss://");
+    address.push_str(endpoint);
+    let url = Url::parse(&address)?;
+    let dns_name = match url.domain() {
+        Some(d) if d.parse::<Ipv4Addr>().is_ok() => "localhost",
+        Some(d) if d.parse::<Ipv6Addr>().is_ok() => "localhost",
+        Some(d) => d,
+        None => "localhost",
+    };
+    Ok(String::from(dns_name))
+}
 
 impl Transport for WsTransport {
     fn accepts(&self, address: &str) -> bool {
-        address.starts_with(PROTOCOL_PREFIX)
+        address.starts_with(WS_PROTOCOL_PREFIX) || address.starts_with(WSS_PROTOCOL_PREFIX)
     }
 
     fn connect(&mut self, endpoint: &str) -> Result<Box<dyn Connection>, ConnectError> {
-        if !self.accepts(endpoint) {
-            return Err(ConnectError::ProtocolError(format!(
-                "Invalid protocol \"{}\"",
-                endpoint
-            )));
-        }
+        if endpoint.starts_with(WS_PROTOCOL_PREFIX) {
+            let address = &endpoint[WS_PROTOCOL_PREFIX.len()..];
+            let stream = TcpStream::connect(address)?;
 
-        let address = if endpoint.starts_with(PROTOCOL_PREFIX) {
-            &endpoint[PROTOCOL_PREFIX.len()..]
-        } else {
-            endpoint
-        };
+            let remote_endpoint = format!("{}{}", WS_PROTOCOL_PREFIX, stream.peer_addr()?);
+            let local_endpoint = format!("{}{}", WS_PROTOCOL_PREFIX, stream.local_addr()?);
 
-        let stream = TcpStream::connect(address)?;
-
-        let remote_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.peer_addr()?);
-        let local_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.local_addr()?);
-
-        let mio_stream = MioTcpStream::from_stream(stream)?;
-
-        let (websocket, _) = client(endpoint, mio_stream).map_or_else(
-            {
-                |mut handshake_err| loop {
-                    match handshake_err {
-                        HandshakeError::Interrupted(mid_handshake) => {
-                            thread::sleep(Duration::from_millis(100));
-                            match mid_handshake.handshake() {
-                                Ok(ok) => break Ok(ok),
-                                Err(err) => handshake_err = err,
+            let (websocket, _) = client(endpoint, stream).map_or_else(
+                {
+                    |mut handshake_err| loop {
+                        match handshake_err {
+                            HandshakeError::Interrupted(mid_handshake) => {
+                                thread::sleep(Duration::from_millis(100));
+                                match mid_handshake.handshake() {
+                                    Ok(ok) => break Ok(ok),
+                                    Err(err) => handshake_err = err,
+                                }
                             }
+                            HandshakeError::Failure(err) => break Err(err),
                         }
-                        HandshakeError::Failure(err) => break Err(err),
                     }
-                }
-            },
-            Ok,
-        )?;
+                },
+                Ok,
+            )?;
 
-        Ok(Box::new(WsConnection::new(
-            websocket,
-            remote_endpoint,
-            local_endpoint,
-        )))
+            Ok(Box::new(WsConnection::new(
+                websocket,
+                remote_endpoint,
+                local_endpoint,
+            )))
+        } else if endpoint.starts_with(WSS_PROTOCOL_PREFIX) {
+            let address = &endpoint[WSS_PROTOCOL_PREFIX.len()..];
+
+            let dns_name = endpoint_to_dns_name(address)?;
+
+            let stream = TcpStream::connect(address)?;
+
+            let remote_endpoint = format!("{}{}", WSS_PROTOCOL_PREFIX, stream.peer_addr()?);
+            let local_endpoint = format!("{}{}", WSS_PROTOCOL_PREFIX, stream.local_addr()?);
+
+            let tls_stream = self
+                .tls_inner
+                .as_ref()
+                .ok_or_else(|| {
+                    ConnectError::ProtocolError(format!(
+                        "Protocol {} requires TLS, which is not configured",
+                        WSS_PROTOCOL_PREFIX
+                    ))
+                })?
+                .connector
+                .connect(&dns_name, stream)?;
+
+            let (websocket, _) = client(endpoint, tls_stream).map_or_else(
+                {
+                    |mut handshake_err| loop {
+                        match handshake_err {
+                            HandshakeError::Interrupted(mid_handshake) => {
+                                thread::sleep(Duration::from_millis(100));
+                                match mid_handshake.handshake() {
+                                    Ok(ok) => break Ok(ok),
+                                    Err(err) => handshake_err = err,
+                                }
+                            }
+                            HandshakeError::Failure(err) => break Err(err),
+                        }
+                    }
+                },
+                Ok,
+            )?;
+
+            Ok(Box::new(WsConnection::new(
+                websocket,
+                remote_endpoint,
+                local_endpoint,
+            )))
+        } else {
+            Err(ConnectError::ProtocolError(format!(
+                "Invalid protocol: {}",
+                endpoint
+            )))
+        }
     }
 
     fn listen(&mut self, bind: &str) -> Result<Box<dyn Listener>, ListenError> {
-        if !self.accepts(bind) {
-            return Err(ListenError::ProtocolError(format!(
-                "Invalid protocol \"{}\"",
-                bind
-            )));
-        }
+        if bind.starts_with(WS_PROTOCOL_PREFIX) {
+            let address = &bind[WS_PROTOCOL_PREFIX.len()..];
+            let tcp_listener = TcpListener::bind(address).map_err(|err| {
+                ListenError::IoError(format!("Failed to bind to {}", address), err)
+            })?;
+            let local_endpoint = format!(
+                "{}{}",
+                WS_PROTOCOL_PREFIX,
+                tcp_listener.local_addr().map_err(|err| {
+                    ListenError::IoError("Failed to get local address".into(), err)
+                })?
+            );
 
-        let address = if bind.starts_with(PROTOCOL_PREFIX) {
-            &bind[PROTOCOL_PREFIX.len()..]
+            Ok(Box::new(WsListener::new(
+                tcp_listener,
+                local_endpoint,
+                None,
+            )))
+        } else if bind.starts_with(WSS_PROTOCOL_PREFIX) {
+            let inner = self.tls_inner.as_ref().ok_or_else(|| {
+                ListenError::ProtocolError(
+                    "TLS support required for the wss:// protocol".to_string(),
+                )
+            })?;
+
+            let address = &bind[WSS_PROTOCOL_PREFIX.len()..];
+            let tcp_listener = TcpListener::bind(address).map_err(|err| {
+                ListenError::IoError(format!("Failed to bind to {}", address), err)
+            })?;
+            let local_endpoint = format!(
+                "{}{}",
+                WSS_PROTOCOL_PREFIX,
+                tcp_listener.local_addr().map_err(|err| {
+                    ListenError::IoError("Failed to get local address".into(), err)
+                })?
+            );
+
+            Ok(Box::new(WsListener::new(
+                tcp_listener,
+                local_endpoint,
+                Some(inner.acceptor.clone()),
+            )))
         } else {
-            bind
-        };
-
-        let tcp_listener = TcpListener::bind(address)
-            .map_err(|err| ListenError::IoError(format!("Failed to bind to {}", address), err))?;
-        let local_endpoint = format!(
-            "ws://{}",
-            tcp_listener.local_addr().map_err(|err| {
-                ListenError::IoError("Failed to get local address".into(), err)
-            })?
-        );
-
-        Ok(Box::new(WsListener::new(tcp_listener, local_endpoint)))
+            Err(ListenError::ProtocolError(format!(
+                "Invalid protocol: {}",
+                bind
+            )))
+        }
     }
 }
 
@@ -171,5 +273,26 @@ impl From<tungstenite::error::Error> for ConnectError {
             tungstenite::error::Error::Io(io) => ConnectError::from(io),
             _ => ConnectError::ProtocolError(format!("handshake failure: {}", err)),
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum WsInitError {
+    ProtocolError(String),
+}
+
+impl std::error::Error for WsInitError {}
+
+impl std::fmt::Display for WsInitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WsInitError::ProtocolError(msg) => write!(f, "Unable to initialize TLS: {}", msg),
+        }
+    }
+}
+
+impl From<ErrorStack> for WsInitError {
+    fn from(error: ErrorStack) -> Self {
+        WsInitError::ProtocolError(format!("OpenSSL error: {}", error))
     }
 }

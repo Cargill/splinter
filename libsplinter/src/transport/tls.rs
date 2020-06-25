@@ -20,7 +20,6 @@ use openssl::error::ErrorStack;
 #[cfg(feature = "ws-transport")]
 use openssl::ssl::{SslAcceptor, SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 
-#[cfg(feature = "ws-transport")]
 pub struct TlsConfig {
     ca_certs_file: Option<String>,
     server_cert_file: String,
@@ -29,7 +28,6 @@ pub struct TlsConfig {
     client_private_key_file: String,
 }
 
-#[cfg(feature = "ws-transport")]
 impl TlsConfig {
     pub fn ca_certs_file(&self) -> &Option<String> {
         &self.ca_certs_file
@@ -52,7 +50,6 @@ impl TlsConfig {
     }
 }
 
-#[cfg(feature = "ws-transport")]
 #[derive(Default)]
 pub struct TlsConfigBuilder {
     ca_certs_file: Option<String>,
@@ -62,7 +59,6 @@ pub struct TlsConfigBuilder {
     client_private_key_file: Option<String>,
 }
 
-#[cfg(feature = "ws-transport")]
 impl TlsConfigBuilder {
     pub fn new() -> Self {
         TlsConfigBuilder {
@@ -124,16 +120,13 @@ impl TlsConfigBuilder {
     }
 }
 
-#[cfg(feature = "ws-transport")]
 #[derive(Debug)]
 pub enum TlsConfigBuilderError {
     MissingField(String),
 }
 
-#[cfg(feature = "ws-transport")]
 impl std::error::Error for TlsConfigBuilderError {}
 
-#[cfg(feature = "ws-transport")]
 impl std::fmt::Display for TlsConfigBuilderError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {

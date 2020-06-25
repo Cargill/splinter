@@ -16,24 +16,31 @@ use std::net::TcpListener;
 use std::thread;
 use std::time::Duration;
 
-use mio::net::TcpStream as MioTcpStream;
+use openssl::ssl::SslAcceptor;
 use tungstenite::{accept, handshake::HandshakeError};
 
 use crate::transport::{AcceptError, Connection, Listener};
 
 use super::connection::WsConnection;
-use super::transport::PROTOCOL_PREFIX;
+use super::transport::WSS_PROTOCOL_PREFIX;
+use super::transport::WS_PROTOCOL_PREFIX;
 
 pub(super) struct WsListener {
     listener: TcpListener,
     local_endpoint: String,
+    acceptor: Option<SslAcceptor>,
 }
 
 impl WsListener {
-    pub fn new(listener: TcpListener, local_endpoint: String) -> Self {
+    pub fn new(
+        listener: TcpListener,
+        local_endpoint: String,
+        acceptor: Option<SslAcceptor>,
+    ) -> Self {
         WsListener {
             listener,
             local_endpoint,
+            acceptor,
         }
     }
 }
@@ -41,33 +48,60 @@ impl WsListener {
 impl Listener for WsListener {
     fn accept(&mut self) -> Result<Box<dyn Connection>, AcceptError> {
         let (stream, _) = self.listener.accept()?;
-        let remote_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.peer_addr()?);
-        let local_endpoint = format!("{}{}", PROTOCOL_PREFIX, stream.local_addr()?);
 
-        let mio_stream = MioTcpStream::from_stream(stream)?;
-        let websocket = accept(mio_stream).map_or_else(
-            {
-                |mut handshake_err| loop {
-                    match handshake_err {
-                        HandshakeError::Interrupted(mid_handshake) => {
-                            thread::sleep(Duration::from_millis(100));
-                            match mid_handshake.handshake() {
-                                Ok(ok) => break Ok(ok),
-                                Err(err) => handshake_err = err,
+        if let Some(acceptor) = &self.acceptor {
+            let remote_endpoint = format!("{}{}", WSS_PROTOCOL_PREFIX, stream.peer_addr()?);
+
+            let websocket = accept(acceptor.accept(stream)?).map_or_else(
+                {
+                    |mut handshake_err| loop {
+                        match handshake_err {
+                            HandshakeError::Interrupted(mid_handshake) => {
+                                thread::sleep(Duration::from_millis(100));
+                                match mid_handshake.handshake() {
+                                    Ok(ok) => break Ok(ok),
+                                    Err(err) => handshake_err = err,
+                                }
                             }
+                            HandshakeError::Failure(err) => break Err(err),
                         }
-                        HandshakeError::Failure(err) => break Err(err),
                     }
-                }
-            },
-            Ok,
-        )?;
+                },
+                Ok,
+            )?;
 
-        Ok(Box::new(WsConnection::new(
-            websocket,
-            remote_endpoint,
-            local_endpoint,
-        )))
+            Ok(Box::new(WsConnection::new(
+                websocket,
+                remote_endpoint,
+                self.local_endpoint.clone(),
+            )))
+        } else {
+            let remote_endpoint = format!("{}{}", WS_PROTOCOL_PREFIX, stream.peer_addr()?);
+
+            let websocket = accept(stream).map_or_else(
+                {
+                    |mut handshake_err| loop {
+                        match handshake_err {
+                            HandshakeError::Interrupted(mid_handshake) => {
+                                thread::sleep(Duration::from_millis(100));
+                                match mid_handshake.handshake() {
+                                    Ok(ok) => break Ok(ok),
+                                    Err(err) => handshake_err = err,
+                                }
+                            }
+                            HandshakeError::Failure(err) => break Err(err),
+                        }
+                    }
+                },
+                Ok,
+            )?;
+
+            Ok(Box::new(WsConnection::new(
+                websocket,
+                remote_endpoint,
+                self.local_endpoint.clone(),
+            )))
+        }
     }
 
     fn endpoint(&self) -> String {

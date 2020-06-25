@@ -13,15 +13,18 @@
 // limitations under the License.
 
 use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::os::unix::io::{AsRawFd, RawFd};
 
-use mio::Evented;
+use mio::{unix::EventedFd, Evented, Poll, PollOpt, Ready, Token};
+use openssl::ssl::SslStream;
 use tungstenite::{protocol::WebSocket, Message};
 
 use crate::transport::{Connection, DisconnectError, RecvError, SendError};
 
 pub(super) struct WsConnection<S>
 where
-    S: Read + Write + Send + Evented,
+    S: Read + Write + Send,
 {
     websocket: WebSocket<S>,
     remote_endpoint: String,
@@ -30,7 +33,7 @@ where
 
 impl<S> WsConnection<S>
 where
-    S: Read + Write + Send + Evented,
+    S: Read + Write + Send,
 {
     pub fn new(websocket: WebSocket<S>, remote_endpoint: String, local_endpoint: String) -> Self {
         WsConnection {
@@ -43,7 +46,7 @@ where
 
 impl<S> Connection for WsConnection<S>
 where
-    S: Read + Write + Send + Evented,
+    S: Read + Write + Send + WsAsRawFd,
 {
     fn send(&mut self, message: &[u8]) -> Result<(), SendError> {
         self.websocket
@@ -79,7 +82,61 @@ where
     }
 
     fn evented(&self) -> &dyn Evented {
-        self.websocket.get_ref()
+        self
+    }
+}
+
+pub(super) trait WsAsRawFd {
+    fn ws_as_raw_fd(&self) -> RawFd;
+}
+
+impl WsAsRawFd for TcpStream {
+    fn ws_as_raw_fd(&self) -> RawFd {
+        self.as_raw_fd()
+    }
+}
+
+impl WsAsRawFd for SslStream<TcpStream> {
+    fn ws_as_raw_fd(&self) -> RawFd {
+        self.get_ref().as_raw_fd()
+    }
+}
+
+impl<S> AsRawFd for WsConnection<S>
+where
+    S: Read + Write + Send + WsAsRawFd,
+{
+    fn as_raw_fd(&self) -> RawFd {
+        self.websocket.get_ref().ws_as_raw_fd()
+    }
+}
+
+impl<S> Evented for WsConnection<S>
+where
+    S: Read + Write + Send + WsAsRawFd,
+{
+    fn register(
+        &self,
+        poll: &Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt,
+    ) -> std::io::Result<()> {
+        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
+    }
+
+    fn reregister(
+        &self,
+        poll: &Poll,
+        token: Token,
+        interest: Ready,
+        opts: PollOpt,
+    ) -> std::io::Result<()> {
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
+    }
+
+    fn deregister(&self, poll: &Poll) -> std::io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
 
