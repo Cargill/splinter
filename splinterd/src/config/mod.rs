@@ -689,6 +689,9 @@ mod tests {
     }
 
     #[test]
+    // This test potentially interactions with other tests that set the environment variables used
+    // within. It also fails to reset the environment variables to their original values.
+    #[ignore]
     /// This test verifies that a `Config` object, constructed from multiple config modules, contains
     /// the correct values, giving `ClapPartialConfigBuilder` values ultimate precedence, using the
     /// following steps:
