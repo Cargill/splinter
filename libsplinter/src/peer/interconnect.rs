@@ -340,7 +340,7 @@ where
             }
         } else {
             error!(
-                "Received message from unknown peer with connection_id {}",
+                "Received message from removed or unknown peer with connection_id {}",
                 connection_id
             );
         }

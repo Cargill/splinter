@@ -32,6 +32,7 @@ mod peer_ref;
 
 use std::cmp::min;
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Instant;
@@ -40,7 +41,7 @@ use uuid::Uuid;
 
 use crate::collections::{BiHashMap, RefMap};
 use crate::network::connection_manager::ConnectionManagerNotification;
-use crate::network::connection_manager::Connector;
+use crate::network::connection_manager::{ConnectionManagerError, Connector};
 use crate::threading::pacemaker;
 
 pub use self::builder::PeerManagerBuilder;
@@ -651,7 +652,7 @@ fn add_peer(
         return Ok(peer_ref);
     }
 
-    debug!("Attempting to peer with {}", peer_id);
+    info!("Attempting to peer with {}", peer_id);
     let connection_id = format!("{}", Uuid::new_v4());
 
     let mut active_endpoint = match endpoints.get(0) {
@@ -679,7 +680,7 @@ fn add_peer(
             }
             // If the request_connection errored we will retry in the future
             Err(err) => {
-                error!("Unable to request connection for peer {}: {}", peer_id, err);
+                log_connect_request_err(err, &peer_id, &endpoint);
             }
         }
     }
@@ -704,7 +705,7 @@ fn add_unidentified(
     peers: &PeerMap,
     ref_map: &mut RefMap,
 ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
-    debug!("Attempting to peer with peer by endpoint {}", endpoint);
+    info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
         // if there is peer in the peer_map, there is reference in the ref map
         ref_map.add_ref(peer_metadata.id.to_string());
@@ -888,7 +889,10 @@ fn handle_notifications(
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
             if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
-                warn!("Received non fatal connection with attempts: {}", attempts);
+                info!(
+                    "{} reconnection attempts have been made to peer {}",
+                    attempts, identity
+                );
                 if attempts >= max_retry_attempts {
                     if endpoint != peer_metadata.active_endpoint {
                         warn!(
@@ -907,10 +911,9 @@ fn handle_notifications(
                         match connector.request_connection(&endpoint, &peer_metadata.connection_id)
                         {
                             Ok(()) => break,
-                            Err(err) => error!(
-                                "Unable to request connection for peer {} at endpoint {}: {}",
-                                peer_metadata.id, endpoint, err
-                            ),
+                            Err(err) => {
+                                log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                            }
                         }
                     }
                 }
@@ -1010,10 +1013,9 @@ fn handle_disconnection(
             for endpoint in peer_metadata.endpoints.iter() {
                 match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
                     Ok(()) => break,
-                    Err(err) => error!(
-                        "Unable to request connection for peer {} at endpoint {}: {}",
-                        peer_metadata.id, endpoint, err
-                    ),
+                    Err(err) => {
+                        log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                    }
                 }
             }
             peer_metadata.status = PeerStatus::Pending;
@@ -1070,7 +1072,7 @@ fn handle_inbound_connection(
                 // otherwise, remove outbound connection and replace with inbound.
                 if local_identity > identity.as_str() {
                     // if peer is already connected, remove the inbound connection
-                    info!(
+                    debug!(
                         "Removing inbound connection, already connected to {}",
                         peer_metadata.id
                     );
@@ -1331,16 +1333,13 @@ fn retry_pending(
     }
 
     for mut peer_metadata in to_retry {
-        debug!("Retry peering with pending peer {}", peer_metadata.id);
+        debug!("Attempting to peer with pending peer {}", peer_metadata.id);
         for endpoint in peer_metadata.endpoints.iter() {
             match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
                 Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
                 // If request_connection errored we will retry in the future
                 Err(err) => {
-                    error!(
-                        "Unable to request connection for peer {}: {}",
-                        peer_metadata.id, err
-                    );
+                    log_connect_request_err(err, &peer_metadata.id, &endpoint);
                 }
             }
         }
@@ -1362,21 +1361,78 @@ fn retry_pending(
             if peers.contains_endpoint(endpoint) {
                 continue;
             }
-            debug!("Attempting to peer with peer by {}", endpoint);
+            info!("Attempting to peer with peer by {}", endpoint);
             let connection_id = format!("{}", Uuid::new_v4());
             match connector.request_connection(&endpoint, &connection_id) {
                 Ok(()) => (),
                 // If request_connection errored we will retry in the future
-                Err(err) => {
-                    error!(
-                        "Unable to request connection for peer endpoint {}: {}",
-                        endpoint, err
-                    );
-                }
+                Err(err) => match err {
+                    ConnectionManagerError::ConnectionCreationError {
+                        context,
+                        error_kind: None,
+                    } => {
+                        info!(
+                            "Unable to request connection for peer endpoint {}: {}",
+                            endpoint, context
+                        );
+                    }
+                    ConnectionManagerError::ConnectionCreationError {
+                        context,
+                        error_kind: Some(err_kind),
+                    } => match err_kind {
+                        ErrorKind::ConnectionRefused => info!(
+                            "Received connection refused attempting to establish a \
+                                        connection to peer at endpoint {}",
+                            endpoint
+                        ),
+                        _ => info!(
+                            "Unable to request connection for peer at {}: {}",
+                            endpoint, context,
+                        ),
+                    },
+                    _ => info!(
+                        "Unable to request connection for peer at endpoint {}: {}",
+                        endpoint,
+                        err.to_string()
+                    ),
+                },
             }
         }
 
         unreferenced_peers.last_connection_attempt = Instant::now();
+    }
+}
+
+fn log_connect_request_err(err: ConnectionManagerError, peer_id: &str, endpoint: &str) {
+    match err {
+        ConnectionManagerError::ConnectionCreationError {
+            context,
+            error_kind: None,
+        } => {
+            info!(
+                "Unable to request connection for peer {}: {}",
+                peer_id, context
+            );
+        }
+        ConnectionManagerError::ConnectionCreationError {
+            context,
+            error_kind: Some(err_kind),
+        } => match err_kind {
+            ErrorKind::ConnectionRefused => info!(
+                "Received connection refused attempting to establish a \
+                        connection to peer {}: endpoint {}",
+                peer_id, endpoint
+            ),
+            _ => info!(
+                "Unable to request connection for peer {}: {}",
+                peer_id, context
+            ),
+        },
+        _ => info!(
+            "Unable to request connection for peer {}: {}",
+            peer_id,
+            err.to_string()
+        ),
     }
 }
 
