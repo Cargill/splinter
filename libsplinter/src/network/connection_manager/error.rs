@@ -18,7 +18,6 @@ use std::{error, fmt, io};
 pub enum ConnectionManagerError {
     StartUpError(String),
     HeartbeatError(String),
-    CreateConnectionError(String),
     SendMessageError(String),
     SendTimeoutError(String),
     ConnectionCreationError(String),
@@ -35,7 +34,6 @@ impl fmt::Display for ConnectionManagerError {
         match self {
             ConnectionManagerError::StartUpError(err) => f.write_str(err),
             ConnectionManagerError::HeartbeatError(ref s) => f.write_str(s),
-            ConnectionManagerError::CreateConnectionError(ref s) => f.write_str(s),
             ConnectionManagerError::SendMessageError(ref s) => f.write_str(s),
             ConnectionManagerError::SendTimeoutError(ref s) => f.write_str(s),
             ConnectionManagerError::ConnectionCreationError(ref s) => f.write_str(s),
