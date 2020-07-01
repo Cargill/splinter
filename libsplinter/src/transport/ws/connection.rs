@@ -12,63 +12,58 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::{self, Read, Write};
-use std::os::unix::io::AsRawFd;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::os::unix::io::{AsRawFd, RawFd};
 
 use mio::{unix::EventedFd, Evented, Poll, PollOpt, Ready, Token};
-use websocket::{
-    client::sync::Client,
-    message::{Message, OwnedMessage::Binary},
-    result::WebSocketError,
-    stream::sync::{AsTcpStream, Stream},
-};
+use openssl::ssl::SslStream;
+use tungstenite::{protocol::WebSocket, Message};
 
 use crate::transport::{Connection, DisconnectError, RecvError, SendError};
 
-pub(super) struct WsClientConnection<S>
+pub(super) struct WsConnection<S>
 where
     S: Read + Write + Send,
 {
-    client: Client<S>,
+    websocket: WebSocket<S>,
     remote_endpoint: String,
     local_endpoint: String,
 }
 
-impl<S> WsClientConnection<S>
+impl<S> WsConnection<S>
 where
     S: Read + Write + Send,
 {
-    pub fn new(client: Client<S>, remote_endpoint: String, local_endpoint: String) -> Self {
-        WsClientConnection {
-            client,
+    pub fn new(websocket: WebSocket<S>, remote_endpoint: String, local_endpoint: String) -> Self {
+        WsConnection {
+            websocket,
             remote_endpoint,
             local_endpoint,
         }
     }
 }
 
-impl<S> Connection for WsClientConnection<S>
+impl<S> Connection for WsConnection<S>
 where
-    S: AsTcpStream + Stream + Read + Write + Send,
+    S: Read + Write + Send + WsAsRawFd,
 {
     fn send(&mut self, message: &[u8]) -> Result<(), SendError> {
-        Ok(self.client.send_message(&Message::binary(message))?)
+        self.websocket
+            .write_message(Message::Binary(message.to_vec()))?;
+        self.websocket.write_pending()?;
+        Ok(())
     }
 
     fn recv(&mut self) -> Result<Vec<u8>, RecvError> {
-        match self.client.recv_message() {
+        match self.websocket.read_message() {
             Ok(message) => match message {
-                Binary(v) => Ok(v),
+                Message::Binary(v) => Ok(v),
                 _ => Err(RecvError::ProtocolError(
-                    "message received was not
-                        websocket::message::OwnedMessage::Binary"
-                        .to_string(),
+                    "message received was not binary".to_string(),
                 )),
             },
-            Err(WebSocketError::IoError(ref e)) if e.kind() == io::ErrorKind::WouldBlock => {
-                Err(RecvError::WouldBlock)
-            }
-            Err(WebSocketError::NoDataAvailable) => Err(RecvError::WouldBlock),
+            Err(tungstenite::error::Error::Io(e)) => Err(RecvError::from(e)),
             Err(err) => Err(err.into()),
         }
     }
@@ -82,7 +77,8 @@ where
     }
 
     fn disconnect(&mut self) -> Result<(), DisconnectError> {
-        self.client.shutdown().map_err(DisconnectError::from)
+        self.websocket.close(None)?;
+        Ok(())
     }
 
     fn evented(&self) -> &dyn Evented {
@@ -90,9 +86,34 @@ where
     }
 }
 
-impl<S> Evented for WsClientConnection<S>
+pub(super) trait WsAsRawFd {
+    fn ws_as_raw_fd(&self) -> RawFd;
+}
+
+impl WsAsRawFd for TcpStream {
+    fn ws_as_raw_fd(&self) -> RawFd {
+        self.as_raw_fd()
+    }
+}
+
+impl WsAsRawFd for SslStream<TcpStream> {
+    fn ws_as_raw_fd(&self) -> RawFd {
+        self.get_ref().as_raw_fd()
+    }
+}
+
+impl<S> AsRawFd for WsConnection<S>
 where
-    S: AsTcpStream + Stream + Read + Write + Send,
+    S: Read + Write + Send + WsAsRawFd,
+{
+    fn as_raw_fd(&self) -> RawFd {
+        self.websocket.get_ref().ws_as_raw_fd()
+    }
+}
+
+impl<S> Evented for WsConnection<S>
+where
+    S: Read + Write + Send + WsAsRawFd,
 {
     fn register(
         &self,
@@ -100,9 +121,8 @@ where
         token: Token,
         interest: Ready,
         opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.client.stream_ref().as_tcp().as_raw_fd())
-            .register(poll, token, interest, opts)
+    ) -> std::io::Result<()> {
+        EventedFd(&self.as_raw_fd()).register(poll, token, interest, opts)
     }
 
     fn reregister(
@@ -111,30 +131,38 @@ where
         token: Token,
         interest: Ready,
         opts: PollOpt,
-    ) -> io::Result<()> {
-        EventedFd(&self.client.stream_ref().as_tcp().as_raw_fd())
-            .reregister(poll, token, interest, opts)
+    ) -> std::io::Result<()> {
+        EventedFd(&self.as_raw_fd()).reregister(poll, token, interest, opts)
     }
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        EventedFd(&self.client.stream_ref().as_tcp().as_raw_fd()).deregister(poll)
+    fn deregister(&self, poll: &Poll) -> std::io::Result<()> {
+        EventedFd(&self.as_raw_fd()).deregister(poll)
     }
 }
 
-impl From<WebSocketError> for RecvError {
-    fn from(err: WebSocketError) -> Self {
+impl From<tungstenite::error::Error> for SendError {
+    fn from(err: tungstenite::error::Error) -> Self {
         match err {
-            WebSocketError::IoError(e) => RecvError::from(e),
-            _ => RecvError::ProtocolError(format!("WebSocketError: {}", err.to_string())),
+            tungstenite::error::Error::Io(io) => SendError::from(io),
+            _ => SendError::ProtocolError(err.to_string()),
         }
     }
 }
 
-impl From<WebSocketError> for SendError {
-    fn from(err: WebSocketError) -> Self {
+impl From<tungstenite::error::Error> for RecvError {
+    fn from(err: tungstenite::error::Error) -> Self {
         match err {
-            WebSocketError::IoError(e) => SendError::from(e),
-            _ => SendError::ProtocolError(format!("WebSocketError: {}", err.to_string())),
+            tungstenite::error::Error::Io(io) => RecvError::from(io),
+            _ => RecvError::ProtocolError(err.to_string()),
+        }
+    }
+}
+
+impl From<tungstenite::error::Error> for DisconnectError {
+    fn from(err: tungstenite::error::Error) -> Self {
+        match err {
+            tungstenite::error::Error::Io(io) => DisconnectError::from(io),
+            _ => DisconnectError::ProtocolError(err.to_string()),
         }
     }
 }

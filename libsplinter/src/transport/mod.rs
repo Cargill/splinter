@@ -42,7 +42,6 @@ pub mod multi;
 #[deprecated(since = "0.3.14", note = "please use splinter::transport::socket")]
 pub mod raw;
 pub mod socket;
-#[deprecated(since = "0.3.14", note = "please use splinter::transport::socket")]
 pub mod tls;
 #[cfg(feature = "ws-transport")]
 pub mod ws;
@@ -150,8 +149,11 @@ pub mod tests {
     }
 
     macro_rules! block {
-        ($op:expr, $err:ident) => {
+        ($op:expr, $err:ident) => {{
+            let start = Instant::now();
+            let duration = Duration::from_millis(60000); // 60 seconds
             loop {
+                assert!(start.elapsed() < duration, "blocked for too long");
                 match $op {
                     Err($err::WouldBlock) => {
                         thread::sleep(Duration::from_millis(100));
@@ -161,7 +163,7 @@ pub mod tests {
                     Ok(ok) => break Ok(ok),
                 }
             }
-        };
+        }};
     }
 
     pub fn test_transport<T: Transport + Send + 'static>(mut transport: T, bind: &str) {
@@ -338,7 +340,7 @@ pub mod tests {
             // a response. Sending a response here will unblock the listener thread, so it is
             // important we do this even in the error case, as the test will hang ohterwise.
             for (mut conn, _token) in connections {
-                assert_eq!(b"hello".to_vec(), conn.recv().unwrap());
+                assert_eq!(b"hello".to_vec(), block!(conn.recv(), RecvError).unwrap());
                 assert_ok(conn.send(b"world"));
             }
 

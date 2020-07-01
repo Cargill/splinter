@@ -18,6 +18,7 @@ use std::path::Path;
 use splinter::transport::multi::MultiTransport;
 use splinter::transport::socket::TcpTransport;
 use splinter::transport::socket::TlsTransport;
+use splinter::transport::tls::{TlsConfig, TlsConfigBuilder};
 #[cfg(feature = "ws-transport")]
 use splinter::transport::ws::WsTransport;
 use splinter::transport::Transport;
@@ -35,100 +36,118 @@ pub fn build_transport(config: &Config) -> Result<MultiTransport, GetTransportEr
     transports.push(Box::new(TcpTransport::default()));
 
     // add web socket transport
-    #[cfg(feature = "ws-transport")]
-    transports.push(Box::new(WsTransport::default()));
 
     // add tls transport
     if !config.no_tls() {
-        transports.push(build_tls_transport(config)?)
+        let tls_config = build_tls_config(&config)?;
+        validate_tls_config(&tls_config)?;
+        print_tls_config(&tls_config)?;
+
+        transports.push(Box::new(TlsTransport::new(
+            tls_config.ca_certs_file().to_owned(),
+            tls_config.client_private_key_file().to_string(),
+            tls_config.client_cert_file().to_string(),
+            tls_config.server_private_key_file().to_string(),
+            tls_config.server_cert_file().to_string(),
+        )?));
+
+        #[cfg(feature = "ws-transport")]
+        transports.push(Box::new(WsTransport::new(Some(&tls_config)).map_err(
+            |e| {
+                GetTransportError::CertError(format!("Failed to create WebSocket transport: {}", e))
+            },
+        )?));
+    } else {
+        #[cfg(feature = "ws-transport")]
+        transports.push(Box::new(WsTransport::default()));
     }
 
     Ok(MultiTransport::new(transports))
 }
 
-fn build_tls_transport(config: &Config) -> Result<Box<dyn Transport + Send>, GetTransportError> {
-    let client_cert = config.tls_client_cert();
+fn build_tls_config(config: &Config) -> Result<TlsConfig, GetTransportError> {
+    let mut builder = TlsConfigBuilder::new()
+        .with_client_cert_file(config.tls_client_cert().to_string())
+        .with_client_private_key_file(config.tls_client_key().to_string())
+        .with_server_cert_file(config.tls_server_cert().to_string())
+        .with_server_private_key_file(config.tls_server_key().to_string());
+
+    if config.tls_insecure() {
+        warn!("Starting TlsTransport in insecure mode");
+    } else {
+        builder = builder.with_ca_certs_file(config.tls_ca_file().to_string());
+    }
+
+    builder
+        .build()
+        .map_err(|e| GetTransportError::CertError(format!("TLS config error: {}", e)))
+}
+
+fn validate_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> {
+    let client_cert = tls_config.client_cert_file();
     if !Path::new(&client_cert).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid client certificate: {}",
             client_cert
         )));
     }
-    debug!(
-        "Using client certificate file: {:?}",
-        fs::canonicalize(&client_cert)?
-    );
 
-    let server_cert = config.tls_server_cert();
+    let server_cert = tls_config.server_cert_file();
     if !Path::new(&server_cert).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid server certificate: {}",
             server_cert
         )));
     }
-    debug!(
-        "Using server certificate file: {:?}",
-        fs::canonicalize(&server_cert)?
-    );
 
-    let server_key_file = config.tls_server_key();
+    let server_key_file = tls_config.server_private_key_file();
     if !Path::new(&server_key_file).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid server key path: {}",
             server_key_file
         )));
     }
-    debug!(
-        "Using server key file: {:?}",
-        fs::canonicalize(&server_key_file)?
-    );
 
-    let client_key_file = config.tls_client_key();
+    let client_key_file = tls_config.client_private_key_file();
     if !Path::new(&client_key_file).is_file() {
         return Err(GetTransportError::CertError(format!(
             "Must provide a valid client key path: {}",
             client_key_file
         )));
     }
+
+    if let Some(ca_file) = tls_config.ca_certs_file() {
+        if !Path::new(&ca_file).is_file() {
+            return Err(GetTransportError::CertError(format!(
+                "Must provide a valid file containing ca certs: {}",
+                ca_file
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn print_tls_config(tls_config: &TlsConfig) -> Result<(), GetTransportError> {
+    debug!(
+        "Using client certificate file: {:?}",
+        fs::canonicalize(tls_config.client_cert_file())?
+    );
     debug!(
         "Using client key file: {:?}",
-        fs::canonicalize(&client_key_file)?
+        fs::canonicalize(tls_config.client_private_key_file())?
     );
-
-    let insecure = config.tls_insecure();
-    if insecure {
-        warn!("Starting TlsTransport in insecure mode");
+    debug!(
+        "Using server certificate file: {:?}",
+        fs::canonicalize(tls_config.server_cert_file())?
+    );
+    debug!(
+        "Using server key file: {:?}",
+        fs::canonicalize(tls_config.server_private_key_file())?
+    );
+    if let Some(ca_path) = tls_config.ca_certs_file() {
+        debug!("Using ca certs file: {:?}", ca_path);
     }
-    let ca_file = {
-        if insecure {
-            None
-        } else {
-            let ca_file = config.tls_ca_file();
-            if !Path::new(&ca_file).is_file() {
-                return Err(GetTransportError::CertError(format!(
-                    "Must provide a valid file containing ca certs: {}",
-                    ca_file
-                )));
-            }
-            match fs::canonicalize(&ca_file)?.to_str() {
-                Some(ca_path) => {
-                    debug!("Using ca certs file: {:?}", ca_path);
-                    Some(ca_path.to_string())
-                }
-                None => {
-                    return Err(GetTransportError::CertError(
-                        "CA path is not a valid path".to_string(),
-                    ))
-                }
-            }
-        }
-    };
 
-    Ok(Box::new(TlsTransport::new(
-        ca_file.map(String::from),
-        String::from(client_key_file),
-        String::from(client_cert),
-        String::from(server_key_file),
-        String::from(server_cert),
-    )?))
+    Ok(())
 }
