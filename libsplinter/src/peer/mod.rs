@@ -217,6 +217,10 @@ impl PeerManager {
         debug!("Shutting down peer manager (complete)");
     }
 
+    #[deprecated(
+        since = "0.4.1",
+        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
+    )]
     /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
     pub fn shutdown_and_wait(self) {
         self.shutdown_signaler.shutdown();
