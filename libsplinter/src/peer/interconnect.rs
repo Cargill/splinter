@@ -119,6 +119,10 @@ impl PeerInterconnect {
         debug!("Shutting down peer interconnect sender (complete)");
     }
 
+    #[deprecated(
+        since = "0.4.1",
+        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
+    )]
     /// Calls shutdown on the shutdown handle and then waits for the `PeerInterconnect` threads to
     /// finish
     pub fn shutdown_and_wait(self) {
@@ -649,7 +653,8 @@ pub mod tests {
         cm.await_shutdown();
         dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
-        interconnect.shutdown_and_wait();
+        interconnect.shutdown_signaler().shutdown();
+        interconnect.await_shutdown();
     }
 
     // Verify that PeerInterconnect can be shutdown after start but without any messages being
@@ -691,7 +696,8 @@ pub mod tests {
         peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
-        interconnect.shutdown_and_wait();
+        interconnect.shutdown_signaler().shutdown();
+        interconnect.await_shutdown();
     }
 
     struct Shutdown {}
