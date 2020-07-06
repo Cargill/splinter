@@ -612,7 +612,7 @@ pub mod tests {
         // trigger the thread shutdown
         tx.send(()).unwrap();
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -655,7 +655,7 @@ pub mod tests {
             .build()
             .expect("Unable to build PeerInterconnect");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();

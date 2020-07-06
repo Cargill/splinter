@@ -240,7 +240,7 @@ impl SplinterDaemon {
             })?;
 
         let peer_connector = peer_manager.connector();
-        let peer_manager_shutdown = peer_manager.shutdown_handle();
+        let peer_manager_shutdown = peer_manager.shutdown_signaler();
 
         // Listen for services
         Self::listen_for_services(
@@ -539,9 +539,7 @@ impl SplinterDaemon {
         let _ = rest_api_join_handle.join();
         let _ = service_processor_join_handle.join_all();
         let _ = orchestator_join_handles.join_all();
-        if let Some(shutdown_handler) = peer_manager_shutdown {
-            shutdown_handler.shutdown();
-        }
+        peer_manager_shutdown.shutdown();
         peer_manager.await_shutdown();
         debug!("Shutting down admin service's peer manager notification receiver...");
         let _ = admin_notification_join.join();
