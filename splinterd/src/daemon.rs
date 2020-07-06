@@ -325,7 +325,7 @@ impl SplinterDaemon {
             })?;
         let network_dispatcher_shutdown = network_dispatch_loop.shutdown_signaler();
 
-        let interconnect_shutdown_handle = interconnect.shutdown_handle();
+        let interconnect_shutdown = interconnect.shutdown_signaler();
 
         // setup threads to listen on the network ports and add incoming connections to the network
         // these threads will just be dropped on shutdown
@@ -499,7 +499,7 @@ impl SplinterDaemon {
             circuit_dispatcher_shutdown.shutdown();
             network_dispatcher_shutdown.shutdown();
             registry_shutdown.shutdown();
-            interconnect_shutdown_handle.shutdown();
+            interconnect_shutdown.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
 
