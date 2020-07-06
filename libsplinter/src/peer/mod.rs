@@ -129,7 +129,7 @@ pub(crate) enum PeerManagerRequest {
 pub struct PeerManager {
     join_handle: thread::JoinHandle<()>,
     sender: Sender<PeerManagerMessage>,
-    shutdown_handle: ShutdownHandle,
+    shutdown_signaler: ShutdownSignaler,
 }
 
 impl PeerManager {
@@ -197,9 +197,15 @@ impl PeerManager {
         PeerManagerConnector::new(self.sender.clone())
     }
 
+    #[deprecated(since = "0.4.1", note = "Please use shutdown_signaler() instead.")]
     /// Returns a `ShutdownHandle` for this `PeerManager`
     pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        Some(self.shutdown_handle.clone())
+        Some(ShutdownHandle::from(self.shutdown_signaler.clone()))
+    }
+
+    /// Returns a `ShutdownSignaler` for this `PeerManager`
+    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
+        self.shutdown_signaler.clone()
     }
 
     /// Waits for the `PeerManager` thread to shutdown
@@ -213,7 +219,7 @@ impl PeerManager {
 
     /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
     pub fn shutdown_and_wait(self) {
-        self.shutdown_handle.shutdown();
+        self.shutdown_signaler.shutdown();
         self.await_shutdown();
     }
 
@@ -344,20 +350,21 @@ impl PeerManager {
                 ))
             })?;
 
-        let shutdown_handle = ShutdownHandle {
+        let shutdown_signaler = ShutdownSignaler {
             sender: sender.clone(),
             pacemaker_shutdown_signaler,
         };
 
         Ok(PeerManager {
-            shutdown_handle,
+            shutdown_signaler,
             join_handle,
             sender,
         })
     }
 }
 
-/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
+/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`.
+/// Deprecated, use ShutdownSignaler instead.
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<PeerManagerMessage>,
@@ -365,6 +372,32 @@ pub struct ShutdownHandle {
 }
 
 impl ShutdownHandle {
+    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
+    pub fn shutdown(&self) {
+        self.pacemaker_shutdown_signaler.shutdown();
+        if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
+            warn!("PeerManager is no longer running");
+        }
+    }
+}
+
+impl From<ShutdownSignaler> for ShutdownHandle {
+    fn from(signaler: ShutdownSignaler) -> Self {
+        ShutdownHandle {
+            sender: signaler.sender,
+            pacemaker_shutdown_signaler: signaler.pacemaker_shutdown_signaler,
+        }
+    }
+}
+
+/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
+#[derive(Clone)]
+pub struct ShutdownSignaler {
+    sender: Sender<PeerManagerMessage>,
+    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
+}
+
+impl ShutdownSignaler {
     /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
     pub fn shutdown(&self) {
         self.pacemaker_shutdown_signaler.shutdown();
@@ -1510,7 +1543,7 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1585,7 +1618,7 @@ pub mod tests {
             .expect("Unable to list connections")
             .is_empty());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1657,7 +1690,7 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1727,7 +1760,7 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1829,7 +1862,7 @@ pub mod tests {
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1926,7 +1959,7 @@ pub mod tests {
 
         assert!(peers.get_by_key("test_peer").is_some());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2010,7 +2043,7 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2111,7 +2144,7 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2252,7 +2285,7 @@ pub mod tests {
         tx.send(()).unwrap();
 
         jh.join().unwrap();
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2282,7 +2315,7 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2356,7 +2389,7 @@ pub mod tests {
 
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2388,7 +2421,7 @@ pub mod tests {
         #[allow(deprecated)]
         peer_manager.start().expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2449,7 +2482,7 @@ pub mod tests {
                 })
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();

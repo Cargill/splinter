@@ -3484,7 +3484,7 @@ mod tests {
     }
 
     fn shutdown(mesh: Mesh, cm: ConnectionManager, pm: PeerManager) {
-        pm.shutdown_handle().unwrap().shutdown();
+        pm.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         pm.await_shutdown();
         cm.await_shutdown();
