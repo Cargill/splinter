@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Type for notifications that the peer manager sends out.
+//!
+//! The public interface includes the enum [`PeerManagerNotification`]
+
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, TryRecvError};
 

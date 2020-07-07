@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures and implementations for sending and receiving messages from peers.
+//!
+//! The public interface includes the structs [`PeerInterconnect`], [`PeerInterconnectBuilder`],
+//! [`NetworkMessageSender`], and [`ShutdownSignaler`].
+//!
+//! [`NetworkMessageSender`]: struct.NetworkMessageSender.html
+//! [`PeerInterconnect`]: struct.PeerInterconnect.html
+//! [`PeerInterconnectBuilder`]: struct.PeerInterconnectBuilder.html
+//! [`ShutdownSignaler`]: struct.ShutdownSignaler.html
+
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
