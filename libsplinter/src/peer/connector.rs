@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures for communicating with the PeerManager.
+
 use std::sync::mpsc::{channel, Sender};
 
 use crate::collections::BiHashMap;
