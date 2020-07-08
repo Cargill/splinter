@@ -813,9 +813,10 @@ fn remove_peer(
                 );
                 Ok(())
             }
-            Ok(None) => Err(PeerRefRemoveError::RemoveError(
-                "No connection to remove, something has gone wrong".to_string(),
-            )),
+            Ok(None) => Err(PeerRefRemoveError::RemoveError(format!(
+                "The connection for peer {}'s active endpoint ({}) has already been removed",
+                peer_id, peer_metadata.active_endpoint
+            ))),
             Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
         }
     } else {
@@ -883,9 +884,10 @@ fn remove_peer_by_endpoint(
                 );
                 Ok(())
             }
-            Ok(None) => Err(PeerRefRemoveError::RemoveError(
-                "No connection to remove, something has gone wrong".to_string(),
-            )),
+            Ok(None) => Err(PeerRefRemoveError::RemoveError(format!(
+                "The connection for peer {}'s active endpoint ({}) has already been removed",
+                peer_metadata.id, peer_metadata.active_endpoint
+            ))),
             Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
         }
     } else {
