@@ -330,7 +330,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                     if let Err(err) = matrix_sender
                         .send(metadata.connection_id.clone(), heartbeat_message.clone())
                     {
-                        error!(
+                        debug!(
                             "Outbound: failed to send heartbeat to {}: {:?} attempting reconnection",
                             endpoint, err
                         );
@@ -350,7 +350,7 @@ fn send_heartbeats<T: ConnectionMatrixLifeCycle, U: ConnectionMatrixSender>(
                 if let Err(err) =
                     matrix_sender.send(metadata.connection_id.clone(), heartbeat_message.clone())
                 {
-                    error!(
+                    debug!(
                         "Inbound: failed to send heartbeat to {}: {:?} ",
                         endpoint, err,
                     );

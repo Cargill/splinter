@@ -31,7 +31,7 @@ pub use notification::ConnectionManagerNotification;
 
 use crate::threading::pacemaker;
 use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
-use crate::transport::{Connection, Transport};
+use crate::transport::{ConnectError, Connection, Transport};
 
 const INITIAL_RETRY_FREQUENCY: u64 = 10;
 
@@ -522,8 +522,8 @@ where
             }),
         ) {
             if reply_sender
-                .send(Err(ConnectionManagerError::ConnectionCreationError(
-                    err.to_string(),
+                .send(Err(ConnectionManagerError::connection_creation_error(
+                    &err.to_string(),
                 )))
                 .is_err()
             {
@@ -592,8 +592,8 @@ where
                         }),
                     ) {
                         if reply_sender
-                            .send(Err(ConnectionManagerError::ConnectionCreationError(
-                                err.to_string(),
+                            .send(Err(ConnectionManagerError::connection_creation_error(
+                                &err.to_string(),
                             )))
                             .is_err()
                         {
@@ -604,12 +604,16 @@ where
                     }
                 }
                 Err(err) => {
-                    if reply_sender
-                        .send(Err(ConnectionManagerError::ConnectionCreationError(
-                            err.to_string(),
-                        )))
-                        .is_err()
-                    {
+                    let connection_error = match err {
+                        ConnectError::IoError(io_err) => {
+                            ConnectionManagerError::connection_creation_error_with_io(
+                                &format!("Unable to connect to {}", endpoint),
+                                io_err.kind(),
+                            )
+                        }
+                        _ => ConnectionManagerError::connection_creation_error(&err.to_string()),
+                    };
+                    if reply_sender.send(Err(connection_error)).is_err() {
                         warn!("connector dropped before receiving result of add connection");
                     }
                 }
@@ -645,7 +649,7 @@ where
                     .life_cycle
                     .add(connection, connection_id.clone())
                     .map_err(|err| {
-                        ConnectionManagerError::ConnectionCreationError(format!("{:?}", err))
+                        ConnectionManagerError::connection_creation_error(&err.to_string())
                     })
                 {
                     subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {
@@ -713,7 +717,7 @@ where
                     .life_cycle
                     .add(connection, connection_id.clone())
                     .map_err(|err| {
-                        ConnectionManagerError::ConnectionCreationError(format!("{:?}", err))
+                        ConnectionManagerError::connection_creation_error(&err.to_string())
                     })
                 {
                     subscribers.broadcast(ConnectionManagerNotification::FatalConnectionError {

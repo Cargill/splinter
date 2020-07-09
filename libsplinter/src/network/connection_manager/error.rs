@@ -18,14 +18,32 @@ use std::{error, fmt, io};
 pub enum ConnectionManagerError {
     StartUpError(String),
     HeartbeatError(String),
-    CreateConnectionError(String),
     SendMessageError(String),
     SendTimeoutError(String),
-    ConnectionCreationError(String),
+    ConnectionCreationError {
+        context: String,
+        error_kind: Option<io::ErrorKind>,
+    },
     ConnectionRemovalError(String),
     ConnectionReconnectError(String),
     Unauthorized(String),
     StatePoisoned,
+}
+
+impl ConnectionManagerError {
+    pub fn connection_creation_error(context: &str) -> Self {
+        ConnectionManagerError::ConnectionCreationError {
+            context: context.into(),
+            error_kind: None,
+        }
+    }
+
+    pub fn connection_creation_error_with_io(context: &str, err: io::ErrorKind) -> Self {
+        ConnectionManagerError::ConnectionCreationError {
+            context: context.into(),
+            error_kind: Some(err),
+        }
+    }
 }
 
 impl error::Error for ConnectionManagerError {}
@@ -35,10 +53,11 @@ impl fmt::Display for ConnectionManagerError {
         match self {
             ConnectionManagerError::StartUpError(err) => f.write_str(err),
             ConnectionManagerError::HeartbeatError(ref s) => f.write_str(s),
-            ConnectionManagerError::CreateConnectionError(ref s) => f.write_str(s),
             ConnectionManagerError::SendMessageError(ref s) => f.write_str(s),
             ConnectionManagerError::SendTimeoutError(ref s) => f.write_str(s),
-            ConnectionManagerError::ConnectionCreationError(ref s) => f.write_str(s),
+            ConnectionManagerError::ConnectionCreationError { context, .. } => {
+                f.write_str(&context)
+            }
             ConnectionManagerError::ConnectionRemovalError(ref s) => f.write_str(s),
             ConnectionManagerError::ConnectionReconnectError(ref s) => f.write_str(s),
             ConnectionManagerError::Unauthorized(ref connection_id) => {

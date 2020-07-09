@@ -133,7 +133,7 @@ impl Pool {
         incoming_tx: &crossbeam_channel::Sender<InternalEnvelope>,
     ) {
         if let Err((id, err)) = self.try_handle_event(event, incoming_tx) {
-            warn!(
+            debug!(
                 "Removing Connection {} due to error handling event: {:?}",
                 id, err
             );
