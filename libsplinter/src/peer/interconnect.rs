@@ -78,7 +78,7 @@ pub struct PeerInterconnect {
     dispatched_sender: Sender<SendRequest>,
     recv_join_handle: thread::JoinHandle<()>,
     send_join_handle: thread::JoinHandle<()>,
-    shutdown_handle: ShutdownHandle,
+    shutdown_signaler: ShutdownSignaler,
 }
 
 impl PeerInterconnect {
@@ -88,8 +88,14 @@ impl PeerInterconnect {
     }
 
     /// Returns a `ShutdownHandle` that can be used to shutdown `PeerInterconnect`
+    #[deprecated(since = "0.5.1", note = "Please use shutdown_signaler() instead.")]
     pub fn shutdown_handle(&self) -> ShutdownHandle {
-        self.shutdown_handle.clone()
+        ShutdownHandle::from(self.shutdown_signaler.clone())
+    }
+
+    /// Returns a `ShutdownSignaler` for this `PeerManager`
+    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
+        self.shutdown_signaler.clone()
     }
 
     /// Waits for the send and receive thread to shutdown
@@ -113,10 +119,14 @@ impl PeerInterconnect {
         debug!("Shutting down peer interconnect sender (complete)");
     }
 
+    #[deprecated(
+        since = "0.5.1",
+        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
+    )]
     /// Calls shutdown on the shutdown handle and then waits for the `PeerInterconnect` threads to
     /// finish
     pub fn shutdown_and_wait(self) {
-        self.shutdown_handle().shutdown();
+        self.shutdown_signaler().shutdown();
         self.await_shutdown();
     }
 }
@@ -267,7 +277,7 @@ where
             dispatched_sender: dispatched_sender.clone(),
             recv_join_handle,
             send_join_handle,
-            shutdown_handle: ShutdownHandle {
+            shutdown_signaler: ShutdownSignaler {
                 sender: dispatched_sender,
             },
         })
@@ -411,7 +421,8 @@ where
     }
 }
 
-/// Handle for shutting down the `PeerInterconnect`
+/// Handle for shutting down the `PeerInterconnect`.
+/// Deprecated, use ShutdownSignaler instead.
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<SendRequest>,
@@ -420,6 +431,29 @@ pub struct ShutdownHandle {
 impl ShutdownHandle {
     /// Sends a shutdown notification to `PeerInterconnect` and the associated dipatcher thread
     /// and `ConnectionMatrix`
+    pub fn shutdown(&self) {
+        if self.sender.send(SendRequest::Shutdown).is_err() {
+            warn!("Peer Interconnect is no longer running");
+        }
+    }
+}
+
+impl From<ShutdownSignaler> for ShutdownHandle {
+    fn from(signaler: ShutdownSignaler) -> Self {
+        ShutdownHandle {
+            sender: signaler.sender,
+        }
+    }
+}
+
+/// Handle for shutting down the `PeerInterconnect`
+#[derive(Clone)]
+pub struct ShutdownSignaler {
+    sender: Sender<SendRequest>,
+}
+
+impl ShutdownSignaler {
+    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
     pub fn shutdown(&self) {
         if self.sender.send(SendRequest::Shutdown).is_err() {
             warn!("Peer Interconnect is no longer running");
@@ -459,7 +493,8 @@ pub mod tests {
     // This tests also validates that PeerInterconnect can retrieve the list of peers from the
     // PeerManager using the PeerManagerConnector.
     //
-    // Finally, verify that PeerInterconnect can be shutdown by calling shutdown_and_wait.
+    // Finally, verify that PeerInterconnect can be shutdown by calling
+    // shutdown_signaler().shutdown() and peer_manager.await_shutdown().
     //
     // 1. Starts up a PeerManager and requests a peer that is running in another thread. Assert
     //    that the peer is properly created.
@@ -612,13 +647,14 @@ pub mod tests {
         // trigger the thread shutdown
         tx.send(()).unwrap();
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
         dispatch_shutdown.shutdown();
         mesh1.shutdown_signaler().shutdown();
-        interconnect.shutdown_and_wait();
+        interconnect.shutdown_signaler().shutdown();
+        interconnect.await_shutdown();
     }
 
     // Verify that PeerInterconnect can be shutdown after start but without any messages being
@@ -655,12 +691,13 @@ pub mod tests {
             .build()
             .expect("Unable to build PeerInterconnect");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();
-        interconnect.shutdown_and_wait();
+        interconnect.shutdown_signaler().shutdown();
+        interconnect.await_shutdown();
     }
 
     struct Shutdown {}
