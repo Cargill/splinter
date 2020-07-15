@@ -19,5 +19,6 @@ pub mod error;
 
 embed_migrations!("./src/biome/migrations/diesel/postgres/migrations");
 
+#[cfg(feature = "biome")]
+#[allow(deprecated)]
 pub use super::database::error::ConnectionError;
-

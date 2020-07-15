@@ -12,27 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines methods and utilities to interact with user tables in the database.
+//! Defines methods and utilities to interact with biome tables in a PostgreSQL database.
 
 embed_migrations!("./src/biome/migrations/diesel/postgres/migrations");
 
 use diesel::pg::PgConnection;
 
-use crate::database::error::ConnectionError;
+use crate::biome::migrations::MigrationError;
 
-/// Run database migrations to create tables defined in the user module
+/// Run database migrations to create tables defined by biome
 ///
 /// # Arguments
 ///
-/// * `conn` - Connection to database
+/// * `conn` - Connection to PostgreSQL database
 ///
-pub fn run_migrations(conn: &PgConnection) -> Result<(), ConnectionError> {
-    embedded_migrations::run(conn).map_err(|err| ConnectionError {
+pub fn run_migrations(conn: &PgConnection) -> Result<(), MigrationError> {
+    embedded_migrations::run(conn).map_err(|err| MigrationError {
         context: "Failed to embed migrations".to_string(),
         source: Box::new(err),
     })?;
 
-    info!("Successfully applied biome credentials migrations");
+    info!("Successfully applied PostgreSQL biome migrations");
 
     Ok(())
 }

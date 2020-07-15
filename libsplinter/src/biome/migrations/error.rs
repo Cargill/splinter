@@ -12,9 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "biome")]
-#[deprecated(
-    since = "0.5.1",
-    note = "replaced by `crate::biome::migrations::MigrationError`"
-)]
-pub type ConnectionError = crate::biome::migrations::MigrationError;
+use std::error::Error;
+use std::fmt;
+
+#[derive(Debug)]
+pub struct MigrationError {
+    pub context: String,
+    pub source: Box<dyn Error>,
+}
+
+impl Error for MigrationError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&*self.source)
+    }
+}
+
+impl fmt::Display for MigrationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Error applying migrations: {}", self.context)
+    }
+}

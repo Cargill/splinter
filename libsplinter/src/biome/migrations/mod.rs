@@ -28,6 +28,8 @@
 
 #[cfg(feature = "diesel")]
 mod diesel;
+mod error;
 
 #[cfg(feature = "postgres")]
 pub use self::diesel::postgres::run_migrations as run_postgres_migrations;
+pub use self::error::MigrationError;
