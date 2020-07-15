@@ -32,4 +32,6 @@ mod error;
 
 #[cfg(feature = "postgres")]
 pub use self::diesel::postgres::run_migrations as run_postgres_migrations;
+#[cfg(feature = "sqlite")]
+pub use self::diesel::sqlite::run_migrations as run_sqlite_migrations;
 pub use self::error::MigrationError;

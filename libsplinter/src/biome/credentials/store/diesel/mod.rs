@@ -46,13 +46,53 @@ impl<C: diesel::Connection> DieselCredentialsStore<C> {
     }
 }
 
-impl<C> CredentialsStore for DieselCredentialsStore<C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
-{
+#[cfg(feature = "postgres")]
+impl CredentialsStore for DieselCredentialsStore<diesel::pg::PgConnection> {
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
+    }
+
+    fn update_credentials(
+        &self,
+        user_id: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<(), CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
+            .update_credentials(user_id, username, password)
+    }
+
+    fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).remove_credentials(user_id)
+    }
+
+    fn fetch_credential_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Credentials, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
+            .fetch_credential_by_id(user_id)
+    }
+
+    fn fetch_credential_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Credentials, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
+            .fetch_credential_by_username(username)
+    }
+
+    fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).fetch_username_by_id(user_id)
+    }
+
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).list_usernames()
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl CredentialsStore for DieselCredentialsStore<diesel::sqlite::SqliteConnection> {
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }

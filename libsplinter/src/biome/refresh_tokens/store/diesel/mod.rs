@@ -37,13 +37,24 @@ impl<C: diesel::Connection> DieselRefreshTokenStore<C> {
     }
 }
 
-impl<C> RefreshTokenStore for DieselRefreshTokenStore<C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
-{
+#[cfg(feature = "postgres")]
+impl RefreshTokenStore for DieselRefreshTokenStore<diesel::pg::PgConnection> {
+    fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
+    }
+    fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).remove_token(user_id)
+    }
+    fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).update_token(user_id, token)
+    }
+    fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).fetch_token(user_id)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl RefreshTokenStore for DieselRefreshTokenStore<diesel::sqlite::SqliteConnection> {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
     }

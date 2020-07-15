@@ -97,6 +97,7 @@ experimental = [
     "circuit-template",
     "service-arg-validation",
     "service-network",
+    "sqlite",
     "ws-transport",
     "zmq-transport",
 ]
@@ -125,6 +126,7 @@ rest-api-cors = []
 sawtooth-signing-compat = ["sawtooth-sdk"]
 service-arg-validation = []
 service-network = []
+sqlite = ["diesel/sqlite", "diesel_migrations"]
 ws-transport = ["tungstenite"]
 zmq-transport = ["zmq"]
 

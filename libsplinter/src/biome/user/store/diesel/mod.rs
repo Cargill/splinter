@@ -46,12 +46,31 @@ impl<C: diesel::Connection> DieselUserStore<C> {
     }
 }
 
-impl<C> UserStore for DieselUserStore<C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
-{
+#[cfg(feature = "postgres")]
+impl UserStore for DieselUserStore<diesel::pg::PgConnection> {
+    fn add_user(&self, user: User) -> Result<(), UserStoreError> {
+        UserStoreOperations::new(&*self.connection_pool.get()?).add_user(user.into())
+    }
+
+    fn update_user(&self, updated_user: User) -> Result<(), UserStoreError> {
+        UserStoreOperations::new(&*self.connection_pool.get()?).update_user(updated_user)
+    }
+
+    fn remove_user(&self, id: &str) -> Result<(), UserStoreError> {
+        UserStoreOperations::new(&*self.connection_pool.get()?).delete_user(id)
+    }
+
+    fn fetch_user(&self, id: &str) -> Result<User, UserStoreError> {
+        UserStoreOperations::new(&*self.connection_pool.get()?).fetch_user(id)
+    }
+
+    fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
+        UserStoreOperations::new(&*self.connection_pool.get()?).list_users()
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl UserStore for DieselUserStore<diesel::sqlite::SqliteConnection> {
     fn add_user(&self, user: User) -> Result<(), UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).add_user(user.into())
     }
