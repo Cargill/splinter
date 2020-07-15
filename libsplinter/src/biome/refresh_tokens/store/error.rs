@@ -15,9 +15,6 @@
 use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "diesel")]
-use crate::database::error;
-
 #[derive(Debug)]
 pub enum RefreshTokenError {
     /// Represents CRUD operations failures
@@ -87,8 +84,8 @@ impl fmt::Display for RefreshTokenError {
 }
 
 #[cfg(feature = "diesel")]
-impl From<error::ConnectionError> for RefreshTokenError {
-    fn from(err: error::ConnectionError) -> RefreshTokenError {
+impl From<diesel::r2d2::PoolError> for RefreshTokenError {
+    fn from(err: diesel::r2d2::PoolError) -> RefreshTokenError {
         RefreshTokenError::ConnectionError(Box::new(err))
     }
 }

@@ -16,8 +16,10 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+
 use super::{User, UserStore, UserStoreError};
-use crate::database::ConnectionPool;
+
 use operations::add_user::UserStoreAddUserOperation as _;
 use operations::delete_user::UserStoreDeleteUserOperation as _;
 use operations::fetch_user::UserStoreFetchUserOperation as _;
@@ -27,11 +29,11 @@ use operations::UserStoreOperations;
 
 /// Manages creating, updating and fetching User from the databae
 #[derive(Clone)]
-pub struct DieselUserStore {
-    connection_pool: ConnectionPool,
+pub struct DieselUserStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
 }
 
-impl DieselUserStore {
+impl<C: diesel::Connection> DieselUserStore<C> {
     /// Creates a new DieselUserStore
     ///
     /// # Arguments
@@ -39,12 +41,17 @@ impl DieselUserStore {
     ///  * `connection_pool`: connection pool to the database
     // Allow dead code if diesel feature is not enabled
     #[allow(dead_code)]
-    pub fn new(connection_pool: ConnectionPool) -> DieselUserStore {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         DieselUserStore { connection_pool }
     }
 }
 
-impl UserStore for DieselUserStore {
+impl<C> UserStore for DieselUserStore<C>
+where
+    C: diesel::Connection,
+    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+{
     fn add_user(&self, user: User) -> Result<(), UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).add_user(user.into())
     }

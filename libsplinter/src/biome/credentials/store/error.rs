@@ -17,9 +17,6 @@ use bcrypt::BcryptError;
 use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "diesel")]
-use crate::database::error;
-
 /// Represents CredentialsStore errors
 #[derive(Debug)]
 pub enum CredentialsStoreError {
@@ -99,8 +96,8 @@ impl fmt::Display for CredentialsStoreError {
 }
 
 #[cfg(feature = "diesel")]
-impl From<error::ConnectionError> for CredentialsStoreError {
-    fn from(err: error::ConnectionError) -> CredentialsStoreError {
+impl From<diesel::r2d2::PoolError> for CredentialsStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> CredentialsStoreError {
         CredentialsStoreError::ConnectionError(Box::new(err))
     }
 }

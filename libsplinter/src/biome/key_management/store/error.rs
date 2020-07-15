@@ -15,9 +15,6 @@
 use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "diesel")]
-use crate::database::error;
-
 /// Represents KeyStore errors
 #[derive(Debug)]
 pub enum KeyStoreError {
@@ -96,8 +93,8 @@ impl fmt::Display for KeyStoreError {
 }
 
 #[cfg(feature = "diesel")]
-impl From<error::ConnectionError> for KeyStoreError {
-    fn from(err: error::ConnectionError) -> KeyStoreError {
+impl From<diesel::r2d2::PoolError> for KeyStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> KeyStoreError {
         KeyStoreError::ConnectionError(Box::new(err))
     }
 }

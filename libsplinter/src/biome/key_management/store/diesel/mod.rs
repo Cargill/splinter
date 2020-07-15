@@ -16,9 +16,10 @@ pub(in crate::biome) mod models;
 mod operations;
 mod schema;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+
 use crate::biome::key_management::store::{KeyStore, KeyStoreError};
 use crate::biome::key_management::Key;
-use crate::database::ConnectionPool;
 
 #[cfg(feature = "biome-credentials")]
 use operations::update_keys_and_password::KeyStoreUpdateKeysAndPasswordOperation as _;
@@ -30,23 +31,28 @@ use operations::{
 };
 
 /// Manages creating, updating and fetching keys from a PostgreSQL database.
-pub struct DieselKeyStore {
-    pub connection_pool: ConnectionPool,
+pub struct DieselKeyStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
 }
 
-impl DieselKeyStore {
+impl<C: diesel::Connection> DieselKeyStore<C> {
     /// Creates a new DieselKeyStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the PostgreSQL database
     ///
-    pub fn new(connection_pool: ConnectionPool) -> Self {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         DieselKeyStore { connection_pool }
     }
 }
 
-impl KeyStore for DieselKeyStore {
+impl<C> KeyStore for DieselKeyStore<C>
+where
+    C: diesel::Connection,
+    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+{
     fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).insert_key(key)
     }

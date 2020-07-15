@@ -16,8 +16,10 @@ mod models;
 mod operations;
 mod schema;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+
 use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
-use crate::database::ConnectionPool;
+
 use operations::{
     add_token::RefreshTokenStoreAddTokenOperation,
     fetch_token::RefreshTokenStoreFetchTokenOperation,
@@ -25,17 +27,23 @@ use operations::{
     update_token::RefreshTokenStoreUpdateTokenOperation, RefreshTokenStoreOperations,
 };
 
-pub struct DieselRefreshTokenStore {
-    connection_pool: ConnectionPool,
+pub struct DieselRefreshTokenStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
 }
 
-impl DieselRefreshTokenStore {
-    pub fn new(connection_pool: ConnectionPool) -> Self {
+impl<C: diesel::Connection> DieselRefreshTokenStore<C> {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         Self { connection_pool }
     }
 }
 
-impl RefreshTokenStore for DieselRefreshTokenStore {
+impl<C> RefreshTokenStore for DieselRefreshTokenStore<C>
+where
+    C: diesel::Connection,
+    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
+    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+{
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
     }

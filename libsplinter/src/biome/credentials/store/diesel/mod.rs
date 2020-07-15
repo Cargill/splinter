@@ -16,8 +16,10 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+
 use super::{Credentials, CredentialsStore, CredentialsStoreError, UsernameId};
-use crate::database::ConnectionPool;
+
 use models::CredentialsModel;
 use operations::add_credentials::CredentialsStoreAddCredentialsOperation as _;
 use operations::fetch_credential_by_id::CredentialsStoreFetchCredentialByIdOperation as _;
@@ -29,22 +31,28 @@ use operations::update_credentials::CredentialsStoreUpdateCredentialsOperation a
 use operations::CredentialsStoreOperations;
 
 /// Manages creating, updating and fetching SplinterCredentials from the database
-pub struct DieselCredentialsStore {
-    connection_pool: ConnectionPool,
+pub struct DieselCredentialsStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
 }
 
-impl DieselCredentialsStore {
+impl<C: diesel::Connection> DieselCredentialsStore<C> {
     /// Creates a new DieselCredentialsStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the database
-    pub fn new(connection_pool: ConnectionPool) -> DieselCredentialsStore {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         DieselCredentialsStore { connection_pool }
     }
 }
 
-impl CredentialsStore for DieselCredentialsStore {
+impl<C> CredentialsStore for DieselCredentialsStore<C>
+where
+    C: diesel::Connection,
+    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
+    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+{
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }
