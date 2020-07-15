@@ -27,8 +27,6 @@ pub(in crate::biome::user) trait UserStoreUpdateUserOperation {
 impl<'a, C> UserStoreUpdateUserOperation for UserStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn update_user(&self, updated_user: User) -> Result<(), UserStoreError> {

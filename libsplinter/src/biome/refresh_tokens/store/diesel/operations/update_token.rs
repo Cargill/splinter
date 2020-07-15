@@ -27,8 +27,6 @@ pub(in crate::biome) trait RefreshTokenStoreUpdateTokenOperation {
 impl<'a, C> RefreshTokenStoreUpdateTokenOperation for RefreshTokenStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
