@@ -26,6 +26,7 @@ pub struct ApplicationMetadata {
 }
 
 impl ApplicationMetadata {
+    #[cfg(feature = "test-authorization-handler")]
     pub fn new(alias: &str, scabbard_admin_keys: &[String]) -> ApplicationMetadata {
         ApplicationMetadata {
             alias: alias.to_string(),
@@ -37,6 +38,7 @@ impl ApplicationMetadata {
         serde_json::from_slice(bytes).map_err(ApplicationMetadataError::DeserializationError)
     }
 
+    #[cfg(feature = "test-authorization-handler")]
     pub fn to_bytes(&self) -> Result<Vec<u8>, ApplicationMetadataError> {
         serde_json::to_vec(self).map_err(ApplicationMetadataError::SerializationError)
     }
