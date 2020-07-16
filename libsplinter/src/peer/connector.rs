@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures for communicating with the PeerManager.
+
 use std::sync::mpsc::{channel, Sender};
 
 use crate::collections::BiHashMap;
@@ -42,7 +44,11 @@ pub trait PeerLookup: Send {
     fn peer_id(&self, connection_id: &str) -> Result<Option<String>, PeerLookupError>;
 }
 
+/// The `PeerLookupProvider` trait facilitates getting the peer IDs and connection IDs for
+/// messages.
 pub trait PeerLookupProvider {
+    /// Returns a `Box<dyn PeerLookup>` to be used for getting a connection ID from the associated
+    /// peer ID, and peer ID from the associated connection ID
     fn peer_lookup(&self) -> Box<dyn PeerLookup>;
 }
 

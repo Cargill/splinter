@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Types for errors that can be raised by the PeerManager.
+
 use std::{error, fmt};
 
 /// Errors that could be raised by the `PeerManager`
