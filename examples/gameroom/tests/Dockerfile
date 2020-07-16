@@ -18,15 +18,6 @@ RUN apt-get update \
  && apt-get install -y \
  postgresql-client
 
-# Install Rust
-RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
- && chmod +x /usr/bin/rustup-init \
- && rustup-init -y
-
-ENV PATH=$PATH:/root/.cargo/bin
-
-RUN rustup update
-
 # Build gameroom cli
 
 WORKDIR /project/gameroom
