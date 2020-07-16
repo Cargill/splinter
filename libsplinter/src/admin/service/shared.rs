@@ -1031,7 +1031,7 @@ impl AdminServiceShared {
                     pending_payload.missing_protocol_ids.contains(&peer_id)
                 });
 
-        std::mem::replace(&mut self.pending_protocol_payloads, protocol);
+        self.pending_protocol_payloads = protocol;
         // Add peer back to any pending payloads
         let mut unpeered_payloads = std::mem::replace(&mut self.unpeered_payloads, vec![]);
         for unpeered_payload in unpeered_payloads.iter_mut() {
@@ -1041,7 +1041,7 @@ impl AdminServiceShared {
         }
         // add payloads that are not waiting on peer connection
         unpeered_payloads.extend(peering);
-        std::mem::replace(&mut self.unpeered_payloads, unpeered_payloads);
+        self.unpeered_payloads = unpeered_payloads;
     }
 
     pub fn on_peer_connected(&mut self, peer_id: &str) -> Result<(), AdminSharedError> {
@@ -1057,7 +1057,7 @@ impl AdminServiceShared {
                 .into_iter()
                 .partition(|unpeered_payload| unpeered_payload.unpeered_ids.is_empty());
 
-        std::mem::replace(&mut self.unpeered_payloads, still_unpeered);
+        self.unpeered_payloads = still_unpeered;
         for peered_payload in fully_peered {
             self.pending_protocol_payloads.push(peered_payload);
         }
@@ -1153,7 +1153,8 @@ impl AdminServiceShared {
             pending_protocol_payloads
                 .into_iter()
                 .partition(|pending_payload| pending_payload.missing_protocol_ids.is_empty());
-        std::mem::replace(&mut self.pending_protocol_payloads, waiting);
+
+        self.pending_protocol_payloads = waiting;
 
         if protocol == 0 {
             // if no agreed protocol, remove all peer refs for proposals
