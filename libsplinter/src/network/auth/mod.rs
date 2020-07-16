@@ -434,13 +434,11 @@ impl ManagedAuthorizations {
     }
 
     fn is_complete(&self, connection_id: &str) -> Option<bool> {
-        self.states
-            .get(connection_id)
-            .and_then(|state| match state {
-                AuthorizationState::Authorized(_) => Some(true),
-                AuthorizationState::Unauthorized => Some(true),
-                _ => Some(false),
-            })
+        self.states.get(connection_id).map(|state| match state {
+            AuthorizationState::Authorized(_) => true,
+            AuthorizationState::Unauthorized => true,
+            _ => false,
+        })
     }
 }
 
