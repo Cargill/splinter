@@ -492,15 +492,15 @@ fn handle_response(
     wait_sink
         .send(outgoing)
         .and_then(|_| wait_sink.flush())
-        .or_else(|protocol_error| {
+        .map_err(|protocol_error| {
             error!("Error occurred while handling message {:?}", protocol_error);
             if let Err(shutdown_error) = do_shutdown(wait_sink, CloseCode::Protocol, running) {
-                Err(WebSocketError::AbnormalShutdownError {
+                WebSocketError::AbnormalShutdownError {
                     protocol_error,
                     shutdown_error,
-                })
+                }
             } else {
-                Err(WebSocketError::from(protocol_error))
+                WebSocketError::from(protocol_error)
             }
         })
 }

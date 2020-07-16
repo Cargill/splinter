@@ -36,7 +36,6 @@ where
             .select(user_credentials::all_columns)
             .load::<CredentialsModel>(self.conn)
             .map(Some)
-            .or_else(Err)
             .map_err(|err| CredentialsStoreError::QueryError {
                 context: "Failed to fetch usernames".to_string(),
                 source: Box::new(err),

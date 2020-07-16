@@ -612,9 +612,9 @@ impl ServiceConnectionMap {
         self.by_endpoint
             .remove(endpoint)
             .and_then(|identity| self.services.remove(&identity))
-            .and_then(|info| {
+            .map(|info| {
                 self.by_connection_id.remove(&info.connection_id);
-                Some(info)
+                info
             })
     }
 
