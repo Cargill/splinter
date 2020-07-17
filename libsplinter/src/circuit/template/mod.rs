@@ -78,34 +78,30 @@ impl CircuitTemplateManager {
 
     pub fn list_available_templates(&self) -> Result<Vec<String>, CircuitTemplateError> {
         let path = Path::new(&self.path);
-
-        path.read_dir()
+        let available_templates = path
+            .read_dir()
             .map_err(|err| {
                 CircuitTemplateError::new_with_source(
-                    &format!("Failed to read files in {}", self.path),
+                    &format!("Failed to read circuit template files in {}", self.path),
                     Box::new(err),
                 )
             })?
-            .map(|entry| {
-                let file = entry.map_err(|err| {
-                    CircuitTemplateError::new_with_source(
-                        &format!("Failed to read file in {}", self.path),
-                        Box::new(err),
-                    )
-                })?;
-                Ok(file
-                    .file_name()
-                    .into_string()
-                    .map_err(|_| {
-                        CircuitTemplateError::new(&format!(
-                            "Failed to read file name {}",
-                            self.path
-                        ))
-                    })?
-                    .trim_end_matches(".yaml")
-                    .to_string())
+            .filter_map(|entry| match entry {
+                Ok(file) => match file.file_name().into_string() {
+                    Ok(name) => Some(name.trim_end_matches(".yaml").to_string()),
+                    Err(_) => {
+                        error!("Unable to read circuit template file name: {}", self.path);
+                        None
+                    }
+                },
+                Err(err) => {
+                    error!("Unable to read circuit template file: {}", err);
+                    None
+                }
             })
-            .collect::<Result<_, CircuitTemplateError>>()
+            .collect::<Vec<String>>();
+
+        Ok(available_templates)
     }
 }
 
