@@ -147,14 +147,19 @@ impl From<v1::ServiceArgument> for ServiceArgument {
 fn all_services(
     service_builders: Vec<SplinterServiceBuilder>,
 ) -> Result<Vec<SplinterServiceBuilder>, CircuitTemplateError> {
-    let peers = service_builders.iter().map(|builder| {
-        let service_id = builder.service_id()
-            .ok_or_else(|| {
-                error!("The service_id must be set before the service argument PEER_SERVICES can be set");
+    let peers = service_builders
+        .iter()
+        .map(|builder| {
+            let service_id = builder.service_id().ok_or_else(|| {
+                error!(
+                    "The service_id must be set before the service argument PEER_SERVICES can \
+                     be set"
+                );
                 CircuitTemplateError::new("Failed to parse template due to an internal error")
             })?;
-        Ok(format!("\"{}\"", service_id))
-    }).collect::<Result<Vec<String>, CircuitTemplateError>>()?;
+            Ok(format!("\"{}\"", service_id))
+        })
+        .collect::<Result<Vec<String>, CircuitTemplateError>>()?;
     let services = service_builders
         .into_iter()
         .enumerate()
