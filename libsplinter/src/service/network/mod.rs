@@ -288,13 +288,13 @@ macro_rules! agent_msg {
         }
     };
 
-    ($sender:expr, $msg_type:ident { $($field:ident: $value:expr,)* }) => {
+    ($sender:expr, $msg_type:ident { $($fields:tt)* }) => {
         {
             let (tx, rx) = mpsc::channel();
             agent_msg!(@do_send $sender, rx,
                 AgentMessage::$msg_type {
                     reply_sender: tx,
-                    $($field: $value)*
+                    $($fields)*
                 })
         }
     };
@@ -366,14 +366,8 @@ impl ServiceConnector {
         )
     }
 
-    #[allow(clippy::redundant_field_names)]
     pub fn unsubscribe(&self, subscriber_id: SubscriberId) -> Result<(), ServiceConnectionError> {
-        agent_msg!(
-            self.sender,
-            Unsubscribe {
-                subscriber_id: subscriber_id,
-            }
-        )
+        agent_msg!(self.sender, Unsubscribe { subscriber_id })
     }
 }
 
