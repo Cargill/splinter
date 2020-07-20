@@ -47,17 +47,24 @@ mod user;
 pub use credentials::store::diesel::DieselCredentialsStore;
 #[cfg(feature = "biome-credentials")]
 pub use credentials::store::memory::MemoryCredentialsStore;
+#[cfg(feature = "biome-credentials")]
+pub use credentials::store::CredentialsStore;
 
 #[cfg(all(feature = "biome-key-management", feature = "diesel"))]
 pub use key_management::store::diesel::DieselKeyStore;
 #[cfg(feature = "biome-key-management")]
 pub use key_management::store::memory::MemoryKeyStore;
+#[cfg(feature = "biome-key-management")]
+pub use key_management::store::KeyStore;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;
 #[cfg(feature = "biome-credentials")]
 pub use refresh_tokens::store::memory::MemoryRefreshTokenStore;
+#[cfg(feature = "biome-credentials")]
+pub use refresh_tokens::store::RefreshTokenStore;
 
 #[cfg(feature = "diesel")]
 pub use user::store::diesel::DieselUserStore;
 pub use user::store::memory::MemoryUserStore;
+pub use user::store::UserStore;
