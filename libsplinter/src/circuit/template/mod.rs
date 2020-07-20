@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures that manage and use templates to create circuit templates.
+//!
+//! The public interface includes the structs [`CircuitTemplateManager`], [`CircuitCreateTemplate`].
+
 mod error;
 mod rules;
 mod yaml_parser;
@@ -28,13 +32,20 @@ use yaml_parser::{v1, CircuitTemplate};
 
 pub(self) use crate::admin::messages::{CreateCircuitBuilder, SplinterServiceBuilder};
 
+/// Default file location for circuit templates
 pub const DEFAULT_TEMPLATE_DIR: &str = "/usr/share/splinter/circuit-templates";
 
+/// Manages circuit templates.
+///
+/// `CircuitTemplateManager` maintains the location of circuit templates, and may be used to
+/// list any availabe circuit templates found in the `path` of the `CircuitTemplateManager`.
 pub struct CircuitTemplateManager {
+    /// Path of the directory containing the circuit template files.
     path: String,
 }
 
 impl Default for CircuitTemplateManager {
+    /// Constructs a `CircuitTemplateManager` with the `DEFAULT_TEMPLATE_DIR`.
     fn default() -> Self {
         CircuitTemplateManager {
             path: DEFAULT_TEMPLATE_DIR.to_string(),
@@ -43,6 +54,7 @@ impl Default for CircuitTemplateManager {
 }
 
 impl CircuitTemplateManager {
+    /// Constructs a `CircuitTemplateManager` with a custom `path` to the circuit templates.
     pub fn new(path: &str) -> Result<CircuitTemplateManager, CircuitTemplateError> {
         if !Path::new(&path).is_dir() {
             Err(CircuitTemplateError::new(&format!(
@@ -56,13 +68,21 @@ impl CircuitTemplateManager {
         }
     }
 
-    /// Loads a YAML circuit template file into a CircuitCreateTemplate
+    /// Loads the specified YAML circuit template file into a CircuitCreateTemplate.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - file name indicating the circuit template to be loaded.
     pub fn load(&self, name: &str) -> Result<CircuitCreateTemplate, CircuitTemplateError> {
         let path = format!("{}/{}.yaml", self.path, name);
         CircuitCreateTemplate::from_yaml_file(&path)
     }
 
-    /// Loads a YAML circuit template file into a YAML string
+    /// Loads the specified YAML circuit template file into a YAML string.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - file name indicating the circuit template to be loaded into a YAML string.
     pub fn load_raw_yaml(&self, name: &str) -> Result<String, CircuitTemplateError> {
         let path = format!("{}/{}.yaml", self.path, name);
         let template = CircuitTemplate::load_from_file(&path)?;
@@ -76,6 +96,7 @@ impl CircuitTemplateManager {
         }
     }
 
+    /// Lists all available circuit templates found in the `path` of the `CircuitTemplateManager`.
     pub fn list_available_templates(&self) -> Result<Vec<String>, CircuitTemplateError> {
         let path = Path::new(&self.path);
         let available_templates = path
@@ -105,13 +126,25 @@ impl CircuitTemplateManager {
     }
 }
 
+/// Generates a `CreateCircuitBuilder` from a circuit template file.
+///
+/// The circuit template outlines all required information to generate a `CreateCircuitBuilder`.
+/// The required `arguments`, set by the circuit template, are used in conjunction with the template
+/// `rules` to create the `CreateCircuitBuilder`.
 pub struct CircuitCreateTemplate {
     version: String,
+    /// Necessary arguments to build a `CreateCircuitBuilder` from the `CircuitCreateTemplate`.
     arguments: Vec<RuleArgument>,
+    /// Automated process to define more complex entries of the `CreateCircuitBuilder`.
     rules: Rules,
 }
 
 impl CircuitCreateTemplate {
+    /// Constructs a `CircuitCreateTemplate` from the specified YAML file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path of the circuit template file.
     pub fn from_yaml_file(path: &str) -> Result<Self, CircuitTemplateError> {
         let circuit_template = CircuitTemplate::load_from_file(path)?;
         match circuit_template {
@@ -119,6 +152,11 @@ impl CircuitCreateTemplate {
         }
     }
 
+    /// Generates a `Builders` object from the `CircuitCreateTemplate`.
+    ///
+    /// Applies any `rules` from the circuit template using the data saved in the `arguments` to
+    /// generate the `Builders`. The `Builders` object includes the `CreateCircuitBuilder` and all
+    /// `SplinterServiceBuilder` objects required for the associated circuit builder.
     pub fn into_builders(self) -> Result<Builders, CircuitTemplateError> {
         let mut builders = Builders {
             create_circuit_builder: CreateCircuitBuilder::new(),
@@ -130,6 +168,12 @@ impl CircuitCreateTemplate {
         Ok(builders)
     }
 
+    /// Set a required argument for a specific circuit template.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Name of the argument to be set.
+    /// * `value` - Value of the argument to be set.
     pub fn set_argument_value(
         &mut self,
         key: &str,
@@ -187,24 +231,38 @@ impl TryFrom<v1::CircuitCreateTemplate> for CircuitCreateTemplate {
     }
 }
 
+/// Struct to hold the builder objects necessary to build a `CircuitProposal`.
 pub struct Builders {
     create_circuit_builder: CreateCircuitBuilder,
     service_builders: Vec<SplinterServiceBuilder>,
 }
 
 impl Builders {
+    /// Adds a `CreateCircuitBuilder` to `Builders`.
+    ///
+    /// # Arguments
+    ///
+    /// * `builder` - a `CreateCircuitBuilder` used to build a `CircuitProposal`.
     pub fn set_create_circuit_builder(&mut self, builder: CreateCircuitBuilder) {
         self.create_circuit_builder = builder;
     }
 
+    /// Adds a list of `SplinterServiceBuilder` structs to `Builders`.
+    ///
+    /// # Arguments
+    ///
+    /// * `builders` - a list of `SplinterServiceBuilder` structs used to build the services
+    ///      used in the `CircuitProposal`.
     pub fn set_service_builders(&mut self, builders: Vec<SplinterServiceBuilder>) {
         self.service_builders = builders;
     }
 
+    /// Returns a clone of the `create_circuit_builder`, a `CreateCircuitBuilder`.
     pub fn create_circuit_builder(&self) -> CreateCircuitBuilder {
         self.create_circuit_builder.clone()
     }
 
+    /// Returns a clone of the `service_builders`, a list of `SplinterServiceBuilder` objects.
     pub fn service_builders(&self) -> Vec<SplinterServiceBuilder> {
         self.service_builders.clone()
     }
@@ -219,6 +277,7 @@ mod test {
 
     use tempdir::TempDir;
 
+    /// Example circuit template YAML file.
     const EXAMPLE_TEMPLATE_YAML: &[u8] = br##"version: v1
 args:
     - name: $(a:ADMIN_KEYS)
@@ -249,10 +308,20 @@ rules:
             - key: "alias"
               value: "$(a:GAMEROOM_NAME)" "##;
 
-    /*
-     * Verifies that Builders can be parsed from template v1 and correctly
-     * applies the set-management-type, create-services and set-metadata rules correctly
-     */
+    /// Verifies that Builders can be parsed from template v1 and correctly applies the
+    /// `set-management-type`, `create-services` and `set-metadata` `rules` correctly.
+    ///
+    /// The test follows the procedure below:
+    /// 1. Sets up a temporary directory, to write a circuit template YAML file from the
+    ///    `EXAMPLE_TEMPLATE_YAML`.
+    /// 2. After building a `CircuitCreateTemplate` from the circuit template YAML file, the required
+    ///    `arguments` are set. These `arguments` are specific to the circuit template YAML file.
+    /// 3. Turn the `CircuitCreateTemplate` into a `Builders` object.
+    ///
+    /// Once the `Builders` object has been created, the values of both the `circuit_create_builder`
+    /// and `service_builders` are asserted against the expected values. This verifies the
+    /// `CircuitCreateTemplate` `rules` have been used applied successfully to the `arguments`.
+    ///
     #[test]
     fn test_builds_template_v1() {
         let temp_dir = TempDir::new("test_builds_template_v1").unwrap();

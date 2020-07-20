@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Provides functionality to apply available rule arguments to create a `SplinterServiceBuilder`.
+
 use crate::admin::messages::is_valid_service_id;
 use crate::base62::next_base62_string;
 
@@ -22,6 +24,7 @@ const ALL_OTHER_SERVICES: &str = "$(r:ALL_OTHER_SERVICES)";
 const NODES_ARG: &str = "$(a:NODES)";
 const PEER_SERVICES_ARG: &str = "peer_services";
 
+/// Data structure used to create a `SplinterServiceBuilder`.
 pub(super) struct CreateServices {
     service_type: String,
     service_args: Vec<ServiceArgument>,
@@ -29,6 +32,7 @@ pub(super) struct CreateServices {
 }
 
 impl CreateServices {
+    /// Builds a `SplinterServiceBuilder` using the available circuit template arguments.
     pub fn apply_rule(
         &self,
         template_arguments: &[RuleArgument],
@@ -181,10 +185,15 @@ fn all_services(
 mod test {
     use super::*;
 
-    /*
-     * Test that CreateServices::apply_rules correcly sets ups
-     * the services builders
-     */
+    /// Verify that a `SplinterServiceBuilder` is accurately constructed using the `CreateServices`
+    /// `apply_rule` method.
+    ///
+    /// The test follows the procedure below:
+    /// 1. Generate a `CreateServices` object and a set of template arguments using mock data.
+    /// 2. Use the `apply_rule` method of the `CreateServices` object created in the previous step,
+    ///    resulting in 2 `SplinterServiceBuilder` objects.
+    ///
+    /// The `SplinterServiceBuilder` objects are then verified to have all expected values.
     #[test]
     fn test_create_service_apply_rules() {
         let create_services = make_create_service();
@@ -242,14 +251,34 @@ mod test {
             ("admin-keys".to_string(), "[\"signer_key\"]".to_string())
         );
 
-        // test that building services succeeds:
+        // Verify each `SplinterServiceBuilder` is able to `build` successfully.
         assert!(service_builders[0].clone().build().is_ok());
         assert!(service_builders[1].clone().build().is_ok());
     }
 
-    /*
-     * Test that CreateServices::apply_rules accurately detects an invalid `first_service`.
-     */
+    /// Verify the `CreateServices` `apply_rule` method accurately detects an invalid
+    /// `first_service`. In order to test the breadth of possible invalidities, this test creates
+    /// multiple, different invalid `first_service` objects.
+    /// Before the `first_service` objects are tested, a set of template arguments are generated
+    /// using mock data, to be passed to the `apply_rule` method for each invalid case.
+    ///
+    /// The different invalidities are tested as follows:
+    ///
+    /// 1. Once a `CreateServices` object has been created, the `first_service` field is set to
+    ///    an empty string. Then verifies the `apply_rule` method returns an error.
+    ///
+    /// 2. Once a `CreateServices` object has been created, the `first_service` field is set to
+    ///    a 3-character string, 'a00', which is invalid as this field must be a 4-character base-62
+    ///    string. Then verifies the `apply_rule` method returns an error.
+    ///
+    /// 3. Once a `CreateServices` object has been created, the `first_service` field is set to
+    ///    a 5-character string, 'a0000', which is invalid for the same reason as the previous step.
+    ///    Then verifies the `apply_rule` method returns an error.
+    ///
+    /// 4. Once a `CreateServices` object has been created, the `first_service` field is set to a
+    ///    4-character string, with an invalid character, ':'. This character is invalid as the
+    ///   field must contain a base-62 string. Then verifies the `apply_rule` method returns an error.
+    ///
     #[test]
     fn test_create_service_apply_rules_invalid_first_service() {
         let template_arguments = make_rule_arguments();

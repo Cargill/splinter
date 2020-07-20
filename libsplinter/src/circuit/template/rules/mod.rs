@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structures to hold necessary information for setting the values in the builders generated
+//! from a circuit template. Also provides the general functionality to apply the circuit template
+//! `rules`.
+//!
+//! The public interface includes the structs [`CircuitManagement`], [`CreateServices`],
+//! [`SetMetadata`].
+
 mod create_services;
 mod set_management_type;
 mod set_metadata;
@@ -24,6 +31,8 @@ use create_services::CreateServices;
 use set_management_type::CircuitManagement;
 use set_metadata::SetMetadata;
 
+/// Available `rules` used to create the value for entries of a builder, based on the circuit
+/// template arguments that have been set.
 pub struct Rules {
     set_management_type: Option<CircuitManagement>,
     create_services: Option<CreateServices>,
@@ -31,6 +40,8 @@ pub struct Rules {
 }
 
 impl Rules {
+    /// Applies all available `Rules` for the circuit template. This updates all builders,
+    /// including the `SplinterServiceBuilder` objects and `CreateCircuitBuilder`.
     pub fn apply_rules(
         &self,
         builders: &mut Builders,
@@ -74,12 +85,15 @@ impl From<v1::Rules> for Rules {
     }
 }
 
+/// Data structure to hold an argument used by a rule.
 #[derive(Clone)]
 pub struct RuleArgument {
     name: String,
+    /// Represents whether the argument itself is required.
     required: bool,
     default_value: Option<String>,
     description: Option<String>,
+    /// Value specified by the user.
     user_value: Option<String>,
 }
 

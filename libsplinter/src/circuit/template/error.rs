@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! An error wrapper for the errors generated throughout the module.
+
+/// General error wrapper
 #[derive(Debug)]
 pub struct CircuitTemplateError {
+    /// Human-readable description of the action attempted, which caused the error.
     context: String,
+    /// Optional field which provides a `source` error, in case an exception must be handled.
     source: Option<Box<dyn std::error::Error>>,
 }
 
 impl CircuitTemplateError {
+    /// Builds a `CircuitTemplateError` with a `context`. This sets the `source` field to `None`.
     pub fn new(context: &str) -> Self {
         Self {
             context: context.into(),
@@ -26,6 +32,7 @@ impl CircuitTemplateError {
         }
     }
 
+    /// Builds a `CircuitTemplateError` with a `context`, and a `source` error.
     pub fn new_with_source(context: &str, err: Box<dyn std::error::Error>) -> Self {
         Self {
             context: context.into(),
