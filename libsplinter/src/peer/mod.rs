@@ -32,6 +32,7 @@ mod peer_ref;
 
 use std::cmp::min;
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Instant;
@@ -40,7 +41,7 @@ use uuid::Uuid;
 
 use crate::collections::{BiHashMap, RefMap};
 use crate::network::connection_manager::ConnectionManagerNotification;
-use crate::network::connection_manager::Connector;
+use crate::network::connection_manager::{ConnectionManagerError, Connector};
 use crate::threading::pacemaker;
 
 pub use self::builder::PeerManagerBuilder;
@@ -128,7 +129,7 @@ pub(crate) enum PeerManagerRequest {
 pub struct PeerManager {
     join_handle: thread::JoinHandle<()>,
     sender: Sender<PeerManagerMessage>,
-    shutdown_handle: ShutdownHandle,
+    shutdown_signaler: ShutdownSignaler,
 }
 
 impl PeerManager {
@@ -196,9 +197,15 @@ impl PeerManager {
         PeerManagerConnector::new(self.sender.clone())
     }
 
+    #[deprecated(since = "0.4.1", note = "Please use shutdown_signaler() instead.")]
     /// Returns a `ShutdownHandle` for this `PeerManager`
     pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        Some(self.shutdown_handle.clone())
+        Some(ShutdownHandle::from(self.shutdown_signaler.clone()))
+    }
+
+    /// Returns a `ShutdownSignaler` for this `PeerManager`
+    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
+        self.shutdown_signaler.clone()
     }
 
     /// Waits for the `PeerManager` thread to shutdown
@@ -210,9 +217,13 @@ impl PeerManager {
         debug!("Shutting down peer manager (complete)");
     }
 
+    #[deprecated(
+        since = "0.4.1",
+        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
+    )]
     /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
     pub fn shutdown_and_wait(self) {
-        self.shutdown_handle.shutdown();
+        self.shutdown_signaler.shutdown();
         self.await_shutdown();
     }
 
@@ -343,20 +354,21 @@ impl PeerManager {
                 ))
             })?;
 
-        let shutdown_handle = ShutdownHandle {
+        let shutdown_signaler = ShutdownSignaler {
             sender: sender.clone(),
             pacemaker_shutdown_signaler,
         };
 
         Ok(PeerManager {
-            shutdown_handle,
+            shutdown_signaler,
             join_handle,
             sender,
         })
     }
 }
 
-/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
+/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`.
+/// Deprecated, use ShutdownSignaler instead.
 #[derive(Clone)]
 pub struct ShutdownHandle {
     sender: Sender<PeerManagerMessage>,
@@ -364,6 +376,32 @@ pub struct ShutdownHandle {
 }
 
 impl ShutdownHandle {
+    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
+    pub fn shutdown(&self) {
+        self.pacemaker_shutdown_signaler.shutdown();
+        if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
+            warn!("PeerManager is no longer running");
+        }
+    }
+}
+
+impl From<ShutdownSignaler> for ShutdownHandle {
+    fn from(signaler: ShutdownSignaler) -> Self {
+        ShutdownHandle {
+            sender: signaler.sender,
+            pacemaker_shutdown_signaler: signaler.pacemaker_shutdown_signaler,
+        }
+    }
+}
+
+/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
+#[derive(Clone)]
+pub struct ShutdownSignaler {
+    sender: Sender<PeerManagerMessage>,
+    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
+}
+
+impl ShutdownSignaler {
     /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
     pub fn shutdown(&self) {
         self.pacemaker_shutdown_signaler.shutdown();
@@ -651,7 +689,7 @@ fn add_peer(
         return Ok(peer_ref);
     }
 
-    debug!("Attempting to peer with {}", peer_id);
+    info!("Attempting to peer with {}", peer_id);
     let connection_id = format!("{}", Uuid::new_v4());
 
     let mut active_endpoint = match endpoints.get(0) {
@@ -679,7 +717,7 @@ fn add_peer(
             }
             // If the request_connection errored we will retry in the future
             Err(err) => {
-                error!("Unable to request connection for peer {}: {}", peer_id, err);
+                log_connect_request_err(err, &peer_id, &endpoint);
             }
         }
     }
@@ -704,7 +742,7 @@ fn add_unidentified(
     peers: &PeerMap,
     ref_map: &mut RefMap,
 ) -> Result<EndpointPeerRef, PeerUnknownAddError> {
-    debug!("Attempting to peer with peer by endpoint {}", endpoint);
+    info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
         // if there is peer in the peer_map, there is reference in the ref map
         ref_map.add_ref(peer_metadata.id.to_string());
@@ -775,9 +813,10 @@ fn remove_peer(
                 );
                 Ok(())
             }
-            Ok(None) => Err(PeerRefRemoveError::RemoveError(
-                "No connection to remove, something has gone wrong".to_string(),
-            )),
+            Ok(None) => Err(PeerRefRemoveError::RemoveError(format!(
+                "The connection for peer {}'s active endpoint ({}) has already been removed",
+                peer_id, peer_metadata.active_endpoint
+            ))),
             Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
         }
     } else {
@@ -845,9 +884,10 @@ fn remove_peer_by_endpoint(
                 );
                 Ok(())
             }
-            Ok(None) => Err(PeerRefRemoveError::RemoveError(
-                "No connection to remove, something has gone wrong".to_string(),
-            )),
+            Ok(None) => Err(PeerRefRemoveError::RemoveError(format!(
+                "The connection for peer {}'s active endpoint ({}) has already been removed",
+                peer_metadata.id, peer_metadata.active_endpoint
+            ))),
             Err(err) => Err(PeerRefRemoveError::RemoveError(format!("{}", err))),
         }
     } else {
@@ -888,7 +928,10 @@ fn handle_notifications(
             // Check if the disconnected peer has reached the retry limit, if so try to find a
             // different endpoint that can be connected to
             if let Some(mut peer_metadata) = peers.get_by_peer_id(&identity).cloned() {
-                warn!("Received non fatal connection with attempts: {}", attempts);
+                info!(
+                    "{} reconnection attempts have been made to peer {}",
+                    attempts, identity
+                );
                 if attempts >= max_retry_attempts {
                     if endpoint != peer_metadata.active_endpoint {
                         warn!(
@@ -907,10 +950,9 @@ fn handle_notifications(
                         match connector.request_connection(&endpoint, &peer_metadata.connection_id)
                         {
                             Ok(()) => break,
-                            Err(err) => error!(
-                                "Unable to request connection for peer {} at endpoint {}: {}",
-                                peer_metadata.id, endpoint, err
-                            ),
+                            Err(err) => {
+                                log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                            }
                         }
                     }
                 }
@@ -1010,10 +1052,9 @@ fn handle_disconnection(
             for endpoint in peer_metadata.endpoints.iter() {
                 match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
                     Ok(()) => break,
-                    Err(err) => error!(
-                        "Unable to request connection for peer {} at endpoint {}: {}",
-                        peer_metadata.id, endpoint, err
-                    ),
+                    Err(err) => {
+                        log_connect_request_err(err, &peer_metadata.id, &endpoint);
+                    }
                 }
             }
             peer_metadata.status = PeerStatus::Pending;
@@ -1070,7 +1111,7 @@ fn handle_inbound_connection(
                 // otherwise, remove outbound connection and replace with inbound.
                 if local_identity > identity.as_str() {
                     // if peer is already connected, remove the inbound connection
-                    info!(
+                    debug!(
                         "Removing inbound connection, already connected to {}",
                         peer_metadata.id
                     );
@@ -1331,16 +1372,13 @@ fn retry_pending(
     }
 
     for mut peer_metadata in to_retry {
-        debug!("Retry peering with pending peer {}", peer_metadata.id);
+        debug!("Attempting to peer with pending peer {}", peer_metadata.id);
         for endpoint in peer_metadata.endpoints.iter() {
             match connector.request_connection(&endpoint, &peer_metadata.connection_id) {
                 Ok(()) => peer_metadata.active_endpoint = endpoint.to_string(),
                 // If request_connection errored we will retry in the future
                 Err(err) => {
-                    error!(
-                        "Unable to request connection for peer {}: {}",
-                        peer_metadata.id, err
-                    );
+                    log_connect_request_err(err, &peer_metadata.id, &endpoint);
                 }
             }
         }
@@ -1362,21 +1400,78 @@ fn retry_pending(
             if peers.contains_endpoint(endpoint) {
                 continue;
             }
-            debug!("Attempting to peer with peer by {}", endpoint);
+            info!("Attempting to peer with peer by {}", endpoint);
             let connection_id = format!("{}", Uuid::new_v4());
             match connector.request_connection(&endpoint, &connection_id) {
                 Ok(()) => (),
                 // If request_connection errored we will retry in the future
-                Err(err) => {
-                    error!(
-                        "Unable to request connection for peer endpoint {}: {}",
-                        endpoint, err
-                    );
-                }
+                Err(err) => match err {
+                    ConnectionManagerError::ConnectionCreationError {
+                        context,
+                        error_kind: None,
+                    } => {
+                        info!(
+                            "Unable to request connection for peer endpoint {}: {}",
+                            endpoint, context
+                        );
+                    }
+                    ConnectionManagerError::ConnectionCreationError {
+                        context,
+                        error_kind: Some(err_kind),
+                    } => match err_kind {
+                        ErrorKind::ConnectionRefused => info!(
+                            "Received connection refused attempting to establish a \
+                                        connection to peer at endpoint {}",
+                            endpoint
+                        ),
+                        _ => info!(
+                            "Unable to request connection for peer at {}: {}",
+                            endpoint, context,
+                        ),
+                    },
+                    _ => info!(
+                        "Unable to request connection for peer at endpoint {}: {}",
+                        endpoint,
+                        err.to_string()
+                    ),
+                },
             }
         }
 
         unreferenced_peers.last_connection_attempt = Instant::now();
+    }
+}
+
+fn log_connect_request_err(err: ConnectionManagerError, peer_id: &str, endpoint: &str) {
+    match err {
+        ConnectionManagerError::ConnectionCreationError {
+            context,
+            error_kind: None,
+        } => {
+            info!(
+                "Unable to request connection for peer {}: {}",
+                peer_id, context
+            );
+        }
+        ConnectionManagerError::ConnectionCreationError {
+            context,
+            error_kind: Some(err_kind),
+        } => match err_kind {
+            ErrorKind::ConnectionRefused => info!(
+                "Received connection refused attempting to establish a \
+                        connection to peer {}: endpoint {}",
+                peer_id, endpoint
+            ),
+            _ => info!(
+                "Unable to request connection for peer {}: {}",
+                peer_id, context
+            ),
+        },
+        _ => info!(
+            "Unable to request connection for peer {}: {}",
+            peer_id,
+            err.to_string()
+        ),
     }
 }
 
@@ -1454,7 +1549,7 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1529,7 +1624,7 @@ pub mod tests {
             .expect("Unable to list connections")
             .is_empty());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1601,7 +1696,7 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1671,7 +1766,7 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1773,7 +1868,7 @@ pub mod tests {
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1870,7 +1965,7 @@ pub mod tests {
 
         assert!(peers.get_by_key("test_peer").is_some());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -1954,7 +2049,7 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2055,7 +2150,7 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2196,7 +2291,7 @@ pub mod tests {
         tx.send(()).unwrap();
 
         jh.join().unwrap();
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2226,7 +2321,7 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2300,7 +2395,7 @@ pub mod tests {
 
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2332,7 +2427,7 @@ pub mod tests {
         #[allow(deprecated)]
         peer_manager.start().expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();
@@ -2393,7 +2488,7 @@ pub mod tests {
                 })
         );
 
-        peer_manager.shutdown_handle().unwrap().shutdown();
+        peer_manager.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
         cm.await_shutdown();

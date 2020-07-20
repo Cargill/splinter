@@ -953,7 +953,8 @@ mod tests {
             envelope.take_circuit_create_request().take_circuit()
         );
 
-        peer_manager.shutdown_and_wait();
+        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.await_shutdown();
         cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
         mesh.shutdown_signaler().shutdown();

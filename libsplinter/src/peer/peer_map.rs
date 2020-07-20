@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data structure for keeping track of peer information
+
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -19,24 +21,39 @@ use crate::collections::BiHashMap;
 
 use super::error::PeerUpdateError;
 
+/// Enum for the current status of a peer
 #[derive(Clone, PartialEq, Debug)]
 pub enum PeerStatus {
+    /// Peer is connected and is reachable
     Connected,
+    /// Peer does not currently have a connection, connection is being attempted
     Pending,
+    /// The peer's connection has disconnected, reconnection is being attempted
     Disconnected { retry_attempts: u64 },
 }
 
+/// The representation of a peer in the `PeerMap`
 #[derive(Clone, PartialEq, Debug)]
 pub struct PeerMetadata {
+    /// The unique ID for the peer
     pub id: String,
+    /// The connection ID for the peer's connection
     pub connection_id: String,
+    /// A list of endpoints the peer is reachable at
     pub endpoints: Vec<String>,
+    /// The endpoint of the peer's current connection
     pub active_endpoint: String,
+    /// The peer's current status
     pub status: PeerStatus,
+    /// The last time that a peer was attempted to be connected to
     pub last_connection_attempt: Instant,
+    /// How long to wait before trying to reconnect to a peer
     pub retry_frequency: u64,
 }
 
+/// A map of peer IDs to peer metadata, which also maintains a redirect table for updated peer IDs.
+///
+/// Peer metadata includes the peer ID, the list of endpoints, and the current active endpoint.
 pub struct PeerMap {
     peers: HashMap<String, PeerMetadata>,
     // Endpoint to peer id
@@ -44,10 +61,12 @@ pub struct PeerMap {
     initial_retry_frequency: u64,
 }
 
-/// A map of Peer IDs to peer metadata, which also maintains a redirect table for updated peer IDs.
-///
-/// Peer metadata includes the peer ID, the list of endpoints and the current active endpoint.
 impl PeerMap {
+    /// Creates a new `PeerMap`
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_retry_frequency` - The value to set as the retry frequency for a new peer
     pub fn new(initial_retry_frequency: u64) -> Self {
         PeerMap {
             peers: HashMap::new(),
@@ -74,7 +93,15 @@ impl PeerMap {
         peer_to_connection_id
     }
 
-    /// Inserts a new peer ID and endpoints
+    /// Inserts a new peer
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The unique ID for the peer
+    /// * `connection_id` - The connection ID for the peer's connection
+    /// * `endpoint` - A list of endpoints the peer is reachable at
+    /// * `active_endpoint` - The endpoint of the peer's current connection
+    /// * `status` - The peer's current status
     pub fn insert(
         &mut self,
         peer_id: String,
@@ -100,7 +127,13 @@ impl PeerMap {
         }
     }
 
-    /// Removes a peer ID and its endpoints. Returns the `PeerMetdata` if the peer exists.
+    /// Removes a peer and its endpoints.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The unique ID for the peer
+    ///
+    /// Returns the metadata for the peer if it exists.
     pub fn remove(&mut self, peer_id: &str) -> Option<PeerMetadata> {
         if let Some(peer_metadata) = self.peers.remove(&peer_id.to_string()) {
             for endpoint in peer_metadata.endpoints.iter() {
@@ -114,6 +147,10 @@ impl PeerMap {
     }
 
     /// Updates an existing peer. All fields can be updated except `peer_id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_metadata` - The updated peer metadata for the peer
     pub fn update_peer(&mut self, peer_metadata: PeerMetadata) -> Result<(), PeerUpdateError> {
         // Only valid if the peer already exists
         if self.peers.contains_key(&peer_metadata.id) {
@@ -134,7 +171,7 @@ impl PeerMap {
         }
     }
 
-    /// Returns the endpoint for the given peer ID
+    /// Returns the metadata for a peer from the provided endpoint
     pub fn get_peer_from_endpoint(&self, endpoint: &str) -> Option<&PeerMetadata> {
         if let Some(peer) = self.endpoints.get(endpoint) {
             self.peers.get(peer)
@@ -143,22 +180,26 @@ impl PeerMap {
         }
     }
 
+    /// Returns the metadata for a peer from the provided peer ID
     pub fn get_by_peer_id(&self, peer_id: &str) -> Option<&PeerMetadata> {
         self.peers.get(peer_id)
     }
 
+    /// Returns the metadata for a peer from the provided connection ID
     pub fn get_by_connection_id(&self, connection_id: &str) -> Option<&PeerMetadata> {
         self.peers
             .values()
             .find(|meta| meta.connection_id == connection_id)
     }
 
+    /// Returns the list of peers whose peer status is pending
     pub fn get_pending(&self) -> impl Iterator<Item = (&String, &PeerMetadata)> {
         self.peers
             .iter()
             .filter(|(_id, peer_meta)| peer_meta.status == PeerStatus::Pending)
     }
 
+    /// Returns true if a provided endpoint is in the `PeerMap`
     pub fn contains_endpoint(&self, endpoint: &str) -> bool {
         self.endpoints.contains_key(endpoint)
     }
