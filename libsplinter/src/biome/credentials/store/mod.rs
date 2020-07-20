@@ -237,6 +237,50 @@ pub trait CredentialsStore: Send + Sync {
     fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError>;
 }
 
+impl<CS> CredentialsStore for Box<CS>
+where
+    CS: CredentialsStore + ?Sized,
+{
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
+        (**self).add_credentials(credentials)
+    }
+
+    fn update_credentials(
+        &self,
+        user_id: &str,
+        updated_username: &str,
+        updated_password: &str,
+    ) -> Result<(), CredentialsStoreError> {
+        (**self).update_credentials(user_id, updated_username, updated_password)
+    }
+
+    fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
+        (**self).remove_credentials(user_id)
+    }
+
+    fn fetch_credential_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Credentials, CredentialsStoreError> {
+        (**self).fetch_credential_by_user_id(user_id)
+    }
+
+    fn fetch_credential_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Credentials, CredentialsStoreError> {
+        (**self).fetch_credential_by_username(username)
+    }
+
+    fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError> {
+        (**self).fetch_username_by_id(user_id)
+    }
+
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
+        (**self).list_usernames()
+    }
+}
+
 #[cfg(feature = "diesel")]
 impl Into<NewCredentialsModel> for Credentials {
     fn into(self) -> NewCredentialsModel {

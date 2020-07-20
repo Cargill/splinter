@@ -90,3 +90,28 @@ impl Clone for Box<dyn CloneBoxUserStore> {
         self.clone_box()
     }
 }
+
+impl<US> UserStore for Box<US>
+where
+    US: UserStore + ?Sized,
+{
+    fn add_user(&self, user: User) -> Result<(), UserStoreError> {
+        (**self).add_user(user)
+    }
+
+    fn update_user(&self, updated_user: User) -> Result<(), UserStoreError> {
+        (**self).update_user(updated_user)
+    }
+
+    fn remove_user(&self, id: &str) -> Result<(), UserStoreError> {
+        (**self).remove_user(id)
+    }
+
+    fn fetch_user(&self, id: &str) -> Result<User, UserStoreError> {
+        (**self).fetch_user(id)
+    }
+
+    fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
+        (**self).list_users()
+    }
+}

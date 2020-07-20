@@ -51,3 +51,24 @@ pub trait RefreshTokenStore: Send + Sync {
     ///   * `user_id` - The user whom which the token is for
     fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError>;
 }
+
+impl<RTS> RefreshTokenStore for Box<RTS>
+where
+    RTS: RefreshTokenStore + ?Sized,
+{
+    fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        (**self).add_token(user_id, token)
+    }
+
+    fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError> {
+        (**self).remove_token(user_id)
+    }
+
+    fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        (**self).update_token(user_id, token)
+    }
+
+    fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError> {
+        (**self).fetch_token(user_id)
+    }
+}
