@@ -83,6 +83,8 @@ pub mod rest_api;
 pub mod service;
 pub mod signing;
 pub mod storage;
+#[cfg(feature = "store-factory")]
+pub mod store;
 mod threading;
 pub mod transport;
 
