@@ -31,20 +31,12 @@ use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
-#[cfg(feature = "biome-key-management")]
-use splinter::biome::DieselKeyStore;
-#[cfg(feature = "biome")]
-use splinter::biome::DieselUserStore;
-#[cfg(feature = "biome-credentials")]
-use splinter::biome::{DieselCredentialsStore, DieselRefreshTokenStore};
 use splinter::circuit::directory::CircuitDirectory;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
 };
 use splinter::circuit::{SplinterState, SplinterStateError};
-#[cfg(feature = "biome")]
-use splinter::database::{self, ConnectionPool};
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::AuthorizationManager;
@@ -466,12 +458,12 @@ impl SplinterDaemon {
         #[cfg(feature = "biome")]
         {
             if self.enable_biome {
-                let db_url = self.db_url.as_ref().ok_or_else(|| {
+                let db_url = self.db_url.clone().ok_or_else(|| {
                     StartError::StorageError(
                         "biome was enabled but the builder failed to require the db URL".into(),
                     )
                 })?;
-                let biome_resources = build_biome_routes(&db_url)?;
+                let biome_resources = build_biome_routes(db_url)?;
                 rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
             }
         }
@@ -699,29 +691,28 @@ fn start_health_service(
 }
 
 #[cfg(feature = "biome")]
-fn build_biome_routes(db_url: &str) -> Result<BiomeRestResourceManager, StartError> {
+fn build_biome_routes(db_url: String) -> Result<BiomeRestResourceManager, StartError> {
     info!("Adding biome routes");
-    let connection_pool: ConnectionPool =
-        database::ConnectionPool::new_pg(db_url).map_err(|err| {
-            StartError::RestApiError(format!(
-                "Unable to connect to the Splinter database: {}",
-                err
-            ))
-        })?;
+    let connection_uri = db_url.parse().map_err(|err| {
+        StartError::StorageError(format!("Invalid database URL provided: {}", err))
+    })?;
+    let store_factory = splinter::store::create_store_factory(connection_uri).map_err(|err| {
+        StartError::StorageError(format!("Failed to initialize store factory: {}", err))
+    })?;
     let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
     biome_rest_provider_builder =
-        biome_rest_provider_builder.with_user_store(DieselUserStore::new(connection_pool.clone()));
+        biome_rest_provider_builder.with_user_store(store_factory.get_biome_user_store());
     #[cfg(feature = "biome-credentials")]
     {
         biome_rest_provider_builder = biome_rest_provider_builder
-            .with_refresh_token_store(DieselRefreshTokenStore::new(connection_pool.clone()));
+            .with_refresh_token_store(store_factory.get_biome_refresh_token_store());
         biome_rest_provider_builder = biome_rest_provider_builder
-            .with_credentials_store(DieselCredentialsStore::new(connection_pool.clone()));
+            .with_credentials_store(store_factory.get_biome_credentials_store());
     }
     #[cfg(feature = "biome-key-management")]
     {
         biome_rest_provider_builder =
-            biome_rest_provider_builder.with_key_store(DieselKeyStore::new(connection_pool))
+            biome_rest_provider_builder.with_key_store(store_factory.get_biome_key_store())
     }
     let biome_rest_provider = biome_rest_provider_builder.build().map_err(|err| {
         StartError::RestApiError(format!("Unable to build Biome REST routes: {}", err))
