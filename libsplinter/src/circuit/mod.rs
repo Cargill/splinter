@@ -16,6 +16,8 @@
 pub mod component;
 pub mod directory;
 pub mod handlers;
+#[cfg(feature = "routing-table")]
+pub mod routing;
 pub mod service;
 pub mod store;
 #[cfg(feature = "circuit-template")]
