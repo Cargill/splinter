@@ -28,6 +28,9 @@ A Scabbard circuit template, named `scabbard`, is available by default (packaged
 with the Splinter CLI). This template can be used as a model for other circuit
 templates.
 
+All available templates are located in the default circuit templates directory,
+`/usr/share/splinter/circuit-templates`.
+
 FLAGS
 =====
 `-h`, `--help`

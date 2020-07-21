@@ -20,6 +20,9 @@ Circuit templates help simplify the process of creating new circuits with the
 `splinter circuit propose` command. This command displays the entire template
 definition, including the arguments and rules, for the specified template.
 
+All available templates are located in the circuit templates directory,
+`/usr/share/splinter/circuit-templates`.
+
 Tip: Use the `splinter circuit template arguments` command to show only the
 required arguments for a specific circuit template.
 
@@ -42,12 +45,14 @@ FLAGS
 ARGUMENTS
 =========
 `TEMPLATE-NAME`
-: Circuit template to be displayed.
+: Name of the circuit template to be displayed. The template file must exist in
+  the circuit template directory, `/usr/share/splinter/circuit-templates`.
 
 EXAMPLES
 ========
 The following command shows the details of the `scabbard` circuit template,
-which is available by default (packaged with the Splinter CLI).
+which is available by default (packaged with the Splinter CLI) in the default
+circuit template directory, `/usr/share/splinter/circuit-templates`.
 
 ```
 $ splinter circuit template show scabbard
