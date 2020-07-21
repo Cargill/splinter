@@ -102,6 +102,9 @@ experimental = [
     "zmq-transport",
 ]
 
+# used for turning benchmark tests on
+benchmark = []
+
 biome = []
 biome-credentials = ["biome", "biome-user", "bcrypt"]
 biome-key-management = ["biome"]

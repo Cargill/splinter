@@ -19,6 +19,9 @@
 //!
 //! [`RoutingTable`]: struct.RoutingTable.html
 
+#[cfg(all(feature = "benchmark", test))]
+mod benchmarks;
+
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 
