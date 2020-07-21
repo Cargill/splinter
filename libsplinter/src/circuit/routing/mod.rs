@@ -27,6 +27,7 @@
 //! [`ServiceId`]: struct.ServiceId.html
 
 mod error;
+pub mod memory;
 
 use std::cmp::Ordering;
 use std::fmt;
