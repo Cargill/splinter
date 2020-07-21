@@ -25,6 +25,7 @@ RUN apt-get update \
     libpq-dev \
     libsasl2-dev \
     libssl-dev \
+    libsqlite3-dev \
     libzmq3-dev \
     openssl \
     pandoc \
