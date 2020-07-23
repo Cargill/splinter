@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Defines the `CircuitCreateTemplate` based on the current version of circuits, version 1.
+
+/// Struct to hold the necessary `rules` and `args` required to create a `CreateCircuitBuilder`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CircuitCreateTemplate {
+    /// Version of the circuit definition.
     version: String,
+    /// Required data to fill out the circuit template.
     args: Vec<RuleArgument>,
+    /// Automated process to define more complex entries of the `CreateCircuitBuilder`.
     rules: Rules,
 }
 
@@ -33,13 +39,18 @@ impl CircuitCreateTemplate {
     }
 }
 
+/// Struct to hold the value of and information about an argument.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RuleArgument {
+    /// Name of the argument.
     name: String,
+    /// Whether or not the argument is required for the `CircuitCreateTemplate`.
     required: bool,
+    /// Optional value of the argument.
     #[serde(rename = "default")]
     #[serde(skip_serializing_if = "Option::is_none")]
     default_value: Option<String>,
+    /// Optional description of the argument.
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
 }
@@ -62,13 +73,18 @@ impl RuleArgument {
     }
 }
 
+/// Struct to hold the defined `rules`, which are automated processes to define entries of the
+/// `CreateCircuitBuilder` based on the `args` values.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Rules {
+    /// Process for defining the `circuit_management_type` of a circuit.
     #[serde(skip_serializing_if = "Option::is_none")]
     set_management_type: Option<CircuitManagement>,
+    /// Process for defining the services of a circuit.
     #[serde(skip_serializing_if = "Option::is_none")]
     create_services: Option<CreateServices>,
+    /// Process for defining the `metadata` field of a circuit.
     #[serde(skip_serializing_if = "Option::is_none")]
     set_metadata: Option<SetMetadata>,
 }
@@ -87,6 +103,7 @@ impl Rules {
     }
 }
 
+/// The `management_type` used in the `set_management_type` rule.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct CircuitManagement {
@@ -99,10 +116,13 @@ impl CircuitManagement {
     }
 }
 
+/// Struct to wrap the information used to define a `SplinterService`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct CreateServices {
+    /// Type of the `SplinterService` being constructed.
     service_type: String,
+    /// Arguments required to build the `SplinterService`.
     service_args: Vec<ServiceArgument>,
     first_service: String,
 }
@@ -121,6 +141,7 @@ impl CreateServices {
     }
 }
 
+/// Struct to wrap the name and value for an argument of a `SplinterService`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ServiceArgument {
     key: String,
@@ -137,6 +158,7 @@ impl ServiceArgument {
     }
 }
 
+/// Struct to wrap the `metadata` used in the `set_metadata` rule.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SetMetadata {
     #[serde(flatten)]
@@ -149,6 +171,7 @@ impl SetMetadata {
     }
 }
 
+/// Enum of the possible types of `metadata` representations.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "encoding")]
 #[serde(rename_all(deserialize = "camelCase"))]
@@ -156,6 +179,7 @@ pub enum Metadata {
     Json { metadata: Vec<JsonMetadata> },
 }
 
+/// Struct of the data held in the `Metadata` object.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonMetadata {
     key: String,
@@ -172,6 +196,7 @@ impl JsonMetadata {
     }
 }
 
+/// Struct to represent single and list values within the `JsonMetadata`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Value {

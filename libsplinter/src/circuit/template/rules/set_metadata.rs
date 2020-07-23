@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Provides functionality to set the `metadata` field of a `CreateCircuitBuilder`.
+
 use super::super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
 use super::{get_argument_value, is_arg, RuleArgument, Value};
 
+/// Data structure wrapping the `Metadata` object to be used to fill in the `metadata` field of the
+/// `CreateCircuitBuilder`.
 pub(super) struct SetMetadata {
     metadata: Metadata,
 }
@@ -76,6 +80,7 @@ impl From<v1::SetMetadata> for SetMetadata {
     }
 }
 
+/// Enum of the possible types of `Metadata` representations.
 pub(super) enum Metadata {
     Json { metadata: Vec<JsonMetadata> },
 }
@@ -90,6 +95,7 @@ impl From<v1::Metadata> for Metadata {
     }
 }
 
+/// Data structure of the JSON representation of `metadata`.
 pub(super) struct JsonMetadata {
     key: String,
     value: Value,
