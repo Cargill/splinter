@@ -14,7 +14,7 @@
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id                    BIGSERIAL     PRIMARY KEY,
+    id                    INTEGER       PRIMARY KEY AUTOINCREMENT,
     user_id               TEXT          NOT NULL,
     token                 TEXT          NOT NULL,
     FOREIGN KEY (user_id) REFERENCES splinter_user(id) ON DELETE CASCADE
