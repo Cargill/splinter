@@ -95,11 +95,15 @@ experimental = [
     "biome-notifications",
     "biome-user",
     "circuit-template",
+    "routing-table",
     "service-arg-validation",
     "service-network",
     "ws-transport",
     "zmq-transport",
 ]
+
+# used for turning benchmark tests on
+benchmark = []
 
 biome = []
 biome-credentials = ["biome", "biome-user", "bcrypt"]
@@ -122,6 +126,7 @@ rest-api = [
 ]
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
+routing-table = []
 sawtooth-signing-compat = ["sawtooth-sdk"]
 service-arg-validation = []
 service-network = []
