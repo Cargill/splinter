@@ -23,13 +23,44 @@ pub(in crate::biome::credentials) trait CredentialsStoreAddCredentialsOperation 
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError>;
 }
 
-impl<'a, C> CredentialsStoreAddCredentialsOperation for CredentialsStoreOperations<'a, C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
-    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+#[cfg(feature = "postgres")]
+impl<'a> CredentialsStoreAddCredentialsOperation
+    for CredentialsStoreOperations<'a, diesel::pg::PgConnection>
+{
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
+        let duplicate_credentials = user_credentials::table
+            .filter(user_credentials::username.eq(&credentials.username))
+            .first::<CredentialsModel>(self.conn)
+            .map(Some)
+            .or_else(|err| if err == NotFound { Ok(None) } else { Err(err) })
+            .map_err(|err| CredentialsStoreError::QueryError {
+                context: "Failed check for existing username".to_string(),
+                source: Box::new(err),
+            })?;
+        if duplicate_credentials.is_some() {
+            return Err(CredentialsStoreError::DuplicateError(format!(
+                "Username already in use: {}",
+                &credentials.username
+            )));
+        }
+
+        let new_credentials: NewCredentialsModel = credentials.into();
+
+        insert_into(user_credentials::table)
+            .values(new_credentials)
+            .execute(self.conn)
+            .map(|_| ())
+            .map_err(|err| CredentialsStoreError::OperationError {
+                context: "Failed to add credentials".to_string(),
+                source: Box::new(err),
+            })?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> CredentialsStoreAddCredentialsOperation
+    for CredentialsStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
         let duplicate_credentials = user_credentials::table

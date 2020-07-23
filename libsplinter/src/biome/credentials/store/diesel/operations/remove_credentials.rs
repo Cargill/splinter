@@ -24,8 +24,6 @@ pub(in crate::biome::credentials) trait CredentialsStoreRemoveCredentialsOperati
 impl<'a, C> CredentialsStoreRemoveCredentialsOperation for CredentialsStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {

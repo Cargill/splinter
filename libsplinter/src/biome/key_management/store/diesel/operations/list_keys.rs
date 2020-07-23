@@ -26,8 +26,6 @@ pub(in crate::biome::key_management) trait KeyStoreListKeysOperation {
 impl<'a, C> KeyStoreListKeysOperation for KeyStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn list_keys(&self) -> Result<Vec<Key>, KeyStoreError> {
@@ -56,8 +54,6 @@ pub(in crate::biome::key_management) trait KeyStoreListKeysWithUserIDOperation {
 impl<'a, C> KeyStoreListKeysWithUserIDOperation for KeyStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn list_keys_with_user_id(&self, user_id: &str) -> Result<Vec<Key>, KeyStoreError> {

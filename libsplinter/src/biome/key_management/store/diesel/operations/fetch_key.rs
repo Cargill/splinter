@@ -26,8 +26,6 @@ pub(in crate::biome::key_management) trait KeyStoreFetchKeyOperation {
 impl<'a, C> KeyStoreFetchKeyOperation for KeyStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {

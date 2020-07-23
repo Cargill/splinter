@@ -24,12 +24,39 @@ pub(in crate::biome) trait RefreshTokenStoreAddTokenOperation {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError>;
 }
 
-impl<'a, C> RefreshTokenStoreAddTokenOperation for RefreshTokenStoreOperations<'a, C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+#[cfg(feature = "postgres")]
+impl<'a> RefreshTokenStoreAddTokenOperation
+    for RefreshTokenStoreOperations<'a, diesel::pg::PgConnection>
+{
+    fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        splinter_user::table
+            .filter(splinter_user::id.eq(&user_id))
+            .first::<UserModel>(self.conn)
+            .map_err(|err| {
+                if err == NotFound {
+                    RefreshTokenError::QueryError {
+                        context: "Failed to check if user exists".into(),
+                        source: Box::new(err),
+                    }
+                } else {
+                    RefreshTokenError::NotFoundError(format!("User {} not found", user_id))
+                }
+            })?;
+
+        insert_into(refresh_tokens::table)
+            .values(NewRefreshToken { user_id, token })
+            .execute(self.conn)
+            .map_err(|err| RefreshTokenError::OperationError {
+                context: "Failed to create token".to_string(),
+                source: Box::new(err),
+            })?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> RefreshTokenStoreAddTokenOperation
+    for RefreshTokenStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         splinter_user::table

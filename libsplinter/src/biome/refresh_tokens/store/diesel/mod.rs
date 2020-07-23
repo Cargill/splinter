@@ -16,8 +16,10 @@ mod models;
 mod operations;
 mod schema;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+
 use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
-use crate::database::ConnectionPool;
+
 use operations::{
     add_token::RefreshTokenStoreAddTokenOperation,
     fetch_token::RefreshTokenStoreFetchTokenOperation,
@@ -25,17 +27,34 @@ use operations::{
     update_token::RefreshTokenStoreUpdateTokenOperation, RefreshTokenStoreOperations,
 };
 
-pub struct DieselRefreshTokenStore {
-    connection_pool: ConnectionPool,
+pub struct DieselRefreshTokenStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
 }
 
-impl DieselRefreshTokenStore {
-    pub fn new(connection_pool: ConnectionPool) -> Self {
+impl<C: diesel::Connection> DieselRefreshTokenStore<C> {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         Self { connection_pool }
     }
 }
 
-impl RefreshTokenStore for DieselRefreshTokenStore {
+#[cfg(feature = "postgres")]
+impl RefreshTokenStore for DieselRefreshTokenStore<diesel::pg::PgConnection> {
+    fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
+    }
+    fn remove_token(&self, user_id: &str) -> Result<(), RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).remove_token(user_id)
+    }
+    fn update_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).update_token(user_id, token)
+    }
+    fn fetch_token(&self, user_id: &str) -> Result<String, RefreshTokenError> {
+        RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).fetch_token(user_id)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl RefreshTokenStore for DieselRefreshTokenStore<diesel::sqlite::SqliteConnection> {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
         RefreshTokenStoreOperations::new(&*self.connection_pool.get()?).add_token(user_id, token)
     }

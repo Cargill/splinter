@@ -16,8 +16,10 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+
 use super::{Credentials, CredentialsStore, CredentialsStoreError, UsernameId};
-use crate::database::ConnectionPool;
+
 use models::CredentialsModel;
 use operations::add_credentials::CredentialsStoreAddCredentialsOperation as _;
 use operations::fetch_credential_by_id::CredentialsStoreFetchCredentialByIdOperation as _;
@@ -29,22 +31,68 @@ use operations::update_credentials::CredentialsStoreUpdateCredentialsOperation a
 use operations::CredentialsStoreOperations;
 
 /// Manages creating, updating and fetching SplinterCredentials from the database
-pub struct DieselCredentialsStore {
-    connection_pool: ConnectionPool,
+pub struct DieselCredentialsStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
 }
 
-impl DieselCredentialsStore {
+impl<C: diesel::Connection> DieselCredentialsStore<C> {
     /// Creates a new DieselCredentialsStore
     ///
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool to the database
-    pub fn new(connection_pool: ConnectionPool) -> DieselCredentialsStore {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         DieselCredentialsStore { connection_pool }
     }
 }
 
-impl CredentialsStore for DieselCredentialsStore {
+#[cfg(feature = "postgres")]
+impl CredentialsStore for DieselCredentialsStore<diesel::pg::PgConnection> {
+    fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
+    }
+
+    fn update_credentials(
+        &self,
+        user_id: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<(), CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
+            .update_credentials(user_id, username, password)
+    }
+
+    fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).remove_credentials(user_id)
+    }
+
+    fn fetch_credential_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Credentials, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
+            .fetch_credential_by_id(user_id)
+    }
+
+    fn fetch_credential_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Credentials, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
+            .fetch_credential_by_username(username)
+    }
+
+    fn fetch_username_by_id(&self, user_id: &str) -> Result<UsernameId, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).fetch_username_by_id(user_id)
+    }
+
+    fn list_usernames(&self) -> Result<Vec<UsernameId>, CredentialsStoreError> {
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).list_usernames()
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl CredentialsStore for DieselCredentialsStore<diesel::sqlite::SqliteConnection> {
     fn add_credentials(&self, credentials: Credentials) -> Result<(), CredentialsStoreError> {
         CredentialsStoreOperations::new(&*self.connection_pool.get()?).add_credentials(credentials)
     }

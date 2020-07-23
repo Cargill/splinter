@@ -33,12 +33,81 @@ pub(in crate::biome::key_management) trait KeyStoreUpdateKeysAndPasswordOperatio
     ) -> Result<(), KeyStoreError>;
 }
 
-impl<'a, C> KeyStoreUpdateKeysAndPasswordOperation for KeyStoreOperations<'a, C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+#[cfg(feature = "postgres")]
+impl<'a> KeyStoreUpdateKeysAndPasswordOperation
+    for KeyStoreOperations<'a, diesel::pg::PgConnection>
+{
+    fn update_keys_and_password(
+        &self,
+        user_id: &str,
+        updated_password: &str,
+        keys: &[Key],
+    ) -> Result<(), KeyStoreError> {
+        let replacement_keys = keys
+            .iter()
+            .map(|key| key.clone().into())
+            .collect::<Vec<KeyModel>>();
+
+        self.conn
+            .transaction::<(), _, _>(|| {
+                if let Err(err) =
+                    delete(keys::table.filter(keys::user_id.eq(user_id))).execute(self.conn)
+                {
+                    return Err(err);
+                }
+                if let Err(err) = insert_into(keys::table)
+                    .values(replacement_keys)
+                    .execute(self.conn)
+                {
+                    return Err(err);
+                }
+                if let Err(err) = diesel::update(
+                    user_credentials::table.filter(user_credentials::user_id.eq(&user_id)),
+                )
+                .set(user_credentials::password.eq(&updated_password))
+                .execute(self.conn)
+                {
+                    return Err(err);
+                }
+
+                Ok(())
+            })
+            .map_err(|err| {
+                if let QueryError::DatabaseError(db_err, _) = err {
+                    match db_err {
+                        DatabaseErrorKind::UniqueViolation => {
+                            return KeyStoreError::DuplicateKeyError(format!(
+                                "Public key for user {} is already in database",
+                                user_id
+                            ));
+                        }
+                        DatabaseErrorKind::ForeignKeyViolation => {
+                            return KeyStoreError::UserDoesNotExistError(format!(
+                                "User with ID {} does not exist in database",
+                                user_id
+                            ));
+                        }
+                        _ => {
+                            return KeyStoreError::OperationError {
+                                context: "Failed to add key".to_string(),
+                                source: Box::new(err),
+                            }
+                        }
+                    }
+                }
+                KeyStoreError::OperationError {
+                    context: "Failed to add key".to_string(),
+                    source: Box::new(err),
+                }
+            })?;
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> KeyStoreUpdateKeysAndPasswordOperation
+    for KeyStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn update_keys_and_password(
         &self,

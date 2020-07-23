@@ -17,24 +17,18 @@
 //! Below is an example of building an instance of BiomeRestResourceManager and passing its
 //! resources to a running instance of `RestApi`.
 //!
-//! ```no_run
+//! ```ignore
 //! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
 //! use splinter::biome::{
 //!     rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder},
-//!     DieselUserStore,
+//!     MemoryUserStore,
 //! };
-//! use splinter::database::{self, ConnectionPool};
-//!
-//! let connection_pool: ConnectionPool = database::ConnectionPool::new_pg(
-//!            "postgres://db_admin:db_password@0.0.0.0:5432/db",
-//!        )
-//!        .unwrap();
 //!
 //! let biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
 //! let biome_rest_provider = biome_rest_provider_builder
-//!             .with_user_store(DieselUserStore::new(connection_pool.clone()))
-//!             .build()
-//!             .unwrap();
+//!     .with_user_store(MemoryUserStore::new())
+//!     .build()
+//!     .unwrap();
 //!
 //! RestApiBuilder::new()
 //!     .add_resources(biome_rest_provider.resources())

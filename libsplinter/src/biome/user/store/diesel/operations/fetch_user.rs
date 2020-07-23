@@ -27,8 +27,6 @@ pub(in crate::biome::user) trait UserStoreFetchUserOperation {
 impl<'a, C> UserStoreFetchUserOperation for UserStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn fetch_user(&self, user_id: &str) -> Result<User, UserStoreError> {

@@ -23,12 +23,23 @@ pub(in crate::biome::user) trait UserStoreAddUserOperation {
     fn add_user(&self, user_model: UserModel) -> Result<(), UserStoreError>;
 }
 
-impl<'a, C> UserStoreAddUserOperation for UserStoreOperations<'a, C>
-where
-    C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
-{
+#[cfg(feature = "postgres")]
+impl<'a> UserStoreAddUserOperation for UserStoreOperations<'a, diesel::pg::PgConnection> {
+    fn add_user(&self, user_model: UserModel) -> Result<(), UserStoreError> {
+        insert_into(splinter_user::table)
+            .values(&vec![user_model])
+            .execute(self.conn)
+            .map(|_| ())
+            .map_err(|err| UserStoreError::OperationError {
+                context: "Failed to add user".to_string(),
+                source: Box::new(err),
+            })?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl<'a> UserStoreAddUserOperation for UserStoreOperations<'a, diesel::sqlite::SqliteConnection> {
     fn add_user(&self, user_model: UserModel) -> Result<(), UserStoreError> {
         insert_into(splinter_user::table)
             .values(&vec![user_model])

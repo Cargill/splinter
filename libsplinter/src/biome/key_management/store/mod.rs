@@ -84,3 +84,43 @@ pub trait KeyStore: Sync + Send {
         keys: &[Key],
     ) -> Result<(), KeyStoreError>;
 }
+
+impl<KS> KeyStore for Box<KS>
+where
+    KS: KeyStore + ?Sized,
+{
+    fn add_key(&self, key: Key) -> Result<(), KeyStoreError> {
+        (**self).add_key(key)
+    }
+
+    fn update_key(
+        &self,
+        public_key: &str,
+        user_id: &str,
+        new_display_name: &str,
+    ) -> Result<(), KeyStoreError> {
+        (**self).update_key(public_key, user_id, new_display_name)
+    }
+
+    fn remove_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
+        (**self).remove_key(public_key, user_id)
+    }
+
+    fn fetch_key(&self, public_key: &str, user_id: &str) -> Result<Key, KeyStoreError> {
+        (**self).fetch_key(public_key, user_id)
+    }
+
+    fn list_keys(&self, user_id: Option<&str>) -> Result<Vec<Key>, KeyStoreError> {
+        (**self).list_keys(user_id)
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    fn update_keys_and_password(
+        &self,
+        user_id: &str,
+        updated_password: &str,
+        keys: &[Key],
+    ) -> Result<(), KeyStoreError> {
+        (**self).update_keys_and_password(user_id, updated_password, keys)
+    }
+}

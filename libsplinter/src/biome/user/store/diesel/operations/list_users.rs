@@ -27,8 +27,6 @@ pub(in crate::biome::user) trait UserStoreListUsersOperation {
 impl<'a, C> UserStoreListUsersOperation for UserStoreOperations<'a, C>
 where
     C: diesel::Connection,
-    <C as diesel::Connection>::Backend: diesel::backend::SupportsDefaultKeyword,
-    <C as diesel::Connection>::Backend: 'static,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn list_users(&self) -> Result<Vec<User>, UserStoreError> {

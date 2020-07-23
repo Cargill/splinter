@@ -12,23 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::error::Error;
-use std::fmt;
-
-#[derive(Debug)]
-pub struct ConnectionError {
-    pub context: String,
-    pub source: Box<dyn Error>,
-}
-
-impl Error for ConnectionError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&*self.source)
-    }
-}
-
-impl fmt::Display for ConnectionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unable to connect to database: {}", self.context)
-    }
-}
+#[cfg(feature = "biome")]
+#[deprecated(
+    since = "0.5.1",
+    note = "replaced by `crate::biome::migrations::MigrationError`"
+)]
+pub type ConnectionError = crate::biome::migrations::MigrationError;
