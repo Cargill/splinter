@@ -22,7 +22,7 @@ pub(in crate::biome) mod memory;
 pub use error::UserStoreError;
 
 /// Represents a user of a splinter application
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct User {
     id: String,
 }
