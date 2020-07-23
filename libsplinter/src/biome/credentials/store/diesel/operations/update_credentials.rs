@@ -15,7 +15,9 @@
 use super::CredentialsStoreOperations;
 use crate::biome::credentials::store::diesel::schema::user_credentials;
 use crate::biome::credentials::store::error::CredentialsStoreError;
-use crate::biome::credentials::store::{CredentialsBuilder, CredentialsModel};
+use crate::biome::credentials::store::{
+    CredentialsBuilder, CredentialsModel, PasswordEncryptionCost,
+};
 use diesel::{dsl::update, prelude::*, result::Error::NotFound};
 
 pub(in crate::biome::credentials) trait CredentialsStoreUpdateCredentialsOperation {
@@ -24,6 +26,7 @@ pub(in crate::biome::credentials) trait CredentialsStoreUpdateCredentialsOperati
         user_id: &str,
         username: &str,
         password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError>;
 }
 
@@ -38,12 +41,14 @@ where
         user_id: &str,
         username: &str,
         password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
         let credentials_builder: CredentialsBuilder = Default::default();
         let credentials = credentials_builder
             .with_user_id(user_id)
             .with_username(username)
             .with_password(password)
+            .with_password_encryption_cost(password_encryption_cost)
             .build()
             .map_err(|err| CredentialsStoreError::OperationError {
                 context: "Failed to build updated credentials".to_string(),

@@ -18,7 +18,9 @@ pub(in crate::biome) mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
-use super::{Credentials, CredentialsStore, CredentialsStoreError, UsernameId};
+use super::{
+    Credentials, CredentialsStore, CredentialsStoreError, PasswordEncryptionCost, UsernameId,
+};
 
 use models::CredentialsModel;
 use operations::add_credentials::CredentialsStoreAddCredentialsOperation as _;
@@ -57,9 +59,14 @@ impl CredentialsStore for DieselCredentialsStore<diesel::pg::PgConnection> {
         user_id: &str,
         username: &str,
         password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
-            .update_credentials(user_id, username, password)
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).update_credentials(
+            user_id,
+            username,
+            password,
+            password_encryption_cost,
+        )
     }
 
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
@@ -102,9 +109,14 @@ impl CredentialsStore for DieselCredentialsStore<diesel::sqlite::SqliteConnectio
         user_id: &str,
         username: &str,
         password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
-        CredentialsStoreOperations::new(&*self.connection_pool.get()?)
-            .update_credentials(user_id, username, password)
+        CredentialsStoreOperations::new(&*self.connection_pool.get()?).update_credentials(
+            user_id,
+            username,
+            password,
+            password_encryption_cost,
+        )
     }
 
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {

@@ -18,6 +18,8 @@ mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
+#[cfg(feature = "biome-credentials")]
+use crate::biome::credentials::store::PasswordEncryptionCost;
 use crate::biome::key_management::store::{KeyStore, KeyStoreError};
 use crate::biome::key_management::Key;
 
@@ -87,11 +89,13 @@ impl KeyStore for DieselKeyStore<diesel::pg::PgConnection> {
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).update_keys_and_password(
             user_id,
             updated_password,
+            password_encryption_cost,
             keys,
         )
     }
@@ -137,11 +141,13 @@ impl KeyStore for DieselKeyStore<diesel::sqlite::SqliteConnection> {
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
         KeyStoreOperations::new(&*self.connection_pool.get()?).update_keys_and_password(
             user_id,
             updated_password,
+            password_encryption_cost,
             keys,
         )
     }

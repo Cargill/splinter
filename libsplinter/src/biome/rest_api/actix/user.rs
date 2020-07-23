@@ -150,7 +150,7 @@ fn add_modify_user_method(
     secret_manager: Arc<dyn SecretManager>,
     key_store: Arc<dyn KeyStore>,
 ) -> HandlerFunction {
-    let ecryption_cost = rest_config.password_encryption_cost();
+    let encryption_cost = rest_config.password_encryption_cost();
     Box::new(move |request, payload| {
         let credentials_store = credentials_store.clone();
         let key_store = key_store.clone();
@@ -229,7 +229,7 @@ fn add_modify_user_method(
                             match CredentialsBuilder::default()
                                 .with_user_id(&credentials.user_id)
                                 .with_username(&credentials.username)
-                                .with_password_encryption_cost(ecryption_cost)
+                                .with_password_encryption_cost(encryption_cost)
                                 .with_password(&val)
                                 .build()
                             {
@@ -254,6 +254,7 @@ fn add_modify_user_method(
                     match key_store.update_keys_and_password(
                         &user_id,
                         &new_password,
+                        encryption_cost,
                         &new_key_pairs,
                     ) {
                         Ok(()) => HttpResponse::Ok()

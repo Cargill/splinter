@@ -14,7 +14,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "biome-credentials")]
-use crate::biome::credentials::store::{memory::MemoryCredentialsStore, CredentialsStore};
+use crate::biome::credentials::store::{
+    memory::MemoryCredentialsStore, CredentialsStore, PasswordEncryptionCost,
+};
 use crate::biome::key_management::{
     store::{error::KeyStoreError, KeyStore},
     Key,
@@ -129,6 +131,7 @@ impl KeyStore for MemoryKeyStore {
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
         for key in keys {
@@ -144,7 +147,12 @@ impl KeyStore for MemoryKeyStore {
             })?;
 
         self.credentials_store
-            .update_credentials(user_id, &creds.username, updated_password)
+            .update_credentials(
+                user_id,
+                &creds.username,
+                updated_password,
+                password_encryption_cost,
+            )
             .map_err(|err| KeyStoreError::QueryError {
                 context: "Cannot update credentials store".to_string(),
                 source: Box::new(err),

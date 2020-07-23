@@ -16,7 +16,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::biome::credentials::store::{
-    error::CredentialsStoreError, Credentials, CredentialsStore, UsernameId,
+    error::CredentialsStoreError, Credentials, CredentialsBuilder, CredentialsStore,
+    PasswordEncryptionCost, UsernameId,
 };
 
 #[derive(Default, Clone)]
@@ -50,6 +51,7 @@ impl CredentialsStore for MemoryCredentialsStore {
         user_id: &str,
         updated_username: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
         let mut inner = self
             .inner
@@ -58,9 +60,18 @@ impl CredentialsStore for MemoryCredentialsStore {
                 context: "Cannot access credentials: mutex lock poisoned".to_string(),
                 source: None,
             })?;
-        if let Some(creds) = inner.get_mut(user_id) {
-            creds.username = updated_username.to_string();
-            creds.password = updated_password.to_string();
+        if inner.contains_key(user_id) {
+            let new_credentials = CredentialsBuilder::default()
+                .with_user_id(user_id)
+                .with_username(updated_username)
+                .with_password(updated_password)
+                .with_password_encryption_cost(password_encryption_cost)
+                .build()
+                .map_err(|err| CredentialsStoreError::OperationError {
+                    context: "Failed to build updated credentials".to_string(),
+                    source: err.into(),
+                })?;
+            inner.insert(user_id.into(), new_credentials);
             Ok(())
         } else {
             Err(CredentialsStoreError::NotFoundError(format!(
