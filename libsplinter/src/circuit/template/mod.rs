@@ -280,14 +280,14 @@ mod test {
     /// Example circuit template YAML file.
     const EXAMPLE_TEMPLATE_YAML: &[u8] = br##"version: v1
 args:
-    - name: $(a:ADMIN_KEYS)
+    - name: $(ADMIN_KEYS)
       required: false
-      default: $(a:SIGNER_PUB_KEY)
-    - name: $(a:NODES)
+      default: $(SIGNER_PUB_KEY)
+    - name: $(NODES)
       required: true
-    - name: $(a:SIGNER_PUB_KEY)
+    - name: $(SIGNER_PUB_KEY)
       required: false
-    - name: $(a:GAMEROOM_NAME)
+    - name: $(GAMEROOM_NAME)
       required: true
 rules:
     set-management-type:
@@ -296,17 +296,17 @@ rules:
         service-type: 'scabbard'
         service-args:
         - key: 'admin-keys'
-          value: [$(a:ADMIN_KEYS)]
+          value: [$(ADMIN_KEYS)]
         - key: 'peer_services'
-          value: '$(r:ALL_OTHER_SERVICES)'
+          value: '$(ALL_OTHER_SERVICES)'
         first-service: 'a000'
     set-metadata:
         encoding: json
         metadata:
             - key: "scabbard_admin_keys"
-              value: ["$(a:ADMIN_KEYS)"]
+              value: ["$(ADMIN_KEYS)"]
             - key: "alias"
-              value: "$(a:GAMEROOM_NAME)" "##;
+              value: "$(GAMEROOM_NAME)" "##;
 
     /// Verifies that Builders can be parsed from template v1 and correctly applies the
     /// `set-management-type`, `create-services` and `set-metadata` `rules` correctly.

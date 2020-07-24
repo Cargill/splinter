@@ -137,15 +137,15 @@ impl TryFrom<v1::RuleArgument> for RuleArgument {
 }
 
 fn is_arg(key: &str) -> bool {
-    key.starts_with("$(a:")
+    key.starts_with("$(")
 }
 
 fn strip_arg_marker(key: &str) -> Result<String, CircuitTemplateError> {
-    if key.starts_with("$(a:") && key.ends_with(')') {
+    if key.starts_with("$(") && key.ends_with(')') {
         let mut key = key.to_string();
         key.pop();
         Ok(key
-            .get(4..)
+            .get(2..)
             .ok_or_else(|| {
                 CircuitTemplateError::new(&format!("{} is not a valid argument name", key))
             })?

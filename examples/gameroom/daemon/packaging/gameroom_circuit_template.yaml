@@ -1,17 +1,17 @@
 version: v1
 args:
-    - name: $(a:ADMIN_KEYS)
+    - name: $(ADMIN_KEYS)
       required: false
-      default: $(a:SIGNER_PUB_KEY)
+      default: $(SIGNER_PUB_KEY)
       description: >-
         Public keys used to verify transactions in the scabbard service
-    - name: $(a:NODES)
+    - name: $(NODES)
       required: true
       description: "List of node IDs"
-    - name: $(a:SIGNER_PUB_KEY)
+    - name: $(SIGNER_PUB_KEY)
       required: false
       description: "Public key of the signer"
-    - name: $(a:GAMEROOM_NAME)
+    - name: $(GAMEROOM_NAME)
       required: true
       description: "Name of the gameroom"
 rules:
@@ -21,14 +21,14 @@ rules:
         service-type: 'scabbard'
         service-args:
         - key: 'admin_keys'
-          value: [$(a:ADMIN_KEYS)]
+          value: [$(ADMIN_KEYS)]
         - key: 'peer_services'
-          value: '$(r:ALL_OTHER_SERVICES)'
+          value: '$(ALL_OTHER_SERVICES)'
         first-service: 'a000'
     set-metadata:
         encoding: json
         metadata:
             - key: "scabbard_admin_keys"
-              value: ["$(a:ADMIN_KEYS)"]
+              value: ["$(ADMIN_KEYS)"]
             - key: "alias"
-              value: "$(a:GAMEROOM_NAME)"
+              value: "$(GAMEROOM_NAME)"

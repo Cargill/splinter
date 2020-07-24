@@ -20,8 +20,8 @@ use crate::base62::next_base62_string;
 use super::super::{yaml_parser::v1, CircuitTemplateError, SplinterServiceBuilder};
 use super::{get_argument_value, is_arg, RuleArgument, Value};
 
-const ALL_OTHER_SERVICES: &str = "$(r:ALL_OTHER_SERVICES)";
-const NODES_ARG: &str = "$(a:NODES)";
+const ALL_OTHER_SERVICES: &str = "$(ALL_OTHER_SERVICES)";
+const NODES_ARG: &str = "$(NODES)";
 const PEER_SERVICES_ARG: &str = "peer_services";
 
 /// Data structure used to create a `SplinterServiceBuilder`.
@@ -307,7 +307,7 @@ mod test {
         };
         let admin_keys_arg = ServiceArgument {
             key: "admin-keys".to_string(),
-            value: Value::List(vec!["$(a:ADMIN_KEYS)".to_string()]),
+            value: Value::List(vec!["$(ADMIN_KEYS)".to_string()]),
         };
 
         CreateServices {
@@ -321,7 +321,7 @@ mod test {
         let admin_keys_templae_arg = RuleArgument {
             name: "admin_keys".to_string(),
             required: false,
-            default_value: Some("$(a:SIGNER_PUB_KEY)".to_string()),
+            default_value: Some("$(SIGNER_PUB_KEY)".to_string()),
             description: None,
             user_value: None,
         };
