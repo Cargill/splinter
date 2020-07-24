@@ -51,8 +51,8 @@ impl CreateCircuitMessageBuilder {
     }
 
     #[cfg(feature = "circuit-template")]
-    pub fn add_services(&mut self, service_builders: &[SplinterServiceBuilder]) {
-        self.services.extend(service_builders.to_owned());
+    pub fn create_circuit_builder(&self) -> CreateCircuitBuilder {
+        self.create_circuit_builder.clone()
     }
 
     #[cfg(feature = "circuit-template")]

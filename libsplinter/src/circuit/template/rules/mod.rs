@@ -25,7 +25,7 @@ mod set_metadata;
 
 use std::convert::TryFrom;
 
-use super::{yaml_parser::v1, Builders, CircuitTemplateError};
+use super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
 
 use create_services::CreateServices;
 use set_management_type::CircuitManagement;
@@ -44,12 +44,10 @@ impl Rules {
     /// including the `SplinterServiceBuilder` objects and `CreateCircuitBuilder`.
     pub fn apply_rules(
         &self,
-        builders: &mut Builders,
+        mut circuit_builder: CreateCircuitBuilder,
         template_arguments: &[RuleArgument],
-    ) -> Result<(), CircuitTemplateError> {
-        let mut service_builders = builders.service_builders();
-
-        let mut circuit_builder = builders.create_circuit_builder();
+    ) -> Result<CreateCircuitBuilder, CircuitTemplateError> {
+        let mut service_builders = vec![];
 
         if let Some(circuit_management) = &self.set_management_type {
             circuit_builder = circuit_management.apply_rule(circuit_builder)?;
@@ -63,9 +61,20 @@ impl Rules {
             circuit_builder = set_metadata.apply_rule(circuit_builder, template_arguments)?;
         }
 
-        builders.set_create_circuit_builder(circuit_builder);
-        builders.set_service_builders(service_builders);
-        Ok(())
+        let mut services = vec![];
+        for service_builder in service_builders {
+            match service_builder.build() {
+                Ok(service) => services.push(service),
+                Err(err) => {
+                    return Err(CircuitTemplateError::new_with_source(
+                        "Failed to build SplinterService: {}",
+                        Box::new(err),
+                    ));
+                }
+            }
+        }
+
+        Ok(circuit_builder.with_roster(&services))
     }
 }
 

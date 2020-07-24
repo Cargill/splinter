@@ -17,9 +17,10 @@
 use std::collections::HashMap;
 
 use splinter::circuit::template::{
-    Builders, CircuitCreateTemplate, CircuitTemplateError, CircuitTemplateManager, RuleArgument,
+    CircuitCreateTemplate, CircuitTemplateError, CircuitTemplateManager, RuleArgument,
 };
 
+use crate::action::circuit::CreateCircuitMessageBuilder;
 use crate::error::CliError;
 
 const NODES_ARG: &str = "nodes";
@@ -118,11 +119,17 @@ impl CircuitTemplate {
         self.template.arguments()
     }
 
-    /// Generate a `Builders` object from the `CircuitTemplate`, including a `CreateCircuitBuilder`
-    /// and a list of `SplinterServiceBuilder` objects. Also checks to ensure no required arguments
-    /// are missing from the `CircuitTemplate` then sets the rest of the arguments from the
-    /// `arguments` list of the `CircuitTemplate`.
-    pub fn into_builders(mut self) -> Result<Builders, CliError> {
+    /// Updates a `CreateCircuitMessageBuilder` based on the template argument values.
+    ///
+    /// Applies all `rules` from the circuit template using the data saved in the `arguments` to
+    /// a `CreateCircuitMessageBuilder`. Also adds services created from the circuit template to
+    /// the returned builder if the `create_services` rule is in the template.
+    pub fn apply_to_builder(
+        mut self,
+        circuit_message_builder: &mut CreateCircuitMessageBuilder,
+    ) -> Result<(), CliError> {
+        let circuit_builder = circuit_message_builder.create_circuit_builder();
+
         let missing_args = self.check_missing_required_arguments();
         if !missing_args.is_empty() {
             return Err(CliError::ActionError(format!(
@@ -135,7 +142,10 @@ impl CircuitTemplate {
             self.template.set_argument_value(key, value)?;
         }
 
-        Ok(self.template.into_builders()?)
+        circuit_message_builder
+            .set_create_circuit_builder(&self.template.apply_to_builder(circuit_builder)?);
+
+        Ok(())
     }
 }
 
