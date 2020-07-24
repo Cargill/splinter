@@ -147,13 +147,13 @@ fn strip_arg_marker(key: &str) -> Result<String, CircuitTemplateError> {
         Ok(key
             .get(2..)
             .ok_or_else(|| {
-                CircuitTemplateError::new(&format!("{} is not a valid argument name", key))
+                CircuitTemplateError::new(&format!("\"{}\" is not a valid argument name", key))
             })?
             .to_string()
             .to_lowercase())
     } else {
         Err(CircuitTemplateError::new(&format!(
-            "{} is not a valid argument name",
+            "\"{}\" is not a valid argument name",
             key
         )))
     }
@@ -185,13 +185,13 @@ fn get_argument_value(
             None => {
                 if arg.required {
                     return Err(CircuitTemplateError::new(&format!(
-                        "Argument {} is required but was not provided",
+                        "Argument \"{}\" is required but was not provided",
                         key
                     )));
                 } else {
                     let default_value = arg.default_value.to_owned().ok_or_else(|| {
                         CircuitTemplateError::new(&format!(
-                            "Argument {} was not provided and no default value is set",
+                            "Argument \"{}\" was not provided and no default value is set",
                             key
                         ))
                     })?;
@@ -205,7 +205,7 @@ fn get_argument_value(
         },
         None => {
             return Err(CircuitTemplateError::new(&format!(
-                "Invalid template. Argument {} was expected but not provided",
+                "Invalid template. Argument \"{}\" was expected but not provided",
                 key
             )));
         }
