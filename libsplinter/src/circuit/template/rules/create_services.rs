@@ -201,7 +201,7 @@ mod test {
 
         let service_builders = create_services
             .apply_rule(&template_arguments)
-            .expect("Failled to apply rules");
+            .expect("Failed to apply rules");
 
         assert_eq!(service_builders.len(), 2);
 
@@ -318,7 +318,7 @@ mod test {
     }
 
     fn make_rule_arguments() -> Vec<RuleArgument> {
-        let admin_keys_templae_arg = RuleArgument {
+        let admin_keys_template_arg = RuleArgument {
             name: "admin_keys".to_string(),
             required: false,
             default_value: Some("$(SIGNER_PUB_KEY)".to_string()),
@@ -326,7 +326,7 @@ mod test {
             user_value: None,
         };
 
-        let nodes_templae_arg = RuleArgument {
+        let nodes_template_arg = RuleArgument {
             name: "nodes".to_string(),
             required: true,
             default_value: None,
@@ -342,6 +342,6 @@ mod test {
             user_value: Some("signer_key".to_string()),
         };
 
-        vec![admin_keys_templae_arg, nodes_templae_arg, signer_pub_key]
+        vec![admin_keys_template_arg, nodes_template_arg, signer_pub_key]
     }
 }
