@@ -110,6 +110,13 @@ impl RegistryReader for LocalYamlRegistry {
             .filter(move |node| predicates.iter().all(|predicate| predicate.apply(node)))
             .count() as u32)
     }
+
+    fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
+        Ok(self
+            .get_nodes()?
+            .iter()
+            .any(|node| node.identity == identity))
+    }
 }
 
 impl RegistryWriter for LocalYamlRegistry {
@@ -578,6 +585,31 @@ mod test {
             Ok(None) => {}
             res => panic!("Should have gotten Ok(None) but got {:?}", res),
         }
+    }
+
+    ///
+    /// Verifies that `has_node` properly determines if a node exists in the registry.
+    ///
+    #[test]
+    fn test_has_node() {
+        let temp_dir = TempDir::new("test_has_node").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![get_node_1()], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        assert!(registry
+            .has_node(&get_node_1().identity)
+            .expect("Failed to check if node1 exists"));
+        assert!(!registry
+            .has_node(&get_node_2().identity)
+            .expect("Failed to check if node2 exists"));
     }
 
     ///

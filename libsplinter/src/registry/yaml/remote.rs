@@ -594,6 +594,29 @@ mod tests {
         test_config.shutdown();
     }
 
+    ///
+    /// Verifies that `has_node` properly determines if a node exists in the registry.
+    ///
+    #[test]
+    fn has_node() {
+        let test_config = TestConfig::setup("has_node", Some(mock_registry()));
+
+        let remote_registry =
+            RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
+                .expect("Failed to create registry");
+
+        let expected_node = mock_registry().pop().expect("Failed to get expected node");
+        assert!(remote_registry
+            .has_node(&expected_node.identity)
+            .expect("Failed to check if expected_node exists"));
+        assert!(!remote_registry
+            .has_node("NodeNotInRegistry")
+            .expect("Failed to check for non-existent node"));
+
+        remote_registry.shutdown_handle().shutdown();
+        test_config.shutdown();
+    }
+
     /// Verifies that `list_nodes` returns all nodes in the remote file.
     #[test]
     fn list_nodes() {

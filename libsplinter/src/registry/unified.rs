@@ -175,6 +175,28 @@ impl RegistryReader for UnifiedRegistry {
                 }
             }))
     }
+
+    fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
+        Ok(self
+            .internal_source
+            .has_node(identity)
+            .unwrap_or_else(|err| {
+                debug!(
+                    "Failed to check for existence of node in source registry: {}",
+                    err
+                );
+                false
+            })
+            || self.external_sources.iter().any(|source| {
+                source.has_node(identity).unwrap_or_else(|err| {
+                    debug!(
+                        "Failed to check for existence of node in source registry: {}",
+                        err
+                    );
+                    false
+                })
+            }))
+    }
 }
 
 impl RegistryWriter for UnifiedRegistry {
@@ -437,6 +459,35 @@ mod test {
             .expect("Node not found");
 
         assert_eq!(expected_node, retreived_node);
+    }
+
+    /// Verify that `has_node` properly determines if a node exists in any of the sources.
+    #[test]
+    fn has_node() {
+        let node1 = new_node("node1", "endpoint1", &[]);
+        let node2 = new_node("node2", "endpoint2", &[]);
+
+        let writable = MemRegistry::default();
+        writable
+            .insert_node(node1.clone())
+            .expect("Unable to insert node");
+
+        let readable = MemRegistry::default();
+        readable
+            .insert_node(node2.clone())
+            .expect("Unable to insert node");
+
+        let unified = UnifiedRegistry::new(Box::new(writable), vec![Box::new(readable)]);
+
+        assert!(unified
+            .has_node(&node1.identity)
+            .expect("Failed to check if node1 exists"));
+        assert!(unified
+            .has_node(&node2.identity)
+            .expect("Failed to check if node2 exists"));
+        assert!(!unified
+            .has_node("NodeNotInRegistry")
+            .expect("Failed to check for non-existent node"));
     }
 
     /// Verify that listed nodes are properly returned based on precedence and that metadata is
