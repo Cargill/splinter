@@ -95,6 +95,7 @@ experimental = [
     "biome-notifications",
     "biome-user",
     "circuit-template",
+    "registry-database",
     "routing-table",
     "service-arg-validation",
     "service-network",
@@ -116,6 +117,7 @@ circuit-template = []
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
+registry-database = ["diesel"]
 registry-remote = ["reqwest", "registry"]
 rest-api = [
     "actix",

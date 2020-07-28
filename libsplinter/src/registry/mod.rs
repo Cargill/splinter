@@ -24,6 +24,8 @@
 //! [`RegistryWriter`]: trait.RegistryWriter.html
 //! [`RwRegistry`]: trait.RwRegistry.html
 
+#[cfg(feature = "registry-database")]
+mod diesel;
 mod error;
 #[cfg(feature = "rest-api")]
 mod rest_api;
@@ -33,6 +35,12 @@ mod yaml;
 use std::collections::HashMap;
 use std::iter::ExactSizeIterator;
 
+#[cfg(all(feature = "registry-database", feature = "postgres"))]
+pub use self::diesel::migrations::run_postgres_migrations;
+#[cfg(all(feature = "registry-database", feature = "sqlite"))]
+pub use self::diesel::migrations::run_sqlite_migrations;
+#[cfg(feature = "registry-database")]
+pub use self::diesel::DieselRegistry;
 pub use error::{InvalidNodeError, RegistryError};
 pub use unified::UnifiedRegistry;
 pub use yaml::LocalYamlRegistry;
