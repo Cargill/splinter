@@ -45,6 +45,7 @@
 
 mod builders;
 pub mod error;
+pub mod yaml;
 
 use std::cmp::Ordering;
 use std::fmt;
