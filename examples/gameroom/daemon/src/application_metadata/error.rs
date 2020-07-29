@@ -21,6 +21,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum ApplicationMetadataError {
+    #[cfg(feature = "test-authorization-handler")]
     SerializationError(SerdeError),
     DeserializationError(SerdeError),
 }
@@ -28,6 +29,7 @@ pub enum ApplicationMetadataError {
 impl Error for ApplicationMetadataError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            #[cfg(feature = "test-authorization-handler")]
             ApplicationMetadataError::SerializationError(err) => Some(err),
             ApplicationMetadataError::DeserializationError(err) => Some(err),
         }
@@ -37,6 +39,7 @@ impl Error for ApplicationMetadataError {
 impl fmt::Display for ApplicationMetadataError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            #[cfg(feature = "test-authorization-handler")]
             ApplicationMetadataError::SerializationError(e) => {
                 write!(f, "Failed to serialize ApplicationMetadata: {}", e)
             }
