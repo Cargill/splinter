@@ -92,6 +92,7 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "admin-service-store",
     "biome-notifications",
     "biome-user",
     "circuit-template",
@@ -107,6 +108,7 @@ experimental = [
 # used for turning benchmark tests on
 benchmark = []
 
+admin-service-store = []
 biome = []
 biome-credentials = ["biome", "biome-user", "bcrypt"]
 biome-key-management = ["biome"]
