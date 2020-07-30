@@ -22,7 +22,7 @@ pub(in crate::biome) mod memory;
 pub use error::UserStoreError;
 
 /// Represents a user of a splinter application
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct User {
     id: String,
 }
@@ -33,7 +33,6 @@ impl User {
     /// # Arguments
     ///
     /// * `user_id`: unique identifier for the user being created
-    #[cfg(feature = "rest-api")]
     pub fn new(user_id: &str) -> Self {
         User {
             id: user_id.to_string(),

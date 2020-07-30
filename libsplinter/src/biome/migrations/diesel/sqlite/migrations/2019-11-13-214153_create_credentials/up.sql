@@ -14,7 +14,7 @@
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS  user_credentials (
-  id                        BIGSERIAL       PRIMARY KEY,
+  id                        INTEGER         PRIMARY KEY AUTOINCREMENT,
   user_id                   TEXT            NOT NULL,
   username                  TEXT            NOT NULL,
   password                  TEXT            NOT NULL,

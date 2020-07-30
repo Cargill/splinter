@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE TABLE IF NOT EXISTS notification_properties (
-  id                        BIGSERIAL   PRIMARY KEY,
+  id                        INTEGER     PRIMARY KEY AUTOINCREMENT,
   notification_id           TEXT        NOT NULL,
   property                  TEXT        NOT NULL,
   property_value            TEXT        NOT NULL,

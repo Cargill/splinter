@@ -17,6 +17,9 @@ pub(in crate::biome) mod diesel;
 pub mod error;
 pub(in crate::biome) mod memory;
 
+#[cfg(feature = "biome-credentials")]
+use crate::biome::credentials::store::PasswordEncryptionCost;
+
 use super::Key;
 
 pub use error::KeyStoreError;
@@ -81,6 +84,7 @@ pub trait KeyStore: Sync + Send {
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError>;
 }
@@ -119,8 +123,9 @@ where
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
-        (**self).update_keys_and_password(user_id, updated_password, keys)
+        (**self).update_keys_and_password(user_id, updated_password, password_encryption_cost, keys)
     }
 }

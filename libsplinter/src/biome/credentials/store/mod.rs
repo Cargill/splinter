@@ -32,7 +32,7 @@ const MEDIUM_COST: u32 = 8;
 const LOW_COST: u32 = 4;
 
 /// Represents crendentials used to authenticate a user
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Credentials {
     pub user_id: String,
     pub username: String,
@@ -52,7 +52,7 @@ impl Credentials {
 }
 
 /// Represents a user's username
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct UsernameId {
     pub username: String,
     pub user_id: String,
@@ -173,6 +173,7 @@ pub trait CredentialsStore: Send + Sync {
         user_id: &str,
         updated_username: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError>;
 
     /// Removes a credential from a user from the underlying storage
@@ -250,8 +251,14 @@ where
         user_id: &str,
         updated_username: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
     ) -> Result<(), CredentialsStoreError> {
-        (**self).update_credentials(user_id, updated_username, updated_password)
+        (**self).update_credentials(
+            user_id,
+            updated_username,
+            updated_password,
+            password_encryption_cost,
+        )
     }
 
     fn remove_credentials(&self, user_id: &str) -> Result<(), CredentialsStoreError> {
@@ -318,7 +325,7 @@ impl FromStr for PasswordEncryptionCost {
 }
 
 impl PasswordEncryptionCost {
-    fn to_value(self) -> u32 {
+    pub(in crate::biome) fn to_value(self) -> u32 {
         match self {
             PasswordEncryptionCost::High => DEFAULT_COST,
             PasswordEncryptionCost::Medium => MEDIUM_COST,

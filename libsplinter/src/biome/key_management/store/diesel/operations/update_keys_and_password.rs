@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use super::KeyStoreOperations;
-use crate::biome::credentials::store::diesel::schema::user_credentials;
+use crate::biome::credentials::store::{diesel::schema::user_credentials, PasswordEncryptionCost};
 use crate::biome::key_management::store::diesel::models::KeyModel;
 use crate::biome::key_management::store::diesel::schema::keys;
 use crate::biome::key_management::{store::KeyStoreError, Key};
 
+use bcrypt::hash;
 use diesel::{
     dsl::{delete, insert_into},
     prelude::*,
@@ -29,6 +30,7 @@ pub(in crate::biome::key_management) trait KeyStoreUpdateKeysAndPasswordOperatio
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError>;
 }
@@ -41,12 +43,19 @@ impl<'a> KeyStoreUpdateKeysAndPasswordOperation
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
         let replacement_keys = keys
             .iter()
             .map(|key| key.clone().into())
             .collect::<Vec<KeyModel>>();
+
+        let replacement_password = hash(updated_password, password_encryption_cost.to_value())
+            .map_err(|err| KeyStoreError::OperationError {
+                context: "Failed to hash updated password".to_string(),
+                source: err.into(),
+            })?;
 
         self.conn
             .transaction::<(), _, _>(|| {
@@ -64,7 +73,7 @@ impl<'a> KeyStoreUpdateKeysAndPasswordOperation
                 if let Err(err) = diesel::update(
                     user_credentials::table.filter(user_credentials::user_id.eq(&user_id)),
                 )
-                .set(user_credentials::password.eq(&updated_password))
+                .set(user_credentials::password.eq(replacement_password))
                 .execute(self.conn)
                 {
                     return Err(err);
@@ -113,12 +122,19 @@ impl<'a> KeyStoreUpdateKeysAndPasswordOperation
         &self,
         user_id: &str,
         updated_password: &str,
+        password_encryption_cost: PasswordEncryptionCost,
         keys: &[Key],
     ) -> Result<(), KeyStoreError> {
         let replacement_keys = keys
             .iter()
             .map(|key| key.clone().into())
             .collect::<Vec<KeyModel>>();
+
+        let replacement_password = hash(updated_password, password_encryption_cost.to_value())
+            .map_err(|err| KeyStoreError::OperationError {
+                context: "Failed to hash updated password".to_string(),
+                source: err.into(),
+            })?;
 
         self.conn
             .transaction::<(), _, _>(|| {
@@ -136,7 +152,7 @@ impl<'a> KeyStoreUpdateKeysAndPasswordOperation
                 if let Err(err) = diesel::update(
                     user_credentials::table.filter(user_credentials::user_id.eq(&user_id)),
                 )
-                .set(user_credentials::password.eq(&updated_password))
+                .set(user_credentials::password.eq(replacement_password))
                 .execute(self.conn)
                 {
                     return Err(err);
