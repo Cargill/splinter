@@ -335,11 +335,8 @@ impl SplinterDaemon {
                                 continue;
                             }
                             Err(AcceptError::IoError(err)) => {
-                                error!("Unable to receive new connections; exiting: {:?}", err);
-                                return Err(StartError::TransportError(format!(
-                                    "Accept Error: {:?}",
-                                    err
-                                )));
+                                warn!("Failed to accept connection on {}: {}", endpoint, err);
+                                continue;
                             }
                         };
                         debug!("Received connection from {}", connection.remote_endpoint());
