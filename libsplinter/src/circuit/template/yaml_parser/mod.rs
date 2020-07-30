@@ -99,7 +99,7 @@ mod test {
 args:
     - name: admin-keys
       required: false
-      default: $(a:SIGNER_PUB_KEY)
+      default: $(SIGNER_PUB_KEY)
 rules:
     set-management-type:
         management-type: "gameroom"
@@ -109,7 +109,7 @@ rules:
         - key: 'admin-keys'
           value: [$(admin-keys)]
         - key: 'peer-services'
-          value: '$(r:ALL_OTHER_SERVICES)'
+          value: '$(ALL_OTHER_SERVICES)'
         first-service: 'a000'
     set-metadata:
         encoding: json
@@ -148,10 +148,7 @@ rules:
                 for arg in args {
                     assert_eq!(arg.name(), "admin-keys");
                     assert_eq!(arg.required(), false);
-                    assert_eq!(
-                        arg.default_value(),
-                        Some(&"$(a:SIGNER_PUB_KEY)".to_string())
-                    );
+                    assert_eq!(arg.default_value(), Some(&"$(SIGNER_PUB_KEY)".to_string()));
 
                     let create_services = template
                         .rules()
@@ -165,7 +162,7 @@ rules:
                     assert!(service_args.iter().any(|arg| arg.key() == "admin-keys"
                         && arg.value() == &Value::List(vec!["$(admin-keys)".to_string()])));
                     assert!(service_args.iter().any(|arg| arg.key() == "peer-services"
-                        && arg.value() == &Value::Single("$(r:ALL_OTHER_SERVICES)".to_string())));
+                        && arg.value() == &Value::Single("$(ALL_OTHER_SERVICES)".to_string())));
                 }
 
                 let management_type = template

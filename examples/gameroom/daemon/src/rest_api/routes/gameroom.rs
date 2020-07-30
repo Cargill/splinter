@@ -21,9 +21,7 @@ use gameroom_database::{
 };
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
-use splinter::admin::messages::{
-    CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterServiceBuilder,
-};
+use splinter::admin::messages::{CreateCircuit, CreateCircuitBuilder, SplinterNode};
 use splinter::circuit::template::{CircuitCreateTemplate, DEFAULT_TEMPLATE_DIR};
 use splinter::protocol;
 use splinter::protos::admin::{
@@ -174,44 +172,23 @@ pub async fn propose_gameroom(
         }
     };
 
-    let builders = match template.into_builders() {
-        Ok(builders) => builders,
+    let mut create_circuit_builder = CreateCircuitBuilder::new();
+
+    create_circuit_builder = match template.apply_to_builder(create_circuit_builder) {
+        Ok(builder) => builder,
         Err(err) => {
             error!(
-                "Failed to generate builders from gameroom template: {}",
+                "Unable to apply circuit template to CreateCircuitBuilder: {}",
                 err
             );
             return HttpResponse::InternalServerError().json(ErrorResponse::internal_error());
         }
     };
 
-    let (create_circuit_builder, service_builders): (
-        CreateCircuitBuilder,
-        Vec<SplinterServiceBuilder>,
-    ) = (
-        builders.create_circuit_builder(),
-        builders.service_builders(),
-    );
-
-    let mut services = vec![];
-    for builder in service_builders {
-        match builder.build() {
-            Ok(service) => services.push(service),
-            Err(err) => {
-                debug!("Failed to build SplinterService: {}", err);
-                return HttpResponse::InternalServerError().json(ErrorResponse::internal_error());
-            }
-        }
-    }
-
-    let create_request = match create_circuit_builder
-        .with_roster(&services)
-        .with_members(&members)
-        .build()
-    {
+    let create_request = match create_circuit_builder.with_members(&members).build() {
         Ok(create_request) => create_request,
         Err(err) => {
-            debug!("Failed to build CreateCircuit: {}", err);
+            error!("Failed to build CreateCircuit: {}", err);
             return HttpResponse::InternalServerError().json(ErrorResponse::internal_error());
         }
     };

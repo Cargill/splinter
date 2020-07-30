@@ -37,7 +37,7 @@ use super::{
 };
 
 use api::{CircuitServiceSlice, CircuitSlice};
-use builder::CreateCircuitMessageBuilder;
+pub(crate) use builder::CreateCircuitMessageBuilder;
 use payload::make_signed_payload;
 
 pub struct CircuitProposeAction;
@@ -74,9 +74,8 @@ impl Action for CircuitProposeAction {
                 };
                 template.add_arguments(&user_args);
                 template.set_nodes(&builder.get_node_ids());
-                let template_builders = template.into_builders()?;
-                builder.add_services(&template_builders.service_builders());
-                builder.set_create_circuit_builder(&template_builders.create_circuit_builder());
+
+                template.apply_to_builder(&mut builder)?;
             }
         }
 
