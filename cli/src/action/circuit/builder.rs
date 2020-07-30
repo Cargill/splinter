@@ -50,7 +50,6 @@ impl CreateCircuitMessageBuilder {
         }
     }
 
-    #[cfg(feature = "circuit-template")]
     pub fn create_circuit_builder(&self) -> CreateCircuitBuilder {
         self.create_circuit_builder.clone()
     }
@@ -233,18 +232,21 @@ impl CreateCircuitMessageBuilder {
         self.comments = Some(comments.into());
     }
 
-    pub fn build(self) -> Result<CreateCircuit, CliError> {
+    pub fn build(mut self) -> Result<CreateCircuit, CliError> {
+        let circuit_builder = self.create_circuit_builder();
+
         // if management type is not set, check for environment variable
         let management_type = self
             .management_type
             .or_else(|| std::env::var(MANAGEMENT_TYPE_ENV).ok())
+            .or_else(|| circuit_builder.circuit_management_type())
             .ok_or_else(|| {
                 CliError::ActionError(
                     "Failed to build circuit: Management type not provided".into(),
                 )
             })?;
 
-        let services = self
+        let mut services = self
             .services
             .into_iter()
             .map(|mut builder| {
@@ -272,13 +274,26 @@ impl CreateCircuitMessageBuilder {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        if let Some(builder_roster) = circuit_builder.roster() {
+            services.extend(builder_roster);
+        }
+
+        if let Some(builder_metadata) = circuit_builder.application_metadata() {
+            self.application_metadata.extend(builder_metadata);
+        }
+
+        let mut comments = self.comments.unwrap_or_default();
+        if let Some(builder_comments) = circuit_builder.comments() {
+            comments.push_str(&format!("; {}", builder_comments));
+        }
+
         let create_circuit_builder = self
             .create_circuit_builder
             .with_members(&self.nodes)
             .with_roster(&services)
             .with_circuit_management_type(&management_type)
             .with_application_metadata(&self.application_metadata)
-            .with_comments(&self.comments.unwrap_or_default());
+            .with_comments(&comments);
 
         #[cfg(feature = "circuit-auth-type")]
         let create_circuit_builder = match self.authorization_type {
