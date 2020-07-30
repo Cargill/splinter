@@ -75,6 +75,20 @@ impl fmt::Display for RegistryError {
     }
 }
 
+#[cfg(feature = "registry-database")]
+impl From<diesel::r2d2::PoolError> for RegistryError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        Self::general_error_with_source("Failed to establish database connection", Box::new(err))
+    }
+}
+
+#[cfg(feature = "registry-database")]
+impl From<diesel::result::Error> for RegistryError {
+    fn from(err: diesel::result::Error) -> Self {
+        Self::general_error_with_source("A diesel error occurred", Box::new(err))
+    }
+}
+
 impl From<InvalidNodeError> for RegistryError {
     fn from(err: InvalidNodeError) -> Self {
         RegistryError::InvalidNode(err)
