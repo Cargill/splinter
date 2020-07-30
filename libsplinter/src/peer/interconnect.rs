@@ -98,7 +98,6 @@ impl PeerInterconnect {
     }
 
     /// Returns a `ShutdownHandle` that can be used to shutdown `PeerInterconnect`
-    #[deprecated(since = "0.4.1", note = "Please use shutdown_signaler() instead.")]
     pub fn shutdown_handle(&self) -> ShutdownHandle {
         ShutdownHandle::from(self.shutdown_signaler.clone())
     }
@@ -129,10 +128,6 @@ impl PeerInterconnect {
         debug!("Shutting down peer interconnect sender (complete)");
     }
 
-    #[deprecated(
-        since = "0.4.1",
-        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
-    )]
     /// Calls shutdown on the shutdown handle and then waits for the `PeerInterconnect` threads to
     /// finish
     pub fn shutdown_and_wait(self) {

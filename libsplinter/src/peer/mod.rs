@@ -146,7 +146,6 @@ impl PeerManager {
     /// * `identity` - The unique ID of the node this `PeerManager` belongs to
     /// * `strict_ref_counts` - Determines whether or not to panic when attempting to remove a
     ///   reference to peer that is not referenced.
-    #[deprecated(since = "0.4.1", note = "Please use PeerManagerBuilder instead")]
     pub fn new(
         connector: Connector,
         max_retry_attempts: Option<u64>,
@@ -184,11 +183,6 @@ impl PeerManager {
     /// handles notifications from the `ConnectionManager`.
     ///
     /// Returns a `PeerManagerConnector` that can be used to send requests to the `PeerManager`.
-    #[deprecated(
-        since = "0.4.1",
-        note = "Please use connector() instead. The PeerManagerBuilder starts up the PeerManager \
-         now"
-    )]
     pub fn start(&mut self) -> Result<PeerManagerConnector, PeerManagerError> {
         Ok(PeerManagerConnector::new(self.sender.clone()))
     }
@@ -197,7 +191,6 @@ impl PeerManager {
         PeerManagerConnector::new(self.sender.clone())
     }
 
-    #[deprecated(since = "0.4.1", note = "Please use shutdown_signaler() instead.")]
     /// Returns a `ShutdownHandle` for this `PeerManager`
     pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
         Some(ShutdownHandle::from(self.shutdown_signaler.clone()))
@@ -217,10 +210,6 @@ impl PeerManager {
         debug!("Shutting down peer manager (complete)");
     }
 
-    #[deprecated(
-        since = "0.4.1",
-        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
-    )]
     /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
     pub fn shutdown_and_wait(self) {
         self.shutdown_signaler.shutdown();
@@ -2420,11 +2409,9 @@ pub mod tests {
 
         let connector = cm.connector();
 
-        #[allow(deprecated)]
         let mut peer_manager =
             PeerManager::new(connector, Some(1), Some(1), "my_id".to_string(), true);
 
-        #[allow(deprecated)]
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_signaler().shutdown();

@@ -200,7 +200,6 @@ impl PeerManagerConnector {
     ///
     /// Returns a `PeerNotificationIter` that can be used to receive notifications about connected
     /// and disconnected peers
-    #[deprecated(since = "0.4.1", note = "please use `subscribe_sender` instead")]
     pub fn subscribe(&self) -> Result<PeerNotificationIter, PeerManagerError> {
         let (send, recv) = channel();
         match self.sender.send(PeerManagerMessage::Subscribe(send)) {
