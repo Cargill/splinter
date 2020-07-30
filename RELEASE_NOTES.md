@@ -1,5 +1,58 @@
 # Release Notes
 
+## Changes in Splinter 0.4.1
+
+### Highlights
+
+* Fixed a Splinter daemon connection bug in `tcp://` and `tcps://` transports
+  which crashed the listener thread if remote disconnects occurred during
+  protocol negotiation.
+
+* The `scabbard` CLI man pages are now available. Please see the
+  [Splinter Website](https://www.splinter.dev/docs/0.4/references/cli/cli_command_reference.html#scabbard-cli)
+  for more information.
+
+### libsplinter
+
+* Implement `Vec::from` for `ConnectionMatrixEnvelope`. Using `Vec::from` is
+  cleaner than using the `ConnectionMatrixEnvelope::take_payload`.
+
+* Remove the remaining deprecated `Network` structs. Several tests still relied
+  on the old `Network` implementation. The tests were updated to use `Mesh` or
+  the `peer` module so the deprecated structs could be removed.
+
+*  Add `PeerManagerBuilder` to make creating a `PeerManger` easier and reduce
+  errors by starting the background thread on build. The builder matches the
+  pattern of the `ConnectionManagerBuilder`.
+
+* Add `subscribe_sender`  to  `PeerManagerConnecter` which takes a `Sender<T> `
+  which can be used to get a `PeerManagerNotification` and adds the ability to
+  convert the notification to another type. This change updates the
+  `PeerManager` to match the `ConnectionManager`. Also adds `unsubscribe` to
+  the connector which allows a subscriber to no longer receive notifications.
+
+* Add `ShutdownSignaler` for `PeerManger` and `PeerInterconnect` to match the
+  `ConnectionManager`. The `ShutdownSignaler` is a more accurate name for the
+  `ShutdownHandler`.
+
+* Improve log messages around peer creation.
+
+* Adds missing Rust API documentation to the peer module.
+
+* Update frame negotiation to result in a handshake failure if the connection is
+  terminated mid-negotiation when using TCP or TLS.
+
+### Splinter daemon
+
+* Update the daemon to use the `PeerMangerBuilder` and `ShutdownSignalers`.
+
+* Update accept thread to log errors and continue instead of exiting on an
+  `AcceptError`.
+
+### scabbard CLI
+
+*  Add man pages for all stable `scabbard` CLI commands
+
 ## Changes in Splinter 0.4.0
 
 ### Highlights
