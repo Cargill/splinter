@@ -27,6 +27,7 @@ pub enum FrameError {
     InvalidChecksum,
     InvalidHeaderLength(usize),
     UnsupportedVersion,
+    HandshakeFailure(String),
 }
 
 impl std::fmt::Display for FrameError {
@@ -40,6 +41,7 @@ impl std::fmt::Display for FrameError {
                 HEADER_LENGTH, n
             ),
             FrameError::UnsupportedVersion => f.write_str("Unsupported frame version"),
+            FrameError::HandshakeFailure(msg) => f.write_str(&msg),
         }
     }
 }
@@ -51,6 +53,7 @@ impl std::error::Error for FrameError {
             FrameError::InvalidChecksum => None,
             FrameError::InvalidHeaderLength(_) => None,
             FrameError::UnsupportedVersion => None,
+            FrameError::HandshakeFailure(_) => None,
         }
     }
 }
