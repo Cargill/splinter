@@ -348,16 +348,17 @@ impl SplinterDaemon {
                             }
                         };
                         debug!("Received connection from {}", connection.remote_endpoint());
-                        connection_connector_clone
-                            .add_inbound_connection(connection)
-                            .map_err(|err| {
-                                StartError::NetworkError(format!(
-                                    "Unable to add inbound connection: {}",
-                                    err
-                                ))
-                            })?;
+                        if let Err(err) =
+                            connection_connector_clone.add_inbound_connection(connection)
+                        {
+                            error!(
+                                "Unable to add inbound connection to connection manager: {}",
+                                err
+                            );
+                            error!("Exiting listener thread for {}", endpoint);
+                            break;
+                        }
                     }
-                    Ok(())
                 })
             })
             .collect::<Vec<_>>();
