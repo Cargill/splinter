@@ -340,10 +340,14 @@ impl FrameNegotiation {
     pub fn negotiate<S: Read + Write>(self, stream: &mut S) -> Result<FrameVersion, FrameError> {
         match self {
             FrameNegotiation::Outbound { min, max } => {
-                stream.write_u16::<BigEndian>(min as u16)?;
-                stream.write_u16::<BigEndian>(max as u16)?;
+                stream
+                    .write_u16::<BigEndian>(min as u16)
+                    .map_err(Self::map_io_err)?;
+                stream
+                    .write_u16::<BigEndian>(max as u16)
+                    .map_err(Self::map_io_err)?;
 
-                let frame_version = stream.read_u16::<BigEndian>()?;
+                let frame_version = stream.read_u16::<BigEndian>().map_err(Self::map_io_err)?;
 
                 match frame_version {
                     0 => Err(FrameError::UnsupportedVersion),
@@ -352,16 +356,30 @@ impl FrameNegotiation {
                 }
             }
             FrameNegotiation::Inbound { version } => {
-                let min = stream.read_u16::<BigEndian>()?;
-                let max = stream.read_u16::<BigEndian>()?;
+                let min = stream.read_u16::<BigEndian>().map_err(Self::map_io_err)?;
+                let max = stream.read_u16::<BigEndian>().map_err(Self::map_io_err)?;
                 if min > version as u16 || max < version as u16 {
-                    stream.write_u16::<BigEndian>(0)?;
+                    stream.write_u16::<BigEndian>(0).map_err(Self::map_io_err)?;
                     Err(FrameError::UnsupportedVersion)
                 } else {
-                    stream.write_u16::<BigEndian>(version as u16)?;
+                    stream
+                        .write_u16::<BigEndian>(version as u16)
+                        .map_err(Self::map_io_err)?;
                     Ok(version)
                 }
             }
+        }
+    }
+
+    fn map_io_err(err: io::Error) -> FrameError {
+        use io::ErrorKind::*;
+        match err.kind() {
+            UnexpectedEof | ConnectionReset | ConnectionAborted | BrokenPipe => {
+                FrameError::HandshakeFailure(
+                    "unable to complete handshake due to closed connection".into(),
+                )
+            }
+            _ => FrameError::IoError(err),
         }
     }
 }
@@ -545,6 +563,37 @@ mod tests {
 
         match res {
             Err(FrameError::UnsupportedVersion) => (),
+            res => {
+                panic!("Unexpected result: {:?}", res);
+            }
+        }
+    }
+
+    /// Test that inbound frame version negotiation returns a error on UnexpectedEof
+    /// 1. Create a stream pair
+    /// 2. Send one end to a thread to act as the outbound end - this stream will be dropped
+    ///    before sending any information.
+    /// 3. Create an inbound negotiation and execute it on the stream.
+    /// 4. Verify that negotiation returns an Handshake error.
+    #[test]
+    fn frame_negotation_eof() {
+        let (mut tx, rx) = stream::byte_stream_pair();
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let join_handle = thread::spawn(move || {
+            drop(rx);
+
+            done_rx.recv().unwrap();
+        });
+
+        let res = FrameNegotiation::inbound(FrameVersion::V1).negotiate(&mut tx);
+
+        done_tx.send(1u8).expect("Unable to send stop signal");
+
+        join_handle.join().expect("Unable to join thread");
+
+        match res {
+            Err(FrameError::HandshakeFailure(_)) => (),
             res => {
                 panic!("Unexpected result: {:?}", res);
             }
