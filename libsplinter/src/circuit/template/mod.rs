@@ -14,7 +14,11 @@
 
 //! Data structures that manage and use templates to create circuit templates.
 //!
-//! The public interface includes the structs [`CircuitTemplateManager`], [`CircuitCreateTemplate`].
+//! The public interface includes the structs [`CircuitTemplateManager`], and
+//! [`CircuitCreateTemplate`].
+//!
+//! [`CircuitTemplateManager`]: struct.CircuitTemplateManager.html
+//! [`CircuitCreateTemplate`]: struct.CircuitCreateTemplate.html
 
 mod error;
 mod rules;
