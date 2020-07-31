@@ -15,9 +15,6 @@
 //! Data structures to hold necessary information for setting the values in the builders generated
 //! from a circuit template. Also provides the general functionality to apply the circuit template
 //! `rules`.
-//!
-//! The public interface includes the structs [`CircuitManagement`], [`CreateServices`],
-//! [`SetMetadata`].
 
 mod create_services;
 mod set_management_type;
