@@ -1,17 +1,17 @@
 version: v1
 args:
-    - name: $(ADMIN_KEYS)
+    - name: ADMIN_KEYS
       required: false
       default: $(SIGNER_PUB_KEY)
       description: >-
         Public keys used to verify transactions in the scabbard service
-    - name: $(NODES)
+    - name: NODES
       required: true
       description: "List of node IDs"
-    - name: $(SIGNER_PUB_KEY)
+    - name: SIGNER_PUB_KEY
       required: false
       description: "Public key of the signer"
-    - name: $(GAMEROOM_NAME)
+    - name: GAMEROOM_NAME
       required: true
       description: "Name of the gameroom"
 rules:

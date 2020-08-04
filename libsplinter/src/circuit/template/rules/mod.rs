@@ -133,7 +133,7 @@ impl TryFrom<v1::RuleArgument> for RuleArgument {
     type Error = CircuitTemplateError;
     fn try_from(arguments: v1::RuleArgument) -> Result<Self, Self::Error> {
         Ok(RuleArgument {
-            name: strip_arg_marker(arguments.name())?,
+            name: arguments.name().to_lowercase(),
             required: arguments.required(),
             default_value: arguments.default_value().map(String::from),
             description: arguments.description().map(String::from),
@@ -142,26 +142,17 @@ impl TryFrom<v1::RuleArgument> for RuleArgument {
     }
 }
 
-fn is_arg(key: &str) -> bool {
+fn is_arg_value(key: &str) -> bool {
     key.starts_with("$(")
 }
 
-fn strip_arg_marker(key: &str) -> Result<String, CircuitTemplateError> {
+fn strip_arg_marker(key: &str) -> String {
     if key.starts_with("$(") && key.ends_with(')') {
         let mut key = key.to_string();
         key.pop();
-        Ok(key
-            .get(2..)
-            .ok_or_else(|| {
-                CircuitTemplateError::new(&format!("\"{}\" is not a valid argument name", key))
-            })?
-            .to_string()
-            .to_lowercase())
+        key.trim_start_matches("$(").to_string().to_lowercase()
     } else {
-        Err(CircuitTemplateError::new(&format!(
-            "\"{}\" is not a valid argument name",
-            key
-        )))
+        key.to_string().to_lowercase()
     }
 }
 
@@ -184,7 +175,7 @@ fn get_argument_value(
     key: &str,
     template_arguments: &[RuleArgument],
 ) -> Result<String, CircuitTemplateError> {
-    let key = strip_arg_marker(key)?;
+    let key = strip_arg_marker(key);
     let value = match template_arguments.iter().find(|arg| arg.name == key) {
         Some(arg) => match arg.user_value() {
             Some(val) => val.to_string(),
@@ -201,7 +192,7 @@ fn get_argument_value(
                             key
                         ))
                     })?;
-                    if is_arg(&default_value) {
+                    if is_arg_value(&default_value) {
                         get_argument_value(&default_value, template_arguments)?
                     } else {
                         default_value

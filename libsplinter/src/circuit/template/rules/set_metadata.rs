@@ -15,7 +15,7 @@
 //! Provides functionality to set the `metadata` field of a `CreateCircuitBuilder`.
 
 use super::super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
-use super::{get_argument_value, is_arg, RuleArgument, Value};
+use super::{get_argument_value, is_arg_value, RuleArgument, Value};
 
 /// Data structure wrapping the `Metadata` object to be used to fill in the `metadata` field of the
 /// `CreateCircuitBuilder`.
@@ -35,7 +35,7 @@ impl SetMetadata {
                     .iter()
                     .map(|metadata| match &metadata.value {
                         Value::Single(value) => {
-                            let value = if is_arg(&value) {
+                            let value = if is_arg_value(&value) {
                                 get_argument_value(&value, &template_arguments)?
                             } else {
                                 value.to_string()
@@ -46,7 +46,7 @@ impl SetMetadata {
                             let processed_values = values
                                 .iter()
                                 .map(|value| {
-                                    let value = if is_arg(&value) {
+                                    let value = if is_arg_value(&value) {
                                         get_argument_value(&value, &template_arguments)?
                                     } else {
                                         value.to_string()

@@ -18,7 +18,7 @@ use crate::admin::messages::is_valid_service_id;
 use crate::base62::next_base62_string;
 
 use super::super::{yaml_parser::v1, CircuitTemplateError, SplinterServiceBuilder};
-use super::{get_argument_value, is_arg, RuleArgument, Value};
+use super::{get_argument_value, is_arg_value, RuleArgument, Value};
 
 const ALL_OTHER_SERVICES: &str = "$(ALL_OTHER_SERVICES)";
 const NODES_ARG: &str = "$(NODES)";
@@ -77,7 +77,7 @@ impl CreateServices {
                     if arg.key == PEER_SERVICES_ARG && value == ALL_OTHER_SERVICES {
                         service_builders = all_services(service_builders)?;
                     } else {
-                        let value = if is_arg(&value) {
+                        let value = if is_arg_value(&value) {
                             get_argument_value(&value, template_arguments)?
                         } else {
                             value.clone()
@@ -91,7 +91,7 @@ impl CreateServices {
                         .try_fold::<_, _, Result<_, CircuitTemplateError>>(
                             Vec::new(),
                             |mut acc, value| {
-                                let value = if is_arg(&value) {
+                                let value = if is_arg_value(&value) {
                                     get_argument_value(&value, template_arguments)?
                                 } else {
                                     value.to_string()

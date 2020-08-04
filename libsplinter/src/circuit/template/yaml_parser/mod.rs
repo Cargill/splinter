@@ -107,7 +107,7 @@ rules:
         service-type: 'scabbard'
         service-args:
         - key: 'admin-keys'
-          value: [$(admin-keys)]
+          value: [$(ADMIN-KEYS)]
         - key: 'peer-services'
           value: '$(ALL_OTHER_SERVICES)'
         first-service: 'a000'
@@ -115,9 +115,9 @@ rules:
         encoding: json
         metadata:
             - key: "scabbard_admin_keys"
-              value: [$(cs:ADMIN)]
+              value: [$(ADMIN-KEYS)]
             - key: "alias"
-              value: "$(sm:gameroom_name)" "##;
+              value: "$(GAMEROOM-NAME)" "##;
 
     /// Verifies load_template correctly loads a `CircuitTemplate` with version 1.
     ///
@@ -160,7 +160,7 @@ rules:
 
                     let service_args = create_services.service_args();
                     assert!(service_args.iter().any(|arg| arg.key() == "admin-keys"
-                        && arg.value() == &Value::List(vec!["$(admin-keys)".to_string()])));
+                        && arg.value() == &Value::List(vec!["$(ADMIN-KEYS)".to_string()])));
                     assert!(service_args.iter().any(|arg| arg.key() == "peer-services"
                         && arg.value() == &Value::Single("$(ALL_OTHER_SERVICES)".to_string())));
                 }
@@ -179,12 +179,13 @@ rules:
 
                 match metadata {
                     Metadata::Json { metadata } => {
-                        assert!(metadata.iter().any(|metadata| metadata.key()
-                            == "scabbard_admin_keys"
-                            && metadata.value() == &Value::List(vec!["$(cs:ADMIN)".to_string()])));
+                        assert!(metadata
+                            .iter()
+                            .any(|metadata| metadata.key() == "scabbard_admin_keys"
+                                && metadata.value()
+                                    == &Value::List(vec!["$(ADMIN-KEYS)".to_string()])));
                         assert!(metadata.iter().any(|metadata| metadata.key() == "alias"
-                            && metadata.value()
-                                == &Value::Single("$(sm:gameroom_name)".to_string())));
+                            && metadata.value() == &Value::Single("$(GAMEROOM-NAME)".to_string())));
                     }
                 }
             }
