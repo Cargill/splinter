@@ -246,14 +246,14 @@ mod test {
     /// Example circuit template YAML file.
     const EXAMPLE_TEMPLATE_YAML: &[u8] = br##"version: v1
 args:
-    - name: $(ADMIN_KEYS)
+    - name: ADMIN_KEYS
       required: false
       default: $(SIGNER_PUB_KEY)
-    - name: $(NODES)
+    - name: NODES
       required: true
-    - name: $(SIGNER_PUB_KEY)
+    - name: SIGNER_PUB_KEY
       required: false
-    - name: $(GAMEROOM_NAME)
+    - name: GAMEROOM_NAME
       required: true
 rules:
     set-management-type:

@@ -14,8 +14,8 @@
 
 //! Provides functionality to set the `metadata` field of a `CreateCircuitBuilder`.
 
-use super::super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
-use super::{get_argument_value, is_arg, RuleArgument, Value};
+use super::super::{yaml_parser::v1, CircuitTemplateError};
+use super::{get_argument_value, is_arg_value, RuleArgument, Value};
 
 /// Data structure wrapping the `Metadata` object to be used to fill in the `metadata` field of the
 /// `CreateCircuitBuilder`.
@@ -26,16 +26,15 @@ pub(super) struct SetMetadata {
 impl SetMetadata {
     pub fn apply_rule(
         &self,
-        builder: CreateCircuitBuilder,
         template_arguments: &[RuleArgument],
-    ) -> Result<CreateCircuitBuilder, CircuitTemplateError> {
+    ) -> Result<Vec<u8>, CircuitTemplateError> {
         match &self.metadata {
             Metadata::Json { metadata } => {
                 let metadata = metadata
                     .iter()
                     .map(|metadata| match &metadata.value {
                         Value::Single(value) => {
-                            let value = if is_arg(&value) {
+                            let value = if is_arg_value(&value) {
                                 get_argument_value(&value, &template_arguments)?
                             } else {
                                 value.to_string()
@@ -46,7 +45,7 @@ impl SetMetadata {
                             let processed_values = values
                                 .iter()
                                 .map(|value| {
-                                    let value = if is_arg(&value) {
+                                    let value = if is_arg_value(&value) {
                                         get_argument_value(&value, &template_arguments)?
                                     } else {
                                         value.to_string()
@@ -66,7 +65,7 @@ impl SetMetadata {
 
                 let json_metadata = format!("{{{}}}", metadata.join(","));
 
-                Ok(builder.with_application_metadata(&json_metadata.as_bytes()))
+                Ok(json_metadata.as_bytes().to_vec())
             }
         }
     }
