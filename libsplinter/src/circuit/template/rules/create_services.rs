@@ -21,7 +21,7 @@ use super::super::{yaml_parser::v1, CircuitTemplateError, SplinterServiceBuilder
 use super::{get_argument_value, is_arg_value, RuleArgument, Value};
 
 const ALL_OTHER_SERVICES: &str = "$(ALL_OTHER_SERVICES)";
-const NODES_ARG: &str = "$(NODES)";
+const NODES_ARG: &str = "NODES";
 const PEER_SERVICES_ARG: &str = "peer_services";
 
 /// Data structure used to create a `SplinterServiceBuilder`.

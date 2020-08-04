@@ -14,7 +14,7 @@
 
 //! Provides functionality to set a `CreateCircuitBuilder` `management_type`.
 
-use super::super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
+use super::super::{yaml_parser::v1, CircuitTemplateError};
 
 /// Data structure holding the circuit's intended `management_type`.
 pub(super) struct CircuitManagement {
@@ -23,11 +23,8 @@ pub(super) struct CircuitManagement {
 
 impl CircuitManagement {
     /// Adds the `management_type` to the provided `CreateCircuitBuilder`.
-    pub fn apply_rule(
-        &self,
-        builder: CreateCircuitBuilder,
-    ) -> Result<CreateCircuitBuilder, CircuitTemplateError> {
-        Ok(builder.with_circuit_management_type(&self.management_type))
+    pub fn apply_rule(&self) -> Result<String, CircuitTemplateError> {
+        Ok(self.management_type.to_string())
     }
 }
 

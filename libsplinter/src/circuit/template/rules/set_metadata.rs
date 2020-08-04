@@ -14,7 +14,7 @@
 
 //! Provides functionality to set the `metadata` field of a `CreateCircuitBuilder`.
 
-use super::super::{yaml_parser::v1, CircuitTemplateError, CreateCircuitBuilder};
+use super::super::{yaml_parser::v1, CircuitTemplateError};
 use super::{get_argument_value, is_arg_value, RuleArgument, Value};
 
 /// Data structure wrapping the `Metadata` object to be used to fill in the `metadata` field of the
@@ -26,9 +26,8 @@ pub(super) struct SetMetadata {
 impl SetMetadata {
     pub fn apply_rule(
         &self,
-        builder: CreateCircuitBuilder,
         template_arguments: &[RuleArgument],
-    ) -> Result<CreateCircuitBuilder, CircuitTemplateError> {
+    ) -> Result<Vec<u8>, CircuitTemplateError> {
         match &self.metadata {
             Metadata::Json { metadata } => {
                 let metadata = metadata
@@ -66,7 +65,7 @@ impl SetMetadata {
 
                 let json_metadata = format!("{{{}}}", metadata.join(","));
 
-                Ok(builder.with_application_metadata(&json_metadata.as_bytes()))
+                Ok(json_metadata.as_bytes().to_vec())
             }
         }
     }

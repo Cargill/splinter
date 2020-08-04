@@ -44,34 +44,34 @@ impl Rules {
         mut circuit_builder: CreateCircuitBuilder,
         template_arguments: &[RuleArgument],
     ) -> Result<CreateCircuitBuilder, CircuitTemplateError> {
-        let mut service_builders = vec![];
-
         if let Some(circuit_management) = &self.set_management_type {
-            circuit_builder = circuit_management.apply_rule(circuit_builder)?;
+            circuit_builder =
+                circuit_builder.with_circuit_management_type(&circuit_management.apply_rule()?);
         }
 
         if let Some(create_services) = &self.create_services {
-            service_builders.extend(create_services.apply_rule(template_arguments)?);
+            let service_builders = create_services.apply_rule(template_arguments)?;
+            let mut services = vec![];
+            for service_builder in service_builders {
+                match service_builder.build() {
+                    Ok(service) => services.push(service),
+                    Err(err) => {
+                        return Err(CircuitTemplateError::new_with_source(
+                            "Failed to build SplinterService: {}",
+                            Box::new(err),
+                        ));
+                    }
+                }
+            }
+            circuit_builder = circuit_builder.with_roster(&services);
         }
 
         if let Some(set_metadata) = &self.set_metadata {
-            circuit_builder = set_metadata.apply_rule(circuit_builder, template_arguments)?;
+            circuit_builder = circuit_builder
+                .with_application_metadata(&set_metadata.apply_rule(template_arguments)?);
         }
 
-        let mut services = vec![];
-        for service_builder in service_builders {
-            match service_builder.build() {
-                Ok(service) => services.push(service),
-                Err(err) => {
-                    return Err(CircuitTemplateError::new_with_source(
-                        "Failed to build SplinterService: {}",
-                        Box::new(err),
-                    ));
-                }
-            }
-        }
-
-        Ok(circuit_builder.with_roster(&services))
+        Ok(circuit_builder)
     }
 }
 
