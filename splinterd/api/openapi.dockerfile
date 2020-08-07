@@ -31,7 +31,7 @@ FROM httpd:2.4
 COPY --from=swagger_downloader /swagger-ui-3.6.0/dist/* /usr/local/apache2/htdocs/
 
 RUN sed -ibak \
-      's#http://petstore.swagger.io/v2/swagger.json#http://localhost:9000/api/openapi.yml#' \
+      's#http://petstore.swagger.io/v2/swagger.json#http://localhost:9000/api/openapi.yaml#' \
       /usr/local/apache2/htdocs/index.html
 
 RUN echo "\

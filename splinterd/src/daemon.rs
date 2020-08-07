@@ -426,7 +426,7 @@ impl SplinterDaemon {
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(&self.rest_api_endpoint)
             .add_resource(
-                Resource::build("/openapi.yml").add_method(Method::Get, routes::get_openapi),
+                Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
             )
             .add_resource(
                 Resource::build("/status").add_method(Method::Get, move |_, _| {
