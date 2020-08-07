@@ -95,4 +95,4 @@ SEE ALSO
 | `splinter-circuit-proposals(1)`
 | `splinter-circuit-show(1)`
 |
-| Splinter documentation: https://github.com/Cargill/splinter-docs/blob/master/docs/index.md
+| Splinter documentation: https://www.splinter.dev/docs/0.4/
