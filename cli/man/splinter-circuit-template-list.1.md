@@ -62,4 +62,4 @@ SEE ALSO
 | `splinter-circuit-template-arguments(1)`
 | `splinter-circuit-template-show(1)`
 |
-| Splinter documentation: https://github.com/Cargill/splinter-docs/blob/master/docs/index.md
+| Splinter documentation: https://www.splinter.dev/docs/0.5/
