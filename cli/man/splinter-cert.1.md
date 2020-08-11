@@ -54,6 +54,5 @@ SUBCOMMANDS
 SEE ALSO
 ========
 | `splinter-cert-generate(1)`
-| 
-| Splinter documentation: https://github.com/Cargill/splinter-docs/blob/master/docs/index.md
-
+|
+| Splinter documentation: https://www.splinter.dev/docs/0.4/
