@@ -44,6 +44,8 @@
 //! [`CircuitProposalBuilder`]: struct.CircuitProposalBuilder.html
 
 mod builders;
+#[cfg(feature = "diesel")]
+pub mod diesel;
 pub mod error;
 pub mod yaml;
 
