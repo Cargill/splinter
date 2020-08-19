@@ -15,5 +15,6 @@
 //! Database backend support for the AdminServiceStore, powered by
 //! [`Diesel`](https://crates.io/crates/diesel).
 
+pub mod migrations;
 mod models;
 mod schema;
