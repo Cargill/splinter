@@ -14,7 +14,50 @@
 
 //! Database backend support for the AdminServiceStore, powered by
 //! [`Diesel`](https://crates.io/crates/diesel).
+//!
+//! This module contains the [`DieselAdminServiceStore`], which provides an implementation of the
+//! [`AdminServiceStore`] trait.
+//!
+//! [`DieselAdminServiceStore`]: struct.DieselAdminServiceStore.html
+//! [`AdminServiceStore`]: ../trait.AdminServiceStore.html
 
 pub mod migrations;
 mod models;
+pub mod operations;
 mod schema;
+
+use diesel::r2d2::{ConnectionManager, Pool};
+
+/// A database-backed AdminServiceStore, powered by [`Diesel`](https://crates.io/crates/diesel).
+pub struct DieselAdminServiceStore<C: diesel::Connection + 'static> {
+    connection_pool: Pool<ConnectionManager<C>>,
+}
+
+impl<C: diesel::Connection> DieselAdminServiceStore<C> {
+    /// Creates a new `DieselAdminServiceStore`.
+    ///
+    /// # Arguments
+    ///
+    ///  * `connection_pool`: connection pool for the database
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
+        DieselAdminServiceStore { connection_pool }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl Clone for DieselAdminServiceStore<diesel::sqlite::SqliteConnection> {
+    fn clone(&self) -> Self {
+        Self {
+            connection_pool: self.connection_pool.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl Clone for DieselAdminServiceStore<diesel::pg::PgConnection> {
+    fn clone(&self) -> Self {
+        Self {
+            connection_pool: self.connection_pool.clone(),
+        }
+    }
+}
