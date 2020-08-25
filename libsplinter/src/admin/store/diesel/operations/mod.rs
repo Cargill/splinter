@@ -24,6 +24,8 @@ pub(super) mod list_circuits;
 pub(super) mod list_nodes;
 pub(super) mod list_proposals;
 pub(super) mod list_services;
+pub(super) mod remove_circuit;
+pub(super) mod remove_proposal;
 
 pub struct AdminServiceStoreOperations<'a, C> {
     #[allow(dead_code)]
