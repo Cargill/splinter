@@ -16,6 +16,10 @@
 
 pub(super) mod add_circuit;
 pub(super) mod add_proposal;
+pub(super) mod fetch_circuit;
+pub(super) mod fetch_node;
+pub(super) mod fetch_proposal;
+pub(super) mod fetch_service;
 pub(super) mod list_circuits;
 pub(super) mod list_nodes;
 pub(super) mod list_proposals;
