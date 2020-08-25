@@ -132,3 +132,23 @@ table! {
         endpoint -> Text,
     }
 }
+
+allow_tables_to_appear_in_same_query!(
+    proposed_circuit,
+    proposed_node,
+    proposed_node_endpoint,
+    proposed_service,
+    proposed_service_allowed_node,
+    proposed_service_argument,
+    vote_record,
+    circuit_proposal,
+);
+
+allow_tables_to_appear_in_same_query!(
+    service,
+    service_allowed_node,
+    service_argument,
+    circuit,
+    circuit_member,
+    node_endpoint
+);
