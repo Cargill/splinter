@@ -112,6 +112,16 @@ impl From<diesel::result::Error> for AdminServiceStoreError {
     }
 }
 
+#[cfg(feature = "diesel")]
+impl From<diesel::r2d2::PoolError> for AdminServiceStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        AdminServiceStoreError::StorageError {
+            context: String::from("Diesel error occurred"),
+            source: Some(Box::new(err)),
+        }
+    }
+}
+
 /// Represents errors raised while building
 #[derive(Debug)]
 pub enum BuilderError {

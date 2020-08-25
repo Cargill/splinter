@@ -31,7 +31,6 @@ pub(super) mod update_proposal;
 pub(super) mod upgrade;
 
 pub struct AdminServiceStoreOperations<'a, C> {
-    #[allow(dead_code)]
     conn: &'a C,
 }
 
