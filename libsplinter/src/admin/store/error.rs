@@ -95,6 +95,23 @@ impl fmt::Display for AdminServiceStoreError {
     }
 }
 
+impl From<diesel::result::Error> for AdminServiceStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        match err {
+            diesel::result::Error::QueryBuilderError(std_err) => {
+                AdminServiceStoreError::QueryError {
+                    context: String::from("Error occurred building diesel query"),
+                    source: std_err,
+                }
+            }
+            _ => AdminServiceStoreError::StorageError {
+                context: String::from("A diesel error occurred"),
+                source: Some(Box::new(err)),
+            },
+        }
+    }
+}
+
 /// Represents errors raised while building
 #[derive(Debug)]
 pub enum BuilderError {
