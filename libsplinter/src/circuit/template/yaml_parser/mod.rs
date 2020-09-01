@@ -22,7 +22,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use super::CircuitTemplateError;
+use super::{
+    find_template, CircuitTemplateError, DEFAULT_TEMPLATE_DIR, SPLINTER_CIRCUIT_TEMPLATE_PATH,
+};
 
 /// Version guard for the template, referring to the version of the circuit definition being used.
 #[derive(Deserialize, Debug)]
@@ -45,14 +47,26 @@ impl CircuitTemplate {
     ///
     /// * `file_path` - Path to the template YAML file.
     pub fn load_from_file(file_path: &str) -> Result<Self, CircuitTemplateError> {
-        let path = Path::new(file_path);
-        if !path.is_file() {
+        let mut paths = Vec::new();
+        if let Ok(template_paths) = std::env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
+            paths.extend(
+                template_paths
+                    .split(':')
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<String>>(),
+            );
+        }
+        paths.push(DEFAULT_TEMPLATE_DIR.to_string());
+        let template_path = find_template(file_path, &paths)?;
+        let custom_path = Path::new(&template_path);
+        if !custom_path.is_file() {
             return Err(CircuitTemplateError::new(&format!(
-                "File does not exist or is inaccessible: {}",
+                "File does not exist or is inaccessible: {:?}",
                 file_path
             )));
         }
-        let file = File::open(path).map_err(|err| {
+        debug!("Loading template file from {:?}", &custom_path);
+        let file = File::open(custom_path).map_err(|err| {
             CircuitTemplateError::new_with_source("Error opening template file", err.into())
         })?;
 

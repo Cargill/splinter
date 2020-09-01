@@ -25,10 +25,12 @@ mod rules;
 mod yaml_parser;
 
 use std::convert::TryFrom;
+use std::env;
 use std::path::Path;
 
 pub use error::CircuitTemplateError;
 
+use glob::glob;
 pub use rules::RuleArgument;
 use rules::Rules;
 
@@ -38,6 +40,8 @@ pub(self) use crate::admin::messages::{CreateCircuitBuilder, SplinterServiceBuil
 
 /// Default file location for circuit templates
 pub const DEFAULT_TEMPLATE_DIR: &str = "/usr/share/splinter/circuit-templates";
+/// Environment variable for file location for circuit templates
+pub const SPLINTER_CIRCUIT_TEMPLATE_PATH: &str = "SPLINTER_CIRCUIT_TEMPLATE_PATH";
 
 /// Manages circuit templates.
 ///
@@ -45,31 +49,32 @@ pub const DEFAULT_TEMPLATE_DIR: &str = "/usr/share/splinter/circuit-templates";
 /// list any availabe circuit templates found in the `path` of the `CircuitTemplateManager`.
 pub struct CircuitTemplateManager {
     /// Path of the directory containing the circuit template files.
-    path: String,
+    paths: Vec<String>,
 }
 
 impl Default for CircuitTemplateManager {
     /// Constructs a `CircuitTemplateManager` with the `DEFAULT_TEMPLATE_DIR`.
     fn default() -> Self {
         CircuitTemplateManager {
-            path: DEFAULT_TEMPLATE_DIR.to_string(),
+            paths: vec![DEFAULT_TEMPLATE_DIR.to_string()],
         }
     }
 }
 
 impl CircuitTemplateManager {
-    /// Constructs a `CircuitTemplateManager` with a custom `path` to the circuit templates.
-    pub fn new(path: &str) -> Result<CircuitTemplateManager, CircuitTemplateError> {
-        if !Path::new(&path).is_dir() {
-            Err(CircuitTemplateError::new(&format!(
-                "{} is not a valid directory",
-                path
-            )))
-        } else {
-            Ok(CircuitTemplateManager {
-                path: path.to_string(),
+    /// Constructs a `CircuitTemplateManager` with custom `paths` to the circuit templates.
+    pub fn new(paths: &[String]) -> CircuitTemplateManager {
+        let paths: Vec<String> = paths
+            .iter()
+            .filter_map(|path| {
+                if Path::new(&path).is_dir() {
+                    Some(path.to_string())
+                } else {
+                    None
+                }
             })
-        }
+            .collect();
+        CircuitTemplateManager { paths }
     }
 
     /// Loads the specified YAML circuit template file into a CircuitCreateTemplate.
@@ -78,7 +83,7 @@ impl CircuitTemplateManager {
     ///
     /// * `name` - file name indicating the circuit template to be loaded.
     pub fn load(&self, name: &str) -> Result<CircuitCreateTemplate, CircuitTemplateError> {
-        let path = format!("{}/{}.yaml", self.path, name);
+        let path = find_template(name, &self.paths)?;
         CircuitCreateTemplate::from_yaml_file(&path)
     }
 
@@ -88,8 +93,9 @@ impl CircuitTemplateManager {
     ///
     /// * `name` - file name indicating the circuit template to be loaded into a YAML string.
     pub fn load_raw_yaml(&self, name: &str) -> Result<String, CircuitTemplateError> {
-        let path = format!("{}/{}.yaml", self.path, name);
+        let path = find_template(name, &self.paths)?;
         let template = CircuitTemplate::load_from_file(&path)?;
+        debug!("Loading template file from {}", &path);
         match template {
             CircuitTemplate::V1(template) => serde_yaml::to_string(&template).map_err(|err| {
                 CircuitTemplateError::new_with_source(
@@ -100,33 +106,113 @@ impl CircuitTemplateManager {
         }
     }
 
-    /// Lists all available circuit templates found in the `path` of the `CircuitTemplateManager`.
+    /// Lists all available circuit templates found in the `paths` of the `CircuitTemplateManager`.
     pub fn list_available_templates(&self) -> Result<Vec<String>, CircuitTemplateError> {
-        let path = Path::new(&self.path);
-        let available_templates = path
-            .read_dir()
-            .map_err(|err| {
-                CircuitTemplateError::new_with_source(
-                    &format!("Failed to read circuit template files in {}", self.path),
-                    Box::new(err),
-                )
-            })?
+        let available_templates = self
+            .paths
+            .iter()
+            .map(|path| {
+                let template_path = Path::new(path).join("*.yaml");
+                let pattern_string = template_path.to_str().ok_or_else(|| {
+                    CircuitTemplateError::new(&String::from("Template path is not valid UTF-8"))
+                })?;
+                Ok(glob(pattern_string).map_err(|_| {
+                    CircuitTemplateError::new(&format!(
+                        "Cannot query path {:?} for pattern: {}",
+                        path,
+                        template_path.display()
+                    ))
+                })?)
+            })
+            .collect::<Result<Vec<_>, CircuitTemplateError>>()?
+            .into_iter()
+            .flatten()
+            // Filter out any files that can't be read
             .filter_map(|entry| match entry {
-                Ok(file) => match file.file_name().into_string() {
-                    Ok(name) => Some(name.trim_end_matches(".yaml").to_string()),
-                    Err(_) => {
-                        error!("Unable to read circuit template file name: {}", self.path);
-                        None
-                    }
-                },
-                Err(err) => {
-                    error!("Unable to read circuit template file: {}", err);
+                Ok(entry) => entry.file_stem()?.to_str().map(ToOwned::to_owned),
+                Err(_) => {
+                    error!("Unable to read file: {:?}", entry);
                     None
                 }
             })
             .collect::<Vec<String>>();
 
         Ok(available_templates)
+    }
+}
+
+/// Searches through a list of paths to find the specified template.
+pub(in crate::circuit::template) fn find_template(
+    name: &str,
+    paths: &[String],
+) -> Result<String, CircuitTemplateError> {
+    // Check if the name of the template passed in is an absolute or relative path, in which
+    // case the `name` will be used as the path to the template file. If `name` is used as the path,
+    // the function will not attempt to search through the possible directories to locate the
+    // template file.
+    let path_name = Path::new(name);
+    if path_name.is_absolute() || path_name.starts_with("./") || path_name.starts_with("../") {
+        return Ok(name.to_string());
+    }
+    // Format the template file name, to allow for the template file name to be passed in with and
+    // without the file extension. For example, both "template" and "template.yaml" passed in as
+    // `name` will locate the "template.yaml" template file.
+    let name = format!("{}.yaml", name.trim_end_matches(".yaml"));
+    // If the `paths` list is empty, populate this list with the `SPLINTER_CIRCUIT_TEMPLATE_PATH`
+    // value, if set, and the default circuit template directory.
+    let paths = if paths.is_empty() {
+        if let Ok(template_paths) = env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
+            paths.to_vec().extend(
+                template_paths
+                    .split(':')
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<String>>(),
+            );
+        }
+        paths.to_vec().push(DEFAULT_TEMPLATE_DIR.to_string());
+        paths
+    } else {
+        paths
+    };
+    // Check for the valid paths to the specified, using `name`, template file.
+    let valid_paths: Vec<String> = paths
+        .iter()
+        .filter_map(|path| {
+            let file_path = Path::new(path).join(&name);
+            if file_path.exists() {
+                file_path
+                    .to_str()
+                    .ok_or_else(|| {
+                        CircuitTemplateError::new(&format!(
+                            "Unable to find {} template file in paths: {:?}",
+                            name, paths
+                        ))
+                    })
+                    .ok()
+                    .map(ToOwned::to_owned)
+            } else {
+                None
+            }
+        })
+        .collect();
+    // If no valid paths to the specified template file are found, an error is returned.
+    if valid_paths.is_empty() {
+        Err(CircuitTemplateError::new(&format!(
+            "Unable to find {} template file in paths: {:?}",
+            name, paths
+        )))
+    } else {
+        // Takes the first template file path in the list, as this adheres to the precedence of the
+        // of list of paths.
+        Ok(valid_paths
+            .first()
+            .ok_or_else(|| {
+                CircuitTemplateError::new(&format!(
+                    "Unable to find {} template file in paths: {:?}",
+                    name, paths
+                ))
+            })?
+            .to_string())
     }
 }
 
@@ -362,6 +448,58 @@ rules:
         assert!(beta_service_args
             .iter()
             .any(|(key, value)| key == "peer_services" && value == "[\"a000\"]"));
+    }
+
+    /// Verifies a `CircuitTemplateManager` can be created using multiple paths, which will be
+    /// be accurately used to locate the circuit template example file.
+    ///
+    /// The test follows the procedure below:
+    /// 1. Sets up a temporary directory, to write a circuit template YAML file from the
+    ///    `EXAMPLE_TEMPLATE_YAML`.
+    /// 2. Create a `CircuitTemplateManager` using multiple temporary directories.
+    /// 3. Write and save two example template files to separate directories used to create the
+    ///    `CircuitTemplateManager` in the previous step.
+    /// 4. Load a circuit template by passing in just the file name and using the
+    ///    `CircuitTemplateManager`, meaning each directory must be searched to find the file.
+    /// 5. Assert the template file was successfully loaded.
+    /// 6. Load a second circuit template by passing in just the file name and using the
+    ///    `CircuitTemplateManager`, meaning each directory must be searched to find the file.
+    /// 7. Assert the second template file was successfully loaded.
+    ///
+    /// Asserting that each template file is successfully loaded from different directories used to
+    /// create the `CircuitTemplateManager` verifies that multiple directories can be parsed to
+    /// find the correct template file.
+    #[test]
+    fn test_multiple_template_paths() {
+        let temp_dir1 = TempDir::new("test1").unwrap();
+        let temp_dir1 = temp_dir1.path().to_path_buf();
+        let temp_dir2 = TempDir::new("test2").unwrap();
+        let temp_dir2 = temp_dir2.path().to_path_buf();
+
+        let manager = CircuitTemplateManager::new(&[
+            temp_dir1
+                .to_str()
+                .expect("Unable to create str from temp_dir1 path")
+                .to_string(),
+            temp_dir2
+                .to_str()
+                .expect("Unable to create str from temp_dir2 path")
+                .to_string(),
+        ]);
+
+        let file_path1 = get_file_path(temp_dir1);
+        write_yaml_file(&file_path1, EXAMPLE_TEMPLATE_YAML);
+
+        let template = manager.load("example_template.yaml");
+        assert!(template.is_ok());
+
+        let mut file_path2 = temp_dir2;
+        file_path2.push("example_template2.yaml");
+        let file_path2 = file_path2.to_str().unwrap().to_string();
+        write_yaml_file(&file_path2, EXAMPLE_TEMPLATE_YAML);
+
+        let template = manager.load("example_template2.yaml");
+        assert!(template.is_ok());
     }
 
     fn get_file_path(mut temp_dir: PathBuf) -> String {

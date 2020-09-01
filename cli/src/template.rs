@@ -18,6 +18,7 @@ use std::collections::HashMap;
 
 use splinter::circuit::template::{
     CircuitCreateTemplate, CircuitTemplateError, CircuitTemplateManager, RuleArgument,
+    DEFAULT_TEMPLATE_DIR, SPLINTER_CIRCUIT_TEMPLATE_PATH,
 };
 
 use crate::action::circuit::CreateCircuitMessageBuilder;
@@ -34,7 +35,17 @@ pub struct CircuitTemplate {
 impl CircuitTemplate {
     /// Lists all available circuit templates found in the default template directory.
     pub fn list_available_templates() -> Result<Vec<String>, CliError> {
-        let manager = CircuitTemplateManager::default();
+        let mut paths = Vec::new();
+        if let Ok(env_paths) = std::env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
+            paths.extend(
+                env_paths
+                    .split(':')
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<String>>(),
+            );
+        }
+        paths.push(DEFAULT_TEMPLATE_DIR.to_string());
+        let manager = CircuitTemplateManager::new(&paths);
         let templates = manager.list_available_templates()?;
         Ok(templates)
     }
@@ -45,7 +56,17 @@ impl CircuitTemplate {
     ///
     /// * `name` - File name of the circuit template YAML file.
     pub fn load_raw(name: &str) -> Result<String, CliError> {
-        let manager = CircuitTemplateManager::default();
+        let mut paths = Vec::new();
+        if let Ok(env_paths) = std::env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
+            paths.extend(
+                env_paths
+                    .split(':')
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<String>>(),
+            );
+        }
+        paths.push(DEFAULT_TEMPLATE_DIR.to_string());
+        let manager = CircuitTemplateManager::new(&paths);
         let template_yaml = manager.load_raw_yaml(name)?;
         Ok(template_yaml)
     }
@@ -57,7 +78,17 @@ impl CircuitTemplate {
     ///
     /// * `name` - File name of the circuit template YAML file.
     pub fn load(name: &str) -> Result<Self, CliError> {
-        let manager = CircuitTemplateManager::default();
+        let mut paths = Vec::new();
+        if let Ok(env_paths) = std::env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
+            paths.extend(
+                env_paths
+                    .split(':')
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<String>>(),
+            );
+        }
+        paths.push(DEFAULT_TEMPLATE_DIR.to_string());
+        let manager = CircuitTemplateManager::new(&paths);
         let possible_values = manager.list_available_templates()?;
         if !possible_values.iter().any(|val| val == name) {
             return Err(CliError::ActionError(format!(
