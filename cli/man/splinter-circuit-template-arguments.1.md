@@ -22,8 +22,12 @@ Circuit templates help simplify the process of creating new circuits with the
 building a circuit from the template. This command lists the arguments that are
 defined in the specified circuit template.
 
-All available templates are located in the circuit templates directory,
-`/usr/share/splinter/circuit-templates`.
+All available templates are located in the default circuit templates directory,
+`/usr/share/splinter/circuit-templates`, unless `SPLINTER_CIRCUIT_TEMPLATE_PATH`
+is set. Note, if multiple template storage directories are specified in the
+`SPLINTER_CIRCUIT_TEMPLATE_PATH`, they are searched from first to last for
+template files. The first file matching the specified `TEMPLATE-NAME` will
+be displayed.
 
 FLAGS
 =====
@@ -45,8 +49,18 @@ ARGUMENTS
 =========
 `TEMPLATE-NAME`
 : Name of the circuit template containing the arguments of interest. The
-  template file must exist in the circuit template directory,
-    `/usr/share/splinter/circuit-templates`.
+  template file must exist in the specified circuit template directory.
+  The circuit template directory is by default
+  `/usr/share/splinter/circuit-templates`, unless
+  `SPLINTER_CIRCUIT_TEMPLATE_PATH` is set.
+
+ENVIRONMENT VARIABLES
+=====================
+**SPLINTER_CIRCUIT_TEMPLATE_PATH**
+: Paths containing circuit template files. Multiple values may be provided,
+  separated by `:`, using the format `DIR1:DIR2:DIR3`. If multiple directories
+  are specified, the directories are searched from first to last for template
+  files.
 
 EXAMPLES
 ========

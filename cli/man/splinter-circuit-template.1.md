@@ -29,7 +29,11 @@ with the Splinter CLI). This template can be used as a model for other circuit
 templates.
 
 All available templates are located in the default circuit templates directory,
-`/usr/share/splinter/circuit-templates`.
+`/usr/share/splinter/circuit-templates`, unless `SPLINTER_CIRCUIT_TEMPLATE_PATH`
+is set. Note, if multiple template storage directories are specified in the
+`SPLINTER_CIRCUIT_TEMPLATE_PATH`, they are searched from first to last for
+template files. The first file matching the specified `TEMPLATE-NAME` will
+be displayed.
 
 FLAGS
 =====
@@ -57,6 +61,14 @@ SUBCOMMANDS
 
 `show`
 : Display a specific available template.
+
+ENVIRONMENT VARIABLES
+=====================
+**SPLINTER_CIRCUIT_TEMPLATE_PATH**
+: Paths containing circuit template files. Multiple values may be provided,
+  separated by `:`, using the format `DIR1:DIR2:DIR3`. If multiple directories
+  are specified, the directories are searched from first to last for template
+  files.
 
 SEE ALSO
 ========
