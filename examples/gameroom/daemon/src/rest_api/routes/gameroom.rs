@@ -22,7 +22,7 @@ use gameroom_database::{
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::{CreateCircuit, CreateCircuitBuilder, SplinterNode};
-use splinter::circuit::template::{CircuitCreateTemplate, DEFAULT_TEMPLATE_DIR};
+use splinter::circuit::template::CircuitCreateTemplate;
 use splinter::protocol;
 use splinter::protos::admin::{
     CircuitManagementPayload, CircuitManagementPayload_Action as Action,
@@ -96,10 +96,7 @@ pub async fn propose_gameroom(
     splinterd_url: web::Data<String>,
     gameroomd_data: web::Data<GameroomdData>,
 ) -> HttpResponse {
-    let mut template = match CircuitCreateTemplate::from_yaml_file(&format!(
-        "{}/gameroom.yaml",
-        &DEFAULT_TEMPLATE_DIR
-    )) {
+    let mut template = match CircuitCreateTemplate::from_yaml_file("gameroom.yaml") {
         Ok(template) => template,
         Err(err) => {
             error!("Failed to load Gameroom template: {}", err);
