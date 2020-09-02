@@ -42,45 +42,45 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
         // Verify that the node's required fields are non-empty
         check_node_required_fields_are_not_empty(&node)?;
 
-        // Verify that the node's endpoints are unique. This requires a raw SQL query because of
-        // the complicated `WHERE` statement.
-        let filters = node
-            .endpoints
-            .iter()
-            .map(|endpoint| format!("endpoint = {}", endpoint))
-            .collect::<Vec<_>>()
-            .join(" OR ");
-        let duplicate_endpoint = sql_query(format!(
-            "SELECT * FROM splinter_nodes_endpoints WHERE identity <> {} AND ({})",
-            node.identity, filters
-        ))
-        .get_result::<NodeEndpointsModel>(self.conn)
-        .optional()
-        .map_err(|err| {
-            RegistryError::general_error_with_source(
-                "Failed to check for duplicate endpoints",
-                Box::new(err),
-            )
-        })?;
-        if let Some(endpoint) = duplicate_endpoint {
-            return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
-                endpoint.endpoint,
-            )));
-        }
-
-        // Check if the node already exists to determine if this is a new node or an updated one
-        let existing_node = splinter_nodes::table
-            .find(&node.identity)
-            .first::<NodesModel>(self.conn)
+        self.conn.transaction::<(), _, _>(|| {
+            // Verify that the node's endpoints are unique. This requires a raw SQL query because of
+            // the complicated `WHERE` statement.
+            let filters = node
+                .endpoints
+                .iter()
+                .map(|endpoint| format!("endpoint = {}", endpoint))
+                .collect::<Vec<_>>()
+                .join(" OR ");
+            let duplicate_endpoint = sql_query(format!(
+                "SELECT * FROM splinter_nodes_endpoints WHERE identity <> {} AND ({})",
+                node.identity, filters
+            ))
+            .get_result::<NodeEndpointsModel>(self.conn)
             .optional()
             .map_err(|err| {
                 RegistryError::general_error_with_source(
-                    "Failed to check if node already exists",
+                    "Failed to check for duplicate endpoints",
                     Box::new(err),
                 )
             })?;
+            if let Some(endpoint) = duplicate_endpoint {
+                return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
+                    endpoint.endpoint,
+                )));
+            }
 
-        self.conn.transaction::<(), _, _>(|| {
+            // Check if the node already exists to determine if this is a new node or an updated one
+            let existing_node = splinter_nodes::table
+                .find(&node.identity)
+                .first::<NodesModel>(self.conn)
+                .optional()
+                .map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to check if node already exists",
+                        Box::new(err),
+                    )
+                })?;
+
             if existing_node.is_none() {
                 // Add new node
                 insert_into(splinter_nodes::table)
@@ -182,45 +182,45 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::sqlite::
         // Verify that the node's required fields are non-empty
         check_node_required_fields_are_not_empty(&node)?;
 
-        // Verify that the node's endpoints are unique. This requires a raw SQL query because of
-        // the complicated `WHERE` statement.
-        let filters = node
-            .endpoints
-            .iter()
-            .map(|endpoint| format!("endpoint = {}", endpoint))
-            .collect::<Vec<_>>()
-            .join(" OR ");
-        let duplicate_endpoint = sql_query(format!(
-            "SELECT * FROM splinter_nodes_endpoints WHERE identity <> {} AND ({})",
-            node.identity, filters
-        ))
-        .get_result::<NodeEndpointsModel>(self.conn)
-        .optional()
-        .map_err(|err| {
-            RegistryError::general_error_with_source(
-                "Failed to check for duplicate endpoints",
-                Box::new(err),
-            )
-        })?;
-        if let Some(endpoint) = duplicate_endpoint {
-            return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
-                endpoint.endpoint,
-            )));
-        }
-
-        // Check if the node already exists to determine if this is a new node or an updated one
-        let existing_node = splinter_nodes::table
-            .find(&node.identity)
-            .first::<NodesModel>(self.conn)
+        self.conn.transaction::<(), _, _>(|| {
+            // Verify that the node's endpoints are unique. This requires a raw SQL query because of
+            // the complicated `WHERE` statement.
+            let filters = node
+                .endpoints
+                .iter()
+                .map(|endpoint| format!("endpoint = {}", endpoint))
+                .collect::<Vec<_>>()
+                .join(" OR ");
+            let duplicate_endpoint = sql_query(format!(
+                "SELECT * FROM splinter_nodes_endpoints WHERE identity <> {} AND ({})",
+                node.identity, filters
+            ))
+            .get_result::<NodeEndpointsModel>(self.conn)
             .optional()
             .map_err(|err| {
                 RegistryError::general_error_with_source(
-                    "Failed to check if node already exists",
+                    "Failed to check for duplicate endpoints",
                     Box::new(err),
                 )
             })?;
+            if let Some(endpoint) = duplicate_endpoint {
+                return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
+                    endpoint.endpoint,
+                )));
+            }
 
-        self.conn.transaction::<(), _, _>(|| {
+            // Check if the node already exists to determine if this is a new node or an updated one
+            let existing_node = splinter_nodes::table
+                .find(&node.identity)
+                .first::<NodesModel>(self.conn)
+                .optional()
+                .map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to check if node already exists",
+                        Box::new(err),
+                    )
+                })?;
+
             if existing_node.is_none() {
                 // Add new node
                 insert_into(splinter_nodes::table)
