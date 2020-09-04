@@ -16,7 +16,6 @@ use std::borrow::Borrow;
 use std::error::Error as StdError;
 
 use sabre_sdk::protocol::payload::{ActionBuildError, SabrePayloadBuildError};
-use sawtooth_sdk::signing;
 use transact::{
     protocol::{batch::BatchBuildError, transaction::TransactionBuildError},
     protos::ProtoConversionError,
@@ -28,7 +27,7 @@ pub enum CliError {
     /// is appropriate for display to the user without additional context
     UserError(String),
     IoError(std::io::Error),
-    SigningError(signing::Error),
+    SigningError(String),
     HyperError(hyper::Error),
     ProtocolBuildError(Box<dyn StdError>),
     ProtoConversionError(ProtoConversionError),
@@ -39,7 +38,7 @@ impl StdError for CliError {
         match self {
             CliError::UserError(_) => None,
             CliError::IoError(err) => Some(err),
-            CliError::SigningError(err) => Some(err),
+            CliError::SigningError(_) => None,
             CliError::HyperError(err) => Some(err),
             CliError::ProtocolBuildError(ref err) => Some(err.borrow()),
             CliError::ProtoConversionError(err) => Some(err),
@@ -52,7 +51,7 @@ impl std::fmt::Display for CliError {
         match *self {
             CliError::UserError(ref s) => write!(f, "Error: {}", s),
             CliError::IoError(ref err) => write!(f, "IoError: {}", err),
-            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err),
+            CliError::SigningError(ref msg) => write!(f, "SigningError: {}", msg),
             CliError::HyperError(ref err) => write!(f, "HyperError: {}", err),
             CliError::ProtocolBuildError(ref err) => write!(f, "Protocol Error: {}", err),
             CliError::ProtoConversionError(ref err) => write!(f, "Proto Conversion Error: {}", err),
@@ -63,12 +62,6 @@ impl std::fmt::Display for CliError {
 impl From<std::io::Error> for CliError {
     fn from(e: std::io::Error) -> Self {
         CliError::IoError(e)
-    }
-}
-
-impl From<signing::Error> for CliError {
-    fn from(e: signing::Error) -> Self {
-        CliError::SigningError(e)
     }
 }
 
