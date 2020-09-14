@@ -30,13 +30,18 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        self.fetch_node(identity).and_then(|node| {
-            delete(splinter_nodes::table.find(identity))
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source("Failed to delete node", Box::new(err))
-                })?;
-            Ok(node)
+        self.conn.transaction(|| {
+            self.fetch_node(identity).and_then(|node| {
+                delete(splinter_nodes::table.find(identity))
+                    .execute(self.conn)
+                    .map_err(|err| {
+                        RegistryError::general_error_with_source(
+                            "Failed to delete node",
+                            Box::new(err),
+                        )
+                    })?;
+                Ok(node)
+            })
         })
     }
 }
