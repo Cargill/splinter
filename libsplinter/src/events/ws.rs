@@ -608,7 +608,7 @@ impl<T: ParseBytes<T> + 'static> Context<T> {
             // time elapsed since last reconnect attempt
             let elapsed = SystemTime::now()
                 .duration_since(self.last_reconnect)
-                .unwrap_or(Duration::from_secs(0));
+                .unwrap_or_else(|_| Duration::from_secs(0));
 
             if elapsed >= self.wait {
                 break;
