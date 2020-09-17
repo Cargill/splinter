@@ -26,7 +26,7 @@ mod yaml_parser;
 
 use std::convert::TryFrom;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub use error::CircuitTemplateError;
 
@@ -107,8 +107,10 @@ impl CircuitTemplateManager {
     }
 
     /// Lists all available circuit templates found in the `paths` of the `CircuitTemplateManager`.
-    pub fn list_available_templates(&self) -> Result<Vec<String>, CircuitTemplateError> {
-        let available_templates = self
+    pub fn list_available_templates(&self) -> Result<Vec<(String, PathBuf)>, CircuitTemplateError> {
+        let mut available_templates: Vec<(String, PathBuf)> = Vec::new();
+        // Search through all paths to find any YAML files using `*.yaml`
+        for entry in self
             .paths
             .iter()
             .map(|path| {
@@ -127,15 +129,39 @@ impl CircuitTemplateManager {
             .collect::<Result<Vec<_>, CircuitTemplateError>>()?
             .into_iter()
             .flatten()
-            // Filter out any files that can't be read
-            .filter_map(|entry| match entry {
-                Ok(entry) => entry.file_stem()?.to_str().map(ToOwned::to_owned),
+        {
+            match entry {
+                Ok(entry) => {
+                    // Create the fully qualified path from the template file entry
+                    let full_path = std::fs::canonicalize(&entry).map_err(|err| {
+                        CircuitTemplateError::new(&format!(
+                            "Cannot get fully qualified path: {}",
+                            err
+                        ))
+                    })?;
+                    // Extract the file stem from the template file entry
+                    let file_stem = entry
+                        .file_stem()
+                        .ok_or_else(|| {
+                            CircuitTemplateError::new(&format!(
+                                "Unable to get file's stem: {}",
+                                entry.display(),
+                            ))
+                        })?
+                        .to_str()
+                        .ok_or_else(|| {
+                            CircuitTemplateError::new(&format!(
+                                "File stem is not valid unicode: {}",
+                                entry.display(),
+                            ))
+                        })?;
+                    available_templates.push((file_stem.to_string(), full_path));
+                }
                 Err(_) => {
                     error!("Unable to read file: {:?}", entry);
-                    None
                 }
-            })
-            .collect::<Vec<String>>();
+            }
+        }
 
         Ok(available_templates)
     }

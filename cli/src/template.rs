@@ -15,6 +15,7 @@
 //! Data structure and implementation of the circuit template representation for the CLI.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use splinter::circuit::template::{
     CircuitCreateTemplate, CircuitTemplateError, CircuitTemplateManager, RuleArgument,
@@ -34,7 +35,7 @@ pub struct CircuitTemplate {
 
 impl CircuitTemplate {
     /// Lists all available circuit templates found in the default template directory.
-    pub fn list_available_templates() -> Result<Vec<String>, CliError> {
+    pub fn list_available_templates() -> Result<Vec<(String, PathBuf)>, CliError> {
         let mut paths = Vec::new();
         if let Ok(env_paths) = std::env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
             paths.extend(
@@ -90,7 +91,7 @@ impl CircuitTemplate {
         paths.push(DEFAULT_TEMPLATE_DIR.to_string());
         let manager = CircuitTemplateManager::new(&paths);
         let possible_values = manager.list_available_templates()?;
-        if !possible_values.iter().any(|val| val == name) {
+        if !possible_values.iter().any(|(stem, _)| stem == name) {
             return Err(CliError::ActionError(format!(
                 "Template with name {} was not found. Available templates: {:?}",
                 name, possible_values
