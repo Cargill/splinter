@@ -14,8 +14,23 @@
 
 //! Provides database operations for the `DieselAdminServiceStore`.
 
+pub(super) mod add_circuit;
+pub(super) mod add_proposal;
+pub(super) mod fetch_circuit;
+pub(super) mod fetch_node;
+pub(super) mod fetch_proposal;
+pub(super) mod fetch_service;
+pub(super) mod list_circuits;
+pub(super) mod list_nodes;
+pub(super) mod list_proposals;
+pub(super) mod list_services;
+pub(super) mod remove_circuit;
+pub(super) mod remove_proposal;
+pub(super) mod update_circuit;
+pub(super) mod update_proposal;
+pub(super) mod upgrade;
+
 pub struct AdminServiceStoreOperations<'a, C> {
-    #[allow(dead_code)]
     conn: &'a C,
 }
 

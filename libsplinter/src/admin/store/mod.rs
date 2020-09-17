@@ -180,6 +180,15 @@ pub struct CircuitNode {
     endpoints: Vec<String>,
 }
 
+impl From<&ProposedNode> for CircuitNode {
+    fn from(proposed_node: &ProposedNode) -> Self {
+        CircuitNode {
+            id: proposed_node.node_id.clone(),
+            endpoints: proposed_node.endpoints.clone(),
+        }
+    }
+}
+
 /// Native representation of a node in a proposed circuit
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ProposedNode {
@@ -194,6 +203,17 @@ pub struct Service {
     service_type: String,
     allowed_nodes: Vec<String>,
     arguments: Vec<(String, String)>,
+}
+
+impl From<&ProposedService> for Service {
+    fn from(proposed_service: &ProposedService) -> Self {
+        Service {
+            service_id: proposed_service.service_id.to_string(),
+            service_type: proposed_service.service_type.to_string(),
+            allowed_nodes: proposed_service.allowed_nodes.to_vec(),
+            arguments: proposed_service.arguments.to_vec(),
+        }
+    }
 }
 
 /// Native representation of a service that is a part of a proposed circuit
