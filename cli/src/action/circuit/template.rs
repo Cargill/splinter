@@ -22,13 +22,46 @@ use super::Action;
 pub struct ListCircuitTemplates;
 
 impl Action for ListCircuitTemplates {
-    fn run<'a>(&mut self, _: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        // Collect list of template file stems and full paths to the associated file stem
         let templates = CircuitTemplate::list_available_templates()?;
 
-        println!("Available templates:");
-        for name in templates {
-            println!("{}", name);
+        let format = arg_matches
+            .and_then(|args| args.value_of("format"))
+            .unwrap_or("human");
+
+        if format == "csv" {
+            print!("TEMPLATE,PATH,");
+            for (stem, path) in templates.iter() {
+                print!("{},{},", stem, path.display());
+            }
+            println!();
+        } else {
+            // Initialize the maximum column length for the first column in the template table,
+            // currently set to 8 as this is the length of the `TEMPLATE` header.
+            let mut max_length = 8;
+
+            // Find the max lengths of the initial column
+            for (stem, _) in templates.iter() {
+                if stem.len() > max_length {
+                    max_length = stem.len()
+                }
+            }
+            // Print headers for the template table to be displayed
+            let header_string = format!("{}{} {} ", "TEMPLATE", " ".repeat(max_length - 8), "PATH");
+            println!("{}", header_string);
+            // Iterate through the list of template file stems and file paths to be displayed
+            for (stem, path) in templates.iter() {
+                let row = format!(
+                    "{}{} {} ",
+                    &stem,
+                    " ".repeat(max_length - stem.len()),
+                    path.display()
+                );
+                println!("{}", row);
+            }
         }
+
         Ok(())
     }
 }

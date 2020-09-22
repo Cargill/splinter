@@ -482,7 +482,19 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         SubCommand::with_name("template")
             .about("Manage circuit templates")
             .setting(AppSettings::SubcommandRequiredElseHelp)
-            .subcommand(SubCommand::with_name("list").about("List available templates"))
+            .subcommand(
+                SubCommand::with_name("list")
+                    .about("List available templates")
+                    .arg(
+                        Arg::with_name("format")
+                            .short("F")
+                            .long("format")
+                            .help("Output format")
+                            .possible_values(&["human", "csv"])
+                            .default_value("human")
+                            .takes_value(true),
+                    ),
+            )
             .subcommand(
                 SubCommand::with_name("show").about("Show a template").arg(
                     Arg::with_name("name")
