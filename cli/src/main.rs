@@ -404,11 +404,19 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 )
                 .arg(
                     Arg::with_name("format")
-                        .short("f")
+                        .short("F")
                         .long("format")
                         .help("Output format")
                         .possible_values(&["human", "csv"])
                         .default_value("human")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("hidden_format")
+                        .short("f")
+                        .hidden(true)
+                        .help("Output format")
+                        .possible_values(&["human", "csv"])
                         .takes_value(true),
                 ),
         )
@@ -430,11 +438,19 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 )
                 .arg(
                     Arg::with_name("format")
-                        .short("f")
+                        .short("F")
                         .long("format")
                         .help("Output format")
                         .possible_values(&["human", "yaml", "json"])
                         .default_value("human")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("hidden_format")
+                        .short("f")
+                        .hidden(true)
+                        .help("Output format")
+                        .possible_values(&["human", "yaml", "json"])
                         .takes_value(true),
                 ),
         )
@@ -468,11 +484,19 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 )
                 .arg(
                     Arg::with_name("format")
-                        .short("f")
+                        .short("F")
                         .long("format")
                         .help("Output format")
                         .possible_values(&["human", "csv"])
                         .default_value("human")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("hidden_format")
+                        .short("f")
+                        .hidden(true)
+                        .help("Output format")
+                        .possible_values(&["human", "csv"])
                         .takes_value(true),
                 ),
         );

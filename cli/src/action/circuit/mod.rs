@@ -595,7 +595,13 @@ impl Action for CircuitListAction {
         let filter = arg_matches.and_then(|args| args.value_of("member"));
 
         let format = arg_matches
-            .and_then(|args| args.value_of("format"))
+            .and_then(|args| {
+                if let Some(val) = args.value_of("hidden_format") {
+                    Some(val)
+                } else {
+                    args.value_of("format")
+                }
+            })
             .unwrap_or("human");
 
         list_circuits(&url, filter, format)
@@ -646,7 +652,11 @@ impl Action for CircuitShowAction {
             .value_of("circuit")
             .ok_or_else(|| CliError::ActionError("'circuit' argument is required".to_string()))?;
 
-        let format = args.value_of("format").unwrap_or("human");
+        let format = if let Some(val) = args.value_of("hidden_format") {
+            val
+        } else {
+            args.value_of("format").unwrap_or("human")
+        };
 
         show_circuit(&url, circuit_id, format)
     }
@@ -726,7 +736,13 @@ impl Action for CircuitProposalsAction {
         let member_filter = arg_matches.and_then(|args| args.value_of("member"));
 
         let format = arg_matches
-            .and_then(|args| args.value_of("format"))
+            .and_then(|args| {
+                if let Some(val) = args.value_of("hidden_format") {
+                    Some(val)
+                } else {
+                    args.value_of("format")
+                }
+            })
             .unwrap_or("human");
 
         list_proposals(&url, management_type_filter, member_filter, format)
