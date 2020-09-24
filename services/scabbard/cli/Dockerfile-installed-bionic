@@ -37,7 +37,6 @@ COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
 
 # Copy over source files
-COPY Cargo.toml /build/Cargo.toml
 COPY libsplinter /build/libsplinter
 COPY services/scabbard/cli /build/services/scabbard/cli
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
