@@ -39,9 +39,9 @@ fi
 if [ -z $1 ]
 then
     # If no arguments are provided to the script
-    ISOLATION_ID=$REPO_VERSION
+    export ISOLATION_ID=$REPO_VERSION
 else
-    ISOLATION_ID=$1
+    export ISOLATION_ID=$1
     if [ $1 == "experimental" ];
     then
         export CARGO_ARGS="-- --features experimental"
