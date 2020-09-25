@@ -41,7 +41,7 @@ FLAGS
 
 OPTIONS
 =======
-`-f`, `--format` FORMAT
+`-F`, `--format` FORMAT
 : Specifies the output format of the circuit proposal. (default `human`).
   Possible values for formatting are `human` and `csv`.
 

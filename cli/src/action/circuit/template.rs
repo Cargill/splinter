@@ -27,7 +27,13 @@ impl Action for ListCircuitTemplates {
         let templates = CircuitTemplate::list_available_templates()?;
 
         let format = arg_matches
-            .and_then(|args| args.value_of("format"))
+            .and_then(|args| {
+                if let Some(val) = args.value_of("hidden_format") {
+                    Some(val)
+                } else {
+                    args.value_of("format")
+                }
+            })
             .unwrap_or("human");
 
         if format == "csv" {
