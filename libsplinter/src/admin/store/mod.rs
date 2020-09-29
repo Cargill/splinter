@@ -34,6 +34,7 @@ mod circuit_node;
 pub mod diesel;
 pub mod error;
 mod proposed_node;
+mod proposed_service;
 mod service;
 pub mod yaml;
 
@@ -42,13 +43,14 @@ use std::fmt;
 
 use crate::hex::{as_hex, deserialize_hex};
 
-pub use self::builders::{CircuitProposalBuilder, ProposedCircuitBuilder, ProposedServiceBuilder};
+pub use self::builders::{CircuitProposalBuilder, ProposedCircuitBuilder};
 pub use self::circuit::{
     AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
 };
 pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
 use self::error::AdminServiceStoreError;
 pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
+pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};
 pub use self::service::{Service, ServiceBuilder};
 
 /// Native representation of a circuit that is being proposed in a proposal
@@ -113,15 +115,6 @@ pub enum ProposalType {
     AddNode,
     RemoveNode,
     Destroy,
-}
-
-/// Native representation of a service that is a part of a proposed circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ProposedService {
-    service_id: String,
-    service_type: String,
-    allowed_nodes: Vec<String>,
-    arguments: Vec<(String, String)>,
 }
 
 /// The unique ID of service made up of a circuit ID and the individual service ID.

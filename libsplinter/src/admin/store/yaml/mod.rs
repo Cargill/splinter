@@ -806,7 +806,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
 
                 for service in services.into_iter() {
                     let service_id =
-                        ServiceId::new(service.service_id.to_string(), circuit_id.to_string());
+                        ServiceId::new(service.service_id().to_string(), circuit_id.to_string());
 
                     state
                         .service_directory
@@ -1099,10 +1099,8 @@ mod tests {
 
     use super::*;
 
-    use crate::admin::store::builders::{
-        CircuitProposalBuilder, ProposedCircuitBuilder, ProposedServiceBuilder,
-    };
-    use crate::admin::store::{CircuitNodeBuilder, ProposedNodeBuilder};
+    use crate::admin::store::builders::{CircuitProposalBuilder, ProposedCircuitBuilder};
+    use crate::admin::store::{CircuitNodeBuilder, ProposedNodeBuilder, ProposedServiceBuilder};
     use crate::admin::store::{ProposalType, Vote, VoteRecord};
     use crate::hex::parse_hex;
 

@@ -12,57 +12,55 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs for building services
-
+//! Structs for building proposed services
 use crate::admin::messages::is_valid_service_id;
 
 use super::error::BuilderError;
-use super::ProposedService;
 
-/// Native representation of a service that is a part of circuit
+/// Native representation of a service that is a part of a proposed circuit
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct Service {
+pub struct ProposedService {
     service_id: String,
     service_type: String,
     allowed_nodes: Vec<String>,
     arguments: Vec<(String, String)>,
 }
 
-impl Service {
-    /// Returns the ID of the service
+impl ProposedService {
+    /// Returns the ID of the proposed service
     pub fn service_id(&self) -> &str {
         &self.service_id
     }
 
-    /// Returns the service type of the service
+    /// Returns the service type of the proposed service
     pub fn service_type(&self) -> &str {
         &self.service_type
     }
 
-    /// Returns the list of allowed nodes the service can run on
+    /// Returns the list of allowed nodes the proposed service can run on
     pub fn allowed_nodes(&self) -> &[String] {
         &self.allowed_nodes
     }
 
-    /// Returns the list of key/value arugments for the service
+    /// Returns the list of key/value arugments for the  proposed service
     pub fn arguments(&self) -> &[(String, String)] {
         &self.arguments
     }
 }
 
-/// Builder for creating a `Service`
+/// Builder for creating a `ProposedService`
 #[derive(Default, Clone)]
-pub struct ServiceBuilder {
+pub struct ProposedServiceBuilder {
     service_id: Option<String>,
     service_type: Option<String>,
     allowed_nodes: Option<Vec<String>>,
     arguments: Option<Vec<(String, String)>>,
 }
 
-impl ServiceBuilder {
-    /// Creates a new `ServiceBuilder`
+impl ProposedServiceBuilder {
+    /// Creates a new `ProposedServiceBuilder`
     pub fn new() -> Self {
-        ServiceBuilder::default()
+        ProposedServiceBuilder::default()
     }
 
     /// Returns the service specific service ID
@@ -90,7 +88,7 @@ impl ServiceBuilder {
     /// # Arguments
     ///
     ///  * `service_id` - The unique service ID for service
-    pub fn with_service_id(mut self, service_id: &str) -> ServiceBuilder {
+    pub fn with_service_id(mut self, service_id: &str) -> ProposedServiceBuilder {
         self.service_id = Some(service_id.into());
         self
     }
@@ -100,7 +98,7 @@ impl ServiceBuilder {
     /// # Arguments
     ///
     ///  * `service_type` - The service type of the service
-    pub fn with_service_type(mut self, service_type: &str) -> ServiceBuilder {
+    pub fn with_service_type(mut self, service_type: &str) -> ProposedServiceBuilder {
         self.service_type = Some(service_type.into());
         self
     }
@@ -110,7 +108,7 @@ impl ServiceBuilder {
     /// # Arguments
     ///
     ///  * `allowed_nodes` - A list of node IDs the service can connect to
-    pub fn with_allowed_nodes(mut self, allowed_nodes: &[String]) -> ServiceBuilder {
+    pub fn with_allowed_nodes(mut self, allowed_nodes: &[String]) -> ProposedServiceBuilder {
         self.allowed_nodes = Some(allowed_nodes.into());
         self
     }
@@ -120,15 +118,15 @@ impl ServiceBuilder {
     /// # Arguments
     ///
     ///  * `arguments` - A list of key-value pairs for the arguments for the service
-    pub fn with_arguments(mut self, arguments: &[(String, String)]) -> ServiceBuilder {
+    pub fn with_arguments(mut self, arguments: &[(String, String)]) -> ProposedServiceBuilder {
         self.arguments = Some(arguments.to_vec());
         self
     }
 
-    /// Builds the `Service`
+    /// Builds the `ProposedService`
     ///
     /// Returns an error if the service ID, service_type, or allowed nodes is not set
-    pub fn build(self) -> Result<Service, BuilderError> {
+    pub fn build(self) -> Result<ProposedService, BuilderError> {
         let service_id = match self.service_id {
             Some(service_id) if is_valid_service_id(&service_id) => service_id,
             Some(service_id) => {
@@ -150,7 +148,7 @@ impl ServiceBuilder {
 
         let arguments = self.arguments.unwrap_or_default();
 
-        let service = Service {
+        let service = ProposedService {
             service_id,
             service_type,
             allowed_nodes,
@@ -158,27 +156,5 @@ impl ServiceBuilder {
         };
 
         Ok(service)
-    }
-}
-
-impl From<ProposedService> for Service {
-    fn from(service: ProposedService) -> Self {
-        Service {
-            service_id: service.service_id().to_string(),
-            service_type: service.service_type().to_string(),
-            allowed_nodes: service.allowed_nodes().to_vec(),
-            arguments: service.arguments().to_vec(),
-        }
-    }
-}
-
-impl From<&ProposedService> for Service {
-    fn from(proposed_service: &ProposedService) -> Self {
-        Service {
-            service_id: proposed_service.service_id().to_string(),
-            service_type: proposed_service.service_type().to_string(),
-            allowed_nodes: proposed_service.allowed_nodes().to_vec(),
-            arguments: proposed_service.arguments().to_vec(),
-        }
     }
 }

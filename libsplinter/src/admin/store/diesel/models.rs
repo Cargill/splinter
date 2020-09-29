@@ -191,8 +191,8 @@ impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
             .iter()
             .map(|service| ProposedServiceModel {
                 circuit_id: proposed_circuit.circuit_id.clone(),
-                service_id: service.service_id.clone(),
-                service_type: service.service_type.clone(),
+                service_id: service.service_id().into(),
+                service_type: service.service_type().into(),
             })
             .collect()
     }
@@ -215,12 +215,12 @@ impl From<&ProposedCircuit> for Vec<ProposedServiceAllowedNodeModel> {
         for service in &proposed_circuit.roster {
             allowed_nodes.extend(
                 service
-                    .allowed_nodes
+                    .allowed_nodes()
                     .iter()
                     .map(|node| ProposedServiceAllowedNodeModel {
                         circuit_id: proposed_circuit.circuit_id.clone(),
-                        service_id: service.service_id.clone(),
-                        allowed_node: node.clone(),
+                        service_id: service.service_id().into(),
+                        allowed_node: node.into(),
                     })
                     .collect::<Vec<ProposedServiceAllowedNodeModel>>(),
             );
@@ -247,13 +247,13 @@ impl From<&ProposedCircuit> for Vec<ProposedServiceArgumentModel> {
         for service in &proposed_circuit.roster {
             service_arguments.extend(
                 service
-                    .arguments
+                    .arguments()
                     .iter()
                     .map(|(key, value)| ProposedServiceArgumentModel {
                         circuit_id: proposed_circuit.circuit_id.clone(),
-                        service_id: service.service_id.clone(),
-                        key: key.clone(),
-                        value: value.clone(),
+                        service_id: service.service_id().into(),
+                        key: key.into(),
+                        value: value.into(),
                     })
                     .collect::<Vec<ProposedServiceArgumentModel>>(),
             );
