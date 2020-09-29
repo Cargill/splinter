@@ -83,7 +83,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .iter()
                 .map(|node| CircuitMemberModel {
                     circuit_id: circuit.circuit_id().into(),
-                    node_id: node.id.clone(),
+                    node_id: node.node_id().into(),
                 })
                 .collect();
             insert_into(circuit_member::table)
@@ -101,12 +101,12 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .iter()
                 .map(|node| {
                     (
-                        node.id.clone(),
-                        node.endpoints
+                        node.node_id().into(),
+                        node.endpoints()
                             .iter()
                             .map(|endpoint| NodeEndpointModel {
-                                node_id: node.id.clone(),
-                                endpoint: endpoint.clone(),
+                                node_id: node.node_id().into(),
+                                endpoint: endpoint.into(),
                             })
                             .collect::<Vec<NodeEndpointModel>>(),
                     )
@@ -207,7 +207,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .iter()
                 .map(|node| CircuitMemberModel {
                     circuit_id: circuit.circuit_id().into(),
-                    node_id: node.id.clone(),
+                    node_id: node.node_id().into(),
                 })
                 .collect();
             insert_into(circuit_member::table)
@@ -225,12 +225,12 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .iter()
                 .map(|node| {
                     (
-                        node.id.clone(),
-                        node.endpoints
+                        node.node_id().into(),
+                        node.endpoints()
                             .iter()
                             .map(|endpoint| NodeEndpointModel {
-                                node_id: node.id.clone(),
-                                endpoint: endpoint.clone(),
+                                node_id: node.node_id().into(),
+                                endpoint: endpoint.into(),
                             })
                             .collect::<Vec<NodeEndpointModel>>(),
                     )

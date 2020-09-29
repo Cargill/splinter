@@ -23,8 +23,8 @@ use crate::admin::store::{
         models::{CircuitMemberModel, NodeEndpointModel},
         schema::{circuit_member, node_endpoint},
     },
-    error::AdminServiceStoreError,
-    CircuitNode,
+    error::{AdminServiceStoreError, BuilderError},
+    CircuitNode, CircuitNodeBuilder,
 };
 
 use super::AdminServiceStoreOperations;
@@ -71,11 +71,17 @@ where
         });
         let nodes: Vec<CircuitNode> = node_map
             .iter()
-            .map(|(node_id, endpoints)| CircuitNode {
-                id: node_id.to_string(),
-                endpoints: endpoints.to_vec(),
+            .map(|(node_id, endpoints)| {
+                CircuitNodeBuilder::new()
+                    .with_node_id(&node_id)
+                    .with_endpoints(&endpoints)
+                    .build()
             })
-            .collect();
+            .collect::<Result<Vec<CircuitNode>, BuilderError>>()
+            .map_err(|err| AdminServiceStoreError::StorageError {
+                context: "Unable to build CircuitNode from stored state".to_string(),
+                source: Some(Box::new(err)),
+            })?;
         Ok(Box::new(nodes.into_iter()))
     }
 }

@@ -29,6 +29,7 @@
 
 mod builders;
 mod circuit;
+mod circuit_node;
 #[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
@@ -41,12 +42,12 @@ use std::fmt;
 use crate::hex::{as_hex, deserialize_hex};
 
 pub use self::builders::{
-    CircuitNodeBuilder, CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder,
-    ProposedServiceBuilder,
+    CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
 };
 pub use self::circuit::{
     AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
 };
+pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
 use self::error::AdminServiceStoreError;
 pub use self::service::{Service, ServiceBuilder};
 
@@ -112,22 +113,6 @@ pub enum ProposalType {
     AddNode,
     RemoveNode,
     Destroy,
-}
-
-/// Native representation of a node included in circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct CircuitNode {
-    id: String,
-    endpoints: Vec<String>,
-}
-
-impl From<&ProposedNode> for CircuitNode {
-    fn from(proposed_node: &ProposedNode) -> Self {
-        CircuitNode {
-            id: proposed_node.node_id.clone(),
-            endpoints: proposed_node.endpoints.clone(),
-        }
-    }
 }
 
 /// Native representation of a node in a proposed circuit

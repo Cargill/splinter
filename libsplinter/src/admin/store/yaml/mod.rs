@@ -620,8 +620,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 }
 
                 for node in nodes.into_iter() {
-                    if !state.circuit_state.nodes.contains_key(&node.id) {
-                        state.circuit_state.nodes.insert(node.id.to_string(), node);
+                    if !state.circuit_state.nodes.contains_key(node.node_id()) {
+                        state
+                            .circuit_state
+                            .nodes
+                            .insert(node.node_id().to_string(), node);
                     }
                 }
 
@@ -1097,9 +1100,9 @@ mod tests {
     use super::*;
 
     use crate::admin::store::builders::{
-        CircuitNodeBuilder, CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder,
-        ProposedServiceBuilder,
+        CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
     };
+    use crate::admin::store::CircuitNodeBuilder;
     use crate::admin::store::{ProposalType, Vote, VoteRecord};
     use crate::hex::parse_hex;
 
@@ -1491,19 +1494,21 @@ proposals:
         );
         yaml_nodes.insert(
             "acme-node-000".to_string(),
-            CircuitNode {
-                id: "acme-node-000".to_string(),
-                endpoints: vec!["tcps://splinterd-node-acme:8044".into()],
-            },
+            CircuitNodeBuilder::new()
+                .with_node_id("acme-node-000")
+                .with_endpoints(&["tcps://splinterd-node-acme:8044".into()])
+                .build()
+                .expect("Unable to build circuit node"),
         );
         yaml_nodes.insert(
             "bubba-node-000".to_string(),
-            CircuitNode {
-                id: "bubba-node-000".to_string(),
-                endpoints: vec!["tcps://splinterd-node-bubba:8044".into()],
-            },
+            CircuitNodeBuilder::new()
+                .with_node_id("bubba-node-000")
+                .with_endpoints(&["tcps://splinterd-node-bubba:8044".into()])
+                .build()
+                .expect("Unable to build circuit node"),
         );
-        yaml_nodes.insert(new_node.id.to_string(), new_node);
+        yaml_nodes.insert(new_node.node_id().to_string(), new_node);
         let mut yaml_state_vec = serde_yaml::to_vec(&YamlCircuitState {
             circuits: yaml_circuits,
             nodes: yaml_nodes,
@@ -1560,23 +1565,26 @@ proposals:
 
         assert_eq!(
             node,
-            CircuitNode {
-                id: "acme-node-000".to_string(),
-                endpoints: vec!["tcps://splinterd-node-acme:8044".into()],
-            }
+            CircuitNodeBuilder::new()
+                .with_node_id("acme-node-000")
+                .with_endpoints(&["tcps://splinterd-node-acme:8044".into()])
+                .build()
+                .expect("Unable to build circuit node"),
         );
 
         assert_eq!(
             store.list_nodes().unwrap().collect::<Vec<CircuitNode>>(),
             vec![
-                CircuitNode {
-                    id: "acme-node-000".to_string(),
-                    endpoints: vec!["tcps://splinterd-node-acme:8044".into()],
-                },
-                CircuitNode {
-                    id: "bubba-node-000".to_string(),
-                    endpoints: vec!["tcps://splinterd-node-bubba:8044".into()],
-                }
+                CircuitNodeBuilder::new()
+                    .with_node_id("acme-node-000")
+                    .with_endpoints(&["tcps://splinterd-node-acme:8044".into()])
+                    .build()
+                    .expect("Unable to build circuit node"),
+                CircuitNodeBuilder::new()
+                    .with_node_id("bubba-node-000")
+                    .with_endpoints(&["tcps://splinterd-node-bubba:8044".into()])
+                    .build()
+                    .expect("Unable to build circuit node"),
             ]
         );
     }
