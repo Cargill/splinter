@@ -276,12 +276,12 @@ pub struct ServiceModel {
 impl From<&Circuit> for Vec<ServiceModel> {
     fn from(circuit: &Circuit) -> Self {
         circuit
-            .roster
+            .roster()
             .iter()
             .map(|service| ServiceModel {
-                circuit_id: circuit.id.clone(),
-                service_id: service.service_id.clone(),
-                service_type: service.service_type.clone(),
+                circuit_id: circuit.circuit_id().into(),
+                service_id: service.service_id().into(),
+                service_type: service.service_type().into(),
             })
             .collect()
     }
@@ -301,14 +301,14 @@ pub struct ServiceAllowedNodeModel {
 impl From<&Circuit> for Vec<ServiceAllowedNodeModel> {
     fn from(circuit: &Circuit) -> Self {
         let mut allowed_nodes = Vec::new();
-        for service in &circuit.roster {
+        for service in circuit.roster() {
             allowed_nodes.extend(
                 service
-                    .allowed_nodes
+                    .allowed_nodes()
                     .iter()
                     .map(|node| ServiceAllowedNodeModel {
-                        circuit_id: circuit.id.clone(),
-                        service_id: service.service_id.clone(),
+                        circuit_id: circuit.circuit_id().into(),
+                        service_id: service.service_id().into(),
                         allowed_node: node.clone(),
                     })
                     .collect::<Vec<ServiceAllowedNodeModel>>(),
@@ -333,14 +333,14 @@ pub struct ServiceArgumentModel {
 impl From<&Circuit> for Vec<ServiceArgumentModel> {
     fn from(circuit: &Circuit) -> Self {
         let mut service_arguments = Vec::new();
-        for service in &circuit.roster {
+        for service in circuit.roster() {
             service_arguments.extend(
                 service
-                    .arguments
+                    .arguments()
                     .iter()
                     .map(|(key, value)| ServiceArgumentModel {
-                        circuit_id: circuit.id.clone(),
-                        service_id: service.service_id.clone(),
+                        circuit_id: circuit.circuit_id().into(),
+                        service_id: service.service_id().into(),
                         key: key.clone(),
                         value: value.clone(),
                     })
@@ -367,12 +367,12 @@ pub struct CircuitModel {
 impl From<&Circuit> for CircuitModel {
     fn from(circuit: &Circuit) -> Self {
         CircuitModel {
-            circuit_id: circuit.id.clone(),
-            auth: String::from(&circuit.auth),
-            persistence: String::from(&circuit.persistence),
-            durability: String::from(&circuit.durability),
-            routes: String::from(&circuit.routes),
-            circuit_management_type: circuit.circuit_management_type.clone(),
+            circuit_id: circuit.circuit_id().into(),
+            auth: String::from(circuit.auth()),
+            persistence: String::from(circuit.persistence()),
+            durability: String::from(circuit.durability()),
+            routes: String::from(circuit.routes()),
+            circuit_management_type: circuit.circuit_management_type().into(),
         }
     }
 }
@@ -390,10 +390,10 @@ pub struct CircuitMemberModel {
 impl From<&Circuit> for Vec<CircuitMemberModel> {
     fn from(circuit: &Circuit) -> Self {
         circuit
-            .members
+            .members()
             .iter()
             .map(|node_id| CircuitMemberModel {
-                circuit_id: circuit.id.clone(),
+                circuit_id: circuit.circuit_id().into(),
                 node_id: node_id.clone(),
             })
             .collect()

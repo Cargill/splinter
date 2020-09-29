@@ -54,7 +54,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             // Check if the circuit already exists in the `AdminServiceStore`, in which case
             // an error is returned.
             if circuit::table
-                .filter(circuit::circuit_id.eq(&circuit.id))
+                .filter(circuit::circuit_id.eq(circuit.circuit_id()))
                 .first::<CircuitModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -82,7 +82,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             let circuit_members: Vec<CircuitMemberModel> = nodes
                 .iter()
                 .map(|node| CircuitMemberModel {
-                    circuit_id: circuit.id.clone(),
+                    circuit_id: circuit.circuit_id().into(),
                     node_id: node.id.clone(),
                 })
                 .collect();
@@ -178,7 +178,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             // Check if the circuit already exists in the `AdminServiceStore`, in which case
             // an error is returned.
             if circuit::table
-                .filter(circuit::circuit_id.eq(&circuit.id))
+                .filter(circuit::circuit_id.eq(circuit.circuit_id()))
                 .first::<CircuitModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -206,7 +206,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             let circuit_member: Vec<CircuitMemberModel> = nodes
                 .iter()
                 .map(|node| CircuitMemberModel {
-                    circuit_id: circuit.id.clone(),
+                    circuit_id: circuit.circuit_id().into(),
                     node_id: node.id.clone(),
                 })
                 .collect();

@@ -22,6 +22,7 @@
 pub mod error;
 
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -30,9 +31,9 @@ use std::sync::{Arc, Mutex};
 use self::error::YamlAdminStoreError;
 
 use super::{
-    AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit, CircuitNode,
-    CircuitPredicate, CircuitProposal, DurabilityType, PersistenceType, RouteType, Service,
-    ServiceId,
+    error::BuilderError, AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit,
+    CircuitBuilder, CircuitNode, CircuitPredicate, CircuitProposal, DurabilityType,
+    PersistenceType, RouteType, Service, ServiceBuilder, ServiceId,
 };
 
 /// A YAML backed implementation of the `AdminServiceStore`
@@ -104,16 +105,21 @@ impl YamlAdminServiceStore {
                 )
             })?;
 
-        let yaml_state = CircuitState::from(yaml_state_circuits);
+        let yaml_state = CircuitState::try_from(yaml_state_circuits).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                "Failed to convert YAML to AdminServiceStore representation ",
+                Box::new(err),
+            )
+        })?;
 
         let mut state = self.state.lock().map_err(|_| {
             YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
         })?;
 
         for (circuit_id, circuit) in yaml_state.circuits.iter() {
-            for service in circuit.roster.iter() {
+            for service in circuit.roster() {
                 let service_id =
-                    ServiceId::new(service.service_id.to_string(), circuit_id.to_string());
+                    ServiceId::new(service.service_id().to_string(), circuit_id.to_string());
 
                 state.service_directory.insert(service_id, service.clone());
             }
@@ -168,7 +174,12 @@ impl YamlAdminServiceStore {
                 )
             })?;
 
-        let yaml_state = CircuitState::from(yaml_state_circuits);
+        let yaml_state = CircuitState::try_from(yaml_state_circuits).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                "Failed to convert YAML to AdminServiceStore representation ",
+                Box::new(err),
+            )
+        })?;
 
         let proposal_file = File::open(&self.proposal_file_path).map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
@@ -190,9 +201,9 @@ impl YamlAdminServiceStore {
         })?;
 
         for (circuit_id, circuit) in yaml_state.circuits.iter() {
-            for service in circuit.roster.iter() {
+            for service in circuit.roster() {
                 let service_id =
-                    ServiceId::new(service.service_id.to_string(), circuit_id.to_string());
+                    ServiceId::new(service.service_id().to_string(), circuit_id.to_string());
 
                 state.service_directory.insert(service_id, service.clone());
             }
@@ -589,15 +600,21 @@ impl AdminServiceStore for YamlAdminServiceStore {
                         source: None,
                     })?;
 
-            if state.circuit_state.circuits.contains_key(&circuit.id) {
+            if state
+                .circuit_state
+                .circuits
+                .contains_key(circuit.circuit_id())
+            {
                 return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A circuit with ID {} already exists", circuit.id),
+                    context: format!("A circuit with ID {} already exists", circuit.circuit_id()),
                     source: None,
                 });
             } else {
-                for service in circuit.roster.iter() {
-                    let service_id =
-                        ServiceId::new(service.service_id.to_string(), circuit.id.to_string());
+                for service in circuit.roster() {
+                    let service_id = ServiceId::new(
+                        service.service_id().to_string(),
+                        circuit.circuit_id().to_string(),
+                    );
 
                     state.service_directory.insert(service_id, service.clone());
                 }
@@ -611,7 +628,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 state
                     .circuit_state
                     .circuits
-                    .insert(circuit.id.to_string(), circuit);
+                    .insert(circuit.circuit_id().to_string(), circuit);
             }
         }
 
@@ -640,14 +657,18 @@ impl AdminServiceStore for YamlAdminServiceStore {
                         source: None,
                     })?;
 
-            if state.circuit_state.circuits.contains_key(&circuit.id) {
+            if state
+                .circuit_state
+                .circuits
+                .contains_key(circuit.circuit_id())
+            {
                 state
                     .circuit_state
                     .circuits
-                    .insert(circuit.id.to_string(), circuit);
+                    .insert(circuit.circuit_id().to_string(), circuit);
             } else {
                 return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A circuit with ID {} does not exist", circuit.id),
+                    context: format!("A circuit with ID {} does not exist", circuit.circuit_id()),
                     source: None,
                 });
             }
@@ -680,9 +701,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
             if state.circuit_state.circuits.contains_key(circuit_id) {
                 let circuit = state.circuit_state.circuits.remove(circuit_id);
                 if let Some(circuit) = circuit {
-                    for service in circuit.roster.iter() {
-                        let service_id =
-                            ServiceId::new(service.service_id.to_string(), circuit_id.to_string());
+                    for service in circuit.roster() {
+                        let service_id = ServiceId::new(
+                            service.service_id().to_string(),
+                            circuit_id.to_string(),
+                        );
                         state.service_directory.remove(&service_id);
                     }
                 }
@@ -776,7 +799,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 state
                     .circuit_state
                     .circuits
-                    .insert(circuit.id.to_string(), circuit);
+                    .insert(circuit.circuit_id().to_string(), circuit);
 
                 for service in services.into_iter() {
                     let service_id =
@@ -893,8 +916,8 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 context: format!("Circuit {} does not exist", circuit_id),
                 source: None,
             })?
-            .roster
-            .clone();
+            .roster()
+            .to_vec();
 
         Ok(Box::new(services.into_iter()))
     }
@@ -916,32 +939,44 @@ struct YamlCircuit {
     circuit_management_type: String,
 }
 
-impl From<YamlCircuit> for Circuit {
-    fn from(circuit: YamlCircuit) -> Self {
-        Circuit {
-            id: circuit.id,
-            roster: circuit.roster.into_iter().map(Service::from).collect(),
-            members: circuit.members,
-            auth: circuit.auth,
-            persistence: circuit.persistence,
-            durability: circuit.durability,
-            routes: circuit.routes,
-            circuit_management_type: circuit.circuit_management_type,
-        }
+impl TryFrom<YamlCircuit> for Circuit {
+    type Error = BuilderError;
+
+    fn try_from(circuit: YamlCircuit) -> Result<Self, Self::Error> {
+        CircuitBuilder::new()
+            .with_circuit_id(&circuit.id)
+            .with_roster(
+                &circuit
+                    .roster
+                    .into_iter()
+                    .map(Service::try_from)
+                    .collect::<Result<Vec<Service>, BuilderError>>()?,
+            )
+            .with_members(&circuit.members)
+            .with_auth(&circuit.auth)
+            .with_persistence(&circuit.persistence)
+            .with_durability(&circuit.durability)
+            .with_routes(&circuit.routes)
+            .with_circuit_management_type(&circuit.circuit_management_type)
+            .build()
     }
 }
 
 impl From<Circuit> for YamlCircuit {
     fn from(circuit: Circuit) -> Self {
         YamlCircuit {
-            id: circuit.id,
-            roster: circuit.roster.into_iter().map(YamlService::from).collect(),
-            members: circuit.members,
-            auth: circuit.auth,
-            persistence: circuit.persistence,
-            durability: circuit.durability,
-            routes: circuit.routes,
-            circuit_management_type: circuit.circuit_management_type,
+            id: circuit.circuit_id().into(),
+            roster: circuit
+                .roster()
+                .iter()
+                .map(|service| YamlService::from(service.clone()))
+                .collect(),
+            members: circuit.members().to_vec(),
+            auth: circuit.auth().clone(),
+            persistence: circuit.persistence().clone(),
+            durability: circuit.durability().clone(),
+            routes: circuit.routes().clone(),
+            circuit_management_type: circuit.circuit_management_type().into(),
         }
     }
 }
@@ -958,31 +993,35 @@ struct YamlService {
     arguments: BTreeMap<String, String>,
 }
 
-impl From<YamlService> for Service {
-    fn from(service: YamlService) -> Self {
-        Service {
-            service_id: service.service_id,
-            service_type: service.service_type,
-            allowed_nodes: service.allowed_nodes,
-            arguments: service
-                .arguments
-                .into_iter()
-                .map(|(key, value)| (key, value))
-                .collect(),
-        }
+impl TryFrom<YamlService> for Service {
+    type Error = BuilderError;
+
+    fn try_from(service: YamlService) -> Result<Self, Self::Error> {
+        ServiceBuilder::new()
+            .with_service_id(&service.service_id)
+            .with_service_type(&service.service_type)
+            .with_allowed_nodes(&service.allowed_nodes)
+            .with_arguments(
+                &service
+                    .arguments
+                    .iter()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect::<Vec<(String, String)>>(),
+            )
+            .build()
     }
 }
 
 impl From<Service> for YamlService {
     fn from(service: Service) -> Self {
         YamlService {
-            service_id: service.service_id,
-            service_type: service.service_type,
-            allowed_nodes: service.allowed_nodes,
+            service_id: service.service_id().into(),
+            service_type: service.service_type().into(),
+            allowed_nodes: service.allowed_nodes().to_vec(),
             arguments: service
-                .arguments
-                .into_iter()
-                .map(|(key, value)| (key, value))
+                .arguments()
+                .iter()
+                .map(|(key, value)| (key.into(), value.into()))
                 .collect(),
         }
     }
@@ -995,16 +1034,21 @@ struct YamlCircuitState {
     circuits: BTreeMap<String, YamlCircuit>,
 }
 
-impl From<YamlCircuitState> for CircuitState {
-    fn from(state: YamlCircuitState) -> Self {
-        CircuitState {
+impl TryFrom<YamlCircuitState> for CircuitState {
+    type Error = BuilderError;
+
+    fn try_from(state: YamlCircuitState) -> Result<Self, Self::Error> {
+        Ok(CircuitState {
             nodes: state.nodes,
             circuits: state
                 .circuits
                 .into_iter()
-                .map(|(id, circuit)| (id, Circuit::from(circuit)))
-                .collect(),
-        }
+                .map(|(id, circuit)| match Circuit::try_from(circuit) {
+                    Ok(circuit) => Ok((id, circuit)),
+                    Err(err) => Err(err),
+                })
+                .collect::<Result<BTreeMap<String, Circuit>, BuilderError>>()?,
+        })
     }
 }
 
@@ -1053,8 +1097,8 @@ mod tests {
     use super::*;
 
     use crate::admin::store::builders::{
-        CircuitBuilder, CircuitNodeBuilder, CircuitProposalBuilder, ProposedCircuitBuilder,
-        ProposedNodeBuilder, ProposedServiceBuilder, ServiceBuilder,
+        CircuitNodeBuilder, CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder,
+        ProposedServiceBuilder,
     };
     use crate::admin::store::{ProposalType, Vote, VoteRecord};
     use crate::hex::parse_hex;
@@ -1365,7 +1409,7 @@ proposals:
             .expect("Unable to create yaml admin store");
 
         // fetch existing circuit from state
-        let mut circuit = store
+        let circuit = store
             .get_circuit("WBKLF-AAAAA")
             .expect("unable to fetch circuit")
             .expect("Expected circuit, got none");
@@ -1378,10 +1422,42 @@ proposals:
             .expect("unable to fetch circuit")
             .is_none());
 
-        circuit.circuit_management_type = "test".to_string();
+        let updated_circuit = CircuitBuilder::default()
+                .with_circuit_id("WBKLF-AAAAA")
+                .with_roster(&vec![
+                    ServiceBuilder::default()
+                        .with_service_id("a000")
+                        .with_service_type("scabbard")
+                        .with_allowed_nodes(&vec!["acme-node-000".into()])
+                        .with_arguments(&vec![
+                            ("admin_keys".into(),
+                           "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
+                                .into()),
+                           ("peer_services".into(), "[\"a001\"]".into()),
+                        ])
+                        .build()
+                        .expect("Unable to build service"),
+                    ServiceBuilder::default()
+                        .with_service_id("a001")
+                        .with_service_type("scabbard")
+                        .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                        .with_arguments(&vec![(
+                            "admin_keys".into(),
+                            "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
+                                .into()
+                        ),(
+                            "peer_services".into(), "[\"a000\"]".into()
+                        )])
+                        .build()
+                        .expect("Unable to build service"),
+                ])
+                .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
+                .with_circuit_management_type("test")
+                .build()
+                .expect("Unable to build circuit");
 
         store
-            .update_circuit(circuit.clone())
+            .update_circuit(updated_circuit.clone())
             .expect("Unable to update circuit");
 
         let (new_circuit, new_node) = new_circuit();
@@ -1400,7 +1476,7 @@ proposals:
                 .list_circuits(&vec![])
                 .expect("Unable to get list of circuits")
                 .collect::<Vec<Circuit>>(),
-            vec![circuit, new_circuit.clone()]
+            vec![updated_circuit, new_circuit.clone()]
         );
 
         store
@@ -1409,7 +1485,10 @@ proposals:
 
         let mut yaml_circuits = BTreeMap::new();
         let mut yaml_nodes = BTreeMap::new();
-        yaml_circuits.insert(new_circuit.id.to_string(), YamlCircuit::from(new_circuit));
+        yaml_circuits.insert(
+            new_circuit.circuit_id().to_string(),
+            YamlCircuit::from(new_circuit),
+        );
         yaml_nodes.insert(
             "acme-node-000".to_string(),
             CircuitNode {
