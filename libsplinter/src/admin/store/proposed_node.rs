@@ -12,59 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs for building circuits nodes
+//! Structs for building proposed nodes
 
 use super::error::BuilderError;
-use super::ProposedNode;
 
-/// Native representation of a node included in circuit
+/// Native representation of a node in a proposed circuit
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct CircuitNode {
-    id: String,
+pub struct ProposedNode {
+    node_id: String,
     endpoints: Vec<String>,
 }
 
-impl CircuitNode {
-    /// Returns the ID of the node
+impl ProposedNode {
+    /// Returns the ID of the proposed node
     pub fn node_id(&self) -> &str {
-        &self.id
+        &self.node_id
     }
 
-    /// Returns the list of endpoints that belong to the node
+    /// Returns the list of endpoints that belong to the proposed node
     pub fn endpoints(&self) -> &[String] {
         &self.endpoints
     }
 }
 
-impl From<&ProposedNode> for CircuitNode {
-    fn from(proposed_node: &ProposedNode) -> Self {
-        CircuitNode {
-            id: proposed_node.node_id().into(),
-            endpoints: proposed_node.endpoints().to_vec(),
-        }
-    }
-}
-
-impl From<ProposedNode> for CircuitNode {
-    fn from(node: ProposedNode) -> Self {
-        CircuitNode {
-            id: node.node_id().into(),
-            endpoints: node.endpoints().to_vec(),
-        }
-    }
-}
-
-/// Builder for creating a `CircutNode`
+/// Builder for creating a `ProposedNode`
 #[derive(Default, Clone)]
-pub struct CircuitNodeBuilder {
+pub struct ProposedNodeBuilder {
     node_id: Option<String>,
     endpoints: Option<Vec<String>>,
 }
 
-impl CircuitNodeBuilder {
-    /// Creates a `CircuitNodeBuilder`
+impl ProposedNodeBuilder {
+    /// Creates a `ProposedNodeBuider`
     pub fn new() -> Self {
-        CircuitNodeBuilder::default()
+        ProposedNodeBuilder::default()
     }
 
     /// Returns the unique node ID
@@ -82,7 +63,7 @@ impl CircuitNodeBuilder {
     /// # Arguments
     ///
     ///  * `node_id` - The unique node ID for node
-    pub fn with_node_id(mut self, node_id: &str) -> CircuitNodeBuilder {
+    pub fn with_node_id(mut self, node_id: &str) -> ProposedNodeBuilder {
         self.node_id = Some(node_id.into());
         self
     }
@@ -92,15 +73,15 @@ impl CircuitNodeBuilder {
     /// # Arguments
     ///
     ///  * `endpoints` - The list of endpoints for the node
-    pub fn with_endpoints(mut self, endpoints: &[String]) -> CircuitNodeBuilder {
+    pub fn with_endpoints(mut self, endpoints: &[String]) -> ProposedNodeBuilder {
         self.endpoints = Some(endpoints.into());
         self
     }
 
-    /// Builds the `CircuitNode`
+    /// Builds the `ProposedNode`
     ///
     /// Returns an error if the node ID or endpoints are not set
-    pub fn build(self) -> Result<CircuitNode, BuilderError> {
+    pub fn build(self) -> Result<ProposedNode, BuilderError> {
         let node_id = self
             .node_id
             .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
@@ -109,10 +90,7 @@ impl CircuitNodeBuilder {
             .endpoints
             .ok_or_else(|| BuilderError::MissingField("endpoints".to_string()))?;
 
-        let node = CircuitNode {
-            id: node_id,
-            endpoints,
-        };
+        let node = ProposedNode { node_id, endpoints };
 
         Ok(node)
     }

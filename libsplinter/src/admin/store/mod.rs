@@ -33,6 +33,7 @@ mod circuit_node;
 #[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
+mod proposed_node;
 mod service;
 pub mod yaml;
 
@@ -41,14 +42,13 @@ use std::fmt;
 
 use crate::hex::{as_hex, deserialize_hex};
 
-pub use self::builders::{
-    CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
-};
+pub use self::builders::{CircuitProposalBuilder, ProposedCircuitBuilder, ProposedServiceBuilder};
 pub use self::circuit::{
     AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
 };
 pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
 use self::error::AdminServiceStoreError;
+pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
 pub use self::service::{Service, ServiceBuilder};
 
 /// Native representation of a circuit that is being proposed in a proposal
@@ -113,13 +113,6 @@ pub enum ProposalType {
     AddNode,
     RemoveNode,
     Destroy,
-}
-
-/// Native representation of a node in a proposed circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ProposedNode {
-    node_id: String,
-    endpoints: Vec<String>,
 }
 
 /// Native representation of a service that is a part of a proposed circuit
@@ -230,7 +223,7 @@ impl CircuitPredicate {
                         .circuit
                         .members
                         .iter()
-                        .find(|node| node_id == &node.node_id)
+                        .find(|node| node_id == node.node_id())
                         .is_none()
                     {
                         return false;

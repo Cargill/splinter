@@ -313,7 +313,7 @@ impl From<ProposedCircuit> for Circuit {
             members: circuit
                 .members
                 .iter()
-                .map(|node| node.node_id.to_string())
+                .map(|node| node.node_id().to_string())
                 .collect(),
             auth: circuit.authorization_type,
             persistence: circuit.persistence,

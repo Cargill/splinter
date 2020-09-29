@@ -814,11 +814,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 }
 
                 for node in nodes.into_iter() {
-                    if !state.circuit_state.nodes.contains_key(&node.node_id) {
+                    if !state.circuit_state.nodes.contains_key(node.node_id()) {
                         state
                             .circuit_state
                             .nodes
-                            .insert(node.node_id.to_string(), CircuitNode::from(node));
+                            .insert(node.node_id().to_string(), CircuitNode::from(node));
                     }
                 }
             } else {
@@ -1100,9 +1100,9 @@ mod tests {
     use super::*;
 
     use crate::admin::store::builders::{
-        CircuitProposalBuilder, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
+        CircuitProposalBuilder, ProposedCircuitBuilder, ProposedServiceBuilder,
     };
-    use crate::admin::store::CircuitNodeBuilder;
+    use crate::admin::store::{CircuitNodeBuilder, ProposedNodeBuilder};
     use crate::admin::store::{ProposalType, Vote, VoteRecord};
     use crate::hex::parse_hex;
 

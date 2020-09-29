@@ -139,7 +139,7 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
             .iter()
             .map(|node| ProposedNodeModel {
                 circuit_id: proposed_circuit.circuit_id.clone(),
-                node_id: node.node_id.clone(),
+                node_id: node.node_id().into(),
             })
             .collect()
     }
@@ -160,10 +160,10 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
         let mut endpoint_models = Vec::new();
         for node in &proposed_circuit.members {
             endpoint_models.extend(
-                node.endpoints
+                node.endpoints()
                     .iter()
                     .map(|endpoint| ProposedNodeEndpointModel {
-                        node_id: node.node_id.clone(),
+                        node_id: node.node_id().into(),
                         endpoint: endpoint.clone(),
                     })
                     .collect::<Vec<ProposedNodeEndpointModel>>(),

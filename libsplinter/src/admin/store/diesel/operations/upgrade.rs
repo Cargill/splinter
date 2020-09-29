@@ -57,7 +57,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                     &proposed_circuit
                         .members
                         .iter()
-                        .map(|node| node.node_id.to_string())
+                        .map(|node| node.node_id().to_string())
                         .collect::<Vec<String>>(),
                 )
                 .with_authorization(&proposed_circuit.authorization_type)
@@ -112,7 +112,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                     &proposed_circuit
                         .members
                         .iter()
-                        .map(|node| node.node_id.to_string())
+                        .map(|node| node.node_id().to_string())
                         .collect::<Vec<String>>(),
                 )
                 .with_auth(&proposed_circuit.authorization_type)
