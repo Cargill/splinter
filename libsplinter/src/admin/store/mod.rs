@@ -27,9 +27,9 @@
 //! [`DieselAdminServiceStore`]: diesel/struct.DieselAdminServiceStore.html
 //! [`Diesel`]: https://crates.io/crates/diesel
 
-mod builders;
 mod circuit;
 mod circuit_node;
+mod circuit_proposal;
 #[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
@@ -42,64 +42,18 @@ pub mod yaml;
 use std::cmp::Ordering;
 use std::fmt;
 
-use crate::hex::{as_hex, deserialize_hex};
-
-pub use self::builders::CircuitProposalBuilder;
 pub use self::circuit::{
     AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
 };
 pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
+pub use self::circuit_proposal::{
+    CircuitProposal, CircuitProposalBuilder, ProposalType, Vote, VoteRecord, VoteRecordBuilder,
+};
 use self::error::AdminServiceStoreError;
 pub use self::proposed_circuit::{ProposedCircuit, ProposedCircuitBuilder};
 pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
 pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};
 pub use self::service::{Service, ServiceBuilder};
-
-/// Native representation of a circuit proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct CircuitProposal {
-    pub proposal_type: ProposalType,
-    pub circuit_id: String,
-    pub circuit_hash: String,
-    pub circuit: ProposedCircuit,
-    pub votes: Vec<VoteRecord>,
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
-    pub requester: Vec<u8>,
-    pub requester_node_id: String,
-}
-
-impl CircuitProposal {
-    /// Adds a vote record to a pending circuit proposal
-    pub fn add_vote(&mut self, vote: VoteRecord) {
-        self.votes.push(vote);
-    }
-}
-
-/// Native representation of a vote record for a proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct VoteRecord {
-    pub public_key: Vec<u8>,
-    pub vote: Vote,
-    pub voter_node_id: String,
-}
-
-/// Represents a vote, either accept or reject, for a circuit proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum Vote {
-    Accept,
-    Reject,
-}
-
-/// Represents the of  type change the circuit proposal is for
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum ProposalType {
-    Create,
-    UpdateRoster,
-    AddNode,
-    RemoveNode,
-    Destroy,
-}
 
 /// The unique ID of service made up of a circuit ID and the individual service ID.
 /// A service ID is only required to be unique from within a circuit.
@@ -192,12 +146,12 @@ impl CircuitPredicate {
     pub fn apply_to_proposals(&self, proposal: &CircuitProposal) -> bool {
         match self {
             CircuitPredicate::ManagmentTypeEq(man_type) => {
-                proposal.circuit.circuit_management_type() == man_type
+                proposal.circuit().circuit_management_type() == man_type
             }
             CircuitPredicate::MembersInclude(nodes) => {
                 for node_id in nodes {
                     if proposal
-                        .circuit
+                        .circuit()
                         .members()
                         .iter()
                         .find(|node| node_id == node.node_id())

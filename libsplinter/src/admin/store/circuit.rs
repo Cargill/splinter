@@ -274,9 +274,7 @@ impl CircuitBuilder {
             .members
             .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
 
-        let auth = self
-            .auth
-            .unwrap_or_else(|| AuthorizationType::Trust);
+        let auth = self.auth.unwrap_or_else(|| AuthorizationType::Trust);
 
         let persistence = self.persistence.unwrap_or_else(PersistenceType::default);
 

@@ -43,7 +43,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 ))),
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
-            let proposed_circuit = proposal.circuit;
+            let proposed_circuit = proposal.circuit();
             let circuit = CircuitBuilder::new()
                 .with_circuit_id(proposed_circuit.circuit_id())
                 .with_roster(
@@ -76,7 +76,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .map(CircuitNode::from)
                 .collect::<Vec<CircuitNode>>();
 
-            self.remove_proposal(&proposal.circuit_id)
+            self.remove_proposal(proposal.circuit_id())
                 .and_then(|_| self.add_circuit(circuit, circuit_nodes))?;
             Ok(())
         })
@@ -98,7 +98,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 ))),
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
-            let proposed_circuit = &proposal.circuit;
+            let proposed_circuit = proposal.circuit();
             let circuit = CircuitBuilder::new()
                 .with_circuit_id(proposed_circuit.circuit_id())
                 .with_roster(
@@ -131,7 +131,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .map(CircuitNode::from)
                 .collect::<Vec<CircuitNode>>();
 
-            self.remove_proposal(&proposal.circuit_id)
+            self.remove_proposal(proposal.circuit_id())
                 .and_then(|_| self.add_circuit(circuit, circuit_nodes))?;
             Ok(())
         })

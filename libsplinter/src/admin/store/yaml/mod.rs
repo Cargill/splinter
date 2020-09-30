@@ -426,17 +426,20 @@ impl AdminServiceStore for YamlAdminServiceStore {
             if state
                 .proposal_state
                 .proposals
-                .contains_key(&proposal.circuit_id)
+                .contains_key(proposal.circuit_id())
             {
                 return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A proposal with ID {} already exists", proposal.circuit_id),
+                    context: format!(
+                        "A proposal with ID {} already exists",
+                        proposal.circuit_id()
+                    ),
                     source: None,
                 });
             } else {
                 state
                     .proposal_state
                     .proposals
-                    .insert(proposal.circuit_id.to_string(), proposal);
+                    .insert(proposal.circuit_id().to_string(), proposal);
             }
         }
 
@@ -468,15 +471,18 @@ impl AdminServiceStore for YamlAdminServiceStore {
             if state
                 .proposal_state
                 .proposals
-                .contains_key(&proposal.circuit_id)
+                .contains_key(proposal.circuit_id())
             {
                 state
                     .proposal_state
                     .proposals
-                    .insert(proposal.circuit_id.to_string(), proposal);
+                    .insert(proposal.circuit_id().to_string(), proposal);
             } else {
                 return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A proposal with ID {} does not exist", proposal.circuit_id),
+                    context: format!(
+                        "A proposal with ID {} does not exist",
+                        proposal.circuit_id()
+                    ),
                     source: None,
                 });
             }
@@ -795,10 +801,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
                     })?;
 
             if let Some(proposal) = state.proposal_state.proposals.remove(circuit_id) {
-                let nodes = proposal.circuit.members().to_vec();
-                let services = proposal.circuit.roster().to_vec();
+                let nodes = proposal.circuit().members().to_vec();
+                let services = proposal.circuit().roster().to_vec();
 
-                let circuit = Circuit::from(proposal.circuit);
+                let circuit = Circuit::from(proposal.circuit().clone());
                 state
                     .circuit_state
                     .circuits
@@ -1099,11 +1105,10 @@ mod tests {
 
     use super::*;
 
-    use crate::admin::store::builders::CircuitProposalBuilder;
     use crate::admin::store::{
-        CircuitNodeBuilder, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
+        CircuitNodeBuilder, CircuitProposalBuilder, ProposalType, ProposedCircuitBuilder,
+        ProposedNodeBuilder, ProposedServiceBuilder, Vote, VoteRecordBuilder,
     };
-    use crate::admin::store::{ProposalType, Vote, VoteRecord};
     use crate::hex::parse_hex;
 
     const CIRCUIT_STATE: &[u8] = b"---
@@ -1318,14 +1323,19 @@ proposals:
             .expect("unable to fetch proposals")
             .is_none());
 
-        proposal.add_vote(VoteRecord {
-            public_key: parse_hex(
-                "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
-            )
-            .unwrap(),
-            vote: Vote::Accept,
-            voter_node_id: "bubba-node-000".into(),
-        });
+        proposal.add_vote(
+            VoteRecordBuilder::new()
+                .with_public_key(
+                    &parse_hex(
+                        "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
+                    )
+                    .unwrap(),
+                )
+                .with_vote(&Vote::Accept)
+                .with_voter_node_id("bubba-node-000")
+                .build()
+                .expect("Unable to build vote record"),
+        );
 
         store
             .update_proposal(proposal.clone())
@@ -1355,7 +1365,7 @@ proposals:
             .expect("Unable to remove proposals");
 
         let mut yaml_state = BTreeMap::new();
-        yaml_state.insert(new_proposal.circuit_id.to_string(), new_proposal);
+        yaml_state.insert(new_proposal.circuit_id().to_string(), new_proposal);
         let mut yaml_state_vec = serde_yaml::to_vec(&ProposalState {
             proposals: yaml_state,
         })

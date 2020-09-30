@@ -15,9 +15,66 @@
 //! Structs for building services
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::hex::{as_hex, deserialize_hex};
 
 use super::error::BuilderError;
-use super::{CircuitProposal, ProposalType, ProposedCircuit, VoteRecord};
+use super::ProposedCircuit;
+
+/// Native representation of a circuit proposal
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct CircuitProposal {
+    proposal_type: ProposalType,
+    circuit_id: String,
+    circuit_hash: String,
+    circuit: ProposedCircuit,
+    votes: Vec<VoteRecord>,
+    #[serde(serialize_with = "as_hex")]
+    #[serde(deserialize_with = "deserialize_hex")]
+    requester: Vec<u8>,
+    requester_node_id: String,
+}
+
+impl CircuitProposal {
+    /// Adds a vote record to a pending circuit proposal
+    pub fn add_vote(&mut self, vote: VoteRecord) {
+        self.votes.push(vote);
+    }
+
+    /// Returns the proposal type of the proposal
+    pub fn proposal_type(&self) -> &ProposalType {
+        &self.proposal_type
+    }
+
+    /// Returns the circuit ID of the circuit in the proposal
+    pub fn circuit_id(&self) -> &str {
+        &self.circuit_id
+    }
+
+    /// Returns the hash of the circuit in the proposal
+    pub fn circuit_hash(&self) -> &str {
+        &self.circuit_id
+    }
+
+    /// Returns the circuit in the proposal
+    pub fn circuit(&self) -> &ProposedCircuit {
+        &self.circuit
+    }
+
+    /// Returns the list of vote records in the proposal
+    pub fn votes(&self) -> &[VoteRecord] {
+        &self.votes
+    }
+
+    /// Returns the public key that requested the proposal
+    pub fn requester(&self) -> &[u8] {
+        &self.requester
+    }
+
+    /// Returns the node id the requester belongs to
+    pub fn requester_node_id(&self) -> &str {
+        &self.requester_node_id
+    }
+}
 
 /// Builder to be used to build a `CircuitProposal`
 #[derive(Clone, Default)]
@@ -193,4 +250,111 @@ impl CircuitProposalBuilder {
             requester_node_id,
         })
     }
+}
+
+// Native representation of a vote record for a proposal
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct VoteRecord {
+    #[serde(serialize_with = "as_hex")]
+    #[serde(deserialize_with = "deserialize_hex")]
+    public_key: Vec<u8>,
+    vote: Vote,
+    voter_node_id: String,
+}
+
+impl VoteRecord {
+    /// Returns the public key that submitted the vote
+    pub fn public_key(&self) -> &[u8] {
+        &self.public_key
+    }
+
+    /// Returns the vote value of the record
+    pub fn vote(&self) -> &Vote {
+        &self.vote
+    }
+
+    /// Returns the node id the vote record is for
+    pub fn voter_node_id(&self) -> &str {
+        &self.voter_node_id
+    }
+}
+
+#[derive(Default)]
+pub struct VoteRecordBuilder {
+    public_key: Option<Vec<u8>>,
+    vote: Option<Vote>,
+    voter_node_id: Option<String>,
+}
+
+impl VoteRecordBuilder {
+    pub fn new() -> Self {
+        VoteRecordBuilder::default()
+    }
+
+    /// Returns the public key that submitted the vote
+    pub fn public_key(&self) -> Option<Vec<u8>> {
+        self.public_key.clone()
+    }
+
+    /// Returns the vote value of the record
+    pub fn vote(&self) -> Option<Vote> {
+        self.vote.clone()
+    }
+
+    /// Returns the node id the vote record is for
+    pub fn voter_node_id(&self) -> Option<String> {
+        self.voter_node_id.clone()
+    }
+
+    pub fn with_public_key(mut self, public_key: &[u8]) -> VoteRecordBuilder {
+        self.public_key = Some(public_key.to_vec());
+        self
+    }
+
+    pub fn with_vote(mut self, vote: &Vote) -> VoteRecordBuilder {
+        self.vote = Some(vote.clone());
+        self
+    }
+
+    pub fn with_voter_node_id(mut self, node_id: &str) -> VoteRecordBuilder {
+        self.voter_node_id = Some(node_id.to_string());
+        self
+    }
+
+    pub fn build(self) -> Result<VoteRecord, BuilderError> {
+        let public_key = self
+            .public_key
+            .ok_or_else(|| BuilderError::MissingField("public_key".to_string()))?;
+
+        let vote = self
+            .vote
+            .ok_or_else(|| BuilderError::MissingField("vote".to_string()))?;
+
+        let voter_node_id = self
+            .voter_node_id
+            .ok_or_else(|| BuilderError::MissingField("vote_node_id".to_string()))?;
+
+        Ok(VoteRecord {
+            public_key,
+            vote,
+            voter_node_id,
+        })
+    }
+}
+
+/// Represents a vote, either accept or reject, for a circuit proposal
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum Vote {
+    Accept,
+    Reject,
+}
+
+/// Represents the of  type change the circuit proposal is for
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum ProposalType {
+    Create,
+    UpdateRoster,
+    AddNode,
+    RemoveNode,
+    Destroy,
 }

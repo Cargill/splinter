@@ -49,7 +49,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
         self.conn.transaction::<(), _, _>(|| {
             // Verify the `circuit_proposal` entry to be updated exists
             circuit_proposal::table
-                .filter(circuit_proposal::circuit_id.eq(&proposal.circuit_id))
+                .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -64,7 +64,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
 
             // Update existing `CircuitProposal`
             let proposal_model = CircuitProposalModel::from(&proposal);
-            update(circuit_proposal::table.find(&proposal.circuit_id))
+            update(circuit_proposal::table.find(proposal.circuit_id()))
                 .set((
                     circuit_proposal::proposal_type.eq(proposal_model.proposal_type),
                     circuit_proposal::circuit_hash.eq(proposal_model.circuit_hash),
@@ -77,10 +77,11 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     source: Box::new(err),
                 })?;
             // Update existing `ProposedCircuit`
-            let proposed_circuit_model = ProposedCircuitModel::from(&proposal.circuit);
-            update(proposed_circuit::table.find(&proposal.circuit_id))
+            let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
+            update(proposed_circuit::table.find(proposal.circuit_id()))
                 .set((
-                    proposed_circuit::authorization_type.eq(proposed_circuit_model.authorization_type),
+                    proposed_circuit::authorization_type
+                        .eq(proposed_circuit_model.authorization_type),
                     proposed_circuit::persistence.eq(proposed_circuit_model.persistence),
                     proposed_circuit::durability.eq(proposed_circuit_model.durability),
                     proposed_circuit::routes.eq(proposed_circuit_model.routes),
@@ -98,7 +99,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
 
             // Delete existing data associated with the `CircuitProposal` and `ProposedCircuit`
             let node_ids: Vec<String> = proposed_node::table
-                .filter(proposed_node::circuit_id.eq(&proposal.circuit_id))
+                .filter(proposed_node::circuit_id.eq(proposal.circuit_id()))
                 .select(proposed_node::node_id)
                 .load(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -106,12 +107,14 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     source: Box::new(err),
                 })?;
 
-            delete(proposed_node::table.filter(proposed_node::circuit_id.eq(&proposal.circuit_id)))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to remove old proposed Nodes"),
-                    source: Box::new(err),
-                })?;
+            delete(
+                proposed_node::table.filter(proposed_node::circuit_id.eq(proposal.circuit_id())),
+            )
+            .execute(self.conn)
+            .map_err(|err| AdminServiceStoreError::QueryError {
+                context: String::from("Failed to remove old proposed Nodes"),
+                source: Box::new(err),
+            })?;
             delete(
                 proposed_node_endpoint::table
                     .filter(proposed_node_endpoint::node_id.eq_any(&node_ids)),
@@ -123,7 +126,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             })?;
             delete(
                 proposed_service::table
-                    .filter(proposed_service::circuit_id.eq(&proposal.circuit_id)),
+                    .filter(proposed_service::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
@@ -132,7 +135,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             })?;
             delete(
                 proposed_service_argument::table
-                    .filter(proposed_service_argument::circuit_id.eq(&proposal.circuit_id)),
+                    .filter(proposed_service_argument::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
@@ -141,14 +144,14 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             })?;
             delete(
                 proposed_service_allowed_node::table
-                    .filter(proposed_service_allowed_node::circuit_id.eq(&proposal.circuit_id)),
+                    .filter(proposed_service_allowed_node::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
                 context: String::from("Failed to remove old proposed Services' allowed nodes"),
                 source: Box::new(err),
             })?;
-            delete(vote_record::table.filter(vote_record::circuit_id.eq(&proposal.circuit_id)))
+            delete(vote_record::table.filter(vote_record::circuit_id.eq(proposal.circuit_id())))
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Failed to remove old proposal's vote records"),
@@ -158,7 +161,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             // Insert the updated info for all of the `CircuitProposal` and `ProposedCircuit`
             // associated data
             // Insert `members` of a `ProposedCircuit`
-            let proposed_members: Vec<ProposedNodeModel> = Vec::from(&proposal.circuit);
+            let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
             insert_into(proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)
@@ -168,7 +171,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 })?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)
@@ -177,7 +180,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
-            let proposed_service: Vec<ProposedServiceModel> = Vec::from(&proposal.circuit);
+            let proposed_service: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
             insert_into(proposed_service::table)
                 .values(proposed_service)
                 .execute(self.conn)
@@ -187,7 +190,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 })?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
                 .execute(self.conn)
@@ -197,7 +200,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 })?;
             // Insert `allowed_nodes` from the `Services` inserted above
             let proposed_service_allowed_node: Vec<ProposedServiceAllowedNodeModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_allowed_node::table)
                 .values(proposed_service_allowed_node)
                 .execute(self.conn)
@@ -228,7 +231,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
         self.conn.transaction::<(), _, _>(|| {
             // Verify the `circuit_proposal` entry to be updated exists
             circuit_proposal::table
-                .filter(circuit_proposal::circuit_id.eq(&proposal.circuit_id))
+                .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -243,7 +246,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
 
             // Update existing `CircuitProposal`
             let proposal_model = CircuitProposalModel::from(&proposal);
-            update(circuit_proposal::table.find(&proposal.circuit_id))
+            update(circuit_proposal::table.find(proposal.circuit_id()))
                 .set((
                     circuit_proposal::proposal_type.eq(proposal_model.proposal_type),
                     circuit_proposal::circuit_hash.eq(proposal_model.circuit_hash),
@@ -256,10 +259,11 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     source: Box::new(err),
                 })?;
             // Update existing `ProposedCircuit`
-            let proposed_circuit_model = ProposedCircuitModel::from(&proposal.circuit);
-            update(proposed_circuit::table.find(&proposal.circuit_id))
+            let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
+            update(proposed_circuit::table.find(proposal.circuit_id()))
                 .set((
-                    proposed_circuit::authorization_type.eq(proposed_circuit_model.authorization_type),
+                    proposed_circuit::authorization_type
+                        .eq(proposed_circuit_model.authorization_type),
                     proposed_circuit::persistence.eq(proposed_circuit_model.persistence),
                     proposed_circuit::durability.eq(proposed_circuit_model.durability),
                     proposed_circuit::routes.eq(proposed_circuit_model.routes),
@@ -277,7 +281,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
 
             // Delete existing data associated with the `CircuitProposal` and `ProposedCircuit`
             let node_ids: Vec<String> = proposed_node::table
-                .filter(proposed_node::circuit_id.eq(&proposal.circuit_id))
+                .filter(proposed_node::circuit_id.eq(proposal.circuit_id()))
                 .select(proposed_node::node_id)
                 .load(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -285,12 +289,14 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     source: Box::new(err),
                 })?;
 
-            delete(proposed_node::table.filter(proposed_node::circuit_id.eq(&proposal.circuit_id)))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to remove old proposed Nodes"),
-                    source: Box::new(err),
-                })?;
+            delete(
+                proposed_node::table.filter(proposed_node::circuit_id.eq(proposal.circuit_id())),
+            )
+            .execute(self.conn)
+            .map_err(|err| AdminServiceStoreError::QueryError {
+                context: String::from("Failed to remove old proposed Nodes"),
+                source: Box::new(err),
+            })?;
             delete(
                 proposed_node_endpoint::table
                     .filter(proposed_node_endpoint::node_id.eq_any(&node_ids)),
@@ -302,7 +308,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             })?;
             delete(
                 proposed_service::table
-                    .filter(proposed_service::circuit_id.eq(&proposal.circuit_id)),
+                    .filter(proposed_service::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
@@ -311,7 +317,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             })?;
             delete(
                 proposed_service_argument::table
-                    .filter(proposed_service_argument::circuit_id.eq(&proposal.circuit_id)),
+                    .filter(proposed_service_argument::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
@@ -320,14 +326,14 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             })?;
             delete(
                 proposed_service_allowed_node::table
-                    .filter(proposed_service_allowed_node::circuit_id.eq(&proposal.circuit_id)),
+                    .filter(proposed_service_allowed_node::circuit_id.eq(proposal.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
                 context: String::from("Failed to remove old proposed Services' allowed nodes"),
                 source: Box::new(err),
             })?;
-            delete(vote_record::table.filter(vote_record::circuit_id.eq(&proposal.circuit_id)))
+            delete(vote_record::table.filter(vote_record::circuit_id.eq(proposal.circuit_id())))
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Failed to remove old proposal's vote records"),
@@ -337,7 +343,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             // Insert the updated info for all of the `CircuitProposal` and `ProposedCircuit`
             // associated data
             // Insert `members` of a `ProposedCircuit`
-            let proposed_members: Vec<ProposedNodeModel> = Vec::from(&proposal.circuit);
+            let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
             insert_into(proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)
@@ -347,7 +353,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 })?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)
@@ -356,7 +362,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
-            let proposed_service: Vec<ProposedServiceModel> = Vec::from(&proposal.circuit);
+            let proposed_service: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
             insert_into(proposed_service::table)
                 .values(proposed_service)
                 .execute(self.conn)
@@ -366,7 +372,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 })?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
                 .execute(self.conn)
@@ -376,7 +382,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 })?;
             // Insert `allowed_nodes` from the `Services` inserted above
             let proposed_service_allowed_node: Vec<ProposedServiceAllowedNodeModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_allowed_node::table)
                 .values(proposed_service_allowed_node)
                 .execute(self.conn)

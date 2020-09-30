@@ -26,6 +26,7 @@ use crate::admin::store::diesel::schema::{
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::admin::store::{
     AuthorizationType, DurabilityType, PersistenceType, ProposalType, RouteType, Vote, VoteRecord,
+    VoteRecordBuilder,
 };
 use crate::admin::store::{Circuit, CircuitProposal, ProposedCircuit};
 
@@ -44,11 +45,11 @@ pub struct CircuitProposalModel {
 impl From<&CircuitProposal> for CircuitProposalModel {
     fn from(proposal: &CircuitProposal) -> Self {
         CircuitProposalModel {
-            proposal_type: String::from(&proposal.proposal_type),
-            circuit_id: proposal.circuit_id.clone(),
-            circuit_hash: proposal.circuit_hash.clone(),
-            requester: proposal.requester.clone(),
-            requester_node_id: proposal.requester_node_id.clone(),
+            proposal_type: String::from(proposal.proposal_type()),
+            circuit_id: proposal.circuit_id().into(),
+            circuit_hash: proposal.circuit_hash().into(),
+            requester: proposal.requester().to_vec(),
+            requester_node_id: proposal.requester_node_id().into(),
         }
     }
 }
@@ -99,13 +100,13 @@ pub struct VoteRecordModel {
 impl From<&CircuitProposal> for Vec<VoteRecordModel> {
     fn from(proposal: &CircuitProposal) -> Self {
         proposal
-            .votes
+            .votes()
             .iter()
             .map(|vote| VoteRecordModel {
-                circuit_id: proposal.circuit_id.clone(),
-                public_key: vote.public_key.clone(),
-                vote: String::from(&vote.vote),
-                voter_node_id: vote.voter_node_id.clone(),
+                circuit_id: proposal.circuit_id().into(),
+                public_key: vote.public_key().into(),
+                vote: String::from(vote.vote()),
+                voter_node_id: vote.voter_node_id().into(),
             })
             .collect()
     }
@@ -114,11 +115,15 @@ impl From<&CircuitProposal> for Vec<VoteRecordModel> {
 impl TryFrom<&VoteRecordModel> for VoteRecord {
     type Error = AdminServiceStoreError;
     fn try_from(vote: &VoteRecordModel) -> Result<Self, Self::Error> {
-        Ok(VoteRecord {
-            public_key: vote.public_key.clone(),
-            vote: Vote::try_from(vote.vote.clone())?,
-            voter_node_id: vote.voter_node_id.clone(),
-        })
+        VoteRecordBuilder::new()
+            .with_public_key(&vote.public_key)
+            .with_vote(&Vote::try_from(vote.vote.clone())?)
+            .with_voter_node_id(&vote.voter_node_id)
+            .build()
+            .map_err(|err| AdminServiceStoreError::StorageError {
+                context: String::from("Failed to build VoteRecord"),
+                source: Some(Box::new(err)),
+            })
     }
 }
 
