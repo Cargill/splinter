@@ -35,11 +35,6 @@ pub struct CircuitProposal {
 }
 
 impl CircuitProposal {
-    /// Adds a vote record to a pending circuit proposal
-    pub fn add_vote(&mut self, vote: VoteRecord) {
-        self.votes.push(vote);
-    }
-
     /// Returns the proposal type of the proposal
     pub fn proposal_type(&self) -> &ProposalType {
         &self.proposal_type
@@ -73,6 +68,17 @@ impl CircuitProposal {
     /// Returns the node id the requester belongs to
     pub fn requester_node_id(&self) -> &str {
         &self.requester_node_id
+    }
+
+    pub fn builder(&self) -> CircuitProposalBuilder {
+        CircuitProposalBuilder::new()
+            .with_proposal_type(self.proposal_type())
+            .with_circuit_id(self.circuit_id())
+            .with_circuit_hash(self.circuit_hash())
+            .with_circuit(self.circuit())
+            .with_votes(self.votes())
+            .with_requester(self.requester())
+            .with_requester_node_id(self.requester_node_id())
     }
 }
 

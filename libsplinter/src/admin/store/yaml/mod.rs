@@ -1310,7 +1310,7 @@ proposals:
             .expect("Unable to create yaml admin store");
 
         // fetch existing proposal from state
-        let mut proposal = store
+        let proposal = store
             .get_proposal("WBKLF-BBBBB")
             .expect("unable to fetch proposals")
             .expect("Expected proposal, got none");
@@ -1323,8 +1323,9 @@ proposals:
             .expect("unable to fetch proposals")
             .is_none());
 
-        proposal.add_vote(
-            VoteRecordBuilder::new()
+        let updated_proposal = proposal
+            .builder()
+            .with_votes(&vec![VoteRecordBuilder::new()
                 .with_public_key(
                     &parse_hex(
                         "035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550",
@@ -1334,11 +1335,12 @@ proposals:
                 .with_vote(&Vote::Accept)
                 .with_voter_node_id("bubba-node-000")
                 .build()
-                .expect("Unable to build vote record"),
-        );
+                .expect("Unable to build vote record")])
+            .build()
+            .expect("Unable to build updated proposal");
 
         store
-            .update_proposal(proposal.clone())
+            .update_proposal(updated_proposal.clone())
             .expect("Unable to update proposal");
 
         let new_proposal = new_proposal();
@@ -1357,7 +1359,7 @@ proposals:
                 .list_proposals(&vec![])
                 .expect("Unable to get list of proposals")
                 .collect::<Vec<CircuitProposal>>(),
-            vec![proposal, new_proposal.clone()]
+            vec![updated_proposal, new_proposal.clone()]
         );
 
         store
