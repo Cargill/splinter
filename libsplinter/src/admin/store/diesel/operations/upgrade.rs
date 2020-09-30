@@ -43,35 +43,35 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 ))),
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
-            let proposed_circuit = &proposal.circuit;
+            let proposed_circuit = proposal.circuit;
             let circuit = CircuitBuilder::new()
-                .with_circuit_id(&proposed_circuit.circuit_id)
+                .with_circuit_id(proposed_circuit.circuit_id())
                 .with_roster(
                     &proposed_circuit
-                        .roster
+                        .roster()
                         .iter()
                         .map(Service::from)
                         .collect::<Vec<Service>>(),
                 )
                 .with_members(
                     &proposed_circuit
-                        .members
+                        .members()
                         .iter()
                         .map(|node| node.node_id().to_string())
                         .collect::<Vec<String>>(),
                 )
-                .with_authorization(&proposed_circuit.authorization_type)
-                .with_persistence(&proposed_circuit.persistence)
-                .with_durability(&proposed_circuit.durability)
-                .with_routes(&proposed_circuit.routes)
-                .with_circuit_management_type(&proposed_circuit.circuit_management_type)
+                .with_auth(proposed_circuit.authorization_type())
+                .with_persistence(proposed_circuit.persistence())
+                .with_durability(proposed_circuit.durability())
+                .with_routes(proposed_circuit.routes())
+                .with_circuit_management_type(proposed_circuit.circuit_management_type())
                 .build()
                 .map_err(|err| AdminServiceStoreError::StorageError {
                     context: String::from("Failed to build Circuit"),
                     source: Some(Box::new(err)),
                 })?;
             let circuit_nodes = proposed_circuit
-                .members
+                .members()
                 .iter()
                 .map(CircuitNode::from)
                 .collect::<Vec<CircuitNode>>();
@@ -100,33 +100,33 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
             // Need to construct the `Circuit` from the `ProposedCircuit`
             let proposed_circuit = &proposal.circuit;
             let circuit = CircuitBuilder::new()
-                .with_circuit_id(&proposed_circuit.circuit_id)
+                .with_circuit_id(proposed_circuit.circuit_id())
                 .with_roster(
                     &proposed_circuit
-                        .roster
+                        .roster()
                         .iter()
                         .map(Service::from)
                         .collect::<Vec<Service>>(),
                 )
                 .with_members(
                     &proposed_circuit
-                        .members
+                        .members()
                         .iter()
                         .map(|node| node.node_id().to_string())
                         .collect::<Vec<String>>(),
                 )
-                .with_auth(&proposed_circuit.authorization_type)
-                .with_persistence(&proposed_circuit.persistence)
-                .with_durability(&proposed_circuit.durability)
-                .with_routes(&proposed_circuit.routes)
-                .with_circuit_management_type(&proposed_circuit.circuit_management_type)
+                .with_auth(proposed_circuit.authorization_type())
+                .with_persistence(proposed_circuit.persistence())
+                .with_durability(proposed_circuit.durability())
+                .with_routes(proposed_circuit.routes())
+                .with_circuit_management_type(proposed_circuit.circuit_management_type())
                 .build()
                 .map_err(|err| AdminServiceStoreError::StorageError {
                     context: String::from("Failed to build Circuit"),
                     source: Some(Box::new(err)),
                 })?;
             let circuit_nodes = proposed_circuit
-                .members
+                .members()
                 .iter()
                 .map(CircuitNode::from)
                 .collect::<Vec<CircuitNode>>();

@@ -12,45 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs for building circuits
+//! Structs for building proposed circuits
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::hex::{as_hex, deserialize_hex};
 
 use super::error::BuilderError;
-use super::{ProposedCircuit, Service};
+use super::{
+    AuthorizationType, DurabilityType, PersistenceType, ProposedNode, ProposedService, RouteType,
+};
 
-/// Native representation of a circuit in state
+/// Native representation of a circuit that is being proposed in a proposal
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct Circuit {
-    id: String,
-    roster: Vec<Service>,
-    members: Vec<String>,
-    auth: AuthorizationType,
+pub struct ProposedCircuit {
+    circuit_id: String,
+    roster: Vec<ProposedService>,
+    members: Vec<ProposedNode>,
+    authorization_type: AuthorizationType,
     persistence: PersistenceType,
     durability: DurabilityType,
     routes: RouteType,
     circuit_management_type: String,
+    #[serde(serialize_with = "as_hex")]
+    #[serde(deserialize_with = "deserialize_hex")]
+    #[serde(default)]
+    application_metadata: Vec<u8>,
+    comments: String,
 }
 
-impl Circuit {
+impl ProposedCircuit {
     /// Returns the ID of the circuit
     pub fn circuit_id(&self) -> &str {
-        &self.id
+        &self.circuit_id
     }
 
     /// Returns the list of service that are in the circuit
-    pub fn roster(&self) -> &[Service] {
+    pub fn roster(&self) -> &[ProposedService] {
         &self.roster
     }
 
     /// Returns the list of node IDs that are in the circuit
-    pub fn members(&self) -> &[String] {
+    pub fn members(&self) -> &[ProposedNode] {
         &self.members
     }
 
     /// Returns the authorization type of the circuit
-    pub fn auth(&self) -> &AuthorizationType {
-        &self.auth
+    pub fn authorization_type(&self) -> &AuthorizationType {
+        &self.authorization_type
     }
 
     /// Returns the persistence type type of the circuit
@@ -72,81 +80,56 @@ impl Circuit {
     pub fn circuit_management_type(&self) -> &str {
         &self.circuit_management_type
     }
-}
 
-/// What type of authorization the circuit requires
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum AuthorizationType {
-    Trust,
-}
+    pub fn application_metadata(&self) -> &[u8] {
+        &self.application_metadata
+    }
 
-/// A circuits message persistence strategy
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum PersistenceType {
-    Any,
-}
-
-impl Default for PersistenceType {
-    fn default() -> Self {
-        PersistenceType::Any
+    /// Returns the mangement type of the circuit
+    pub fn comments(&self) -> &str {
+        &self.comments
     }
 }
 
-/// A circuits durability requirement
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum DurabilityType {
-    NoDurability,
-}
-
-/// How messages are expected to be routed across a circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum RouteType {
-    Any,
-}
-
-impl Default for RouteType {
-    fn default() -> Self {
-        RouteType::Any
-    }
-}
-
-/// Builder to be used to build a `Circuit`
+/// Builder to be used to build a `ProposedCircuit` which will be included in a `CircuitProposal`
 #[derive(Default, Clone)]
-pub struct CircuitBuilder {
+pub struct ProposedCircuitBuilder {
     circuit_id: Option<String>,
-    roster: Option<Vec<Service>>,
-    members: Option<Vec<String>>,
-    auth: Option<AuthorizationType>,
+    roster: Option<Vec<ProposedService>>,
+    members: Option<Vec<ProposedNode>>,
+    authorization_type: Option<AuthorizationType>,
     persistence: Option<PersistenceType>,
     durability: Option<DurabilityType>,
     routes: Option<RouteType>,
     circuit_management_type: Option<String>,
+    application_metadata: Option<Vec<u8>>,
+    comments: Option<String>,
 }
 
-impl CircuitBuilder {
-    /// Creates a new circuit builder
+impl ProposedCircuitBuilder {
+    /// Creates a new proposed circuit builder
     pub fn new() -> Self {
-        CircuitBuilder::default()
+        ProposedCircuitBuilder::default()
     }
 
-    /// Returns the circuit ID in the builder
+    // Returns the circuit ID in the builder
     pub fn circuit_id(&self) -> Option<String> {
         self.circuit_id.clone()
     }
 
     /// Returns the list of services in the builder
-    pub fn roster(&self) -> Option<Vec<Service>> {
+    pub fn roster(&self) -> Option<Vec<ProposedService>> {
         self.roster.clone()
     }
 
     /// Returns the list of node IDs in the builder
-    pub fn members(&self) -> Option<Vec<String>> {
+    pub fn members(&self) -> Option<Vec<ProposedNode>> {
         self.members.clone()
     }
 
-    /// Returns the authorization type in the builder
-    pub fn auth(&self) -> Option<AuthorizationType> {
-        self.auth.clone()
+    /// Returns the authorizationtype in the builder
+    pub fn authorization_type(&self) -> Option<AuthorizationType> {
+        self.authorization_type.clone()
     }
 
     /// Returns the persistence type in the builder
@@ -169,12 +152,22 @@ impl CircuitBuilder {
         self.circuit_management_type.clone()
     }
 
+    /// Returns the appplication metdata in the builder
+    pub fn application_metadata(&self) -> Option<Vec<u8>> {
+        self.application_metadata.clone()
+    }
+
+    /// Returns the comments describing the circuit proposal in the builder
+    pub fn comments(&self) -> Option<String> {
+        self.comments.clone()
+    }
+
     /// Sets the circuit ID
     ///
     /// # Arguments
     ///
     ///  * `circuit_id` - The unique ID of the circuit
-    pub fn with_circuit_id(mut self, circuit_id: &str) -> CircuitBuilder {
+    pub fn with_circuit_id(mut self, circuit_id: &str) -> ProposedCircuitBuilder {
         self.circuit_id = Some(circuit_id.into());
         self
     }
@@ -183,29 +176,29 @@ impl CircuitBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `services` - List of services
-    pub fn with_roster(mut self, services: &[Service]) -> CircuitBuilder {
+    ///  * `services` - List of proposed services
+    pub fn with_roster(mut self, services: &[ProposedService]) -> ProposedCircuitBuilder {
         self.roster = Some(services.into());
         self
     }
 
-    /// Sets the list of node IDs for the members in the circuit
+    /// Sets the list of nodes that are included in the circuit
     ///
     /// # Arguments
     ///
-    ///  * `members` - List of node IDs
-    pub fn with_members(mut self, members: &[String]) -> CircuitBuilder {
+    ///  * `members` - List of proposed nodes
+    pub fn with_members(mut self, members: &[ProposedNode]) -> ProposedCircuitBuilder {
         self.members = Some(members.into());
         self
     }
 
-    /// Sets the authorization type
+    /// Sets the authorizationtype
     ///
     /// # Arguments
     ///
     ///  * `auth` - The authorization type for the circuit
-    pub fn with_auth(mut self, auth: &AuthorizationType) -> CircuitBuilder {
-        self.auth = Some(auth.clone());
+    pub fn with_authorization_type(mut self, auth: &AuthorizationType) -> ProposedCircuitBuilder {
+        self.authorization_type = Some(auth.clone());
         self
     }
 
@@ -214,46 +207,72 @@ impl CircuitBuilder {
     /// # Arguments
     ///
     ///  * `persistence` - The persistence type for the circuit
-    pub fn with_persistence(mut self, persistence: &PersistenceType) -> CircuitBuilder {
+    pub fn with_persistence(mut self, persistence: &PersistenceType) -> ProposedCircuitBuilder {
         self.persistence = Some(persistence.clone());
         self
     }
 
-    /// Sets the durabilitye type
+    /// Sets the durability type
     ///
     /// # Arguments
     ///
     ///  * `durability` - The durability type for the circuit
-    pub fn with_durability(mut self, durability: &DurabilityType) -> CircuitBuilder {
+    pub fn with_durability(mut self, durability: &DurabilityType) -> ProposedCircuitBuilder {
         self.durability = Some(durability.clone());
         self
     }
 
-    /// Sets the routing type
+    /// Sets the routes type
     ///
     /// # Arguments
     ///
-    ///  * `route_type` - The routing type for the circuit
-    pub fn with_routes(mut self, route_type: &RouteType) -> CircuitBuilder {
+    ///  * `routes` - The routes type for the circuit
+    pub fn with_routes(mut self, route_type: &RouteType) -> ProposedCircuitBuilder {
         self.routes = Some(route_type.clone());
         self
     }
 
-    /// Sets the circuit management type
+    /// Sets the circuit managment type
     ///
     /// # Arguments
     ///
-    ///  * `circuit_management_type` - The circuit management type for a circuit
-    pub fn with_circuit_management_type(mut self, circuit_management_type: &str) -> CircuitBuilder {
+    ///  * `circuit_management_type` - The circuit_management_type for the circuit
+    pub fn with_circuit_management_type(
+        mut self,
+        circuit_management_type: &str,
+    ) -> ProposedCircuitBuilder {
         self.circuit_management_type = Some(circuit_management_type.into());
         self
     }
 
-    /// Builds a `Circuit`
+    /// Sets the application metadata
+    ///
+    /// # Arguments
+    ///
+    ///  * `application_metadata` - The application_metadata for the proposed circuit
+    pub fn with_application_metadata(
+        mut self,
+        application_metadata: &[u8],
+    ) -> ProposedCircuitBuilder {
+        self.application_metadata = Some(application_metadata.into());
+        self
+    }
+
+    /// Sets the comments
+    ///
+    /// # Arguments
+    ///
+    ///  * `comments` - The comments describing the purpose of the proposed circuit
+    pub fn with_comments(mut self, comments: &str) -> ProposedCircuitBuilder {
+        self.comments = Some(comments.into());
+        self
+    }
+
+    /// Builds a `ProposedCircuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
     /// type are not set.
-    pub fn build(self) -> Result<Circuit, BuilderError> {
+    pub fn build(self) -> Result<ProposedCircuit, BuilderError> {
         let circuit_id = match self.circuit_id {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
             Some(circuit_id) => {
@@ -274,8 +293,8 @@ impl CircuitBuilder {
             .members
             .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
 
-        let auth = self
-            .auth
+        let authorization_type = self
+            .authorization_type
             .unwrap_or_else(|| AuthorizationType::Trust);
 
         let persistence = self.persistence.unwrap_or_else(PersistenceType::default);
@@ -290,36 +309,23 @@ impl CircuitBuilder {
             .circuit_management_type
             .ok_or_else(|| BuilderError::MissingField("circuit_management_type".to_string()))?;
 
-        let create_circuit_message = Circuit {
-            id: circuit_id,
+        let application_metadata = self.application_metadata.unwrap_or_default();
+
+        let comments = self.comments.unwrap_or_default();
+
+        let create_circuit_message = ProposedCircuit {
+            circuit_id,
             roster,
             members,
-            auth,
+            authorization_type,
             persistence,
             durability,
             routes,
             circuit_management_type,
+            application_metadata,
+            comments,
         };
 
         Ok(create_circuit_message)
-    }
-}
-
-impl From<ProposedCircuit> for Circuit {
-    fn from(circuit: ProposedCircuit) -> Self {
-        Circuit {
-            id: circuit.circuit_id().into(),
-            roster: circuit.roster().iter().map(Service::from).collect(),
-            members: circuit
-                .members()
-                .iter()
-                .map(|node| node.node_id().to_string())
-                .collect(),
-            auth: circuit.authorization_type().clone(),
-            persistence: circuit.persistence().clone(),
-            durability: circuit.durability().clone(),
-            routes: circuit.routes().clone(),
-            circuit_management_type: circuit.circuit_management_type().into(),
-        }
     }
 }

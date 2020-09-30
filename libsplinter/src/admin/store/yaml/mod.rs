@@ -795,8 +795,8 @@ impl AdminServiceStore for YamlAdminServiceStore {
                     })?;
 
             if let Some(proposal) = state.proposal_state.proposals.remove(circuit_id) {
-                let nodes = proposal.circuit.members.to_vec();
-                let services = proposal.circuit.roster.to_vec();
+                let nodes = proposal.circuit.members().to_vec();
+                let services = proposal.circuit.roster().to_vec();
 
                 let circuit = Circuit::from(proposal.circuit);
                 state
@@ -1099,8 +1099,10 @@ mod tests {
 
     use super::*;
 
-    use crate::admin::store::builders::{CircuitProposalBuilder, ProposedCircuitBuilder};
-    use crate::admin::store::{CircuitNodeBuilder, ProposedNodeBuilder, ProposedServiceBuilder};
+    use crate::admin::store::builders::CircuitProposalBuilder;
+    use crate::admin::store::{
+        CircuitNodeBuilder, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
+    };
     use crate::admin::store::{ProposalType, Vote, VoteRecord};
     use crate::hex::parse_hex;
 

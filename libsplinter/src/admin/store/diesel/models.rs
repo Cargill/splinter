@@ -72,14 +72,14 @@ pub struct ProposedCircuitModel {
 impl From<&ProposedCircuit> for ProposedCircuitModel {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         ProposedCircuitModel {
-            circuit_id: proposed_circuit.circuit_id.clone(),
-            authorization_type: String::from(&proposed_circuit.authorization_type),
-            persistence: String::from(&proposed_circuit.persistence),
-            durability: String::from(&proposed_circuit.durability),
-            routes: String::from(&proposed_circuit.routes),
-            circuit_management_type: proposed_circuit.circuit_management_type.clone(),
-            application_metadata: proposed_circuit.application_metadata.clone(),
-            comments: proposed_circuit.comments.clone(),
+            circuit_id: proposed_circuit.circuit_id().into(),
+            authorization_type: String::from(proposed_circuit.authorization_type()),
+            persistence: String::from(proposed_circuit.persistence()),
+            durability: String::from(proposed_circuit.durability()),
+            routes: String::from(proposed_circuit.routes()),
+            circuit_management_type: proposed_circuit.circuit_management_type().into(),
+            application_metadata: proposed_circuit.application_metadata().into(),
+            comments: proposed_circuit.comments().into(),
         }
     }
 }
@@ -135,10 +135,10 @@ pub struct ProposedNodeModel {
 impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         proposed_circuit
-            .members
+            .members()
             .iter()
             .map(|node| ProposedNodeModel {
-                circuit_id: proposed_circuit.circuit_id.clone(),
+                circuit_id: proposed_circuit.circuit_id().into(),
                 node_id: node.node_id().into(),
             })
             .collect()
@@ -158,7 +158,7 @@ pub struct ProposedNodeEndpointModel {
 impl From<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         let mut endpoint_models = Vec::new();
-        for node in &proposed_circuit.members {
+        for node in proposed_circuit.members() {
             endpoint_models.extend(
                 node.endpoints()
                     .iter()
@@ -187,10 +187,10 @@ pub struct ProposedServiceModel {
 impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         proposed_circuit
-            .roster
+            .roster()
             .iter()
             .map(|service| ProposedServiceModel {
-                circuit_id: proposed_circuit.circuit_id.clone(),
+                circuit_id: proposed_circuit.circuit_id().into(),
                 service_id: service.service_id().into(),
                 service_type: service.service_type().into(),
             })
@@ -212,13 +212,13 @@ pub struct ProposedServiceAllowedNodeModel {
 impl From<&ProposedCircuit> for Vec<ProposedServiceAllowedNodeModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         let mut allowed_nodes = Vec::new();
-        for service in &proposed_circuit.roster {
+        for service in proposed_circuit.roster() {
             allowed_nodes.extend(
                 service
                     .allowed_nodes()
                     .iter()
                     .map(|node| ProposedServiceAllowedNodeModel {
-                        circuit_id: proposed_circuit.circuit_id.clone(),
+                        circuit_id: proposed_circuit.circuit_id().into(),
                         service_id: service.service_id().into(),
                         allowed_node: node.into(),
                     })
@@ -244,13 +244,13 @@ pub struct ProposedServiceArgumentModel {
 impl From<&ProposedCircuit> for Vec<ProposedServiceArgumentModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         let mut service_arguments = Vec::new();
-        for service in &proposed_circuit.roster {
+        for service in proposed_circuit.roster() {
             service_arguments.extend(
                 service
                     .arguments()
                     .iter()
                     .map(|(key, value)| ProposedServiceArgumentModel {
-                        circuit_id: proposed_circuit.circuit_id.clone(),
+                        circuit_id: proposed_circuit.circuit_id().into(),
                         service_id: service.service_id().into(),
                         key: key.into(),
                         value: value.into(),

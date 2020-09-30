@@ -33,6 +33,7 @@ mod circuit_node;
 #[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
+mod proposed_circuit;
 mod proposed_node;
 mod proposed_service;
 mod service;
@@ -43,33 +44,16 @@ use std::fmt;
 
 use crate::hex::{as_hex, deserialize_hex};
 
-pub use self::builders::{CircuitProposalBuilder, ProposedCircuitBuilder};
+pub use self::builders::CircuitProposalBuilder;
 pub use self::circuit::{
     AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
 };
 pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
 use self::error::AdminServiceStoreError;
+pub use self::proposed_circuit::{ProposedCircuit, ProposedCircuitBuilder};
 pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
 pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};
 pub use self::service::{Service, ServiceBuilder};
-
-/// Native representation of a circuit that is being proposed in a proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ProposedCircuit {
-    circuit_id: String,
-    roster: Vec<ProposedService>,
-    members: Vec<ProposedNode>,
-    authorization_type: AuthorizationType,
-    persistence: PersistenceType,
-    durability: DurabilityType,
-    routes: RouteType,
-    circuit_management_type: String,
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
-    #[serde(default)]
-    application_metadata: Vec<u8>,
-    comments: String,
-}
 
 /// Native representation of a circuit proposal
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -208,13 +192,13 @@ impl CircuitPredicate {
     pub fn apply_to_proposals(&self, proposal: &CircuitProposal) -> bool {
         match self {
             CircuitPredicate::ManagmentTypeEq(man_type) => {
-                &proposal.circuit.circuit_management_type == man_type
+                proposal.circuit.circuit_management_type() == man_type
             }
             CircuitPredicate::MembersInclude(nodes) => {
                 for node_id in nodes {
                     if proposal
                         .circuit
-                        .members
+                        .members()
                         .iter()
                         .find(|node| node_id == node.node_id())
                         .is_none()
