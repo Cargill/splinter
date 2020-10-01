@@ -261,7 +261,7 @@ pub trait RoutingTableReader: Send {
     /// # Arguments
     ///
     /// * `service_id` -  The unique ID for the service to be fetched
-    fn fetch_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError>;
+    fn get_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError>;
 
     /// Returns all the services for the provided circuit
     ///
@@ -280,7 +280,7 @@ pub trait RoutingTableReader: Send {
     /// # Arguments
     ///
     /// * `node_id` -  The unique ID for the node to be fetched
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError>;
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError>;
 
     /// Returns the circuits in the routing table
     fn list_circuits(&self) -> Result<CircuitIter, ListCircuitsError>;
@@ -290,5 +290,5 @@ pub trait RoutingTableReader: Send {
     /// # Arguments
     ///
     /// * `circuit_id` -  The unique ID for the circuit to be fetched
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError>;
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError>;
 }

@@ -114,7 +114,7 @@ fn test_high_load_2_to_14_circuits() {
     }
 
     let fetched_circuit = reader
-        .fetch_circuit(&first_circuit.circuit_id)
+        .get_circuit(&first_circuit.circuit_id)
         .expect("Unable to fetch 1st circuit");
     assert_eq!(fetched_circuit, Some(first_circuit.clone()));
 
@@ -129,12 +129,12 @@ fn test_high_load_2_to_14_circuits() {
         service.service_id.to_string(),
     );
     let fetched_service = reader
-        .fetch_service(&service_id)
+        .get_service(&service_id)
         .expect("Unable to fetch service");
     assert_eq!(fetched_service, Some(service));
 
     let fetched_node = reader
-        .fetch_node(&first_node.node_id)
+        .get_node(&first_node.node_id)
         .expect("Unable to fetch node");
     assert_eq!(fetched_node, Some(first_node));
 }
@@ -185,7 +185,7 @@ fn test_high_load_start_up_cost_threads(b: &mut Bencher) {
     });
 
     let fetched_circuit = reader
-        .fetch_circuit(&first_circuit.circuit_id)
+        .get_circuit(&first_circuit.circuit_id)
         .expect("Unable to fetch circuit");
     assert_eq!(fetched_circuit, Some(first_circuit.clone()));
 }
@@ -220,7 +220,7 @@ fn test_high_load_start_up_cost(b: &mut Bencher) {
     });
 
     let fetched_circuit = reader
-        .fetch_circuit(&first_circuit.circuit_id)
+        .get_circuit(&first_circuit.circuit_id)
         .expect("Unable to get 1st circuit");
     assert_eq!(fetched_circuit, Some(first_circuit));
 }
@@ -926,7 +926,7 @@ fn run_read_test(circuit_pow: u32, node_pow: u32, b: &mut Bencher) {
 
     b.iter(|| {
         fetched_circuit = reader
-            .fetch_circuit(&first_circuit.circuit_id)
+            .get_circuit(&first_circuit.circuit_id)
             .expect("Unable to fetch circuits");
     });
 

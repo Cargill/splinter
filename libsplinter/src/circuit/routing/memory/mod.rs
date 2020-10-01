@@ -61,7 +61,7 @@ impl RoutingTableReader for RoutingTable {
     /// * `service_id` -  The unique ID for the service to be fetched
     ///
     /// Returns an error if the lock is poisoned.
-    fn fetch_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError> {
+    fn get_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError> {
         Ok(self
             .state
             .read()
@@ -117,7 +117,7 @@ impl RoutingTableReader for RoutingTable {
     /// * `node_id` -  The unique ID for the node to be fetched
     ///
     /// Returns an error if the lock was poisoned
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError> {
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError> {
         Ok(self
             .state
             .read()
@@ -148,7 +148,7 @@ impl RoutingTableReader for RoutingTable {
     /// * `circuit_id` -  The unique ID for the circuit to be fetched
     ///
     /// Returns an error if the lock is poisoned
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError> {
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError> {
         Ok(self
             .state
             .read()
