@@ -74,8 +74,23 @@ in the circuit template directory, `/usr/share/splinter/circuit-templates`, unle
 
 ```
 $ splinter circuit template list
-Available templates:
-scabbard
+TEMPLATE PATH
+scabbard /usr/share/splinter/circuit-templates/scabbard.yaml
+```
+
+If the `SPLINTER_CIRCUIT_TEMPLATE_PATH` is set with multiple directories, all
+YAML files located in these directories will be displayed, including circuit
+template files with the same file names.
+
+```
+$ export SPLINTER_CIRCUIT_TEMPLATE_PATH='/foo:/bar'
+$ splinter circuit template list
+TEMPLATE PATH
+foo      /foo/foo.yaml
+bar      /foo/bar.yaml
+foo      /bar/foo.yaml
+bar      /bar/bar.yaml
+scabbard /usr/share/splinter/circuit-templates/scabbard.yaml
 ```
 
 SEE ALSO
