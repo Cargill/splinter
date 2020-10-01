@@ -12,36 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines an API for managing the API for writing and reading circuit state and pending circuit
-//! proposals. The provided `AdminServiceStore` trait makes no assumptions about the storage
-//! backend.
+//! Data store for writing and reading circuit state and pending circuit proposals.
 //!
-//! The public interface includes the trait [`AdminServiceStore`] and structs for
-//! [`Circuit`], [`ProposedCircuit`], [`CircuitNode`], [`ProposedNode`], [`Service`],
-//! [`ProposedService`], and [`CircuitProposal`]. A YAML backed [`YamlAdminServiceStore`] is
-//! also available.
+//! The [`AdminServiceStore`] trait provides the public interface for storing circuits and
+//! proposals. Splinter provides the following implementations of this trait:
 //!
-//! Builders are also provided. The structs are [`CircuitBuilder`], [`ProposedCircuitBuilder`],
-//! [`CircuitNodeBuilder`], [`ProposedNodeBuilder`], [`ServiceBuilder`],
-//! [`ProposedServiceBuilder`], and [`CircuitProposalBuilder`].
+//! * [`YamlAdminServiceStore`] - A YAML-backed store that is available by default
+//! * [`DieselAdminServiceStore`] - A database-backed store, powered by [`Diesel`], that currently
+//!   supports SQLite databases (with the `sqlite` feature) and PostgreSQL databases (with the
+//!   `postgres` feature).
 //!
 //! [`AdminServiceStore`]: trait.AdminServiceStore.html
-//! [`Circuit`]: struct.Circuit.html
-//! [`ProposedCircuit`]: struct.ProposedCircuit.html
-//! [`CircuitNode`]: struct.CircuitNode.html
-//! [`ProposedNode`]: struct.ProposedNode.html
-//! [`Service`]: struct.Service.html
-//! [`ProposedService`]: struct.ProposedService.html
-//! [`CircuitProposal`]: struct.CircuitProposal.html
 //! [`YamlAdminServiceStore`]: yaml/struct.YamlAdminServiceStore.html
-//!
-//! [`CircuitBuilder`]: struct.CircuitBuilder.html
-//! [`ProposedCircuitBuilder`]: struct.ProposedCircuitBuilder.html
-//! [`CircuitNodeBuilder`]: struct.CircuitNodeBuilder.html
-//! [`ProposedNodeBuilder`]: struct.ProposedNodeBuilder.html
-//! [`ServiceBuilder`]: struct.ServiceBuilder.html
-//! [`ProposedServiceBuilder`]: struct.ProposedServiceBuilder.html
-//! [`CircuitProposalBuilder`]: struct.CircuitProposalBuilder.html
+//! [`DieselAdminServiceStore`]: diesel/struct.DieselAdminServiceStore.html
+//! [`Diesel`]: https://crates.io/crates/diesel
 
 mod builders;
 #[cfg(feature = "diesel")]
@@ -336,10 +320,9 @@ impl CircuitPredicate {
     }
 }
 
-/// Defines methods for CRUD operations and fetching and listing circuits, proposals, nodes and
-/// services without defining a storage strategy
+/// Interface for performing CRUD operations on circuits, proposals, nodes, and services
 pub trait AdminServiceStore: Send + Sync {
-    /// Adds a circuit proposal to the underlying storage
+    /// Adds a circuit proposal to the store
     ///
     /// # Arguments
     ///
@@ -348,7 +331,7 @@ pub trait AdminServiceStore: Send + Sync {
     ///  Returns an error if a `CircuitProposal` with the same ID already exists
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError>;
 
-    /// Updates a circuit proposal in the underlying storage
+    /// Updates a circuit proposal in the store
     ///
     /// # Arguments
     ///
@@ -357,7 +340,7 @@ pub trait AdminServiceStore: Send + Sync {
     ///  Returns an error if a `CircuitProposal` with the same ID does not exist
     fn update_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError>;
 
-    /// Removes a circuit proposal from the underlying storage
+    /// Removes a circuit proposal from the store
     ///
     /// # Arguments
     ///
@@ -366,7 +349,7 @@ pub trait AdminServiceStore: Send + Sync {
     ///  Returns an error if a `CircuitProposal` with specified ID does not exist
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError>;
 
-    /// Fetches a circuit proposal from the underlying storage
+    /// Fetches a circuit proposal from the store
     ///
     /// # Arguments
     ///
@@ -376,7 +359,7 @@ pub trait AdminServiceStore: Send + Sync {
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError>;
 
-    /// List circuit proposals from the underlying storage
+    /// List circuit proposals from the store
     ///
     /// The proposals returned can be filtered by provided `CircuitPredicate`. This enables
     /// filtering by management type and members.
@@ -385,8 +368,7 @@ pub trait AdminServiceStore: Send + Sync {
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitProposal>>, AdminServiceStoreError>;
 
-    /// Adds a circuit to the underlying storage. Also includes the associated Services and
-    /// Nodes
+    /// Adds a circuit to the store along with the associated services and nodes
     ///
     /// # Arguments
     ///
@@ -400,7 +382,7 @@ pub trait AdminServiceStore: Send + Sync {
         nodes: Vec<CircuitNode>,
     ) -> Result<(), AdminServiceStoreError>;
 
-    /// Updates a circuit in the underlying storage
+    /// Updates a circuit in the store
     ///
     /// # Arguments
     ///
@@ -409,7 +391,7 @@ pub trait AdminServiceStore: Send + Sync {
     ///  Returns an error if a `CircuitProposal` with the same ID does not exist
     fn update_circuit(&self, circuit: Circuit) -> Result<(), AdminServiceStoreError>;
 
-    /// Removes a circuit from the underlying storage
+    /// Removes a circuit from the store
     ///
     /// # Arguments
     ///
@@ -418,44 +400,43 @@ pub trait AdminServiceStore: Send + Sync {
     ///  Returns an error if a `Circuit` with the specified ID does not exist
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError>;
 
-    /// Fetches a circuit from the underlying storage
+    /// Fetches a circuit from the store
     ///
     /// # Arguments
     ///
     ///  * `circuit_id` - The unique ID of the circuit to be returned
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
 
-    /// List all circuits from the underlying storage
+    /// List all circuits from the store
     ///
-    /// The proposals returned can be filtered by provided `CircuitPredicate`. This enables
-    /// filtering by management type and members.
+    /// `CircuitPredicate`s may be provided for filtering which circuits are returned.
     fn list_circuits(
         &self,
         predicates: &[CircuitPredicate],
     ) -> Result<Box<dyn ExactSizeIterator<Item = Circuit>>, AdminServiceStoreError>;
 
-    /// Adds a circuit to the underlying storage based on the proposal that is already in state.
-    /// Also includes the associated Services and Nodes. The associated circuit proposal for
-    /// the circuit ID is also removed
+    /// Adds a circuit, along with the associated services and nodes, to the store based on the
+    /// proposal that is already in state. The associated circuit proposal for the circuit ID is
+    /// also removed.
     ///
     /// # Arguments
     ///
     ///  * `circuit_id` - The ID of the circuit proposal that should be converted to a circuit
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError>;
 
-    /// Fetches a node from the underlying storage
+    /// Fetches a node from the store
     ///
     /// # Arguments
     ///
     ///  * `node_id` - The unique ID of the node to be returned
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError>;
 
-    /// List all nodes from the underlying storage
+    /// List all nodes from the store
     fn list_nodes(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = CircuitNode>>, AdminServiceStoreError>;
 
-    /// Fetches a service from the underlying storage
+    /// Fetches a service from the store
     ///
     /// # Arguments
     ///
@@ -465,7 +446,7 @@ pub trait AdminServiceStore: Send + Sync {
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError>;
 
-    /// List all services in a specific circuit from the underlying storage
+    /// List all services in a specific circuit from the store
     ///
     /// # Arguments
     ///
