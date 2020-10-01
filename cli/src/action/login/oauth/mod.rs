@@ -15,6 +15,7 @@
 mod callback;
 mod error;
 mod provider;
+mod storage;
 
 use std::path::PathBuf;
 
@@ -57,6 +58,8 @@ pub fn handle_oauth2_login(base_url: &str, user_splinter_dir: PathBuf) -> Result
         .get_tokens()
         .map_err(|err| CliError::ActionError(err.to_string()))?;
 
+    storage::save_tokens(&user_splinter_dir, &tokens)
+        .map_err(|err| CliError::ActionError(err.to_string()))?;
 
     Ok(())
 }
