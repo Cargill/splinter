@@ -97,7 +97,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     #[cfg(feature = "login")]
     {
-        let mut login_subcommand = SubCommand::with_name("login")
+        let mut login_subcommand = SubCommand::with_name("login");
+        login_subcommand = login_subcommand
             .about("Log in to the Splinter REST API")
             .long_about(
                 "Authenticate using one of the supported methods in order to use \

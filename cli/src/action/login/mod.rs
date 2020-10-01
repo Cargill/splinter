@@ -19,12 +19,31 @@ use clap::ArgMatches;
 
 use crate::error::CliError;
 
-use super::Action;
+use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
 pub struct LoginAction;
 
 impl Action for LoginAction {
-    fn run<'a>(&mut self, _arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        if cfg!(feature = "login-oauth2") {
+            let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+
+            let mut splinter_dir = dirs::home_dir().ok_or_else(|| {
+                CliError::ActionError(
+                    "Unable to determine your home directory; this is required to log in.".into(),
+                )
+            })?;
+            splinter_dir.push(".splinter");
+
+            let url = args
+                .value_of("url")
+                .map(ToOwned::to_owned)
+                .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+                .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
+
+            return oauth::handle_oauth2_login(&url, splinter_dir);
+        }
+
         Ok(())
     }
 }
