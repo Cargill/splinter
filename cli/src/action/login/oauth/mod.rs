@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(feature = "login-oauth2-github", feature = "login-oauth2-google"))]
 mod callback;
 mod error;
+mod provider;
+
+use std::path::PathBuf;
 
 /// Contains the user information returned by an OAuth2 Provider.
 pub struct UserTokens {
