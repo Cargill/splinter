@@ -11,20 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#[cfg(feature = "login-oauth2")]
-mod oauth;
-
-use clap::ArgMatches;
-
-use crate::error::CliError;
-
-use super::Action;
-
-pub struct LoginAction;
-
-impl Action for LoginAction {
-    fn run<'a>(&mut self, _arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        Ok(())
-    }
-}

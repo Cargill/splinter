@@ -66,6 +66,7 @@ experimental = [
     "circuit-template",
     "health",
     "login",
+    "login-oauth2",
     "postgres",
     "circuit-auth-type",
 ]
@@ -78,6 +79,7 @@ health = []
 
 database = ["splinter/postgres", "diesel", "postgres"]
 login = []
+login-oauth2 = ["login"]
 
 postgres = [
     "diesel/postgres",
