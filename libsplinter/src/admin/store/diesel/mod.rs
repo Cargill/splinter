@@ -34,10 +34,10 @@ use crate::admin::store::{
 };
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
-use operations::fetch_circuit::AdminServiceStoreFetchCircuitOperation as _;
-use operations::fetch_node::AdminServiceStoreFetchNodeOperation as _;
-use operations::fetch_proposal::AdminServiceStoreFetchProposalOperation as _;
-use operations::fetch_service::AdminServiceStoreFetchServiceOperation as _;
+use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
+use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
+use operations::get_proposal::AdminServiceStoreFetchProposalOperation as _;
+use operations::get_service::AdminServiceStoreFetchServiceOperation as _;
 use operations::list_circuits::AdminServiceStoreListCircuitsOperation as _;
 use operations::list_nodes::AdminServiceStoreListNodesOperation as _;
 use operations::list_proposals::AdminServiceStoreListProposalsOperation as _;
@@ -97,11 +97,11 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_proposal(proposal_id)
     }
 
-    fn fetch_proposal(
+    fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_proposal(proposal_id)
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_proposal(proposal_id)
     }
 
     fn list_proposals(
@@ -127,8 +127,8 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_circuit(circuit_id)
     }
 
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_circuit(circuit_id)
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_circuit(circuit_id)
     }
 
     fn list_circuits(
@@ -143,8 +143,8 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
             .upgrade_proposal_to_circuit(circuit_id)
     }
 
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_node(node_id)
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_node(node_id)
     }
 
     fn list_nodes(
@@ -153,11 +153,11 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_nodes()
     }
 
-    fn fetch_service(
+    fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_service(service_id)
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_service(service_id)
     }
 
     fn list_services(
@@ -182,11 +182,11 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_proposal(proposal_id)
     }
 
-    fn fetch_proposal(
+    fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_proposal(proposal_id)
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_proposal(proposal_id)
     }
 
     fn list_proposals(
@@ -212,8 +212,8 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).remove_circuit(circuit_id)
     }
 
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_circuit(circuit_id)
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_circuit(circuit_id)
     }
 
     fn list_circuits(
@@ -228,8 +228,8 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
             .upgrade_proposal_to_circuit(circuit_id)
     }
 
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_node(node_id)
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_node(node_id)
     }
 
     fn list_nodes(
@@ -238,11 +238,11 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_nodes()
     }
 
-    fn fetch_service(
+    fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError> {
-        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).fetch_service(service_id)
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).get_service(service_id)
     }
 
     fn list_services(

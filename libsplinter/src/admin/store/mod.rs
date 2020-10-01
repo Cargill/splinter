@@ -371,7 +371,7 @@ pub trait AdminServiceStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `proposal_id` - The unique ID of the circuit proposal to be returned
-    fn fetch_proposal(
+    fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError>;
@@ -423,7 +423,7 @@ pub trait AdminServiceStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `circuit_id` - The unique ID of the circuit to be returned
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
 
     /// List all circuits from the underlying storage
     ///
@@ -448,7 +448,7 @@ pub trait AdminServiceStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `node_id` - The unique ID of the node to be returned
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError>;
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError>;
 
     /// List all nodes from the underlying storage
     fn list_nodes(
@@ -460,7 +460,7 @@ pub trait AdminServiceStore: Send + Sync {
     /// # Arguments
     ///
     ///  * `service_id` - The `ServiceId` of a service made up of the circuit ID and service ID
-    fn fetch_service(
+    fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError>;
