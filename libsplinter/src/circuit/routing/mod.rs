@@ -268,7 +268,7 @@ pub trait RoutingTableReader: Send {
     /// # Arguments
     ///
     /// * `circuit_id` -  The unique ID the circuit whose services should be returned
-    fn list_service(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError>;
+    fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError>;
 
     // ---------- methods to access circuit directory ----------
 

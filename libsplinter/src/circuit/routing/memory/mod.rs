@@ -78,7 +78,7 @@ impl RoutingTableReader for RoutingTable {
     /// * `circuit_id` -  The unique ID the circuit whose services should be returned
     ///
     /// Returns an error if the lock is poisoned or if the circuit does not exist
-    fn list_service(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError> {
+    fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError> {
         if let Some(circuit) = self
             .state
             .read()
