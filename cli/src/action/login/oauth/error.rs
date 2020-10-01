@@ -27,3 +27,15 @@ impl fmt::Display for OAuth2ProviderError {
 }
 
 impl Error for OAuth2ProviderError {}
+
+/// May be returned if the OAuth2Callback encounters an error during processing.
+#[derive(Debug)]
+pub struct OAuth2CallbackError(pub String);
+
+impl fmt::Display for OAuth2CallbackError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Error for OAuth2CallbackError {}
