@@ -95,6 +95,18 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     );
 
+    #[cfg(feature = "login")]
+    {
+        let mut login_subcommand = SubCommand::with_name("login")
+            .about("Log in to the Splinter REST API")
+            .long_about(
+                "Authenticate using one of the supported methods in order to use \
+                functionality that requires higher authorization levels.",
+            );
+
+        app = app.subcommand(login_subcommand);
+    }
+
     app = app
         .subcommand(
             SubCommand::with_name("cert")
@@ -667,6 +679,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             SubcommandActions::new().with_command("generate", certs::CertGenAction),
         )
         .with_command("keygen", keygen::KeyGenAction);
+
+    #[cfg(feature = "login")]
+    {
+        use action::login;
+        subcommands = subcommands.with_command("login", login::LoginAction);
+    }
 
     let circuit_command = SubcommandActions::new()
         .with_command("propose", circuit::CircuitProposeAction)

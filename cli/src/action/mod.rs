@@ -22,6 +22,8 @@ pub mod database;
 #[cfg(feature = "health")]
 pub mod health;
 pub mod keygen;
+#[cfg(feature = "login")]
+pub mod login;
 pub mod registry;
 
 use std::collections::HashMap;

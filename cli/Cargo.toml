@@ -65,6 +65,7 @@ experimental = [
     # The following features are experimental:
     "circuit-template",
     "health",
+    "login",
     "postgres",
     "circuit-auth-type",
 ]
@@ -76,6 +77,8 @@ database-migrate-biome = ["splinter/biome"]
 health = []
 
 database = ["splinter/postgres", "diesel", "postgres"]
+login = []
+
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
