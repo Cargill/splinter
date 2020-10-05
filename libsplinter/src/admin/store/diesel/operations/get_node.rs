@@ -27,7 +27,7 @@ use crate::admin::store::{
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchNodeOperation {
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError>;
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError>;
 }
 
 impl<'a, C> AdminServiceStoreFetchNodeOperation for AdminServiceStoreOperations<'a, C>
@@ -36,7 +36,7 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
 {
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
         self.conn.transaction::<Option<CircuitNode>, _, _>(|| {
             // Retrieves the `circuit_member` entry with the matching `node_id`.
             let member: CircuitMemberModel = circuit_member::table

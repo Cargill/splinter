@@ -41,7 +41,7 @@ use crate::admin::store::{
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchProposalOperation {
-    fn fetch_proposal(
+    fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError>;
@@ -57,7 +57,7 @@ where
         diesel::Queryable<(Text, Text, Text, Text, Text, Text, Binary, Text), C::Backend>,
     VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text), C::Backend>,
 {
-    fn fetch_proposal(
+    fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {

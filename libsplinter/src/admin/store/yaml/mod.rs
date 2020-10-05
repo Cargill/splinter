@@ -518,7 +518,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
     /// # Arguments
     ///
     ///  * `proposal_id` - The unique ID of the circuit proposal to be returned
-    fn fetch_proposal(
+    fn get_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {
@@ -706,7 +706,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
     /// # Arguments
     ///
     ///  * `circuit_id` - The unique ID of the circuit to be returned
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
         Ok(self
             .state
             .lock()
@@ -815,7 +815,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
     /// # Arguments
     ///
     ///  * `node_id` - The unique ID of the node to be returned
-    fn fetch_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
         Ok(self
             .state
             .lock()
@@ -854,7 +854,7 @@ impl AdminServiceStore for YamlAdminServiceStore {
     /// # Arguments
     ///
     ///  * `service_id` - The `ServiceId` of a service made up of the circuit ID and service ID
-    fn fetch_service(
+    fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError> {
@@ -1210,11 +1210,11 @@ proposals:
             .expect("Unable to create yaml admin store");
 
         assert!(store
-            .fetch_proposal("WBKLF-BBBBB")
+            .get_proposal("WBKLF-BBBBB")
             .expect("unable to fetch proposals")
             .is_some());
         assert!(store
-            .fetch_circuit("WBKLF-AAAAA")
+            .get_circuit("WBKLF-AAAAA")
             .expect("unable to fetch circuits")
             .is_some());
     }
@@ -1259,7 +1259,7 @@ proposals:
 
         // fetch existing proposal from state
         let mut proposal = store
-            .fetch_proposal("WBKLF-BBBBB")
+            .get_proposal("WBKLF-BBBBB")
             .expect("unable to fetch proposals")
             .expect("Expected proposal, got none");
 
@@ -1267,7 +1267,7 @@ proposals:
 
         // fetch nonexisting proposal from state
         assert!(store
-            .fetch_proposal("WBKLF-BADD")
+            .get_proposal("WBKLF-BADD")
             .expect("unable to fetch proposals")
             .is_none());
 
@@ -1366,7 +1366,7 @@ proposals:
 
         // fetch existing circuit from state
         let mut circuit = store
-            .fetch_circuit("WBKLF-AAAAA")
+            .get_circuit("WBKLF-AAAAA")
             .expect("unable to fetch circuit")
             .expect("Expected circuit, got none");
 
@@ -1374,7 +1374,7 @@ proposals:
 
         // fetch nonexisting circuitfrom state
         assert!(store
-            .fetch_circuit("WBKLF-BADD")
+            .get_circuit("WBKLF-BADD")
             .expect("unable to fetch circuit")
             .is_none());
 
@@ -1475,7 +1475,7 @@ proposals:
             .expect("Unable to create yaml admin store");
 
         let node = store
-            .fetch_node("acme-node-000")
+            .get_node("acme-node-000")
             .expect("Unable to fetch node")
             .expect("expected node, got none");
 
@@ -1536,7 +1536,7 @@ proposals:
             .expect("Unable to create yaml admin store");
 
         let service = store
-            .fetch_service(&service_id)
+            .get_service(&service_id)
             .expect("Unable to fetch service")
             .expect("unable to get expected service, got none");
 
@@ -1625,9 +1625,9 @@ proposals:
             .expect("Unable to create yaml admin store");
 
         let service_id = ServiceId::new("a000".to_string(), "WBKLF-BBBBB".to_string());
-        assert_eq!(store.fetch_circuit("WBKLF-BBBBB").unwrap(), None);
-        assert_eq!(store.fetch_node("acme-node-000").unwrap(), None);
-        assert_eq!(store.fetch_service(&service_id).unwrap(), None);
+        assert_eq!(store.get_circuit("WBKLF-BBBBB").unwrap(), None);
+        assert_eq!(store.get_node("acme-node-000").unwrap(), None);
+        assert_eq!(store.get_service(&service_id).unwrap(), None);
 
         store
             .upgrade_proposal_to_circuit("WBKLF-BBBBB")
@@ -1635,9 +1635,9 @@ proposals:
 
         assert_eq!(store.list_proposals(&vec![]).unwrap().next(), None);
 
-        assert!(store.fetch_circuit("WBKLF-BBBBB").unwrap().is_some());
-        assert!(store.fetch_node("acme-node-000").unwrap().is_some());
-        assert!(store.fetch_service(&service_id).unwrap().is_some());
+        assert!(store.get_circuit("WBKLF-BBBBB").unwrap().is_some());
+        assert!(store.get_node("acme-node-000").unwrap().is_some());
+        assert!(store.get_service(&service_id).unwrap().is_some());
     }
 
     fn write_file(data: &[u8], file_path: &str) {

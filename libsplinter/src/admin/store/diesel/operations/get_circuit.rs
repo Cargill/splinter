@@ -29,7 +29,7 @@ use crate::admin::store::{
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchCircuitOperation {
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError>;
 }
 
 impl<'a, C> AdminServiceStoreFetchCircuitOperation for AdminServiceStoreOperations<'a, C>
@@ -38,7 +38,7 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
 {
-    fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
         self.conn.transaction::<Option<Circuit>, _, _>(|| {
             // Retrieve the `circuit` entry with the matching `circuit_id`
             let circuit: CircuitModel = circuit::table

@@ -20,7 +20,7 @@ use crate::admin::store::{error::AdminServiceStoreError, CircuitBuilder, Circuit
 
 use super::{
     add_circuit::AdminServiceStoreAddCircuitOperation,
-    fetch_proposal::AdminServiceStoreFetchProposalOperation,
+    get_proposal::AdminServiceStoreFetchProposalOperation,
     remove_proposal::AdminServiceStoreRemoveProposalOperation, AdminServiceStoreOperations,
 };
 
@@ -35,7 +35,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
         self.conn.transaction::<(), _, _>(|| {
             // Attempting to fetch the proposal to be upgraded. If not found, an error is returned.
-            let proposal = match self.fetch_proposal(circuit_id)? {
+            let proposal = match self.get_proposal(circuit_id)? {
                 Some(proposal) => Ok(proposal),
                 None => Err(AdminServiceStoreError::NotFoundError(format!(
                     "Cannot find circuit proposal with id: {}",
@@ -90,7 +90,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
         self.conn.transaction::<(), _, _>(|| {
             // Attempting to fetch the proposal to be upgraded. If not found, an error is returned.
-            let proposal = match self.fetch_proposal(circuit_id)? {
+            let proposal = match self.get_proposal(circuit_id)? {
                 Some(proposal) => Ok(proposal),
                 None => Err(AdminServiceStoreError::NotFoundError(format!(
                     "Cannot find circuit proposal with id: {}",

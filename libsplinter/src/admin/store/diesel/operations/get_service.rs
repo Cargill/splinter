@@ -27,7 +27,7 @@ use crate::admin::store::{
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchServiceOperation {
-    fn fetch_service(
+    fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError>;
@@ -39,7 +39,7 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
 {
-    fn fetch_service(
+    fn get_service(
         &self,
         service_id: &ServiceId,
     ) -> Result<Option<Service>, AdminServiceStoreError> {

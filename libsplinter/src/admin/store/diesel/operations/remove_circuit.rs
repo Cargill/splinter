@@ -21,7 +21,7 @@ use crate::admin::store::{
     error::AdminServiceStoreError,
 };
 
-use super::{fetch_circuit::AdminServiceStoreFetchCircuitOperation, AdminServiceStoreOperations};
+use super::{get_circuit::AdminServiceStoreFetchCircuitOperation, AdminServiceStoreOperations};
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreRemoveCircuitOperation {
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError>;
@@ -36,7 +36,7 @@ where
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
         self.conn.transaction::<(), _, _>(|| {
             // Verify the circuit attempting to be removed exists.
-            self.fetch_circuit(&circuit_id).and_then(|opt_circuit| {
+            self.get_circuit(&circuit_id).and_then(|opt_circuit| {
                 // Remove the `circuit` entry with the matching `circuit_id`
                 // The `circuit_id` foreign key has cascade delete, meaning all related tables
                 // associated to the `circuit` table via the `circuit_id` will be deleted, if the

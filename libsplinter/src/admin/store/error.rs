@@ -95,6 +95,7 @@ impl fmt::Display for AdminServiceStoreError {
     }
 }
 
+#[cfg(feature = "diesel")]
 impl From<diesel::result::Error> for AdminServiceStoreError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
