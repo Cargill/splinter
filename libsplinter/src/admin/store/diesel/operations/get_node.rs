@@ -23,7 +23,7 @@ use crate::admin::store::{
         schema::{circuit_member, node_endpoint},
     },
     error::AdminServiceStoreError,
-    CircuitNode,
+    CircuitNode, CircuitNodeBuilder,
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchNodeOperation {
@@ -63,10 +63,16 @@ where
                 .into_iter()
                 .map(|endpoint_model: NodeEndpointModel| endpoint_model.endpoint)
                 .collect();
-            Ok(Some(CircuitNode {
-                id: member.node_id,
-                endpoints,
-            }))
+            Ok(Some(
+                CircuitNodeBuilder::new()
+                    .with_node_id(&member.node_id)
+                    .with_endpoints(&endpoints)
+                    .build()
+                    .map_err(|err| AdminServiceStoreError::StorageError {
+                        context: "Unable to build CircuitNode from stored state".to_string(),
+                        source: Some(Box::new(err)),
+                    })?,
+            ))
         })
     }
 }

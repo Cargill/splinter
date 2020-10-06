@@ -44,7 +44,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
         self.conn.transaction::<(), _, _>(|| {
             // Verify the `circuit` entry to be updated exists
             circuit::table
-                .filter(circuit::circuit_id.eq(&circuit.id))
+                .filter(circuit::circuit_id.eq(circuit.circuit_id()))
                 .first::<CircuitModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -59,7 +59,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
 
             // Update existing `Circuit`
             let circuit_model = CircuitModel::from(&circuit);
-            update(circuit::table.find(&circuit.id))
+            update(circuit::table.find(circuit.circuit_id()))
                 .set((
                     circuit::auth.eq(circuit_model.auth),
                     circuit::persistence.eq(circuit_model.persistence),
@@ -73,7 +73,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                     source: Box::new(err),
                 })?;
             // Delete existing data associated with the `Circuit`
-            delete(service::table.filter(service::circuit_id.eq(&circuit.id)))
+            delete(service::table.filter(service::circuit_id.eq(circuit.circuit_id())))
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Failed to remove old Services"),
@@ -81,19 +81,22 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                 })?;
             delete(
                 service_allowed_node::table
-                    .filter(service_allowed_node::circuit_id.eq(&circuit.id)),
+                    .filter(service_allowed_node::circuit_id.eq(circuit.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
                 context: String::from("Failed to remove old Services' allowed nodes"),
                 source: Box::new(err),
             })?;
-            delete(service_argument::table.filter(service_argument::circuit_id.eq(&circuit.id)))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to remove old Service arguments"),
-                    source: Box::new(err),
-                })?;
+            delete(
+                service_argument::table
+                    .filter(service_argument::circuit_id.eq(circuit.circuit_id())),
+            )
+            .execute(self.conn)
+            .map_err(|err| AdminServiceStoreError::QueryError {
+                context: String::from("Failed to remove old Service arguments"),
+                source: Box::new(err),
+            })?;
             // Insert new data associate with the `Circuit`
             let services: Vec<ServiceModel> = Vec::from(&circuit);
             insert_into(service::table)
@@ -140,7 +143,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
         self.conn.transaction::<(), _, _>(|| {
             // Verify the `circuit` entry to be updated exists
             circuit::table
-                .filter(circuit::circuit_id.eq(&circuit.id))
+                .filter(circuit::circuit_id.eq(circuit.circuit_id()))
                 .first::<CircuitModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -155,7 +158,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
 
             // Update existing `Circuit`
             let circuit_model = CircuitModel::from(&circuit);
-            update(circuit::table.find(&circuit.id))
+            update(circuit::table.find(circuit.circuit_id()))
                 .set((
                     circuit::auth.eq(circuit_model.auth),
                     circuit::persistence.eq(circuit_model.persistence),
@@ -169,7 +172,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                     source: Box::new(err),
                 })?;
             // Delete existing data associated with the `Circuit`
-            delete(service::table.filter(service::circuit_id.eq(&circuit.id)))
+            delete(service::table.filter(service::circuit_id.eq(circuit.circuit_id())))
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Failed to remove old Services"),
@@ -177,19 +180,22 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                 })?;
             delete(
                 service_allowed_node::table
-                    .filter(service_allowed_node::circuit_id.eq(&circuit.id)),
+                    .filter(service_allowed_node::circuit_id.eq(circuit.circuit_id())),
             )
             .execute(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
                 context: String::from("Failed to remove old Services' allowed nodes"),
                 source: Box::new(err),
             })?;
-            delete(service_argument::table.filter(service_argument::circuit_id.eq(&circuit.id)))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to remove old Service arguments"),
-                    source: Box::new(err),
-                })?;
+            delete(
+                service_argument::table
+                    .filter(service_argument::circuit_id.eq(circuit.circuit_id())),
+            )
+            .execute(self.conn)
+            .map_err(|err| AdminServiceStoreError::QueryError {
+                context: String::from("Failed to remove old Service arguments"),
+                source: Box::new(err),
+            })?;
             // Insert new `Circuit` data
             let services: Vec<ServiceModel> = Vec::from(&circuit);
             insert_into(service::table)

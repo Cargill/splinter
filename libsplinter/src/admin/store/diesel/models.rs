@@ -26,6 +26,7 @@ use crate::admin::store::diesel::schema::{
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::admin::store::{
     AuthorizationType, DurabilityType, PersistenceType, ProposalType, RouteType, Vote, VoteRecord,
+    VoteRecordBuilder,
 };
 use crate::admin::store::{Circuit, CircuitProposal, ProposedCircuit};
 
@@ -44,11 +45,11 @@ pub struct CircuitProposalModel {
 impl From<&CircuitProposal> for CircuitProposalModel {
     fn from(proposal: &CircuitProposal) -> Self {
         CircuitProposalModel {
-            proposal_type: String::from(&proposal.proposal_type),
-            circuit_id: proposal.circuit_id.clone(),
-            circuit_hash: proposal.circuit_hash.clone(),
-            requester: proposal.requester.clone(),
-            requester_node_id: proposal.requester_node_id.clone(),
+            proposal_type: String::from(proposal.proposal_type()),
+            circuit_id: proposal.circuit_id().into(),
+            circuit_hash: proposal.circuit_hash().into(),
+            requester: proposal.requester().to_vec(),
+            requester_node_id: proposal.requester_node_id().into(),
         }
     }
 }
@@ -72,14 +73,14 @@ pub struct ProposedCircuitModel {
 impl From<&ProposedCircuit> for ProposedCircuitModel {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         ProposedCircuitModel {
-            circuit_id: proposed_circuit.circuit_id.clone(),
-            authorization_type: String::from(&proposed_circuit.authorization_type),
-            persistence: String::from(&proposed_circuit.persistence),
-            durability: String::from(&proposed_circuit.durability),
-            routes: String::from(&proposed_circuit.routes),
-            circuit_management_type: proposed_circuit.circuit_management_type.clone(),
-            application_metadata: proposed_circuit.application_metadata.clone(),
-            comments: proposed_circuit.comments.clone(),
+            circuit_id: proposed_circuit.circuit_id().into(),
+            authorization_type: String::from(proposed_circuit.authorization_type()),
+            persistence: String::from(proposed_circuit.persistence()),
+            durability: String::from(proposed_circuit.durability()),
+            routes: String::from(proposed_circuit.routes()),
+            circuit_management_type: proposed_circuit.circuit_management_type().into(),
+            application_metadata: proposed_circuit.application_metadata().into(),
+            comments: proposed_circuit.comments().into(),
         }
     }
 }
@@ -99,13 +100,13 @@ pub struct VoteRecordModel {
 impl From<&CircuitProposal> for Vec<VoteRecordModel> {
     fn from(proposal: &CircuitProposal) -> Self {
         proposal
-            .votes
+            .votes()
             .iter()
             .map(|vote| VoteRecordModel {
-                circuit_id: proposal.circuit_id.clone(),
-                public_key: vote.public_key.clone(),
-                vote: String::from(&vote.vote),
-                voter_node_id: vote.voter_node_id.clone(),
+                circuit_id: proposal.circuit_id().into(),
+                public_key: vote.public_key().into(),
+                vote: String::from(vote.vote()),
+                voter_node_id: vote.voter_node_id().into(),
             })
             .collect()
     }
@@ -114,11 +115,15 @@ impl From<&CircuitProposal> for Vec<VoteRecordModel> {
 impl TryFrom<&VoteRecordModel> for VoteRecord {
     type Error = AdminServiceStoreError;
     fn try_from(vote: &VoteRecordModel) -> Result<Self, Self::Error> {
-        Ok(VoteRecord {
-            public_key: vote.public_key.clone(),
-            vote: Vote::try_from(vote.vote.clone())?,
-            voter_node_id: vote.voter_node_id.clone(),
-        })
+        VoteRecordBuilder::new()
+            .with_public_key(&vote.public_key)
+            .with_vote(&Vote::try_from(vote.vote.clone())?)
+            .with_voter_node_id(&vote.voter_node_id)
+            .build()
+            .map_err(|err| AdminServiceStoreError::StorageError {
+                context: String::from("Failed to build VoteRecord"),
+                source: Some(Box::new(err)),
+            })
     }
 }
 
@@ -135,11 +140,11 @@ pub struct ProposedNodeModel {
 impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         proposed_circuit
-            .members
+            .members()
             .iter()
             .map(|node| ProposedNodeModel {
-                circuit_id: proposed_circuit.circuit_id.clone(),
-                node_id: node.node_id.clone(),
+                circuit_id: proposed_circuit.circuit_id().into(),
+                node_id: node.node_id().into(),
             })
             .collect()
     }
@@ -158,12 +163,12 @@ pub struct ProposedNodeEndpointModel {
 impl From<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         let mut endpoint_models = Vec::new();
-        for node in &proposed_circuit.members {
+        for node in proposed_circuit.members() {
             endpoint_models.extend(
-                node.endpoints
+                node.endpoints()
                     .iter()
                     .map(|endpoint| ProposedNodeEndpointModel {
-                        node_id: node.node_id.clone(),
+                        node_id: node.node_id().into(),
                         endpoint: endpoint.clone(),
                     })
                     .collect::<Vec<ProposedNodeEndpointModel>>(),
@@ -187,12 +192,12 @@ pub struct ProposedServiceModel {
 impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         proposed_circuit
-            .roster
+            .roster()
             .iter()
             .map(|service| ProposedServiceModel {
-                circuit_id: proposed_circuit.circuit_id.clone(),
-                service_id: service.service_id.clone(),
-                service_type: service.service_type.clone(),
+                circuit_id: proposed_circuit.circuit_id().into(),
+                service_id: service.service_id().into(),
+                service_type: service.service_type().into(),
             })
             .collect()
     }
@@ -212,15 +217,15 @@ pub struct ProposedServiceAllowedNodeModel {
 impl From<&ProposedCircuit> for Vec<ProposedServiceAllowedNodeModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         let mut allowed_nodes = Vec::new();
-        for service in &proposed_circuit.roster {
+        for service in proposed_circuit.roster() {
             allowed_nodes.extend(
                 service
-                    .allowed_nodes
+                    .allowed_nodes()
                     .iter()
                     .map(|node| ProposedServiceAllowedNodeModel {
-                        circuit_id: proposed_circuit.circuit_id.clone(),
-                        service_id: service.service_id.clone(),
-                        allowed_node: node.clone(),
+                        circuit_id: proposed_circuit.circuit_id().into(),
+                        service_id: service.service_id().into(),
+                        allowed_node: node.into(),
                     })
                     .collect::<Vec<ProposedServiceAllowedNodeModel>>(),
             );
@@ -244,16 +249,16 @@ pub struct ProposedServiceArgumentModel {
 impl From<&ProposedCircuit> for Vec<ProposedServiceArgumentModel> {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         let mut service_arguments = Vec::new();
-        for service in &proposed_circuit.roster {
+        for service in proposed_circuit.roster() {
             service_arguments.extend(
                 service
-                    .arguments
+                    .arguments()
                     .iter()
                     .map(|(key, value)| ProposedServiceArgumentModel {
-                        circuit_id: proposed_circuit.circuit_id.clone(),
-                        service_id: service.service_id.clone(),
-                        key: key.clone(),
-                        value: value.clone(),
+                        circuit_id: proposed_circuit.circuit_id().into(),
+                        service_id: service.service_id().into(),
+                        key: key.into(),
+                        value: value.into(),
                     })
                     .collect::<Vec<ProposedServiceArgumentModel>>(),
             );
@@ -276,12 +281,12 @@ pub struct ServiceModel {
 impl From<&Circuit> for Vec<ServiceModel> {
     fn from(circuit: &Circuit) -> Self {
         circuit
-            .roster
+            .roster()
             .iter()
             .map(|service| ServiceModel {
-                circuit_id: circuit.id.clone(),
-                service_id: service.service_id.clone(),
-                service_type: service.service_type.clone(),
+                circuit_id: circuit.circuit_id().into(),
+                service_id: service.service_id().into(),
+                service_type: service.service_type().into(),
             })
             .collect()
     }
@@ -301,14 +306,14 @@ pub struct ServiceAllowedNodeModel {
 impl From<&Circuit> for Vec<ServiceAllowedNodeModel> {
     fn from(circuit: &Circuit) -> Self {
         let mut allowed_nodes = Vec::new();
-        for service in &circuit.roster {
+        for service in circuit.roster() {
             allowed_nodes.extend(
                 service
-                    .allowed_nodes
+                    .allowed_nodes()
                     .iter()
                     .map(|node| ServiceAllowedNodeModel {
-                        circuit_id: circuit.id.clone(),
-                        service_id: service.service_id.clone(),
+                        circuit_id: circuit.circuit_id().into(),
+                        service_id: service.service_id().into(),
                         allowed_node: node.clone(),
                     })
                     .collect::<Vec<ServiceAllowedNodeModel>>(),
@@ -333,14 +338,14 @@ pub struct ServiceArgumentModel {
 impl From<&Circuit> for Vec<ServiceArgumentModel> {
     fn from(circuit: &Circuit) -> Self {
         let mut service_arguments = Vec::new();
-        for service in &circuit.roster {
+        for service in circuit.roster() {
             service_arguments.extend(
                 service
-                    .arguments
+                    .arguments()
                     .iter()
                     .map(|(key, value)| ServiceArgumentModel {
-                        circuit_id: circuit.id.clone(),
-                        service_id: service.service_id.clone(),
+                        circuit_id: circuit.circuit_id().into(),
+                        service_id: service.service_id().into(),
                         key: key.clone(),
                         value: value.clone(),
                     })
@@ -367,12 +372,12 @@ pub struct CircuitModel {
 impl From<&Circuit> for CircuitModel {
     fn from(circuit: &Circuit) -> Self {
         CircuitModel {
-            circuit_id: circuit.id.clone(),
-            auth: String::from(&circuit.auth),
-            persistence: String::from(&circuit.persistence),
-            durability: String::from(&circuit.durability),
-            routes: String::from(&circuit.routes),
-            circuit_management_type: circuit.circuit_management_type.clone(),
+            circuit_id: circuit.circuit_id().into(),
+            auth: String::from(circuit.auth()),
+            persistence: String::from(circuit.persistence()),
+            durability: String::from(circuit.durability()),
+            routes: String::from(circuit.routes()),
+            circuit_management_type: circuit.circuit_management_type().into(),
         }
     }
 }
@@ -390,10 +395,10 @@ pub struct CircuitMemberModel {
 impl From<&Circuit> for Vec<CircuitMemberModel> {
     fn from(circuit: &Circuit) -> Self {
         circuit
-            .members
+            .members()
             .iter()
             .map(|node_id| CircuitMemberModel {
-                circuit_id: circuit.id.clone(),
+                circuit_id: circuit.circuit_id().into(),
                 node_id: node_id.clone(),
             })
             .collect()

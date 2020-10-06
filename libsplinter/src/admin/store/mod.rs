@@ -27,187 +27,33 @@
 //! [`DieselAdminServiceStore`]: diesel/struct.DieselAdminServiceStore.html
 //! [`Diesel`]: https://crates.io/crates/diesel
 
-mod builders;
+mod circuit;
+mod circuit_node;
+mod circuit_proposal;
 #[cfg(feature = "diesel")]
 pub mod diesel;
 pub mod error;
+mod proposed_circuit;
+mod proposed_node;
+mod proposed_service;
+mod service;
 pub mod yaml;
 
 use std::cmp::Ordering;
 use std::fmt;
 
-use crate::hex::{as_hex, deserialize_hex};
-
-pub use self::builders::{
-    CircuitBuilder, CircuitNodeBuilder, CircuitProposalBuilder, ProposedCircuitBuilder,
-    ProposedNodeBuilder, ProposedServiceBuilder, ServiceBuilder,
+pub use self::circuit::{
+    AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
+};
+pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
+pub use self::circuit_proposal::{
+    CircuitProposal, CircuitProposalBuilder, ProposalType, Vote, VoteRecord, VoteRecordBuilder,
 };
 use self::error::AdminServiceStoreError;
-
-/// Native representation of a circuit in state
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct Circuit {
-    id: String,
-    roster: Vec<Service>,
-    members: Vec<String>,
-    auth: AuthorizationType,
-    persistence: PersistenceType,
-    durability: DurabilityType,
-    routes: RouteType,
-    circuit_management_type: String,
-}
-
-/// Native representation of a circuit that is being proposed in a proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ProposedCircuit {
-    circuit_id: String,
-    roster: Vec<ProposedService>,
-    members: Vec<ProposedNode>,
-    authorization_type: AuthorizationType,
-    persistence: PersistenceType,
-    durability: DurabilityType,
-    routes: RouteType,
-    circuit_management_type: String,
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
-    #[serde(default)]
-    application_metadata: Vec<u8>,
-    comments: String,
-}
-
-/// Native representation of a circuit proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct CircuitProposal {
-    pub proposal_type: ProposalType,
-    pub circuit_id: String,
-    pub circuit_hash: String,
-    pub circuit: ProposedCircuit,
-    pub votes: Vec<VoteRecord>,
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
-    pub requester: Vec<u8>,
-    pub requester_node_id: String,
-}
-
-impl CircuitProposal {
-    /// Adds a vote record to a pending circuit proposal
-    pub fn add_vote(&mut self, vote: VoteRecord) {
-        self.votes.push(vote);
-    }
-}
-
-/// Native representation of a vote record for a proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct VoteRecord {
-    pub public_key: Vec<u8>,
-    pub vote: Vote,
-    pub voter_node_id: String,
-}
-
-/// Represents a vote, either accept or reject, for a circuit proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum Vote {
-    Accept,
-    Reject,
-}
-
-/// Represents the of  type change the circuit proposal is for
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum ProposalType {
-    Create,
-    UpdateRoster,
-    AddNode,
-    RemoveNode,
-    Destroy,
-}
-
-/// What type of authorization the circuit requires
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum AuthorizationType {
-    Trust,
-}
-
-/// A circuits message persistence strategy
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum PersistenceType {
-    Any,
-}
-
-impl Default for PersistenceType {
-    fn default() -> Self {
-        PersistenceType::Any
-    }
-}
-
-/// A circuits durability requirement
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum DurabilityType {
-    NoDurability,
-}
-
-/// How messages are expected to be routed across a circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum RouteType {
-    Any,
-}
-
-impl Default for RouteType {
-    fn default() -> Self {
-        RouteType::Any
-    }
-}
-
-/// Native representation of a node included in circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct CircuitNode {
-    id: String,
-    endpoints: Vec<String>,
-}
-
-impl From<&ProposedNode> for CircuitNode {
-    fn from(proposed_node: &ProposedNode) -> Self {
-        CircuitNode {
-            id: proposed_node.node_id.clone(),
-            endpoints: proposed_node.endpoints.clone(),
-        }
-    }
-}
-
-/// Native representation of a node in a proposed circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ProposedNode {
-    node_id: String,
-    endpoints: Vec<String>,
-}
-
-/// Native representation of a service that is a part of circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct Service {
-    service_id: String,
-    service_type: String,
-    allowed_nodes: Vec<String>,
-    arguments: Vec<(String, String)>,
-}
-
-impl From<&ProposedService> for Service {
-    fn from(proposed_service: &ProposedService) -> Self {
-        Service {
-            service_id: proposed_service.service_id.to_string(),
-            service_type: proposed_service.service_type.to_string(),
-            allowed_nodes: proposed_service.allowed_nodes.to_vec(),
-            arguments: proposed_service.arguments.to_vec(),
-        }
-    }
-}
-
-/// Native representation of a service that is a part of a proposed circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct ProposedService {
-    service_id: String,
-    service_type: String,
-    allowed_nodes: Vec<String>,
-    arguments: Vec<(String, String)>,
-}
+pub use self::proposed_circuit::{ProposedCircuit, ProposedCircuitBuilder};
+pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
+pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};
+pub use self::service::{Service, ServiceBuilder};
 
 /// The unique ID of service made up of a circuit ID and the individual service ID.
 /// A service ID is only required to be unique from within a circuit.
@@ -283,11 +129,11 @@ impl CircuitPredicate {
     pub fn apply_to_circuit(&self, circuit: &Circuit) -> bool {
         match self {
             CircuitPredicate::ManagmentTypeEq(man_type) => {
-                &circuit.circuit_management_type == man_type
+                circuit.circuit_management_type() == man_type
             }
             CircuitPredicate::MembersInclude(nodes) => {
                 for node_id in nodes.iter() {
-                    if !circuit.members.contains(node_id) {
+                    if !circuit.members().contains(node_id) {
                         return false;
                     }
                 }
@@ -300,15 +146,15 @@ impl CircuitPredicate {
     pub fn apply_to_proposals(&self, proposal: &CircuitProposal) -> bool {
         match self {
             CircuitPredicate::ManagmentTypeEq(man_type) => {
-                &proposal.circuit.circuit_management_type == man_type
+                proposal.circuit().circuit_management_type() == man_type
             }
             CircuitPredicate::MembersInclude(nodes) => {
                 for node_id in nodes {
                     if proposal
-                        .circuit
-                        .members
+                        .circuit()
+                        .members()
                         .iter()
-                        .find(|node| node_id == &node.node_id)
+                        .find(|node| node_id == node.node_id())
                         .is_none()
                     {
                         return false;

@@ -52,7 +52,7 @@ where
                 // check first if the `node_id` is a member of any other circuit, and the
                 // `node_endpoint` data is still valid and, therefore, should not be deleted.
                 if let Some(circuit) = opt_circuit {
-                    for node_id in circuit.members.iter() {
+                    for node_id in circuit.members() {
                         // Count the amount of `circuit_member` entries with the same `node_id`. If
                         // there are still `circuit_member` entries with the associated `node_id`,
                         // or the count is not equal to 0, the `node_enpoint` should not be deleted.

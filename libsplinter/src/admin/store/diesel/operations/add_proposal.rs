@@ -48,7 +48,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
         self.conn.transaction::<(), _, _>(|| {
             // Check if a `CircuitProposal` already exists with the given `circuit_id`
             if circuit_proposal::table
-                .filter(circuit_proposal::circuit_id.eq(&proposal.circuit_id))
+                .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -73,7 +73,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `ProposedCircuitModel`, representing the `proposed_circuit` of a `CircuitProposal`
-            let proposed_circuit_model = ProposedCircuitModel::from(&proposal.circuit);
+            let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
             insert_into(proposed_circuit::table)
                 .values(proposed_circuit_model)
                 .execute(self.conn)
@@ -82,7 +82,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `members` of a `ProposedCircuit`
-            let proposed_members: Vec<ProposedNodeModel> = Vec::from(&proposal.circuit);
+            let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
             insert_into(proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)
@@ -92,7 +92,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                 })?;
             // Insert the node `endpoints` and the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)
@@ -101,7 +101,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
-            let proposed_services: Vec<ProposedServiceModel> = Vec::from(&proposal.circuit);
+            let proposed_services: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
             insert_into(proposed_service::table)
                 .values(proposed_services)
                 .execute(self.conn)
@@ -111,7 +111,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                 })?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
                 .execute(self.conn)
@@ -121,7 +121,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                 })?;
             // Insert `allowed_nodes` from the `Services` inserted above
             let proposed_service_allowed_node: Vec<ProposedServiceAllowedNodeModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_allowed_node::table)
                 .values(proposed_service_allowed_node)
                 .execute(self.conn)
@@ -154,7 +154,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
             // Check if a `CircuitProposal` already exists with the given `circuit_id`, in which
             // case an error is returned.
             if circuit_proposal::table
-                .filter(circuit_proposal::circuit_id.eq(&proposal.circuit_id))
+                .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -179,7 +179,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `ProposedCircuitModel`, representing the `proposed_circuit` of a `CircuitProposal`
-            let proposed_circuit_model = ProposedCircuitModel::from(&proposal.circuit);
+            let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
             insert_into(proposed_circuit::table)
                 .values(proposed_circuit_model)
                 .execute(self.conn)
@@ -188,7 +188,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `members` of a `ProposedCircuit`
-            let proposed_members: Vec<ProposedNodeModel> = Vec::from(&proposal.circuit);
+            let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
             insert_into(proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)
@@ -198,7 +198,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                 })?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)
@@ -207,7 +207,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     source: Box::new(err),
                 })?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
-            let proposed_services: Vec<ProposedServiceModel> = Vec::from(&proposal.circuit);
+            let proposed_services: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
             insert_into(proposed_service::table)
                 .values(proposed_services)
                 .execute(self.conn)
@@ -217,7 +217,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                 })?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
                 .execute(self.conn)
@@ -227,7 +227,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                 })?;
             // Insert `allowed_nodes` from the `Services` inserted above
             let proposed_service_allowed_node: Vec<ProposedServiceAllowedNodeModel> =
-                Vec::from(&proposal.circuit);
+                Vec::from(proposal.circuit());
             insert_into(proposed_service_allowed_node::table)
                 .values(proposed_service_allowed_node)
                 .execute(self.conn)
