@@ -32,9 +32,13 @@ use self::error::YamlAdminStoreError;
 
 use super::{
     error::BuilderError, AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit,
-    CircuitBuilder, CircuitNode, CircuitPredicate, CircuitProposal, DurabilityType,
-    PersistenceType, RouteType, Service, ServiceBuilder, ServiceId,
+    CircuitBuilder, CircuitNode, CircuitPredicate, CircuitProposal, CircuitProposalBuilder,
+    DurabilityType, PersistenceType, ProposalType, ProposedCircuit, ProposedCircuitBuilder,
+    ProposedNode, ProposedService, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
+    VoteRecordBuilder,
 };
+
+use crate::hex::{parse_hex, to_hex};
 
 /// A YAML backed implementation of the `AdminServiceStore`
 pub struct YamlAdminServiceStore {
@@ -139,13 +143,20 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let proposals_state: ProposalState =
-            serde_yaml::from_reader(&proposal_file).map_err(|err| {
+        let yaml_proposals_state: YamlProposalState = serde_yaml::from_reader(&proposal_file)
+            .map_err(|err| {
                 YamlAdminStoreError::general_error_with_source(
                     "Failed to read YAML proposal state file",
                     Box::new(err),
                 )
             })?;
+
+        let proposals_state = ProposalState::try_from(yaml_proposals_state).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                "Failed to convert YAML to AdminServiceStore representation",
+                Box::new(err),
+            )
+        })?;
 
         let mut state = self.state.lock().map_err(|_| {
             YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
@@ -188,13 +199,20 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let proposals_state: ProposalState =
-            serde_yaml::from_reader(&proposal_file).map_err(|err| {
+        let yaml_proposals_state: YamlProposalState = serde_yaml::from_reader(&proposal_file)
+            .map_err(|err| {
                 YamlAdminStoreError::general_error_with_source(
                     "Failed to read YAML proposal state file",
                     Box::new(err),
                 )
             })?;
+
+        let proposals_state = ProposalState::try_from(yaml_proposals_state).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                "Failed to convert YAML to AdminServiceStore representation",
+                Box::new(err),
+            )
+        })?;
 
         let mut state = self.state.lock().map_err(|_| {
             YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
@@ -271,9 +289,12 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
         })?;
 
-        let proposal_output = serde_yaml::to_vec(&state.proposal_state).map_err(|err| {
+        let proposal_output = serde_yaml::to_vec(&YamlProposalState::from(
+            state.proposal_state.clone(),
+        ))
+        .map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
-                "Failed to write proposal state to YAML",
+                "Failed to write proposals state to YAML",
                 Box::new(err),
             )
         })?;
@@ -360,9 +381,12 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let proposal_output = serde_yaml::to_vec(&state.proposal_state).map_err(|err| {
+        let proposal_output = serde_yaml::to_vec(&YamlProposalState::from(
+            state.proposal_state.clone(),
+        ))
+        .map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
-                "Failed to write proposal state to YAML",
+                "Failed to write proposals state to YAML",
                 Box::new(err),
             )
         })?;
@@ -1082,6 +1106,186 @@ struct CircuitState {
     circuits: BTreeMap<String, Circuit>,
 }
 
+/// YAML file specific proposal definition. The YAML state requires that the requester public key
+/// is converted to a hex string. To handle this, proposals needs to be converted to the correct
+/// format during read/write operations.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct YamlCircuitProposal {
+    proposal_type: ProposalType,
+    circuit_id: String,
+    circuit_hash: String,
+    circuit: YamlProposedCircuit,
+    votes: Vec<YamlVoteRecord>,
+    requester: String,
+    requester_node_id: String,
+}
+
+impl From<ProposalState> for YamlProposalState {
+    fn from(state: ProposalState) -> Self {
+        YamlProposalState {
+            proposals: state
+                .proposals
+                .into_iter()
+                .map(|(id, proposal)| (id, YamlCircuitProposal::from(proposal)))
+                .collect(),
+        }
+    }
+}
+
+impl TryFrom<YamlProposalState> for ProposalState {
+    type Error = BuilderError;
+
+    fn try_from(state: YamlProposalState) -> Result<Self, Self::Error> {
+        Ok(ProposalState {
+            proposals: state
+                .proposals
+                .into_iter()
+                .map(|(id, proposal)| match CircuitProposal::try_from(proposal) {
+                    Ok(proposal) => Ok((id, proposal)),
+                    Err(err) => Err(err),
+                })
+                .collect::<Result<BTreeMap<String, CircuitProposal>, BuilderError>>()?,
+        })
+    }
+}
+
+impl TryFrom<YamlCircuitProposal> for CircuitProposal {
+    type Error = BuilderError;
+
+    fn try_from(proposal: YamlCircuitProposal) -> Result<Self, Self::Error> {
+        CircuitProposalBuilder::new()
+            .with_circuit_id(&proposal.circuit_id)
+            .with_proposal_type(&proposal.proposal_type)
+            .with_circuit_hash(&proposal.circuit_hash)
+            .with_circuit(&ProposedCircuit::try_from(proposal.circuit)?)
+            .with_votes(
+                &proposal
+                    .votes
+                    .into_iter()
+                    .map(VoteRecord::try_from)
+                    .collect::<Result<Vec<VoteRecord>, BuilderError>>()?,
+            )
+            .with_requester(&parse_hex(&proposal.requester).map_err(|_| {
+                BuilderError::InvalidField("Requester public key is not valid hex".to_string())
+            })?)
+            .with_requester_node_id(&proposal.requester_node_id)
+            .build()
+    }
+}
+
+impl From<CircuitProposal> for YamlCircuitProposal {
+    fn from(proposal: CircuitProposal) -> Self {
+        YamlCircuitProposal {
+            circuit_id: proposal.circuit_id().into(),
+            proposal_type: proposal.proposal_type().clone(),
+            circuit_hash: proposal.circuit_hash().into(),
+            circuit: YamlProposedCircuit::from(proposal.circuit().clone()),
+            votes: proposal
+                .votes()
+                .iter()
+                .map(|vote| YamlVoteRecord::from(vote.clone()))
+                .collect(),
+            requester: to_hex(proposal.requester()),
+            requester_node_id: proposal.requester_node_id().into(),
+        }
+    }
+}
+
+/// YAML file specific vote record definition. The YAML state requires that the vote public key
+/// is converted to a hex string. To handle this, proposals needs to be converted to the correct
+/// format during read/write operations.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct YamlVoteRecord {
+    public_key: String,
+    vote: Vote,
+    voter_node_id: String,
+}
+
+impl TryFrom<YamlVoteRecord> for VoteRecord {
+    type Error = BuilderError;
+
+    fn try_from(vote: YamlVoteRecord) -> Result<Self, Self::Error> {
+        VoteRecordBuilder::new()
+            .with_public_key(&parse_hex(&vote.public_key).map_err(|_| {
+                BuilderError::InvalidField("Requester public key is not valid hex".to_string())
+            })?)
+            .with_vote(&vote.vote)
+            .with_voter_node_id(&vote.voter_node_id)
+            .build()
+    }
+}
+
+impl From<VoteRecord> for YamlVoteRecord {
+    fn from(vote: VoteRecord) -> Self {
+        YamlVoteRecord {
+            public_key: to_hex(vote.public_key()),
+            vote: vote.vote().clone(),
+            voter_node_id: vote.voter_node_id().into(),
+        }
+    }
+}
+
+/// YAML file specific proposed circuit definition. In the YAML format the application metadata
+/// needs to be converted into a hex string. To handle this, circuit needs to be converted to the
+/// correct format during read/write operations.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+struct YamlProposedCircuit {
+    circuit_id: String,
+    roster: Vec<ProposedService>,
+    members: Vec<ProposedNode>,
+    authorization_type: AuthorizationType,
+    persistence: PersistenceType,
+    durability: DurabilityType,
+    routes: RouteType,
+    circuit_management_type: String,
+    application_metadata: String,
+    comments: String,
+}
+
+impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
+    type Error = BuilderError;
+
+    fn try_from(circuit: YamlProposedCircuit) -> Result<Self, Self::Error> {
+        ProposedCircuitBuilder::new()
+            .with_circuit_id(&circuit.circuit_id)
+            .with_roster(&circuit.roster)
+            .with_members(&circuit.members)
+            .with_authorization_type(&circuit.authorization_type)
+            .with_persistence(&circuit.persistence)
+            .with_durability(&circuit.durability)
+            .with_routes(&circuit.routes)
+            .with_circuit_management_type(&circuit.circuit_management_type)
+            .with_application_metadata(&parse_hex(&circuit.application_metadata).map_err(|_| {
+                BuilderError::InvalidField("Requester public key is not valid hex".to_string())
+            })?)
+            .with_comments(&circuit.comments)
+            .build()
+    }
+}
+
+impl From<ProposedCircuit> for YamlProposedCircuit {
+    fn from(circuit: ProposedCircuit) -> Self {
+        YamlProposedCircuit {
+            circuit_id: circuit.circuit_id().into(),
+            roster: circuit.roster().to_vec(),
+            members: circuit.members().to_vec(),
+            authorization_type: circuit.authorization_type().clone(),
+            persistence: circuit.persistence().clone(),
+            durability: circuit.durability().clone(),
+            routes: circuit.routes().clone(),
+            circuit_management_type: circuit.circuit_management_type().into(),
+            application_metadata: to_hex(circuit.application_metadata()),
+            comments: circuit.comments().into(),
+        }
+    }
+}
+
+/// YAML file specific state definition that can be read and written to the proposal YAML state file
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+struct YamlProposalState {
+    proposals: BTreeMap<String, YamlCircuitProposal>,
+}
+
 /// The proposal state that is cached by the YAML admin service store and used to respond to fetch
 /// requests
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -1367,8 +1571,12 @@ proposals:
             .expect("Unable to remove proposals");
 
         let mut yaml_state = BTreeMap::new();
-        yaml_state.insert(new_proposal.circuit_id().to_string(), new_proposal);
-        let mut yaml_state_vec = serde_yaml::to_vec(&ProposalState {
+        yaml_state.insert(
+            new_proposal.circuit_id().to_string(),
+            YamlCircuitProposal::from(new_proposal),
+        );
+
+        let mut yaml_state_vec = serde_yaml::to_vec(&YamlProposalState {
             proposals: yaml_state,
         })
         .unwrap();

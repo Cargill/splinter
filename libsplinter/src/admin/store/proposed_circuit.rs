@@ -15,7 +15,6 @@
 //! Structs for building proposed circuits
 
 use crate::admin::messages::is_valid_circuit_id;
-use crate::hex::{as_hex, deserialize_hex};
 
 use super::error::BuilderError;
 use super::{
@@ -33,9 +32,6 @@ pub struct ProposedCircuit {
     durability: DurabilityType,
     routes: RouteType,
     circuit_management_type: String,
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
-    #[serde(default)]
     application_metadata: Vec<u8>,
     comments: String,
 }

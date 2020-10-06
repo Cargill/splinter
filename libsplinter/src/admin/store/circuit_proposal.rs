@@ -15,7 +15,6 @@
 //! Structs for building services
 
 use crate::admin::messages::is_valid_circuit_id;
-use crate::hex::{as_hex, deserialize_hex};
 
 use super::error::BuilderError;
 use super::ProposedCircuit;
@@ -28,8 +27,6 @@ pub struct CircuitProposal {
     circuit_hash: String,
     circuit: ProposedCircuit,
     votes: Vec<VoteRecord>,
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
     requester: Vec<u8>,
     requester_node_id: String,
 }
@@ -261,8 +258,6 @@ impl CircuitProposalBuilder {
 // Native representation of a vote record for a proposal
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct VoteRecord {
-    #[serde(serialize_with = "as_hex")]
-    #[serde(deserialize_with = "deserialize_hex")]
     public_key: Vec<u8>,
     vote: Vote,
     voter_node_id: String,
