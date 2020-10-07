@@ -23,7 +23,7 @@ pub mod error;
 
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
-use std::fs::File;
+use std::fs::{rename, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -249,11 +249,14 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let mut circuit_file = File::create(&self.circuit_file_path).map_err(|err| {
+        // write state to a temporary file to avoid state corruption if an IO error occurs during
+        // write
+        let temp_circuit_file = format!("{}.temp", self.circuit_file_path);
+        let mut circuit_file = File::create(&temp_circuit_file).map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to open YAML circuit state file '{}'",
-                    self.circuit_file_path
+                    temp_circuit_file
                 ),
                 Box::new(err),
             )
@@ -263,7 +266,7 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML circuit state file '{}'",
-                    self.circuit_file_path
+                    temp_circuit_file
                 ),
                 Box::new(err),
             )
@@ -274,7 +277,18 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML circuit file '{}'",
-                    self.circuit_file_path
+                    temp_circuit_file
+                ),
+                Box::new(err),
+            )
+        })?;
+
+        // rename temp file to circuit state filename
+        rename(&temp_circuit_file, &self.circuit_file_path).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                &format!(
+                    "Failed to rename temp circuit state file to final location '{}'",
+                    temp_circuit_file
                 ),
                 Box::new(err),
             )
@@ -299,11 +313,12 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let mut proposal_file = File::create(&self.proposal_file_path).map_err(|err| {
+        let temp_proposal_file = format!("{}.temp", self.proposal_file_path);
+        let mut proposal_file = File::create(&temp_proposal_file).map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to open YAML proposal state file '{}'",
-                    self.proposal_file_path
+                    temp_proposal_file
                 ),
                 Box::new(err),
             )
@@ -313,7 +328,7 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML proposal state file '{}'",
-                    self.proposal_file_path
+                    temp_proposal_file
                 ),
                 Box::new(err),
             )
@@ -324,7 +339,18 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML proposal file '{}'",
-                    self.proposal_file_path
+                    temp_proposal_file
+                ),
+                Box::new(err),
+            )
+        })?;
+
+        // rename temp file to proposal state filename
+        rename(&temp_proposal_file, &self.proposal_file_path).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                &format!(
+                    "Failed to rename temp proposal state file to final location '{}'",
+                    temp_proposal_file
                 ),
                 Box::new(err),
             )
@@ -350,11 +376,14 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let mut circuit_file = File::create(&self.circuit_file_path).map_err(|err| {
+        // write state to a temporary file to avoid state corruption if an IO error occurs during
+        // write
+        let temp_circuit_file = format!("{}.temp", self.circuit_file_path);
+        let mut circuit_file = File::create(&temp_circuit_file).map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to open YAML circuit state file '{}'",
-                    self.circuit_file_path
+                    temp_circuit_file
                 ),
                 Box::new(err),
             )
@@ -364,7 +393,7 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML circuit state file '{}'",
-                    self.circuit_file_path
+                    temp_circuit_file
                 ),
                 Box::new(err),
             )
@@ -375,7 +404,18 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML circuit file '{}'",
-                    self.circuit_file_path
+                    temp_circuit_file
+                ),
+                Box::new(err),
+            )
+        })?;
+
+        // rename temp file to circuit state filename
+        rename(&temp_circuit_file, &self.circuit_file_path).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                &format!(
+                    "Failed to rename temp circuit state file to final location '{}'",
+                    temp_circuit_file
                 ),
                 Box::new(err),
             )
@@ -391,11 +431,14 @@ impl YamlAdminServiceStore {
             )
         })?;
 
-        let mut proposal_file = File::create(&self.proposal_file_path).map_err(|err| {
+        // write state to a temporary file to avoid state corruption if an IO error occurs during
+        // write
+        let temp_proposal_file = format!("{}.temp", self.proposal_file_path);
+        let mut proposal_file = File::create(&temp_proposal_file).map_err(|err| {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to open YAML proposal state file '{}'",
-                    self.proposal_file_path
+                    temp_proposal_file
                 ),
                 Box::new(err),
             )
@@ -405,7 +448,7 @@ impl YamlAdminServiceStore {
             YamlAdminStoreError::general_error_with_source(
                 &format!(
                     "Failed to write to YAML proposal state file '{}'",
-                    self.proposal_file_path
+                    temp_proposal_file
                 ),
                 Box::new(err),
             )
@@ -417,6 +460,17 @@ impl YamlAdminServiceStore {
                 &format!(
                     "Failed to write to YAML proposal file '{}'",
                     self.proposal_file_path
+                ),
+                Box::new(err),
+            )
+        })?;
+
+        // rename temp file to proposal state filename
+        rename(&temp_proposal_file, &self.proposal_file_path).map_err(|err| {
+            YamlAdminStoreError::general_error_with_source(
+                &format!(
+                    "Failed to rename temp proposal state file to final location '{}'",
+                    temp_proposal_file
                 ),
                 Box::new(err),
             )
