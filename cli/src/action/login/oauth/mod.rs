@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod error;
+
 /// Contains the user information returned by an OAuth2 Provider.
 pub struct UserTokens {
     pub provider_type: String,
