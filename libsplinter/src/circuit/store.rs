@@ -28,10 +28,7 @@ pub enum CircuitFilter {
 impl CircuitFilter {
     /// Returns true if the given circuit matches the filter criteria, false otherwise.
     pub fn matches(&self, circuit: &Circuit) -> bool {
-        match self {
-            CircuitFilter::WithMember(ref member) if circuit.members().contains(member) => true,
-            _ => false,
-        }
+        matches!(self, CircuitFilter::WithMember(ref member) if circuit.members().contains(member))
     }
 }
 
