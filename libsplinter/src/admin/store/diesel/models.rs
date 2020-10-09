@@ -20,8 +20,8 @@ use std::convert::TryFrom;
 
 use crate::admin::store::diesel::schema::{
     circuit, circuit_member, circuit_proposal, node_endpoint, proposed_circuit, proposed_node,
-    proposed_node_endpoint, proposed_service, proposed_service_allowed_node,
-    proposed_service_argument, service, service_allowed_node, service_argument, vote_record,
+    proposed_node_endpoint, proposed_service, proposed_service_argument, service,
+    service_allowed_node, service_argument, vote_record,
 };
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::admin::store::{
@@ -187,6 +187,7 @@ pub struct ProposedServiceModel {
     pub circuit_id: String,
     pub service_id: String,
     pub service_type: String,
+    pub node_id: String,
 }
 
 impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
@@ -198,39 +199,9 @@ impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
                 circuit_id: proposed_circuit.circuit_id().into(),
                 service_id: service.service_id().into(),
                 service_type: service.service_type().into(),
+                node_id: service.node_id().into(),
             })
             .collect()
-    }
-}
-
-/// Database model representation of the `allowed_nodes` associated with a `ProposedService`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "proposed_service_allowed_node"]
-#[belongs_to(ProposedServiceModel, foreign_key = "service_id")]
-#[primary_key(circuit_id, service_id, allowed_node)]
-pub struct ProposedServiceAllowedNodeModel {
-    pub circuit_id: String,
-    pub service_id: String,
-    pub allowed_node: String,
-}
-
-impl From<&ProposedCircuit> for Vec<ProposedServiceAllowedNodeModel> {
-    fn from(proposed_circuit: &ProposedCircuit) -> Self {
-        let mut allowed_nodes = Vec::new();
-        for service in proposed_circuit.roster() {
-            allowed_nodes.extend(
-                service
-                    .allowed_nodes()
-                    .iter()
-                    .map(|node| ProposedServiceAllowedNodeModel {
-                        circuit_id: proposed_circuit.circuit_id().into(),
-                        service_id: service.service_id().into(),
-                        allowed_node: node.into(),
-                    })
-                    .collect::<Vec<ProposedServiceAllowedNodeModel>>(),
-            );
-        }
-        allowed_nodes
     }
 }
 

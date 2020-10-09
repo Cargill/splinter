@@ -24,13 +24,11 @@ use crate::admin::store::{
     diesel::{
         models::{
             CircuitProposalModel, ProposedCircuitModel, ProposedNodeEndpointModel,
-            ProposedNodeModel, ProposedServiceAllowedNodeModel, ProposedServiceArgumentModel,
-            ProposedServiceModel, VoteRecordModel,
+            ProposedNodeModel, ProposedServiceArgumentModel, ProposedServiceModel, VoteRecordModel,
         },
         schema::{
             circuit_proposal, proposed_circuit, proposed_node, proposed_node_endpoint,
-            proposed_service, proposed_service_allowed_node, proposed_service_argument,
-            vote_record,
+            proposed_service, proposed_service_argument, vote_record,
         },
     },
     error::AdminServiceStoreError,
@@ -142,15 +140,6 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 context: String::from("Failed to remove old proposed Services' arguments"),
                 source: Box::new(err),
             })?;
-            delete(
-                proposed_service_allowed_node::table
-                    .filter(proposed_service_allowed_node::circuit_id.eq(proposal.circuit_id())),
-            )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Services' allowed nodes"),
-                source: Box::new(err),
-            })?;
             delete(vote_record::table.filter(vote_record::circuit_id.eq(proposal.circuit_id())))
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -196,16 +185,6 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to insert ProposedService's arguments"),
-                    source: Box::new(err),
-                })?;
-            // Insert `allowed_nodes` from the `Services` inserted above
-            let proposed_service_allowed_node: Vec<ProposedServiceAllowedNodeModel> =
-                Vec::from(proposal.circuit());
-            insert_into(proposed_service_allowed_node::table)
-                .values(proposed_service_allowed_node)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedService's allowed_nodes"),
                     source: Box::new(err),
                 })?;
             // Insert `votes` from the `CircuitProposal`
@@ -324,15 +303,6 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 context: String::from("Failed to remove old proposed Services' arguments"),
                 source: Box::new(err),
             })?;
-            delete(
-                proposed_service_allowed_node::table
-                    .filter(proposed_service_allowed_node::circuit_id.eq(proposal.circuit_id())),
-            )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Services' allowed nodes"),
-                source: Box::new(err),
-            })?;
             delete(vote_record::table.filter(vote_record::circuit_id.eq(proposal.circuit_id())))
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
@@ -378,16 +348,6 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to insert ProposedService's arguments"),
-                    source: Box::new(err),
-                })?;
-            // Insert `allowed_nodes` from the `Services` inserted above
-            let proposed_service_allowed_node: Vec<ProposedServiceAllowedNodeModel> =
-                Vec::from(proposal.circuit());
-            insert_into(proposed_service_allowed_node::table)
-                .values(proposed_service_allowed_node)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedService's allowed_nodes"),
                     source: Box::new(err),
                 })?;
             // Insert `votes` from the `CircuitProposal`

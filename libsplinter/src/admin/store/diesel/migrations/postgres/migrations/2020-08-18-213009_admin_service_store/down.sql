@@ -17,7 +17,6 @@ DROP TABLE IF EXISTS proposed_circuit;
 DROP TABLE IF EXISTS proposed_node;
 DROP TABLE IF EXISTS proposed_node_endpoint;
 DROP TABLE IF EXISTS proposed_service;
-DROP TABLE IF EXISTS proposed_services_allowed_node;
 DROP TABLE IF EXISTS proposed_service_argument;
 DROP TABLE IF EXISTS vote_record;
 DROP TABLE IF EXISTS circuit_proposal;

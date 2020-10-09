@@ -166,7 +166,7 @@ impl From<ProposedService> for Service {
         Service {
             service_id: service.service_id().to_string(),
             service_type: service.service_type().to_string(),
-            allowed_nodes: service.allowed_nodes().to_vec(),
+            allowed_nodes: vec![service.node_id().to_string()],
             arguments: service.arguments().to_vec(),
         }
     }
@@ -177,7 +177,7 @@ impl From<&ProposedService> for Service {
         Service {
             service_id: proposed_service.service_id().to_string(),
             service_type: proposed_service.service_type().to_string(),
-            allowed_nodes: proposed_service.allowed_nodes().to_vec(),
+            allowed_nodes: vec![proposed_service.node_id().to_string()],
             arguments: proposed_service.arguments().to_vec(),
         }
     }

@@ -30,8 +30,7 @@ use crate::admin::store::{
         },
         schema::{
             circuit_proposal, proposed_circuit, proposed_node, proposed_node_endpoint,
-            proposed_service, proposed_service_allowed_node, proposed_service_argument,
-            vote_record,
+            proposed_service, proposed_service_argument, vote_record,
         },
     },
     error::AdminServiceStoreError,
@@ -141,12 +140,9 @@ where
             let mut proposed_services: HashMap<String, ProposedServiceBuilder> = HashMap::new();
             // Create HashMap of `service_id` to the associated argument values
             let mut arguments_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
-            // Create HashMap of `service_id` to the associated allowed nodes
-            let mut allowed_nodes_map: HashMap<String, Vec<String>> = HashMap::new();
             // Collect all 'proposed_service' entries and associated data using `inner_join`, as
-            // `proposed_service` has a one-to-many relationship to both `proposed_service_argument`
-            // and `propoosed_service_allowed_node`.
-            for (proposed_service, opt_arg, opt_allowed_node) in proposed_service::table
+            // `proposed_service` has a one-to-many relationship to `proposed_service_argument`.
+            for (proposed_service, opt_arg) in proposed_service::table
                 .filter(proposed_service::circuit_id.eq(&proposal.circuit_id))
                 // The `proposed_service` table has a one-to-many relationship with the
                 // `proposed_service_argument` table. The `inner_join` will retrieve the
@@ -159,31 +155,14 @@ where
                             proposed_service::service_id.eq(proposed_service_argument::service_id),
                         )),
                 )
-                // The `proposed_service` table has a one-to-many relationship with the
-                // `proposed_service_allowed_node` table. The `inner_join` will retrieve the
-                // `proposed_service` and all `proposed_service_allowed_node` entries with the
-                // matching `circuit_id` and `service_id`.
-                .inner_join(
-                    proposed_service_allowed_node::table.on(proposed_service::circuit_id
-                        .eq(proposed_service_allowed_node::circuit_id)
-                        .and(
-                            proposed_service::service_id
-                                .eq(proposed_service_allowed_node::service_id),
-                        )),
-                )
-                // Making the `proposed_service_argument` and `proposed_service_allowed_node` data
-                // `nullable`, removes the requirement for different numbers of each to be returned
-                // with, or without an associated entry from the other table.
+                // Making the `proposed_service_argument` data `nullable`, removes the requirement
+                // for different numbers of each to be returned with, or without an associated
+                // entry from the other table.
                 .select((
                     proposed_service::all_columns,
                     proposed_service_argument::all_columns.nullable(),
-                    proposed_service_allowed_node::allowed_node.nullable(),
                 ))
-                .load::<(
-                    ProposedServiceModel,
-                    Option<ProposedServiceArgumentModel>,
-                    Option<String>,
-                )>(self.conn)
+                .load::<(ProposedServiceModel, Option<ProposedServiceArgumentModel>)>(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to load service information"),
                     source: Box::new(err),
@@ -199,23 +178,14 @@ where
                         );
                     }
                 }
-                if let Some(allowed_node) = opt_allowed_node {
-                    if let Some(list) = allowed_nodes_map.get_mut(&proposed_service.service_id) {
-                        list.push(allowed_node.to_string());
-                    } else {
-                        allowed_nodes_map.insert(
-                            proposed_service.service_id.to_string(),
-                            vec![allowed_node.to_string()],
-                        );
-                    }
-                }
                 // Insert new `ProposedServiceBuilder` if it does not already exist
                 if !proposed_services.contains_key(&proposed_service.service_id) {
                     proposed_services.insert(
                         proposed_service.service_id.to_string(),
                         ProposedServiceBuilder::new()
                             .with_service_id(&proposed_service.service_id)
-                            .with_service_type(&proposed_service.service_type),
+                            .with_service_type(&proposed_service.service_type)
+                            .with_node_id(&proposed_service.node_id),
                     );
                 }
             }
@@ -224,9 +194,6 @@ where
                 .map(|(id, mut builder)| {
                     if let Some(args) = arguments_map.get(&id) {
                         builder = builder.with_arguments(&args);
-                    }
-                    if let Some(allowed_nodes) = allowed_nodes_map.get(&id) {
-                        builder = builder.with_allowed_nodes(&allowed_nodes);
                     }
                     builder
                         .build()

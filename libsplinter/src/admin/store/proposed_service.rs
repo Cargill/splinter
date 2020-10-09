@@ -22,7 +22,7 @@ use super::error::BuilderError;
 pub struct ProposedService {
     service_id: String,
     service_type: String,
-    allowed_nodes: Vec<String>,
+    node_id: String,
     arguments: Vec<(String, String)>,
 }
 
@@ -37,9 +37,9 @@ impl ProposedService {
         &self.service_type
     }
 
-    /// Returns the list of allowed nodes the proposed service can run on
-    pub fn allowed_nodes(&self) -> &[String] {
-        &self.allowed_nodes
+    /// Returns the node the proposed service can run on
+    pub fn node_id(&self) -> &str {
+        &self.node_id
     }
 
     /// Returns the list of key/value arugments for the  proposed service
@@ -53,7 +53,7 @@ impl ProposedService {
 pub struct ProposedServiceBuilder {
     service_id: Option<String>,
     service_type: Option<String>,
-    allowed_nodes: Option<Vec<String>>,
+    node_id: Option<String>,
     arguments: Option<Vec<(String, String)>>,
 }
 
@@ -73,9 +73,9 @@ impl ProposedServiceBuilder {
         self.service_type.clone()
     }
 
-    /// Returns the list of allowed nodes the service can connect to
-    pub fn allowed_nodes(&self) -> Option<Vec<String>> {
-        self.allowed_nodes.clone()
+    /// Returns the node ID the service can connect to
+    pub fn node_id(&self) -> Option<String> {
+        self.node_id.clone()
     }
 
     /// Returns the list of arguments for the service
@@ -103,13 +103,13 @@ impl ProposedServiceBuilder {
         self
     }
 
-    /// Sets the allowed nodes
+    /// Sets the node ID the service is allowed to connect to
     ///
     /// # Arguments
     ///
-    ///  * `allowed_nodes` - A list of node IDs the service can connect to
-    pub fn with_allowed_nodes(mut self, allowed_nodes: &[String]) -> ProposedServiceBuilder {
-        self.allowed_nodes = Some(allowed_nodes.into());
+    ///  * `node_id` - A node ID of the node the service can connect to
+    pub fn with_node_id(mut self, node_id: &str) -> ProposedServiceBuilder {
+        self.node_id = Some(node_id.into());
         self
     }
 
@@ -142,16 +142,16 @@ impl ProposedServiceBuilder {
             .service_type
             .ok_or_else(|| BuilderError::MissingField("service_type".to_string()))?;
 
-        let allowed_nodes = self
-            .allowed_nodes
-            .ok_or_else(|| BuilderError::MissingField("allowed_nodes".to_string()))?;
+        let node_id = self
+            .node_id
+            .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
 
         let arguments = self.arguments.unwrap_or_default();
 
         let service = ProposedService {
             service_id,
             service_type,
-            allowed_nodes,
+            node_id,
             arguments,
         };
 
