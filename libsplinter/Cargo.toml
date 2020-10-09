@@ -98,6 +98,7 @@ experimental = [
     "biome-notifications",
     "biome-user",
     "circuit-template",
+    "oauth",
     "registry-database",
     "routing-table",
     "service-arg-validation",
@@ -120,6 +121,7 @@ biome-notifications = ["biome"]
 biome-user = ["biome"]
 circuit-template = ["glob"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
+oauth = ["auth"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
 registry-database = ["diesel"]
