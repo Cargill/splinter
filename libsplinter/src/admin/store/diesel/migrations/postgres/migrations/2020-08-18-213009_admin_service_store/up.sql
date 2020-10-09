@@ -80,16 +80,8 @@ CREATE TABLE IF NOT EXISTS service (
     circuit_id                TEXT NOT NULL,
     service_id                TEXT NOT NULL,
     service_type              TEXT NOT NULL,
+    node_id                   TEXT NOT NULL,
     PRIMARY KEY (circuit_id, service_id),
-    FOREIGN KEY (circuit_id) REFERENCES circuit(circuit_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS service_allowed_node (
-    circuit_id                TEXT NOT NULL,
-    service_id                TEXT NOT NULL,
-    allowed_node              TEXT NOT NULL,
-    PRIMARY KEY (circuit_id, service_id, allowed_node),
-    FOREIGN KEY (service_id) REFERENCES service(service_id),
     FOREIGN KEY (circuit_id) REFERENCES circuit(circuit_id) ON DELETE CASCADE
 );
 

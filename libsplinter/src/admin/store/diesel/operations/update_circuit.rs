@@ -22,11 +22,8 @@ use diesel::{
 use super::AdminServiceStoreOperations;
 use crate::admin::store::{
     diesel::{
-        models::{
-            CircuitMemberModel, CircuitModel, ServiceAllowedNodeModel, ServiceArgumentModel,
-            ServiceModel,
-        },
-        schema::{circuit, circuit_member, service, service_allowed_node, service_argument},
+        models::{CircuitMemberModel, CircuitModel, ServiceArgumentModel, ServiceModel},
+        schema::{circuit, circuit_member, service, service_argument},
     },
     error::AdminServiceStoreError,
     Circuit,
@@ -80,15 +77,6 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                     source: Box::new(err),
                 })?;
             delete(
-                service_allowed_node::table
-                    .filter(service_allowed_node::circuit_id.eq(circuit.circuit_id())),
-            )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old Services' allowed nodes"),
-                source: Box::new(err),
-            })?;
-            delete(
                 service_argument::table
                     .filter(service_argument::circuit_id.eq(circuit.circuit_id())),
             )
@@ -104,14 +92,6 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to insert Services"),
-                    source: Box::new(err),
-                })?;
-            let service_allowed_node: Vec<ServiceAllowedNodeModel> = Vec::from(&circuit);
-            insert_into(service_allowed_node::table)
-                .values(&service_allowed_node)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Services' allowed nodes"),
                     source: Box::new(err),
                 })?;
             let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
@@ -179,15 +159,6 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                     source: Box::new(err),
                 })?;
             delete(
-                service_allowed_node::table
-                    .filter(service_allowed_node::circuit_id.eq(circuit.circuit_id())),
-            )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old Services' allowed nodes"),
-                source: Box::new(err),
-            })?;
-            delete(
                 service_argument::table
                     .filter(service_argument::circuit_id.eq(circuit.circuit_id())),
             )
@@ -203,14 +174,6 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to insert Services"),
-                    source: Box::new(err),
-                })?;
-            let service_allowed_node: Vec<ServiceAllowedNodeModel> = Vec::from(&circuit);
-            insert_into(service_allowed_node::table)
-                .values(&service_allowed_node)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Services' allowed nodes"),
                     source: Box::new(err),
                 })?;
             let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);

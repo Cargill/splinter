@@ -21,7 +21,7 @@ use diesel::prelude::*;
 use crate::admin::store::{
     diesel::{
         models::{ServiceArgumentModel, ServiceModel},
-        schema::{service, service_allowed_node, service_argument},
+        schema::{service, service_argument},
     },
     error::AdminServiceStoreError,
     Service, ServiceBuilder,
@@ -50,11 +50,9 @@ where
         let mut services: HashMap<String, ServiceBuilder> = HashMap::new();
         // Create HashMap of `service_id` to the associated argument values
         let mut arguments_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
-        // Create HashMap of `service_id` to the associated allowed nodes
-        let mut allowed_nodes_map: HashMap<String, Vec<String>> = HashMap::new();
         // Collect all 'service' entries and associated data using `inner_join`, as each `service`
-        // entry has a one-to-many relationship to `service_argument` and `service_allowed_node`
-        for (service, opt_arg, opt_allowed_node) in service::table
+        // entry has a one-to-many relationship to `service_argument`.
+        for (service, opt_arg) in service::table
             // Filter retrieved 'service' entries by the provided `circuit_id`
             .filter(service::circuit_id.eq(&circuit_id))
             // The `service` table has a one-to-many relationship with the `service_argument` table.
@@ -65,23 +63,14 @@ where
                     .eq(service_argument::circuit_id)
                     .and(service::service_id.eq(service_argument::service_id))),
             )
-            // The `service` table has a one-to-many relationship with the `service_allowed_node`
-            // table. The `inner_join` will retrieve the `service` and all `service_allowed_node`
-            // entries with the matching `circuit_id` and `service_id`.
-            .inner_join(
-                service_allowed_node::table.on(service::circuit_id
-                    .eq(service_allowed_node::circuit_id)
-                    .and(service::service_id.eq(service_allowed_node::service_id))),
-            )
-            // Making the `service_argument` and `service_allowed_node` data `nullable`, removes
+            // Making the `service_argument` data `nullable`, removes
             // the requirement for different numbers of each to be returned with, or without
             // an associated entry from the other table.
             .select((
                 service::all_columns,
                 service_argument::all_columns.nullable(),
-                service_allowed_node::allowed_node.nullable(),
             ))
-            .load::<(ServiceModel, Option<ServiceArgumentModel>, Option<String>)>(self.conn)
+            .load::<(ServiceModel, Option<ServiceArgumentModel>)>(self.conn)
             .map_err(|err| AdminServiceStoreError::QueryError {
                 context: String::from("Unable to load Service information"),
                 source: Box::new(err),
@@ -97,23 +86,14 @@ where
                     );
                 }
             }
-            if let Some(allowed_node) = opt_allowed_node {
-                if let Some(list) = allowed_nodes_map.get_mut(&service.service_id) {
-                    list.push(allowed_node.to_string());
-                } else {
-                    allowed_nodes_map.insert(
-                        service.service_id.to_string(),
-                        vec![allowed_node.to_string()],
-                    );
-                }
-            }
             // Insert new `ServiceBuilder` if it does not already exist
             if !services.contains_key(&service.service_id) {
                 services.insert(
                     service.service_id.to_string(),
                     ServiceBuilder::new()
                         .with_service_id(&service.service_id)
-                        .with_service_type(&service.service_type),
+                        .with_service_type(&service.service_type)
+                        .with_node_id(&service.node_id),
                 );
             }
         }
@@ -123,9 +103,6 @@ where
             .map(|(id, mut builder)| {
                 if let Some(args) = arguments_map.get(&id) {
                     builder = builder.with_arguments(&args);
-                }
-                if let Some(allowed_nodes) = allowed_nodes_map.get(&id) {
-                    builder = builder.with_allowed_nodes(&allowed_nodes);
                 }
                 builder
                     .build()

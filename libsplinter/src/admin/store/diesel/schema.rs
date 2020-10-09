@@ -81,14 +81,7 @@ table! {
         circuit_id -> Text,
         service_id -> Text,
         service_type -> Text,
-    }
-}
-
-table! {
-    service_allowed_node (circuit_id, service_id, allowed_node) {
-        circuit_id -> Text,
-        service_id -> Text,
-        allowed_node -> Text,
+        node_id -> Text,
     }
 }
 
@@ -138,7 +131,6 @@ allow_tables_to_appear_in_same_query!(
 
 allow_tables_to_appear_in_same_query!(
     service,
-    service_allowed_node,
     service_argument,
     circuit,
     circuit_member,

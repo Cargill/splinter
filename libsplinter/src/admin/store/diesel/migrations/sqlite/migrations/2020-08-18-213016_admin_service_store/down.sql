@@ -21,7 +21,6 @@ DROP TABLE IF EXISTS proposed_service_argument;
 DROP TABLE IF EXISTS vote_record;
 DROP TABLE IF EXISTS circuit_proposal;
 DROP TABLE IF EXISTS service;
-DROP TABLE IF EXISTS service_allowed_node;
 DROP TABLE IF EXISTS service_argument;
 DROP TABLE IF EXISTS circuit;
 DROP TABLE IF EXISTS circuit_member;

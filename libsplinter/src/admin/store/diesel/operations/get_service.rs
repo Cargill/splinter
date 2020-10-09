@@ -19,8 +19,8 @@ use diesel::prelude::*;
 use super::AdminServiceStoreOperations;
 use crate::admin::store::{
     diesel::{
-        models::{ServiceAllowedNodeModel, ServiceArgumentModel, ServiceModel},
-        schema::{service, service_allowed_node, service_argument},
+        models::{ServiceArgumentModel, ServiceModel},
+        schema::{service, service_argument},
     },
     error::AdminServiceStoreError,
     Service, ServiceBuilder, ServiceId,
@@ -74,24 +74,11 @@ where
                 .map(|arg| (arg.key.to_string(), arg.value.to_string()))
                 .collect();
 
-            // Collect the `allowed_node` entries with the associated `circuit_id` found
-            // in the `service` entry previously fetched and the provided `service_id`.
-            let allowed_nodes: Vec<String> = service_allowed_node::table
-                .filter(service_allowed_node::circuit_id.eq(&service_id.circuit_id))
-                .filter(service_allowed_node::service_id.eq(&service_id.service_id))
-                .load::<ServiceAllowedNodeModel>(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred fetching Service allowed nodes"),
-                    source: Box::new(err),
-                })?
-                .iter()
-                .map(|entry| entry.allowed_node.to_string())
-                .collect();
             let return_service = ServiceBuilder::new()
                 .with_service_id(&service.service_id)
                 .with_service_type(&service.service_type)
                 .with_arguments(&arguments)
-                .with_allowed_nodes(&allowed_nodes)
+                .with_node_id(&service.node_id)
                 .build()
                 .map_err(|err| AdminServiceStoreError::StorageError {
                     context: String::from("Failed to build Service"),

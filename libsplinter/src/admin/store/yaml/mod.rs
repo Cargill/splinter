@@ -1087,7 +1087,11 @@ impl TryFrom<YamlService> for Service {
         ServiceBuilder::new()
             .with_service_id(&service.service_id)
             .with_service_type(&service.service_type)
-            .with_allowed_nodes(&service.allowed_nodes)
+            .with_node_id(
+                &service.allowed_nodes.get(0).ok_or_else(|| {
+                    BuilderError::InvalidField("Must contain 1 node ID".to_string())
+                })?,
+            )
             .with_arguments(
                 &service
                     .arguments
@@ -1104,7 +1108,7 @@ impl From<Service> for YamlService {
         YamlService {
             service_id: service.service_id().into(),
             service_type: service.service_type().into(),
-            allowed_nodes: service.allowed_nodes().to_vec(),
+            allowed_nodes: vec![service.node_id().into()],
             arguments: service
                 .arguments()
                 .iter()
@@ -1762,7 +1766,7 @@ proposals:
                     ServiceBuilder::default()
                         .with_service_id("a000")
                         .with_service_type("scabbard")
-                        .with_allowed_nodes(&vec!["acme-node-000".into()])
+                        .with_node_id("acme-node-000")
                         .with_arguments(&vec![
                             ("admin_keys".into(),
                            "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -1774,7 +1778,7 @@ proposals:
                     ServiceBuilder::default()
                         .with_service_id("a001")
                         .with_service_type("scabbard")
-                        .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                        .with_node_id("bubba-node-000")
                         .with_arguments(&vec![(
                             "admin_keys".into(),
                             "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -1963,7 +1967,7 @@ proposals:
             ServiceBuilder::default()
                 .with_service_id("a000")
                 .with_service_type("scabbard")
-                .with_allowed_nodes(&vec!["acme-node-000".into()])
+                .with_node_id("acme-node-000")
                 .with_arguments(&vec![
                     (
                         "admin_keys".into(),
@@ -1985,7 +1989,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a000")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["acme-node-000".into()])
+                    .with_node_id("acme-node-000")
                     .with_arguments(&vec![
                     ("admin_keys".into(),
                    "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -1997,7 +2001,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a001")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                    .with_node_id("bubba-node-000")
                     .with_arguments(&vec![
                         ("admin_keys".into(),
                        "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -2125,7 +2129,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a000")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["acme-node-000".into()])
+                    .with_node_id("acme-node-000")
                     .with_arguments(&vec![
                         ("admin_keys".into(),
                        "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -2137,7 +2141,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a001")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                    .with_node_id("bubba-node-000")
                     .with_arguments(&vec![(
                         "admin_keys".into(),
                         "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -2215,7 +2219,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a000")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["acme-node-000".into()])
+                    .with_node_id("acme-node-000")
                     .with_arguments(&vec![
                         ("peer_services".into(), "[\"a001\"]".into()),
                         ("admin_keys".into(),
@@ -2225,7 +2229,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a001")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                    .with_node_id("bubba-node-000")
                     .with_arguments(&vec![
                         ("peer_services".into(), "[\"a000\"]".into()),
                         ("admin_keys".into(),

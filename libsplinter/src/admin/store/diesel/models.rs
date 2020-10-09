@@ -20,8 +20,8 @@ use std::convert::TryFrom;
 
 use crate::admin::store::diesel::schema::{
     circuit, circuit_member, circuit_proposal, node_endpoint, proposed_circuit, proposed_node,
-    proposed_node_endpoint, proposed_service, proposed_service_argument, service,
-    service_allowed_node, service_argument, vote_record,
+    proposed_node_endpoint, proposed_service, proposed_service_argument, service, service_argument,
+    vote_record,
 };
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::admin::store::{
@@ -247,6 +247,7 @@ pub struct ServiceModel {
     pub circuit_id: String,
     pub service_id: String,
     pub service_type: String,
+    pub node_id: String,
 }
 
 impl From<&Circuit> for Vec<ServiceModel> {
@@ -258,39 +259,9 @@ impl From<&Circuit> for Vec<ServiceModel> {
                 circuit_id: circuit.circuit_id().into(),
                 service_id: service.service_id().into(),
                 service_type: service.service_type().into(),
+                node_id: service.node_id().into(),
             })
             .collect()
-    }
-}
-
-/// Database model representation of the `allowed_nodes` in a `Service`
-#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
-#[table_name = "service_allowed_node"]
-#[belongs_to(ServiceModel, foreign_key = "service_id")]
-#[primary_key(circuit_id, service_id, allowed_node)]
-pub struct ServiceAllowedNodeModel {
-    pub circuit_id: String,
-    pub service_id: String,
-    pub allowed_node: String,
-}
-
-impl From<&Circuit> for Vec<ServiceAllowedNodeModel> {
-    fn from(circuit: &Circuit) -> Self {
-        let mut allowed_nodes = Vec::new();
-        for service in circuit.roster() {
-            allowed_nodes.extend(
-                service
-                    .allowed_nodes()
-                    .iter()
-                    .map(|node| ServiceAllowedNodeModel {
-                        circuit_id: circuit.circuit_id().into(),
-                        service_id: service.service_id().into(),
-                        allowed_node: node.clone(),
-                    })
-                    .collect::<Vec<ServiceAllowedNodeModel>>(),
-            );
-        }
-        allowed_nodes
     }
 }
 
