@@ -59,6 +59,8 @@ macro_rules! mutex_lock_unwrap {
 }
 
 pub mod admin;
+#[cfg(feature = "auth")]
+pub mod auth;
 mod base62;
 #[cfg(feature = "biome")]
 pub mod biome;
