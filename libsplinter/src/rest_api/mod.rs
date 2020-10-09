@@ -19,7 +19,7 @@
 //! Below is an example of a `struct` that implements `ResouceProvider` and then passes its resources
 //! to a running instance of `RestApi`.
 //!
-//! ```
+//! ```no_run
 //! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
 //! use actix_web::HttpResponse;
 //! use futures::IntoFuture;
@@ -70,6 +70,9 @@ use protobuf::{self, Message};
 use std::boxed::Box;
 use std::sync::{mpsc, Arc};
 use std::thread;
+
+#[cfg(feature = "oauth")]
+use crate::auth::oauth::Provider as OAuthProvider;
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -464,6 +467,8 @@ pub struct RestApi {
     bind: String,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "oauth")]
+    _oauth_provider: Option<OAuthProvider>,
 }
 
 impl RestApi {
@@ -564,6 +569,8 @@ pub struct RestApiBuilder {
     bind: Option<String>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "oauth")]
+    oauth_provider: Option<OAuthProvider>,
 }
 
 impl Default for RestApiBuilder {
@@ -573,6 +580,8 @@ impl Default for RestApiBuilder {
             bind: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
+            #[cfg(feature = "oauth")]
+            oauth_provider: None,
         }
     }
 }
@@ -603,16 +612,40 @@ impl RestApiBuilder {
         self
     }
 
+    #[cfg(feature = "oauth")]
+    pub fn with_oauth_provider(mut self, oauth_provider: OAuthProvider) -> Self {
+        self.oauth_provider = Some(oauth_provider);
+        self
+    }
+
     pub fn build(self) -> Result<RestApi, RestApiServerError> {
         let bind = self
             .bind
             .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
+
+        #[cfg(feature = "auth")]
+        {
+            let mut authentication_configured = false;
+
+            #[cfg(feature = "oauth")]
+            if self.oauth_provider.is_some() {
+                authentication_configured = true;
+            }
+
+            if !authentication_configured {
+                return Err(RestApiServerError::MissingField(
+                    "REST API auth is enabled, but no authentication is configured".to_string(),
+                ));
+            }
+        }
 
         Ok(RestApi {
             bind,
             resources: self.resources,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
+            #[cfg(feature = "oauth")]
+            _oauth_provider: self.oauth_provider,
         })
     }
 }
@@ -696,5 +729,32 @@ mod test {
                 Box::new(Response::Ok().finish().into_future())
             })
             .into_route();
+    }
+
+    /// Verifies that the `RestApiBuilder` fails to build when auth is enabled but no authentication
+    /// is configured, but succeeds when authentication is configured.
+    #[test]
+    #[cfg(feature = "auth")]
+    fn rest_api_builder_auth() {
+        assert!(matches!(
+            RestApiBuilder::new().with_bind("test").build(),
+            Err(RestApiServerError::MissingField(_))
+        ));
+
+        #[cfg(feature = "oauth")]
+        assert!(RestApiBuilder::new()
+            .with_bind("test")
+            .with_oauth_provider(
+                OAuthProvider::new(
+                    "client_id".into(),
+                    "client_secret".into(),
+                    "https://provider.com/auth".into(),
+                    "https://provider.com/token".into(),
+                    vec![],
+                )
+                .expect("Failed to create OAuth provider")
+            )
+            .build()
+            .is_ok())
     }
 }

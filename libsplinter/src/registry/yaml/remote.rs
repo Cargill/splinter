@@ -400,6 +400,8 @@ mod tests {
     use futures::future::IntoFuture;
     use tempdir::TempDir;
 
+    #[cfg(feature = "oauth")]
+    use crate::auth::oauth::Provider;
     use crate::rest_api::{
         Method, Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
     };
@@ -1096,12 +1098,23 @@ mod tests {
         (10000..20000)
             .find_map(|port| {
                 let bind_url = format!("127.0.0.1:{}", port);
-                let result = RestApiBuilder::new()
+                let mut builder = RestApiBuilder::new()
                     .with_bind(&bind_url)
-                    .add_resources(resources.clone())
-                    .build()
-                    .expect("Failed to build REST API")
-                    .run();
+                    .add_resources(resources.clone());
+                #[cfg(feature = "oauth")]
+                {
+                    builder = builder.with_oauth_provider(
+                        Provider::new(
+                            "client_id".into(),
+                            "client_secret".into(),
+                            "https://provider.com/auth".into(),
+                            "https://provider.com/token".into(),
+                            vec![],
+                        )
+                        .expect("Failed to create OAuth provider"),
+                    );
+                }
+                let result = builder.build().expect("Failed to build REST API").run();
                 match result {
                     Ok((shutdown_handle, join_handle)) => {
                         Some((shutdown_handle, join_handle, bind_url))
