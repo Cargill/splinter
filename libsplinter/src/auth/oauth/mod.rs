@@ -16,15 +16,25 @@
 
 mod error;
 
-use oauth2::basic::BasicClient;
-use oauth2::{AuthUrl, ClientId, ClientSecret, TokenUrl};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-pub use error::OAuthClientConfigurationError;
+use oauth2::{
+    basic::{BasicClient, BasicTokenResponse},
+    reqwest::http_client,
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
+    PkceCodeVerifier, Scope, TokenResponse, TokenUrl,
+};
+
+pub use error::{OAuthClientConfigurationError, OAuthClientError};
 
 /// An OAuth2 client for Splinter
 #[derive(Clone)]
 pub struct OAuthClient {
     client: BasicClient,
+    /// List of (CSRF token, PKCE verifier) pairs for pending authorization requests
+    pending_authorizations: Arc<Mutex<HashMap<String, String>>>,
     scopes: Vec<String>,
 }
 
@@ -47,7 +57,125 @@ impl OAuthClient {
                 })?,
             ),
         );
-        Ok(Self { client, scopes })
+        Ok(Self {
+            client,
+            pending_authorizations: Default::default(),
+            scopes,
+        })
+    }
+
+    /// Generates the URL that the end user should be redirected to for authorization
+    pub fn get_authorization_url(&self) -> Result<String, OAuthClientError> {
+        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+
+        let mut request = self
+            .client
+            .authorize_url(CsrfToken::new_random)
+            .set_pkce_challenge(pkce_challenge);
+        for scope in &self.scopes {
+            request = request.add_scope(Scope::new(scope.into()));
+        }
+        let (authorize_url, csrf_state) = request.url();
+
+        self.pending_authorizations
+            .lock()
+            .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
+            .insert(csrf_state.secret().into(), pkce_verifier.secret().into());
+
+        Ok(authorize_url.to_string())
+    }
+
+    /// Exchanges the given authorization code for an access token
+    ///
+    /// # Arguments
+    ///
+    /// * `auth_code` - The authorization code that was supplied by the OAuth provider
+    /// * `csrf_token` - The CSRF token that was provided in the original auth request, which is
+    ///   used to prevent CSRF attacks and to correlate the auth code with the original auth
+    ///   request.
+    pub fn exchange_authorization_code(
+        &self,
+        auth_code: String,
+        csrf_token: &str,
+    ) -> Result<Option<UserTokens>, OAuthClientError> {
+        let pkce_verifier = match self
+            .pending_authorizations
+            .lock()
+            .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
+            .remove(csrf_token)
+        {
+            Some(pkce_verifier) => PkceCodeVerifier::new(pkce_verifier),
+            None => return Ok(None),
+        };
+
+        let token_response = self
+            .client
+            .exchange_code(AuthorizationCode::new(auth_code))
+            .set_pkce_verifier(pkce_verifier)
+            .request(http_client)
+            .map_err(|err| {
+                OAuthClientError::new(&format!(
+                    "failed to make authorization code exchange request: {}",
+                    err,
+                ))
+            })?;
+
+        Ok(Some(UserTokens::from(token_response)))
+    }
+}
+
+/// User information returned by the OAuth2 client
+pub struct UserTokens {
+    /// The access token to be used for authentication in future requests
+    access_token: String,
+    /// The amount of time (if the provider gives it) until the access token expires and the refresh
+    /// token will need to be used
+    expires_in: Option<Duration>,
+    /// The refresh token (if the provider gives one) for refreshing the access token
+    refresh_token: Option<String>,
+}
+
+impl UserTokens {
+    /// Gets the user's access token
+    pub fn access_token(&self) -> &str {
+        &self.access_token
+    }
+
+    /// Gets the amount of time that the user's access token is valid for. Not all providers expire
+    /// access tokens, so this may be `None` for some providers.
+    pub fn expires_in(&self) -> Option<Duration> {
+        self.expires_in
+    }
+
+    /// Gets the user's refresh token. Not all providers use refresh tokens, so this may be `None`
+    /// for some providers.
+    pub fn refresh_token(&self) -> Option<&str> {
+        self.refresh_token.as_deref()
+    }
+}
+
+impl std::fmt::Debug for UserTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("UserTokens")
+            .field("access_token", &"<Redacted>".to_string())
+            .field("expires_in", &self.expires_in)
+            .field(
+                "refresh_token",
+                &self.refresh_token.as_deref().map(|_| "<Redacted>"),
+            )
+            .finish()
+    }
+}
+
+impl From<BasicTokenResponse> for UserTokens {
+    fn from(token_response: BasicTokenResponse) -> Self {
+        Self {
+            access_token: token_response.access_token().secret().into(),
+            expires_in: token_response.expires_in(),
+            refresh_token: token_response
+                .refresh_token()
+                .map(|token| token.secret().into()),
+        }
     }
 }
 
