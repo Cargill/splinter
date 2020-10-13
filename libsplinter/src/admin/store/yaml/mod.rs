@@ -34,8 +34,8 @@ use super::{
     error::BuilderError, AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit,
     CircuitBuilder, CircuitNode, CircuitPredicate, CircuitProposal, CircuitProposalBuilder,
     DurabilityType, PersistenceType, ProposalType, ProposedCircuit, ProposedCircuitBuilder,
-    ProposedNode, ProposedService, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
-    VoteRecordBuilder,
+    ProposedNode, ProposedService, ProposedServiceBuilder, RouteType, Service, ServiceBuilder,
+    ServiceId, Vote, VoteRecord, VoteRecordBuilder,
 };
 
 use crate::hex::{parse_hex, to_hex};
@@ -1087,7 +1087,11 @@ impl TryFrom<YamlService> for Service {
         ServiceBuilder::new()
             .with_service_id(&service.service_id)
             .with_service_type(&service.service_type)
-            .with_allowed_nodes(&service.allowed_nodes)
+            .with_node_id(
+                &service.allowed_nodes.get(0).ok_or_else(|| {
+                    BuilderError::InvalidField("Must contain 1 node ID".to_string())
+                })?,
+            )
             .with_arguments(
                 &service
                     .arguments
@@ -1104,7 +1108,7 @@ impl From<Service> for YamlService {
         YamlService {
             service_id: service.service_id().into(),
             service_type: service.service_type().into(),
-            allowed_nodes: service.allowed_nodes().to_vec(),
+            allowed_nodes: vec![service.node_id().into()],
             arguments: service
                 .arguments()
                 .iter()
@@ -1285,7 +1289,7 @@ impl From<VoteRecord> for YamlVoteRecord {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 struct YamlProposedCircuit {
     circuit_id: String,
-    roster: Vec<ProposedService>,
+    roster: Vec<YamlProposedService>,
     members: Vec<ProposedNode>,
     authorization_type: AuthorizationType,
     persistence: PersistenceType,
@@ -1302,7 +1306,13 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
     fn try_from(circuit: YamlProposedCircuit) -> Result<Self, Self::Error> {
         ProposedCircuitBuilder::new()
             .with_circuit_id(&circuit.circuit_id)
-            .with_roster(&circuit.roster)
+            .with_roster(
+                &circuit
+                    .roster
+                    .into_iter()
+                    .map(ProposedService::try_from)
+                    .collect::<Result<Vec<ProposedService>, BuilderError>>()?,
+            )
             .with_members(&circuit.members)
             .with_authorization_type(&circuit.authorization_type)
             .with_persistence(&circuit.persistence)
@@ -1321,7 +1331,12 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
     fn from(circuit: ProposedCircuit) -> Self {
         YamlProposedCircuit {
             circuit_id: circuit.circuit_id().into(),
-            roster: circuit.roster().to_vec(),
+            roster: circuit
+                .roster()
+                .to_vec()
+                .into_iter()
+                .map(YamlProposedService::from)
+                .collect(),
             members: circuit.members().to_vec(),
             authorization_type: circuit.authorization_type().clone(),
             persistence: circuit.persistence().clone(),
@@ -1330,6 +1345,52 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
             circuit_management_type: circuit.circuit_management_type().into(),
             application_metadata: to_hex(circuit.application_metadata()),
             comments: circuit.comments().into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default, Eq)]
+pub struct YamlProposedService {
+    service_id: String,
+    service_type: String,
+    allowed_nodes: Vec<String>,
+    arguments: Vec<(String, String)>,
+}
+
+impl TryFrom<YamlProposedService> for ProposedService {
+    type Error = BuilderError;
+
+    fn try_from(service: YamlProposedService) -> Result<Self, Self::Error> {
+        ProposedServiceBuilder::new()
+            .with_service_id(&service.service_id)
+            .with_service_type(&service.service_type)
+            .with_node_id(
+                &service.allowed_nodes.get(0).ok_or_else(|| {
+                    BuilderError::InvalidField("Must contain 1 node ID".to_string())
+                })?,
+            )
+            .with_arguments(
+                &service
+                    .arguments
+                    .iter()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect::<Vec<(String, String)>>(),
+            )
+            .build()
+    }
+}
+
+impl From<ProposedService> for YamlProposedService {
+    fn from(service: ProposedService) -> Self {
+        YamlProposedService {
+            service_id: service.service_id().into(),
+            service_type: service.service_type().into(),
+            allowed_nodes: vec![service.node_id().to_string()],
+            arguments: service
+                .arguments()
+                .iter()
+                .map(|(key, value)| (key.into(), value.into()))
+                .collect(),
         }
     }
 }
@@ -1705,7 +1766,7 @@ proposals:
                     ServiceBuilder::default()
                         .with_service_id("a000")
                         .with_service_type("scabbard")
-                        .with_allowed_nodes(&vec!["acme-node-000".into()])
+                        .with_node_id("acme-node-000")
                         .with_arguments(&vec![
                             ("admin_keys".into(),
                            "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -1717,7 +1778,7 @@ proposals:
                     ServiceBuilder::default()
                         .with_service_id("a001")
                         .with_service_type("scabbard")
-                        .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                        .with_node_id("bubba-node-000")
                         .with_arguments(&vec![(
                             "admin_keys".into(),
                             "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -1906,7 +1967,7 @@ proposals:
             ServiceBuilder::default()
                 .with_service_id("a000")
                 .with_service_type("scabbard")
-                .with_allowed_nodes(&vec!["acme-node-000".into()])
+                .with_node_id("acme-node-000")
                 .with_arguments(&vec![
                     (
                         "admin_keys".into(),
@@ -1928,7 +1989,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a000")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["acme-node-000".into()])
+                    .with_node_id("acme-node-000")
                     .with_arguments(&vec![
                     ("admin_keys".into(),
                    "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -1940,7 +2001,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a001")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                    .with_node_id("bubba-node-000")
                     .with_arguments(&vec![
                         ("admin_keys".into(),
                        "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -2020,7 +2081,7 @@ proposals:
                         ProposedServiceBuilder::default()
                             .with_service_id("a000")
                             .with_service_type("scabbard")
-                            .with_allowed_nodes(&vec!["acme-node-000".into()])
+                            .with_node_id(&"acme-node-000")
                             .with_arguments(&vec![
                                 ("peer_services".into(), "[\"a001\"]".into()),
                                 ("admin_keys".into(),
@@ -2030,7 +2091,7 @@ proposals:
                         ProposedServiceBuilder::default()
                             .with_service_id("a001")
                             .with_service_type("scabbard")
-                            .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                            .with_node_id(&"bubba-node-000")
                             .with_arguments(&vec![
                                 ("peer_services".into(), "[\"a000\"]".into()),
                                 ("admin_keys".into(),
@@ -2068,7 +2129,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a000")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["acme-node-000".into()])
+                    .with_node_id("acme-node-000")
                     .with_arguments(&vec![
                         ("admin_keys".into(),
                        "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -2080,7 +2141,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a001")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                    .with_node_id("bubba-node-000")
                     .with_arguments(&vec![(
                         "admin_keys".into(),
                         "[\"035724d11cae47c8907f8bfdf510488f49df8494ff81b63825bad923733c4ac550\"]"
@@ -2110,7 +2171,7 @@ proposals:
                         ProposedServiceBuilder::default()
                             .with_service_id("a000")
                             .with_service_type("scabbard")
-                            .with_allowed_nodes(&vec!["acme-node-000".into()])
+                            .with_node_id("acme-node-000")
                             .with_arguments(&vec![
                                 ("peer_services".into(), "[\"a001\"]".into()),
                                 ("admin_keys".into(),
@@ -2120,7 +2181,7 @@ proposals:
                         ProposedServiceBuilder::default()
                             .with_service_id("a001")
                             .with_service_type("scabbard")
-                            .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                            .with_node_id("bubba-node-000")
                             .with_arguments(&vec![
                                 ("peer_services".into(), "[\"a000\"]".into()),
                                 ("admin_keys".into(),
@@ -2158,7 +2219,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a000")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["acme-node-000".into()])
+                    .with_node_id("acme-node-000")
                     .with_arguments(&vec![
                         ("peer_services".into(), "[\"a001\"]".into()),
                         ("admin_keys".into(),
@@ -2168,7 +2229,7 @@ proposals:
                 ServiceBuilder::default()
                     .with_service_id("a001")
                     .with_service_type("scabbard")
-                    .with_allowed_nodes(&vec!["bubba-node-000".into()])
+                    .with_node_id("bubba-node-000")
                     .with_arguments(&vec![
                         ("peer_services".into(), "[\"a000\"]".into()),
                         ("admin_keys".into(),

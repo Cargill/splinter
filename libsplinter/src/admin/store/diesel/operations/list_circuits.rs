@@ -25,7 +25,7 @@ use diesel::{
 use crate::admin::store::{
     diesel::{
         models::{CircuitMemberModel, CircuitModel, ServiceArgumentModel, ServiceModel},
-        schema::{circuit, circuit_member, service, service_allowed_node, service_argument},
+        schema::{circuit, circuit_member, service, service_argument},
     },
     error::AdminServiceStoreError,
     AuthorizationType, Circuit, CircuitBuilder, CircuitPredicate, DurabilityType, PersistenceType,
@@ -125,15 +125,12 @@ where
                 // Create HashMap of (`circuit_id`, `service_id`) to the associated argument values
                 let mut arguments_map: HashMap<(String, String), Vec<(String, String)>> =
                     HashMap::new();
-                // Create HashMap of (`circuit_id`, `service_id`) to the associated allowed nodes
-                let mut allowed_nodes_map: HashMap<(String, String), Vec<String>> = HashMap::new();
-                // Collects all `service`, `service_argument`, and `service_allowed_node` entries
-                // using an inner_join on the `service_id`, since the relationship between `service`
-                // and `service_argument` and between `service` and `service_allowed_node` is one-
-                // to-many. Adding the models retrieved from the database backend to HashMaps
+                // Collects all `service` and `service_argument` entries using an inner_join on the
+                // `service_id`, since the relationship between `service` and `service_argument` is
+                // one-to-many. Adding the models retrieved from the database backend to HashMaps
                 // removed the duplicate `service` entries collected, and also makes it simpler
                 // to build each `Service` later on.
-                for (service, opt_arg, opt_allowed_node) in service::table
+                for (service, opt_arg) in service::table
                     // Filters the services based on the circuit_ids collected based on the circuits
                     // which matched the predicates.
                     .filter(service::circuit_id.eq_any(&circuit_ids))
@@ -142,23 +139,15 @@ where
                         service_argument::table
                             .on(service::service_id.eq(service_argument::service_id)),
                     )
-                    // Joins a `service_allowed_node` entry to a `service` entry, based on
-                    // `service_id`.
-                    .inner_join(
-                        service_allowed_node::table
-                            .on(service::service_id.eq(service_allowed_node::service_id)),
-                    )
                     // Collects all data from the `service` entry, and the pertinent data from the
-                    // `service_argument` and `service_allowed_node` entry.
-                    // Making `service_argument` and `service_allowed_node` nullable is required
-                    // to return all matching records since the relationship with services is
-                    // one-to-many for each.
+                    // `service_argument` entry.
+                    // Making `service_argument` nullable is required to return all matching
+                    // records since the relationship with services is one-to-many for each.
                     .select((
                         service::all_columns,
                         service_argument::all_columns.nullable(),
-                        service_allowed_node::allowed_node.nullable(),
                     ))
-                    .load::<(ServiceModel, Option<ServiceArgumentModel>, Option<String>)>(self.conn)
+                    .load::<(ServiceModel, Option<ServiceArgumentModel>)>(self.conn)
                     .map_err(|err| AdminServiceStoreError::QueryError {
                         context: String::from("Unable to load Service information"),
                         source: Box::new(err),
@@ -180,22 +169,6 @@ where
                             );
                         }
                     }
-                    if let Some(allowed_node) = opt_allowed_node {
-                        if let Some(list) = allowed_nodes_map.get_mut(&(
-                            service.circuit_id.to_string(),
-                            service.service_id.to_string(),
-                        )) {
-                            list.push(allowed_node.to_string());
-                        } else {
-                            allowed_nodes_map.insert(
-                                (
-                                    service.circuit_id.to_string(),
-                                    service.service_id.to_string(),
-                                ),
-                                vec![allowed_node.to_string()],
-                            );
-                        }
-                    }
                     // Insert new `ServiceBuilder` if it does not already exist
                     services
                         .entry((
@@ -206,21 +179,17 @@ where
                             ServiceBuilder::new()
                                 .with_service_id(&service.service_id)
                                 .with_service_type(&service.service_type)
+                                .with_node_id(&service.node_id)
                         });
                 }
-                // Collect the `Services` mapped to `circuit_ids` after adding any `service_arguments`
-                // and `service_allowed_nodes` to the `ServiceBuilder`.
+                // Collect the `Services` mapped to `circuit_ids` after adding any
+                // `service_arguments` to the `ServiceBuilder`.
                 let mut built_services: HashMap<String, Vec<Service>> = HashMap::new();
                 for ((circuit_id, service_id), mut builder) in services.into_iter() {
                     if let Some(args) =
                         arguments_map.get(&(circuit_id.to_string(), service_id.to_string()))
                     {
                         builder = builder.with_arguments(&args);
-                    }
-                    if let Some(allowed_nodes) =
-                        allowed_nodes_map.get(&(circuit_id.to_string(), service_id.to_string()))
-                    {
-                        builder = builder.with_allowed_nodes(&allowed_nodes);
                     }
                     let service =
                         builder

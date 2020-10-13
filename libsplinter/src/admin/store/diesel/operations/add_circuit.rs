@@ -22,12 +22,9 @@ use super::AdminServiceStoreOperations;
 use crate::admin::store::{
     diesel::{
         models::{
-            CircuitMemberModel, CircuitModel, NodeEndpointModel, ServiceAllowedNodeModel,
-            ServiceArgumentModel, ServiceModel,
+            CircuitMemberModel, CircuitModel, NodeEndpointModel, ServiceArgumentModel, ServiceModel,
         },
-        schema::{
-            circuit, circuit_member, node_endpoint, service, service_allowed_node, service_argument,
-        },
+        schema::{circuit, circuit_member, node_endpoint, service, service_argument},
     },
     error::AdminServiceStoreError,
     Circuit, CircuitNode,
@@ -151,14 +148,6 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                     context: String::from("Unable to insert Service arguments"),
                     source: Box::new(err),
                 })?;
-            let service_allowed_node: Vec<ServiceAllowedNodeModel> = Vec::from(&circuit);
-            insert_into(service_allowed_node::table)
-                .values(&service_allowed_node)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Service allowed nodes"),
-                    source: Box::new(err),
-                })?;
 
             Ok(())
         })
@@ -273,14 +262,6 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to insert Service arguments"),
-                    source: Box::new(err),
-                })?;
-            let service_allowed_node: Vec<ServiceAllowedNodeModel> = Vec::from(&circuit);
-            insert_into(service_allowed_node::table)
-                .values(&service_allowed_node)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Service allowed nodes"),
                     source: Box::new(err),
                 })?;
 

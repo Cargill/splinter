@@ -24,7 +24,7 @@ use super::ProposedService;
 pub struct Service {
     service_id: String,
     service_type: String,
-    allowed_nodes: Vec<String>,
+    node_id: String,
     arguments: Vec<(String, String)>,
 }
 
@@ -39,9 +39,9 @@ impl Service {
         &self.service_type
     }
 
-    /// Returns the list of allowed nodes the service can run on
-    pub fn allowed_nodes(&self) -> &[String] {
-        &self.allowed_nodes
+    /// Returns the node ID of the node the service can connect to
+    pub fn node_id(&self) -> &str {
+        &self.node_id
     }
 
     /// Returns the list of key/value arugments for the service
@@ -55,7 +55,7 @@ impl Service {
 pub struct ServiceBuilder {
     service_id: Option<String>,
     service_type: Option<String>,
-    allowed_nodes: Option<Vec<String>>,
+    node_id: Option<String>,
     arguments: Option<Vec<(String, String)>>,
 }
 
@@ -75,9 +75,9 @@ impl ServiceBuilder {
         self.service_type.clone()
     }
 
-    /// Returns the list of allowed nodes the service can connect to
-    pub fn allowed_nodes(&self) -> Option<Vec<String>> {
-        self.allowed_nodes.clone()
+    /// Returns the node ID of the node the service can connect to
+    pub fn node_id(&self) -> Option<String> {
+        self.node_id.clone()
     }
 
     /// Returns the list of arguments for the service
@@ -105,13 +105,13 @@ impl ServiceBuilder {
         self
     }
 
-    /// Sets the allowed nodes
+    /// Sets the node ID
     ///
     /// # Arguments
     ///
-    ///  * `allowed_nodes` - A list of node IDs the service can connect to
-    pub fn with_allowed_nodes(mut self, allowed_nodes: &[String]) -> ServiceBuilder {
-        self.allowed_nodes = Some(allowed_nodes.into());
+    ///  * `node_id` - The node ID of the node the service can connect to
+    pub fn with_node_id(mut self, node_id: &str) -> ServiceBuilder {
+        self.node_id = Some(node_id.into());
         self
     }
 
@@ -144,16 +144,16 @@ impl ServiceBuilder {
             .service_type
             .ok_or_else(|| BuilderError::MissingField("service_type".to_string()))?;
 
-        let allowed_nodes = self
-            .allowed_nodes
-            .ok_or_else(|| BuilderError::MissingField("allowed_nodes".to_string()))?;
+        let node_id = self
+            .node_id
+            .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
 
         let arguments = self.arguments.unwrap_or_default();
 
         let service = Service {
             service_id,
             service_type,
-            allowed_nodes,
+            node_id,
             arguments,
         };
 
@@ -166,7 +166,7 @@ impl From<ProposedService> for Service {
         Service {
             service_id: service.service_id().to_string(),
             service_type: service.service_type().to_string(),
-            allowed_nodes: service.allowed_nodes().to_vec(),
+            node_id: service.node_id().to_string(),
             arguments: service.arguments().to_vec(),
         }
     }
@@ -177,7 +177,7 @@ impl From<&ProposedService> for Service {
         Service {
             service_id: proposed_service.service_id().to_string(),
             service_type: proposed_service.service_type().to_string(),
-            allowed_nodes: proposed_service.allowed_nodes().to_vec(),
+            node_id: proposed_service.node_id().to_string(),
             arguments: proposed_service.arguments().to_vec(),
         }
     }

@@ -31,8 +31,7 @@ use crate::admin::store::{
         },
         schema::{
             circuit_proposal, proposed_circuit, proposed_node, proposed_node_endpoint,
-            proposed_service, proposed_service_allowed_node, proposed_service_argument,
-            vote_record,
+            proposed_service, proposed_service_argument, vote_record,
         },
     },
     error::AdminServiceStoreError,
@@ -160,27 +159,17 @@ where
                 // Create HashMap of (`circuit_id`, `service_id`) to the associated argument values
                 let mut arguments_map: HashMap<(String, String), Vec<(String, String)>> =
                     HashMap::new();
-                // Create HashMap of (`circuit_id`, `service_id`) to the associated allowed nodes
-                let mut allowed_nodes_map: HashMap<(String, String), Vec<String>> = HashMap::new();
-                for (proposed_service, opt_arg, opt_allowed_node) in proposed_service::table
+                for (proposed_service, opt_arg) in proposed_service::table
                     .inner_join(
                         proposed_service_argument::table
                             .on(proposed_service::service_id
                                 .eq(proposed_service_argument::service_id)),
                     )
-                    .inner_join(proposed_service_allowed_node::table.on(
-                        proposed_service::service_id.eq(proposed_service_allowed_node::service_id),
-                    ))
                     .select((
                         proposed_service::all_columns,
                         proposed_service_argument::all_columns.nullable(),
-                        proposed_service_allowed_node::allowed_node.nullable(),
                     ))
-                    .load::<(
-                        ProposedServiceModel,
-                        Option<ProposedServiceArgumentModel>,
-                        Option<String>,
-                    )>(self.conn)
+                    .load::<(ProposedServiceModel, Option<ProposedServiceArgumentModel>)>(self.conn)
                     .map_err(|err| AdminServiceStoreError::QueryError {
                         context: String::from("Unable to load ProposedService information"),
                         source: Box::new(err),
@@ -202,22 +191,6 @@ where
                             );
                         }
                     }
-                    if let Some(allowed_node) = opt_allowed_node {
-                        if let Some(list) = allowed_nodes_map.get_mut(&(
-                            proposed_service.circuit_id.to_string(),
-                            proposed_service.service_id.to_string(),
-                        )) {
-                            list.push(allowed_node.to_string());
-                        } else {
-                            allowed_nodes_map.insert(
-                                (
-                                    proposed_service.circuit_id.to_string(),
-                                    proposed_service.service_id.to_string(),
-                                ),
-                                vec![allowed_node.to_string()],
-                            );
-                        }
-                    }
                     // Insert new `ProposedServiceBuilder` if it does not already exist
                     proposed_services
                         .entry((
@@ -228,6 +201,7 @@ where
                             ProposedServiceBuilder::new()
                                 .with_service_id(&proposed_service.service_id)
                                 .with_service_type(&proposed_service.service_type)
+                                .with_node_id(&proposed_service.node_id)
                         });
                 }
                 // Need to collect the `ProposedServices` mapped to `circuit_ids`
@@ -238,11 +212,6 @@ where
                         arguments_map.get(&(circuit_id.to_string(), service_id.to_string()))
                     {
                         builder = builder.with_arguments(&args);
-                    }
-                    if let Some(allowed_nodes) =
-                        allowed_nodes_map.get(&(circuit_id.to_string(), service_id.to_string()))
-                    {
-                        builder = builder.with_allowed_nodes(&allowed_nodes);
                     }
                     let proposed_service =
                         builder
