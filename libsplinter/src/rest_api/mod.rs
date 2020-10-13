@@ -72,7 +72,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 #[cfg(feature = "oauth")]
-use crate::auth::oauth::OAuthClient;
+use crate::auth::oauth::{rest_api::OAuthResourceProvider, OAuthClient};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -468,7 +468,7 @@ pub struct RestApi {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "oauth")]
-    _oauth_client: Option<OAuthClient>,
+    oauth_client: Option<OAuthClient>,
 }
 
 impl RestApi {
@@ -481,6 +481,8 @@ impl RestApi {
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist.to_owned();
+        #[cfg(feature = "oauth")]
+        let oauth_resource_provider = self.oauth_client.to_owned().map(OAuthResourceProvider::new);
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -498,6 +500,13 @@ impl RestApi {
 
                     #[cfg(not(feature = "rest-api-cors"))]
                     let mut app = App::new().wrap(middleware::Logger::default());
+
+                    #[cfg(feature = "oauth")]
+                    if let Some(resource_provider) = &oauth_resource_provider {
+                        for resource in resource_provider.resources() {
+                            app = app.service(resource.into_route());
+                        }
+                    }
 
                     for resource in resources.clone() {
                         app = app.service(resource.into_route());
@@ -645,7 +654,7 @@ impl RestApiBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
             #[cfg(feature = "oauth")]
-            _oauth_client: self.oauth_client,
+            oauth_client: self.oauth_client,
         })
     }
 }
