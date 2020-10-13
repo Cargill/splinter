@@ -15,6 +15,8 @@
 //! Support for OAuth2 authorization in Splinter
 
 mod error;
+#[cfg(feature = "rest-api")]
+pub mod rest_api;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
