@@ -209,7 +209,7 @@ where
                 for (id, model) in circuits {
                     let mut circuit_builder = CircuitBuilder::new()
                         .with_circuit_id(&model.circuit_id)
-                        .with_auth(&AuthorizationType::try_from(model.auth)?)
+                        .with_authorization(&AuthorizationType::try_from(model.authorization)?)
                         .with_persistence(&PersistenceType::try_from(model.persistence)?)
                         .with_durability(&DurabilityType::try_from(model.durability)?)
                         .with_routes(&RouteType::try_from(model.routes)?);

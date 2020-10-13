@@ -1040,7 +1040,7 @@ impl TryFrom<YamlCircuit> for Circuit {
                     .collect::<Result<Vec<Service>, BuilderError>>()?,
             )
             .with_members(&circuit.members)
-            .with_auth(&circuit.auth)
+            .with_authorization(&circuit.auth)
             .with_persistence(&circuit.persistence)
             .with_durability(&circuit.durability)
             .with_routes(&circuit.routes)
@@ -1059,7 +1059,7 @@ impl From<Circuit> for YamlCircuit {
                 .map(|service| YamlService::from(service.clone()))
                 .collect(),
             members: circuit.members().to_vec(),
-            auth: circuit.auth().clone(),
+            auth: circuit.authorization().clone(),
             persistence: circuit.persistence().clone(),
             durability: circuit.durability().clone(),
             routes: circuit.routes().clone(),

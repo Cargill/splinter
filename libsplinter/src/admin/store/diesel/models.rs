@@ -304,7 +304,7 @@ impl From<&Circuit> for Vec<ServiceArgumentModel> {
 #[primary_key(circuit_id)]
 pub struct CircuitModel {
     pub circuit_id: String,
-    pub auth: String,
+    pub authorization: String,
     pub persistence: String,
     pub durability: String,
     pub routes: String,
@@ -315,7 +315,7 @@ impl From<&Circuit> for CircuitModel {
     fn from(circuit: &Circuit) -> Self {
         CircuitModel {
             circuit_id: circuit.circuit_id().into(),
-            auth: String::from(circuit.auth()),
+            authorization: String::from(circuit.authorization()),
             persistence: String::from(circuit.persistence()),
             durability: String::from(circuit.durability()),
             routes: String::from(circuit.routes()),
