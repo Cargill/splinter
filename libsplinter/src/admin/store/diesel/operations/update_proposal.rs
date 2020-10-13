@@ -78,8 +78,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
             update(proposed_circuit::table.find(proposal.circuit_id()))
                 .set((
-                    proposed_circuit::authorization_type
-                        .eq(proposed_circuit_model.authorization_type),
+                    proposed_circuit::authorization.eq(proposed_circuit_model.authorization),
                     proposed_circuit::persistence.eq(proposed_circuit_model.persistence),
                     proposed_circuit::durability.eq(proposed_circuit_model.durability),
                     proposed_circuit::routes.eq(proposed_circuit_model.routes),
@@ -241,8 +240,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
             update(proposed_circuit::table.find(proposal.circuit_id()))
                 .set((
-                    proposed_circuit::authorization_type
-                        .eq(proposed_circuit_model.authorization_type),
+                    proposed_circuit::authorization.eq(proposed_circuit_model.authorization),
                     proposed_circuit::persistence.eq(proposed_circuit_model.persistence),
                     proposed_circuit::durability.eq(proposed_circuit_model.durability),
                     proposed_circuit::routes.eq(proposed_circuit_model.routes),

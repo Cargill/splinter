@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS vote_record (
 
 CREATE TABLE IF NOT EXISTS proposed_circuit (
     circuit_id                TEXT NOT NULL,
-    authorization_type        TEXT NOT NULL,
+    authorization             TEXT NOT NULL,
     persistence               TEXT NOT NULL,
     durability                TEXT NOT NULL,
     routes                    TEXT NOT NULL,

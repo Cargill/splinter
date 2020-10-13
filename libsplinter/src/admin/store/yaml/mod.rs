@@ -1314,7 +1314,7 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
                     .collect::<Result<Vec<ProposedService>, BuilderError>>()?,
             )
             .with_members(&circuit.members)
-            .with_authorization_type(&circuit.authorization_type)
+            .with_authorization(&circuit.authorization_type)
             .with_persistence(&circuit.persistence)
             .with_durability(&circuit.durability)
             .with_routes(&circuit.routes)
@@ -1338,7 +1338,7 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
                 .map(YamlProposedService::from)
                 .collect(),
             members: circuit.members().to_vec(),
-            authorization_type: circuit.authorization_type().clone(),
+            authorization_type: circuit.authorization().clone(),
             persistence: circuit.persistence().clone(),
             durability: circuit.durability().clone(),
             routes: circuit.routes().clone(),

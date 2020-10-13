@@ -135,8 +135,8 @@ where
                             .with_requester_node_id(&proposal.requester_node_id);
                         let proposed_circuit_builder = ProposedCircuitBuilder::new()
                             .with_circuit_id(&proposed_circuit.circuit_id)
-                            .with_authorization_type(&AuthorizationType::try_from(
-                                proposed_circuit.authorization_type,
+                            .with_authorization(&AuthorizationType::try_from(
+                                proposed_circuit.authorization,
                             )?)
                             .with_persistence(&PersistenceType::try_from(
                                 proposed_circuit.persistence,

@@ -218,8 +218,8 @@ where
                 .with_circuit_id(&proposal.circuit_id)
                 .with_roster(&built_proposed_services)
                 .with_members(built_proposed_nodes.as_slice())
-                .with_authorization_type(&AuthorizationType::try_from(
-                    proposed_circuit.authorization_type,
+                .with_authorization(&AuthorizationType::try_from(
+                    proposed_circuit.authorization,
                 )?)
                 .with_persistence(&PersistenceType::try_from(proposed_circuit.persistence)?)
                 .with_durability(&DurabilityType::try_from(proposed_circuit.durability)?)

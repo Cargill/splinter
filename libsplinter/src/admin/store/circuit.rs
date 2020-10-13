@@ -315,7 +315,7 @@ impl From<ProposedCircuit> for Circuit {
                 .iter()
                 .map(|node| node.node_id().to_string())
                 .collect(),
-            authorization: circuit.authorization_type().clone(),
+            authorization: circuit.authorization().clone(),
             persistence: circuit.persistence().clone(),
             durability: circuit.durability().clone(),
             routes: circuit.routes().clone(),

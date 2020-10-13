@@ -61,7 +61,7 @@ impl From<&CircuitProposal> for CircuitProposalModel {
 #[primary_key(circuit_id)]
 pub struct ProposedCircuitModel {
     pub circuit_id: String,
-    pub authorization_type: String,
+    pub authorization: String,
     pub persistence: String,
     pub durability: String,
     pub routes: String,
@@ -74,7 +74,7 @@ impl From<&ProposedCircuit> for ProposedCircuitModel {
     fn from(proposed_circuit: &ProposedCircuit) -> Self {
         ProposedCircuitModel {
             circuit_id: proposed_circuit.circuit_id().into(),
-            authorization_type: String::from(proposed_circuit.authorization_type()),
+            authorization: String::from(proposed_circuit.authorization()),
             persistence: String::from(proposed_circuit.persistence()),
             durability: String::from(proposed_circuit.durability()),
             routes: String::from(proposed_circuit.routes()),

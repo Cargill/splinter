@@ -25,7 +25,7 @@ table! {
 table! {
     proposed_circuit (circuit_id) {
         circuit_id -> Text,
-        authorization_type -> Text,
+        authorization -> Text,
         persistence -> Text,
         durability -> Text,
         routes -> Text,
