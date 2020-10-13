@@ -63,7 +63,8 @@ where
     ) -> Result<Option<CircuitProposal>, AdminServiceStoreError> {
         self.conn.transaction::<Option<CircuitProposal>, _, _>(|| {
             let (proposal, proposed_circuit): (CircuitProposalModel, ProposedCircuitModel) =
-                circuit_proposal::table
+                // return None if the `circuit_proposal` does not exist
+                match circuit_proposal::table
                     // The `circuit_proposal` and `proposed_circuit` have a one-to-one relationhip
                     // which allows for the returned entries to be returned as a pair, and the
                     // `inner_join` allows for the data from each table to be returned in this query.
@@ -80,12 +81,10 @@ where
                             "Error occurred fetching CircuitProposal and ProposedCircuit",
                         ),
                         source: Box::new(err),
-                    })?
-                    .ok_or_else(|| {
-                        AdminServiceStoreError::NotFoundError(String::from(
-                            "CircuitProposal and ProposedCircuit do not exist in AdminServiceStore",
-                        ))
-                    })?;
+                    })? {
+                    Some((proposal, proposed_circuit)) => (proposal, proposed_circuit),
+                    None => return Ok(None),
+                };
             // If the proposal exists, we must fetch all associated data
             let mut proposed_node_endpoints: HashMap<String, Vec<String>> = HashMap::new();
             let mut nodes: HashMap<String, ProposedNodeBuilder> = HashMap::new();

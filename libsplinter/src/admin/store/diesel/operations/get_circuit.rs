@@ -41,7 +41,8 @@ where
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
         self.conn.transaction::<Option<Circuit>, _, _>(|| {
             // Retrieve the `circuit` entry with the matching `circuit_id`
-            let circuit: CircuitModel = circuit::table
+            // return None if the `circuit` does not exist
+            let circuit: CircuitModel = match circuit::table
                 .select(circuit::all_columns)
                 .filter(circuit::circuit_id.eq(circuit_id.to_string()))
                 .first::<CircuitModel>(self.conn)
@@ -49,12 +50,10 @@ where
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Error occurred fetching Circuit"),
                     source: Box::new(err),
-                })?
-                .ok_or_else(|| {
-                    AdminServiceStoreError::NotFoundError(String::from(
-                        "Circuit does not exist in AdminServiceStore",
-                    ))
-                })?;
+                })? {
+                Some(circuit) => circuit,
+                None => return Ok(None),
+            };
 
             // Collecting the members of the `Circuit`
             let members: Vec<CircuitMemberModel> = circuit_member::table

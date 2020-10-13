@@ -39,19 +39,18 @@ where
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, AdminServiceStoreError> {
         self.conn.transaction::<Option<CircuitNode>, _, _>(|| {
             // Retrieves the `circuit_member` entry with the matching `node_id`.
-            let member: CircuitMemberModel = circuit_member::table
+            // return None if the `circuit_member` does not exist
+            let member: CircuitMemberModel = match circuit_member::table
                 .filter(circuit_member::node_id.eq(&node_id))
                 .first::<CircuitMemberModel>(self.conn)
                 .optional()
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Diesel error occurred fetching Node"),
                     source: Box::new(err),
-                })?
-                .ok_or_else(|| {
-                    AdminServiceStoreError::NotFoundError(String::from(
-                        "CircuitNode does not exist in AdminServiceStore",
-                    ))
-                })?;
+                })? {
+                Some(node) => node,
+                None => return Ok(None),
+            };
             // Collect all `node_endpoint` entries with the matching `node_id`.
             let endpoints: Vec<String> = node_endpoint::table
                 .filter(node_endpoint::node_id.eq(&member.node_id))

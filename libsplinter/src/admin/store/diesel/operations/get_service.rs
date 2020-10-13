@@ -45,7 +45,8 @@ where
     ) -> Result<Option<Service>, AdminServiceStoreError> {
         self.conn.transaction::<Option<Service>, _, _>(|| {
             // Fetch the `service` entry with the matching `service_id`.
-            let service: ServiceModel = service::table
+            // return None if the `service` does not exist
+            let service: ServiceModel = match service::table
                 .filter(service::circuit_id.eq(&service_id.circuit_id))
                 .filter(service::service_id.eq(&service_id.service_id))
                 .first::<ServiceModel>(self.conn)
@@ -53,12 +54,10 @@ where
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Error occurred fetching Service"),
                     source: Box::new(err),
-                })?
-                .ok_or_else(|| {
-                    AdminServiceStoreError::NotFoundError(String::from(
-                        "Service does not exist in AdminServiceStore",
-                    ))
-                })?;
+                })? {
+                Some(service) => service,
+                None => return Ok(None),
+            };
 
             // Collect the `service_argument` entries with the associated `circuit_id` found
             // in the `service` entry previously fetched and the provided `service_id`.
