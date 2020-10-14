@@ -58,7 +58,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
             let circuit_model = CircuitModel::from(&circuit);
             update(circuit::table.find(circuit.circuit_id()))
                 .set((
-                    circuit::auth.eq(circuit_model.auth),
+                    circuit::authorization_type.eq(circuit_model.authorization_type),
                     circuit::persistence.eq(circuit_model.persistence),
                     circuit::durability.eq(circuit_model.durability),
                     circuit::routes.eq(circuit_model.routes),
@@ -140,7 +140,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
             let circuit_model = CircuitModel::from(&circuit);
             update(circuit::table.find(circuit.circuit_id()))
                 .set((
-                    circuit::auth.eq(circuit_model.auth),
+                    circuit::authorization_type.eq(circuit_model.authorization_type),
                     circuit::persistence.eq(circuit_model.persistence),
                     circuit::durability.eq(circuit_model.durability),
                     circuit::routes.eq(circuit_model.routes),

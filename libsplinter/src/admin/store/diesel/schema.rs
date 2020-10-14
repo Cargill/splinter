@@ -97,7 +97,7 @@ table! {
 table! {
     circuit (circuit_id) {
         circuit_id -> Text,
-        auth -> Text,
+        authorization_type -> Text,
         persistence -> Text,
         durability -> Text,
         routes -> Text,

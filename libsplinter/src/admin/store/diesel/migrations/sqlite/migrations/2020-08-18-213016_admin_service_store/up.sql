@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS service_argument (
 
 CREATE TABLE IF NOT EXISTS circuit (
     circuit_id                TEXT PRIMARY KEY,
-    auth                      TEXT NOT NULL,
+    authorization_type        TEXT NOT NULL,
     persistence               TEXT NOT NULL,
     durability                TEXT NOT NULL,
     routes                    TEXT NOT NULL,
