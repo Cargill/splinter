@@ -17,16 +17,16 @@
 use std::error::Error;
 use std::fmt;
 
-/// An error that can occur when configuring a provider
+/// An error that can occur when configuring an OAuth client
 #[derive(Debug)]
-pub enum ProviderConfigurationError {
+pub enum OAuthClientConfigurationError {
     /// The specified authorization URL for the provider was invalid
     InvalidAuthUrl(String),
     /// The specified token URL for the provider was invalid
     InvalidTokenUrl(String),
 }
 
-impl fmt::Display for ProviderConfigurationError {
+impl fmt::Display for OAuthClientConfigurationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::InvalidAuthUrl(msg) => {
@@ -37,4 +37,4 @@ impl fmt::Display for ProviderConfigurationError {
     }
 }
 
-impl Error for ProviderConfigurationError {}
+impl Error for OAuthClientConfigurationError {}

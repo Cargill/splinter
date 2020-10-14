@@ -72,7 +72,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 #[cfg(feature = "oauth")]
-use crate::auth::oauth::Provider as OAuthProvider;
+use crate::auth::oauth::OAuthClient;
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -468,7 +468,7 @@ pub struct RestApi {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "oauth")]
-    _oauth_provider: Option<OAuthProvider>,
+    _oauth_client: Option<OAuthClient>,
 }
 
 impl RestApi {
@@ -570,7 +570,7 @@ pub struct RestApiBuilder {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "oauth")]
-    oauth_provider: Option<OAuthProvider>,
+    oauth_client: Option<OAuthClient>,
 }
 
 impl Default for RestApiBuilder {
@@ -581,7 +581,7 @@ impl Default for RestApiBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
             #[cfg(feature = "oauth")]
-            oauth_provider: None,
+            oauth_client: None,
         }
     }
 }
@@ -613,8 +613,8 @@ impl RestApiBuilder {
     }
 
     #[cfg(feature = "oauth")]
-    pub fn with_oauth_provider(mut self, oauth_provider: OAuthProvider) -> Self {
-        self.oauth_provider = Some(oauth_provider);
+    pub fn with_oauth_client(mut self, oauth_client: OAuthClient) -> Self {
+        self.oauth_client = Some(oauth_client);
         self
     }
 
@@ -628,7 +628,7 @@ impl RestApiBuilder {
             let mut authentication_configured = false;
 
             #[cfg(feature = "oauth")]
-            if self.oauth_provider.is_some() {
+            if self.oauth_client.is_some() {
                 authentication_configured = true;
             }
 
@@ -645,7 +645,7 @@ impl RestApiBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
             #[cfg(feature = "oauth")]
-            _oauth_provider: self.oauth_provider,
+            _oauth_client: self.oauth_client,
         })
     }
 }
@@ -744,15 +744,15 @@ mod test {
         #[cfg(feature = "oauth")]
         assert!(RestApiBuilder::new()
             .with_bind("test")
-            .with_oauth_provider(
-                OAuthProvider::new(
+            .with_oauth_client(
+                OAuthClient::new(
                     "client_id".into(),
                     "client_secret".into(),
                     "https://provider.com/auth".into(),
                     "https://provider.com/token".into(),
                     vec![],
                 )
-                .expect("Failed to create OAuth provider")
+                .expect("Failed to create OAuth client")
             )
             .build()
             .is_ok())

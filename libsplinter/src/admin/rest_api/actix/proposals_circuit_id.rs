@@ -91,7 +91,7 @@ mod tests {
         service::proposal_store::{ProposalFilter, ProposalIter, ProposalStoreError},
     };
     #[cfg(feature = "oauth")]
-    use crate::auth::oauth::Provider;
+    use crate::auth::oauth::OAuthClient;
     use crate::rest_api::{RestApiBuilder, RestApiServerError, RestApiShutdownHandle};
 
     #[test]
@@ -208,15 +208,15 @@ mod tests {
                     .add_resources(resources.clone());
                 #[cfg(feature = "oauth")]
                 {
-                    builder = builder.with_oauth_provider(
-                        Provider::new(
+                    builder = builder.with_oauth_client(
+                        OAuthClient::new(
                             "client_id".into(),
                             "client_secret".into(),
                             "https://provider.com/auth".into(),
                             "https://provider.com/token".into(),
                             vec![],
                         )
-                        .expect("Failed to create OAuth provider"),
+                        .expect("Failed to create OAuth client"),
                     );
                 }
                 let result = builder.build().expect("Failed to build REST API").run();

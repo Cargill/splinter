@@ -19,31 +19,32 @@ mod error;
 use oauth2::basic::BasicClient;
 use oauth2::{AuthUrl, ClientId, ClientSecret, TokenUrl};
 
-pub use error::ProviderConfigurationError;
+pub use error::OAuthClientConfigurationError;
 
-/// An abstraction of an OAuth2 provider
+/// An OAuth2 client for Splinter
 #[derive(Clone)]
-pub struct Provider {
+pub struct OAuthClient {
     client: BasicClient,
     scopes: Vec<String>,
 }
 
-impl Provider {
+impl OAuthClient {
     pub fn new(
         client_id: String,
         client_secret: String,
         auth_url: String,
         token_url: String,
         scopes: Vec<String>,
-    ) -> Result<Self, ProviderConfigurationError> {
+    ) -> Result<Self, OAuthClientConfigurationError> {
         let client = BasicClient::new(
             ClientId::new(client_id),
             Some(ClientSecret::new(client_secret)),
             AuthUrl::new(auth_url)
-                .map_err(|err| ProviderConfigurationError::InvalidAuthUrl(err.to_string()))?,
+                .map_err(|err| OAuthClientConfigurationError::InvalidAuthUrl(err.to_string()))?,
             Some(
-                TokenUrl::new(token_url)
-                    .map_err(|err| ProviderConfigurationError::InvalidTokenUrl(err.to_string()))?,
+                TokenUrl::new(token_url).map_err(|err| {
+                    OAuthClientConfigurationError::InvalidTokenUrl(err.to_string())
+                })?,
             ),
         );
         Ok(Self { client, scopes })
@@ -54,39 +55,39 @@ impl Provider {
 mod tests {
     use super::*;
 
-    /// Verifies that the `Provider::new` is successful when valid URLs are provided but returns
+    /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
     #[test]
-    fn provider_construction() {
-        Provider::new(
+    fn client_construction() {
+        OAuthClient::new(
             "client_id".into(),
             "client_secret".into(),
             "https://provider.com/auth".into(),
             "https://provider.com/token".into(),
             vec![],
         )
-        .expect("Failed to create provider from valid inputs");
+        .expect("Failed to create client from valid inputs");
 
         assert!(matches!(
-            Provider::new(
+            OAuthClient::new(
                 "client_id".into(),
                 "client_secret".into(),
                 "invalid_auth_url".into(),
                 "https://provider.com/token".into(),
                 vec![],
             ),
-            Err(ProviderConfigurationError::InvalidAuthUrl(_))
+            Err(OAuthClientConfigurationError::InvalidAuthUrl(_))
         ));
 
         assert!(matches!(
-            Provider::new(
+            OAuthClient::new(
                 "client_id".into(),
                 "client_secret".into(),
                 "https://provider.com/auth".into(),
                 "invalid_token_url".into(),
                 vec![],
             ),
-            Err(ProviderConfigurationError::InvalidTokenUrl(_))
+            Err(OAuthClientConfigurationError::InvalidTokenUrl(_))
         ));
     }
 }
