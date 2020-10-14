@@ -90,8 +90,8 @@ $ scabbard contract upload \
 ```
 
 For the next command, there are two scar files in the `~/scar` directory:
-`intkey_0.1.0.scar` and `intkey_0.1.1.scar`. This command uploads the smart
-contract from `intkey_0.1.1.scar`, since it specifies a minimum version
+`xo_0.1.0.scar` and `xo_0.1.1.scar`. This command uploads the smart
+contract from `xo_0.1.1.scar`, since it specifies a minimum version
 requirement of `0.1`, and `0.1.1` is later than `0.1.0`.
 
 ```
@@ -103,7 +103,7 @@ $ scabbard contract upload \
   xo:0.1
 ```
 
-The next example uploads the contract from the same `intkey_0.1.1.scar` file to
+The next example uploads the contract from the same `xo_0.1.1.scar` file to
 he same scabbard service, but it uses a wildcard to match any version. It also
 specifies a key in the `$HOME/.splinter/keys` directory by name and waits up to
 10 seconds for the contract upload batch to commit.
