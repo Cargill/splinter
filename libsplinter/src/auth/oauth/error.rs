@@ -48,6 +48,8 @@ impl Error for OAuthClientError {}
 pub enum OAuthClientConfigurationError {
     /// The specified authorization URL for the provider was invalid
     InvalidAuthUrl(String),
+    /// The specified redirect URL for the client was invalid
+    InvalidRedirectUrl(String),
     /// The specified token URL for the provider was invalid
     InvalidTokenUrl(String),
 }
@@ -58,6 +60,7 @@ impl fmt::Display for OAuthClientConfigurationError {
             Self::InvalidAuthUrl(msg) => {
                 write!(f, "provided authorization URL is invalid: {}", msg)
             }
+            Self::InvalidRedirectUrl(msg) => write!(f, "client redirect URL is invalid: {}", msg),
             Self::InvalidTokenUrl(msg) => write!(f, "provided token URL is invalid: {}", msg),
         }
     }

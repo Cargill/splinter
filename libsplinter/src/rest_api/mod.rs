@@ -749,6 +749,7 @@ mod test {
                     "client_id".into(),
                     "client_secret".into(),
                     "https://provider.com/auth".into(),
+                    "https://localhost/oauth/callback".into(),
                     "https://provider.com/token".into(),
                     vec![],
                 )

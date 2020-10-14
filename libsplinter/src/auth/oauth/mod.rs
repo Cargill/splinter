@@ -24,7 +24,7 @@ use oauth2::{
     basic::{BasicClient, BasicTokenResponse},
     reqwest::http_client,
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    PkceCodeVerifier, Scope, TokenResponse, TokenUrl,
+    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 
 pub use error::{OAuthClientConfigurationError, OAuthClientError};
@@ -43,20 +43,24 @@ impl OAuthClient {
         client_id: String,
         client_secret: String,
         auth_url: String,
+        redirect_url: String,
         token_url: String,
         scopes: Vec<String>,
     ) -> Result<Self, OAuthClientConfigurationError> {
-        let client = BasicClient::new(
-            ClientId::new(client_id),
-            Some(ClientSecret::new(client_secret)),
-            AuthUrl::new(auth_url)
-                .map_err(|err| OAuthClientConfigurationError::InvalidAuthUrl(err.to_string()))?,
-            Some(
-                TokenUrl::new(token_url).map_err(|err| {
-                    OAuthClientConfigurationError::InvalidTokenUrl(err.to_string())
+        let client =
+            BasicClient::new(
+                ClientId::new(client_id),
+                Some(ClientSecret::new(client_secret)),
+                AuthUrl::new(auth_url).map_err(|err| {
+                    OAuthClientConfigurationError::InvalidAuthUrl(err.to_string())
                 })?,
-            ),
-        );
+                Some(TokenUrl::new(token_url).map_err(|err| {
+                    OAuthClientConfigurationError::InvalidTokenUrl(err.to_string())
+                })?),
+            )
+            .set_redirect_url(RedirectUrl::new(redirect_url).map_err(|err| {
+                OAuthClientConfigurationError::InvalidRedirectUrl(err.to_string())
+            })?);
         Ok(Self {
             client,
             pending_authorizations: Default::default(),
@@ -191,6 +195,7 @@ mod tests {
             "client_id".into(),
             "client_secret".into(),
             "https://provider.com/auth".into(),
+            "https://localhost/oauth/callback".into(),
             "https://provider.com/token".into(),
             vec![],
         )
@@ -201,6 +206,7 @@ mod tests {
                 "client_id".into(),
                 "client_secret".into(),
                 "invalid_auth_url".into(),
+                "https://localhost/oauth/callback".into(),
                 "https://provider.com/token".into(),
                 vec![],
             ),
@@ -212,6 +218,19 @@ mod tests {
                 "client_id".into(),
                 "client_secret".into(),
                 "https://provider.com/auth".into(),
+                "invalid_redirect_url".into(),
+                "https://provider.com/token".into(),
+                vec![],
+            ),
+            Err(OAuthClientConfigurationError::InvalidRedirectUrl(_))
+        ));
+
+        assert!(matches!(
+            OAuthClient::new(
+                "client_id".into(),
+                "client_secret".into(),
+                "https://provider.com/auth".into(),
+                "https://localhost/oauth/callback".into(),
                 "invalid_token_url".into(),
                 vec![],
             ),
