@@ -32,15 +32,32 @@ use oauth2::{
 pub use error::{OAuthClientConfigurationError, OAuthClientError};
 
 /// An OAuth2 client for Splinter
+///
+/// This client currently supports OAuth2 authorization code grants
+/// (<https://tools.ietf.org/html/rfc6749#section-4.1>).
 #[derive(Clone)]
 pub struct OAuthClient {
+    /// The inner OAuth2 client
     client: BasicClient,
     /// List of (CSRF token, PKCE verifier) pairs for pending authorization requests
     pending_authorizations: Arc<Mutex<HashMap<String, String>>>,
+    /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
 }
 
 impl OAuthClient {
+    /// Creates a new `OAuthClient`
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - The OAuth client ID
+    /// * `client_secret` - The OAuth client secret
+    /// * `auth_url` - The provider's authorization endpoint
+    /// * `redirect_url` - The endpoint that the provider will redirect to after it has completed
+    ///   authorization
+    /// * `token_url` - The provider's endpoint for exchanging an authorization code for an access
+    ///   token
+    /// * `scopes` - The scopes that will be requested for each user
     pub fn new(
         client_id: String,
         client_secret: String,
