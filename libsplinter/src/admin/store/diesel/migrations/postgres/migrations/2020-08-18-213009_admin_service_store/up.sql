@@ -17,13 +17,13 @@ CREATE TABLE IF NOT EXISTS circuit_proposal (
     proposal_type             TEXT NOT NULL,
     circuit_id                TEXT PRIMARY KEY,
     circuit_hash              TEXT NOT NULL,
-    requester                 BINARY NOT NULL,
+    requester                 BYTEA NOT NULL,
     requester_node_id         TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS vote_record (
     circuit_id                TEXT NOT NULL,
-    public_key                BINARY NOT NULL,
+    public_key                BYTEA NOT NULL,
     vote                      TEXT NOT NULL,
     voter_node_id             TEXT NOT NULL,
     PRIMARY KEY (circuit_id, voter_node_id),
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS proposed_circuit (
     durability                TEXT NOT NULL,
     routes                    TEXT NOT NULL,
     circuit_management_type   TEXT NOT NULL,
-    application_metadata      BINARY NOT NULL,
+    application_metadata      BYTEA NOT NULL,
     comments                  TEXT NOT NULL,
     PRIMARY KEY (circuit_id),
     FOREIGN KEY (circuit_id) REFERENCES circuit_proposal(circuit_id) ON DELETE CASCADE
