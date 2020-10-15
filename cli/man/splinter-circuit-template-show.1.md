@@ -66,8 +66,7 @@ EXAMPLES
 ========
 The following command shows the details of the `scabbard` circuit template,
 which is available by default (packaged with the Splinter CLI) in the default
-circuit template directory, `/usr/share/splinter/circuit-templates`, unless
-`SPLINTER_CIRCUIT_TEMPLATE_PATH` is set.
+circuit template directory, `/usr/share/splinter/circuit-templates`.
 
 ```
 $ splinter circuit template show scabbard
