@@ -252,3 +252,34 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
     }
 }
+
+#[cfg(all(test, feature = "sqlite"))]
+pub mod tests {
+    use crate::admin::store::diesel::migrations::run_sqlite_migrations;
+
+    use diesel::{
+        r2d2::{ConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
+
+    #[test]
+    fn test_sqlite_migrations() {
+        create_connection_pool_and_migrate();
+    }
+
+    /// Creates a connection pool for an in-memory SQLite database with only a single connection
+    /// available. Each connection is backed by a different in-memory SQLite database, so limiting
+    /// the pool to a single connection ensures that the same DB is used for all operations.
+    fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        pool
+    }
+}
