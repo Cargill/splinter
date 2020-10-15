@@ -53,8 +53,9 @@ CREATE TABLE IF NOT EXISTS proposed_node (
 CREATE TABLE IF NOT EXISTS proposed_node_endpoint (
     node_id                TEXT NOT NULL,
     endpoint               TEXT NOT NULL,
+    circuit_id             TEXT NOT NULL,
     PRIMARY KEY (node_id, endpoint),
-    FOREIGN KEY (node_id) REFERENCES proposed_node(node_id) ON DELETE CASCADE
+    FOREIGN KEY (circuit_id) REFERENCES proposed_circuit(circuit_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS proposed_service (

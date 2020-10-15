@@ -153,10 +153,11 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
 /// Database model representation of the endpoint values associated with a `ProposedNode`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "proposed_node_endpoint"]
-#[belongs_to(ProposedNodeModel, foreign_key = "node_id")]
+#[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(node_id, endpoint)]
 pub struct ProposedNodeEndpointModel {
     pub node_id: String,
+    pub circuit_id: String,
     pub endpoint: String,
 }
 
@@ -169,6 +170,7 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
                     .iter()
                     .map(|endpoint| ProposedNodeEndpointModel {
                         node_id: node.node_id().into(),
+                        circuit_id: proposed_circuit.circuit_id().into(),
                         endpoint: endpoint.clone(),
                     })
                     .collect::<Vec<ProposedNodeEndpointModel>>(),

@@ -52,7 +52,8 @@ table! {
 }
 
 table! {
-    proposed_node_endpoint (node_id, endpoint) {
+    proposed_node_endpoint (circuit_id, node_id, endpoint) {
+        circuit_id -> Text,
         node_id -> Text,
         endpoint -> Text,
     }
