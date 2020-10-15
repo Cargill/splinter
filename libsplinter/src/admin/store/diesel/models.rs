@@ -352,7 +352,6 @@ impl From<&Circuit> for Vec<CircuitMemberModel> {
 /// Database model representation of the endpoint values associated with a `Circuit` member `node_id`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "node_endpoint"]
-#[belongs_to(CircuitMemberModel, foreign_key = "node_id")]
 #[primary_key(node_id, endpoint)]
 pub struct NodeEndpointModel {
     pub node_id: String,

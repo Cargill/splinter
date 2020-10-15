@@ -113,6 +113,5 @@ CREATE TABLE IF NOT EXISTS circuit_member (
 CREATE TABLE IF NOT EXISTS node_endpoint (
     node_id                TEXT NOT NULL,
     endpoint               TEXT NOT NULL,
-    PRIMARY KEY (node_id, endpoint),
-    FOREIGN KEY (node_id) REFERENCES circuit_member(node_id)
+    PRIMARY KEY (node_id, endpoint)
 );
