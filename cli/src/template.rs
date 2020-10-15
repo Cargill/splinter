@@ -34,7 +34,7 @@ pub struct CircuitTemplate {
 }
 
 impl CircuitTemplate {
-    /// Lists all available circuit templates found in the default template directory.
+    /// Lists all available circuit templates found in the template directories
     pub fn list_available_templates() -> Result<Vec<(String, PathBuf)>, CliError> {
         let mut paths = Vec::new();
         if let Ok(env_paths) = std::env::var(SPLINTER_CIRCUIT_TEMPLATE_PATH) {
