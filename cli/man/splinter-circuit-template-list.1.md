@@ -69,8 +69,7 @@ EXAMPLES
 ========
 The following example lists the circuit templates on a system that has only the
 `scabbard` template, which is available by default (packaged with the Splinter CLI)
-in the circuit template directory, `/usr/share/splinter/circuit-templates`, unless
-`SPLINTER_CIRCUIT_TEMPLATE_PATH` is set.
+in the circuit template directory, `/usr/share/splinter/circuit-templates`.
 
 ```
 $ splinter circuit template list
