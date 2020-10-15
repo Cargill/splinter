@@ -46,7 +46,7 @@ pub const SPLINTER_CIRCUIT_TEMPLATE_PATH: &str = "SPLINTER_CIRCUIT_TEMPLATE_PATH
 /// Manages circuit templates.
 ///
 /// `CircuitTemplateManager` maintains the location of circuit templates, and may be used to
-/// list any availabe circuit templates found in the `path` of the `CircuitTemplateManager`.
+/// list any available circuit templates found in the `path` of the `CircuitTemplateManager`.
 pub struct CircuitTemplateManager {
     /// Path of the directory containing the circuit template files.
     paths: Vec<String>,
