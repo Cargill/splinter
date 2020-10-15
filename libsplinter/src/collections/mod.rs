@@ -17,6 +17,10 @@
 mod bi_hash_map;
 mod error;
 mod ref_map;
+#[cfg(feature = "oauth")]
+mod ttl_map;
 
 pub(crate) use bi_hash_map::BiHashMap;
 pub(crate) use ref_map::RefMap;
+#[cfg(feature = "oauth")]
+pub(crate) use ttl_map::TtlMap;
