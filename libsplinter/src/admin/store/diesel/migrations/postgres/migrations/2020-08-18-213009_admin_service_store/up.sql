@@ -73,7 +73,6 @@ CREATE TABLE IF NOT EXISTS proposed_service_argument (
     key                       TEXT NOT NULL,
     value                     TEXT NOT NULL,
     PRIMARY KEY (circuit_id, service_id, key),
-    FOREIGN KEY (service_id) REFERENCES proposed_service(service_id),
     FOREIGN KEY (circuit_id) REFERENCES proposed_circuit(circuit_id) ON DELETE CASCADE
 );
 
@@ -101,7 +100,6 @@ CREATE TABLE IF NOT EXISTS service_argument (
     key                       TEXT NOT NULL,
     value                     TEXT NOT NULL,
     PRIMARY KEY (circuit_id, service_id, key),
-    FOREIGN KEY (service_id) REFERENCES service(service_id),
     FOREIGN KEY (circuit_id) REFERENCES circuit(circuit_id) ON DELETE CASCADE
 );
 

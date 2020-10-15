@@ -210,7 +210,7 @@ impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
 /// Database model representation of the arguments associated with a `ProposedService`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "proposed_service_argument"]
-#[belongs_to(ProposedServiceModel, foreign_key = "service_id")]
+#[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id, key)]
 pub struct ProposedServiceArgumentModel {
     pub circuit_id: String,
@@ -270,7 +270,7 @@ impl From<&Circuit> for Vec<ServiceModel> {
 /// Database model representation of the arguments in a `Service`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "service_argument"]
-#[belongs_to(ServiceModel, foreign_key = "service_id")]
+#[belongs_to(CircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id, key)]
 pub struct ServiceArgumentModel {
     pub circuit_id: String,
