@@ -72,7 +72,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 #[cfg(feature = "oauth")]
-use crate::auth::oauth::Provider as OAuthProvider;
+use crate::auth::oauth::{rest_api::OAuthResourceProvider, OAuthClient};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -468,7 +468,7 @@ pub struct RestApi {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "oauth")]
-    _oauth_provider: Option<OAuthProvider>,
+    oauth_client: Option<OAuthClient>,
 }
 
 impl RestApi {
@@ -481,6 +481,8 @@ impl RestApi {
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist.to_owned();
+        #[cfg(feature = "oauth")]
+        let oauth_resource_provider = self.oauth_client.to_owned().map(OAuthResourceProvider::new);
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -498,6 +500,13 @@ impl RestApi {
 
                     #[cfg(not(feature = "rest-api-cors"))]
                     let mut app = App::new().wrap(middleware::Logger::default());
+
+                    #[cfg(feature = "oauth")]
+                    if let Some(resource_provider) = &oauth_resource_provider {
+                        for resource in resource_provider.resources() {
+                            app = app.service(resource.into_route());
+                        }
+                    }
 
                     for resource in resources.clone() {
                         app = app.service(resource.into_route());
@@ -570,7 +579,7 @@ pub struct RestApiBuilder {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "oauth")]
-    oauth_provider: Option<OAuthProvider>,
+    oauth_client: Option<OAuthClient>,
 }
 
 impl Default for RestApiBuilder {
@@ -581,7 +590,7 @@ impl Default for RestApiBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
             #[cfg(feature = "oauth")]
-            oauth_provider: None,
+            oauth_client: None,
         }
     }
 }
@@ -613,8 +622,8 @@ impl RestApiBuilder {
     }
 
     #[cfg(feature = "oauth")]
-    pub fn with_oauth_provider(mut self, oauth_provider: OAuthProvider) -> Self {
-        self.oauth_provider = Some(oauth_provider);
+    pub fn with_oauth_client(mut self, oauth_client: OAuthClient) -> Self {
+        self.oauth_client = Some(oauth_client);
         self
     }
 
@@ -628,7 +637,7 @@ impl RestApiBuilder {
             let mut authentication_configured = false;
 
             #[cfg(feature = "oauth")]
-            if self.oauth_provider.is_some() {
+            if self.oauth_client.is_some() {
                 authentication_configured = true;
             }
 
@@ -645,7 +654,7 @@ impl RestApiBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
             #[cfg(feature = "oauth")]
-            _oauth_provider: self.oauth_provider,
+            oauth_client: self.oauth_client,
         })
     }
 }
@@ -744,15 +753,16 @@ mod test {
         #[cfg(feature = "oauth")]
         assert!(RestApiBuilder::new()
             .with_bind("test")
-            .with_oauth_provider(
-                OAuthProvider::new(
+            .with_oauth_client(
+                OAuthClient::new(
                     "client_id".into(),
                     "client_secret".into(),
                     "https://provider.com/auth".into(),
+                    "https://localhost/oauth/callback".into(),
                     "https://provider.com/token".into(),
                     vec![],
                 )
-                .expect("Failed to create OAuth provider")
+                .expect("Failed to create OAuth client")
             )
             .build()
             .is_ok())
