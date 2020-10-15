@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS service_argument (
 
 CREATE TABLE IF NOT EXISTS circuit_member (
     circuit_id                TEXT NOT NULL,
-    node_id                    TEXT NOT NULL,
+    node_id                   TEXT NOT NULL,
     PRIMARY KEY (circuit_id, node_id),
     FOREIGN KEY (circuit_id) REFERENCES circuit(circuit_id) ON DELETE CASCADE
 );
