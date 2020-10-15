@@ -77,7 +77,9 @@ where
                     .with_circuit_id(&circuit.circuit_id)
                     .with_roster(&services)
                     .with_members(&circuit_member)
-                    .with_auth(&AuthorizationType::try_from(circuit.auth)?)
+                    .with_authorization_type(&AuthorizationType::try_from(
+                        circuit.authorization_type,
+                    )?)
                     .with_persistence(&PersistenceType::try_from(circuit.persistence)?)
                     .with_durability(&DurabilityType::try_from(circuit.durability)?)
                     .with_routes(&RouteType::try_from(circuit.routes)?)

@@ -25,7 +25,7 @@ pub struct Circuit {
     id: String,
     roster: Vec<Service>,
     members: Vec<String>,
-    auth: AuthorizationType,
+    authorization_type: AuthorizationType,
     persistence: PersistenceType,
     durability: DurabilityType,
     routes: RouteType,
@@ -49,8 +49,8 @@ impl Circuit {
     }
 
     /// Returns the authorization type of the circuit
-    pub fn auth(&self) -> &AuthorizationType {
-        &self.auth
+    pub fn authorization_type(&self) -> &AuthorizationType {
+        &self.authorization_type
     }
 
     /// Returns the persistence type type of the circuit
@@ -116,7 +116,7 @@ pub struct CircuitBuilder {
     circuit_id: Option<String>,
     roster: Option<Vec<Service>>,
     members: Option<Vec<String>>,
-    auth: Option<AuthorizationType>,
+    authorization_type: Option<AuthorizationType>,
     persistence: Option<PersistenceType>,
     durability: Option<DurabilityType>,
     routes: Option<RouteType>,
@@ -145,8 +145,8 @@ impl CircuitBuilder {
     }
 
     /// Returns the authorization type in the builder
-    pub fn auth(&self) -> Option<AuthorizationType> {
-        self.auth.clone()
+    pub fn authorization_type(&self) -> Option<AuthorizationType> {
+        self.authorization_type.clone()
     }
 
     /// Returns the persistence type in the builder
@@ -203,9 +203,12 @@ impl CircuitBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `auth` - The authorization type for the circuit
-    pub fn with_auth(mut self, auth: &AuthorizationType) -> CircuitBuilder {
-        self.auth = Some(auth.clone());
+    ///  * `authorization_type` - The authorization type for the circuit
+    pub fn with_authorization_type(
+        mut self,
+        authorization_type: &AuthorizationType,
+    ) -> CircuitBuilder {
+        self.authorization_type = Some(authorization_type.clone());
         self
     }
 
@@ -274,7 +277,9 @@ impl CircuitBuilder {
             .members
             .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
 
-        let auth = self.auth.unwrap_or_else(|| AuthorizationType::Trust);
+        let authorization_type = self
+            .authorization_type
+            .unwrap_or_else(|| AuthorizationType::Trust);
 
         let persistence = self.persistence.unwrap_or_else(PersistenceType::default);
 
@@ -292,7 +297,7 @@ impl CircuitBuilder {
             id: circuit_id,
             roster,
             members,
-            auth,
+            authorization_type,
             persistence,
             durability,
             routes,
@@ -313,7 +318,7 @@ impl From<ProposedCircuit> for Circuit {
                 .iter()
                 .map(|node| node.node_id().to_string())
                 .collect(),
-            auth: circuit.authorization_type().clone(),
+            authorization_type: circuit.authorization_type().clone(),
             persistence: circuit.persistence().clone(),
             durability: circuit.durability().clone(),
             routes: circuit.routes().clone(),
