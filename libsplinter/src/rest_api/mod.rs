@@ -488,18 +488,15 @@ impl RestApi {
             .spawn(move || {
                 let sys = actix::System::new("SplinterD-Rest-API");
                 let mut server = HttpServer::new(move || {
-                    // Actix's type definitions require this to be chained, otherwise, the generic
-                    // type of App is changed as the values are returned.
+                    let app = App::new();
+
                     #[cfg(feature = "rest-api-cors")]
-                    let cors = match &whitelist {
+                    let app = app.wrap(match &whitelist {
                         Some(list) => cors::Cors::new(list.to_vec()),
                         None => cors::Cors::new_allow_any(),
-                    };
-                    #[cfg(feature = "rest-api-cors")]
-                    let mut app = App::new().wrap(middleware::Logger::default()).wrap(cors);
+                    });
 
-                    #[cfg(not(feature = "rest-api-cors"))]
-                    let mut app = App::new().wrap(middleware::Logger::default());
+                    let mut app = app.wrap(middleware::Logger::default());
 
                     #[cfg(feature = "oauth")]
                     if let Some(resource_provider) = &oauth_resource_provider {
