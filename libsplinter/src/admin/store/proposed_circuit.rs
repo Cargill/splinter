@@ -281,13 +281,17 @@ impl ProposedCircuitBuilder {
             None => return Err(BuilderError::MissingField("circuit_id".to_string())),
         };
 
-        let roster = self
+        let mut roster = self
             .roster
             .ok_or_else(|| BuilderError::MissingField("roster".to_string()))?;
 
-        let members = self
+        roster.sort_by_key(|service| service.service_id().to_string());
+
+        let mut members = self
             .members
             .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
+
+        members.sort_by_key(|node| node.node_id().to_string());
 
         let authorization_type = self
             .authorization_type
