@@ -51,6 +51,7 @@ serial_test = "0.3"
 
 [features]
 default = [
+    "circuit-template",
     "database",
     "database-migrate-biome",
 ]
@@ -63,7 +64,6 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "circuit-template",
     "health",
     "postgres",
     "circuit-auth-type",
