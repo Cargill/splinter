@@ -44,7 +44,7 @@ impl CircuitProposal {
 
     /// Returns the hash of the circuit in the proposal
     pub fn circuit_hash(&self) -> &str {
-        &self.circuit_id
+        &self.circuit_hash
     }
 
     /// Returns the circuit in the proposal
