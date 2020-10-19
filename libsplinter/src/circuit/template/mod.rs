@@ -528,6 +528,114 @@ rules:
         assert!(template.is_ok());
     }
 
+    /// Verifies a `CircuitTemplateManager` can be created using multiple paths, which are then
+    /// used to find the template files using `list_available_templates`.
+    ///
+    /// The test follows the procedure below:
+    /// 1. Sets up a temporary directory, to write circuit template files from the
+    ///    `EXAMPLE_TEMPLATE_YAML`.
+    /// 2. Create a `CircuitTemplateManager` using multiple temporary directories.
+    /// 3. Write and save two example template files to separate directories used to create the
+    ///    `CircuitTemplateManager` in the previous step.
+    /// 4. Use the `list_available_templates` method of the `CircuitTemplateManager` to collect a
+    ///    list of template names and paths that have been found by the manager.
+    /// 5. Assert the list returned by `list_available_templates` contains data on the expected
+    ///    template files.
+    ///
+    /// Asserting the `list_available_templates` method returns the correct information verifies
+    /// the `CircuitTemplateManager` is able to locate multiple template files.
+    #[test]
+    fn test_list_available_templates() {
+        let temp_dir1 = TempDir::new("test1").unwrap();
+        let temp_dir1 = temp_dir1.path().to_path_buf();
+        let temp_dir2 = TempDir::new("test2").unwrap();
+        let temp_dir2 = temp_dir2.path().to_path_buf();
+
+        // Create the manager with the multiple temporary directories.
+        let manager = CircuitTemplateManager::new(&[
+            temp_dir1
+                .to_str()
+                .expect("Unable to create str from temp_dir1 path")
+                .to_string(),
+            temp_dir2
+                .to_str()
+                .expect("Unable to create str from temp_dir2 path")
+                .to_string(),
+        ]);
+
+        // Set up example template files in separate temporary directories.
+        let file_path1 = get_file_path(temp_dir1);
+        write_yaml_file(&file_path1, EXAMPLE_TEMPLATE_YAML);
+        let mut file_path2 = temp_dir2;
+        file_path2.push("example_template2.yaml");
+        let file_path2 = file_path2.to_str().unwrap().to_string();
+        write_yaml_file(&file_path2, EXAMPLE_TEMPLATE_YAML);
+
+        // Collect all available templates found by the manager.
+        let templates = manager
+            .list_available_templates()
+            .expect("Error listing available circuit templates");
+
+        // Set up the expected template name and full path values in order to validate the
+        // list returned by the manager above.
+        let expected_templates = vec![
+            (
+                "example_template".to_string(),
+                PathBuf::from(file_path1)
+                    .canonicalize()
+                    .expect("Unable to get full file path of temporary circuit file"),
+            ),
+            (
+                "example_template2".to_string(),
+                PathBuf::from(file_path2)
+                    .canonicalize()
+                    .expect("Unable to get full file path of temporary circuit file"),
+            ),
+        ];
+
+        // Verify the returned templates matches the data expected.
+        assert_eq!(templates, expected_templates);
+    }
+
+    /// Verifies a valid YAML string is created using the `CircuitTemplateManager` `load_raw_yaml`
+    /// method.
+    ///
+    /// The test follows the procedure below:
+    /// 1. Sets up a temporary directory, to write circuit template files from the
+    ///    `EXAMPLE_TEMPLATE_YAML`.
+    /// 2. Create a `CircuitTemplateManager` using multiple temporary directories.
+    /// 3. Write and save an example template file.
+    /// 4. Use the `load_raw_yaml` method of the `CircuitTemplateManager` to create a YAML string
+    ///    from the template file.
+    /// 5. Assert the string returned by `load_raw_yaml` is created successfully and contains the
+    ///    expected fields.
+    ///
+    /// Asserting the `load_raw_yaml` method returns the correct YAML string and verifies
+    /// the `CircuitTemplateManager` is able to load the raw YAML from a template file.
+    #[test]
+    fn test_raw_yaml_string() {
+        let temp_dir1 = TempDir::new("test1").unwrap();
+        let temp_dir1 = temp_dir1.path().to_path_buf();
+
+        // Create the manager with the temporary directory.
+        let manager = CircuitTemplateManager::new(&[temp_dir1
+            .to_str()
+            .expect("Unable to create str from temp_dir1 path")
+            .to_string()]);
+
+        // Set up example template file.
+        let file_path1 = get_file_path(temp_dir1);
+        write_yaml_file(&file_path1, EXAMPLE_TEMPLATE_YAML);
+
+        // Load the raw YAML string from the template file.
+        let raw_yaml_result = manager.load_raw_yaml("example_template");
+        // Verify the YAML string was successfully created.
+        assert!(raw_yaml_result.is_ok());
+        let raw_yaml = raw_yaml_result.unwrap();
+        // Verify the template fields.
+        verify_example_yaml_string(raw_yaml);
+    }
+
     fn get_file_path(mut temp_dir: PathBuf) -> String {
         temp_dir.push("example_template.yaml");
         let path = temp_dir.to_str().unwrap().to_string();
@@ -539,5 +647,33 @@ rules:
 
         file.write_all(data)
             .expect("Error writing example template yaml.");
+    }
+
+    fn verify_example_yaml_string(yaml: String) {
+        // Validate the YAML string is valid
+        let _: serde_yaml::Value = serde_yaml::from_str(&yaml).expect("Invalid yaml was returned");
+
+        // Validate the main headers in the YAML string
+        assert!(yaml.contains("version: v1"));
+        assert!(yaml.contains("args:"));
+        assert!(yaml.contains("rules:"));
+        // Validate the main `args` fields in the YAML string
+        assert!(yaml.contains("- name: ADMIN_KEYS"));
+        assert!(yaml.contains("- name: NODES"));
+        assert!(yaml.contains("- name: SIGNER_PUB_KEY"));
+        assert!(yaml.contains("- name: GAMEROOM_NAME"));
+        // Validate the `rules` fields in the YAML string
+        assert!(yaml.contains("set-management-type:"));
+        assert!(yaml.contains("management-type: gameroom"));
+        assert!(yaml.contains("create-services:"));
+        assert!(yaml.contains("service-type: scabbard"));
+        assert!(yaml.contains("service-args:"));
+        assert!(yaml.contains("- key: admin-keys"));
+        assert!(yaml.contains("- key: peer_services"));
+        assert!(yaml.contains("set-metadata:"));
+        assert!(yaml.contains("encoding: Json"));
+        assert!(yaml.contains("metadata:"));
+        assert!(yaml.contains("- key: scabbard_admin_keys"));
+        assert!(yaml.contains("- key: alias"));
     }
 }
