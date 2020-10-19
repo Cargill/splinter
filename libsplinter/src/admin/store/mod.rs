@@ -120,7 +120,7 @@ impl PartialOrd for ServiceId {
 
 /// Predicate for filtering the lists of circuits and circuit proposals
 pub enum CircuitPredicate {
-    ManagmentTypeEq(String),
+    ManagementTypeEq(String),
     MembersInclude(Vec<String>),
 }
 
@@ -128,7 +128,7 @@ impl CircuitPredicate {
     /// Apply this predicate against a given circuit
     pub fn apply_to_circuit(&self, circuit: &Circuit) -> bool {
         match self {
-            CircuitPredicate::ManagmentTypeEq(man_type) => {
+            CircuitPredicate::ManagementTypeEq(man_type) => {
                 circuit.circuit_management_type() == man_type
             }
             CircuitPredicate::MembersInclude(nodes) => {
@@ -145,7 +145,7 @@ impl CircuitPredicate {
     /// Apply this predicate against a given circuit proposal
     pub fn apply_to_proposals(&self, proposal: &CircuitProposal) -> bool {
         match self {
-            CircuitPredicate::ManagmentTypeEq(man_type) => {
+            CircuitPredicate::ManagementTypeEq(man_type) => {
                 proposal.circuit().circuit_management_type() == man_type
             }
             CircuitPredicate::MembersInclude(nodes) => {
