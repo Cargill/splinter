@@ -224,6 +224,7 @@ where
                 .with_persistence(&PersistenceType::try_from(proposed_circuit.persistence)?)
                 .with_durability(&DurabilityType::try_from(proposed_circuit.durability)?)
                 .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
+                .with_circuit_management_type(&proposed_circuit.circuit_management_type)
                 .build()
                 .map_err(|err| AdminServiceStoreError::StorageError {
                     context: String::from("Failed to build ProposedCircuit"),
