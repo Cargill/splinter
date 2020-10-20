@@ -33,7 +33,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreUpdateCircuitOperatio
     fn update_circuit(&self, circuit: Circuit) -> Result<(), AdminServiceStoreError>;
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(all(feature = "admin-service-store-postgres", feature = "postgres"))]
 impl<'a> AdminServiceStoreUpdateCircuitOperation
     for AdminServiceStoreOperations<'a, diesel::pg::PgConnection>
 {

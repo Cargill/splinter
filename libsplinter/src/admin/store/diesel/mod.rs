@@ -74,7 +74,7 @@ impl Clone for DieselAdminServiceStore<diesel::sqlite::SqliteConnection> {
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(all(feature = "admin-service-store-postgres", feature = "postgres"))]
 impl Clone for DieselAdminServiceStore<diesel::pg::PgConnection> {
     fn clone(&self) -> Self {
         Self {
@@ -83,7 +83,7 @@ impl Clone for DieselAdminServiceStore<diesel::pg::PgConnection> {
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(all(feature = "admin-service-store-postgres", feature = "postgres"))]
 impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_proposal(proposal)
