@@ -32,7 +32,7 @@ use super::OAuthClient;
 ///
 /// * `rest-api-actix`
 #[derive(Clone)]
-pub struct OAuthResourceProvider {
+pub(crate) struct OAuthResourceProvider {
     client: OAuthClient,
 }
 
