@@ -218,7 +218,8 @@ where
                         )?)
                         .with_persistence(&PersistenceType::try_from(model.persistence)?)
                         .with_durability(&DurabilityType::try_from(model.durability)?)
-                        .with_routes(&RouteType::try_from(model.routes)?);
+                        .with_routes(&RouteType::try_from(model.routes)?)
+                        .with_circuit_management_type(&model.circuit_management_type);
 
                     if let Some(members) = circuit_members.get(&id) {
                         circuit_builder = circuit_builder.with_members(&members);
