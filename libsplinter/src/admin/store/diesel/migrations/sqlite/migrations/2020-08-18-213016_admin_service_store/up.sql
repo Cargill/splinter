@@ -53,8 +53,9 @@ CREATE TABLE IF NOT EXISTS proposed_node (
 CREATE TABLE IF NOT EXISTS proposed_node_endpoint (
     node_id                TEXT NOT NULL,
     endpoint               TEXT NOT NULL,
+    circuit_id             TEXT NOT NULL,
     PRIMARY KEY (node_id, endpoint),
-    FOREIGN KEY (node_id) REFERENCES proposed_node(node_id) ON DELETE CASCADE
+    FOREIGN KEY (circuit_id, node_id) REFERENCES proposed_node(circuit_id, node_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS proposed_service (
@@ -72,8 +73,16 @@ CREATE TABLE IF NOT EXISTS proposed_service_argument (
     key                       TEXT NOT NULL,
     value                     TEXT NOT NULL,
     PRIMARY KEY (circuit_id, service_id, key),
-    FOREIGN KEY (service_id) REFERENCES proposed_service(service_id),
     FOREIGN KEY (circuit_id) REFERENCES proposed_circuit(circuit_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS circuit (
+    circuit_id                TEXT PRIMARY KEY,
+    authorization_type        TEXT NOT NULL,
+    persistence               TEXT NOT NULL,
+    durability                TEXT NOT NULL,
+    routes                    TEXT NOT NULL,
+    circuit_management_type   TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS service (
@@ -91,22 +100,12 @@ CREATE TABLE IF NOT EXISTS service_argument (
     key                       TEXT NOT NULL,
     value                     TEXT NOT NULL,
     PRIMARY KEY (circuit_id, service_id, key),
-    FOREIGN KEY (service_id) REFERENCES service(service_id),
     FOREIGN KEY (circuit_id) REFERENCES circuit(circuit_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS circuit (
-    circuit_id                TEXT PRIMARY KEY,
-    authorization_type        TEXT NOT NULL,
-    persistence               TEXT NOT NULL,
-    durability                TEXT NOT NULL,
-    routes                    TEXT NOT NULL,
-    circuit_management_type   TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS circuit_member (
     circuit_id                TEXT NOT NULL,
-    node_id                    TEXT NOT NULL,
+    node_id                   TEXT NOT NULL,
     PRIMARY KEY (circuit_id, node_id),
     FOREIGN KEY (circuit_id) REFERENCES circuit(circuit_id) ON DELETE CASCADE
 );
@@ -114,6 +113,5 @@ CREATE TABLE IF NOT EXISTS circuit_member (
 CREATE TABLE IF NOT EXISTS node_endpoint (
     node_id                TEXT NOT NULL,
     endpoint               TEXT NOT NULL,
-    PRIMARY KEY (node_id, endpoint),
-    FOREIGN KEY (node_id) REFERENCES circuit_member(node_id)
+    PRIMARY KEY (node_id, endpoint)
 );

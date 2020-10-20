@@ -153,10 +153,11 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
 /// Database model representation of the endpoint values associated with a `ProposedNode`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "proposed_node_endpoint"]
-#[belongs_to(ProposedNodeModel, foreign_key = "node_id")]
+#[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(node_id, endpoint)]
 pub struct ProposedNodeEndpointModel {
     pub node_id: String,
+    pub circuit_id: String,
     pub endpoint: String,
 }
 
@@ -169,6 +170,7 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
                     .iter()
                     .map(|endpoint| ProposedNodeEndpointModel {
                         node_id: node.node_id().into(),
+                        circuit_id: proposed_circuit.circuit_id().into(),
                         endpoint: endpoint.clone(),
                     })
                     .collect::<Vec<ProposedNodeEndpointModel>>(),
@@ -208,7 +210,7 @@ impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
 /// Database model representation of the arguments associated with a `ProposedService`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "proposed_service_argument"]
-#[belongs_to(ProposedServiceModel, foreign_key = "service_id")]
+#[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id, key)]
 pub struct ProposedServiceArgumentModel {
     pub circuit_id: String,
@@ -268,7 +270,7 @@ impl From<&Circuit> for Vec<ServiceModel> {
 /// Database model representation of the arguments in a `Service`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "service_argument"]
-#[belongs_to(ServiceModel, foreign_key = "service_id")]
+#[belongs_to(CircuitModel, foreign_key = "circuit_id")]
 #[primary_key(circuit_id, service_id, key)]
 pub struct ServiceArgumentModel {
     pub circuit_id: String,
@@ -350,7 +352,6 @@ impl From<&Circuit> for Vec<CircuitMemberModel> {
 /// Database model representation of the endpoint values associated with a `Circuit` member `node_id`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "node_endpoint"]
-#[belongs_to(CircuitMemberModel, foreign_key = "node_id")]
 #[primary_key(node_id, endpoint)]
 pub struct NodeEndpointModel {
     pub node_id: String,
