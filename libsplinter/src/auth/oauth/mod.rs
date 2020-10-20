@@ -18,7 +18,6 @@ mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,7 +28,12 @@ use oauth2::{
     PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 
+use crate::collections::TtlMap;
+
 pub use error::{OAuthClientConfigurationError, OAuthClientError};
+
+/// The amount of time before a pending authorization expires and a new request must be made
+const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
 
 /// An OAuth2 client for Splinter
 ///
@@ -40,7 +44,7 @@ pub struct OAuthClient {
     /// The inner OAuth2 client
     client: BasicClient,
     /// List of (CSRF token, PKCE verifier) pairs for pending authorization requests
-    pending_authorizations: Arc<Mutex<HashMap<String, String>>>,
+    pending_authorizations: Arc<Mutex<TtlMap<String, String>>>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
 }
@@ -82,7 +86,9 @@ impl OAuthClient {
             })?);
         Ok(Self {
             client,
-            pending_authorizations: Default::default(),
+            pending_authorizations: Arc::new(Mutex::new(TtlMap::new(Duration::from_secs(
+                PENDING_AUTHORIZATION_EXPIRATION_SECS,
+            )))),
             scopes,
         })
     }
