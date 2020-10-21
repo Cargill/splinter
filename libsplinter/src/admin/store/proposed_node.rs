@@ -86,9 +86,11 @@ impl ProposedNodeBuilder {
             .node_id
             .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
 
-        let endpoints = self
+        let mut endpoints = self
             .endpoints
             .ok_or_else(|| BuilderError::MissingField("endpoints".to_string()))?;
+
+        endpoints.sort();
 
         let node = ProposedNode { node_id, endpoints };
 

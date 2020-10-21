@@ -17,10 +17,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use diesel::{
-    dsl::{exists, not},
-    prelude::*,
-};
+use diesel::{dsl::exists, prelude::*};
 
 use crate::admin::store::{
     diesel::{
@@ -55,7 +52,7 @@ where
         let management_types: Vec<String> = predicates
             .iter()
             .filter_map(|pred| match pred {
-                CircuitPredicate::ManagmentTypeEq(man_type) => Some(man_type.to_string()),
+                CircuitPredicate::ManagementTypeEq(man_type) => Some(man_type.to_string()),
                 _ => None,
             })
             .collect::<Vec<String>>();
@@ -69,24 +66,30 @@ where
             .flatten()
             .collect();
 
+        println!("{:?}", members);
+
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Circuit>>, _, _>(|| {
                 // Collects circuits which match the circuit predicates
-                let circuits: HashMap<String, CircuitModel> = circuit::table
-                    // Filters based on the circuit's management type
-                    .filter(circuit::circuit_management_type.eq_any(management_types))
-                    // Circuits are filtered by where there doesn't exist any `circuit_member` entries that
-                    // have a matching circuit_id value and have a node_id field that does not equal
-                    // any of the IDs collected from the `CircuitPredicates`.
-                    .filter(not(exists(
-                        // Selects all `circuit_member` entries where the `node_id` is not equal
+                let mut query = circuit::table.into_boxed().select(circuit::all_columns);
+
+                if !management_types.is_empty() {
+                    query = query.filter(circuit::circuit_management_type.eq_any(management_types));
+                }
+
+                if !members.is_empty() {
+                    query = query.filter(exists(
+                        // Selects all `circuit_member` entries where the `node_id` is equal
                         // to any of the members in the circuit predicates
                         circuit_member::table.filter(
                             circuit_member::circuit_id
                                 .eq(circuit::circuit_id)
-                                .and(circuit_member::node_id.ne_all(members)),
+                                .and(circuit_member::node_id.eq_any(members)),
                         ),
-                    )))
+                    ));
+                }
+
+                let circuits: HashMap<String, CircuitModel> = query
                     .load::<CircuitModel>(self.conn)
                     .map_err(|err| AdminServiceStoreError::QueryError {
                         context: String::from("Unable to load Circuit information"),
@@ -96,6 +99,7 @@ where
                     .into_iter()
                     .map(|model| (model.circuit_id.to_string(), model))
                     .collect();
+
                 // Store circuit IDs separately to make it easier to filter following queries
                 let circuit_ids: Vec<String> = circuits.keys().cloned().collect();
 
@@ -136,8 +140,9 @@ where
                     .filter(service::circuit_id.eq_any(&circuit_ids))
                     // Joins a `service_argument` entry to a `service` entry, based on `service_id`.
                     .inner_join(
-                        service_argument::table
-                            .on(service::service_id.eq(service_argument::service_id)),
+                        service_argument::table.on(service::service_id
+                            .eq(service_argument::service_id)
+                            .and(service_argument::circuit_id.eq(service::circuit_id))),
                     )
                     // Collects all data from the `service` entry, and the pertinent data from the
                     // `service_argument` entry.
@@ -214,7 +219,8 @@ where
                         )?)
                         .with_persistence(&PersistenceType::try_from(model.persistence)?)
                         .with_durability(&DurabilityType::try_from(model.durability)?)
-                        .with_routes(&RouteType::try_from(model.routes)?);
+                        .with_routes(&RouteType::try_from(model.routes)?)
+                        .with_circuit_management_type(&model.circuit_management_type);
 
                     if let Some(members) = circuit_members.get(&id) {
                         circuit_builder = circuit_builder.with_members(&members);

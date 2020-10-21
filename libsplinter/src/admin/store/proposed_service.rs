@@ -146,7 +146,9 @@ impl ProposedServiceBuilder {
             .node_id
             .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
 
-        let arguments = self.arguments.unwrap_or_default();
+        let mut arguments = self.arguments.unwrap_or_default();
+
+        arguments.sort();
 
         let service = ProposedService {
             service_id,

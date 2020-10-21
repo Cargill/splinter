@@ -92,8 +92,9 @@ where
                 // this join will return all matching entries as there are `proposed_node_endpoint`
                 // entries.
                 .inner_join(
-                    proposed_node_endpoint::table
-                        .on(proposed_node::node_id.eq(proposed_node_endpoint::node_id)),
+                    proposed_node_endpoint::table.on(proposed_node::node_id
+                        .eq(proposed_node_endpoint::node_id)
+                        .and(proposed_node_endpoint::circuit_id.eq(proposed_node::circuit_id))),
                 )
                 // Filters the entries based on the provided `proposal_id`.
                 .filter(proposed_node::circuit_id.eq(&proposal.circuit_id))
@@ -224,6 +225,7 @@ where
                 .with_persistence(&PersistenceType::try_from(proposed_circuit.persistence)?)
                 .with_durability(&DurabilityType::try_from(proposed_circuit.durability)?)
                 .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
+                .with_circuit_management_type(&proposed_circuit.circuit_management_type)
                 .build()
                 .map_err(|err| AdminServiceStoreError::StorageError {
                     context: String::from("Failed to build ProposedCircuit"),

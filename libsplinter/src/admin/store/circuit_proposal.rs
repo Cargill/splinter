@@ -44,7 +44,7 @@ impl CircuitProposal {
 
     /// Returns the hash of the circuit in the proposal
     pub fn circuit_hash(&self) -> &str {
-        &self.circuit_id
+        &self.circuit_hash
     }
 
     /// Returns the circuit in the proposal
@@ -233,7 +233,9 @@ impl CircuitProposalBuilder {
             .circuit
             .ok_or_else(|| BuilderError::MissingField("circuit".to_string()))?;
 
-        let votes = self.votes.unwrap_or_default();
+        let mut votes = self.votes.unwrap_or_default();
+
+        votes.sort_by_key(|vote| vote.voter_node_id().to_string());
 
         let requester = self
             .requester

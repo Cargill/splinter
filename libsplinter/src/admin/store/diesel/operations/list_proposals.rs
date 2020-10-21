@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use diesel::{
-    dsl::{exists, not},
+    dsl::exists,
     prelude::*,
     sql_types::{Binary, Text},
 };
@@ -67,7 +67,7 @@ where
         let management_types: Vec<String> = predicates
             .iter()
             .filter_map(|pred| match pred {
-                CircuitPredicate::ManagmentTypeEq(man_type) => Some(man_type.to_string()),
+                CircuitPredicate::ManagementTypeEq(man_type) => Some(man_type.to_string()),
                 _ => None,
             })
             .collect::<Vec<String>>();
@@ -80,55 +80,80 @@ where
             })
             .flatten()
             .collect();
+
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = CircuitProposal>>, _, _>(|| {
-                // Collects proposed circuits which match the circuit predicates
-                let proposed_circuits: HashMap<
-                    String,
-                    (ProposedCircuitModel, CircuitProposalModel),
-                > = proposed_circuit::table
-                    .filter(proposed_circuit::circuit_management_type.eq_any(management_types))
-                    // Join the `circuit_proposal` table as these are one-to-one, and this eliminates
-                    // the need for an additional query.
-                    .inner_join(
-                        circuit_proposal::table
-                            .on(circuit_proposal::circuit_id.eq(proposed_circuit::circuit_id)),
-                    )
-                    // Proposed circuits are filtered by where there doesn't exist any `proposed_nodes`
-                    // entries that have a matching circuit_id value and have a node_id field that does
-                    // not equal any of the IDs collected from the `CircuitPredicates`.
-                    .filter(not(exists(
+                let mut query = proposed_circuit::table
+                    .into_boxed()
+                    .select(proposed_circuit::all_columns);
+
+                if !members.is_empty() {
+                    query = query.filter(exists(
                         // Selects all `proposed_node` entries where the `node_id` is not equal
                         // to any of the members in the circuit predicates
                         proposed_node::table.filter(
                             proposed_node::circuit_id
                                 .eq(proposed_circuit::circuit_id)
-                                .and(proposed_node::node_id.ne_all(members)),
+                                .and(proposed_node::node_id.eq_any(members)),
                         ),
-                    )))
-                    .load::<(ProposedCircuitModel, CircuitProposalModel)>(self.conn)
+                    ))
+                }
+
+                // Selects proposed circuits that match the management types
+                if !management_types.is_empty() {
+                    query = query
+                        .filter(proposed_circuit::circuit_management_type.eq_any(management_types));
+                }
+
+                // Collects proposed circuits which match the circuit predicates
+                let proposed_circuits: HashMap<String, ProposedCircuitModel> = query
+                    .load::<ProposedCircuitModel>(self.conn)
                     .map_err(|err| AdminServiceStoreError::QueryError {
                         context: String::from("Unable to load proposed Circuit information"),
                         source: Box::new(err),
                     })?
-                    // Once the `ProposedCircuitModels` and `CircuitProposalModels` have been collected,
+                    // Once the `ProposedCircuitModels` have been collected,
                     // organize into a HashMap.
                     .into_iter()
-                    .map(|(proposed_circuit, circuit_proposal)| {
-                        (
-                            proposed_circuit.circuit_id.to_string(),
-                            (proposed_circuit, circuit_proposal),
-                        )
+                    .map(|proposed_circuit| {
+                        (proposed_circuit.circuit_id.to_string(), proposed_circuit)
                     })
                     .collect();
+
+                let circuit_proposals: HashMap<String, CircuitProposalModel> =
+                    circuit_proposal::table
+                        .filter(circuit_proposal::circuit_id.eq_any(proposed_circuits.keys()))
+                        .load::<CircuitProposalModel>(self.conn)
+                        .map_err(|err| AdminServiceStoreError::QueryError {
+                            context: String::from("Unable to load proposal information"),
+                            source: Box::new(err),
+                        })?
+                        // Once the `CircuitProposalModels` have been
+                        // collected,  organize into a HashMap.
+                        .into_iter()
+                        .map(|proposal| (proposal.circuit_id.to_string(), proposal))
+                        .collect();
+
                 let proposal_builders: HashMap<
                     String,
                     (CircuitProposalBuilder, ProposedCircuitBuilder),
                 > = proposed_circuits
                     .into_iter()
-                    .map(|(circuit_id, (proposed_circuit, proposal))| {
+                    .map(|(circuit_id, proposed_circuit)| {
+                        let proposal = circuit_proposals.get(&circuit_id).ok_or_else(|| {
+                            AdminServiceStoreError::StorageError {
+                                context: format!(
+                                    "Missing proposal for proposed_circuit {}",
+                                    circuit_id
+                                ),
+                                source: None,
+                            }
+                        })?;
+
                         let proposal_builder = CircuitProposalBuilder::new()
-                            .with_proposal_type(&ProposalType::try_from(proposal.proposal_type)?)
+                            .with_proposal_type(&ProposalType::try_from(
+                                proposal.proposal_type.to_string(),
+                            )?)
                             .with_circuit_id(&proposal.circuit_id)
                             .with_circuit_hash(&proposal.circuit_hash)
                             .with_requester(&proposal.requester)
@@ -161,9 +186,12 @@ where
                     HashMap::new();
                 for (proposed_service, opt_arg) in proposed_service::table
                     .inner_join(
-                        proposed_service_argument::table
-                            .on(proposed_service::service_id
-                                .eq(proposed_service_argument::service_id)),
+                        proposed_service_argument::table.on(proposed_service::service_id
+                            .eq(proposed_service_argument::service_id)
+                            .and(
+                                proposed_service_argument::circuit_id
+                                    .eq(proposed_service::circuit_id),
+                            )),
                     )
                     .select((
                         proposed_service::all_columns,
@@ -228,13 +256,13 @@ where
                     }
                 }
                 // Collect `ProposedNodes` and proposed node endpoints
-                let mut proposed_node_endpoints: HashMap<String, Vec<String>> = HashMap::new();
                 let mut proposed_nodes: HashMap<(String, String), ProposedNodeBuilder> =
                     HashMap::new();
                 for (node, endpoint) in proposed_node::table
                     .inner_join(
-                        proposed_node_endpoint::table
-                            .on(proposed_node::node_id.eq(proposed_node_endpoint::node_id)),
+                        proposed_node_endpoint::table.on(proposed_node::node_id
+                            .eq(proposed_node_endpoint::node_id)
+                            .and(proposed_node_endpoint::circuit_id.eq(proposed_node::circuit_id))),
                     )
                     .select((proposed_node::all_columns, proposed_node_endpoint::endpoint))
                     .load::<(ProposedNodeModel, String)>(self.conn)
@@ -243,21 +271,26 @@ where
                         source: Box::new(err),
                     })?
                 {
-                    if let Some(endpoint_list) = proposed_node_endpoints.get_mut(&node.node_id) {
-                        endpoint_list.push(endpoint.to_string());
+                    if let Some(proposed_node) = proposed_nodes
+                        .remove(&(node.circuit_id.to_string(), node.node_id.to_string()))
+                    {
+                        if let Some(mut endpoints) = proposed_node.endpoints() {
+                            endpoints.push(endpoint);
+                            let proposed_node = proposed_node.with_endpoints(&endpoints);
+                            proposed_nodes.insert((node.circuit_id, node.node_id), proposed_node);
+                        } else {
+                            let proposed_node = proposed_node.with_endpoints(&[endpoint]);
+                            proposed_nodes.insert((node.circuit_id, node.node_id), proposed_node);
+                        }
                     } else {
-                        proposed_node_endpoints
-                            .insert(node.node_id.to_string(), vec![endpoint.to_string()]);
+                        let proposed_node = ProposedNodeBuilder::new()
+                            .with_node_id(&node.node_id)
+                            .with_endpoints(&[endpoint]);
+                        proposed_nodes.insert((node.circuit_id, node.node_id), proposed_node);
                     }
-                    proposed_nodes
-                        .entry((node.circuit_id.to_string(), node.node_id.to_string()))
-                        .or_insert_with(|| ProposedNodeBuilder::new().with_node_id(&node.node_id));
                 }
                 let mut built_proposed_nodes: HashMap<String, Vec<ProposedNode>> = HashMap::new();
-                for ((circuit_id, node_id), mut builder) in proposed_nodes.into_iter() {
-                    if let Some(endpoints) = proposed_node_endpoints.get(&node_id) {
-                        builder = builder.with_endpoints(endpoints);
-                    }
+                for ((circuit_id, _), builder) in proposed_nodes.into_iter() {
                     if let Some(nodes) = built_proposed_nodes.get_mut(&circuit_id) {
                         nodes.push(builder.build().map_err(|err| {
                             AdminServiceStoreError::StorageError {
