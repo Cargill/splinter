@@ -154,7 +154,7 @@ impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "proposed_node_endpoint"]
 #[belongs_to(ProposedCircuitModel, foreign_key = "circuit_id")]
-#[primary_key(node_id, endpoint)]
+#[primary_key(circuit_id, node_id, endpoint)]
 pub struct ProposedNodeEndpointModel {
     pub node_id: String,
     pub circuit_id: String,
