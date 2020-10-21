@@ -93,6 +93,30 @@ impl OAuthClient {
         })
     }
 
+    /// Creates a new `OAuthClient` with GitHub's authorization and token URLs.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - The GitHub OAuth client ID
+    /// * `client_secret` - The GitHub OAuth client secret
+    /// * `redirect_url` - The endpoint that GitHub will redirect to after it has completed
+    ///   authorization
+    #[cfg(feature = "oauth-github")]
+    pub fn new_github(
+        client_id: String,
+        client_secret: String,
+        redirect_url: String,
+    ) -> Result<Self, OAuthClientConfigurationError> {
+        Self::new(
+            client_id,
+            client_secret,
+            "https://github.com/login/oauth/authorize".into(),
+            redirect_url,
+            "https://github.com/login/oauth/access_token".into(),
+            vec![],
+        )
+    }
+
     /// Generates the URL that the end user should be redirected to for authorization
     pub fn get_authorization_url(&self) -> Result<String, OAuthClientError> {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
