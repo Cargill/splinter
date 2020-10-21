@@ -40,7 +40,7 @@ use self::error::{
 
 /// The routing table representation of a circuit. It is simplified to only contain the required
 /// values for routing.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Circuit {
     circuit_id: String,
     roster: Vec<Service>,
@@ -65,7 +65,7 @@ impl Circuit {
 }
 
 /// The routing table representation of a node
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CircuitNode {
     node_id: String,
     endpoints: Vec<String>,
@@ -96,7 +96,7 @@ impl PartialOrd for CircuitNode {
 }
 
 /// The routing table representation of a service
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Service {
     service_id: String,
     service_type: String,
