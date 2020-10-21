@@ -575,6 +575,95 @@ impl RestApi {
             join_handle,
         ))
     }
+
+    /// Builds the `RestApi` without requiring any security configuration
+    #[cfg(test)]
+    pub fn run_insecure(
+        self,
+    ) -> Result<(RestApiShutdownHandle, thread::JoinHandle<()>), RestApiServerError> {
+        let (tx, rx) = mpsc::channel();
+
+        let bind_url = self.bind.to_owned();
+        let resources = self.resources.to_owned();
+        #[cfg(feature = "rest-api-cors")]
+        let whitelist = self.whitelist.to_owned();
+        let join_handle = thread::Builder::new()
+            .name("SplinterDRestApi".into())
+            .spawn(move || {
+                let sys = actix::System::new("SplinterD-Rest-API");
+                let mut server = HttpServer::new(move || {
+                    let app = App::new();
+
+                    #[cfg(feature = "rest-api-cors")]
+                    let app = app.wrap(match &whitelist {
+                        Some(list) => cors::Cors::new(list.to_vec()),
+                        None => cors::Cors::new_allow_any(),
+                    });
+
+                    let mut app = app.wrap(middleware::Logger::default());
+
+                    for resource in resources.clone() {
+                        app = app.service(resource.into_route());
+                    }
+                    app
+                });
+
+                server = match server.bind(&bind_url) {
+                    Ok(server) => server,
+                    Err(err) => {
+                        let error_msg = format!("Invalid REST API bind {}: {}", bind_url, err);
+                        error!("{}", error_msg);
+                        if let Err(err) = tx.send(Err(error_msg)) {
+                            error!("Failed to notify receiver of bind error: {}", err);
+                        }
+                        return;
+                    }
+                };
+                let port_numbers = server.addrs().iter().map(|addrs| addrs.port()).collect();
+
+                let addr = server.disable_signals().system_exit().start();
+
+                if let Err(err) = tx.send(Ok((addr, port_numbers))) {
+                    error!("Unable to send Server Addr: {}", err);
+                }
+
+                if let Err(err) = sys.run() {
+                    error!("REST Api unexpectedly exiting: {}", err);
+                };
+
+                info!("Rest API terminating");
+            })?;
+
+        let (addr, port_numbers) = rx
+            .recv()
+            .map_err(|err| {
+                RestApiServerError::StartUpError(format!("Unable to receive Server Addr: {}", err))
+            })?
+            .map_err(|err| {
+                RestApiServerError::BindError(format!(
+                    "Failed to bind to URL {}: {}",
+                    self.bind, err
+                ))
+            })?;
+
+        let do_shutdown = Box::new(move || {
+            debug!("Shutting down Rest API");
+            if let Err(err) = addr.stop(true).wait() {
+                error!("An error occured while shutting down rest API: {:?}", err);
+            }
+            debug!("Graceful signal sent to Rest API");
+
+            Ok(())
+        });
+
+        Ok((
+            RestApiShutdownHandle {
+                do_shutdown,
+                port_numbers,
+            },
+            join_handle,
+        ))
+    }
 }
 
 /// Builder `struct` for `RestApi`.
@@ -670,6 +759,28 @@ impl RestApiBuilder {
                 ));
             }
         }
+
+        Ok(RestApi {
+            bind,
+            resources: self.resources,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: self.whitelist,
+            #[cfg(feature = "auth")]
+            identity_providers,
+            #[cfg(feature = "oauth")]
+            oauth_client: self.oauth_client,
+        })
+    }
+
+    /// Builds the `RestApi` without requiring any security configuration
+    #[cfg(test)]
+    pub fn build_insecure(self) -> Result<RestApi, RestApiServerError> {
+        let bind = self
+            .bind
+            .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
+
+        #[cfg(feature = "auth")]
+        let identity_providers = self.identity_providers.unwrap_or_default();
 
         Ok(RestApi {
             bind,
