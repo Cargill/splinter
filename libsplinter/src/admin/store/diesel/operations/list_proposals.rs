@@ -186,9 +186,12 @@ where
                     HashMap::new();
                 for (proposed_service, opt_arg) in proposed_service::table
                     .inner_join(
-                        proposed_service_argument::table
-                            .on(proposed_service::service_id
-                                .eq(proposed_service_argument::service_id)),
+                        proposed_service_argument::table.on(proposed_service::service_id
+                            .eq(proposed_service_argument::service_id)
+                            .and(
+                                proposed_service_argument::circuit_id
+                                    .eq(proposed_service::circuit_id),
+                            )),
                     )
                     .select((
                         proposed_service::all_columns,

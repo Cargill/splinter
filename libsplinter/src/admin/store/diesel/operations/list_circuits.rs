@@ -140,8 +140,9 @@ where
                     .filter(service::circuit_id.eq_any(&circuit_ids))
                     // Joins a `service_argument` entry to a `service` entry, based on `service_id`.
                     .inner_join(
-                        service_argument::table
-                            .on(service::service_id.eq(service_argument::service_id)),
+                        service_argument::table.on(service::service_id
+                            .eq(service_argument::service_id)
+                            .and(service_argument::circuit_id.eq(service::circuit_id))),
                     )
                     // Collects all data from the `service` entry, and the pertinent data from the
                     // `service_argument` entry.
