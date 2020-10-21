@@ -92,8 +92,9 @@ where
                 // this join will return all matching entries as there are `proposed_node_endpoint`
                 // entries.
                 .inner_join(
-                    proposed_node_endpoint::table
-                        .on(proposed_node::node_id.eq(proposed_node_endpoint::node_id)),
+                    proposed_node_endpoint::table.on(proposed_node::node_id
+                        .eq(proposed_node_endpoint::node_id)
+                        .and(proposed_node_endpoint::circuit_id.eq(proposed_node::circuit_id))),
                 )
                 // Filters the entries based on the provided `proposal_id`.
                 .filter(proposed_node::circuit_id.eq(&proposal.circuit_id))

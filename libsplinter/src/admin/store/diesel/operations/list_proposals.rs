@@ -256,13 +256,13 @@ where
                     }
                 }
                 // Collect `ProposedNodes` and proposed node endpoints
-                let mut proposed_node_endpoints: HashMap<String, Vec<String>> = HashMap::new();
                 let mut proposed_nodes: HashMap<(String, String), ProposedNodeBuilder> =
                     HashMap::new();
                 for (node, endpoint) in proposed_node::table
                     .inner_join(
-                        proposed_node_endpoint::table
-                            .on(proposed_node::node_id.eq(proposed_node_endpoint::node_id)),
+                        proposed_node_endpoint::table.on(proposed_node::node_id
+                            .eq(proposed_node_endpoint::node_id)
+                            .and(proposed_node_endpoint::circuit_id.eq(proposed_node::circuit_id))),
                     )
                     .select((proposed_node::all_columns, proposed_node_endpoint::endpoint))
                     .load::<(ProposedNodeModel, String)>(self.conn)
@@ -271,21 +271,26 @@ where
                         source: Box::new(err),
                     })?
                 {
-                    if let Some(endpoint_list) = proposed_node_endpoints.get_mut(&node.node_id) {
-                        endpoint_list.push(endpoint.to_string());
+                    if let Some(proposed_node) = proposed_nodes
+                        .remove(&(node.circuit_id.to_string(), node.node_id.to_string()))
+                    {
+                        if let Some(mut endpoints) = proposed_node.endpoints() {
+                            endpoints.push(endpoint);
+                            let proposed_node = proposed_node.with_endpoints(&endpoints);
+                            proposed_nodes.insert((node.circuit_id, node.node_id), proposed_node);
+                        } else {
+                            let proposed_node = proposed_node.with_endpoints(&[endpoint]);
+                            proposed_nodes.insert((node.circuit_id, node.node_id), proposed_node);
+                        }
                     } else {
-                        proposed_node_endpoints
-                            .insert(node.node_id.to_string(), vec![endpoint.to_string()]);
+                        let proposed_node = ProposedNodeBuilder::new()
+                            .with_node_id(&node.node_id)
+                            .with_endpoints(&[endpoint]);
+                        proposed_nodes.insert((node.circuit_id, node.node_id), proposed_node);
                     }
-                    proposed_nodes
-                        .entry((node.circuit_id.to_string(), node.node_id.to_string()))
-                        .or_insert_with(|| ProposedNodeBuilder::new().with_node_id(&node.node_id));
                 }
                 let mut built_proposed_nodes: HashMap<String, Vec<ProposedNode>> = HashMap::new();
-                for ((circuit_id, node_id), mut builder) in proposed_nodes.into_iter() {
-                    if let Some(endpoints) = proposed_node_endpoints.get(&node_id) {
-                        builder = builder.with_endpoints(endpoints);
-                    }
+                for ((circuit_id, _), builder) in proposed_nodes.into_iter() {
                     if let Some(nodes) = built_proposed_nodes.get_mut(&circuit_id) {
                         nodes.push(builder.build().map_err(|err| {
                             AdminServiceStoreError::StorageError {
