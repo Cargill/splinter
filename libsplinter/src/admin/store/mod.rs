@@ -57,7 +57,7 @@ pub use self::service::{Service, ServiceBuilder};
 
 /// The unique ID of service made up of a circuit ID and the individual service ID.
 /// A service ID is only required to be unique from within a circuit.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ServiceId {
     circuit_id: String,
     service_id: String,
