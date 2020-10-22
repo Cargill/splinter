@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines traits and structs for an in-memory routing table
+//! A routing table for directing messages to nodes and services based on defined circuits.
+//!
+//! The routing table stores information required for routing messages to nodes and services that
+//! are a part of a circuit. The routing table is split into two traits, a reader and a writer.
+//! A writer is used to update the routing table with circuit, node, and service routing
+//! information. For example, the `AdminService` uses a writer when a new circuit has been added to
+//! Splinter state. Components that require routing information must use a reader. For example,
+//! the dispatch handlers use the reader to route messages to services or other nodes on a circuit.
 //!
 //! The public interface includes the traits [`RoutingTableReader`] and [`RoutingTableWriter`] and
 //! the structs [`Service`], [`ServiceId`], [`Circuit`], and [`CircuitNode`]. It also includes
