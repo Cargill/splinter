@@ -22,7 +22,7 @@ use super::{
 };
 
 /// Native representation of a circuit that is being proposed in a proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProposedCircuit {
     circuit_id: String,
     roster: Vec<ProposedService>,

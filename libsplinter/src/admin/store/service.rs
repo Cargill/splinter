@@ -20,7 +20,7 @@ use super::error::BuilderError;
 use super::ProposedService;
 
 /// Native representation of a service that is a part of circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Service {
     service_id: String,
     service_type: String,

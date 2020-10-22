@@ -20,7 +20,7 @@ use super::error::BuilderError;
 use super::ProposedCircuit;
 
 /// Native representation of a circuit proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CircuitProposal {
     proposal_type: ProposalType,
     circuit_id: String,
@@ -258,7 +258,7 @@ impl CircuitProposalBuilder {
 }
 
 // Native representation of a vote record for a proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VoteRecord {
     public_key: Vec<u8>,
     vote: Vote,
@@ -346,14 +346,14 @@ impl VoteRecordBuilder {
 }
 
 /// Represents a vote, either accept or reject, for a circuit proposal
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Vote {
     Accept,
     Reject,
 }
 
 /// Represents the of  type change the circuit proposal is for
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProposalType {
     Create,
     UpdateRoster,

@@ -20,7 +20,7 @@ use super::error::BuilderError;
 use super::{ProposedCircuit, Service};
 
 /// Native representation of a circuit in state
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Circuit {
     id: String,
     roster: Vec<Service>,
@@ -75,13 +75,13 @@ impl Circuit {
 }
 
 /// What type of authorization the circuit requires
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthorizationType {
     Trust,
 }
 
 /// A circuits message persistence strategy
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PersistenceType {
     Any,
 }
@@ -93,13 +93,13 @@ impl Default for PersistenceType {
 }
 
 /// A circuits durability requirement
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DurabilityType {
     NoDurability,
 }
 
 /// How messages are expected to be routed across a circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RouteType {
     Any,
 }
