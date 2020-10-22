@@ -143,7 +143,7 @@ pub struct ServiceId {
 }
 
 impl ServiceId {
-    /// Creates a new `ServiceID`
+    /// Creates a new `ServiceId`
     ///
     /// # Arguments
     ///
@@ -166,7 +166,7 @@ impl ServiceId {
         &self.service_id
     }
 
-    /// Decompose the service id into a tuple of (<circuit ID>, <service ID>).
+    /// Decompose the service ID into a tuple of (<circuit ID>, <service ID>).
     pub fn into_parts(self) -> (String, String) {
         (self.circuit_id, self.service_id)
     }
@@ -186,8 +186,8 @@ pub trait RoutingTableWriter: Send {
     ///
     /// # Arguments
     ///
-    /// * `service_id` -  The unique ServiceId for the service
-    /// * `service` -  The service to be added to the routing table
+    /// * `service_id` - The unique ServiceId for the service
+    /// * `service` - The service to be added to the routing table
     fn add_service(
         &mut self,
         service_id: ServiceId,
@@ -198,15 +198,15 @@ pub trait RoutingTableWriter: Send {
     ///
     /// # Arguments
     ///
-    /// * `service_id` -  The unique ServiceId for the service
+    /// * `service_id` - The unique ServiceId for the service
     fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), RemoveServiceError>;
 
-    /// Adds a new circuit to the routing table.  Also adds the associated services and nodes.
+    /// Adds a new circuit to the routing table. Also adds the associated services and nodes.
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID for the circuit
-    /// * `circuit` -  The circuit to be added to the routing table
+    /// * `circuit_id` - The unique ID for the circuit
+    /// * `circuit` - The circuit to be added to the routing table
     /// * `nodes` - The list of circuit nodes that should be added along with the circuit
     fn add_circuit(
         &mut self,
@@ -222,19 +222,19 @@ pub trait RoutingTableWriter: Send {
     /// * `circuits` - The list of circuits to be added to the routing table
     fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), AddCircuitsError>;
 
-    /// Removes a circuit from the routing table if it exists.  Also removes the associated
+    /// Removes a circuit from the routing table if it exists. Also removes the associated
     /// services.
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID for the circuit
+    /// * `circuit_id` - The unique ID for the circuit
     fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), RemoveCircuitError>;
 
     /// Adds a new node to the routing table
     ///
     /// # Arguments
     ///
-    /// * `node_id` -  The unique ID for the node
+    /// * `node_id` - The unique ID for the node
     /// * `node`- The node to add to the routing table
     fn add_node(&mut self, node_id: String, node: CircuitNode) -> Result<(), AddNodeError>;
 
@@ -249,7 +249,7 @@ pub trait RoutingTableWriter: Send {
     ///
     /// # Arguments
     ///
-    /// * `node_id` -  The unique ID for the node that should be removed
+    /// * `node_id` - The unique ID for the node that should be removed
     fn remove_node(&mut self, node_id: &str) -> Result<(), RemoveNodeError>;
 }
 
@@ -267,14 +267,14 @@ pub trait RoutingTableReader: Send {
     ///
     /// # Arguments
     ///
-    /// * `service_id` -  The unique ID for the service to be fetched
+    /// * `service_id` - The unique ID for the service to be fetched
     fn get_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError>;
 
     /// Returns all the services for the provided circuit
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID the circuit whose services should be returned
+    /// * `circuit_id` - The unique ID the circuit whose services should be returned
     fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError>;
 
     // ---------- methods to access circuit directory ----------
@@ -286,7 +286,7 @@ pub trait RoutingTableReader: Send {
     ///
     /// # Arguments
     ///
-    /// * `node_id` -  The unique ID for the node to be fetched
+    /// * `node_id` - The unique ID for the node to be fetched
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError>;
 
     /// Returns the circuits in the routing table
@@ -296,6 +296,6 @@ pub trait RoutingTableReader: Send {
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID for the circuit to be fetched
+    /// * `circuit_id` - The unique ID for the circuit to be fetched
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError>;
 }
