@@ -180,7 +180,7 @@ impl fmt::Display for ServiceId {
 
 impl Eq for ServiceId {}
 
-/// The trait that defines a writer for updating the in-memory routing table
+/// Interface for updating the routing table
 pub trait RoutingTableWriter: Send {
     /// Adds a new service to the routing table
     ///
@@ -259,7 +259,7 @@ pub type CircuitNodeIter = Box<dyn ExactSizeIterator<Item = (String, CircuitNode
 /// Type returned by the `RoutingTableReader::list_circuits` method
 pub type CircuitIter = Box<dyn ExactSizeIterator<Item = (String, Circuit)> + Send>;
 
-/// The trait that defines a reader for reading the in-memory routing table
+/// Interface for reading the routing table
 pub trait RoutingTableReader: Send {
     // ---------- methods to access service directory ----------
 
