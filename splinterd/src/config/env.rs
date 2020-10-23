@@ -42,7 +42,7 @@ impl EnvPartialConfigBuilder {
     }
 }
 
-/// Implementatiion of the `PartialConfigBuilder` trait to create a `PartialConfig` object from the
+/// Implementation of the `PartialConfigBuilder` trait to create a `PartialConfig` object from the
 /// environment variable config options.
 impl PartialConfigBuilder for EnvPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
