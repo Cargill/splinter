@@ -123,6 +123,23 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             )
         }
 
+        #[cfg(feature = "auth")]
+        {
+            partial_config = partial_config
+                .with_oauth_provider(self.matches.value_of("oauth_provider").map(String::from))
+                .with_oauth_client_id(self.matches.value_of("oauth_client_id").map(String::from))
+                .with_oauth_client_secret(
+                    self.matches
+                        .value_of("oauth_client_secret")
+                        .map(String::from),
+                )
+                .with_oauth_redirect_url(
+                    self.matches
+                        .value_of("oauth_redirect_url")
+                        .map(String::from),
+                )
+        }
+
         Ok(partial_config)
     }
 }

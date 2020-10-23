@@ -299,6 +299,36 @@ impl ConfigBuilder {
                     Some(v) => Some((v, p.source())),
                     None => None,
                 }),
+            #[cfg(feature = "auth")]
+            oauth_provider: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.oauth_provider() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }),
+            #[cfg(feature = "auth")]
+            oauth_client_id: self
+                .partial_configs
+                .iter()
+                .find_map(|p| match p.oauth_client_id() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }),
+            #[cfg(feature = "auth")]
+            oauth_client_secret: self.partial_configs.iter().find_map(|p| {
+                match p.oauth_client_secret() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }
+            }),
+            #[cfg(feature = "auth")]
+            oauth_redirect_url: self.partial_configs.iter().find_map(|p| {
+                match p.oauth_redirect_url() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }
+            }),
             strict_ref_counts: self
                 .partial_configs
                 .iter()

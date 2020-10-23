@@ -25,6 +25,14 @@ const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const CERT_DIR_ENV: &str = "SPLINTER_CERT_DIR";
 const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 const SPLINTER_STRICT_REF_COUNT_ENV: &str = "SPLINTER_STRICT_REF_COUNT";
+#[cfg(feature = "auth")]
+const OAUTH_PROVIDER_ENV: &str = "OAUTH_PROVIDER";
+#[cfg(feature = "auth")]
+const OAUTH_CLIENT_ID_ENV: &str = "OAUTH_CLIENT_ID";
+#[cfg(feature = "auth")]
+const OAUTH_CLIENT_SECRET_ENV: &str = "OAUTH_CLIENT_SECRET";
+#[cfg(feature = "auth")]
+const OAUTH_REDIRECT_URL_ENV: &str = "OAUTH_REDIRECT_URL";
 
 pub struct EnvPartialConfigBuilder;
 
@@ -38,6 +46,8 @@ impl EnvPartialConfigBuilder {
 /// environment variable config options.
 impl PartialConfigBuilder for EnvPartialConfigBuilder {
     fn build(self) -> Result<PartialConfig, ConfigError> {
+        let mut config = PartialConfig::new(ConfigSource::Environment);
+
         let config_dir_env = match (
             env::var(CONFIG_DIR_ENV).ok(),
             env::var(SPLINTER_HOME_ENV).ok(),
@@ -89,11 +99,22 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
             None => Some(false),
         };
 
-        Ok(PartialConfig::new(ConfigSource::Environment)
+        config = config
             .with_config_dir(config_dir_env)
             .with_tls_cert_dir(tls_cert_dir_env)
             .with_state_dir(state_dir_env)
-            .with_strict_ref_counts(strict_ref_counts))
+            .with_strict_ref_counts(strict_ref_counts);
+
+        #[cfg(feature = "auth")]
+        {
+            config = config
+                .with_oauth_provider(env::var(OAUTH_PROVIDER_ENV).ok())
+                .with_oauth_client_id(env::var(OAUTH_CLIENT_ID_ENV).ok())
+                .with_oauth_client_secret(env::var(OAUTH_CLIENT_SECRET_ENV).ok())
+                .with_oauth_redirect_url(env::var(OAUTH_REDIRECT_URL_ENV).ok());
+        }
+
+        Ok(config)
     }
 }
 
