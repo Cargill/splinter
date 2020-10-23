@@ -83,6 +83,7 @@ COPY --from=builder /commit-hash /commit-hash
 
 RUN apt-get update \
  && apt-get install -y -q \
+    ca-certificates \
     man \
     postgresql-client \
  && mandb \
