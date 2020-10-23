@@ -36,6 +36,9 @@ pub mod migrations;
 #[cfg(feature = "biome-notifications")]
 pub mod notifications;
 
+#[cfg(feature = "biome-oauth")]
+pub mod oauth;
+
 #[cfg(feature = "biome-credentials")]
 pub mod refresh_tokens;
 
@@ -56,6 +59,9 @@ pub use key_management::store::diesel::DieselKeyStore;
 pub use key_management::store::memory::MemoryKeyStore;
 #[cfg(feature = "biome-key-management")]
 pub use key_management::store::KeyStore;
+
+#[cfg(feature = "biome-oauth")]
+pub use oauth::store::OAuthUserStore;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;

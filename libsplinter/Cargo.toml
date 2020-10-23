@@ -99,6 +99,7 @@ experimental = [
     "admin-service-store-postgres",
     "auth",
     "biome-notifications",
+    "biome-oauth",
     "biome-user",
     "oauth",
     "oauth-github",
@@ -122,6 +123,7 @@ biome = []
 biome-credentials = ["biome", "biome-user", "bcrypt"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
+biome-oauth = ["biome"]
 biome-user = ["biome"]
 circuit-template = ["glob"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
