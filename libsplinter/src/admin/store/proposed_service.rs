@@ -18,7 +18,7 @@ use crate::admin::messages::is_valid_service_id;
 use super::error::BuilderError;
 
 /// Native representation of a service that is a part of a proposed circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProposedService {
     service_id: String,
     service_type: String,

@@ -17,7 +17,7 @@
 use super::error::BuilderError;
 
 /// Native representation of a node in a proposed circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProposedNode {
     node_id: String,
     endpoints: Vec<String>,

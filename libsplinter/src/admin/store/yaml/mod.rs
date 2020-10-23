@@ -32,10 +32,11 @@ use self::error::YamlAdminStoreError;
 
 use super::{
     error::BuilderError, AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit,
-    CircuitBuilder, CircuitNode, CircuitPredicate, CircuitProposal, CircuitProposalBuilder,
-    DurabilityType, PersistenceType, ProposalType, ProposedCircuit, ProposedCircuitBuilder,
-    ProposedNode, ProposedService, ProposedServiceBuilder, RouteType, Service, ServiceBuilder,
-    ServiceId, Vote, VoteRecord, VoteRecordBuilder,
+    CircuitBuilder, CircuitNode, CircuitNodeBuilder, CircuitPredicate, CircuitProposal,
+    CircuitProposalBuilder, DurabilityType, PersistenceType, ProposalType, ProposedCircuit,
+    ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder, ProposedService,
+    ProposedServiceBuilder, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
+    VoteRecordBuilder,
 };
 
 use crate::hex::{parse_hex, to_hex};
@@ -1019,10 +1020,10 @@ struct YamlCircuit {
     id: String,
     roster: Vec<YamlService>,
     members: Vec<String>,
-    auth: AuthorizationType,
-    persistence: PersistenceType,
-    durability: DurabilityType,
-    routes: RouteType,
+    auth: YamlAuthorizationType,
+    persistence: YamlPersistenceType,
+    durability: YamlDurabilityType,
+    routes: YamlRouteType,
     circuit_management_type: String,
 }
 
@@ -1040,10 +1041,10 @@ impl TryFrom<YamlCircuit> for Circuit {
                     .collect::<Result<Vec<Service>, BuilderError>>()?,
             )
             .with_members(&circuit.members)
-            .with_authorization_type(&circuit.auth)
-            .with_persistence(&circuit.persistence)
-            .with_durability(&circuit.durability)
-            .with_routes(&circuit.routes)
+            .with_authorization_type(&AuthorizationType::from(circuit.auth))
+            .with_persistence(&PersistenceType::from(circuit.persistence))
+            .with_durability(&DurabilityType::from(circuit.durability))
+            .with_routes(&RouteType::from(circuit.routes))
             .with_circuit_management_type(&circuit.circuit_management_type)
             .build()
     }
@@ -1059,10 +1060,10 @@ impl From<Circuit> for YamlCircuit {
                 .map(|service| YamlService::from(service.clone()))
                 .collect(),
             members: circuit.members().to_vec(),
-            auth: circuit.authorization_type().clone(),
-            persistence: circuit.persistence().clone(),
-            durability: circuit.durability().clone(),
-            routes: circuit.routes().clone(),
+            auth: circuit.authorization_type().clone().into(),
+            persistence: circuit.persistence().clone().into(),
+            durability: circuit.durability().clone().into(),
+            routes: circuit.routes().clone().into(),
             circuit_management_type: circuit.circuit_management_type().into(),
         }
     }
@@ -1121,7 +1122,7 @@ impl From<Service> for YamlService {
 /// YAML file specific state definition that can be read and written to the circuit YAML state file
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 struct YamlCircuitState {
-    nodes: BTreeMap<String, CircuitNode>,
+    nodes: BTreeMap<String, YamlCircuitNode>,
     circuits: BTreeMap<String, YamlCircuit>,
 }
 
@@ -1130,7 +1131,11 @@ impl TryFrom<YamlCircuitState> for CircuitState {
 
     fn try_from(state: YamlCircuitState) -> Result<Self, Self::Error> {
         Ok(CircuitState {
-            nodes: state.nodes,
+            nodes: state
+                .nodes
+                .into_iter()
+                .map(|(id, node)| CircuitNode::try_from(node).map(|node| (id, node)))
+                .collect::<Result<BTreeMap<String, CircuitNode>, BuilderError>>()?,
             circuits: state
                 .circuits
                 .into_iter()
@@ -1146,7 +1151,11 @@ impl TryFrom<YamlCircuitState> for CircuitState {
 impl From<CircuitState> for YamlCircuitState {
     fn from(state: CircuitState) -> Self {
         YamlCircuitState {
-            nodes: state.nodes,
+            nodes: state
+                .nodes
+                .into_iter()
+                .map(|(id, node)| (id, node.into()))
+                .collect::<BTreeMap<String, YamlCircuitNode>>(),
             circuits: state
                 .circuits
                 .into_iter()
@@ -1158,7 +1167,7 @@ impl From<CircuitState> for YamlCircuitState {
 
 /// The circuit state that is cached by the YAML admin service store and used to respond to fetch
 /// requests
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 struct CircuitState {
     nodes: BTreeMap<String, CircuitNode>,
     circuits: BTreeMap<String, Circuit>,
@@ -1169,7 +1178,7 @@ struct CircuitState {
 /// format during read/write operations.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct YamlCircuitProposal {
-    proposal_type: ProposalType,
+    proposal_type: YamlProposalType,
     circuit_id: String,
     circuit_hash: String,
     circuit: YamlProposedCircuit,
@@ -1213,7 +1222,7 @@ impl TryFrom<YamlCircuitProposal> for CircuitProposal {
     fn try_from(proposal: YamlCircuitProposal) -> Result<Self, Self::Error> {
         CircuitProposalBuilder::new()
             .with_circuit_id(&proposal.circuit_id)
-            .with_proposal_type(&proposal.proposal_type)
+            .with_proposal_type(&ProposalType::from(proposal.proposal_type))
             .with_circuit_hash(&proposal.circuit_hash)
             .with_circuit(&ProposedCircuit::try_from(proposal.circuit)?)
             .with_votes(
@@ -1235,7 +1244,7 @@ impl From<CircuitProposal> for YamlCircuitProposal {
     fn from(proposal: CircuitProposal) -> Self {
         YamlCircuitProposal {
             circuit_id: proposal.circuit_id().into(),
-            proposal_type: proposal.proposal_type().clone(),
+            proposal_type: proposal.proposal_type().clone().into(),
             circuit_hash: proposal.circuit_hash().into(),
             circuit: YamlProposedCircuit::from(proposal.circuit().clone()),
             votes: proposal
@@ -1249,13 +1258,46 @@ impl From<CircuitProposal> for YamlCircuitProposal {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum YamlProposalType {
+    Create,
+    UpdateRoster,
+    AddNode,
+    RemoveNode,
+    Destroy,
+}
+
+impl From<YamlProposalType> for ProposalType {
+    fn from(proposal_type: YamlProposalType) -> Self {
+        match proposal_type {
+            YamlProposalType::Create => ProposalType::Create,
+            YamlProposalType::UpdateRoster => ProposalType::UpdateRoster,
+            YamlProposalType::AddNode => ProposalType::AddNode,
+            YamlProposalType::RemoveNode => ProposalType::RemoveNode,
+            YamlProposalType::Destroy => ProposalType::Destroy,
+        }
+    }
+}
+
+impl From<ProposalType> for YamlProposalType {
+    fn from(proposal_type: ProposalType) -> Self {
+        match proposal_type {
+            ProposalType::Create => YamlProposalType::Create,
+            ProposalType::UpdateRoster => YamlProposalType::UpdateRoster,
+            ProposalType::AddNode => YamlProposalType::AddNode,
+            ProposalType::RemoveNode => YamlProposalType::RemoveNode,
+            ProposalType::Destroy => YamlProposalType::Destroy,
+        }
+    }
+}
+
 /// YAML file specific vote record definition. The YAML state requires that the vote public key
 /// is converted to a hex string. To handle this, proposals needs to be converted to the correct
 /// format during read/write operations.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct YamlVoteRecord {
     public_key: String,
-    vote: Vote,
+    vote: YamlVote,
     voter_node_id: String,
 }
 
@@ -1267,7 +1309,7 @@ impl TryFrom<YamlVoteRecord> for VoteRecord {
             .with_public_key(&parse_hex(&vote.public_key).map_err(|_| {
                 BuilderError::InvalidField("Requester public key is not valid hex".to_string())
             })?)
-            .with_vote(&vote.vote)
+            .with_vote(&Vote::from(vote.vote))
             .with_voter_node_id(&vote.voter_node_id)
             .build()
     }
@@ -1277,7 +1319,7 @@ impl From<VoteRecord> for YamlVoteRecord {
     fn from(vote: VoteRecord) -> Self {
         YamlVoteRecord {
             public_key: to_hex(vote.public_key()),
-            vote: vote.vote().clone(),
+            vote: vote.vote().clone().into(),
             voter_node_id: vote.voter_node_id().into(),
         }
     }
@@ -1290,11 +1332,11 @@ impl From<VoteRecord> for YamlVoteRecord {
 struct YamlProposedCircuit {
     circuit_id: String,
     roster: Vec<YamlProposedService>,
-    members: Vec<ProposedNode>,
-    authorization_type: AuthorizationType,
-    persistence: PersistenceType,
-    durability: DurabilityType,
-    routes: RouteType,
+    members: Vec<YamlProposedNode>,
+    authorization_type: YamlAuthorizationType,
+    persistence: YamlPersistenceType,
+    durability: YamlDurabilityType,
+    routes: YamlRouteType,
     circuit_management_type: String,
     application_metadata: String,
     comments: String,
@@ -1313,11 +1355,17 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
                     .map(ProposedService::try_from)
                     .collect::<Result<Vec<ProposedService>, BuilderError>>()?,
             )
-            .with_members(&circuit.members)
-            .with_authorization_type(&circuit.authorization_type)
-            .with_persistence(&circuit.persistence)
-            .with_durability(&circuit.durability)
-            .with_routes(&circuit.routes)
+            .with_members(
+                &circuit
+                    .members
+                    .into_iter()
+                    .map(ProposedNode::try_from)
+                    .collect::<Result<Vec<ProposedNode>, BuilderError>>()?,
+            )
+            .with_authorization_type(&AuthorizationType::from(circuit.authorization_type))
+            .with_persistence(&PersistenceType::from(circuit.persistence))
+            .with_durability(&DurabilityType::from(circuit.durability))
+            .with_routes(&RouteType::from(circuit.routes))
             .with_circuit_management_type(&circuit.circuit_management_type)
             .with_application_metadata(&parse_hex(&circuit.application_metadata).map_err(|_| {
                 BuilderError::InvalidField("Requester public key is not valid hex".to_string())
@@ -1337,11 +1385,16 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
                 .into_iter()
                 .map(YamlProposedService::from)
                 .collect(),
-            members: circuit.members().to_vec(),
-            authorization_type: circuit.authorization_type().clone(),
-            persistence: circuit.persistence().clone(),
-            durability: circuit.durability().clone(),
-            routes: circuit.routes().clone(),
+            members: circuit
+                .members()
+                .to_vec()
+                .into_iter()
+                .map(YamlProposedNode::from)
+                .collect(),
+            authorization_type: circuit.authorization_type().clone().into(),
+            persistence: circuit.persistence().clone().into(),
+            durability: circuit.durability().clone().into(),
+            routes: circuit.routes().clone().into(),
             circuit_management_type: circuit.circuit_management_type().into(),
             application_metadata: to_hex(circuit.application_metadata()),
             comments: circuit.comments().into(),
@@ -1395,6 +1448,173 @@ impl From<ProposedService> for YamlProposedService {
     }
 }
 
+/// YAML file specific ProposedNode definition.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct YamlProposedNode {
+    node_id: String,
+    endpoints: Vec<String>,
+}
+
+impl TryFrom<YamlProposedNode> for ProposedNode {
+    type Error = BuilderError;
+
+    fn try_from(node: YamlProposedNode) -> Result<Self, Self::Error> {
+        ProposedNodeBuilder::new()
+            .with_node_id(&node.node_id)
+            .with_endpoints(&node.endpoints)
+            .build()
+    }
+}
+
+impl From<ProposedNode> for YamlProposedNode {
+    fn from(node: ProposedNode) -> Self {
+        YamlProposedNode {
+            node_id: node.node_id().into(),
+            endpoints: node.endpoints().into(),
+        }
+    }
+}
+
+/// YAML file specific AuthorizationType definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum YamlAuthorizationType {
+    Trust,
+}
+
+impl From<AuthorizationType> for YamlAuthorizationType {
+    fn from(authorization_type: AuthorizationType) -> Self {
+        match authorization_type {
+            AuthorizationType::Trust => YamlAuthorizationType::Trust,
+        }
+    }
+}
+
+impl From<YamlAuthorizationType> for AuthorizationType {
+    fn from(yaml_authorization_type: YamlAuthorizationType) -> Self {
+        match yaml_authorization_type {
+            YamlAuthorizationType::Trust => AuthorizationType::Trust,
+        }
+    }
+}
+
+/// YAML file specific PersistenceType definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum YamlPersistenceType {
+    Any,
+}
+
+impl From<PersistenceType> for YamlPersistenceType {
+    fn from(persistence_type: PersistenceType) -> Self {
+        match persistence_type {
+            PersistenceType::Any => YamlPersistenceType::Any,
+        }
+    }
+}
+
+impl From<YamlPersistenceType> for PersistenceType {
+    fn from(yaml_persistence_type: YamlPersistenceType) -> Self {
+        match yaml_persistence_type {
+            YamlPersistenceType::Any => PersistenceType::Any,
+        }
+    }
+}
+
+/// YAML file specific DurabilityType definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum YamlDurabilityType {
+    NoDurability,
+}
+
+impl From<DurabilityType> for YamlDurabilityType {
+    fn from(durability_type: DurabilityType) -> Self {
+        match durability_type {
+            DurabilityType::NoDurability => YamlDurabilityType::NoDurability,
+        }
+    }
+}
+
+impl From<YamlDurabilityType> for DurabilityType {
+    fn from(yaml_durability_type: YamlDurabilityType) -> Self {
+        match yaml_durability_type {
+            YamlDurabilityType::NoDurability => DurabilityType::NoDurability,
+        }
+    }
+}
+
+/// YAML file specific RouteType definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum YamlRouteType {
+    Any,
+}
+
+impl From<RouteType> for YamlRouteType {
+    fn from(route_type: RouteType) -> Self {
+        match route_type {
+            RouteType::Any => YamlRouteType::Any,
+        }
+    }
+}
+
+impl From<YamlRouteType> for RouteType {
+    fn from(yaml_route_type: YamlRouteType) -> Self {
+        match yaml_route_type {
+            YamlRouteType::Any => RouteType::Any,
+        }
+    }
+}
+
+/// YAML file specific CircuitNode definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct YamlCircuitNode {
+    id: String,
+    endpoints: Vec<String>,
+}
+
+impl From<CircuitNode> for YamlCircuitNode {
+    fn from(circuit_node: CircuitNode) -> Self {
+        YamlCircuitNode {
+            id: circuit_node.node_id().to_string(),
+            endpoints: circuit_node.endpoints().to_vec(),
+        }
+    }
+}
+
+impl TryFrom<YamlCircuitNode> for CircuitNode {
+    type Error = BuilderError;
+
+    fn try_from(yaml_circuit_node: YamlCircuitNode) -> Result<Self, Self::Error> {
+        CircuitNodeBuilder::new()
+            .with_node_id(&yaml_circuit_node.id)
+            .with_endpoints(&yaml_circuit_node.endpoints)
+            .build()
+    }
+}
+
+/// YAML file specific Vote definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum YamlVote {
+    Accept,
+    Reject,
+}
+
+impl From<Vote> for YamlVote {
+    fn from(vote: Vote) -> Self {
+        match vote {
+            Vote::Accept => YamlVote::Accept,
+            Vote::Reject => YamlVote::Reject,
+        }
+    }
+}
+
+impl From<YamlVote> for Vote {
+    fn from(vote: YamlVote) -> Self {
+        match vote {
+            YamlVote::Accept => Vote::Accept,
+            YamlVote::Reject => Vote::Reject,
+        }
+    }
+}
+
 /// YAML file specific state definition that can be read and written to the proposal YAML state file
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 struct YamlProposalState {
@@ -1403,7 +1623,7 @@ struct YamlProposalState {
 
 /// The proposal state that is cached by the YAML admin service store and used to respond to fetch
 /// requests
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 struct ProposalState {
     proposals: BTreeMap<String, CircuitProposal>,
 }
@@ -1829,21 +2049,28 @@ proposals:
         );
         yaml_nodes.insert(
             "acme-node-000".to_string(),
-            CircuitNodeBuilder::new()
-                .with_node_id("acme-node-000")
-                .with_endpoints(&["tcps://splinterd-node-acme:8044".into()])
-                .build()
-                .expect("Unable to build circuit node"),
+            YamlCircuitNode::from(
+                CircuitNodeBuilder::new()
+                    .with_node_id("acme-node-000")
+                    .with_endpoints(&["tcps://splinterd-node-acme:8044".into()])
+                    .build()
+                    .expect("Unable to build circuit node"),
+            ),
         );
         yaml_nodes.insert(
             "bubba-node-000".to_string(),
-            CircuitNodeBuilder::new()
-                .with_node_id("bubba-node-000")
-                .with_endpoints(&["tcps://splinterd-node-bubba:8044".into()])
-                .build()
-                .expect("Unable to build circuit node"),
+            YamlCircuitNode::from(
+                CircuitNodeBuilder::new()
+                    .with_node_id("bubba-node-000")
+                    .with_endpoints(&["tcps://splinterd-node-bubba:8044".into()])
+                    .build()
+                    .expect("Unable to build circuit node"),
+            ),
         );
-        yaml_nodes.insert(new_node.node_id().to_string(), new_node);
+        yaml_nodes.insert(
+            new_node.node_id().to_string(),
+            YamlCircuitNode::from(new_node),
+        );
         let mut yaml_state_vec = serde_yaml::to_vec(&YamlCircuitState {
             circuits: yaml_circuits,
             nodes: yaml_nodes,

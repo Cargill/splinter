@@ -18,7 +18,7 @@ use super::error::BuilderError;
 use super::ProposedNode;
 
 /// Native representation of a node included in circuit
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CircuitNode {
     id: String,
     endpoints: Vec<String>,
