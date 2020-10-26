@@ -73,6 +73,8 @@ use std::thread;
 
 #[cfg(feature = "oauth")]
 use crate::auth::oauth::{rest_api::OAuthResourceProvider, OAuthClient};
+#[cfg(feature = "auth")]
+use crate::auth::rest_api::{actix::Authorization, identity::IdentityProvider};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -467,6 +469,8 @@ pub struct RestApi {
     bind: String,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "auth")]
+    identity_providers: Vec<Box<dyn IdentityProvider>>,
     #[cfg(feature = "oauth")]
     oauth_client: Option<OAuthClient>,
 }
@@ -481,6 +485,8 @@ impl RestApi {
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist.to_owned();
+        #[cfg(feature = "auth")]
+        let authorization = Authorization::new(self.identity_providers.to_owned());
         #[cfg(feature = "oauth")]
         let oauth_resource_provider = self.oauth_client.to_owned().map(OAuthResourceProvider::new);
         let join_handle = thread::Builder::new()
@@ -488,18 +494,17 @@ impl RestApi {
             .spawn(move || {
                 let sys = actix::System::new("SplinterD-Rest-API");
                 let mut server = HttpServer::new(move || {
-                    // Actix's type definitions require this to be chained, otherwise, the generic
-                    // type of App is changed as the values are returned.
+                    let app = App::new();
+
                     #[cfg(feature = "rest-api-cors")]
-                    let cors = match &whitelist {
+                    let app = app.wrap(match &whitelist {
                         Some(list) => cors::Cors::new(list.to_vec()),
                         None => cors::Cors::new_allow_any(),
-                    };
-                    #[cfg(feature = "rest-api-cors")]
-                    let mut app = App::new().wrap(middleware::Logger::default()).wrap(cors);
+                    });
+                    #[cfg(feature = "auth")]
+                    let app = app.wrap(authorization.clone());
 
-                    #[cfg(not(feature = "rest-api-cors"))]
-                    let mut app = App::new().wrap(middleware::Logger::default());
+                    let mut app = app.wrap(middleware::Logger::default());
 
                     #[cfg(feature = "oauth")]
                     if let Some(resource_provider) = &oauth_resource_provider {
@@ -507,6 +512,95 @@ impl RestApi {
                             app = app.service(resource.into_route());
                         }
                     }
+
+                    for resource in resources.clone() {
+                        app = app.service(resource.into_route());
+                    }
+                    app
+                });
+
+                server = match server.bind(&bind_url) {
+                    Ok(server) => server,
+                    Err(err) => {
+                        let error_msg = format!("Invalid REST API bind {}: {}", bind_url, err);
+                        error!("{}", error_msg);
+                        if let Err(err) = tx.send(Err(error_msg)) {
+                            error!("Failed to notify receiver of bind error: {}", err);
+                        }
+                        return;
+                    }
+                };
+                let port_numbers = server.addrs().iter().map(|addrs| addrs.port()).collect();
+
+                let addr = server.disable_signals().system_exit().start();
+
+                if let Err(err) = tx.send(Ok((addr, port_numbers))) {
+                    error!("Unable to send Server Addr: {}", err);
+                }
+
+                if let Err(err) = sys.run() {
+                    error!("REST Api unexpectedly exiting: {}", err);
+                };
+
+                info!("Rest API terminating");
+            })?;
+
+        let (addr, port_numbers) = rx
+            .recv()
+            .map_err(|err| {
+                RestApiServerError::StartUpError(format!("Unable to receive Server Addr: {}", err))
+            })?
+            .map_err(|err| {
+                RestApiServerError::BindError(format!(
+                    "Failed to bind to URL {}: {}",
+                    self.bind, err
+                ))
+            })?;
+
+        let do_shutdown = Box::new(move || {
+            debug!("Shutting down Rest API");
+            if let Err(err) = addr.stop(true).wait() {
+                error!("An error occured while shutting down rest API: {:?}", err);
+            }
+            debug!("Graceful signal sent to Rest API");
+
+            Ok(())
+        });
+
+        Ok((
+            RestApiShutdownHandle {
+                do_shutdown,
+                port_numbers,
+            },
+            join_handle,
+        ))
+    }
+
+    /// Builds the `RestApi` without requiring any security configuration
+    #[cfg(test)]
+    pub fn run_insecure(
+        self,
+    ) -> Result<(RestApiShutdownHandle, thread::JoinHandle<()>), RestApiServerError> {
+        let (tx, rx) = mpsc::channel();
+
+        let bind_url = self.bind.to_owned();
+        let resources = self.resources.to_owned();
+        #[cfg(feature = "rest-api-cors")]
+        let whitelist = self.whitelist.to_owned();
+        let join_handle = thread::Builder::new()
+            .name("SplinterDRestApi".into())
+            .spawn(move || {
+                let sys = actix::System::new("SplinterD-Rest-API");
+                let mut server = HttpServer::new(move || {
+                    let app = App::new();
+
+                    #[cfg(feature = "rest-api-cors")]
+                    let app = app.wrap(match &whitelist {
+                        Some(list) => cors::Cors::new(list.to_vec()),
+                        None => cors::Cors::new_allow_any(),
+                    });
+
+                    let mut app = app.wrap(middleware::Logger::default());
 
                     for resource in resources.clone() {
                         app = app.service(resource.into_route());
@@ -578,6 +672,8 @@ pub struct RestApiBuilder {
     bind: Option<String>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "auth")]
+    identity_providers: Option<Vec<Box<dyn IdentityProvider>>>,
     #[cfg(feature = "oauth")]
     oauth_client: Option<OAuthClient>,
 }
@@ -589,6 +685,8 @@ impl Default for RestApiBuilder {
             bind: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
+            #[cfg(feature = "auth")]
+            identity_providers: None,
             #[cfg(feature = "oauth")]
             oauth_client: None,
         }
@@ -621,6 +719,15 @@ impl RestApiBuilder {
         self
     }
 
+    #[cfg(feature = "auth")]
+    pub fn with_identity_providers(
+        mut self,
+        identity_providers: Vec<Box<dyn IdentityProvider>>,
+    ) -> Self {
+        self.identity_providers = Some(identity_providers);
+        self
+    }
+
     #[cfg(feature = "oauth")]
     pub fn with_oauth_client(mut self, oauth_client: OAuthClient) -> Self {
         self.oauth_client = Some(oauth_client);
@@ -631,6 +738,11 @@ impl RestApiBuilder {
         let bind = self
             .bind
             .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
+
+        #[cfg(feature = "auth")]
+        let identity_providers = self
+            .identity_providers
+            .ok_or_else(|| RestApiServerError::MissingField("identity_providers".to_string()))?;
 
         #[cfg(feature = "auth")]
         {
@@ -653,6 +765,30 @@ impl RestApiBuilder {
             resources: self.resources,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
+            #[cfg(feature = "auth")]
+            identity_providers,
+            #[cfg(feature = "oauth")]
+            oauth_client: self.oauth_client,
+        })
+    }
+
+    /// Builds the `RestApi` without requiring any security configuration
+    #[cfg(test)]
+    pub fn build_insecure(self) -> Result<RestApi, RestApiServerError> {
+        let bind = self
+            .bind
+            .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
+
+        #[cfg(feature = "auth")]
+        let identity_providers = self.identity_providers.unwrap_or_default();
+
+        Ok(RestApi {
+            bind,
+            resources: self.resources,
+            #[cfg(feature = "rest-api-cors")]
+            whitelist: self.whitelist,
+            #[cfg(feature = "auth")]
+            identity_providers,
             #[cfg(feature = "oauth")]
             oauth_client: self.oauth_client,
         })
@@ -719,6 +855,9 @@ mod test {
     use actix_http::Response;
     use futures::IntoFuture;
 
+    #[cfg(feature = "auth")]
+    use crate::auth::rest_api::identity::{Authorization, IdentityProviderError};
+
     #[test]
     fn test_resource() {
         Resource::build("/test")
@@ -741,15 +880,41 @@ mod test {
     }
 
     /// Verifies that the `RestApiBuilder` fails to build when auth is enabled but no authentication
-    /// is configured, but succeeds when authentication is configured.
+    /// or identity providers are configured, but succeeds when authentication and identity
+    /// providers are configured.
     #[test]
     #[cfg(feature = "auth")]
     fn rest_api_builder_auth() {
+        // Verify that no authentication causes error
         assert!(matches!(
-            RestApiBuilder::new().with_bind("test").build(),
+            RestApiBuilder::new()
+                .with_bind("test")
+                .with_identity_providers(vec![Box::new(MockIdentityProvider)])
+                .build(),
             Err(RestApiServerError::MissingField(_))
         ));
 
+        // Verify that no identity providers causes error
+        #[cfg(feature = "oauth")]
+        assert!(matches!(
+            RestApiBuilder::new()
+                .with_bind("test")
+                .with_oauth_client(
+                    OAuthClient::new(
+                        "client_id".into(),
+                        "client_secret".into(),
+                        "https://provider.com/auth".into(),
+                        "https://localhost/oauth/callback".into(),
+                        "https://provider.com/token".into(),
+                        vec![],
+                    )
+                    .expect("Failed to create OAuth client")
+                )
+                .build(),
+            Err(RestApiServerError::MissingField(_))
+        ));
+
+        // Verify that the build is successful with both authentication and identity providers
         #[cfg(feature = "oauth")]
         assert!(RestApiBuilder::new()
             .with_bind("test")
@@ -764,7 +929,36 @@ mod test {
                 )
                 .expect("Failed to create OAuth client")
             )
+            .with_identity_providers(vec![Box::new(MockIdentityProvider)])
             .build()
             .is_ok())
+    }
+
+    #[cfg(feature = "auth")]
+    #[derive(Clone)]
+    struct MockIdentityProvider;
+
+    #[cfg(feature = "auth")]
+    impl IdentityProvider for MockIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &Authorization,
+        ) -> Result<String, IdentityProviderError> {
+            Ok("".into())
+        }
+
+        /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
+        /// `Box<dyn IdentityProvider>` calls this method.
+        ///
+        /// # Example
+        ///
+        ///```ignore
+        ///  fn clone_box(&self) -> Box<dyn IdentityProvider> {
+        ///     Box::new(self.clone())
+        ///  }
+        ///```
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
     }
 }

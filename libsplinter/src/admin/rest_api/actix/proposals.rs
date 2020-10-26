@@ -174,8 +174,6 @@ mod tests {
         },
         service::proposal_store::{ProposalFilter, ProposalIter, ProposalStoreError},
     };
-    #[cfg(feature = "oauth")]
-    use crate::auth::oauth::OAuthClient;
     use crate::rest_api::{
         paging::Paging, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
     };
@@ -606,24 +604,12 @@ mod tests {
         (10000..20000)
             .find_map(|port| {
                 let bind_url = format!("127.0.0.1:{}", port);
-                let mut builder = RestApiBuilder::new()
+                let result = RestApiBuilder::new()
                     .with_bind(&bind_url)
-                    .add_resources(resources.clone());
-                #[cfg(feature = "oauth")]
-                {
-                    builder = builder.with_oauth_client(
-                        OAuthClient::new(
-                            "client_id".into(),
-                            "client_secret".into(),
-                            "https://provider.com/auth".into(),
-                            "https://localhost/oauth/callback".into(),
-                            "https://provider.com/token".into(),
-                            vec![],
-                        )
-                        .expect("Failed to create OAuth client"),
-                    );
-                }
-                let result = builder.build().expect("Failed to build REST API").run();
+                    .add_resources(resources.clone())
+                    .build_insecure()
+                    .expect("Failed to build REST API")
+                    .run_insecure();
                 match result {
                     Ok((shutdown_handle, join_handle)) => {
                         Some((shutdown_handle, join_handle, bind_url))
