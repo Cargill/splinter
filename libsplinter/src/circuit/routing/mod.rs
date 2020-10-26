@@ -100,7 +100,7 @@ impl PartialOrd for CircuitNode {
 pub struct Service {
     service_id: String,
     service_type: String,
-    allowed_nodes: Vec<String>,
+    node_id: String,
     arguments: Vec<(String, String)>,
 }
 
@@ -111,18 +111,18 @@ impl Service {
     ///
     /// * `service_id` -  The unique ID for the service
     /// * `service_type` - The type of service this is
-    /// * `allowed_nodes` - The list of node IDs that this service can connect to
+    /// * `node_id` - The node ID that this service can connect to
     /// * `arguments` - The key-value pairs of arguments that will be passed to the service
     pub fn new(
         service_id: String,
         service_type: String,
-        allowed_nodes: Vec<String>,
+        node_id: String,
         arguments: Vec<(String, String)>,
     ) -> Self {
         Service {
             service_id,
             service_type,
-            allowed_nodes,
+            node_id,
             arguments,
         }
     }

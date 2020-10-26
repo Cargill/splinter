@@ -42,7 +42,7 @@ fn generate_circuits(num_circuits: i64, total_num_node: i64) -> (Vec<Circuit>, V
         let service = Service {
             service_id: generate_random_base62_string(4),
             service_type: "benchmark".to_string(),
-            allowed_nodes: vec![format!("inproc://node_{}", i)],
+            node_id: format!("inproc://node_{}", i),
             arguments: vec![("peer_services".to_string(), "node-000".to_string())],
         };
         nodes.push((node, service));
