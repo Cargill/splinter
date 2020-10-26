@@ -70,6 +70,7 @@ mod collections;
 pub mod consensus;
 #[cfg(feature = "diesel")]
 pub mod database;
+pub mod error;
 #[cfg(feature = "events")]
 pub mod events;
 mod hex;
