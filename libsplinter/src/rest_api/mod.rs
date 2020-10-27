@@ -758,6 +758,13 @@ impl RestApiBuilder {
                     "REST API auth is enabled, but no authentication is configured".to_string(),
                 ));
             }
+
+            if identity_providers.is_empty() {
+                return Err(RestApiServerError::MissingField(
+                    "REST API auth is enabled, but no identity providers have been provided"
+                        .to_string(),
+                ));
+            }
         }
 
         Ok(RestApi {

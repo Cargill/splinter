@@ -92,3 +92,15 @@ admin_timeout = 30
 # Domains included in the REST API CORS
 # (default ["*"])
 whitelist = ["*"]
+
+# The OAuth provider used by the REST API. Options are: "github".
+oauth_provider = "github"
+
+# Client ID for the OAuth provider used by the REST API
+oauth_client_id = "<client-id>"
+
+# Client secret for the OAuth provider used by the REST API
+oauth_client_secret = "<client-secret>"
+
+# Redirect URL for the OAuth provider used by the REST API
+oauth_redirect_url = "http://localhost:8080/oauth/callback"

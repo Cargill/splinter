@@ -70,6 +70,14 @@ pub struct Config {
     enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
+    #[cfg(feature = "auth")]
+    oauth_provider: Option<(String, ConfigSource)>,
+    #[cfg(feature = "auth")]
+    oauth_client_id: Option<(String, ConfigSource)>,
+    #[cfg(feature = "auth")]
+    oauth_client_secret: Option<(String, ConfigSource)>,
+    #[cfg(feature = "auth")]
+    oauth_redirect_url: Option<(String, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
 }
 
@@ -194,6 +202,42 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "auth")]
+    pub fn oauth_provider(&self) -> Option<&str> {
+        if let Some((provider, _)) = &self.oauth_provider {
+            Some(provider)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_client_id(&self) -> Option<&str> {
+        if let Some((client_id, _)) = &self.oauth_client_id {
+            Some(client_id)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_client_secret(&self) -> Option<&str> {
+        if let Some((client_secret, _)) = &self.oauth_client_secret {
+            Some(client_secret)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_redirect_url(&self) -> Option<&str> {
+        if let Some((redirect_url, _)) = &self.oauth_redirect_url {
+            Some(redirect_url)
+        } else {
+            None
+        }
+    }
+
     pub fn strict_ref_counts(&self) -> bool {
         self.strict_ref_counts.0
     }
@@ -312,6 +356,42 @@ impl Config {
     #[cfg(feature = "rest-api-cors")]
     pub fn whitelist_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.whitelist {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_provider_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_provider {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_client_id_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_client_id {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_client_secret_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_client_secret {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_redirect_url_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_redirect_url {
             Some(source)
         } else {
             None
@@ -451,6 +531,42 @@ impl Config {
         );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
+        #[cfg(feature = "auth")]
+        {
+            if let (Some(provider), Some(source)) =
+                (self.oauth_provider(), self.oauth_provider_source())
+            {
+                debug!(
+                    "Config: oauth_provider: {} (source: {:?})",
+                    provider, source,
+                );
+            }
+            if let (Some(client_id), Some(source)) =
+                (self.oauth_client_id(), self.oauth_client_id_source())
+            {
+                debug!(
+                    "Config: oauth_client_id: {} (source: {:?})",
+                    client_id, source,
+                );
+            }
+            if let (Some(client_secret), Some(source)) = (
+                self.oauth_client_secret(),
+                self.oauth_client_secret_source(),
+            ) {
+                debug!(
+                    "Config: oauth_client_secret: {} (source: {:?})",
+                    client_secret, source,
+                );
+            }
+            if let (Some(redirect_url), Some(source)) =
+                (self.oauth_redirect_url(), self.oauth_redirect_url_source())
+            {
+                debug!(
+                    "Config: oauth_redirect_url: {} (source: {:?})",
+                    redirect_url, source,
+                );
+            }
+        }
         debug!(
             "Config: strict_ref_counts: {:?} (source: {:?})",
             self.strict_ref_counts(),

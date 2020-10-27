@@ -29,6 +29,11 @@ use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
+#[cfg(feature = "auth")]
+use splinter::auth::{
+    oauth::OAuthClient,
+    rest_api::identity::{github::GithubUserIdentityProvider, IdentityProvider},
+};
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
 use splinter::circuit::directory::CircuitDirectory;
@@ -111,6 +116,14 @@ pub struct SplinterDaemon {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "auth")]
+    oauth_provider: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_client_id: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_client_secret: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_redirect_url: Option<String>,
     heartbeat: u64,
     strict_ref_counts: bool,
 }
@@ -453,6 +466,59 @@ impl SplinterDaemon {
             }
         }
 
+        #[cfg(feature = "auth")]
+        {
+            let mut identity_providers = vec![];
+
+            // Handle OAuth config. If no OAuth config values are provided, just skip this;
+            // otherwise, require that all are set.
+            let any_oauth_args_provided = self.oauth_provider.is_some()
+                || self.oauth_client_id.is_some()
+                || self.oauth_client_secret.is_some()
+                || self.oauth_redirect_url.is_some();
+            if any_oauth_args_provided {
+                let oauth_provider = self.oauth_provider.as_deref().ok_or_else(|| {
+                    StartError::RestApiError("missing OAuth provider configuration".into())
+                })?;
+                let oauth_client_id = self.oauth_client_id.clone().ok_or_else(|| {
+                    StartError::RestApiError("missing OAuth client ID configuration".into())
+                })?;
+                let oauth_client_secret = self.oauth_client_secret.clone().ok_or_else(|| {
+                    StartError::RestApiError("missing OAuth client secret configuration".into())
+                })?;
+                let oauth_redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
+                    StartError::RestApiError("missing OAuth redirect URL configuration".into())
+                })?;
+                let (oauth_client, oauth_identity_provider) = match oauth_provider {
+                    "github" => (
+                        OAuthClient::new_github(
+                            oauth_client_id,
+                            oauth_client_secret,
+                            oauth_redirect_url,
+                        )
+                        .map_err(|err| {
+                            StartError::RestApiError(format!(
+                                "invalid OAuth configuration: {}",
+                                err
+                            ))
+                        })?,
+                        Box::new(GithubUserIdentityProvider) as Box<dyn IdentityProvider>,
+                    ),
+                    other_provider => {
+                        return Err(StartError::RestApiError(format!(
+                            "invalid OAuth provider: {}",
+                            other_provider
+                        )))
+                    }
+                };
+
+                rest_api_builder = rest_api_builder.with_oauth_client(oauth_client);
+                identity_providers.push(oauth_identity_provider);
+            }
+
+            rest_api_builder = rest_api_builder.with_identity_providers(identity_providers);
+        }
+
         #[cfg(feature = "biome")]
         {
             if self.enable_biome {
@@ -742,6 +808,14 @@ pub struct SplinterDaemonBuilder {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "auth")]
+    oauth_provider: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_client_id: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_client_secret: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_redirect_url: Option<String>,
     strict_ref_counts: Option<bool>,
 }
 
@@ -836,6 +910,30 @@ impl SplinterDaemonBuilder {
     #[cfg(feature = "rest-api-cors")]
     pub fn with_whitelist(mut self, value: Option<Vec<String>>) -> Self {
         self.whitelist = value;
+        self
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn with_oauth_provider(mut self, value: Option<String>) -> Self {
+        self.oauth_provider = value;
+        self
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn with_oauth_client_id(mut self, value: Option<String>) -> Self {
+        self.oauth_client_id = value;
+        self
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn with_oauth_client_secret(mut self, value: Option<String>) -> Self {
+        self.oauth_client_secret = value;
+        self
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn with_oauth_redirect_url(mut self, value: Option<String>) -> Self {
+        self.oauth_redirect_url = value;
         self
     }
 
@@ -934,6 +1032,14 @@ impl SplinterDaemonBuilder {
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
+            #[cfg(feature = "auth")]
+            oauth_provider: self.oauth_provider,
+            #[cfg(feature = "auth")]
+            oauth_client_id: self.oauth_client_id,
+            #[cfg(feature = "auth")]
+            oauth_client_secret: self.oauth_client_secret,
+            #[cfg(feature = "auth")]
+            oauth_redirect_url: self.oauth_redirect_url,
             heartbeat,
             strict_ref_counts,
         })

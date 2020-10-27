@@ -78,6 +78,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "health",
+    "auth",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
@@ -87,6 +88,7 @@ biome = ["splinter/biome", "splinter/store-factory", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]
 database = ["splinter/postgres", "splinter/sqlite"]
+auth = ["splinter/oauth-github"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
     "scabbard/service-arg-validation",
