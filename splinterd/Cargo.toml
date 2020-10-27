@@ -83,11 +83,11 @@ experimental = [
     "ws-transport",
 ]
 
+auth = ["splinter/oauth-github"]
 biome = ["splinter/biome", "splinter/store-factory", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]
 database = ["splinter/postgres", "splinter/sqlite"]
-auth = ["splinter/oauth-github"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
     "scabbard/service-arg-validation",
