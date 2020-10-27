@@ -78,7 +78,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "health",
-    "auth",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
