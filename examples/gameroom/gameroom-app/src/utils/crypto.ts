@@ -15,11 +15,13 @@
 import sjcl from 'sjcl';
 import protos from '@/protobuf';
 
-const signing = require('sawtooth-sdk/signing');
-const { Secp256k1PrivateKey } = require('sawtooth-sdk/signing/secp256k1');
+import {
+  Secp256k1Context,
+  Secp256k1PrivateKey,
+  Secp256k1Signer,
+} from 'transact-sdk-javascript';
 
-const CRYPTO_CONTEXT = signing.createContext('secp256k1');
-const CRYPTO_FACTORY = new signing.CryptoFactory(CRYPTO_CONTEXT);
+const CRYPTO_CONTEXT = new Secp256k1Context();
 
 /**
  * Returns the SHA-256 hash of the provided salt and data.
@@ -50,7 +52,7 @@ export function createPrivateKey(): string {
 export function getPublicKey(privateKey: string) {
   try {
     const privKey = Secp256k1PrivateKey.fromHex(privateKey);
-    const signer = CRYPTO_FACTORY.newSigner(privKey);
+    const signer = new Secp256k1Signer(privKey);
     return signer.getPublicKey().asHex();
   } catch (err) {
     console.error(err);
@@ -84,7 +86,7 @@ export function decrypt(password: string, encryptedPrivateKey: string): string {
  */
 export function signPayload(payload: Uint8Array, privateKey: string): Uint8Array {
   const privKey = Secp256k1PrivateKey.fromHex(privateKey);
-  const signer = CRYPTO_FACTORY.newSigner(privKey);
+  const signer = new Secp256k1Signer(privKey);
 
   const message = protos.CircuitManagementPayload.decode(payload);
   const header = protos.CircuitManagementPayload.Header.decode(message.header);
@@ -95,20 +97,6 @@ export function signPayload(payload: Uint8Array, privateKey: string): Uint8Array
   message.header = protos.CircuitManagementPayload.Header.encode(header).finish();
   const signedPayload = protos.CircuitManagementPayload.encode(message).finish();
   return signedPayload;
-}
-
-/**
- * Signs an XO Transaction.
- *
- * @param payload - The payload bytes to be signed.
- * @param signer - Wrapper containing the user's keys.
- */
-export function signXOPayload(payload: Uint8Array, privateKey: string): Uint8Array {
-  const privKey = Secp256k1PrivateKey.fromHex(privateKey);
-  const signer = CRYPTO_FACTORY.newSigner(privKey);
-  const pubKey = signer.getPublicKey().asBytes();
-  return signer.sign(payload);
-
 }
 
 function hexToBytes(hex: string) {

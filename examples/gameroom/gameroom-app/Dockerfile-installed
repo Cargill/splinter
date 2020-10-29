@@ -18,7 +18,8 @@ FROM node:lts-alpine as build-stage
 RUN apk update && apk add python g++ git make && rm -rf /var/cache/apk/*
 WORKDIR /app
 COPY examples/gameroom/gameroom-app/package*.json ./
-RUN npm install
+# Need to set as non-root user to properly install transact-sdk-javascript
+RUN npm config set unsafe-perm true && npm install
 COPY examples/gameroom/gameroom-app/ .
 COPY /libsplinter/protos ./protos
 ARG VUE_APP_BRAND
