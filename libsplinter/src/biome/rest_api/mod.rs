@@ -388,11 +388,7 @@ impl BiomeRestResourceManagerBuilder {
 }
 
 #[cfg(test)]
-#[cfg(all(
-    feature = "biome-key-management",
-    feature = "biome-credentials",
-    feature = "biome-refresh-tokens"
-))]
+#[cfg(all(feature = "biome-key-management", feature = "biome-credentials"))]
 mod tests {
     use super::*;
 
@@ -521,9 +517,9 @@ mod tests {
         RestApiBuilder::new()
             .with_bind("127.0.0.1:0")
             .add_resources(resource_manager.resources())
-            .build()
+            .build_insecure()
             .unwrap()
-            .run()
+            .run_insecure()
             .unwrap()
     }
 
