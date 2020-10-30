@@ -58,7 +58,7 @@ impl RoutingTableReader for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `service_id` -  The unique ID for the service to be fetched
+    /// * `service_id` - The unique ID for the service to be fetched
     ///
     /// Returns an error if the lock is poisoned.
     fn get_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError> {
@@ -75,7 +75,7 @@ impl RoutingTableReader for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID the circuit whose services should be returned
+    /// * `circuit_id` - The unique ID the circuit whose services should be returned
     ///
     /// Returns an error if the lock is poisoned or if the circuit does not exist
     fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError> {
@@ -114,7 +114,7 @@ impl RoutingTableReader for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `node_id` -  The unique ID for the node to be fetched
+    /// * `node_id` - The unique ID for the node to be fetched
     ///
     /// Returns an error if the lock was poisoned
     fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError> {
@@ -145,7 +145,7 @@ impl RoutingTableReader for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID for the circuit to be fetched
+    /// * `circuit_id` - The unique ID for the circuit to be fetched
     ///
     /// Returns an error if the lock is poisoned
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError> {
@@ -164,8 +164,8 @@ impl RoutingTableWriter for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `service_id` -  The unique ServiceId for the service
-    /// * `service` -  The service to be added to the routing table
+    /// * `service_id` - The unique ServiceId for the service
+    /// * `service` - The service to be added to the routing table
     ///
     /// Returns an error if the lock is poisoned
     fn add_service(
@@ -185,7 +185,7 @@ impl RoutingTableWriter for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `service_id` -  The unique ServiceId for the service
+    /// * `service_id` - The unique ServiceId for the service
     ///
     /// Returns an error if the lock is poisoned
     fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), RemoveServiceError> {
@@ -201,8 +201,8 @@ impl RoutingTableWriter for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID for the circuit
-    /// * `circuit` -  The circuit to be added to the routing table
+    /// * `circuit_id` - The unique ID for the circuit
+    /// * `circuit` - The circuit to be added to the routing table
     /// * `nodes` - The list of circuit nodes that should be added along with the circuit
     ///
     /// Returns an error if the lock is poisoned
@@ -269,7 +269,7 @@ impl RoutingTableWriter for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `circuit_id` -  The unique ID for the circuit
+    /// * `circuit_id` - The unique ID for the circuit
     ///
     /// Returns an error if the lock is poisoned
     fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), RemoveCircuitError> {
@@ -297,7 +297,7 @@ impl RoutingTableWriter for RoutingTable {
     ///
     /// # Arguments
     ///
-    /// * `node_id` -  The unique ID for the node
+    /// * `node_id` - The unique ID for the node
     /// * `node`- The node to add to the routing table
     ///
     /// Returns an error if the lock is poisoned
