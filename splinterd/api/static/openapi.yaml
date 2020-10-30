@@ -1568,6 +1568,74 @@ paths:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
 
+  /oauth/login:
+    get:
+      tags:
+        - OAuth
+      description: |
+        Provides a redirect to the node's configured OAuth provider to
+        authenticate the user.
+      parameters:
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        302:
+          description: Found redirect
+          headers:
+            Location:
+              description: URL of the OAuth provider
+              schema:
+                type: string
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+
+  /oauth/callback:
+    get:
+      tags:
+        - OAuth
+      description: |
+        Receives an authorization code from the OAuth provider and exchanges it
+        for an access token for the user.
+      parameters:
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: Obtained access token for user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  refresh_token:
+                    type: string
+                required:
+                  - access_token
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+
 components:
   parameters:
     auth:
