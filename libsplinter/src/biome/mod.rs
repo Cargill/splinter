@@ -61,6 +61,8 @@ pub use key_management::store::memory::MemoryKeyStore;
 pub use key_management::store::KeyStore;
 
 #[cfg(feature = "biome-oauth")]
+pub use oauth::store::memory::MemoryOAuthUserStore;
+#[cfg(feature = "biome-oauth")]
 pub use oauth::store::OAuthUserStore;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]

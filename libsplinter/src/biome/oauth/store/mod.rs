@@ -17,11 +17,13 @@
 //! The OAuth user can be considered an extension of the base Biome user.
 
 mod error;
+pub(in crate::biome) mod memory;
 
 pub use error::InvalidStateError;
 pub use error::OAuthUserStoreError;
 
 /// The set of supported OAuth providers.
+#[derive(Clone, Debug, PartialEq)]
 pub enum OAuthProvider {
     Github,
 }
@@ -29,6 +31,7 @@ pub enum OAuthProvider {
 /// A user defined by an OAuth Provider.
 ///
 /// This user is connected to a Biome User, via a user ID.
+#[derive(Clone)]
 pub struct OAuthUser {
     user_id: String,
     provider_user_ref: String,
