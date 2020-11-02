@@ -16,6 +16,8 @@
 //!
 //! The OAuth user can be considered an extension of the base Biome user.
 
+#[cfg(feature = "diesel")]
+pub(in crate::biome) mod diesel;
 mod error;
 pub(in crate::biome) mod memory;
 
