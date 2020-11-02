@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "biome-oauth")]
+use crate::biome::MemoryOAuthUserStore;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::{
     CredentialsStore, MemoryCredentialsStore, MemoryRefreshTokenStore, RefreshTokenStore,
@@ -32,6 +34,8 @@ pub struct MemoryStoreFactory {
     #[cfg(feature = "biome-credentials")]
     biome_refresh_token_store: MemoryRefreshTokenStore,
     biome_user_store: MemoryUserStore,
+    #[cfg(feature = "biome-oauth")]
+    biome_oauth_user_store: MemoryOAuthUserStore,
 }
 
 impl MemoryStoreFactory {
@@ -49,6 +53,9 @@ impl MemoryStoreFactory {
         #[cfg(not(feature = "biome-credentials"))]
         let biome_user_store = MemoryUserStore::new();
 
+        #[cfg(feature = "biome-oauth")]
+        let biome_oauth_user_store = MemoryOAuthUserStore::new();
+
         Self {
             #[cfg(feature = "biome-credentials")]
             biome_credentials_store,
@@ -57,6 +64,8 @@ impl MemoryStoreFactory {
             #[cfg(feature = "biome-credentials")]
             biome_refresh_token_store: MemoryRefreshTokenStore::new(),
             biome_user_store,
+            #[cfg(feature = "biome-oauth")]
+            biome_oauth_user_store,
         }
     }
 }
@@ -79,5 +88,10 @@ impl StoreFactory for MemoryStoreFactory {
 
     fn get_biome_user_store(&self) -> Box<dyn UserStore> {
         Box::new(self.biome_user_store.clone())
+    }
+
+    #[cfg(feature = "biome-oauth")]
+    fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
+        Box::new(self.biome_oauth_user_store.clone())
     }
 }

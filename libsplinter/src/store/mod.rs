@@ -37,6 +37,10 @@ pub trait StoreFactory {
     #[cfg(feature = "biome-credentials")]
     fn get_biome_refresh_token_store(&self) -> Box<dyn crate::biome::RefreshTokenStore>;
 
+    /// Get a new `OAuthUserStore`
+    #[cfg(feature = "biome-oauth")]
+    fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore>;
+
     /// Get a new `UserStore`
     fn get_biome_user_store(&self) -> Box<dyn crate::biome::UserStore>;
 }
