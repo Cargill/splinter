@@ -65,6 +65,32 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
     }
 }
 
+#[cfg(feature = "postgres")]
+impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
+    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
+    }
+
+    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserStoreOperations::new(&*connection).update_oauth_user(oauth_user)
+    }
+
+    fn get_by_provider_user_ref(
+        &self,
+        provider_user_ref: &str,
+    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
+    }
+
+    fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
+    }
+}
+
 impl From<OAuthUserModel> for OAuthUser {
     fn from(model: OAuthUserModel) -> Self {
         let OAuthUserModel {

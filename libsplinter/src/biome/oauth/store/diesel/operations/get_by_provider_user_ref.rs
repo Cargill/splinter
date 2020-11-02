@@ -30,9 +30,12 @@ pub(in crate::biome::oauth) trait OAuthUserStoreGetByProviderUserRef {
     ) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
 }
 
-#[cfg(feature = "sqlite")]
-impl<'a> OAuthUserStoreGetByProviderUserRef
-    for OAuthUserStoreOperations<'a, diesel::sqlite::SqliteConnection>
+impl<'a, C> OAuthUserStoreGetByProviderUserRef for OAuthUserStoreOperations<'a, C>
+where
+    C: diesel::Connection,
+    i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
+    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn get_by_provider_user_ref(
         &self,

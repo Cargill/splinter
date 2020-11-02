@@ -24,9 +24,9 @@ pub(in crate::biome::oauth) trait OAuthUserStoreUpdateOAuthUserOperation {
     fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError>;
 }
 
-#[cfg(feature = "sqlite")]
-impl<'a> OAuthUserStoreUpdateOAuthUserOperation
-    for OAuthUserStoreOperations<'a, diesel::sqlite::SqliteConnection>
+impl<'a, C> OAuthUserStoreUpdateOAuthUserOperation for OAuthUserStoreOperations<'a, C>
+where
+    C: diesel::Connection,
 {
     fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
         update(oauth_user::table.filter(oauth_user::user_id.eq(oauth_user.user_id())))

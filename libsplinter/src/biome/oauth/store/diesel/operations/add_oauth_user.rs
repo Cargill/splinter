@@ -53,3 +53,28 @@ impl<'a> OAuthUserStoreAddOAuthUserOperation
             })
     }
 }
+
+#[cfg(feature = "postgres")]
+impl<'a> OAuthUserStoreAddOAuthUserOperation
+    for OAuthUserStoreOperations<'a, diesel::pg::PgConnection>
+{
+    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+        let new_oauth_user = NewOAuthUserModel::from(&oauth_user);
+
+        insert_into(oauth_user::table)
+            .values(new_oauth_user)
+            .execute(self.conn)
+            .map(|_| ())
+            .map_err(|err| match err {
+                DieselError::DatabaseError(ref kind, _) => match kind {
+                    DatabaseErrorKind::UniqueViolation | DatabaseErrorKind::ForeignKeyViolation => {
+                        OAuthUserStoreError::ConstraintViolation(Box::new(err))
+                    }
+                    _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(
+                        err,
+                    ))),
+                },
+                _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err))),
+            })
+    }
+}
