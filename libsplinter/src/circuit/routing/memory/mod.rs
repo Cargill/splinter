@@ -346,3 +346,338 @@ impl RoutingTableWriter for RoutingTable {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // Test the routing table read and write operations for circuits
+    //
+    // 1. Create circuits with corresponding nodes and services and write one circuit to the
+    //    routing table
+    // 2. Check that the circuit was written to the routing table
+    // 3. Check that the expected circuit is returned when fetched
+    // 4. Remove the circuit from the routing table
+    // 5. Check that the 'circuits' field of the routing table is empty
+    // 6. Write both circuits to the routing table
+    // 7. Check that both circuits were written to the routing table
+    // 8. list circuits, validate both circuits are returned
+    #[test]
+    fn test_circuit() {
+        let routing_table = RoutingTable::default();
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(routing_table.clone());
+        let reader: Box<dyn RoutingTableReader> = Box::new(routing_table.clone());
+
+        // create four nodes and four services
+        let mut roster = vec![];
+        let mut nodes = vec![];
+        let mut members = vec![];
+        for x in 0..4 {
+            let node = CircuitNode {
+                node_id: format!("node-{}", x),
+                endpoints: vec![format!("endpoint_{}", x)],
+            };
+            let service = Service {
+                service_id: format!("service-{}", x),
+                service_type: "test".to_string(),
+                node_id: format!("endpoint_{}", x),
+                arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+            };
+            roster.push(service.clone());
+            nodes.push(node.clone());
+            members.push(node.node_id.clone());
+        }
+        let circuit_roster0 = vec![roster[0].clone(), roster[1].clone()];
+        let circuit_roster1 = vec![roster[2].clone(), roster[3].clone()];
+        let circuit_members0 = vec![members[0].clone(), members[1].clone()];
+        let circuit_members1 = vec![members[2].clone(), members[3].clone()];
+        let circuit_nodes0 = vec![nodes[0].clone(), nodes[1].clone()];
+
+        // create circuits with the previously created nodes and services
+        let circuit0 = Circuit {
+            circuit_id: "012-abc".to_string(),
+            roster: circuit_roster0.clone(),
+            members: circuit_members0.clone(),
+        };
+        let circuit1 = Circuit {
+            circuit_id: "345-def".to_string(),
+            roster: circuit_roster1.clone(),
+            members: circuit_members1.clone(),
+        };
+
+        let mut expected_nodes = BTreeMap::new();
+        let mut expected_circuits = BTreeMap::new();
+        let mut expected_service_directory = HashMap::new();
+
+        expected_nodes.insert(nodes[0].node_id.clone().to_string(), nodes[0].clone());
+        expected_nodes.insert(nodes[1].node_id.clone().to_string(), nodes[1].clone());
+
+        expected_circuits.insert(circuit0.circuit_id.clone().to_string(), circuit0.clone());
+
+        expected_service_directory.insert(
+            ServiceId::new(
+                "012-abc".to_string(),
+                circuit_roster0[0].service_id.clone().to_string(),
+            ),
+            circuit_roster0[0].clone(),
+        );
+        expected_service_directory.insert(
+            ServiceId::new(
+                "012-abc".to_string(),
+                circuit_roster0[1].service_id.clone().to_string(),
+            ),
+            circuit_roster0[1].clone(),
+        );
+
+        // add a circuit to the routing table
+        writer
+            .add_circuit(
+                "012-abc".to_string(),
+                circuit0.clone(),
+                circuit_nodes0.clone(),
+            )
+            .expect("Unable to add circuit");
+
+        assert_eq!(routing_table.state.read().unwrap().nodes, expected_nodes);
+        assert_eq!(
+            routing_table.state.read().unwrap().circuits,
+            expected_circuits
+        );
+        assert_eq!(
+            routing_table.state.read().unwrap().service_directory,
+            expected_service_directory
+        );
+
+        // remove circuit from the routing table
+        writer
+            .remove_circuit("012-abc")
+            .expect("Unable to remove circuit");
+
+        assert!(!routing_table.state.read().unwrap().nodes.is_empty());
+        assert!(routing_table.state.read().unwrap().circuits.is_empty());
+        assert!(routing_table
+            .state
+            .read()
+            .unwrap()
+            .service_directory
+            .is_empty());
+
+        expected_circuits.insert(circuit1.circuit_id.clone().to_string(), circuit1.clone());
+
+        expected_service_directory.insert(
+            ServiceId::new(
+                "345-def".to_string(),
+                circuit_roster1[0].service_id.clone().to_string(),
+            ),
+            circuit_roster1[0].clone(),
+        );
+        expected_service_directory.insert(
+            ServiceId::new(
+                "345-def".to_string(),
+                circuit_roster1[1].service_id.clone().to_string(),
+            ),
+            circuit_roster1[1].clone(),
+        );
+
+        // add multiple circuits to the routing table
+        writer
+            .add_circuits(vec![circuit0.clone(), circuit1.clone()])
+            .expect("Unable to add circuits");
+
+        assert_eq!(routing_table.state.read().unwrap().nodes, expected_nodes);
+        assert_eq!(
+            routing_table.state.read().unwrap().circuits,
+            expected_circuits
+        );
+        assert_eq!(
+            routing_table.state.read().unwrap().service_directory,
+            expected_service_directory
+        );
+
+        // get one of the circuits in the routing table
+        let fetched_circuit = reader
+            .get_circuit(&circuit0.circuit_id)
+            .expect("Unable to get circuit");
+
+        assert_eq!(fetched_circuit, Some(circuit0));
+
+        // list all circuits in the routing table
+        let fetched_circuit_list = reader.list_circuits().expect("Unable to list circuits");
+
+        assert_eq!(
+            fetched_circuit_list.collect::<BTreeMap<String, Circuit>>(),
+            expected_circuits
+        );
+    }
+
+    // Test the routing table read and write operations for services
+    //
+    // 1. Create a circuit with corresponding nodes and services
+    // 2. Write a service to the routing table
+    // 3. Check the service was written to the routing table
+    // 4. Remove service from the routing table
+    // 5. Add circuit with two services to the routing table, validate ok
+    // 6. Check the expected service is returned when fetched
+    // 7. List services, validate both services are returned
+    #[test]
+    fn test_service() {
+        let routing_table = RoutingTable::default();
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(routing_table.clone());
+        let reader: Box<dyn RoutingTableReader> = Box::new(routing_table.clone());
+
+        // create two nodes, two services, and one circuit
+        let node0 = CircuitNode {
+            node_id: "node-0".to_string(),
+            endpoints: vec!["endpoint_0".to_string()],
+        };
+        let service0 = Service {
+            service_id: "service-0".to_string(),
+            service_type: "test".to_string(),
+            node_id: "endpoint_0".to_string(),
+            arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+        };
+        let node1 = CircuitNode {
+            node_id: "node-1".to_string(),
+            endpoints: vec!["endpoint_1".to_string()],
+        };
+        let service1 = Service {
+            service_id: "service-1".to_string(),
+            service_type: "test".to_string(),
+            node_id: "endpoint_1".to_string(),
+            arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+        };
+        let circuit = Circuit {
+            circuit_id: "012-abc".to_string(),
+            roster: vec![service0.clone(), service1.clone()],
+            members: vec![node0.node_id.clone(), node1.node_id.clone()],
+        };
+        let service_id0 = ServiceId::new(
+            "012-abc".to_string(),
+            service0.service_id.clone().to_string(),
+        );
+
+        let mut expected_service_directory = HashMap::new();
+
+        let expected_service_id = ServiceId::new("012-abc".to_string(), "service-0".to_string());
+        expected_service_directory.insert(expected_service_id, service0.clone());
+
+        // add service to the routing table
+        writer
+            .add_service(service_id0.clone(), service0.clone())
+            .expect("Unable to add service");
+
+        assert_eq!(
+            routing_table.state.read().unwrap().service_directory,
+            expected_service_directory
+        );
+
+        // remove service from the routing table
+        writer
+            .remove_service(&service_id0.clone())
+            .expect("Unable to remove service");
+
+        assert!(routing_table
+            .state
+            .read()
+            .unwrap()
+            .service_directory
+            .is_empty());
+
+        // add circuit with two services to the routing table
+        writer
+            .add_circuit(
+                circuit.circuit_id.clone(),
+                circuit.clone(),
+                vec![node0.clone(), node1.clone()],
+            )
+            .expect("Unable to add circuit");
+
+        assert!(routing_table
+            .state
+            .read()
+            .unwrap()
+            .circuits
+            .contains_key("012-abc"));
+
+        // get one of the services in the routing table
+        let fetched_service = reader
+            .get_service(&service_id0.clone())
+            .expect("Unable to get service");
+
+        assert_eq!(fetched_service, Some(service0.clone()));
+
+        // list all services in the routing table
+        let fetched_service_list = reader
+            .list_services(&circuit.circuit_id)
+            .expect("Unable to list services");
+
+        assert_eq!(fetched_service_list, vec![service0, service1]);
+    }
+
+    // Test the routing table read and write operations for nodes
+    //
+    // 1. Create two nodes, write one node to the routing table
+    // 2. Check node was written to the routing table
+    // 3. Remove node from the routing table
+    // 4. Check node was removed from the routing table
+    // 5. Add two nodes to the routing table
+    // 6. Check both nodes written to the routing table
+    // 7. Check the expected node is returned when fetched
+    // 8. List nodes, validate both nodes are returned
+    #[test]
+    fn test_node() {
+        let routing_table = RoutingTable::default();
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(routing_table.clone());
+        let reader: Box<dyn RoutingTableReader> = Box::new(routing_table.clone());
+
+        let node0 = CircuitNode {
+            node_id: "node-0".to_string(),
+            endpoints: vec!["endpoint_0".to_string()],
+        };
+        let node1 = CircuitNode {
+            node_id: "node-1".to_string(),
+            endpoints: vec!["endpoint_1".to_string()],
+        };
+
+        let mut expected_nodes = BTreeMap::new();
+        expected_nodes.insert(node0.node_id.clone(), node0.clone());
+
+        // add node to the routing table
+        writer
+            .add_node(node0.node_id.clone(), node0.clone())
+            .expect("Unable to add node");
+
+        assert_eq!(routing_table.state.read().unwrap().nodes, expected_nodes);
+
+        // remove node from the routing table
+        writer
+            .remove_node(&node0.node_id)
+            .expect("Unable to remove node");
+
+        assert!(routing_table.state.read().unwrap().nodes.is_empty());
+
+        // add multiple nodes to the routing table
+        writer
+            .add_nodes(vec![node0.clone(), node1.clone()])
+            .expect("Unable to add nodes");
+
+        expected_nodes.insert(node1.node_id.clone(), node1.clone());
+
+        assert_eq!(routing_table.state.read().unwrap().nodes, expected_nodes);
+
+        // get a node from the routing table
+        let fetched_node = reader
+            .get_node(&node0.node_id.clone())
+            .expect("Unable to get node");
+
+        assert_eq!(fetched_node, Some(node0.clone()));
+
+        // list all nodes in the routing table
+        let fetched_node_list = reader.list_nodes().expect("Unable to list nodes");
+
+        assert_eq!(
+            fetched_node_list.collect::<BTreeMap<String, CircuitNode>>(),
+            expected_nodes
+        );
+    }
+}
