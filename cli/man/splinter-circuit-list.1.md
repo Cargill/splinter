@@ -46,6 +46,10 @@ OPTIONS
 : Specifies the output format of the circuit. (default `human`). Possible values
   for formatting are `human` and `csv`.
 
+`-k`, `--key` PRIVATE-KEY-FILE
+: Specifies the private signing key (either a file path or the name of a
+  .priv file in $HOME/.splinter/keys).
+
 `-m`, `--member` <member>
 : Filter the circuits list by a node ID that is present in the circuits’ members
   list.
