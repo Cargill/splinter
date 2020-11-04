@@ -252,4 +252,13 @@ pub trait OAuthUserStore {
 
     /// Returns the stored OAuth user based on the biome user ID.
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+
+    /// Clone into a boxed, dynamic dispatched OAuthUserStore.
+    fn clone_box(&self) -> Box<dyn OAuthUserStore>;
+}
+
+impl Clone for Box<dyn OAuthUserStore> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }

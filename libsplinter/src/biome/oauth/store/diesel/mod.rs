@@ -63,6 +63,12 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
     }
+
+    fn clone_box(&self) -> Box<dyn OAuthUserStore> {
+        Box::new(Self {
+            connection_pool: self.connection_pool.clone(),
+        })
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -88,6 +94,12 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
+    }
+
+    fn clone_box(&self) -> Box<dyn OAuthUserStore> {
+        Box::new(Self {
+            connection_pool: self.connection_pool.clone(),
+        })
     }
 }
 
