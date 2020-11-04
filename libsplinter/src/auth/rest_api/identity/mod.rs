@@ -88,6 +88,7 @@ impl FromStr for BearerToken {
         let mut parts = s.splitn(2, ':');
         match (parts.next(), parts.next()) {
             (Some(token_type), Some(token)) => match token_type {
+                #[cfg(feature = "oauth")]
                 "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
                 other_type => Err(AuthorizationParseError::new(format!(
                     "unsupported token type: {}",
