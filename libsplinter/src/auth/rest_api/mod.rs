@@ -47,6 +47,10 @@ fn authorize(
 ) -> AuthorizationResult {
     // Authorization isn't necessary when using one of the authorization endpoints
     let mut is_auth_endpoint = false;
+    #[cfg(feature = "biome-credentials")]
+    if endpoint == "/biome/register" || endpoint == "/biome/login" || endpoint == "/biome/token" {
+        is_auth_endpoint = true;
+    }
     #[cfg(feature = "oauth")]
     if endpoint.starts_with("/oauth") {
         is_auth_endpoint = true;
