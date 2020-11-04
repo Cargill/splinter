@@ -51,4 +51,9 @@ impl StoreFactory for SqliteStoreFactory {
     fn get_biome_user_store(&self) -> Box<dyn crate::biome::UserStore> {
         Box::new(crate::biome::DieselUserStore::new(self.pool.clone()))
     }
+
+    #[cfg(feature = "biome-oauth")]
+    fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
+        Box::new(crate::biome::DieselOAuthUserStore::new(self.pool.clone()))
+    }
 }

@@ -17,7 +17,8 @@
 use std::error::Error;
 use std::fmt;
 
-type InternalError = Box<dyn Error>;
+use crate::error::InternalError;
+
 type ConstraintViolation = Box<dyn Error>;
 
 /// Errors that may occur during OAuthUserStore operations.
