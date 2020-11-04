@@ -98,6 +98,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Mutex;
 
+    use cylinder::{secp256k1::Secp256k1Context, Context};
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
     use tempdir::TempDir;
@@ -107,7 +108,6 @@ mod tests {
             batch::BatchBuilder,
             command::{BytesEntry, Command, SetState},
         },
-        signing::hash::HashSigner,
     };
 
     use splinter::{
@@ -158,18 +158,22 @@ mod tests {
             )
             .expect("Failed to initialize state");
 
-            let signer = HashSigner::default();
+            let signing_context = Secp256k1Context::new();
+            let signer = signing_context.new_signer(signing_context.new_random_private_key());
             let batch = BatchBuilder::new()
                 .with_transactions(vec![
-                    make_command_transaction(&[Command::SetState(SetState::new(vec![
-                        BytesEntry::new(address1.clone(), value1.clone()),
-                        BytesEntry::new(address2.clone(), value2.clone()),
-                        BytesEntry::new(address3.clone(), value3.clone()),
-                    ]))])
+                    make_command_transaction(
+                        &[Command::SetState(SetState::new(vec![
+                            BytesEntry::new(address1.clone(), value1.clone()),
+                            BytesEntry::new(address2.clone(), value2.clone()),
+                            BytesEntry::new(address3.clone(), value3.clone()),
+                        ]))],
+                        &*signer,
+                    )
                     .take()
                     .0,
                 ])
-                .build_pair(&signer)
+                .build_pair(&*signer)
                 .expect("Failed to build batch");
             state
                 .prepare_change(batch)
