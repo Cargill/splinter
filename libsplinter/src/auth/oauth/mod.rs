@@ -43,8 +43,9 @@ const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
 pub struct OAuthClient {
     /// The inner OAuth2 client
     client: BasicClient,
-    /// List of (CSRF token, PKCE verifier) pairs for pending authorization requests
-    pending_authorizations: Arc<Mutex<TtlMap<String, String>>>,
+    /// Pending authorization requests, including the CSRF token, PKCE verifier, and client's
+    /// redirect URL
+    pending_authorizations: Arc<Mutex<TtlMap<String, PendingAuthorization>>>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
 }
@@ -118,7 +119,15 @@ impl OAuthClient {
     }
 
     /// Generates the URL that the end user should be redirected to for authorization
-    pub fn get_authorization_url(&self) -> Result<String, OAuthClientError> {
+    ///
+    /// # Arguments
+    ///
+    /// * `client_redirect_url` - The endpoint that Splinter will redirect to after it has
+    ///   completed authorization and the code exchange
+    pub fn get_authorization_url(
+        &self,
+        client_redirect_url: String,
+    ) -> Result<String, OAuthClientError> {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
         let mut request = self
@@ -133,12 +142,19 @@ impl OAuthClient {
         self.pending_authorizations
             .lock()
             .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
-            .insert(csrf_state.secret().into(), pkce_verifier.secret().into());
+            .insert(
+                csrf_state.secret().into(),
+                PendingAuthorization {
+                    pkce_verifier: pkce_verifier.secret().into(),
+                    client_redirect_url,
+                },
+            );
 
         Ok(authorize_url.to_string())
     }
 
-    /// Exchanges the given authorization code for an access token
+    /// Exchanges the given authorization code for an access token and the client redirect URL
+    /// provided in the original auth request, represented by a `String`.
     ///
     /// # Arguments
     ///
@@ -150,21 +166,21 @@ impl OAuthClient {
         &self,
         auth_code: String,
         csrf_token: &str,
-    ) -> Result<Option<UserTokens>, OAuthClientError> {
-        let pkce_verifier = match self
+    ) -> Result<Option<(UserTokens, String)>, OAuthClientError> {
+        let pending_authorization = match self
             .pending_authorizations
             .lock()
             .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
             .remove(csrf_token)
         {
-            Some(pkce_verifier) => PkceCodeVerifier::new(pkce_verifier),
+            Some(pending_authorization) => pending_authorization,
             None => return Ok(None),
         };
 
         let token_response = self
             .client
             .exchange_code(AuthorizationCode::new(auth_code))
-            .set_pkce_verifier(pkce_verifier)
+            .set_pkce_verifier(PkceCodeVerifier::new(pending_authorization.pkce_verifier))
             .request(http_client)
             .map_err(|err| {
                 OAuthClientError::new(&format!(
@@ -173,8 +189,18 @@ impl OAuthClient {
                 ))
             })?;
 
-        Ok(Some(UserTokens::from(token_response)))
+        Ok(Some((
+            UserTokens::from(token_response),
+            pending_authorization.client_redirect_url,
+        )))
     }
+}
+
+/// Information pertaining to pending authorization requests, including the PKCE verifier, and
+/// client's redirect URL
+struct PendingAuthorization {
+    pkce_verifier: String,
+    client_redirect_url: String,
 }
 
 /// User information returned by the OAuth2 client

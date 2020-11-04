@@ -14,8 +14,9 @@
 
 //! The `GET /oauth/login` endpoint for getting the authorization request URL for the provider.
 
-use actix_web::{http::header::LOCATION, HttpResponse};
+use actix_web::{http::header::LOCATION, web, HttpResponse};
 use futures::future::IntoFuture;
+use std::collections::HashMap;
 
 use crate::auth::oauth::OAuthClient;
 use crate::protocol;
@@ -27,9 +28,45 @@ pub fn make_login_route(client: OAuthClient) -> Resource {
             protocol::OAUTH_LOGIN_MIN,
             protocol::OAUTH_PROTOCOL_VERSION,
         ))
-        .add_method(Method::Get, move |_, _| {
+        .add_method(Method::Get, move |req, _| {
+            let query: web::Query<HashMap<String, String>> =
+                if let Ok(q) = web::Query::from_query(req.query_string()) {
+                    q
+                } else {
+                    return Box::new(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request("Invalid query"))
+                            .into_future(),
+                    );
+                };
+            let client_redirect_url = if let Some(header_value) = query.get("redirect_url") {
+                header_value
+            } else {
+                match req.headers().get("referer") {
+                    Some(url) => match url.to_str() {
+                        Ok(url) => url,
+                        Err(_) => {
+                            return Box::new(
+                                HttpResponse::BadRequest()
+                                    .json(ErrorResponse::bad_request(
+                                        "No valid redirect URL supplied",
+                                    ))
+                                    .into_future(),
+                            )
+                        }
+                    },
+                    None => {
+                        return Box::new(
+                            HttpResponse::BadRequest()
+                                .json(ErrorResponse::bad_request("No valid redirect URL supplied"))
+                                .into_future(),
+                        )
+                    }
+                }
+            };
+
             Box::new(
-                match client.get_authorization_url() {
+                match client.get_authorization_url(client_redirect_url.to_string()) {
                     Ok(auth_url) => HttpResponse::Found().header(LOCATION, auth_url).finish(),
                     Err(err) => {
                         error!("{}", err);
