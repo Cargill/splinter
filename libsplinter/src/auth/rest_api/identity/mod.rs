@@ -23,7 +23,7 @@ use std::str::FromStr;
 pub use error::{AuthorizationParseError, IdentityProviderError};
 
 /// A service that fetches identities from a backing provider
-pub trait IdentityProvider: Send {
+pub trait IdentityProvider: Send + Sync {
     /// Attempts to get the identity that corresponds to the given authorization
     fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError>;
 
