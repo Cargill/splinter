@@ -226,7 +226,7 @@ impl OAuthUserUpdateBuilder {
 }
 
 /// Defines methods for CRUD operations and fetching OAuth user information.
-pub trait OAuthUserStore {
+pub trait OAuthUserStore: Send + Sync {
     /// Add an OAuthUser to the store.
     ///
     /// # Errors
