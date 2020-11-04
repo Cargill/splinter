@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
-use sawtooth_sdk::signing::{
-    create_context, secp256k1::Secp256k1PrivateKey, transact::TransactSigner, Signer,
-};
+use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey, Signer};
 
 use super::error::CliError;
 
@@ -29,13 +26,13 @@ use super::error::CliError;
 /// the specified location. If the argument is not a file path, this will attempt to load the
 /// file from the $HOME/.splinter/keys directory; when loading from this directory, the '.priv'
 /// file extension is optional.
-pub fn load_signer(key: &str) -> Result<TransactSigner, CliError> {
-    let context = create_context("secp256k1")?;
+pub fn load_signer(key: &str) -> Result<Box<dyn Signer>, CliError> {
+    let context = Secp256k1Context::new();
     let private_key = load_signing_key(key)?;
-    Ok(Signer::new_boxed(context, Box::new(private_key)).try_into()?)
+    Ok(context.new_signer(private_key))
 }
 
-fn load_signing_key(key: &str) -> Result<Secp256k1PrivateKey, CliError> {
+fn load_signing_key(key: &str) -> Result<PrivateKey, CliError> {
     let file_path = determine_key_file_path(key)?;
 
     let key_file = File::open(file_path).map_err(|err| {
@@ -55,7 +52,7 @@ fn load_signing_key(key: &str) -> Result<Secp256k1PrivateKey, CliError> {
         return Err(CliError::action_error("private key file is empty"));
     }
 
-    let signing_key = Secp256k1PrivateKey::from_hex(key_string).map_err(|err| {
+    let signing_key = PrivateKey::new_from_hex(key_string).map_err(|err| {
         CliError::action_error_with_source("failed to read valid private key from file", err.into())
     })?;
 
@@ -90,17 +87,14 @@ fn determine_key_file_path(key: &str) -> Result<PathBuf, CliError> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::to_hex;
     use super::*;
 
     use std::fs::create_dir_all;
     use std::io::Write;
     use std::path::Path;
 
-    use sawtooth_sdk::signing::PrivateKey;
     use serial_test::serial;
     use tempfile::{tempdir, NamedTempFile};
-    use transact::signing::Signer as _;
 
     const MOCK_PRIV_KEY_HEX: &str =
         "d31e395bed0d9b2277b25d57523063d7d6b9db802d80549bc1362875cdcb83c6";
@@ -177,13 +171,18 @@ mod tests {
         let (_file, path) = temp_key_file(MOCK_PRIV_KEY_HEX);
 
         let signer = load_signer(&path).expect("failed to get signer with key from file");
-        assert_eq!(&to_hex(signer.public_key()), MOCK_PUB_KEY_HEX);
-
-        let signature = to_hex(
+        assert_eq!(
             &signer
-                .sign(MOCK_BYTES_TO_SIGN)
-                .expect("failed to sign bytes"),
+                .public_key()
+                .expect("Failed to compute public key")
+                .as_hex(),
+            MOCK_PUB_KEY_HEX
         );
+
+        let signature = signer
+            .sign(MOCK_BYTES_TO_SIGN)
+            .expect("failed to sign bytes")
+            .as_hex();
         assert_eq!(signature, MOCK_SIGNATURE);
     }
 
