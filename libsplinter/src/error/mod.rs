@@ -74,8 +74,10 @@
 //! }
 //! ```
 
+mod constraint_violation;
 mod internal;
 mod invalid_state;
 
+pub use constraint_violation::{ConstraintViolationError, ConstraintViolationType};
 pub use internal::InternalError;
 pub use invalid_state::InvalidStateError;
