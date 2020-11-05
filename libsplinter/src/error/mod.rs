@@ -75,5 +75,7 @@
 //! ```
 
 mod internal;
+mod invalid_state;
 
 pub use internal::InternalError;
+pub use invalid_state::InvalidStateError;
