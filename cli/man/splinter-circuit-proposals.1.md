@@ -47,6 +47,10 @@ OPTIONS
   displays the circuit proposals information in a formatted table, while `csv`
   prints the circuit proposals information via comma-separated values.
 
+`-k`, `--key` PRIVATE-KEY-FILE
+: Specifies the private signing key (either a file path or the name of a
+  .priv file in $HOME/.splinter/keys).
+
 `--management-type` MANAGEMENT-TYPE
 : Filter the circuit proposals by their circuit management type.
 

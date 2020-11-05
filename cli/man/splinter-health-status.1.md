@@ -44,6 +44,10 @@ FLAGS
 OPTIONS
 =======
 
+`-k`, `--key` PRIVATE-KEY-FILE
+: Specifies the private signing key (either a file path or the name of a
+  .priv file in $HOME/.splinter/keys).
+
 `-U`, `--url URL`
 : Specifies the URL for the node of interest (the URL for the `splinterd`
   REST API on the node). This option is required unless `$SPLINTER_REST_API_URL`

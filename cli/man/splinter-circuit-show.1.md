@@ -45,6 +45,10 @@ OPTIONS
 : Specifies the output format of the circuit proposal. (default `human`).
   Possible values for formatting are `human` and `csv`.
 
+`-k`, `--key` PRIVATE-KEY-FILE
+: Specifies the private signing key (either a file path or the name of a
+  .priv file in $HOME/.splinter/keys).
+
 `-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
   `$SPLINTER_REST_API_URL` is set.

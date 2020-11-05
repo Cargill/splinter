@@ -418,6 +418,14 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .help("Output format")
                         .possible_values(&["human", "csv"])
                         .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("private_key_file")
+                        .value_name("private-key-file")
+                        .short("k")
+                        .long("key")
+                        .takes_value(true)
+                        .help("Name or path of private key"),
                 ),
         )
         .subcommand(
@@ -452,6 +460,14 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .help("Output format")
                         .possible_values(&["human", "yaml", "json"])
                         .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("private_key_file")
+                        .value_name("private-key-file")
+                        .short("k")
+                        .long("key")
+                        .takes_value(true)
+                        .help("Name or path of private key"),
                 ),
         )
         .subcommand(
@@ -498,6 +514,14 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .help("Output format")
                         .possible_values(&["human", "csv"])
                         .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("private_key_file")
+                        .value_name("private-key-file")
+                        .short("k")
+                        .long("key")
+                        .takes_value(true)
+                        .help("Name or path of private key"),
                 ),
         );
 
@@ -578,6 +602,14 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                             .takes_value(true)
                             .multiple(true)
                             .help("Metadata to include with node (<key>=<value>)"),
+                    )
+                    .arg(
+                        Arg::with_name("private_key_file")
+                            .value_name("private-key-file")
+                            .short("k")
+                            .long("key")
+                            .takes_value(true)
+                            .help("Name or path of private key"),
                     ),
             ),
     );
@@ -600,6 +632,14 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .long("url")
                                 .help("URL of the Splinter daemon REST API")
                                 .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
                         ),
                 ),
         );
