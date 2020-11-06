@@ -136,4 +136,8 @@ impl UserStore for MemoryUserStore {
 
         Ok(inner.iter().map(|(_, v)| v.clone()).collect())
     }
+
+    fn clone_box(&self) -> Box<dyn UserStore> {
+        Box::new(self.clone())
+    }
 }
