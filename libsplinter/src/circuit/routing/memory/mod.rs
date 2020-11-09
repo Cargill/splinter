@@ -35,6 +35,8 @@ use super::{
     Service, ServiceId,
 };
 
+const ADMIN_CIRCUIT_ID: &str = "admin";
+
 /// The internal state of the routing table that will be wrapped in a read-write lock
 #[derive(Clone, Default)]
 struct RoutingTableState {
@@ -149,13 +151,21 @@ impl RoutingTableReader for RoutingTable {
     ///
     /// Returns an error if the lock is poisoned
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError> {
-        Ok(self
-            .state
-            .read()
-            .map_err(|_| FetchCircuitError(String::from("RoutingTable lock poisoned")))?
-            .circuits
-            .get(circuit_id)
-            .cloned())
+        if circuit_id == ADMIN_CIRCUIT_ID {
+            Ok(Some(Circuit::new(
+                ADMIN_CIRCUIT_ID.to_string(),
+                vec![],
+                vec![],
+            )))
+        } else {
+            Ok(self
+                .state
+                .read()
+                .map_err(|_| FetchCircuitError(String::from("RoutingTable lock poisoned")))?
+                .circuits
+                .get(circuit_id)
+                .cloned())
+        }
     }
 }
 
