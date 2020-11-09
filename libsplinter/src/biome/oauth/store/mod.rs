@@ -130,8 +130,8 @@ impl OAuthUserBuilder {
     /// Set the OAuth refresh token.
     ///
     /// This field is optional when constructing the final struct.
-    pub fn with_refresh_token(mut self, refresh_token: String) -> Self {
-        self.refresh_token = Some(refresh_token);
+    pub fn with_refresh_token(mut self, refresh_token: Option<String>) -> Self {
+        self.refresh_token = refresh_token;
 
         self
     }
@@ -200,8 +200,8 @@ impl OAuthUserUpdateBuilder {
     /// Set the OAuth refresh token.
     ///
     /// This field is optional when constructing the final struct.
-    pub fn with_refresh_token(mut self, refresh_token: String) -> Self {
-        self.refresh_token = Some(refresh_token);
+    pub fn with_refresh_token(mut self, refresh_token: Option<String>) -> Self {
+        self.refresh_token = refresh_token;
 
         self
     }

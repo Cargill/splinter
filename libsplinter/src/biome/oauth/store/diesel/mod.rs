@@ -270,7 +270,7 @@ pub mod tests {
 
         let updated_oauth_user = stored_oauth_user
             .into_update_builder()
-            .with_refresh_token("somerefreshtoken".into())
+            .with_refresh_token(Some("somerefreshtoken".into()))
             .build()
             .expect("Unable to build updated user");
 
