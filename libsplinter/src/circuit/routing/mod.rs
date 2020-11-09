@@ -268,6 +268,26 @@ impl Service {
             arguments,
         }
     }
+
+    /// Returns the ID of the service
+    pub fn service_id(&self) -> &str {
+        &self.service_id
+    }
+
+    /// Returns the service type of the service
+    pub fn service_type(&self) -> &str {
+        &self.service_type
+    }
+
+    /// Returns the node ID of the node the service can connect to
+    pub fn node_id(&self) -> &str {
+        &self.node_id
+    }
+
+    /// Returns the list of key/value arugments for the service
+    pub fn arguments(&self) -> &[(String, String)] {
+        &self.arguments
+    }
 }
 
 /// The unique ID of a service made up of a circuit ID and service ID
