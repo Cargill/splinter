@@ -244,6 +244,7 @@ pub struct Service {
     service_type: String,
     node_id: String,
     arguments: Vec<(String, String)>,
+    peer_id: Option<String>,
 }
 
 impl Service {
@@ -266,6 +267,7 @@ impl Service {
             service_type,
             node_id,
             arguments,
+            peer_id: None,
         }
     }
 
@@ -287,6 +289,19 @@ impl Service {
     /// Returns the list of key/value arugments for the service
     pub fn arguments(&self) -> &[(String, String)] {
         &self.arguments
+    }
+
+    /// Returns the local peer ID for the service
+    pub fn peer_id(&self) -> &Option<String> {
+        &self.peer_id
+    }
+
+    pub fn set_peer_id(&mut self, peer_id: String) {
+        self.peer_id = Some(peer_id)
+    }
+
+    pub fn remove_peer_id(&mut self) {
+        self.peer_id = None
     }
 }
 

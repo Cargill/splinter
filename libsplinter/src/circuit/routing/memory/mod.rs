@@ -392,6 +392,7 @@ mod test {
                 service_type: "test".to_string(),
                 node_id: format!("endpoint_{}", x),
                 arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+                peer_id: None,
             };
             roster.push(service.clone());
             nodes.push(node.clone());
@@ -545,6 +546,7 @@ mod test {
             service_type: "test".to_string(),
             node_id: "endpoint_0".to_string(),
             arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+            peer_id: None,
         };
         let node1 = CircuitNode {
             node_id: "node-1".to_string(),
@@ -555,6 +557,7 @@ mod test {
             service_type: "test".to_string(),
             node_id: "endpoint_1".to_string(),
             arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+            peer_id: None,
         };
         let circuit = Circuit {
             circuit_id: "012-abc".to_string(),
