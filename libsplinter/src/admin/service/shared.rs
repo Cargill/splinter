@@ -14,21 +14,18 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::iter::ExactSizeIterator;
 use std::iter::FromIterator;
-use std::path::Path;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
-use protobuf::{Message, RepeatedField};
+use protobuf::Message;
 
-use crate::circuit::SplinterState;
-use crate::circuit::{
-    service::SplinterNode as StateNode,
-    service::{Service, ServiceId},
-    AuthorizationType, Circuit as StateCircuit, DurabilityType, PersistenceType, RouteType,
-    ServiceDefinition as StateServiceDefinition,
+use crate::admin::store::{
+    AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
+    CircuitProposal as StoreProposal, ProposalType, ProposedNode, Vote, VoteRecordBuilder,
 };
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
 use crate::hex::to_hex;
@@ -42,9 +39,8 @@ use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
     CircuitProposalVote, CircuitProposalVote_Vote, CircuitProposal_ProposalType,
-    CircuitProposal_VoteRecord, Circuit_AuthorizationType, Circuit_DurabilityType,
-    Circuit_PersistenceType, Circuit_RouteType, MemberReady, ServiceProtocolVersionRequest,
-    SplinterNode,
+    Circuit_AuthorizationType, Circuit_DurabilityType, Circuit_PersistenceType, Circuit_RouteType,
+    MemberReady, ServiceProtocolVersionRequest, SplinterNode,
 };
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -56,7 +52,6 @@ use crate::storage::sets::mem::DurableBTreeSet;
 use super::error::{AdminSharedError, MarshallingError};
 use super::mailbox::Mailbox;
 use super::messages;
-use super::open_proposals::OpenProposals;
 use super::{
     admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, AdminSubscriberError,
     Events,
@@ -157,8 +152,6 @@ impl SubscriberMap {
 pub struct AdminServiceShared {
     // the node id of the connected splinter node
     node_id: String,
-    // the list of circuit proposal that are being voted on by members of a circuit
-    open_proposals: OpenProposals,
     // the list of circuit that have been committed to splinter state but whose services haven't
     // been initialized
     uninitialized_circuits: HashMap<String, UninitializedCircuit>,
@@ -193,8 +186,8 @@ pub struct AdminServiceShared {
     event_subscribers: SubscriberMap,
     // Mailbox of AdminServiceEvent values
     event_mailbox: Mailbox,
-    // copy of splinter state
-    splinter_state: SplinterState,
+    // AdminServiceStore
+    admin_store: Box<dyn AdminServiceStore>,
     // signature verifier
     signature_verifier: Box<dyn SignatureVerifier>,
     key_verifier: Box<dyn AdminKeyVerifier>,
@@ -214,26 +207,11 @@ impl AdminServiceShared {
             Box<dyn ServiceArgValidator + Send>,
         >,
         peer_connector: PeerManagerConnector,
-        splinter_state: SplinterState,
+        admin_store: Box<dyn AdminServiceStore>,
         signature_verifier: Box<dyn SignatureVerifier>,
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
-        storage_type: &str,
-        state_dir: &str,
     ) -> Result<Self, ServiceError> {
-        let storage_location = match storage_type {
-            "yaml" => Path::new(state_dir)
-                .join("circuit_proposals.yaml")
-                .to_str()
-                .expect("'state_dir' is not a valid UTF-8 string")
-                .to_string(),
-            "memory" => "memory".to_string(),
-            _ => panic!("Storage type is not supported: {}", storage_type),
-        };
-
-        let open_proposals = OpenProposals::new(storage_location)
-            .map_err(|err| ServiceError::UnableToCreate(Box::new(err)))?;
-
         let event_mailbox = Mailbox::new(DurableBTreeSet::new_boxed_with_bound(
             std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
         ));
@@ -241,7 +219,6 @@ impl AdminServiceShared {
         Ok(AdminServiceShared {
             node_id,
             network_sender: None,
-            open_proposals,
             uninitialized_circuits: Default::default(),
             orchestrator,
             #[cfg(feature = "service-arg-validation")]
@@ -257,7 +234,7 @@ impl AdminServiceShared {
             current_consensus_verifiers: Vec::new(),
             event_subscribers: SubscriberMap::new(),
             event_mailbox,
-            splinter_state,
+            admin_store,
             signature_verifier,
             key_verifier,
             key_permission_manager,
@@ -361,6 +338,7 @@ impl AdminServiceShared {
                 let circuit_proposal = circuit_proposal_context.circuit_proposal;
                 let action = circuit_proposal_context.action;
                 let circuit_id = circuit_proposal.get_circuit_id();
+                let circuit = circuit_proposal.get_circuit_proposal();
                 let mgmt_type = circuit_proposal
                     .get_circuit_proposal()
                     .circuit_management_type
@@ -369,12 +347,9 @@ impl AdminServiceShared {
                 match self.check_approved(&circuit_proposal) {
                     Ok(CircuitProposalStatus::Accepted) => {
                         // commit new circuit
-                        let circuit = circuit_proposal.get_circuit_proposal();
-                        self.update_splinter_state(circuit)?;
-                        // remove approved proposal
-                        self.remove_proposal(&circuit_id)?;
-                        // send message about circuit acceptance
+                        self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
 
+                        // send message about circuit acceptance
                         let circuit_proposal_proto =
                             messages::CircuitProposal::from_proto(circuit_proposal.clone())
                                 .map_err(AdminSharedError::InvalidMessageFormat)?;
@@ -387,7 +362,7 @@ impl AdminServiceShared {
                         // send MEMBER_READY message to all other members' admin services
                         if let Some(ref network_sender) = self.network_sender {
                             let mut member_ready = MemberReady::new();
-                            member_ready.set_circuit_id(circuit.circuit_id.clone());
+                            member_ready.set_circuit_id(circuit_id.to_string());
                             member_ready.set_member_node_id(self.node_id.clone());
                             let mut msg = AdminMessage::new();
                             msg.set_message_type(AdminMessage_Type::MEMBER_READY);
@@ -450,8 +425,8 @@ impl AdminServiceShared {
                         // remove circuit
                         let proposal = self.remove_proposal(&circuit_id)?;
                         if let Some(proposal) = proposal {
-                            for member in proposal.get_circuit_proposal().members.iter() {
-                                self.remove_peer_ref(member.get_node_id());
+                            for member in proposal.circuit().members().iter() {
+                                self.remove_peer_ref(member.node_id());
                             }
                         }
                         let circuit_proposal_proto =
@@ -562,8 +537,8 @@ impl AdminServiceShared {
                     })?;
 
                 let mut verifiers = vec![];
-                for member in circuit_proposal.get_circuit_proposal().get_members() {
-                    verifiers.push(admin_service_id(member.get_node_id()));
+                for member in circuit_proposal.circuit().members() {
+                    verifiers.push(admin_service_id(member.node_id()));
                 }
                 let signer_public_key = header.get_requester();
 
@@ -574,33 +549,61 @@ impl AdminServiceShared {
                     header.get_requester_node_id(),
                 )
                 .map_err(|err| {
-                    if circuit_proposal.get_proposal_type() == CircuitProposal_ProposalType::CREATE
-                    {
+                    if circuit_proposal.proposal_type() == &ProposalType::Create {
                         // remove peer_ref because we will not accept this proposal
-                        for member in circuit_proposal.get_circuit_proposal().get_members() {
-                            self.remove_peer_ref(member.get_node_id())
+                        for member in circuit_proposal.circuit().members() {
+                            self.remove_peer_ref(member.node_id())
                         }
                     }
                     err
                 })?;
+
                 // add vote to circuit_proposal
-                let mut vote_record = CircuitProposal_VoteRecord::new();
-                vote_record.set_public_key(signer_public_key.to_vec());
-                vote_record.set_vote(proposal_vote.get_vote());
-                vote_record.set_voter_node_id(header.get_requester_node_id().to_string());
+                let vote = match proposal_vote.get_vote() {
+                    CircuitProposalVote_Vote::ACCEPT => Vote::Accept,
+                    CircuitProposalVote_Vote::REJECT => Vote::Reject,
+                    CircuitProposalVote_Vote::UNSET_VOTE => {
+                        return Err(AdminSharedError::ValidationFailed(
+                            "Vote is unset".to_string(),
+                        ));
+                    }
+                };
 
-                let mut votes = circuit_proposal.get_votes().to_vec();
+                let vote_record = VoteRecordBuilder::new()
+                    .with_public_key(signer_public_key)
+                    .with_vote(&vote)
+                    .with_voter_node_id(header.get_requester_node_id())
+                    .build()
+                    .map_err(|err| {
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to build vote record: {}",
+                            err
+                        ))
+                    })?;
+
+                let mut votes = circuit_proposal.votes().to_vec();
                 votes.push(vote_record);
-                circuit_proposal.set_votes(RepeatedField::from_vec(votes));
+                circuit_proposal = circuit_proposal
+                    .builder()
+                    .with_votes(&votes)
+                    .build()
+                    .map_err(|err| {
+                        AdminSharedError::SplinterStateError(format!(
+                            "Unable to build circuit proposal: {}",
+                            err
+                        ))
+                    })?;
 
-                let expected_hash = sha256(&circuit_proposal)?;
+                let proto_circuit_proposal = circuit_proposal.into_proto();
+
+                let expected_hash = sha256(&proto_circuit_proposal)?;
                 self.pending_changes = Some(CircuitProposalContext {
-                    circuit_proposal: circuit_proposal.clone(),
+                    circuit_proposal: proto_circuit_proposal.clone(),
                     signer_public_key: header.get_requester().to_vec(),
                     action: CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE,
                 });
                 self.current_consensus_verifiers = verifiers;
-                Ok((expected_hash, circuit_proposal))
+                Ok((expected_hash, proto_circuit_proposal))
             }
             CircuitManagementPayload_Action::ACTION_UNSET => Err(
                 AdminSharedError::ValidationFailed("Action must be set".to_string()),
@@ -612,8 +615,8 @@ impl AdminServiceShared {
         }
     }
 
-    pub fn has_proposal(&self, circuit_id: &str) -> bool {
-        self.open_proposals.has_proposal(circuit_id)
+    pub fn has_proposal(&self, circuit_id: &str) -> Result<bool, AdminSharedError> {
+        Ok(self.admin_store.get_proposal(circuit_id)?.is_some())
     }
 
     /// Propose a new circuit
@@ -669,7 +672,7 @@ impl AdminServiceShared {
             })?;
 
         self.check_connected_peers_payload_vote(
-            proposal.get_circuit_proposal().get_members(),
+            &proposal.circuit().members(),
             payload,
             message_sender,
         )
@@ -708,23 +711,23 @@ impl AdminServiceShared {
 
     fn check_connected_peers_payload_vote(
         &mut self,
-        members: &[SplinterNode],
+        members: &[ProposedNode],
         payload: CircuitManagementPayload,
         message_sender: String,
     ) -> Result<(), ServiceError> {
         let mut missing_protocol_ids = vec![];
         let mut pending_members = vec![];
         for node in members {
-            if self.node_id() != node.get_node_id()
+            if self.node_id() != node.node_id()
                 && self
                     .service_protocols
-                    .get(&admin_service_id(node.get_node_id()))
+                    .get(&admin_service_id(node.node_id()))
                     .is_none()
             {
-                self.send_protocol_request(node.get_node_id())?;
-                missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                self.send_protocol_request(node.node_id())?;
+                missing_protocol_ids.push(admin_service_id(node.node_id()))
             }
-            pending_members.push(node.get_node_id().to_string());
+            pending_members.push(node.node_id().to_string());
         }
 
         if missing_protocol_ids.is_empty() {
@@ -1196,26 +1199,37 @@ impl AdminServiceShared {
     pub fn get_proposal(
         &self,
         circuit_id: &str,
-    ) -> Result<Option<CircuitProposal>, AdminSharedError> {
-        Ok(self.open_proposals.get_proposal(circuit_id)?)
+    ) -> Result<Option<StoreProposal>, AdminSharedError> {
+        Ok(self.admin_store.get_proposal(circuit_id)?)
     }
 
-    pub fn get_proposals(&self) -> BTreeMap<String, messages::CircuitProposal> {
-        self.open_proposals.get_proposals()
+    pub fn get_proposals(
+        &self,
+        filters: &[CircuitPredicate],
+    ) -> Result<Box<dyn ExactSizeIterator<Item = StoreProposal>>, AdminSharedError> {
+        self.admin_store
+            .list_proposals(filters)
+            .map_err(AdminSharedError::from)
     }
 
     pub fn remove_proposal(
         &mut self,
         circuit_id: &str,
-    ) -> Result<Option<CircuitProposal>, AdminSharedError> {
-        Ok(self.open_proposals.remove_proposal(circuit_id)?)
+    ) -> Result<Option<StoreProposal>, AdminSharedError> {
+        let proposal = self.admin_store.get_proposal(circuit_id)?;
+        self.admin_store.remove_proposal(circuit_id)?;
+        Ok(proposal)
     }
 
     pub fn add_proposal(
         &mut self,
         circuit_proposal: CircuitProposal,
-    ) -> Result<Option<CircuitProposal>, AdminSharedError> {
-        Ok(self.open_proposals.add_proposal(circuit_proposal)?)
+    ) -> Result<(), AdminSharedError> {
+        Ok(self
+            .admin_store
+            .add_proposal(StoreProposal::from_proto(circuit_proposal).map_err(|err| {
+                AdminSharedError::SplinterStateError(format!("Unable to add proposal: {}", err))
+            })?)?)
     }
 
     /// Add a circuit definition as an uninitialized circuit. If all members are ready, initialize
@@ -1360,14 +1374,18 @@ impl AdminServiceShared {
                 ))
             })?;
 
-        if self.has_proposal(circuit.get_circuit_id()) {
+        if self.has_proposal(circuit.get_circuit_id())? {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Ignoring duplicate create proposal of circuit {}",
                 circuit.get_circuit_id()
             )));
         }
 
-        if self.splinter_state.has_circuit(circuit.get_circuit_id())? {
+        if self
+            .admin_store
+            .get_circuit(circuit.get_circuit_id())?
+            .is_some()
+        {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Circuit with circuit id {} already exists",
                 circuit.get_circuit_id()
@@ -1568,7 +1586,7 @@ impl AdminServiceShared {
         &self,
         proposal_vote: &CircuitProposalVote,
         signer_public_key: &[u8],
-        circuit_proposal: &CircuitProposal,
+        circuit_proposal: &StoreProposal,
         node_id: &str,
     ) -> Result<(), AdminSharedError> {
         let circuit_hash = proposal_vote.get_circuit_hash();
@@ -1583,17 +1601,17 @@ impl AdminServiceShared {
             )));
         }
 
-        if circuit_proposal.get_requester_node_id() == node_id {
+        if circuit_proposal.requester_node_id() == node_id {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Received vote from requester node: {}",
-                to_hex(circuit_proposal.get_requester())
+                to_hex(circuit_proposal.requester())
             )));
         }
 
         let voted_nodes: Vec<String> = circuit_proposal
-            .get_votes()
+            .votes()
             .iter()
-            .map(|vote| vote.get_voter_node_id().to_string())
+            .map(|vote| vote.voter_node_id().to_string())
             .collect();
 
         if voted_nodes.iter().any(|node| *node == node_id) {
@@ -1614,7 +1632,7 @@ impl AdminServiceShared {
             })?;
 
         // validate hash of circuit
-        if circuit_proposal.get_circuit_hash() != circuit_hash {
+        if circuit_proposal.circuit_hash() != circuit_hash {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Hash of circuit does not match circuit proposal: {}",
                 proposal_vote.circuit_id
@@ -1742,169 +1760,22 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    pub fn get_circuits(&self) -> Result<BTreeMap<String, StateCircuit>, AdminSharedError> {
-        self.splinter_state
-            .circuits()
+    pub fn get_circuits(
+        &self,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = StoreCircuit>>, AdminSharedError> {
+        self.admin_store
+            .list_circuits(&Vec::new())
             .map_err(AdminSharedError::from)
     }
 
-    pub fn get_nodes(&self) -> Result<BTreeMap<String, StateNode>, AdminSharedError> {
-        self.splinter_state.nodes().map_err(AdminSharedError::from)
-    }
-
-    fn update_splinter_state(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
-        let members: Vec<StateNode> = circuit
-            .get_members()
-            .iter()
-            .map(|node| {
-                StateNode::new(
-                    node.get_node_id().to_string(),
-                    node.get_endpoints().to_vec(),
-                )
-            })
-            .collect();
-
-        let roster = circuit.get_roster().iter().map(|service| {
-            StateServiceDefinition::builder(
-                service.get_service_id().to_string(),
-                service.get_service_type().to_string(),
-            )
-            .with_allowed_nodes(service.get_allowed_nodes().to_vec())
-            .with_arguments(
-                service
-                    .get_arguments()
-                    .iter()
-                    .map(|argument| {
-                        (
-                            argument.get_key().to_string(),
-                            argument.get_value().to_string(),
-                        )
-                    })
-                    .collect::<BTreeMap<String, String>>(),
-            )
-            .build()
-        });
-
-        let auth = match circuit.get_authorization_type() {
-            Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
-            // This should never happen
-            Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE => {
-                return Err(AdminSharedError::CommitError(
-                    "Missing authorization type on circuit commit".to_string(),
-                ))
-            }
-        };
-
-        let persistence = match circuit.get_persistence() {
-            Circuit_PersistenceType::ANY_PERSISTENCE => PersistenceType::Any,
-            // This should never happen
-            Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE => {
-                return Err(AdminSharedError::CommitError(
-                    "Missing persistence type on circuit commit".to_string(),
-                ))
-            }
-        };
-
-        let durability = match circuit.get_durability() {
-            Circuit_DurabilityType::NO_DURABILITY => DurabilityType::NoDurability,
-            // This should never happen
-            Circuit_DurabilityType::UNSET_DURABILITY_TYPE => {
-                return Err(AdminSharedError::CommitError(
-                    "Missing durabilty type on circuit commit".to_string(),
-                ))
-            }
-        };
-
-        let routes = match circuit.get_routes() {
-            Circuit_RouteType::ANY_ROUTE => RouteType::Any,
-            // This should never happen
-            Circuit_RouteType::UNSET_ROUTE_TYPE => {
-                return Err(AdminSharedError::CommitError(
-                    "Missing route type on circuit commit".to_string(),
-                ))
-            }
-        };
-
-        let new_circuit = StateCircuit::builder()
-            .with_id(circuit.get_circuit_id().to_string())
-            .with_members(
-                members
-                    .iter()
-                    .map(|node| node.id().to_string())
-                    .collect::<Vec<String>>(),
-            )
-            .with_roster(roster.clone())
-            .with_auth(auth)
-            .with_persistence(persistence)
-            .with_durability(durability)
-            .with_routes(routes)
-            .with_circuit_management_type(circuit.get_circuit_management_type().to_string())
-            .build()
-            .map_err(|err| {
-                AdminSharedError::CommitError(format!("Unable build new circuit: {}", err))
-            })?;
-
-        for member in members {
-            self.splinter_state
-                .add_node(member.id().to_string(), member)?;
-        }
-
-        self.splinter_state
-            .add_circuit(new_circuit.id().to_string(), new_circuit)?;
-
-        for service in roster {
-            if service.allowed_nodes().contains(&self.node_id) {
-                continue;
-            }
-
-            let unique_id = ServiceId::new(
-                circuit.circuit_id.to_string(),
-                service.service_id().to_string(),
-            );
-
-            let allowed_node = &service.allowed_nodes()[0];
-            if let Some(member) = self.splinter_state.node(&allowed_node)? {
-                let service = Service::new(service.service_id().to_string(), None, member.clone());
-                self.splinter_state.add_service(unique_id, service)?;
-            } else {
-                return Err(AdminSharedError::CommitError(format!(
-                    "Unable to find allowed node {} when adding service {} to directory",
-                    allowed_node,
-                    service.service_id()
-                )));
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn add_services_to_directory(&mut self) -> Result<(), AdminSharedError> {
-        let circuits = self.splinter_state.circuits()?;
-        for (id, circuit) in circuits {
-            for service in circuit.roster() {
-                if service.allowed_nodes().contains(&self.node_id) {
-                    continue;
-                }
-                let unique_id = ServiceId::new(id.to_string(), service.service_id().to_string());
-
-                let allowed_node = &service.allowed_nodes()[0];
-                if let Some(member) = self.splinter_state.node(&allowed_node)? {
-                    // rebuild Node with id
-                    let node =
-                        StateNode::new(allowed_node.to_string(), member.endpoints().to_vec());
-                    let service = Service::new(service.service_id().to_string(), None, node);
-                    self.splinter_state.add_service(unique_id, service)?
-                } else {
-                    return Err(AdminSharedError::CommitError(format!(
-                        "Unable to find allowed node {} when adding service {} to directory",
-                        allowed_node,
-                        service.service_id()
-                    )));
-                }
-            }
-        }
-
-        Ok(())
+    pub fn get_nodes(&self) -> Result<BTreeMap<String, CircuitNode>, AdminSharedError> {
+        Ok(self
+            .admin_store
+            .list_nodes()
+            .map_err(AdminSharedError::from)?
+            .into_iter()
+            .map(|node| (node.node_id().into(), node))
+            .collect())
     }
 
     fn verify_signature(&self, payload: &CircuitManagementPayload) -> Result<bool, ServiceError> {
@@ -1924,7 +1795,7 @@ impl AdminServiceShared {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sqlite"))]
 mod tests {
     use super::*;
 
@@ -1933,10 +1804,16 @@ mod tests {
     use cylinder::{secp256k1::Secp256k1Context, Context};
     use protobuf::{Message, RepeatedField};
 
+    use diesel::{
+        r2d2::{ConnectionManager as DieselConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
+
     use crate::admin::service::AdminKeyVerifierError;
-    use crate::circuit::directory::CircuitDirectory;
+    use crate::admin::store::diesel::DieselAdminServiceStore;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::{Envelope, Mesh};
+    use crate::migrations::run_sqlite_migrations;
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
@@ -1946,12 +1823,13 @@ mod tests {
         TrustRequest,
     };
     use crate::protos::admin;
-    use crate::protos::admin::{SplinterNode, SplinterService};
+    use crate::protos::admin::{
+        CircuitProposalVote_Vote, CircuitProposal_VoteRecord, SplinterNode, SplinterService,
+    };
     use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::protos::prelude::*;
     use crate::service::{ServiceMessageContext, ServiceSendError};
-    use crate::storage::get_storage;
     use crate::transport::{
         inproc::InprocTransport, ConnectError, Connection, DisconnectError, RecvError, SendError,
         Transport,
@@ -1961,8 +1839,6 @@ mod tests {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
         25, 26, 27, 28, 29, 30, 31, 32,
     ];
-
-    const STATE_DIR: &str = "/var/lib/splinter/";
 
     /// Test that the CircuitManagementPayload is moved to the pending payloads when the peers are
     /// fully authorized.
@@ -1987,7 +1863,7 @@ mod tests {
             .expect("failed to create connection");
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
 
@@ -1997,12 +1873,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
 
@@ -2113,7 +1987,7 @@ mod tests {
             .expect("failed to create connection");
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
 
@@ -2123,12 +1997,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
 
@@ -2203,7 +2075,7 @@ mod tests {
     #[test]
     // test that a valid circuit is validated correctly
     fn test_validate_circuit_valid() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2215,12 +2087,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2236,7 +2106,7 @@ mod tests {
     // test that a circuit proposed with a key that is not permitted for the requesting node is
     // invalid
     fn test_validate_circuit_signer_not_permitted() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2248,12 +2118,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2268,7 +2136,7 @@ mod tests {
     // test that if a circuit is proposed by a signer key is not a valid public key the proposal is
     // invalid
     fn test_validate_circuit_signer_key_invalid() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2280,12 +2148,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2306,7 +2172,7 @@ mod tests {
     // test that if a circuit has a service in its roster with an allowed node that is not in
     // members an error is returned
     fn test_validate_circuit_bad_node() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2318,12 +2184,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2344,7 +2208,7 @@ mod tests {
     #[test]
     // test that if a circuit has a service in its roster with too many allowed nodes
     fn test_validate_circuit_too_many_allowed_nodes() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2356,12 +2220,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2385,7 +2247,7 @@ mod tests {
     #[test]
     // test that if a circuit has a service with "" for a service id an error is returned
     fn test_validate_circuit_empty_service_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2397,12 +2259,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2423,7 +2283,7 @@ mod tests {
     #[test]
     // test that if a circuit has a service with an invalid service id an error is returned
     fn test_validate_circuit_invalid_service_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2435,12 +2295,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2461,7 +2319,7 @@ mod tests {
     #[test]
     // test that if a circuit has a service with duplicate service ids an error is returned
     fn test_validate_circuit_duplicate_service_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2473,12 +2331,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2504,7 +2360,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have any services in its roster an error is returned
     fn test_validate_circuit_empty_roster() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2516,12 +2372,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2536,7 +2390,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have any nodes in its members an error is returned
     fn test_validate_circuit_empty_members() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2548,12 +2402,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2570,7 +2422,7 @@ mod tests {
     // test that if a circuit does not have the local node in the member list an error is
     // returned
     fn test_validate_circuit_missing_local_node() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2582,12 +2434,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2608,7 +2458,7 @@ mod tests {
     // test that if a circuit has a member with node id of "" an error is
     // returned
     fn test_validate_circuit_empty_node_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2620,12 +2470,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2653,7 +2501,7 @@ mod tests {
     #[test]
     // test that if a circuit has duplicate members an error is returned
     fn test_validate_circuit_duplicate_members() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2665,12 +2513,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2698,7 +2544,7 @@ mod tests {
     #[test]
     // test that if a circuit has an empty circuit id an error is returned
     fn test_validate_circuit_empty_circuit_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2710,12 +2556,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2731,7 +2575,7 @@ mod tests {
     #[test]
     // test that if a circuit has an invalid circuit id an error is returned
     fn test_validate_circuit_invalid_circuit_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2743,12 +2587,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2764,7 +2606,7 @@ mod tests {
     #[test]
     // test that if a circuit has a member with no endpoints an error is returned
     fn test_validate_circuit_no_endpoints() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2776,12 +2618,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2805,7 +2645,7 @@ mod tests {
     #[test]
     // test that if a circuit has a member with an empty endpoint an error is returned
     fn test_validate_circuit_empty_endpoint() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2817,12 +2657,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2846,7 +2684,7 @@ mod tests {
     #[test]
     // test that if a circuit has a member with a duplicate endpoint an error is returned
     fn test_validate_circuit_duplicate_endpoint() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2858,12 +2696,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2887,7 +2723,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have authorization set an error is returned
     fn test_validate_circuit_no_authorization() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2899,12 +2735,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2920,7 +2754,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have persistence set an error is returned
     fn test_validate_circuit_no_persitance() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2932,12 +2766,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2953,7 +2785,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have durability set an error is returned
     fn test_validate_circuit_unset_durability() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2965,12 +2797,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2986,7 +2816,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have route type set an error is returned
     fn test_validate_circuit_no_routes() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -2998,12 +2828,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3019,7 +2847,7 @@ mod tests {
     #[test]
     // test that if a circuit does not have circuit_management_type set an error is returned
     fn test_validate_circuit_no_management_type() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3031,12 +2859,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3052,7 +2878,7 @@ mod tests {
     #[test]
     // test that a valid circuit proposal vote comes back as valid
     fn test_validate_proposal_vote_valid() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3064,19 +2890,22 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
 
-        if let Err(err) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
+        if let Err(err) = admin_shared.validate_circuit_vote(
+            &vote,
+            PUB_KEY,
+            &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
+            "node_a",
+        ) {
             panic!("Should have been valid: {}", err);
         }
         shutdown(mesh, cm, pm);
@@ -3086,7 +2915,7 @@ mod tests {
     // test that if the vote is from a key that is not permitted for the voting node the vote is
     // invalid
     fn test_validate_proposal_vote_not_permitted() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3098,19 +2927,22 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
 
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
+        if let Ok(_) = admin_shared.validate_circuit_vote(
+            &vote,
+            PUB_KEY,
+            &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
+            "node_a",
+        ) {
             panic!("Should have been invalid because voting node is not registered");
         }
         shutdown(mesh, cm, pm);
@@ -3119,7 +2951,7 @@ mod tests {
     #[test]
     // test if the voter is the original requester node the vote is invalid
     fn test_validate_proposal_vote_requester() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3131,19 +2963,22 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
 
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_b") {
+        if let Ok(_) = admin_shared.validate_circuit_vote(
+            &vote,
+            PUB_KEY,
+            &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
+            "node_b",
+        ) {
             panic!("Should have been invalid because voter is the requester");
         }
         shutdown(mesh, cm, pm);
@@ -3152,7 +2987,7 @@ mod tests {
     #[test]
     // test if a voter has already voted on a proposal the new vote is invalid
     fn test_validate_proposal_vote_duplicate_vote() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3164,12 +2999,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3183,7 +3016,12 @@ mod tests {
 
         proposal.set_votes(RepeatedField::from_vec(vec![vote_record]));
 
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
+        if let Ok(_) = admin_shared.validate_circuit_vote(
+            &vote,
+            PUB_KEY,
+            &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
+            "node_a",
+        ) {
             panic!("Should have been invalid because node as already submited a vote");
         }
         shutdown(mesh, cm, pm);
@@ -3193,7 +3031,7 @@ mod tests {
     // test that if the circuit hash in the circuit proposal does not match the circuit hash on
     // the vote, the vote is invalid
     fn test_validate_proposal_vote_circuit_hash_mismatch() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3205,12 +3043,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3219,7 +3055,12 @@ mod tests {
 
         proposal.set_circuit_hash("bad_hash".to_string());
 
-        if let Ok(_) = admin_shared.validate_circuit_vote(&vote, PUB_KEY, &proposal, "node_a") {
+        if let Ok(_) = admin_shared.validate_circuit_vote(
+            &vote,
+            PUB_KEY,
+            &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
+            "node_a",
+        ) {
             panic!("Should have been invalid because the circuit hash does not match");
         }
         shutdown(mesh, cm, pm);
@@ -3229,7 +3070,7 @@ mod tests {
     // test that the validate_circuit_management_payload method returns an error in case the
     // signature is empty.
     fn test_validate_circuit_management_payload_signature() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3244,12 +3085,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
 
@@ -3284,7 +3123,7 @@ mod tests {
     // test that the validate_circuit_management_payload method returns an error in case the
     // header is empty.
     fn test_validate_circuit_management_payload_header() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3299,12 +3138,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
 
@@ -3340,7 +3177,7 @@ mod tests {
     // test that the validate_circuit_management_payload method returns an error in case the header
     // requester field is empty.
     fn test_validate_circuit_management_header_requester() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3355,12 +3192,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
 
@@ -3398,7 +3233,7 @@ mod tests {
     // test that the CircuitManagementPayload returns an error in case the header requester_node_id
     // field is empty.
     fn test_validate_circuit_management_header_requester_node_id() {
-        let state = setup_splinter_state();
+        let store = setup_admin_service_store();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3413,12 +3248,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
         )
         .unwrap();
 
@@ -3508,11 +3341,17 @@ mod tests {
         circuit_proposal
     }
 
-    fn setup_splinter_state() -> SplinterState {
-        let mut storage = get_storage("memory", CircuitDirectory::new).unwrap();
-        let circuit_directory = storage.write().clone();
+    fn setup_admin_service_store() -> Box<dyn AdminServiceStore> {
+        let connection_manager = DieselConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
 
-        SplinterState::new("memory".to_string(), circuit_directory)
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        Box::new(DieselAdminServiceStore::new(pool))
     }
 
     fn setup_peer_connector(

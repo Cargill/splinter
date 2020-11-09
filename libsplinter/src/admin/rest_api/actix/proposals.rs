@@ -17,7 +17,8 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 use std::collections::HashMap;
 
-use crate::admin::service::proposal_store::{ProposalFilter, ProposalStore};
+use crate::admin::service::proposal_store::ProposalStore;
+use crate::admin::store::CircuitPredicate;
 use crate::protocol;
 use crate::rest_api::paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET};
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
@@ -121,10 +122,10 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
     web::block(move || {
         let mut filters = vec![];
         if let Some(management_type) = management_type_filter {
-            filters.push(ProposalFilter::WithManagementType(management_type));
+            filters.push(CircuitPredicate::ManagementTypeEq(management_type));
         }
         if let Some(member) = member_filter {
-            filters.push(ProposalFilter::WithMember(member));
+            filters.push(CircuitPredicate::MembersInclude(vec![member]));
         }
 
         let proposals = proposal_store
@@ -172,7 +173,11 @@ mod tests {
             AuthorizationType, CircuitProposal, CreateCircuit, DurabilityType, PersistenceType,
             ProposalType, RouteType, SplinterNode,
         },
-        service::proposal_store::{ProposalFilter, ProposalIter, ProposalStoreError},
+        service::proposal_store::{ProposalIter, ProposalStoreError},
+        store::{
+            self, CircuitPredicate, CircuitProposal as StoreProposal, CircuitProposalBuilder,
+            ProposedCircuitBuilder, ProposedNodeBuilder,
+        },
     };
     use crate::rest_api::{
         paging::Paging, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
@@ -197,9 +202,9 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&get_proposal_1()),
-                ProposalResponse::from(&get_proposal_2()),
-                ProposalResponse::from(&get_proposal_3()),
+                ProposalResponse::from(&CircuitProposal::from(get_proposal_1())),
+                ProposalResponse::from(&CircuitProposal::from(get_proposal_2())),
+                ProposalResponse::from(&CircuitProposal::from(get_proposal_3())),
             ])
             .expect("failed to convert expected data"),
         );
@@ -498,21 +503,17 @@ mod tests {
     impl ProposalStore for MockProposalStore {
         fn proposals(
             &self,
-            filters: Vec<ProposalFilter>,
+            filters: Vec<CircuitPredicate>,
         ) -> Result<ProposalIter, ProposalStoreError> {
-            let proposals = vec![get_proposal_1(), get_proposal_2(), get_proposal_3()];
+            let mut proposals = get_proposal_list();
 
-            let total = proposals
-                .iter()
-                .filter(|proposal| filters.iter().all(|filter| filter.matches(&proposal)))
-                .count();
+            proposals.retain(|proposal| {
+                filters
+                    .iter()
+                    .all(|predicate| predicate.apply_to_proposals(proposal))
+            });
 
-            let iter =
-                Box::new(proposals.into_iter().filter(move |proposal| {
-                    filters.iter().all(|filter| filter.matches(&proposal))
-                }));
-
-            Ok(ProposalIter::new(iter, total))
+            Ok(ProposalIter::new(Box::new(proposals.into_iter())))
         }
 
         fn proposal(
@@ -523,13 +524,92 @@ mod tests {
         }
     }
 
+    fn get_proposal_list() -> Vec<StoreProposal> {
+        vec![
+            CircuitProposalBuilder::new()
+                .with_proposal_type(&store::ProposalType::Create)
+                .with_circuit_id("abcDE-00000")
+                .with_circuit_hash("012345")
+                .with_circuit(
+                    &ProposedCircuitBuilder::new()
+                        .with_circuit_id("abcDE-00000")
+                        .with_roster(&[])
+                        .with_members(&[ProposedNodeBuilder::new()
+                            .with_node_id("node_id")
+                            .with_endpoints(&["".into()])
+                            .build()
+                            .expect("Unable to build circuit node")])
+                        .with_authorization_type(&store::AuthorizationType::Trust)
+                        .with_persistence(&store::PersistenceType::Any)
+                        .with_durability(&store::DurabilityType::NoDurability)
+                        .with_routes(&store::RouteType::Any)
+                        .with_circuit_management_type("mgmt_type_1")
+                        .with_comments("mock circuit 1")
+                        .build()
+                        .expect("Unable to create proposed circuit"),
+                )
+                .with_requester(&[])
+                .with_requester_node_id("node_id")
+                .build()
+                .expect("unable to build proposal"),
+            CircuitProposalBuilder::new()
+                .with_proposal_type(&store::ProposalType::Create)
+                .with_circuit_id("abcDE-00001")
+                .with_circuit_hash("abcdef")
+                .with_circuit(
+                    &ProposedCircuitBuilder::new()
+                        .with_circuit_id("abcDE-00001")
+                        .with_roster(&[])
+                        .with_members(&[])
+                        .with_authorization_type(&store::AuthorizationType::Trust)
+                        .with_persistence(&store::PersistenceType::Any)
+                        .with_durability(&store::DurabilityType::NoDurability)
+                        .with_routes(&store::RouteType::Any)
+                        .with_circuit_management_type("mgmt_type_2")
+                        .with_comments("mock circuit 2")
+                        .build()
+                        .expect("Unable to create proposed circuit"),
+                )
+                .with_requester(&[])
+                .with_requester_node_id("node_id")
+                .build()
+                .expect("unable to build proposal"),
+            CircuitProposalBuilder::new()
+                .with_proposal_type(&store::ProposalType::Create)
+                .with_circuit_id("abcDE-00002")
+                .with_circuit_hash("678910")
+                .with_circuit(
+                    &ProposedCircuitBuilder::new()
+                        .with_circuit_id("abcDE-00002")
+                        .with_roster(&[])
+                        .with_members(&[ProposedNodeBuilder::new()
+                            .with_node_id("node_id")
+                            .with_endpoints(&["".into()])
+                            .build()
+                            .expect("Unable to build circuit node")])
+                        .with_authorization_type(&store::AuthorizationType::Trust)
+                        .with_persistence(&store::PersistenceType::Any)
+                        .with_durability(&store::DurabilityType::NoDurability)
+                        .with_routes(&store::RouteType::Any)
+                        .with_circuit_management_type("mgmt_type_2")
+                        .with_comments("mock circuit 3")
+                        .build()
+                        .expect("Unable to create proposed circuit"),
+                )
+                .with_requester(&[])
+                .with_requester_node_id("node_id")
+                .build()
+                .expect("unable to build proposal"),
+        ]
+    }
+
     fn get_proposal_1() -> CircuitProposal {
         CircuitProposal {
             proposal_type: ProposalType::Create,
-            circuit_id: "circuit1".into(),
+            circuit_id: "abcDE-00000".into(),
             circuit_hash: "012345".into(),
             circuit: CreateCircuit {
-                circuit_id: "circuit1".into(),
+                circuit_id: "abcDE-00000".into(),
                 roster: vec![],
                 members: vec![SplinterNode {
                     node_id: "node_id".into(),
@@ -552,10 +632,10 @@ mod tests {
     fn get_proposal_2() -> CircuitProposal {
         CircuitProposal {
             proposal_type: ProposalType::Create,
-            circuit_id: "circuit2".into(),
+            circuit_id: "abcDE-00001".into(),
             circuit_hash: "abcdef".into(),
             circuit: CreateCircuit {
-                circuit_id: "circuit2".into(),
+                circuit_id: "abcDE-00001".into(),
                 roster: vec![],
                 members: vec![],
                 authorization_type: AuthorizationType::Trust,
@@ -575,10 +655,10 @@ mod tests {
     fn get_proposal_3() -> CircuitProposal {
         CircuitProposal {
             proposal_type: ProposalType::Create,
-            circuit_id: "circuit3".into(),
+            circuit_id: "abcDE-00002".into(),
             circuit_hash: "678910".into(),
             circuit: CreateCircuit {
-                circuit_id: "circuit3".into(),
+                circuit_id: "abcDE-00002".into(),
                 roster: vec![],
                 members: vec![SplinterNode {
                     node_id: "node_id".into(),

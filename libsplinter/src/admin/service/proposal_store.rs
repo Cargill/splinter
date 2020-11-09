@@ -14,40 +14,16 @@
 
 use std::sync::{Arc, Mutex};
 
+use crate::admin::store::{CircuitPredicate, CircuitProposal as StoreProposal};
+
 use super::messages::CircuitProposal;
 use super::shared::AdminServiceShared;
-
-/// A filter that matches on aspects of a proposal.
-///
-/// Each variant applies to a different field on the proposal or its circuit defition.
-#[derive(Debug)]
-pub enum ProposalFilter {
-    /// Matches any proposals whose circuits have the given management type.
-    WithManagementType(String),
-    /// Matches any proposals whose circuits have the given node as a member.
-    WithMember(String),
-}
-
-impl ProposalFilter {
-    /// Returns true if the given proposal matches the filter criteria, false otherwise.
-    pub fn matches(&self, proposal: &CircuitProposal) -> bool {
-        match self {
-            ProposalFilter::WithManagementType(ref management_type) => {
-                &proposal.circuit.circuit_management_type == management_type
-            }
-            ProposalFilter::WithMember(ref member_id) => proposal
-                .circuit
-                .members
-                .iter()
-                .any(|member| &member.node_id == member_id),
-        }
-    }
-}
 
 pub trait ProposalStore: Send + Sync + Clone {
     /// Return an iterator over the proposals in this store. Proposal filters may optionally be
     /// provided.
-    fn proposals(&self, filters: Vec<ProposalFilter>) -> Result<ProposalIter, ProposalStoreError>;
+    fn proposals(&self, filters: Vec<CircuitPredicate>)
+        -> Result<ProposalIter, ProposalStoreError>;
 
     fn proposal(&self, circuit_id: &str) -> Result<Option<CircuitProposal>, ProposalStoreError>;
 }
@@ -108,27 +84,20 @@ impl AdminServiceProposals {
 }
 
 impl ProposalStore for AdminServiceProposals {
-    fn proposals(&self, filters: Vec<ProposalFilter>) -> Result<ProposalIter, ProposalStoreError> {
+    fn proposals(
+        &self,
+        filters: Vec<CircuitPredicate>,
+    ) -> Result<ProposalIter, ProposalStoreError> {
         let proposals = self
             .shared
             .lock()
             .map_err(|_| ProposalStoreError::new("Admin shared lock was lock poisoned"))?
-            .get_proposals();
+            .get_proposals(&filters)
+            .map_err(|err| {
+                ProposalStoreError::from_source("Unable to get proposals", Box::new(err))
+            })?;
 
-        let total = proposals
-            .iter()
-            .filter(|(_, proposal)| filters.iter().all(|filter| filter.matches(proposal)))
-            .count();
-
-        let iter = Box::new(proposals.into_iter().filter_map(move |(_, proposal)| {
-            if filters.iter().all(|filter| filter.matches(&proposal)) {
-                Some(proposal)
-            } else {
-                None
-            }
-        }));
-
-        Ok(ProposalIter::new(iter, total))
+        Ok(ProposalIter::new(proposals))
     }
 
     fn proposal(&self, circuit_id: &str) -> Result<Option<CircuitProposal>, ProposalStoreError> {
@@ -139,8 +108,8 @@ impl ProposalStore for AdminServiceProposals {
             .map_err(|err| {
                 ProposalStoreError::from_source("Unable to get proposal", Box::new(err))
             })?
-            .map(|proto| {
-                CircuitProposal::from_proto(proto).map_err(|err| {
+            .map(|proposal| {
+                CircuitProposal::from_proto(proposal.into_proto()).map_err(|err| {
                     ProposalStoreError::from_source(
                         "Unable to convert proposal protobuf to native",
                         Box::new(err),
@@ -153,20 +122,16 @@ impl ProposalStore for AdminServiceProposals {
 
 /// An iterator over CircuitProposals, with a well-known count of values.
 pub struct ProposalIter {
-    inner: Box<dyn Iterator<Item = CircuitProposal>>,
-    size: usize,
+    inner: Box<dyn ExactSizeIterator<Item = StoreProposal>>,
 }
 
 impl ProposalIter {
-    pub fn new(iter: Box<dyn Iterator<Item = CircuitProposal>>, count: usize) -> Self {
-        Self {
-            inner: iter,
-            size: count,
-        }
+    pub fn new(iter: Box<dyn ExactSizeIterator<Item = StoreProposal>>) -> Self {
+        Self { inner: iter }
     }
 
     pub fn total(&self) -> usize {
-        self.size
+        self.inner.len()
     }
 }
 
@@ -174,10 +139,13 @@ impl Iterator for ProposalIter {
     type Item = CircuitProposal;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        match self.inner.next() {
+            Some(circuit_proposal) => Some(CircuitProposal::from(circuit_proposal)),
+            None => None,
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.size, Some(self.size))
+        (self.inner.len(), Some(self.inner.len()))
     }
 }

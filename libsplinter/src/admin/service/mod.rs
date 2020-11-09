@@ -16,7 +16,6 @@ mod consensus;
 pub(crate) mod error;
 mod mailbox;
 pub(crate) mod messages;
-pub(super) mod open_proposals;
 pub(super) mod proposal_store;
 mod shared;
 
@@ -31,7 +30,7 @@ use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
-use crate::circuit::SplinterState;
+use crate::admin::store::AdminServiceStore;
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
@@ -164,12 +163,10 @@ impl AdminService {
             Box<dyn ServiceArgValidator + Send>,
         >,
         peer_connector: PeerManagerConnector,
-        splinter_state: SplinterState,
+        admin_store: Box<dyn AdminServiceStore>,
         signature_verifier: Box<dyn SignatureVerifier>,
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
-        storage_type: &str,
-        state_dir: &str,
         // The coordinator timeout for the two-phase commit consensus engine; if `None`, the
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
@@ -191,12 +188,10 @@ impl AdminService {
                 #[cfg(feature = "service-arg-validation")]
                 service_arg_validators,
                 peer_connector.clone(),
-                splinter_state,
+                admin_store,
                 signature_verifier,
                 key_verifier,
                 key_permission_manager,
-                storage_type,
-                state_dir,
             )?)),
             orchestrator,
             coordinator_timeout,
@@ -275,9 +270,9 @@ impl AdminService {
         })?;
         let mut peer_refs = vec![];
         // start all services of the supported types
-        for (circuit_name, circuit) in circuits.iter() {
+        for circuit in circuits {
             // restart all peer in the circuit
-            for member in circuit.members() {
+            for member in circuit.members().iter() {
                 if member != &self.node_id {
                     if let Some(node) = nodes.get(member) {
                         let peer_ref = self
@@ -300,7 +295,7 @@ impl AdminService {
                 .roster()
                 .iter()
                 .filter(|service| {
-                    service.allowed_nodes().contains(&self.node_id)
+                    service.node_id() == self.node_id
                         && orchestrator
                             .supported_service_types()
                             .contains(&service.service_type().to_string())
@@ -310,7 +305,7 @@ impl AdminService {
             // Start all services
             for service in services {
                 let service_definition = ServiceDefinition {
-                    circuit: circuit_name.into(),
+                    circuit: circuit.circuit_id().into(),
                     service_id: service.service_id().into(),
                     service_type: service.service_type().into(),
                 };
@@ -327,7 +322,7 @@ impl AdminService {
                     error!(
                         "Unable to start service {} on circuit {}: {}",
                         service.service_id(),
-                        circuit_name,
+                        circuit.circuit_id(),
                         err
                     );
                 }
@@ -340,20 +335,21 @@ impl AdminService {
             .map_err(|_| {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
-            .get_proposals();
+            .get_proposals(&[])
+            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
 
-        for (_, proposal) in proposals.iter() {
-            // restart all peer in the circuit
-            for member in proposal.circuit.members.iter() {
-                if member.node_id != self.node_id {
+        for proposal in proposals {
+            // connect to all peers in the circuit proposal
+            for member in proposal.circuit().members().iter() {
+                if member.node_id() != self.node_id {
                     let peer_ref = self
                         .peer_connector
-                        .add_peer_ref(member.node_id.to_string(), member.endpoints.to_vec());
+                        .add_peer_ref(member.node_id().to_string(), member.endpoints().to_vec());
 
                     if let Ok(peer_ref) = peer_ref {
                         peer_refs.push(peer_ref);
                     } else {
-                        info!("Unable to peer with {} at this time", member.node_id);
+                        info!("Unable to peer with {} at this time", member.node_id());
                     }
                 }
             }
@@ -418,16 +414,6 @@ impl Service for AdminService {
             .set_proposal_sender(Some(proposal_sender));
 
         self.re_initialize_circuits()?;
-
-        self.admin_service_shared
-            .lock()
-            .map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?
-            .add_services_to_directory()
-            .map_err(|err| {
-                ServiceStartError::Internal(format!("Unable to add services to directory: {}", err))
-            })?;
 
         self.admin_service_shared
             .lock()
@@ -738,7 +724,7 @@ fn supported_protocol_version(min: u32, max: u32) -> u32 {
     ADMIN_PROTOCOL_VERSION
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sqlite"))]
 mod tests {
     use super::*;
 
@@ -746,20 +732,22 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use cylinder::{secp256k1::Secp256k1Context, Context};
+    use diesel::{
+        r2d2::{ConnectionManager as DieselConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
 
-    use crate::circuit::{directory::CircuitDirectory, SplinterState};
+    use crate::admin::store::diesel::DieselAdminServiceStore;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
+    use crate::migrations::run_sqlite_migrations;
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
     use crate::peer::PeerManager;
     use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
-    use crate::storage::get_storage;
     use crate::transport::{inproc::InprocTransport, Transport};
-
-    const STATE_DIR: &str = "/var/lib/splinter/";
 
     /// Test that a circuit creation creates the correct connections and sends the appropriate
     /// messages.
@@ -811,10 +799,15 @@ mod tests {
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
 
-        let mut storage = get_storage("memory", CircuitDirectory::new).unwrap();
+        let connection_manager = DieselConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
 
-        let circuit_directory = storage.write().clone();
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
         let orchestrator_connection = orchestrator_transport
             .connect("inproc://orchestator")
             .expect("failed to create connection");
@@ -832,12 +825,10 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            state,
+            Box::new(DieselAdminServiceStore::new(pool)),
             signature_verifier,
             Box::new(MockAdminKeyVerifier),
             Box::new(AllowAllKeyPermissionManager),
-            "memory",
-            STATE_DIR,
             None,
         )
         .expect("Service should have been created correctly");
