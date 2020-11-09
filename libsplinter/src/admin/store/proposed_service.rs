@@ -14,6 +14,7 @@
 
 //! Structs for building proposed services
 use crate::admin::messages::is_valid_service_id;
+use crate::protos::admin;
 
 use super::error::BuilderError;
 
@@ -45,6 +46,43 @@ impl ProposedService {
     /// Returns the list of key/value arugments for the  proposed service
     pub fn arguments(&self) -> &[(String, String)] {
         &self.arguments
+    }
+
+    pub fn into_proto(self) -> admin::SplinterService {
+        let mut proto = admin::SplinterService::new();
+        proto.set_service_id(self.service_id);
+        proto.set_service_type(self.service_type);
+        proto.set_allowed_nodes(protobuf::RepeatedField::from_vec(vec![self.node_id]));
+        proto.set_arguments(protobuf::RepeatedField::from_vec(
+            self.arguments
+                .into_iter()
+                .map(|(k, v)| {
+                    let mut argument = admin::SplinterService_Argument::new();
+                    argument.set_key(k);
+                    argument.set_value(v);
+                    argument
+                })
+                .collect(),
+        ));
+
+        proto
+    }
+
+    pub fn from_proto(mut proto: admin::SplinterService) -> Result<Self, BuilderError> {
+        Ok(Self {
+            service_id: proto.take_service_id(),
+            service_type: proto.take_service_type(),
+            node_id: proto
+                .take_allowed_nodes()
+                .get(0)
+                .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?
+                .to_string(),
+            arguments: proto
+                .take_arguments()
+                .into_iter()
+                .map(|mut argument| (argument.take_key(), argument.take_value()))
+                .collect(),
+        })
     }
 }
 

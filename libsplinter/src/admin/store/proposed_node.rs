@@ -14,6 +14,8 @@
 
 //! Structs for building proposed nodes
 
+use crate::protos::admin;
+
 use super::error::BuilderError;
 
 /// Native representation of a node in a proposed circuit
@@ -32,6 +34,22 @@ impl ProposedNode {
     /// Returns the list of endpoints that belong to the proposed node
     pub fn endpoints(&self) -> &[String] {
         &self.endpoints
+    }
+
+    pub fn into_proto(self) -> admin::SplinterNode {
+        let mut proto = admin::SplinterNode::new();
+
+        proto.set_node_id(self.node_id);
+        proto.set_endpoints(self.endpoints.into());
+
+        proto
+    }
+
+    pub fn from_proto(mut proto: admin::SplinterNode) -> Self {
+        Self {
+            node_id: proto.take_node_id(),
+            endpoints: proto.take_endpoints().into(),
+        }
     }
 }
 

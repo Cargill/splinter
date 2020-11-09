@@ -15,6 +15,7 @@
 //! Structs for building proposed circuits
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::protos::admin;
 
 use super::error::BuilderError;
 use super::{
@@ -84,6 +85,103 @@ impl ProposedCircuit {
     /// Returns the mangement type of the circuit
     pub fn comments(&self) -> &str {
         &self.comments
+    }
+
+    pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, BuilderError> {
+        let authorization_type = match proto.get_authorization_type() {
+            admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
+            admin::Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE => {
+                return Err(BuilderError::MissingField("authorization type".to_string()));
+            }
+        };
+
+        let persistence = match proto.get_persistence() {
+            admin::Circuit_PersistenceType::ANY_PERSISTENCE => PersistenceType::Any,
+            admin::Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE => {
+                return Err(BuilderError::MissingField("persistence type".to_string()));
+            }
+        };
+
+        let durability = match proto.get_durability() {
+            admin::Circuit_DurabilityType::NO_DURABILITY => DurabilityType::NoDurability,
+            admin::Circuit_DurabilityType::UNSET_DURABILITY_TYPE => {
+                return Err(BuilderError::MissingField("durability type".to_string()));
+            }
+        };
+
+        let routes = match proto.get_routes() {
+            admin::Circuit_RouteType::ANY_ROUTE => RouteType::Any,
+            admin::Circuit_RouteType::UNSET_ROUTE_TYPE => {
+                return Err(BuilderError::MissingField("route type".to_string()));
+            }
+        };
+
+        Ok(Self {
+            circuit_id: proto.take_circuit_id(),
+            roster: proto
+                .take_roster()
+                .into_iter()
+                .map(ProposedService::from_proto)
+                .collect::<Result<Vec<ProposedService>, BuilderError>>()?,
+            members: proto
+                .take_members()
+                .into_iter()
+                .map(ProposedNode::from_proto)
+                .collect::<Vec<ProposedNode>>(),
+            authorization_type,
+            persistence,
+            durability,
+            routes,
+            circuit_management_type: proto.take_circuit_management_type(),
+            application_metadata: proto.take_application_metadata(),
+            comments: proto.take_comments(),
+        })
+    }
+
+    pub fn into_proto(self) -> admin::Circuit {
+        let mut circuit = admin::Circuit::new();
+
+        circuit.set_circuit_id(self.circuit_id);
+        circuit.set_roster(protobuf::RepeatedField::from_vec(
+            self.roster
+                .into_iter()
+                .map(ProposedService::into_proto)
+                .collect(),
+        ));
+        circuit.set_members(protobuf::RepeatedField::from_vec(
+            self.members
+                .into_iter()
+                .map(ProposedNode::into_proto)
+                .collect(),
+        ));
+
+        circuit.set_circuit_management_type(self.circuit_management_type);
+        circuit.set_application_metadata(self.application_metadata);
+        circuit.set_comments(self.comments);
+
+        match self.authorization_type {
+            AuthorizationType::Trust => {
+                circuit
+                    .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
+            }
+        };
+
+        match self.persistence {
+            PersistenceType::Any => {
+                circuit.set_persistence(admin::Circuit_PersistenceType::ANY_PERSISTENCE);
+            }
+        };
+        match self.durability {
+            DurabilityType::NoDurability => {
+                circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
+            }
+        };
+
+        match self.routes {
+            RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
+        };
+
+        circuit
     }
 }
 
