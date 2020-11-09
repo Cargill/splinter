@@ -29,6 +29,7 @@ impl IdentityProvider for GithubUserIdentityProvider {
     fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError> {
         let token = match authorization {
             Authorization::Bearer(BearerToken::OAuth2(token)) => token,
+            _ => return Err(IdentityProviderError::UnsupportedAuth),
         };
 
         let response = Client::builder()
