@@ -189,6 +189,21 @@ impl Circuit {
             members,
         }
     }
+
+    /// Returns the ID of the circuit
+    pub fn circuit_id(&self) -> &str {
+        &self.circuit_id
+    }
+
+    /// Returns the list of service that are in the circuit
+    pub fn roster(&self) -> &[Service] {
+        &self.roster
+    }
+
+    /// Returns the list of node IDs that are in the circuit
+    pub fn members(&self) -> &[String] {
+        &self.members
+    }
 }
 
 /// The routing table representation of a node
