@@ -17,6 +17,8 @@ use std::fmt;
 
 use actix_web::Error as ActixError;
 
+use crate::error::InvalidStateError;
+
 /// Error module for `rest_api`.
 #[derive(Debug)]
 pub enum RestApiServerError {
@@ -24,6 +26,7 @@ pub enum RestApiServerError {
     StartUpError(String),
     MissingField(String),
     StdError(std::io::Error),
+    InvalidStateError(InvalidStateError),
 }
 
 impl From<std::io::Error> for RestApiServerError {
@@ -39,6 +42,7 @@ impl Error for RestApiServerError {
             RestApiServerError::StartUpError(_) => None,
             RestApiServerError::StdError(err) => Some(err),
             RestApiServerError::MissingField(_) => None,
+            RestApiServerError::InvalidStateError(err) => Some(err),
         }
     }
 }
@@ -52,6 +56,7 @@ impl fmt::Display for RestApiServerError {
             RestApiServerError::MissingField(field) => {
                 write!(f, "Missing required field: {}", field)
             }
+            RestApiServerError::InvalidStateError(e) => write!(f, "{}", e),
         }
     }
 }

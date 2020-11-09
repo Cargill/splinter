@@ -73,11 +73,20 @@ use std::thread;
 
 #[cfg(feature = "oauth")]
 use crate::auth::oauth::{
-    rest_api::{OAuthResourceProvider, SaveTokensOperation},
+    rest_api::{OAuthResourceProvider, SaveTokensOperation, SaveTokensToNull},
     OAuthClient,
 };
+#[cfg(feature = "oauth-github")]
+use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::auth::rest_api::{actix::Authorization, identity::IdentityProvider};
+#[cfg(feature = "biome-oauth")]
+use crate::biome::{
+    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveTokensOperation, OAuthUserStore,
+    UserStore,
+};
+#[cfg(feature = "auth")]
+use crate::error::InvalidStateError;
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -465,13 +474,6 @@ impl RequestGuard for ProtocolVersionRangeGuard {
     }
 }
 
-#[cfg(feature = "oauth")]
-#[derive(Clone)]
-struct OAuthConfiguration {
-    oauth_client: OAuthClient,
-    save_tokens_operation: Box<dyn SaveTokensOperation>,
-}
-
 /// `RestApi` is used to create an instance of a restful web server.
 #[derive(Clone)]
 pub struct RestApi {
@@ -481,8 +483,6 @@ pub struct RestApi {
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     identity_providers: Vec<Box<dyn IdentityProvider>>,
-    #[cfg(feature = "oauth")]
-    oauth_configuration: Option<OAuthConfiguration>,
 }
 
 impl RestApi {
@@ -497,10 +497,6 @@ impl RestApi {
         let whitelist = self.whitelist.to_owned();
         #[cfg(feature = "auth")]
         let authorization = Authorization::new(self.identity_providers.to_owned());
-        #[cfg(feature = "oauth")]
-        let oauth_resource_provider = self.oauth_configuration.to_owned().map(|config| {
-            OAuthResourceProvider::new(config.oauth_client, config.save_tokens_operation)
-        });
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -517,13 +513,6 @@ impl RestApi {
                     let app = app.wrap(authorization.clone());
 
                     let mut app = app.wrap(middleware::Logger::default());
-
-                    #[cfg(feature = "oauth")]
-                    if let Some(resource_provider) = &oauth_resource_provider {
-                        for resource in resource_provider.resources() {
-                            app = app.service(resource.into_route());
-                        }
-                    }
 
                     for resource in resources.clone() {
                         app = app.service(resource.into_route());
@@ -685,11 +674,7 @@ pub struct RestApiBuilder {
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
-    identity_providers: Option<Vec<Box<dyn IdentityProvider>>>,
-    #[cfg(feature = "oauth")]
-    oauth_client: Option<OAuthClient>,
-    #[cfg(feature = "oauth")]
-    save_tokens_operation: Option<Box<dyn SaveTokensOperation>>,
+    auth_configs: Vec<AuthConfig>,
 }
 
 impl Default for RestApiBuilder {
@@ -700,11 +685,7 @@ impl Default for RestApiBuilder {
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
             #[cfg(feature = "auth")]
-            identity_providers: None,
-            #[cfg(feature = "oauth")]
-            oauth_client: None,
-            #[cfg(feature = "oauth")]
-            save_tokens_operation: None,
+            auth_configs: Vec::new(),
         }
     }
 }
@@ -736,85 +717,111 @@ impl RestApiBuilder {
     }
 
     #[cfg(feature = "auth")]
-    pub fn with_identity_providers(
-        mut self,
-        identity_providers: Vec<Box<dyn IdentityProvider>>,
-    ) -> Self {
-        self.identity_providers = Some(identity_providers);
+    pub fn with_auth_configs(mut self, auth_configs: Vec<AuthConfig>) -> Self {
+        self.auth_configs = auth_configs;
         self
     }
 
-    #[cfg(feature = "oauth")]
-    pub fn with_oauth_client(mut self, oauth_client: OAuthClient) -> Self {
-        self.oauth_client = Some(oauth_client);
-        self
-    }
-
-    #[cfg(feature = "oauth")]
-    pub fn with_oauth_save_tokens_operation(
-        mut self,
-        save_token_op: Box<dyn SaveTokensOperation>,
-    ) -> Self {
-        self.save_tokens_operation = Some(save_token_op);
-        self
-    }
-
-    pub fn build(self) -> Result<RestApi, RestApiServerError> {
+    // Allowing unused_mut because self must be mutable if feature `auth` is enabled
+    #[allow(unused_mut)]
+    pub fn build(mut self) -> Result<RestApi, RestApiServerError> {
         let bind = self
             .bind
             .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
 
         #[cfg(feature = "auth")]
-        let identity_providers = self
-            .identity_providers
-            .ok_or_else(|| RestApiServerError::MissingField("identity_providers".to_string()))?;
+        let identity_providers = {
+            if self.auth_configs.is_empty() {
+                return Err(RestApiServerError::InvalidStateError(
+                    InvalidStateError::with_message(
+                        "REST API auth is enabled, but no auth has been configured".to_string(),
+                    ),
+                ));
+            }
 
-        #[cfg(feature = "oauth")]
-        let mut oauth_configuration = None;
-
-        #[cfg(feature = "auth")]
-        {
-            let mut authentication_configured = false;
-
+            let mut identity_providers = Vec::<Box<dyn IdentityProvider>>::new();
             #[cfg(feature = "oauth")]
-            match (self.oauth_client, self.save_tokens_operation) {
-                (Some(oauth_client), Some(save_tokens_operation)) => {
-                    authentication_configured = true;
-                    oauth_configuration = Some(OAuthConfiguration {
-                        oauth_client,
-                        save_tokens_operation,
-                    });
+            let mut oauth_configured = false;
+
+            for auth_config in self.auth_configs {
+                match auth_config {
+                    #[cfg(feature = "oauth")]
+                    AuthConfig::OAuth {
+                        oauth_config,
+                        token_save_config,
+                    } => {
+                        if oauth_configured {
+                            return Err(RestApiServerError::InvalidStateError(
+                                InvalidStateError::with_message(
+                                    "Only one OAuth provider can be configured".to_string(),
+                                ),
+                            ));
+                        }
+
+                        let (oauth_client, oauth_identity_provider) = match &oauth_config {
+                            #[cfg(feature = "oauth-github")]
+                            OAuthConfig::GitHub {
+                                client_id,
+                                client_secret,
+                                redirect_url,
+                            } => (
+                                OAuthClient::new_github(
+                                    client_id.to_string(),
+                                    client_secret.to_string(),
+                                    redirect_url.to_string(),
+                                )
+                                .map_err(|err| {
+                                    RestApiServerError::InvalidStateError(
+                                        InvalidStateError::with_message(format!(
+                                            "Invalid GitHub OAuth config provided: {}",
+                                            err
+                                        )),
+                                    )
+                                })?,
+                                Box::new(GithubUserIdentityProvider),
+                            ),
+                        };
+
+                        let save_tokens_operation: Box<dyn SaveTokensOperation> =
+                            match token_save_config {
+                                #[cfg(feature = "biome-oauth")]
+                                TokenSaveConfig::Biome {
+                                    user_store,
+                                    oauth_user_store,
+                                } => {
+                                    let oauth_provider = match oauth_config {
+                                        #[cfg(feature = "oauth-github")]
+                                        OAuthConfig::GitHub { .. } => OAuthProvider::Github,
+                                    };
+                                    Box::new(OAuthUserStoreSaveTokensOperation::new(
+                                        oauth_provider,
+                                        oauth_identity_provider.clone(),
+                                        user_store,
+                                        oauth_user_store,
+                                    ))
+                                }
+                                TokenSaveConfig::NoOp => Box::new(SaveTokensToNull),
+                            };
+
+                        identity_providers.push(oauth_identity_provider);
+                        self.resources.append(
+                            &mut OAuthResourceProvider::new(oauth_client, save_tokens_operation)
+                                .resources(),
+                        );
+                        oauth_configured = true;
+                    }
+                    AuthConfig::Custom {
+                        mut resources,
+                        identity_provider,
+                    } => {
+                        self.resources.append(&mut resources);
+                        identity_providers.push(identity_provider);
+                    }
                 }
-                (Some(_), None) => {
-                    return Err(RestApiServerError::MissingField(
-                        "REST API auth is enabled as OAuth, but no save token operation has been \
-                        provided"
-                            .to_string(),
-                    ));
-                }
-                (None, Some(_)) => {
-                    return Err(RestApiServerError::MissingField(
-                        "REST API auth is not enabled as OAuth, but a save token operation has \
-                        been provided"
-                            .to_string(),
-                    ));
-                }
-                (None, None) => (),
             }
 
-            if !authentication_configured {
-                return Err(RestApiServerError::MissingField(
-                    "REST API auth is enabled, but no authentication is configured".to_string(),
-                ));
-            }
-
-            if identity_providers.is_empty() {
-                return Err(RestApiServerError::MissingField(
-                    "REST API auth is enabled, but no identity providers have been provided"
-                        .to_string(),
-                ));
-            }
-        }
+            identity_providers
+        };
 
         Ok(RestApi {
             bind,
@@ -823,8 +830,6 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers,
-            #[cfg(feature = "oauth")]
-            oauth_configuration,
         })
     }
 
@@ -835,20 +840,64 @@ impl RestApiBuilder {
             .bind
             .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
 
-        #[cfg(feature = "auth")]
-        let identity_providers = self.identity_providers.unwrap_or_default();
-
         Ok(RestApi {
             bind,
             resources: self.resources,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
-            identity_providers,
-            #[cfg(feature = "oauth")]
-            oauth_configuration: None,
+            identity_providers: vec![],
         })
     }
+}
+
+/// Configurations for the various authentication methods supported by the Splinter REST API.
+#[cfg(feature = "auth")]
+pub enum AuthConfig {
+    /// OAuth authentication
+    #[cfg(feature = "oauth")]
+    OAuth {
+        /// OAuth provider configuration
+        oauth_config: OAuthConfig,
+        /// The configuration for the token save operation
+        token_save_config: TokenSaveConfig,
+    },
+    /// A custom authentication method
+    Custom {
+        /// REST API resources that would allow a client to receive some authentication credentials
+        resources: Vec<Resource>,
+        /// The identity provider that correlates the contents of the `Authorization` header with
+        /// an identity for the client
+        identity_provider: Box<dyn IdentityProvider>,
+    },
+}
+
+/// OAuth configurations that are supported out-of-the-box by the Splinter REST API.
+#[cfg(feature = "oauth")]
+pub enum OAuthConfig {
+    /// OAuth provided by GitHub
+    #[cfg(feature = "oauth-github")]
+    GitHub {
+        /// The client ID of the GitHub OAuth app
+        client_id: String,
+        /// The client secret of the GitHub OAuth app
+        client_secret: String,
+        /// The redirect URL that is configured for the GitHub OAuth app
+        redirect_url: String,
+    },
+}
+
+/// Configurations for how users' tokens are saved when they're received from the OAuth provider
+#[cfg(feature = "oauth")]
+pub enum TokenSaveConfig {
+    /// Saves users' tokens to Biome's OAuth user store
+    #[cfg(feature = "biome-oauth")]
+    Biome {
+        user_store: Box<dyn UserStore>,
+        oauth_user_store: Box<dyn OAuthUserStore>,
+    },
+    /// Users' tokens will not be saved by the Splinter REST API
+    NoOp,
 }
 
 pub fn into_protobuf<M: Message>(
@@ -935,62 +984,33 @@ mod test {
             .into_route();
     }
 
-    /// Verifies that the `RestApiBuilder` fails to build when auth is enabled but no authentication
-    /// or identity providers are configured, but succeeds when authentication and identity
-    /// providers are configured.
+    /// Verifies that the `RestApiBuilder` builds succesfully when all required configuration is
+    /// provided.
+    #[test]
+    fn rest_api_builder_successful() {
+        let mut builder = RestApiBuilder::new().with_bind("test");
+
+        #[cfg(feature = "auth")]
+        {
+            let auth_config = AuthConfig::Custom {
+                resources: vec![],
+                identity_provider: Box::new(MockIdentityProvider),
+            };
+            builder = builder.with_auth_configs(vec![auth_config]);
+        }
+
+        assert!(builder.build().is_ok())
+    }
+
+    /// Verifies that the `RestApiBuilder` fails to build when auth is enabled but no auth is
+    /// configured.
     #[test]
     #[cfg(feature = "auth")]
-    fn rest_api_builder_auth() {
-        // Verify that no authentication causes error
+    fn rest_api_builder_no_auth() {
         assert!(matches!(
-            RestApiBuilder::new()
-                .with_bind("test")
-                .with_identity_providers(vec![Box::new(MockIdentityProvider)])
-                .build(),
-            Err(RestApiServerError::MissingField(_))
+            RestApiBuilder::new().with_bind("test").build(),
+            Err(RestApiServerError::InvalidStateError(_))
         ));
-
-        // Verify that no identity providers causes error
-        #[cfg(feature = "oauth")]
-        assert!(matches!(
-            RestApiBuilder::new()
-                .with_bind("test")
-                .with_oauth_client(
-                    OAuthClient::new(
-                        "client_id".into(),
-                        "client_secret".into(),
-                        "https://provider.com/auth".into(),
-                        "https://localhost/oauth/callback".into(),
-                        "https://provider.com/token".into(),
-                        vec![],
-                    )
-                    .expect("Failed to create OAuth client")
-                )
-                .build(),
-            Err(RestApiServerError::MissingField(_))
-        ));
-
-        // Verify that the build is successful with both authentication and identity providers
-        #[cfg(feature = "oauth")]
-        assert!(RestApiBuilder::new()
-            .with_bind("test")
-            .with_oauth_client(
-                OAuthClient::new(
-                    "client_id".into(),
-                    "client_secret".into(),
-                    "https://provider.com/auth".into(),
-                    "https://localhost/oauth/callback".into(),
-                    "https://provider.com/token".into(),
-                    vec![],
-                )
-                .expect("Failed to create OAuth client")
-            )
-            .with_oauth_save_tokens_operation(Box::new(
-                crate::auth::oauth::rest_api::SaveTokensToNull
-            ))
-            .with_identity_providers(vec![Box::new(MockIdentityProvider)])
-            .build()
-            .is_ok())
     }
 
     #[cfg(feature = "auth")]
