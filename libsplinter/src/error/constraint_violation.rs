@@ -126,20 +126,15 @@ impl fmt::Display for ConstraintViolationError {
 
 impl fmt::Debug for ConstraintViolationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        const TYPE_NAME: &str = "ConstraintViolationError";
+        let mut debug_struct = f.debug_struct("ConstraintViolationError");
 
-        match &self.source {
-            Some(s) => write!(
-                f,
-                "{} {{ source: {:?}, violation_type: {:?} }}",
-                TYPE_NAME, s, &self.violation_type
-            ),
-            None => write!(
-                f,
-                "{} {{ violation_type: {:?} }}",
-                TYPE_NAME, &self.violation_type
-            ),
+        debug_struct.field("violation_type", &self.violation_type);
+
+        if let Some(source) = &self.source {
+            debug_struct.field("source", source);
         }
+
+        debug_struct.finish()
     }
 }
 
@@ -162,7 +157,7 @@ pub mod tests {
     /// `format!("ConstraintViolationError { source: {:?}, violation_type: {:?} }", source, type)`.
     #[test]
     fn test_debug_from_source_with_violation_type() {
-        let debug = "ConstraintViolationError { source: ConstraintViolationError { violation_type: Unique }, violation_type: Unique }";
+        let debug = "ConstraintViolationError { violation_type: Unique, source: ConstraintViolationError { violation_type: Unique } }";
         let err = ConstraintViolationError::from_source_with_violation_type(
             ConstraintViolationType::Unique,
             Box::new(ConstraintViolationError::with_violation_type(

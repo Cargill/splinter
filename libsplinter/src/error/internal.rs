@@ -154,29 +154,21 @@ impl fmt::Display for InternalError {
 
 impl fmt::Debug for InternalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        const TYPE_NAME: &str = "InternalError";
+        let mut debug_struct = f.debug_struct("InternalError");
 
-        match &self.message {
-            Some(m) => match &self.source {
-                Some(s) => write!(
-                    f,
-                    "{} {{ message: {:?}, source: {:?} }}",
-                    TYPE_NAME, m, s.source
-                ),
-                None => write!(f, "{} {{ message: {:?} }}", TYPE_NAME, m),
-            },
-            None => match &self.source {
-                Some(s) => match &s.prefix {
-                    Some(p) => write!(
-                        f,
-                        "{} {{ prefix: {:?}, source: {:?} }}",
-                        TYPE_NAME, p, s.source
-                    ),
-                    None => write!(f, "{} {{ source: {:?} }}", TYPE_NAME, s.source),
-                },
-                None => write!(f, "{}", TYPE_NAME),
-            },
+        if let Some(message) = &self.message {
+            debug_struct.field("message", message);
         }
+
+        if let Some(source) = &self.source {
+            if let Some(prefix) = &source.prefix {
+                debug_struct.field("prefix", prefix);
+            }
+
+            debug_struct.field("source", &source.source);
+        }
+
+        debug_struct.finish()
     }
 }
 
