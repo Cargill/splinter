@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs for building services
+//! Structs for building circuit proposals
 
 use crate::admin::messages::is_valid_circuit_id;
 use crate::protos::admin;
