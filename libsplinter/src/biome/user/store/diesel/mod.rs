@@ -67,6 +67,12 @@ impl UserStore for DieselUserStore<diesel::pg::PgConnection> {
     fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).list_users()
     }
+
+    fn clone_box(&self) -> Box<dyn UserStore> {
+        Box::new(Self {
+            connection_pool: self.connection_pool.clone(),
+        })
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -89,6 +95,12 @@ impl UserStore for DieselUserStore<diesel::sqlite::SqliteConnection> {
 
     fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
         UserStoreOperations::new(&*self.connection_pool.get()?).list_users()
+    }
+
+    fn clone_box(&self) -> Box<dyn UserStore> {
+        Box::new(Self {
+            connection_pool: self.connection_pool.clone(),
+        })
     }
 }
 

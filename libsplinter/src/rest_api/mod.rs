@@ -72,7 +72,10 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 #[cfg(feature = "oauth")]
-use crate::auth::oauth::{rest_api::OAuthResourceProvider, OAuthClient};
+use crate::auth::oauth::{
+    rest_api::{OAuthResourceProvider, SaveTokensOperation},
+    OAuthClient,
+};
 #[cfg(feature = "auth")]
 use crate::auth::rest_api::{actix::Authorization, identity::IdentityProvider};
 
@@ -462,6 +465,13 @@ impl RequestGuard for ProtocolVersionRangeGuard {
     }
 }
 
+#[cfg(feature = "oauth")]
+#[derive(Clone)]
+struct OAuthConfiguration {
+    oauth_client: OAuthClient,
+    save_tokens_operation: Box<dyn SaveTokensOperation>,
+}
+
 /// `RestApi` is used to create an instance of a restful web server.
 #[derive(Clone)]
 pub struct RestApi {
@@ -472,7 +482,7 @@ pub struct RestApi {
     #[cfg(feature = "auth")]
     identity_providers: Vec<Box<dyn IdentityProvider>>,
     #[cfg(feature = "oauth")]
-    oauth_client: Option<OAuthClient>,
+    oauth_configuration: Option<OAuthConfiguration>,
 }
 
 impl RestApi {
@@ -488,7 +498,9 @@ impl RestApi {
         #[cfg(feature = "auth")]
         let authorization = Authorization::new(self.identity_providers.to_owned());
         #[cfg(feature = "oauth")]
-        let oauth_resource_provider = self.oauth_client.to_owned().map(OAuthResourceProvider::new);
+        let oauth_resource_provider = self.oauth_configuration.to_owned().map(|config| {
+            OAuthResourceProvider::new(config.oauth_client, config.save_tokens_operation)
+        });
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -676,6 +688,8 @@ pub struct RestApiBuilder {
     identity_providers: Option<Vec<Box<dyn IdentityProvider>>>,
     #[cfg(feature = "oauth")]
     oauth_client: Option<OAuthClient>,
+    #[cfg(feature = "oauth")]
+    save_tokens_operation: Option<Box<dyn SaveTokensOperation>>,
 }
 
 impl Default for RestApiBuilder {
@@ -689,6 +703,8 @@ impl Default for RestApiBuilder {
             identity_providers: None,
             #[cfg(feature = "oauth")]
             oauth_client: None,
+            #[cfg(feature = "oauth")]
+            save_tokens_operation: None,
         }
     }
 }
@@ -734,6 +750,15 @@ impl RestApiBuilder {
         self
     }
 
+    #[cfg(feature = "oauth")]
+    pub fn with_oauth_save_tokens_operation(
+        mut self,
+        save_token_op: Box<dyn SaveTokensOperation>,
+    ) -> Self {
+        self.save_tokens_operation = Some(save_token_op);
+        self
+    }
+
     pub fn build(self) -> Result<RestApi, RestApiServerError> {
         let bind = self
             .bind
@@ -744,13 +769,37 @@ impl RestApiBuilder {
             .identity_providers
             .ok_or_else(|| RestApiServerError::MissingField("identity_providers".to_string()))?;
 
+        #[cfg(feature = "oauth")]
+        let mut oauth_configuration = None;
+
         #[cfg(feature = "auth")]
         {
             let mut authentication_configured = false;
 
             #[cfg(feature = "oauth")]
-            if self.oauth_client.is_some() {
-                authentication_configured = true;
+            match (self.oauth_client, self.save_tokens_operation) {
+                (Some(oauth_client), Some(save_tokens_operation)) => {
+                    authentication_configured = true;
+                    oauth_configuration = Some(OAuthConfiguration {
+                        oauth_client,
+                        save_tokens_operation,
+                    });
+                }
+                (Some(_), None) => {
+                    return Err(RestApiServerError::MissingField(
+                        "REST API auth is enabled as OAuth, but no save token operation has been \
+                        provided"
+                            .to_string(),
+                    ));
+                }
+                (None, Some(_)) => {
+                    return Err(RestApiServerError::MissingField(
+                        "REST API auth is not enabled as OAuth, but a save token operation has \
+                        been provided"
+                            .to_string(),
+                    ));
+                }
+                (None, None) => (),
             }
 
             if !authentication_configured {
@@ -775,7 +824,7 @@ impl RestApiBuilder {
             #[cfg(feature = "auth")]
             identity_providers,
             #[cfg(feature = "oauth")]
-            oauth_client: self.oauth_client,
+            oauth_configuration,
         })
     }
 
@@ -797,7 +846,7 @@ impl RestApiBuilder {
             #[cfg(feature = "auth")]
             identity_providers,
             #[cfg(feature = "oauth")]
-            oauth_client: self.oauth_client,
+            oauth_configuration: None,
         })
     }
 }
@@ -936,6 +985,9 @@ mod test {
                 )
                 .expect("Failed to create OAuth client")
             )
+            .with_oauth_save_tokens_operation(Box::new(
+                crate::auth::oauth::rest_api::SaveTokensToNull
+            ))
             .with_identity_providers(vec![Box::new(MockIdentityProvider)])
             .build()
             .is_ok())

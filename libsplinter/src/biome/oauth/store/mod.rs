@@ -130,8 +130,8 @@ impl OAuthUserBuilder {
     /// Set the OAuth refresh token.
     ///
     /// This field is optional when constructing the final struct.
-    pub fn with_refresh_token(mut self, refresh_token: String) -> Self {
-        self.refresh_token = Some(refresh_token);
+    pub fn with_refresh_token(mut self, refresh_token: Option<String>) -> Self {
+        self.refresh_token = refresh_token;
 
         self
     }
@@ -200,8 +200,8 @@ impl OAuthUserUpdateBuilder {
     /// Set the OAuth refresh token.
     ///
     /// This field is optional when constructing the final struct.
-    pub fn with_refresh_token(mut self, refresh_token: String) -> Self {
-        self.refresh_token = Some(refresh_token);
+    pub fn with_refresh_token(mut self, refresh_token: Option<String>) -> Self {
+        self.refresh_token = refresh_token;
 
         self
     }
@@ -226,7 +226,7 @@ impl OAuthUserUpdateBuilder {
 }
 
 /// Defines methods for CRUD operations and fetching OAuth user information.
-pub trait OAuthUserStore {
+pub trait OAuthUserStore: Send + Sync {
     /// Add an OAuthUser to the store.
     ///
     /// # Errors
@@ -252,4 +252,13 @@ pub trait OAuthUserStore {
 
     /// Returns the stored OAuth user based on the biome user ID.
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+
+    /// Clone into a boxed, dynamic dispatched OAuthUserStore.
+    fn clone_box(&self) -> Box<dyn OAuthUserStore>;
+}
+
+impl Clone for Box<dyn OAuthUserStore> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }

@@ -36,6 +36,10 @@ use splinter::auth::{
 };
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
+#[cfg(feature = "biome-oauth")]
+use splinter::biome::{
+    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveTokensOperation,
+};
 use splinter::circuit::directory::CircuitDirectory;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -466,6 +470,22 @@ impl SplinterDaemon {
             }
         }
 
+        #[cfg(feature = "biome")]
+        let db_url = if self.enable_biome {
+            self.db_url.clone().ok_or_else(|| {
+                StartError::StorageError(
+                    "biome was enabled but the builder failed to require the db URL".into(),
+                )
+            })?
+        } else {
+            // Default to memory, as no components other than biome use the db_url value. This line
+            // merely makes the compiler happy by providing an assignment.
+            "memory".into()
+        };
+
+        #[cfg(feature = "biome")]
+        let store_factory = create_store_factory(&db_url)?;
+
         #[cfg(feature = "auth")]
         {
             let mut identity_providers = vec![];
@@ -489,7 +509,7 @@ impl SplinterDaemon {
                 let oauth_redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
                     StartError::RestApiError("missing OAuth redirect URL configuration".into())
                 })?;
-                let (oauth_client, oauth_identity_provider) = match oauth_provider {
+                let (oauth_client, oauth_identity_provider, oauth_provider) = match oauth_provider {
                     "github" => (
                         OAuthClient::new_github(
                             oauth_client_id,
@@ -503,6 +523,7 @@ impl SplinterDaemon {
                             ))
                         })?,
                         Box::new(GithubUserIdentityProvider) as Box<dyn IdentityProvider>,
+                        OAuthProvider::Github,
                     ),
                     other_provider => {
                         return Err(StartError::RestApiError(format!(
@@ -513,6 +534,19 @@ impl SplinterDaemon {
                 };
 
                 rest_api_builder = rest_api_builder.with_oauth_client(oauth_client);
+
+                #[cfg(feature = "biome-oauth")]
+                if self.enable_biome {
+                    rest_api_builder = rest_api_builder.with_oauth_save_tokens_operation(Box::new(
+                        OAuthUserStoreSaveTokensOperation::new(
+                            oauth_provider,
+                            oauth_identity_provider.clone(),
+                            store_factory.get_biome_user_store(),
+                            store_factory.get_biome_oauth_user_store(),
+                        ),
+                    ));
+                }
+
                 identity_providers.push(oauth_identity_provider);
             }
 
@@ -522,12 +556,7 @@ impl SplinterDaemon {
         #[cfg(feature = "biome")]
         {
             if self.enable_biome {
-                let db_url = self.db_url.clone().ok_or_else(|| {
-                    StartError::StorageError(
-                        "biome was enabled but the builder failed to require the db URL".into(),
-                    )
-                })?;
-                let biome_resources = build_biome_routes(db_url)?;
+                let biome_resources = build_biome_routes(&*store_factory)?;
                 rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
             }
         }
@@ -755,14 +784,22 @@ fn start_health_service(
 }
 
 #[cfg(feature = "biome")]
-fn build_biome_routes(db_url: String) -> Result<BiomeRestResourceManager, StartError> {
-    info!("Adding biome routes");
+fn create_store_factory(
+    db_url: &str,
+) -> Result<Box<dyn splinter::store::StoreFactory>, StartError> {
     let connection_uri = db_url.parse().map_err(|err| {
         StartError::StorageError(format!("Invalid database URL provided: {}", err))
     })?;
-    let store_factory = splinter::store::create_store_factory(connection_uri).map_err(|err| {
+    splinter::store::create_store_factory(connection_uri).map_err(|err| {
         StartError::StorageError(format!("Failed to initialize store factory: {}", err))
-    })?;
+    })
+}
+
+#[cfg(feature = "biome")]
+fn build_biome_routes(
+    store_factory: &dyn splinter::store::StoreFactory,
+) -> Result<BiomeRestResourceManager, StartError> {
+    info!("Adding biome routes");
     let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
     biome_rest_provider_builder =
         biome_rest_provider_builder.with_user_store(store_factory.get_biome_user_store());

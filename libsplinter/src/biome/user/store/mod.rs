@@ -78,14 +78,12 @@ pub trait UserStore: Send + Sync {
 
     /// List all users from the underlying storage
     fn list_users(&self) -> Result<Vec<User>, UserStoreError>;
+
+    fn clone_box(&self) -> Box<dyn UserStore>;
 }
 
-pub trait CloneBoxUserStore: UserStore {
-    fn clone_box(&self) -> Box<dyn CloneBoxUserStore>;
-}
-
-impl Clone for Box<dyn CloneBoxUserStore> {
-    fn clone(&self) -> Box<dyn CloneBoxUserStore> {
+impl Clone for Box<dyn UserStore> {
+    fn clone(&self) -> Self {
         self.clone_box()
     }
 }
@@ -112,5 +110,9 @@ where
 
     fn list_users(&self) -> Result<Vec<User>, UserStoreError> {
         (**self).list_users()
+    }
+
+    fn clone_box(&self) -> Box<dyn UserStore> {
+        (**self).clone_box()
     }
 }

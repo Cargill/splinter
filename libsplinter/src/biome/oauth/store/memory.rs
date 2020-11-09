@@ -78,4 +78,8 @@ impl OAuthUserStore for MemoryOAuthUserStore {
 
         Ok(inner.get(user_id).cloned())
     }
+
+    fn clone_box(&self) -> Box<dyn OAuthUserStore> {
+        Box::new(self.clone())
+    }
 }

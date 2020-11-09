@@ -19,13 +19,19 @@ use actix_web::{http::header::LOCATION, web::Query, HttpResponse};
 use futures::future::IntoFuture;
 
 use crate::auth::oauth::{
-    rest_api::resources::callback::{CallbackQuery, CallbackResponse},
+    rest_api::{
+        resources::callback::{CallbackQuery, CallbackResponse},
+        SaveTokensOperation,
+    },
     OAuthClient,
 };
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
-pub fn make_callback_route(client: OAuthClient) -> Resource {
+pub fn make_callback_route(
+    client: OAuthClient,
+    save_token_op: Box<dyn SaveTokensOperation>,
+) -> Resource {
     Resource::build("/oauth/callback")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::OAUTH_CALLBACK_MIN,
@@ -37,22 +43,29 @@ pub fn make_callback_route(client: OAuthClient) -> Resource {
                     Ok(query) => {
                         match client.exchange_authorization_code(query.code.clone(), &query.state) {
                             Ok(Some((user_tokens, redirect_url))) => {
-                                // Adding the user tokens to the redirect URL, so the client may
-                                // access these values after a redirect
-                                let callback_response = CallbackResponse::from(&user_tokens);
-                                let mut redirect_url = format!(
-                                    "{}?access_token={}",
-                                    redirect_url, callback_response.access_token
-                                );
-                                if let Some(expiry) = callback_response.expires_in {
-                                    redirect_url.push_str(&format!("&expires_in={}", expiry))
-                                };
-                                if let Some(refresh) = callback_response.refresh_token {
-                                    redirect_url.push_str(&format!("&refresh_token={}", refresh))
-                                };
-                                HttpResponse::Found()
-                                    .header(LOCATION, redirect_url)
-                                    .finish()
+                                if let Err(err) = save_token_op.save_tokens(&user_tokens) {
+                                    error!("Unable to store user tokens: {}", err);
+                                    HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                } else {
+                                    // Adding the user tokens to the redirect URL, so the client may
+                                    // access these values after a redirect
+                                    let callback_response = CallbackResponse::from(&user_tokens);
+                                    let mut redirect_url = format!(
+                                        "{}?access_token={}",
+                                        redirect_url, callback_response.access_token
+                                    );
+                                    if let Some(expiry) = callback_response.expires_in {
+                                        redirect_url.push_str(&format!("&expires_in={}", expiry))
+                                    };
+                                    if let Some(refresh) = callback_response.refresh_token {
+                                        redirect_url
+                                            .push_str(&format!("&refresh_token={}", refresh))
+                                    };
+                                    HttpResponse::Found()
+                                        .header(LOCATION, redirect_url)
+                                        .finish()
+                                }
                             }
                             Ok(None) => {
                                 error!(

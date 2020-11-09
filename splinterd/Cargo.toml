@@ -87,6 +87,7 @@ auth = ["splinter/oauth-github"]
 biome = ["splinter/biome", "splinter/store-factory", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]
+biome-oauth = ["auth", "splinter/biome-oauth"]
 database = ["splinter/postgres", "splinter/sqlite"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
