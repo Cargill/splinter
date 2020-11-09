@@ -167,6 +167,10 @@ impl RoutingTableReader for RoutingTable {
                 .cloned())
         }
     }
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableReader> {
+        Box::new(self.clone())
+    }
 }
 
 impl RoutingTableWriter for RoutingTable {
@@ -354,6 +358,10 @@ impl RoutingTableWriter for RoutingTable {
             .nodes
             .remove(id);
         Ok(())
+    }
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableWriter> {
+        Box::new(self.clone())
     }
 }
 

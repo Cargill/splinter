@@ -116,6 +116,14 @@ pub trait RoutingTableWriter: Send {
     ///
     /// * `node_id` - The unique ID for the node that should be removed
     fn remove_node(&mut self, node_id: &str) -> Result<(), RemoveNodeError>;
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableWriter>;
+}
+
+impl Clone for Box<dyn RoutingTableWriter> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }
 
 /// Type returned by the `RoutingTableReader::list_nodes` method
@@ -163,6 +171,14 @@ pub trait RoutingTableReader: Send {
     ///
     /// * `circuit_id` - The unique ID for the circuit to be fetched
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError>;
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableReader>;
+}
+
+impl Clone for Box<dyn RoutingTableReader> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }
 
 /// The routing table representation of a circuit. It is simplified to only contain the required
