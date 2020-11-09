@@ -59,7 +59,8 @@ pub fn make_callback_route(
                                         redirect_url.push_str(&format!("&expires_in={}", expiry))
                                     };
                                     if let Some(refresh) = callback_response.refresh_token {
-                                        redirect_url.push_str(&format!("&refresh_token={}", refresh))
+                                        redirect_url
+                                            .push_str(&format!("&refresh_token={}", refresh))
                                     };
                                     HttpResponse::Found()
                                         .header(LOCATION, redirect_url)
