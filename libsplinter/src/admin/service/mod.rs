@@ -31,6 +31,7 @@ use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
 use crate::admin::store::AdminServiceStore;
+use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
@@ -170,6 +171,7 @@ impl AdminService {
         // The coordinator timeout for the two-phase commit consensus engine; if `None`, the
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
+        routing_table_writer: Box<dyn RoutingTableWriter>,
     ) -> Result<(Self, thread::JoinHandle<()>), ServiceError> {
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
@@ -192,6 +194,7 @@ impl AdminService {
                 signature_verifier,
                 key_verifier,
                 key_permission_manager,
+                routing_table_writer,
             )?)),
             orchestrator,
             coordinator_timeout,
@@ -270,7 +273,16 @@ impl AdminService {
         })?;
         let mut peer_refs = vec![];
         // start all services of the supported types
+        let mut writer = self
+            .admin_service_shared
+            .lock()
+            .map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?
+            .routing_table_writer();
+
         for circuit in circuits {
+            let mut routing_members = vec![];
             // restart all peer in the circuit
             for member in circuit.members().iter() {
                 if member != &self.node_id {
@@ -284,6 +296,11 @@ impl AdminService {
                         } else {
                             info!("Unable to peer with {} at this time", member);
                         }
+
+                        routing_members.push(routing::CircuitNode::new(
+                            member.to_string(),
+                            node.endpoints().to_vec(),
+                        ))
                     } else {
                         error!("Missing node information for {}", member);
                     }
@@ -291,6 +308,20 @@ impl AdminService {
             }
 
             // Get all services this node is allowed to run and the orchestrator has a factory for
+
+            let routing_services = circuit
+                .roster()
+                .iter()
+                .map(|service| {
+                    routing::Service::new(
+                        service.service_id().to_string(),
+                        service.service_type().to_string(),
+                        service.node_id().to_string(),
+                        service.arguments().to_vec(),
+                    )
+                })
+                .collect();
+
             let services = circuit
                 .roster()
                 .iter()
@@ -301,6 +332,18 @@ impl AdminService {
                             .contains(&service.service_type().to_string())
                 })
                 .collect::<Vec<_>>();
+
+            writer
+                .add_circuit(
+                    circuit.circuit_id().to_string(),
+                    routing::Circuit::new(
+                        circuit.circuit_id().to_string(),
+                        routing_services,
+                        circuit.members().to_vec(),
+                    ),
+                    routing_members,
+                )
+                .map_err(|err| ServiceStartError::Internal(err.reduce_to_string()))?;
 
             // Start all services
             for service in services {
@@ -336,7 +379,9 @@ impl AdminService {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .get_proposals(&[])
-            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+            .map_err(|err| {
+                ServiceStartError::Internal(format!("Unable to get circuit proposals: {}", err))
+            })?;
 
         for proposal in proposals {
             // connect to all peers in the circuit proposal
@@ -738,6 +783,7 @@ mod tests {
     };
 
     use crate::admin::store::diesel::DieselAdminServiceStore;
+    use crate::circuit::routing::memory::RoutingTable;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
     use crate::migrations::run_sqlite_migrations;
@@ -819,6 +865,9 @@ mod tests {
         let signer = context.new_signer(private_key);
         let signature_verifier = context.new_verifier();
 
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
         let (mut admin_service, _) = AdminService::new(
             "test-node".into(),
             orchestrator,
@@ -830,6 +879,7 @@ mod tests {
             Box::new(MockAdminKeyVerifier),
             Box::new(AllowAllKeyPermissionManager),
             None,
+            writer,
         )
         .expect("Service should have been created correctly");
 
