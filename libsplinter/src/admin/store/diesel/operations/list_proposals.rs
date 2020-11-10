@@ -106,23 +106,23 @@ where
                 }
 
                 // Collects proposed circuits which match the circuit predicates
-                let proposed_circuits: HashMap<String, ProposedCircuitModel> = query
+                let proposed_circuits: Vec<ProposedCircuitModel> = query
+                    .order(proposed_circuit::circuit_id.desc())
                     .load::<ProposedCircuitModel>(self.conn)
                     .map_err(|err| AdminServiceStoreError::QueryError {
                         context: String::from("Unable to load proposed Circuit information"),
                         source: Box::new(err),
-                    })?
-                    // Once the `ProposedCircuitModels` have been collected,
-                    // organize into a HashMap.
-                    .into_iter()
-                    .map(|proposed_circuit| {
-                        (proposed_circuit.circuit_id.to_string(), proposed_circuit)
-                    })
+                    })?;
+
+                // Store circuit IDs separately to make it easier to filter following queries
+                let circuit_ids: Vec<&str> = proposed_circuits
+                    .iter()
+                    .map(|proposed_circuit| proposed_circuit.circuit_id.as_str())
                     .collect();
 
                 let circuit_proposals: HashMap<String, CircuitProposalModel> =
                     circuit_proposal::table
-                        .filter(circuit_proposal::circuit_id.eq_any(proposed_circuits.keys()))
+                        .filter(circuit_proposal::circuit_id.eq_any(&circuit_ids))
                         .load::<CircuitProposalModel>(self.conn)
                         .map_err(|err| AdminServiceStoreError::QueryError {
                             context: String::from("Unable to load proposal information"),
@@ -134,21 +134,21 @@ where
                         .map(|proposal| (proposal.circuit_id.to_string(), proposal))
                         .collect();
 
-                let proposal_builders: HashMap<
+                let proposal_builders: Vec<(
                     String,
                     (CircuitProposalBuilder, ProposedCircuitBuilder),
-                > = proposed_circuits
+                )> = proposed_circuits
                     .into_iter()
-                    .map(|(circuit_id, proposed_circuit)| {
-                        let proposal = circuit_proposals.get(&circuit_id).ok_or_else(|| {
-                            AdminServiceStoreError::StorageError {
+                    .map(|proposed_circuit| {
+                        let proposal = circuit_proposals
+                            .get(&proposed_circuit.circuit_id)
+                            .ok_or_else(|| AdminServiceStoreError::StorageError {
                                 context: format!(
                                     "Missing proposal for proposed_circuit {}",
-                                    circuit_id
+                                    proposed_circuit.circuit_id
                                 ),
                                 source: None,
-                            }
-                        })?;
+                            })?;
 
                         let proposal_builder = CircuitProposalBuilder::new()
                             .with_proposal_type(&ProposalType::try_from(
@@ -173,9 +173,12 @@ where
                             .with_circuit_management_type(&proposed_circuit.circuit_management_type)
                             .with_application_metadata(&proposed_circuit.application_metadata)
                             .with_comments(&proposed_circuit.comments);
-                        Ok((circuit_id, (proposal_builder, proposed_circuit_builder)))
+                        Ok((
+                            proposed_circuit.circuit_id.to_string(),
+                            (proposal_builder, proposed_circuit_builder),
+                        ))
                     })
-                    .collect::<Result<HashMap<_, _>, AdminServiceStoreError>>()?;
+                    .collect::<Result<Vec<(_, _)>, AdminServiceStoreError>>()?;
 
                 // Collect `ProposedServices` to apply to the `ProposedCircuit`
                 // Create HashMap of (`circuit_id`, `service_id`) to a `ProposedServiceBuilder`
