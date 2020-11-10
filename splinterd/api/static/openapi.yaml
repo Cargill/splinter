@@ -1577,6 +1577,18 @@ paths:
         authenticate the user.
       parameters:
         - $ref: "#/components/parameters/protocol_version"
+        - name: redirect_url
+          in: query
+          description: |
+            The URL the client will be redirected to once the OAuth
+            authentication process has been completed. If this parameter is not
+            provided, Splinter will attempt to retrieve the `referer` header
+            of the request. If this header value is also not available and the
+            `redirect_url` does not have a value, Splinter will respond with
+            400 Bad Request.
+          required: false
+          schema:
+            type: string
       responses:
         302:
           description: Found redirect
@@ -1586,7 +1598,9 @@ paths:
               schema:
                 type: string
         400:
-          description: Request was malformed
+          description: |
+            Request was malformed or no `redirect_url` was provided and the server
+            was unable to retrieve the request's `referer` header value.
           content:
             application/json:
               schema:
@@ -1603,28 +1617,33 @@ paths:
       tags:
         - OAuth
       description: |
-        Receives an authorization code from the OAuth provider and exchanges it
-        for an access token for the user.
+        Receives an authorization code from the OAuth provider to create an
+        access token for the user. Redirects to a URL provided by the client
+        when the OAuth authentication process was initiated.
       parameters:
         - $ref: "#/components/parameters/protocol_version"
       responses:
-        200:
-          description: Obtained access token for user
-          content:
-            application/json:
+        302:
+          description: |
+            Splinter has successfully exchanged the authorization code provided
+            by the OAuth provider has been successfully exchanged for an access
+            token. The application may then be redirected to the `redirect_url`
+            provided when the OAuth authentication process was initiated.
+            The `redirect_url` has the access token and other user data required
+            to log in the user to the application appended to it as query
+            parameters.
+          headers:
+            Location:
+              description: |
+                Client URL provided at the beginning of the OAuth authentication
+                process, with the user's information appended as query parameters.
               schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-                  expires_in:
-                    type: integer
-                  refresh_token:
-                    type: string
-                required:
-                  - access_token
+                type: string
         400:
-          description: Request was malformed
+          description: |
+            Request was malformed or no authorization request was found correlating
+            to the authorization code and the server was unable to retrieve the
+            request's `referer` header value.
           content:
             application/json:
               schema:
