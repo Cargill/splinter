@@ -156,7 +156,7 @@ pub fn make_token_route(
                 };
 
                 let token = match token_issuer.issue_token_with_claims(claim) {
-                    Ok(token) => token,
+                    Ok(token) => format!("Biome:{}", token),
                     Err(err) => {
                         error!("Failed to issue token {}", err);
                         return HttpResponse::InternalServerError()

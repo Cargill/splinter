@@ -29,7 +29,13 @@ pub(crate) fn authorize_user(
     validation: &Validation,
 ) -> AuthorizationResult {
     let token = match get_authorization_token(&request) {
-        Ok(token) => token,
+        Ok(token) => match token.splitn(2, ':').nth(1) {
+            Some(token) => token.to_string(),
+            None => {
+                debug!("Invalid token; should be in the format 'Biome:<JWT>'");
+                return AuthorizationResult::Unauthorized("User is not authorized".to_string());
+            }
+        },
         Err(err) => {
             debug!("Failed to get token: {}", err);
             return AuthorizationResult::Unauthorized("User is not authorized".to_string());

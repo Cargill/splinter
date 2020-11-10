@@ -953,10 +953,10 @@ paths:
                   token:
                     type: string
                     description: "JWT access token used for authorizing access to protected resources"
-                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
-                      IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
-                      XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
-                      riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
+                    example: "Biome:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2\
+                      VyX2lkIjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE\
+                      0IiwiaXNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8h\
+                      A0ru_xriYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
                   refresh_token:
                     type: string
                     description: "JWT refresh token used for obtaining a new access to token"
@@ -1044,10 +1044,10 @@ paths:
                   token:
                     type: string
                     description: "JWT access token used for authorizing access to protected resources"
-                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lk\
-                      IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0Iiwia\
-                      XNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_x\
-                      riYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
+                    example: "Biome:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2\
+                      VyX2lkIjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE\
+                      0IiwiaXNzIjoic2VsZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8h\
+                      A0ru_xriYX7qryl08ZEp86t5HD_AEVPEUXY70Ehc"
         400:
           description: Invalid request
           content:
