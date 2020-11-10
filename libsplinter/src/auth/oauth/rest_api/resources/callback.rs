@@ -20,19 +20,14 @@ pub struct CallbackQuery {
     pub state: String,
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
-pub struct CallbackResponse<'a> {
-    pub access_token: &'a str,
-    pub expires_in: Option<u64>,
-    pub refresh_token: Option<&'a str>,
-}
-
-impl<'a> From<&'a UserTokens> for CallbackResponse<'a> {
-    fn from(tokens: &'a UserTokens) -> Self {
-        Self {
-            access_token: tokens.access_token(),
-            expires_in: tokens.expires_in().map(|duration| duration.as_secs()),
-            refresh_token: tokens.refresh_token(),
-        }
-    }
+/// Serializes the given user tokens as a query string to pass to the client
+pub fn user_tokens_to_query_string(user_tokens: &UserTokens) -> String {
+    let mut query_string = format!("access_token=OAuth2:{}", user_tokens.access_token());
+    if let Some(duration) = user_tokens.expires_in() {
+        query_string.push_str(&format!("&expires_in={}", duration.as_secs()))
+    };
+    if let Some(refresh) = user_tokens.refresh_token() {
+        query_string.push_str(&format!("&refresh_token={}", refresh))
+    };
+    query_string
 }

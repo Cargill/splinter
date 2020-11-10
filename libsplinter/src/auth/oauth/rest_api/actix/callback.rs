@@ -20,7 +20,7 @@ use futures::future::IntoFuture;
 
 use crate::auth::oauth::{
     rest_api::{
-        resources::callback::{CallbackQuery, CallbackResponse},
+        resources::callback::{user_tokens_to_query_string, CallbackQuery},
         SaveTokensOperation,
     },
     OAuthClient,
@@ -50,18 +50,11 @@ pub fn make_callback_route(
                                 } else {
                                     // Adding the user tokens to the redirect URL, so the client may
                                     // access these values after a redirect
-                                    let callback_response = CallbackResponse::from(&user_tokens);
-                                    let mut redirect_url = format!(
-                                        "{}?access_token={}",
-                                        redirect_url, callback_response.access_token
+                                    let redirect_url = format!(
+                                        "{}?{}",
+                                        redirect_url,
+                                        user_tokens_to_query_string(&user_tokens)
                                     );
-                                    if let Some(expiry) = callback_response.expires_in {
-                                        redirect_url.push_str(&format!("&expires_in={}", expiry))
-                                    };
-                                    if let Some(refresh) = callback_response.refresh_token {
-                                        redirect_url
-                                            .push_str(&format!("&refresh_token={}", refresh))
-                                    };
                                     HttpResponse::Found()
                                         .header(LOCATION, redirect_url)
                                         .finish()
