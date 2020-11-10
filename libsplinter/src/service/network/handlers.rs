@@ -14,7 +14,7 @@
 
 //! Dispatch handlers for service component messages.
 
-use crate::circuit::service::ServiceId;
+use crate::circuit::routing::ServiceId;
 use crate::network::dispatch::{
     ConnectionId, DispatchError, DispatchMessageSender, Handler, MessageContext, MessageSender,
 };
