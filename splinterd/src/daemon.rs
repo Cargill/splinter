@@ -29,17 +29,8 @@ use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
-#[cfg(feature = "auth")]
-use splinter::auth::{
-    oauth::OAuthClient,
-    rest_api::identity::{github::GithubUserIdentityProvider, IdentityProvider},
-};
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
-#[cfg(feature = "biome-oauth")]
-use splinter::biome::{
-    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveTokensOperation,
-};
 use splinter::circuit::directory::CircuitDirectory;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -66,6 +57,8 @@ use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
 };
+#[cfg(feature = "auth")]
+use splinter::rest_api::{AuthConfig, OAuthConfig, TokenSaveConfig};
 use splinter::rest_api::{
     Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };
@@ -488,7 +481,7 @@ impl SplinterDaemon {
 
         #[cfg(feature = "auth")]
         {
-            let mut identity_providers = vec![];
+            let mut auth_configs = vec![];
 
             // Handle OAuth config. If no OAuth config values are provided, just skip this;
             // otherwise, require that all are set.
@@ -500,31 +493,21 @@ impl SplinterDaemon {
                 let oauth_provider = self.oauth_provider.as_deref().ok_or_else(|| {
                     StartError::RestApiError("missing OAuth provider configuration".into())
                 })?;
-                let oauth_client_id = self.oauth_client_id.clone().ok_or_else(|| {
+                let client_id = self.oauth_client_id.clone().ok_or_else(|| {
                     StartError::RestApiError("missing OAuth client ID configuration".into())
                 })?;
-                let oauth_client_secret = self.oauth_client_secret.clone().ok_or_else(|| {
+                let client_secret = self.oauth_client_secret.clone().ok_or_else(|| {
                     StartError::RestApiError("missing OAuth client secret configuration".into())
                 })?;
-                let oauth_redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
+                let redirect_url = self.oauth_redirect_url.clone().ok_or_else(|| {
                     StartError::RestApiError("missing OAuth redirect URL configuration".into())
                 })?;
-                let (oauth_client, oauth_identity_provider, oauth_provider) = match oauth_provider {
-                    "github" => (
-                        OAuthClient::new_github(
-                            oauth_client_id,
-                            oauth_client_secret,
-                            oauth_redirect_url,
-                        )
-                        .map_err(|err| {
-                            StartError::RestApiError(format!(
-                                "invalid OAuth configuration: {}",
-                                err
-                            ))
-                        })?,
-                        Box::new(GithubUserIdentityProvider) as Box<dyn IdentityProvider>,
-                        OAuthProvider::Github,
-                    ),
+                let oauth_config = match oauth_provider {
+                    "github" => OAuthConfig::GitHub {
+                        client_id,
+                        client_secret,
+                        redirect_url,
+                    },
                     other_provider => {
                         return Err(StartError::RestApiError(format!(
                             "invalid OAuth provider: {}",
@@ -533,24 +516,25 @@ impl SplinterDaemon {
                     }
                 };
 
-                rest_api_builder = rest_api_builder.with_oauth_client(oauth_client);
-
+                // Allowing unused_mut because token_save_config must be mutable if feature
+                // biome-oauth is enabled
+                #[allow(unused_mut)]
+                let mut token_save_config = TokenSaveConfig::NoOp;
                 #[cfg(feature = "biome-oauth")]
                 if self.enable_biome {
-                    rest_api_builder = rest_api_builder.with_oauth_save_tokens_operation(Box::new(
-                        OAuthUserStoreSaveTokensOperation::new(
-                            oauth_provider,
-                            oauth_identity_provider.clone(),
-                            store_factory.get_biome_user_store(),
-                            store_factory.get_biome_oauth_user_store(),
-                        ),
-                    ));
+                    token_save_config = TokenSaveConfig::Biome {
+                        user_store: store_factory.get_biome_user_store(),
+                        oauth_user_store: store_factory.get_biome_oauth_user_store(),
+                    };
                 }
 
-                identity_providers.push(oauth_identity_provider);
+                auth_configs.push(AuthConfig::OAuth {
+                    oauth_config,
+                    token_save_config,
+                });
             }
 
-            rest_api_builder = rest_api_builder.with_identity_providers(identity_providers);
+            rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
         }
 
         #[cfg(feature = "biome")]
