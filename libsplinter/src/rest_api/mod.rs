@@ -80,6 +80,8 @@ use crate::auth::oauth::{
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::auth::rest_api::{actix::Authorization, identity::IdentityProvider};
+#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::{
     oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveTokensOperation, OAuthUserStore,
@@ -745,6 +747,15 @@ impl RestApiBuilder {
 
             for auth_config in self.auth_configs {
                 match auth_config {
+                    #[cfg(feature = "biome-credentials")]
+                    AuthConfig::Biome {
+                        biome_resource_manager,
+                    } => {
+                        identity_providers
+                            .push(Box::new(biome_resource_manager.get_identity_provider()));
+                        self.resources
+                            .append(&mut biome_resource_manager.resources());
+                    }
                     #[cfg(feature = "oauth")]
                     AuthConfig::OAuth {
                         oauth_config,
@@ -854,6 +865,11 @@ impl RestApiBuilder {
 /// Configurations for the various authentication methods supported by the Splinter REST API.
 #[cfg(feature = "auth")]
 pub enum AuthConfig {
+    /// Biome credentials authentication
+    #[cfg(feature = "biome-credentials")]
+    Biome {
+        biome_resource_manager: BiomeRestResourceManager,
+    },
     /// OAuth authentication
     #[cfg(feature = "oauth")]
     OAuth {
