@@ -188,7 +188,7 @@ where
                 let mut arguments_map: HashMap<(String, String), Vec<(String, String)>> =
                     HashMap::new();
                 for (proposed_service, opt_arg) in proposed_service::table
-                    .inner_join(
+                    .left_join(
                         proposed_service_argument::table.on(proposed_service::service_id
                             .eq(proposed_service_argument::service_id)
                             .and(

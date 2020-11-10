@@ -137,7 +137,7 @@ where
                     // which matched the predicates.
                     .filter(service::circuit_id.eq_any(&circuit_ids))
                     // Joins a `service_argument` entry to a `service` entry, based on `service_id`.
-                    .inner_join(
+                    .left_join(
                         service_argument::table.on(service::service_id
                             .eq(service_argument::service_id)
                             .and(service_argument::circuit_id.eq(service::circuit_id))),

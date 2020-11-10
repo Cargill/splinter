@@ -58,7 +58,7 @@ where
             // The `service` table has a one-to-many relationship with the `service_argument` table.
             // The `inner_join` will retrieve the `service` and all `service_argument` entries
             // with the matching `circuit_id` and `service_id`.
-            .inner_join(
+            .left_join(
                 service_argument::table.on(service::circuit_id
                     .eq(service_argument::circuit_id)
                     .and(service::service_id.eq(service_argument::service_id))),
