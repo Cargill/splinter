@@ -40,6 +40,7 @@ use crate::error::{
 use crate::hex::{parse_hex, to_hex};
 
 /// A YAML backed implementation of the `AdminServiceStore`
+#[derive(Clone)]
 pub struct YamlAdminServiceStore {
     circuit_file_path: String,
     proposal_file_path: String,
@@ -999,6 +1000,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 .to_vec();
 
         Ok(Box::new(services.into_iter()))
+    }
+
+    fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
+        Box::new(self.clone())
     }
 }
 

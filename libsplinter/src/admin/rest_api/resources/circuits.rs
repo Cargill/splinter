@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::circuit::{Circuit, Roster, ServiceDefinition};
+use crate::admin::store::{Circuit, Service};
 use crate::rest_api::paging::Paging;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
@@ -34,9 +34,9 @@ pub(crate) struct CircuitResponse<'a> {
 impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
     fn from(circuit: &'a Circuit) -> Self {
         Self {
-            id: circuit.id(),
+            id: circuit.circuit_id(),
             members: circuit.members().to_vec(),
-            roster: circuit.roster().into(),
+            roster: circuit.roster().iter().map(ServiceResponse::from).collect(),
             management_type: circuit.circuit_management_type(),
         }
     }
@@ -46,28 +46,21 @@ impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
 pub(crate) struct ServiceResponse<'a> {
     pub service_id: &'a str,
     pub service_type: &'a str,
-    pub allowed_nodes: &'a [String],
-    pub arguments: &'a BTreeMap<String, String>,
+    pub allowed_nodes: Vec<String>,
+    pub arguments: BTreeMap<String, String>,
 }
 
-impl<'a> From<&'a ServiceDefinition> for ServiceResponse<'a> {
-    fn from(service_def: &'a ServiceDefinition) -> Self {
+impl<'a> From<&'a Service> for ServiceResponse<'a> {
+    fn from(service_def: &'a Service) -> Self {
         Self {
             service_id: service_def.service_id(),
             service_type: service_def.service_type(),
-            allowed_nodes: service_def.allowed_nodes(),
-            arguments: service_def.arguments(),
-        }
-    }
-}
-
-impl<'a> From<&'a Roster> for Vec<ServiceResponse<'a>> {
-    fn from(roster: &'a Roster) -> Self {
-        match roster {
-            Roster::Standard(service_defs) => {
-                service_defs.iter().map(ServiceResponse::from).collect()
-            }
-            Roster::Admin => vec![],
+            allowed_nodes: vec![service_def.node_id().to_string()],
+            arguments: service_def
+                .arguments()
+                .iter()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect::<BTreeMap<String, String>>(),
         }
     }
 }

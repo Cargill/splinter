@@ -165,6 +165,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
     }
+
+    fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -249,6 +253,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
+    }
+
+    fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
+        Box::new(self.clone())
     }
 }
 

@@ -19,7 +19,7 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 use std::collections::HashMap;
 
-use crate::circuit::store::{CircuitFilter, CircuitStore};
+use crate::admin::store::{AdminServiceStore, CircuitPredicate};
 use crate::protocol;
 use crate::rest_api::{
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
@@ -29,7 +29,7 @@ use crate::rest_api::{
 use super::super::error::CircuitListError;
 use super::super::resources::circuits::{CircuitResponse, ListCircuitsResponse};
 
-pub fn make_list_circuits_resource<T: CircuitStore + 'static>(store: T) -> Resource {
+pub fn make_list_circuits_resource(store: Box<dyn AdminServiceStore>) -> Resource {
     Resource::build("/admin/circuits")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::ADMIN_LIST_CIRCUITS_MIN,
@@ -40,9 +40,9 @@ pub fn make_list_circuits_resource<T: CircuitStore + 'static>(store: T) -> Resou
         })
 }
 
-fn list_circuits<T: CircuitStore + 'static>(
+fn list_circuits(
     req: HttpRequest,
-    store: web::Data<T>,
+    store: web::Data<Box<dyn AdminServiceStore>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
@@ -108,17 +108,28 @@ fn list_circuits<T: CircuitStore + 'static>(
     ))
 }
 
-fn query_list_circuits<T: CircuitStore + 'static>(
-    store: web::Data<T>,
+fn query_list_circuits(
+    store: web::Data<Box<dyn AdminServiceStore>>,
     link: String,
     filters: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
-        let circuits = store.circuits(filters.map(CircuitFilter::WithMember))?;
+        let filters = {
+            if let Some(member) = filters {
+                vec![CircuitPredicate::MembersInclude(vec![member])]
+            } else {
+                vec![]
+            }
+        };
+
+        let circuits = store
+            .list_circuits(&filters)
+            .map_err(|err| CircuitListError::CircuitStoreError(err.to_string()))?;
+
         let offset_value = offset.unwrap_or(0);
-        let total = circuits.total();
+        let total = circuits.len();
         let limit_value = limit.unwrap_or_else(|| total as usize);
 
         let circuits = circuits
@@ -154,17 +165,22 @@ fn query_list_circuits<T: CircuitStore + 'static>(
 mod tests {
     use super::*;
 
+    use diesel::{
+        r2d2::{ConnectionManager as DieselConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::circuit::{
-        directory::CircuitDirectory, AuthorizationType, Circuit, DurabilityType, PersistenceType,
-        RouteType, ServiceDefinition, SplinterState,
+    use crate::admin::store::diesel::DieselAdminServiceStore;
+    use crate::admin::store::{
+        AuthorizationType, Circuit, CircuitBuilder, CircuitNode, CircuitNodeBuilder,
+        DurabilityType, PersistenceType, RouteType, ServiceBuilder,
     };
+    use crate::migrations::run_sqlite_migrations;
     use crate::rest_api::{
         paging::Paging, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
     };
-    use crate::storage::get_storage;
 
     #[test]
     /// Tests a GET /admin/circuits request with no filters returns the expected circuits.
@@ -185,8 +201,8 @@ mod tests {
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
             &to_value(vec![
-                CircuitResponse::from(&get_circuit_1()),
-                CircuitResponse::from(&get_circuit_2())
+                CircuitResponse::from(&get_circuit_2().0),
+                CircuitResponse::from(&get_circuit_1().0)
             ])
             .expect("failed to convert expected data"),
         );
@@ -228,7 +244,7 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_1())])
+            &to_value(vec![CircuitResponse::from(&get_circuit_1().0)])
                 .expect("failed to convert expected data"),
         );
 
@@ -270,7 +286,7 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_1())])
+            &to_value(vec![CircuitResponse::from(&get_circuit_2().0)])
                 .expect("failed to convert expected data"),
         );
 
@@ -312,7 +328,7 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_2())])
+            &to_value(vec![CircuitResponse::from(&get_circuit_1().0)])
                 .expect("failed to convert expected data"),
         );
 
@@ -364,58 +380,106 @@ mod tests {
         }
     }
 
-    fn get_circuit_1() -> Circuit {
-        let service_definition =
-            ServiceDefinition::builder("service_1".to_string(), "type_a".to_string())
-                .with_allowed_nodes(vec!["node_1".to_string()])
-                .build();
-        Circuit::builder()
-            .with_id("circuit_1".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["node_1".to_string(), "node_2".to_string()])
-            .with_roster(vec![service_definition])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_1_type".into())
+    fn get_circuit_1() -> (Circuit, Vec<CircuitNode>) {
+        let service = ServiceBuilder::new()
+            .with_service_id("aaaa")
+            .with_service_type("type_a")
+            .with_node_id("node_1")
             .build()
-            .expect("Should have built a correct circuit")
+            .expect("Unable to build service");
+
+        let nodes = vec![
+            CircuitNodeBuilder::new()
+                .with_node_id("node_1")
+                .with_endpoints(&["tcp://localhost:8000".to_string()])
+                .build()
+                .expect("Unable to build node"),
+            CircuitNodeBuilder::new()
+                .with_node_id("node_2")
+                .with_endpoints(&["tcp://localhost:8001".to_string()])
+                .build()
+                .expect("Unable to build node"),
+        ];
+
+        (
+            CircuitBuilder::new()
+                .with_circuit_id("abcde-12345".into())
+                .with_authorization_type(&AuthorizationType::Trust)
+                .with_members(&["node_1".to_string(), "node_2".to_string()])
+                .with_roster(&[service])
+                .with_persistence(&PersistenceType::Any)
+                .with_durability(&DurabilityType::NoDurability)
+                .with_routes(&RouteType::Any)
+                .with_circuit_management_type("circuit_1_type")
+                .build()
+                .expect("Should have built a correct circuit"),
+            nodes,
+        )
     }
 
-    fn get_circuit_2() -> Circuit {
-        let service_definition =
-            ServiceDefinition::builder("service_2".to_string(), "other_type".to_string())
-                .with_allowed_nodes(vec!["node_3".to_string()])
-                .build();
-        Circuit::builder()
-            .with_id("circuit_2".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["node_3".to_string(), "node_4".to_string()])
-            .with_roster(vec![service_definition])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_2_type".into())
+    fn get_circuit_2() -> (Circuit, Vec<CircuitNode>) {
+        let service = ServiceBuilder::new()
+            .with_service_id("bbbb")
+            .with_service_type("other_type")
+            .with_node_id("node_3")
             .build()
-            .expect("Should have built a correct circuit")
+            .expect("unable to build service");
+
+        let nodes = vec![
+            CircuitNodeBuilder::new()
+                .with_node_id("node_3")
+                .with_endpoints(&["tcp://localhost:8000".to_string()])
+                .build()
+                .expect("Unable to build node"),
+            CircuitNodeBuilder::new()
+                .with_node_id("node_4")
+                .with_endpoints(&["tcp://localhost:8001".to_string()])
+                .build()
+                .expect("Unable to build node"),
+        ];
+
+        (
+            CircuitBuilder::new()
+                .with_circuit_id("efghi-56789")
+                .with_authorization_type(&AuthorizationType::Trust)
+                .with_members(&["node_3".to_string(), "node_4".to_string()])
+                .with_roster(&[service])
+                .with_persistence(&PersistenceType::Any)
+                .with_durability(&DurabilityType::NoDurability)
+                .with_routes(&RouteType::Any)
+                .with_circuit_management_type("circuit_2_type")
+                .build()
+                .expect("Should have built a correct circuit"),
+            nodes,
+        )
     }
 
-    fn setup_splinter_state() -> SplinterState {
-        let mut storage = get_storage("memory", CircuitDirectory::new).unwrap();
-        let circuit_directory = storage.write().clone();
-        SplinterState::new("memory".to_string(), circuit_directory)
+    fn setup_admin_service_store() -> Box<dyn AdminServiceStore> {
+        let connection_manager = DieselConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        Box::new(DieselAdminServiceStore::new(pool))
     }
 
-    fn filled_splinter_state() -> SplinterState {
-        let mut splinter_state = setup_splinter_state();
-        splinter_state
-            .add_circuit("circuit_1".into(), get_circuit_1())
+    fn filled_splinter_state() -> Box<dyn AdminServiceStore> {
+        let admin_store = setup_admin_service_store();
+        let (circuit, nodes) = get_circuit_1();
+        admin_store
+            .add_circuit(circuit, nodes)
             .expect("Unable to add circuit_1");
-        splinter_state
-            .add_circuit("circuit_2".into(), get_circuit_2())
+
+        let (circuit, nodes) = get_circuit_2();
+        admin_store
+            .add_circuit(circuit, nodes)
             .expect("Unable to add circuit_2");
 
-        splinter_state
+        admin_store
     }
 
     fn run_rest_api_on_open_port(

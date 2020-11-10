@@ -21,7 +21,7 @@ mod error;
 mod resources;
 
 use crate::admin::service::AdminService;
-use crate::circuit::store;
+use crate::admin::store::AdminServiceStore;
 use crate::rest_api::{Resource, RestResourceProvider};
 
 /// The admin service provides the following endpoints as REST API resources:
@@ -72,13 +72,13 @@ impl RestResourceProvider for AdminService {
 ///
 /// * `rest-api-actix`
 #[derive(Clone)]
-pub struct CircuitResourceProvider<T: store::CircuitStore> {
+pub struct CircuitResourceProvider {
     node_id: String,
-    store: T,
+    store: Box<dyn AdminServiceStore>,
 }
 
-impl<T: store::CircuitStore + 'static> CircuitResourceProvider<T> {
-    pub fn new(node_id: String, store: T) -> Self {
+impl CircuitResourceProvider {
+    pub fn new(node_id: String, store: Box<dyn AdminServiceStore>) -> Self {
         Self { node_id, store }
     }
 }
@@ -92,7 +92,7 @@ impl<T: store::CircuitStore + 'static> CircuitResourceProvider<T> {
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
 /// * `rest-api-actix`
-impl<T: store::CircuitStore + 'static> RestResourceProvider for CircuitResourceProvider<T> {
+impl RestResourceProvider for CircuitResourceProvider {
     fn resources(&self) -> Vec<Resource> {
         // Allowing unused_mut because resources must be mutable if feature rest-api-actix is
         // enabled

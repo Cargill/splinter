@@ -14,8 +14,6 @@
 
 use std::error::Error;
 
-use crate::circuit::store;
-
 #[derive(Debug)]
 pub enum ProposalFetchError {
     NotFound(String),
@@ -64,56 +62,31 @@ impl std::fmt::Display for ProposalListError {
 #[derive(Debug)]
 pub enum CircuitFetchError {
     NotFound(String),
-    CircuitStoreError(store::CircuitStoreError),
+    CircuitStoreError(String),
 }
 
-impl Error for CircuitFetchError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            CircuitFetchError::NotFound(_) => None,
-            CircuitFetchError::CircuitStoreError(err) => Some(err),
-        }
-    }
-}
+impl Error for CircuitFetchError {}
 
 impl std::fmt::Display for CircuitFetchError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             CircuitFetchError::NotFound(msg) => write!(f, "Circuit not found: {}", msg),
-            CircuitFetchError::CircuitStoreError(err) => write!(f, "{}", err),
+            CircuitFetchError::CircuitStoreError(msg) => write!(f, "{}", msg),
         }
-    }
-}
-
-impl From<store::CircuitStoreError> for CircuitFetchError {
-    fn from(err: store::CircuitStoreError) -> Self {
-        CircuitFetchError::CircuitStoreError(err)
     }
 }
 
 #[derive(Debug)]
 pub enum CircuitListError {
-    CircuitStoreError(store::CircuitStoreError),
+    CircuitStoreError(String),
 }
 
-impl Error for CircuitListError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            CircuitListError::CircuitStoreError(err) => Some(err),
-        }
-    }
-}
+impl Error for CircuitListError {}
 
 impl std::fmt::Display for CircuitListError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            CircuitListError::CircuitStoreError(err) => write!(f, "{}", err),
+            CircuitListError::CircuitStoreError(msg) => write!(f, "{}", msg),
         }
-    }
-}
-
-impl From<store::CircuitStoreError> for CircuitListError {
-    fn from(err: store::CircuitStoreError) -> Self {
-        CircuitListError::CircuitStoreError(err)
     }
 }
