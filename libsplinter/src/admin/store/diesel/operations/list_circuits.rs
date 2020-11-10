@@ -66,8 +66,6 @@ where
             .flatten()
             .collect();
 
-        println!("{:?}", members);
-
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Circuit>>, _, _>(|| {
                 // Collects circuits which match the circuit predicates

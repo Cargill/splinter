@@ -635,8 +635,6 @@ pub mod tests {
             ])])
             .expect("Unable to list circuits with members include predicate");
 
-        println!("{} circuits returned", circuits.len());
-
         assert_eq!(circuits.next(), Some(extra_circuit));
         assert_eq!(circuits.next(), None);
 
