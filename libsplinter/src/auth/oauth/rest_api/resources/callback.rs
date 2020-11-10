@@ -22,7 +22,7 @@ pub struct CallbackQuery {
 
 /// Serializes the given user tokens as a query string to pass to the client
 pub fn user_tokens_to_query_string(user_tokens: &UserTokens) -> String {
-    let mut query_string = format!("access_token={}", user_tokens.access_token());
+    let mut query_string = format!("access_token=OAuth2:{}", user_tokens.access_token());
     if let Some(duration) = user_tokens.expires_in() {
         query_string.push_str(&format!("&expires_in={}", duration.as_secs()))
     };
