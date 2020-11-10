@@ -77,6 +77,8 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "auth",
+    "biome-oauth",
     "health",
     "service-arg-validation",
     "service-endpoint",
