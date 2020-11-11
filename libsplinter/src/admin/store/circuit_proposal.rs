@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Structs for building services
+//! Structs for building circuit proposals
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::protos::admin;
 
 use super::error::BuilderError;
 use super::ProposedCircuit;
@@ -76,6 +77,64 @@ impl CircuitProposal {
             .with_votes(self.votes())
             .with_requester(self.requester())
             .with_requester_node_id(self.requester_node_id())
+    }
+
+    pub fn from_proto(mut proto: admin::CircuitProposal) -> Result<Self, BuilderError> {
+        let proposal_type = match proto.get_proposal_type() {
+            admin::CircuitProposal_ProposalType::CREATE => ProposalType::Create,
+            admin::CircuitProposal_ProposalType::UPDATE_ROSTER => ProposalType::UpdateRoster,
+            admin::CircuitProposal_ProposalType::ADD_NODE => ProposalType::AddNode,
+            admin::CircuitProposal_ProposalType::REMOVE_NODE => ProposalType::RemoveNode,
+            admin::CircuitProposal_ProposalType::DESTROY => ProposalType::Destroy,
+            admin::CircuitProposal_ProposalType::UNSET_PROPOSAL_TYPE => {
+                return Err(BuilderError::MissingField("proposal type".to_string()));
+            }
+        };
+
+        let votes = proto
+            .take_votes()
+            .into_iter()
+            .map(VoteRecord::from_proto)
+            .collect::<Result<Vec<VoteRecord>, BuilderError>>()?;
+
+        Ok(Self {
+            proposal_type,
+            circuit_id: proto.take_circuit_id(),
+            circuit_hash: proto.take_circuit_hash(),
+            circuit: ProposedCircuit::from_proto(proto.take_circuit_proposal())?,
+            votes,
+            requester: proto.take_requester(),
+            requester_node_id: proto.take_requester_node_id(),
+        })
+    }
+
+    pub fn into_proto(self) -> admin::CircuitProposal {
+        let proposal_type = match self.proposal_type {
+            ProposalType::Create => admin::CircuitProposal_ProposalType::CREATE,
+            ProposalType::UpdateRoster => admin::CircuitProposal_ProposalType::UPDATE_ROSTER,
+            ProposalType::AddNode => admin::CircuitProposal_ProposalType::ADD_NODE,
+            ProposalType::RemoveNode => admin::CircuitProposal_ProposalType::REMOVE_NODE,
+            ProposalType::Destroy => admin::CircuitProposal_ProposalType::DESTROY,
+        };
+
+        let votes = self
+            .votes
+            .into_iter()
+            .map(|vote| vote.into_proto())
+            .collect::<Vec<admin::CircuitProposal_VoteRecord>>();
+
+        let circuit = self.circuit.into_proto();
+
+        let mut proposal = admin::CircuitProposal::new();
+        proposal.set_proposal_type(proposal_type);
+        proposal.set_circuit_id(self.circuit_id.to_string());
+        proposal.set_circuit_hash(self.circuit_hash.to_string());
+        proposal.set_circuit_proposal(circuit);
+        proposal.set_votes(protobuf::RepeatedField::from_vec(votes));
+        proposal.set_requester(self.requester.to_vec());
+        proposal.set_requester_node_id(self.requester_node_id);
+
+        proposal
     }
 }
 
@@ -279,6 +338,36 @@ impl VoteRecord {
     /// Returns the node id the vote record is for
     pub fn voter_node_id(&self) -> &str {
         &self.voter_node_id
+    }
+
+    fn from_proto(mut proto: admin::CircuitProposal_VoteRecord) -> Result<Self, BuilderError> {
+        let vote = match proto.get_vote() {
+            admin::CircuitProposalVote_Vote::ACCEPT => Vote::Accept,
+            admin::CircuitProposalVote_Vote::REJECT => Vote::Reject,
+            admin::CircuitProposalVote_Vote::UNSET_VOTE => {
+                return Err(BuilderError::MissingField("vote".to_string()));
+            }
+        };
+
+        Ok(Self {
+            public_key: proto.take_public_key(),
+            vote,
+            voter_node_id: proto.take_voter_node_id(),
+        })
+    }
+
+    fn into_proto(self) -> admin::CircuitProposal_VoteRecord {
+        let vote = match self.vote {
+            Vote::Accept => admin::CircuitProposalVote_Vote::ACCEPT,
+            Vote::Reject => admin::CircuitProposalVote_Vote::REJECT,
+        };
+
+        let mut vote_record = admin::CircuitProposal_VoteRecord::new();
+        vote_record.set_vote(vote);
+        vote_record.set_public_key(self.public_key);
+        vote_record.set_voter_node_id(self.voter_node_id);
+
+        vote_record
     }
 }
 
