@@ -30,7 +30,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
-cylinder = "0.1"
+cylinder = "0.2"
 dirs = "2.0"
 flexi_logger = "0.14"
 log = "0.4"
