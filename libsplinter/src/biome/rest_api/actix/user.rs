@@ -15,9 +15,7 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
-use crate::biome::credentials::store::{
-    CredentialsBuilder, CredentialsStore, CredentialsStoreError,
-};
+use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::{UserStore, UserStoreError};
@@ -224,24 +222,7 @@ fn add_modify_user_method(
             match credentials.verify_password(&modify_user.hashed_password) {
                 Ok(true) => {
                     let new_password = match modify_user.new_password {
-                        Some(val) => {
-                            // Use credentials builder to salt password
-                            match CredentialsBuilder::default()
-                                .with_user_id(&credentials.user_id)
-                                .with_username(&credentials.username)
-                                .with_password_encryption_cost(encryption_cost)
-                                .with_password(&val)
-                                .build()
-                            {
-                                Ok(creds) => creds.password,
-                                Err(err) => {
-                                    debug!("Failed to salt new password: {}", err);
-                                    return HttpResponse::InternalServerError()
-                                        .json(ErrorResponse::internal_error())
-                                        .into_future();
-                                }
-                            }
-                        }
+                        Some(val) => val,
                         // If no new password, pull old password for update operation
                         None => credentials.password,
                     };
