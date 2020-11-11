@@ -14,26 +14,86 @@
 
 //! Authorization middleware for the Actix REST API
 
+use std::sync::Arc;
+
 use actix_web::dev::*;
-use actix_web::{Error as ActixError, HttpResponse};
+use actix_web::{Error as ActixError, HttpMessage, HttpResponse};
 use futures::{
     future::{ok, FutureResult},
     Future, IntoFuture, Poll,
 };
 
+use crate::error::InternalError;
 use crate::rest_api::ErrorResponse;
 
-use super::{authorize, identity::IdentityProvider, AuthorizationResult};
+use super::{
+    authorize,
+    identity::{Authorization as IdentityAuthorization, GetByAuthorization, IdentityProvider},
+    AuthorizationResult,
+};
 
 /// Wrapper for the authorization middleware
 #[derive(Clone)]
 pub struct Authorization {
     identity_providers: Vec<Box<dyn IdentityProvider>>,
+    identity_extensions: Vec<Arc<IdentityExtension>>,
+}
+
+/// This is a wrapper to avoid multiple generic types.
+struct IdentityExtension {
+    inner: Box<
+        dyn Fn(&mut Extensions, &IdentityAuthorization) -> Result<(), InternalError> + Send + Sync,
+    >,
+}
+
+impl IdentityExtension {
+    /// Wrap a GetByAuthorization implementation in an IdentityExtension, to provide the ability to
+    /// add a value from the GetByAuthorization trait to the HttpRequest.
+    fn new<G, T>(get_by_auth: G) -> Self
+    where
+        T: 'static,
+        G: GetByAuthorization<T> + Send + Sync + 'static,
+    {
+        Self {
+            inner: Box::new(move |extensions, identity_auth| {
+                debug!("executing auth mapping {}", std::any::type_name::<G>());
+                if let Some(xformed) = get_by_auth.get(identity_auth)? {
+                    extensions.insert(xformed);
+                }
+
+                Ok(())
+            }),
+        }
+    }
+
+    /// Extend the given HttpRequest::Extensions.
+    fn extend(
+        &self,
+        extensions: &mut Extensions,
+        authorization: &IdentityAuthorization,
+    ) -> Result<(), InternalError> {
+        (*self.inner)(extensions, authorization)
+    }
 }
 
 impl Authorization {
     pub fn new(identity_providers: Vec<Box<dyn IdentityProvider>>) -> Self {
-        Self { identity_providers }
+        Self {
+            identity_providers,
+            identity_extensions: Vec::new(),
+        }
+    }
+
+    /// Add an authorization mapping, provided by a GetByAuthorization implementation.
+    pub fn with_authorization_mapping<G, T>(mut self, get_by_auth: G) -> Self
+    where
+        T: 'static,
+        G: GetByAuthorization<T> + Send + Sync + 'static,
+    {
+        self.identity_extensions
+            .push(Arc::new(IdentityExtension::new(get_by_auth)));
+
+        self
     }
 }
 
@@ -53,6 +113,7 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ok(AuthorizationMiddleware {
             identity_providers: self.identity_providers.clone(),
+            identity_extensions: self.identity_extensions.clone(),
             service,
         })
     }
@@ -61,6 +122,7 @@ where
 /// Authorization middleware for the Actix REST API
 pub struct AuthorizationMiddleware<S> {
     identity_providers: Vec<Box<dyn IdentityProvider>>,
+    identity_extensions: Vec<Arc<IdentityExtension>>,
     service: S,
 }
 
@@ -102,7 +164,28 @@ where
             };
 
         match authorize(req.path(), auth_header, &self.identity_providers) {
-            AuthorizationResult::Authorized(_identity) => {}
+            AuthorizationResult::Authorized {
+                authorization,
+                identity,
+            } => {
+                for identity_extension in self.identity_extensions.iter() {
+                    let res =
+                        { identity_extension.extend(&mut req.extensions_mut(), &authorization) };
+
+                    if let Err(err) = res {
+                        error!("Unable to transform extension: {}", err);
+                        return Box::new(
+                            req.into_response(
+                                HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
+                                    .into_body(),
+                            )
+                            .into_future(),
+                        );
+                    }
+                }
+                debug!("Authenticated user {}", identity);
+            }
             AuthorizationResult::NoAuthorizationNecessary => {}
             AuthorizationResult::Unauthorized => {
                 return Box::new(
