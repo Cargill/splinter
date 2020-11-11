@@ -40,8 +40,8 @@ impl User {
     }
 
     /// Returns the user's id.
-    pub fn id(&self) -> String {
-        self.id.to_string()
+    pub fn id(&self) -> &str {
+        &self.id
     }
 }
 
