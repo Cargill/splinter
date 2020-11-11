@@ -31,14 +31,14 @@ use std::sync::{Arc, Mutex};
 use self::error::YamlAdminStoreError;
 
 use super::{
-    error::BuilderError, AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit,
-    CircuitBuilder, CircuitNode, CircuitNodeBuilder, CircuitPredicate, CircuitProposal,
-    CircuitProposalBuilder, DurabilityType, PersistenceType, ProposalType, ProposedCircuit,
-    ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder, ProposedService,
-    ProposedServiceBuilder, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
-    VoteRecordBuilder,
+    AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit, CircuitBuilder,
+    CircuitNode, CircuitNodeBuilder, CircuitPredicate, CircuitProposal, CircuitProposalBuilder,
+    DurabilityType, PersistenceType, ProposalType, ProposedCircuit, ProposedCircuitBuilder,
+    ProposedNode, ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, Service,
+    ServiceBuilder, ServiceId, Vote, VoteRecord, VoteRecordBuilder,
 };
 
+use crate::error::InvalidStateError;
 use crate::hex::{parse_hex, to_hex};
 
 /// A YAML backed implementation of the `AdminServiceStore`
@@ -1028,7 +1028,7 @@ struct YamlCircuit {
 }
 
 impl TryFrom<YamlCircuit> for Circuit {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(circuit: YamlCircuit) -> Result<Self, Self::Error> {
         CircuitBuilder::new()
@@ -1038,7 +1038,7 @@ impl TryFrom<YamlCircuit> for Circuit {
                     .roster
                     .into_iter()
                     .map(Service::try_from)
-                    .collect::<Result<Vec<Service>, BuilderError>>()?,
+                    .collect::<Result<Vec<Service>, InvalidStateError>>()?,
             )
             .with_members(&circuit.members)
             .with_authorization_type(&AuthorizationType::from(circuit.auth))
@@ -1082,17 +1082,15 @@ struct YamlService {
 }
 
 impl TryFrom<YamlService> for Service {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(service: YamlService) -> Result<Self, Self::Error> {
         ServiceBuilder::new()
             .with_service_id(&service.service_id)
             .with_service_type(&service.service_type)
-            .with_node_id(
-                &service.allowed_nodes.get(0).ok_or_else(|| {
-                    BuilderError::InvalidField("Must contain 1 node ID".to_string())
-                })?,
-            )
+            .with_node_id(&service.allowed_nodes.get(0).ok_or_else(|| {
+                InvalidStateError::with_message("Must contain 1 node ID".to_string())
+            })?)
             .with_arguments(
                 &service
                     .arguments
@@ -1127,7 +1125,7 @@ struct YamlCircuitState {
 }
 
 impl TryFrom<YamlCircuitState> for CircuitState {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(state: YamlCircuitState) -> Result<Self, Self::Error> {
         Ok(CircuitState {
@@ -1135,7 +1133,7 @@ impl TryFrom<YamlCircuitState> for CircuitState {
                 .nodes
                 .into_iter()
                 .map(|(id, node)| CircuitNode::try_from(node).map(|node| (id, node)))
-                .collect::<Result<BTreeMap<String, CircuitNode>, BuilderError>>()?,
+                .collect::<Result<BTreeMap<String, CircuitNode>, InvalidStateError>>()?,
             circuits: state
                 .circuits
                 .into_iter()
@@ -1143,7 +1141,7 @@ impl TryFrom<YamlCircuitState> for CircuitState {
                     Ok(circuit) => Ok((id, circuit)),
                     Err(err) => Err(err),
                 })
-                .collect::<Result<BTreeMap<String, Circuit>, BuilderError>>()?,
+                .collect::<Result<BTreeMap<String, Circuit>, InvalidStateError>>()?,
         })
     }
 }
@@ -1200,7 +1198,7 @@ impl From<ProposalState> for YamlProposalState {
 }
 
 impl TryFrom<YamlProposalState> for ProposalState {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(state: YamlProposalState) -> Result<Self, Self::Error> {
         Ok(ProposalState {
@@ -1211,13 +1209,13 @@ impl TryFrom<YamlProposalState> for ProposalState {
                     Ok(proposal) => Ok((id, proposal)),
                     Err(err) => Err(err),
                 })
-                .collect::<Result<BTreeMap<String, CircuitProposal>, BuilderError>>()?,
+                .collect::<Result<BTreeMap<String, CircuitProposal>, InvalidStateError>>()?,
         })
     }
 }
 
 impl TryFrom<YamlCircuitProposal> for CircuitProposal {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(proposal: YamlCircuitProposal) -> Result<Self, Self::Error> {
         CircuitProposalBuilder::new()
@@ -1230,10 +1228,10 @@ impl TryFrom<YamlCircuitProposal> for CircuitProposal {
                     .votes
                     .into_iter()
                     .map(VoteRecord::try_from)
-                    .collect::<Result<Vec<VoteRecord>, BuilderError>>()?,
+                    .collect::<Result<Vec<VoteRecord>, InvalidStateError>>()?,
             )
             .with_requester(&parse_hex(&proposal.requester).map_err(|_| {
-                BuilderError::InvalidField("Requester public key is not valid hex".to_string())
+                InvalidStateError::with_message("Requester public key is not valid hex".to_string())
             })?)
             .with_requester_node_id(&proposal.requester_node_id)
             .build()
@@ -1302,12 +1300,12 @@ pub struct YamlVoteRecord {
 }
 
 impl TryFrom<YamlVoteRecord> for VoteRecord {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(vote: YamlVoteRecord) -> Result<Self, Self::Error> {
         VoteRecordBuilder::new()
             .with_public_key(&parse_hex(&vote.public_key).map_err(|_| {
-                BuilderError::InvalidField("Requester public key is not valid hex".to_string())
+                InvalidStateError::with_message("Requester public key is not valid hex".to_string())
             })?)
             .with_vote(&Vote::from(vote.vote))
             .with_voter_node_id(&vote.voter_node_id)
@@ -1343,7 +1341,7 @@ struct YamlProposedCircuit {
 }
 
 impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(circuit: YamlProposedCircuit) -> Result<Self, Self::Error> {
         ProposedCircuitBuilder::new()
@@ -1353,14 +1351,14 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
                     .roster
                     .into_iter()
                     .map(ProposedService::try_from)
-                    .collect::<Result<Vec<ProposedService>, BuilderError>>()?,
+                    .collect::<Result<Vec<ProposedService>, InvalidStateError>>()?,
             )
             .with_members(
                 &circuit
                     .members
                     .into_iter()
                     .map(ProposedNode::try_from)
-                    .collect::<Result<Vec<ProposedNode>, BuilderError>>()?,
+                    .collect::<Result<Vec<ProposedNode>, InvalidStateError>>()?,
             )
             .with_authorization_type(&AuthorizationType::from(circuit.authorization_type))
             .with_persistence(&PersistenceType::from(circuit.persistence))
@@ -1368,7 +1366,7 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
             .with_routes(&RouteType::from(circuit.routes))
             .with_circuit_management_type(&circuit.circuit_management_type)
             .with_application_metadata(&parse_hex(&circuit.application_metadata).map_err(|_| {
-                BuilderError::InvalidField("Requester public key is not valid hex".to_string())
+                InvalidStateError::with_message("Requester public key is not valid hex".to_string())
             })?)
             .with_comments(&circuit.comments)
             .build()
@@ -1411,17 +1409,15 @@ pub struct YamlProposedService {
 }
 
 impl TryFrom<YamlProposedService> for ProposedService {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(service: YamlProposedService) -> Result<Self, Self::Error> {
         ProposedServiceBuilder::new()
             .with_service_id(&service.service_id)
             .with_service_type(&service.service_type)
-            .with_node_id(
-                &service.allowed_nodes.get(0).ok_or_else(|| {
-                    BuilderError::InvalidField("Must contain 1 node ID".to_string())
-                })?,
-            )
+            .with_node_id(&service.allowed_nodes.get(0).ok_or_else(|| {
+                InvalidStateError::with_message("Must contain 1 node ID".to_string())
+            })?)
             .with_arguments(
                 &service
                     .arguments
@@ -1456,7 +1452,7 @@ pub struct YamlProposedNode {
 }
 
 impl TryFrom<YamlProposedNode> for ProposedNode {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(node: YamlProposedNode) -> Result<Self, Self::Error> {
         ProposedNodeBuilder::new()
@@ -1580,7 +1576,7 @@ impl From<CircuitNode> for YamlCircuitNode {
 }
 
 impl TryFrom<YamlCircuitNode> for CircuitNode {
-    type Error = BuilderError;
+    type Error = InvalidStateError;
 
     fn try_from(yaml_circuit_node: YamlCircuitNode) -> Result<Self, Self::Error> {
         CircuitNodeBuilder::new()

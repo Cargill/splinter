@@ -122,21 +122,3 @@ impl From<diesel::r2d2::PoolError> for AdminServiceStoreError {
         }
     }
 }
-
-/// Represents errors raised while building
-#[derive(Debug)]
-pub enum BuilderError {
-    InvalidField(String),
-    MissingField(String),
-}
-
-impl Error for BuilderError {}
-
-impl std::fmt::Display for BuilderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            BuilderError::InvalidField(ref s) => write!(f, "unable to build, invalid field: {}", s),
-            BuilderError::MissingField(ref s) => write!(f, "unable to build, missing field: {}", s),
-        }
-    }
-}
