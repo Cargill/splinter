@@ -18,11 +18,45 @@ use uuid::Uuid;
 
 use crate::auth::{
     oauth::{rest_api::SaveTokensOperation, UserTokens},
-    rest_api::identity::{Authorization, BearerToken, IdentityProvider},
+    rest_api::identity::{Authorization, BearerToken, GetByAuthorization, IdentityProvider},
 };
 use crate::biome::oauth::store::{OAuthProvider, OAuthUserBuilder, OAuthUserStore};
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
+
+/// A `GetByAuthorization` implementation that returns an `User`.
+pub struct GetUserByOAuthAuthorization {
+    oauth_user_store: Box<dyn OAuthUserStore>,
+}
+
+impl GetUserByOAuthAuthorization {
+    /// Construct a new `GetUserByOAuthAuthorization` over an `OAuthUserStore` implementation.
+    pub fn new(oauth_user_store: Box<dyn OAuthUserStore>) -> Self {
+        Self { oauth_user_store }
+    }
+}
+
+impl GetByAuthorization<User> for GetUserByOAuthAuthorization {
+    fn get(&self, authorization: &Authorization) -> Result<Option<User>, InternalError> {
+        match authorization {
+            Authorization::Bearer(BearerToken::OAuth2(access_token)) => {
+                debug!("Getting user for access token {}", access_token);
+                self.oauth_user_store
+                    .get_by_access_token(&access_token)
+                    .map(|opt_oauth_user| {
+                        opt_oauth_user.map(|oauth_user| User::new(oauth_user.user_id()))
+                    })
+                    .map_err(|e| {
+                        InternalError::from_source_with_message(
+                            Box::new(e),
+                            "Unable to load oauth user".into(),
+                        )
+                    })
+            }
+            _ => Ok(None),
+        }
+    }
+}
 
 /// Biome-backed implementation of the SaveTokensOperation trait.
 ///
