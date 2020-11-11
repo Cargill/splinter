@@ -250,6 +250,12 @@ pub trait OAuthUserStore: Send + Sync {
         provider_user_ref: &str,
     ) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
 
+    /// Returns the stored OAuth user based on the access token from the OAuth provider.
+    fn get_by_access_token(
+        &self,
+        access_token: &str,
+    ) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+
     /// Returns the stored OAuth user based on the biome user ID.
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
 
