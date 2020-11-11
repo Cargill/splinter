@@ -35,6 +35,8 @@ use super::{
     Service, ServiceId,
 };
 
+const ADMIN_CIRCUIT_ID: &str = "admin";
+
 /// The internal state of the routing table that will be wrapped in a read-write lock
 #[derive(Clone, Default)]
 struct RoutingTableState {
@@ -149,13 +151,25 @@ impl RoutingTableReader for RoutingTable {
     ///
     /// Returns an error if the lock is poisoned
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError> {
-        Ok(self
-            .state
-            .read()
-            .map_err(|_| FetchCircuitError(String::from("RoutingTable lock poisoned")))?
-            .circuits
-            .get(circuit_id)
-            .cloned())
+        if circuit_id == ADMIN_CIRCUIT_ID {
+            Ok(Some(Circuit::new(
+                ADMIN_CIRCUIT_ID.to_string(),
+                vec![],
+                vec![],
+            )))
+        } else {
+            Ok(self
+                .state
+                .read()
+                .map_err(|_| FetchCircuitError(String::from("RoutingTable lock poisoned")))?
+                .circuits
+                .get(circuit_id)
+                .cloned())
+        }
+    }
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableReader> {
+        Box::new(self.clone())
     }
 }
 
@@ -345,6 +359,10 @@ impl RoutingTableWriter for RoutingTable {
             .remove(id);
         Ok(())
     }
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableWriter> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(test)]
@@ -382,6 +400,7 @@ mod test {
                 service_type: "test".to_string(),
                 node_id: format!("endpoint_{}", x),
                 arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+                peer_id: None,
             };
             roster.push(service.clone());
             nodes.push(node.clone());
@@ -535,6 +554,7 @@ mod test {
             service_type: "test".to_string(),
             node_id: "endpoint_0".to_string(),
             arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+            peer_id: None,
         };
         let node1 = CircuitNode {
             node_id: "node-1".to_string(),
@@ -545,6 +565,7 @@ mod test {
             service_type: "test".to_string(),
             node_id: "endpoint_1".to_string(),
             arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+            peer_id: None,
         };
         let circuit = Circuit {
             circuit_id: "012-abc".to_string(),

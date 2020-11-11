@@ -45,141 +45,6 @@ use self::error::{
     ListServiceError, RemoveCircuitError, RemoveNodeError, RemoveServiceError,
 };
 
-/// The routing table representation of a circuit. It is simplified to only contain the required
-/// values for routing.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Circuit {
-    circuit_id: String,
-    roster: Vec<Service>,
-    members: Vec<String>,
-}
-
-impl Circuit {
-    /// Creates a new `Circuit`
-    ///
-    /// # Arguments
-    ///
-    /// * `circuit_id` -  The unique ID for the circuit
-    /// * `roster` - The list of services in the circuit
-    /// * `members` - The list of node IDs for the members of a circuit
-    pub fn new(circuit_id: String, roster: Vec<Service>, members: Vec<String>) -> Self {
-        Circuit {
-            circuit_id,
-            roster,
-            members,
-        }
-    }
-}
-
-/// The routing table representation of a node
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CircuitNode {
-    node_id: String,
-    endpoints: Vec<String>,
-}
-
-impl CircuitNode {
-    /// Creates a new `CircuitNode`
-    ///
-    /// # Arguments
-    ///
-    /// * `node_id` -  The unique ID for the circuit
-    /// * `endpoints` -  A list of endpoints the node can be reached at
-    pub fn new(node_id: String, endpoints: Vec<String>) -> Self {
-        CircuitNode { node_id, endpoints }
-    }
-}
-
-impl Ord for CircuitNode {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.node_id.cmp(&other.node_id)
-    }
-}
-
-impl PartialOrd for CircuitNode {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-/// The routing table representation of a service
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Service {
-    service_id: String,
-    service_type: String,
-    node_id: String,
-    arguments: Vec<(String, String)>,
-}
-
-impl Service {
-    /// Creates a new `Service`
-    ///
-    /// # Arguments
-    ///
-    /// * `service_id` -  The unique ID for the service
-    /// * `service_type` - The type of service this is
-    /// * `node_id` - The node ID that this service can connect to
-    /// * `arguments` - The key-value pairs of arguments that will be passed to the service
-    pub fn new(
-        service_id: String,
-        service_type: String,
-        node_id: String,
-        arguments: Vec<(String, String)>,
-    ) -> Self {
-        Service {
-            service_id,
-            service_type,
-            node_id,
-            arguments,
-        }
-    }
-}
-
-/// The unique ID of a service made up of a circuit ID and service ID
-#[derive(Clone, Debug, Hash, PartialEq)]
-pub struct ServiceId {
-    circuit_id: String,
-    service_id: String,
-}
-
-impl ServiceId {
-    /// Creates a new `ServiceId`
-    ///
-    /// # Arguments
-    ///
-    /// * `circuit_id` -  The unique ID for the circuit this service belongs to
-    /// * `service_id` -  The unique ID for the service
-    pub fn new(circuit_id: String, service_id: String) -> Self {
-        ServiceId {
-            circuit_id,
-            service_id,
-        }
-    }
-
-    /// Returns the circuit ID
-    pub fn circuit(&self) -> &str {
-        &self.circuit_id
-    }
-
-    /// Returns the service ID
-    pub fn service_id(&self) -> &str {
-        &self.service_id
-    }
-
-    /// Decompose the service ID into a tuple of (<circuit ID>, <service ID>).
-    pub fn into_parts(self) -> (String, String) {
-        (self.circuit_id, self.service_id)
-    }
-}
-
-impl fmt::Display for ServiceId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}::{}", self.circuit_id, self.service_id)
-    }
-}
-
-impl Eq for ServiceId {}
-
 /// Interface for updating the routing table
 pub trait RoutingTableWriter: Send {
     /// Adds a new service to the routing table
@@ -251,6 +116,14 @@ pub trait RoutingTableWriter: Send {
     ///
     /// * `node_id` - The unique ID for the node that should be removed
     fn remove_node(&mut self, node_id: &str) -> Result<(), RemoveNodeError>;
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableWriter>;
+}
+
+impl Clone for Box<dyn RoutingTableWriter> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }
 
 /// Type returned by the `RoutingTableReader::list_nodes` method
@@ -298,4 +171,197 @@ pub trait RoutingTableReader: Send {
     ///
     /// * `circuit_id` - The unique ID for the circuit to be fetched
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError>;
+
+    fn clone_boxed(&self) -> Box<dyn RoutingTableReader>;
 }
+
+impl Clone for Box<dyn RoutingTableReader> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
+}
+
+/// The routing table representation of a circuit. It is simplified to only contain the required
+/// values for routing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Circuit {
+    circuit_id: String,
+    roster: Vec<Service>,
+    members: Vec<String>,
+}
+
+impl Circuit {
+    /// Creates a new `Circuit`
+    ///
+    /// # Arguments
+    ///
+    /// * `circuit_id` -  The unique ID for the circuit
+    /// * `roster` - The list of services in the circuit
+    /// * `members` - The list of node IDs for the members of a circuit
+    pub fn new(circuit_id: String, roster: Vec<Service>, members: Vec<String>) -> Self {
+        Circuit {
+            circuit_id,
+            roster,
+            members,
+        }
+    }
+
+    /// Returns the ID of the circuit
+    pub fn circuit_id(&self) -> &str {
+        &self.circuit_id
+    }
+
+    /// Returns the list of service that are in the circuit
+    pub fn roster(&self) -> &[Service] {
+        &self.roster
+    }
+
+    /// Returns the list of node IDs that are in the circuit
+    pub fn members(&self) -> &[String] {
+        &self.members
+    }
+}
+
+/// The routing table representation of a node
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CircuitNode {
+    node_id: String,
+    endpoints: Vec<String>,
+}
+
+impl CircuitNode {
+    /// Creates a new `CircuitNode`
+    ///
+    /// # Arguments
+    ///
+    /// * `node_id` -  The unique ID for the circuit
+    /// * `endpoints` -  A list of endpoints the node can be reached at
+    pub fn new(node_id: String, endpoints: Vec<String>) -> Self {
+        CircuitNode { node_id, endpoints }
+    }
+}
+
+impl Ord for CircuitNode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.node_id.cmp(&other.node_id)
+    }
+}
+
+impl PartialOrd for CircuitNode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// The routing table representation of a service
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Service {
+    service_id: String,
+    service_type: String,
+    node_id: String,
+    arguments: Vec<(String, String)>,
+    peer_id: Option<String>,
+}
+
+impl Service {
+    /// Creates a new `Service`
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` -  The unique ID for the service
+    /// * `service_type` - The type of service this is
+    /// * `node_id` - The node ID that this service can connect to
+    /// * `arguments` - The key-value pairs of arguments that will be passed to the service
+    pub fn new(
+        service_id: String,
+        service_type: String,
+        node_id: String,
+        arguments: Vec<(String, String)>,
+    ) -> Self {
+        Service {
+            service_id,
+            service_type,
+            node_id,
+            arguments,
+            peer_id: None,
+        }
+    }
+
+    /// Returns the ID of the service
+    pub fn service_id(&self) -> &str {
+        &self.service_id
+    }
+
+    /// Returns the service type of the service
+    pub fn service_type(&self) -> &str {
+        &self.service_type
+    }
+
+    /// Returns the node ID of the node the service can connect to
+    pub fn node_id(&self) -> &str {
+        &self.node_id
+    }
+
+    /// Returns the list of key/value arugments for the service
+    pub fn arguments(&self) -> &[(String, String)] {
+        &self.arguments
+    }
+
+    /// Returns the local peer ID for the service
+    pub fn peer_id(&self) -> &Option<String> {
+        &self.peer_id
+    }
+
+    pub fn set_peer_id(&mut self, peer_id: String) {
+        self.peer_id = Some(peer_id)
+    }
+
+    pub fn remove_peer_id(&mut self) {
+        self.peer_id = None
+    }
+}
+
+/// The unique ID of a service made up of a circuit ID and service ID
+#[derive(Clone, Debug, Hash, PartialEq)]
+pub struct ServiceId {
+    circuit_id: String,
+    service_id: String,
+}
+
+impl ServiceId {
+    /// Creates a new `ServiceId`
+    ///
+    /// # Arguments
+    ///
+    /// * `circuit_id` -  The unique ID for the circuit this service belongs to
+    /// * `service_id` -  The unique ID for the service
+    pub fn new(circuit_id: String, service_id: String) -> Self {
+        ServiceId {
+            circuit_id,
+            service_id,
+        }
+    }
+
+    /// Returns the circuit ID
+    pub fn circuit(&self) -> &str {
+        &self.circuit_id
+    }
+
+    /// Returns the service ID
+    pub fn service_id(&self) -> &str {
+        &self.service_id
+    }
+
+    /// Decompose the service ID into a tuple of (<circuit ID>, <service ID>).
+    pub fn into_parts(self) -> (String, String) {
+        (self.circuit_id, self.service_id)
+    }
+}
+
+impl fmt::Display for ServiceId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::{}", self.circuit_id, self.service_id)
+    }
+}
+
+impl Eq for ServiceId {}
