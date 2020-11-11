@@ -17,7 +17,13 @@
 use std::sync::Arc;
 
 use actix_web::dev::*;
-use actix_web::{Error as ActixError, HttpMessage, HttpResponse};
+use actix_web::{
+    http::{
+        header::{self, HeaderValue},
+        Method,
+    },
+    Error as ActixError, HttpMessage, HttpResponse,
+};
 use futures::{
     future::{ok, FutureResult},
     Future, IntoFuture, Poll,
@@ -142,6 +148,17 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
+        if req.method() == Method::OPTIONS {
+            return Box::new(self.service.call(req).and_then(|mut res| {
+                res.headers_mut().insert(
+                    header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                    HeaderValue::from_static("true"),
+                );
+
+                res
+            }));
+        }
+
         let auth_header =
             match req
                 .headers()
@@ -195,6 +212,13 @@ where
             }
         }
 
-        Box::new(self.service.call(req))
+        Box::new(self.service.call(req).and_then(|mut res| {
+            res.headers_mut().insert(
+                header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                HeaderValue::from_static("true"),
+            );
+
+            res
+        }))
     }
 }
