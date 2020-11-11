@@ -66,8 +66,6 @@ where
             .flatten()
             .collect();
 
-        println!("{:?}", members);
-
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Circuit>>, _, _>(|| {
                 // Collects circuits which match the circuit predicates
@@ -89,19 +87,19 @@ where
                     ));
                 }
 
-                let circuits: HashMap<String, CircuitModel> = query
+                let circuits: Vec<CircuitModel> = query
+                    .order(circuit::circuit_id.desc())
                     .load::<CircuitModel>(self.conn)
                     .map_err(|err| AdminServiceStoreError::QueryError {
                         context: String::from("Unable to load Circuit information"),
                         source: Box::new(err),
-                    })?
-                    // Once the `CircuitModels` have been collected, organize into a HashMap
-                    .into_iter()
-                    .map(|model| (model.circuit_id.to_string(), model))
-                    .collect();
+                    })?;
 
                 // Store circuit IDs separately to make it easier to filter following queries
-                let circuit_ids: Vec<String> = circuits.keys().cloned().collect();
+                let circuit_ids: Vec<&str> = circuits
+                    .iter()
+                    .map(|circuit| circuit.circuit_id.as_str())
+                    .collect();
 
                 // Collect the `Circuit` members and put them in a HashMap to associate the list
                 // of `node_ids` to the `circuit_id`
@@ -139,7 +137,7 @@ where
                     // which matched the predicates.
                     .filter(service::circuit_id.eq_any(&circuit_ids))
                     // Joins a `service_argument` entry to a `service` entry, based on `service_id`.
-                    .inner_join(
+                    .left_join(
                         service_argument::table.on(service::service_id
                             .eq(service_argument::service_id)
                             .and(service_argument::circuit_id.eq(service::circuit_id))),
@@ -211,7 +209,7 @@ where
                 }
 
                 let mut ret_circuits: Vec<Circuit> = Vec::new();
-                for (id, model) in circuits {
+                for model in circuits {
                     let mut circuit_builder = CircuitBuilder::new()
                         .with_circuit_id(&model.circuit_id)
                         .with_authorization_type(&AuthorizationType::try_from(
@@ -222,10 +220,10 @@ where
                         .with_routes(&RouteType::try_from(model.routes)?)
                         .with_circuit_management_type(&model.circuit_management_type);
 
-                    if let Some(members) = circuit_members.get(&id) {
+                    if let Some(members) = circuit_members.get(&model.circuit_id) {
                         circuit_builder = circuit_builder.with_members(&members);
                     }
-                    if let Some(services) = built_services.get(&id) {
+                    if let Some(services) = built_services.get(&model.circuit_id) {
                         circuit_builder = circuit_builder.with_roster(&services);
                     }
 
