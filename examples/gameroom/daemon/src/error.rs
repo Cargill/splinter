@@ -15,7 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
-use sawtooth_sdk::signing::Error as KeyGenError;
+use cylinder::ContextError;
 
 use crate::authorization_handler::AppAuthHandlerError;
 use crate::rest_api::RestApiServerError;
@@ -28,7 +28,7 @@ pub enum GameroomDaemonError {
     DatabaseError(Box<DatabaseError>),
     RestApiError(RestApiServerError),
     AppAuthHandlerError(AppAuthHandlerError),
-    KeyGenError(KeyGenError),
+    SigningContextError(ContextError),
     GetNodeError(GetNodeError),
 }
 
@@ -40,7 +40,7 @@ impl Error for GameroomDaemonError {
             GameroomDaemonError::DatabaseError(err) => Some(&**err),
             GameroomDaemonError::RestApiError(err) => Some(err),
             GameroomDaemonError::AppAuthHandlerError(err) => Some(err),
-            GameroomDaemonError::KeyGenError(err) => Some(err),
+            GameroomDaemonError::SigningContextError(err) => Some(err),
             GameroomDaemonError::GetNodeError(err) => Some(err),
         }
     }
@@ -60,11 +60,9 @@ impl fmt::Display for GameroomDaemonError {
                 "The application authorization handler returned an error: {}",
                 e
             ),
-            GameroomDaemonError::KeyGenError(e) => write!(
-                f,
-                "an error occurred while generating a new key pair: {}",
-                e
-            ),
+            GameroomDaemonError::SigningContextError(e) => {
+                write!(f, "A signing error occurred: {}", e)
+            }
             GameroomDaemonError::GetNodeError(e) => write!(
                 f,
                 "an error occurred while getting splinterd node information: {}",
@@ -98,9 +96,9 @@ impl From<AppAuthHandlerError> for GameroomDaemonError {
     }
 }
 
-impl From<KeyGenError> for GameroomDaemonError {
-    fn from(err: KeyGenError) -> GameroomDaemonError {
-        GameroomDaemonError::KeyGenError(err)
+impl From<ContextError> for GameroomDaemonError {
+    fn from(err: ContextError) -> GameroomDaemonError {
+        GameroomDaemonError::SigningContextError(err)
     }
 }
 
