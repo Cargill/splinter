@@ -86,6 +86,8 @@ use self::actix::token::make_token_route;
 use self::actix::user::make_user_routes;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
 use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
+#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+use self::auth::GetUserByBiomeAuthorization;
 #[cfg(feature = "biome-credentials")]
 use super::credentials::store::CredentialsStore;
 
@@ -138,6 +140,15 @@ impl BiomeRestResourceManager {
         BiomeUserIdentityProvider::new(
             self.token_secret_manager.clone(),
             default_validation(&self.rest_config.issuer()),
+        )
+    }
+
+    /// Creates a new Biome authorization mapping for Users
+    #[cfg(all(feature = "auth", feature = "biome-credentials"))]
+    pub fn get_authorization_mapping(&self) -> GetUserByBiomeAuthorization {
+        GetUserByBiomeAuthorization::new(
+            self.rest_config.clone(),
+            self.token_secret_manager.clone(),
         )
     }
 }

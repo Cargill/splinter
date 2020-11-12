@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "biome-credentials")]
+mod credentials;
 #[cfg(feature = "biome-oauth")]
 mod oauth;
 
+#[cfg(feature = "biome-credentials")]
+pub use credentials::GetUserByBiomeAuthorization;
 #[cfg(feature = "biome-oauth")]
 pub use oauth::GetUserByOAuthAuthorization;
 #[cfg(feature = "biome-oauth")]
