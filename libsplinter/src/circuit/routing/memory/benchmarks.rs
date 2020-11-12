@@ -44,6 +44,7 @@ fn generate_circuits(num_circuits: i64, total_num_node: i64) -> (Vec<Circuit>, V
             service_type: "benchmark".to_string(),
             node_id: format!("inproc://node_{}", i),
             arguments: vec![("peer_services".to_string(), "node-000".to_string())],
+            peer_id: Some("benchmark_peer_id".to_string()),
         };
         nodes.push((node, service));
     }
