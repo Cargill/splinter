@@ -46,7 +46,7 @@ impl IdentityProvider for BiomeUserIdentityProvider {
     fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError> {
         let token = match authorization {
             Authorization::Bearer(BearerToken::Biome(token)) => token,
-            _ => return Err(IdentityProviderError::UnsupportedAuth),
+            _ => return Err(IdentityProviderError::Unauthorized),
         };
 
         let secret = self

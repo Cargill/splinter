@@ -104,19 +104,6 @@ where
         match authorize(req.path(), auth_header, &self.identity_providers) {
             AuthorizationResult::Authorized(_identity) => {}
             AuthorizationResult::NoAuthorizationNecessary => {}
-            AuthorizationResult::InvalidAuthorization(auth_str) => {
-                return Box::new(
-                    req.into_response(
-                        HttpResponse::BadRequest()
-                            .json(ErrorResponse::bad_request(&format!(
-                                "The provided authorization header is not supported: {}",
-                                auth_str
-                            )))
-                            .into_body(),
-                    )
-                    .into_future(),
-                )
-            }
             AuthorizationResult::Unauthorized => {
                 return Box::new(
                     req.into_response(HttpResponse::Unauthorized().finish().into_body())
