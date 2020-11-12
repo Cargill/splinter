@@ -65,8 +65,16 @@ services:
         - REPO_VERSION=${REPO_VERSION}
     entrypoint: |
       bash -c "
+        until PGPASSWORD=gameroom_test psql -h db-test -U gameroom_test -c '\q'; do
+            >&2 echo \"Database is unavailable - sleeping\"
+            sleep 1
+        done &&
+        splinter database migrate -C postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test &&
         splinter cert generate --skip &&
-        splinterd -c ./project/tests/splinterd-node-0-docker.toml --tls-insecure -vv
+        splinterd -c ./project/tests/splinterd-node-0-docker.toml -vv \
+            --database postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test \
+            --tls-insecure \
+            --enable-biome
       "
 
   db-test:
