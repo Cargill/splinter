@@ -39,10 +39,9 @@ pub mod memory;
 use std::cmp::Ordering;
 use std::fmt;
 
-use self::error::{
-    AddCircuitError, AddCircuitsError, AddNodeError, AddNodesError, AddServiceError,
-    RemoveCircuitError, RemoveNodeError, RemoveServiceError, RoutingTableReaderError,
-};
+use self::error::RoutingTableReaderError;
+
+use crate::error::InternalError;
 
 /// Interface for updating the routing table
 pub trait RoutingTableWriter: Send {
@@ -52,18 +51,15 @@ pub trait RoutingTableWriter: Send {
     ///
     /// * `service_id` - The unique ServiceId for the service
     /// * `service` - The service to be added to the routing table
-    fn add_service(
-        &mut self,
-        service_id: ServiceId,
-        service: Service,
-    ) -> Result<(), AddServiceError>;
+    fn add_service(&mut self, service_id: ServiceId, service: Service)
+        -> Result<(), InternalError>;
 
     /// Removes a service from the routing table if it exists
     ///
     /// # Arguments
     ///
     /// * `service_id` - The unique ServiceId for the service
-    fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), RemoveServiceError>;
+    fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), InternalError>;
 
     /// Adds a new circuit to the routing table. Also adds the associated services and nodes.
     ///
@@ -77,14 +73,14 @@ pub trait RoutingTableWriter: Send {
         circuit_id: String,
         circuit: Circuit,
         nodes: Vec<CircuitNode>,
-    ) -> Result<(), AddCircuitError>;
+    ) -> Result<(), InternalError>;
 
     /// Adds a list of circuits to the routing table. Also adds the associated services.
     ///
     /// # Arguments
     ///
     /// * `circuits` - The list of circuits to be added to the routing table
-    fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), AddCircuitsError>;
+    fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), InternalError>;
 
     /// Removes a circuit from the routing table if it exists. Also removes the associated
     /// services.
@@ -92,7 +88,7 @@ pub trait RoutingTableWriter: Send {
     /// # Arguments
     ///
     /// * `circuit_id` - The unique ID for the circuit
-    fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), RemoveCircuitError>;
+    fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), InternalError>;
 
     /// Adds a new node to the routing table
     ///
@@ -100,21 +96,21 @@ pub trait RoutingTableWriter: Send {
     ///
     /// * `node_id` - The unique ID for the node
     /// * `node`- The node to add to the routing table
-    fn add_node(&mut self, node_id: String, node: CircuitNode) -> Result<(), AddNodeError>;
+    fn add_node(&mut self, node_id: String, node: CircuitNode) -> Result<(), InternalError>;
 
     /// Adds a list of node to the routing table
     ///
     /// # Arguments
     ///
     /// * `nodes`- The list of nodes to add to the routing table
-    fn add_nodes(&mut self, nodes: Vec<CircuitNode>) -> Result<(), AddNodesError>;
+    fn add_nodes(&mut self, nodes: Vec<CircuitNode>) -> Result<(), InternalError>;
 
     /// Removes a node from the routing table if it exists
     ///
     /// # Arguments
     ///
     /// * `node_id` - The unique ID for the node that should be removed
-    fn remove_node(&mut self, node_id: &str) -> Result<(), RemoveNodeError>;
+    fn remove_node(&mut self, node_id: &str) -> Result<(), InternalError>;
 
     fn clone_boxed(&self) -> Box<dyn RoutingTableWriter>;
 }

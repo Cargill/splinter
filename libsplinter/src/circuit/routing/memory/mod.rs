@@ -25,10 +25,7 @@ mod benchmarks;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 
-use super::error::{
-    AddCircuitError, AddCircuitsError, AddNodeError, AddNodesError, AddServiceError,
-    RemoveCircuitError, RemoveNodeError, RemoveServiceError, RoutingTableReaderError,
-};
+use super::error::RoutingTableReaderError;
 use super::{
     Circuit, CircuitIter, CircuitNode, CircuitNodeIter, RoutingTableReader, RoutingTableWriter,
     Service, ServiceId,
@@ -214,10 +211,10 @@ impl RoutingTableWriter for RoutingTable {
         &mut self,
         service_id: ServiceId,
         service: Service,
-    ) -> Result<(), AddServiceError> {
+    ) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| AddServiceError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .service_directory
             .insert(service_id, service);
         Ok(())
@@ -230,10 +227,10 @@ impl RoutingTableWriter for RoutingTable {
     /// * `service_id` - The unique ServiceId for the service
     ///
     /// Returns an error if the lock is poisoned
-    fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), RemoveServiceError> {
+    fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| RemoveServiceError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .service_directory
             .remove(service_id);
         Ok(())
@@ -253,11 +250,11 @@ impl RoutingTableWriter for RoutingTable {
         circuit_id: String,
         circuit: Circuit,
         nodes: Vec<CircuitNode>,
-    ) -> Result<(), AddCircuitError> {
+    ) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| AddCircuitError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
 
         for service in circuit.roster.iter() {
             let service_id = ServiceId::new(
@@ -285,11 +282,11 @@ impl RoutingTableWriter for RoutingTable {
     /// * `circuits` - The list of circuits to be added to the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), AddCircuitsError> {
+    fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| AddCircuitsError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
         for circuit in circuits.into_iter() {
             for service in circuit.roster.iter() {
                 let service_id = ServiceId::new(
@@ -314,11 +311,11 @@ impl RoutingTableWriter for RoutingTable {
     /// * `circuit_id` - The unique ID for the circuit
     ///
     /// Returns an error if the lock is poisoned
-    fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), RemoveCircuitError> {
+    fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| RemoveCircuitError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
 
         let circuit = state.circuits.remove(circuit_id);
 
@@ -343,10 +340,10 @@ impl RoutingTableWriter for RoutingTable {
     /// * `node`- The node to add to the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn add_node(&mut self, id: String, node: CircuitNode) -> Result<(), AddNodeError> {
+    fn add_node(&mut self, id: String, node: CircuitNode) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| AddNodeError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .nodes
             .insert(id, node);
         Ok(())
@@ -359,11 +356,11 @@ impl RoutingTableWriter for RoutingTable {
     /// * `nodes`- The list of nodes to add to the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn add_nodes(&mut self, nodes: Vec<CircuitNode>) -> Result<(), AddNodesError> {
+    fn add_nodes(&mut self, nodes: Vec<CircuitNode>) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| AddNodesError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
         for node in nodes {
             if !state.nodes.contains_key(&node.node_id) {
                 state.nodes.insert(node.node_id.to_string(), node);
@@ -379,10 +376,10 @@ impl RoutingTableWriter for RoutingTable {
     /// * `node_id` -  The unique ID for the node that should be removed
     ///
     /// Returns an error if the lock is poisoned
-    fn remove_node(&mut self, id: &str) -> Result<(), RemoveNodeError> {
+    fn remove_node(&mut self, id: &str) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| RemoveNodeError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .nodes
             .remove(id);
         Ok(())
