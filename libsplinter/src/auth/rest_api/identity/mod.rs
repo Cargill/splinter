@@ -84,6 +84,7 @@ impl FromStr for Authorization {
 }
 
 /// A bearer token of a specific type
+#[non_exhaustive]
 pub enum BearerToken {
     #[cfg(feature = "biome-credentials")]
     /// Contains a Biome JWT
