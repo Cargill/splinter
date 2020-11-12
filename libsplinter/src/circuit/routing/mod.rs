@@ -41,8 +41,7 @@ use std::fmt;
 
 use self::error::{
     AddCircuitError, AddCircuitsError, AddNodeError, AddNodesError, AddServiceError,
-    FetchCircuitError, FetchNodeError, FetchServiceError, ListCircuitsError, ListNodesError,
-    ListServiceError, RemoveCircuitError, RemoveNodeError, RemoveServiceError,
+    RemoveCircuitError, RemoveNodeError, RemoveServiceError, RoutingTableReaderError,
 };
 
 /// Interface for updating the routing table
@@ -141,36 +140,39 @@ pub trait RoutingTableReader: Send {
     /// # Arguments
     ///
     /// * `service_id` - The unique ID for the service to be fetched
-    fn get_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError>;
+    fn get_service(
+        &self,
+        service_id: &ServiceId,
+    ) -> Result<Option<Service>, RoutingTableReaderError>;
 
     /// Returns all the services for the provided circuit
     ///
     /// # Arguments
     ///
     /// * `circuit_id` - The unique ID the circuit whose services should be returned
-    fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError>;
+    fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, RoutingTableReaderError>;
 
     // ---------- methods to access circuit directory ----------
 
     /// Returns the nodes in the routing table
-    fn list_nodes(&self) -> Result<CircuitNodeIter, ListNodesError>;
+    fn list_nodes(&self) -> Result<CircuitNodeIter, RoutingTableReaderError>;
 
     /// Returns the node with the provided ID
     ///
     /// # Arguments
     ///
     /// * `node_id` - The unique ID for the node to be fetched
-    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError>;
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, RoutingTableReaderError>;
 
     /// Returns the circuits in the routing table
-    fn list_circuits(&self) -> Result<CircuitIter, ListCircuitsError>;
+    fn list_circuits(&self) -> Result<CircuitIter, RoutingTableReaderError>;
 
     /// Returns the circuit with the provided ID
     ///
     /// # Arguments
     ///
     /// * `circuit_id` - The unique ID for the circuit to be fetched
-    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError>;
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, RoutingTableReaderError>;
 
     fn clone_boxed(&self) -> Box<dyn RoutingTableReader>;
 }
