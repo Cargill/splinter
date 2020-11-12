@@ -19,16 +19,12 @@
 //!
 //! [`YamlAdminServiceStore`]: struct.YamlAdminServiceStore.html
 
-pub mod error;
-
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fs::{rename, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-
-use self::error::YamlAdminStoreError;
 
 use super::{
     AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit, CircuitBuilder,
@@ -64,7 +60,7 @@ impl YamlAdminServiceStore {
     pub fn new(
         circuit_file_path: String,
         proposal_file_path: String,
-    ) -> Result<Self, YamlAdminStoreError> {
+    ) -> Result<Self, AdminServiceStoreError> {
         let mut store = YamlAdminServiceStore {
             circuit_file_path: circuit_file_path.to_string(),
             proposal_file_path: proposal_file_path.to_string(),
@@ -96,31 +92,29 @@ impl YamlAdminServiceStore {
     }
 
     /// Read circuit state from the circuit file path and cache the contents in the store
-    fn read_circuit_state(&mut self) -> Result<(), YamlAdminStoreError> {
+    fn read_circuit_state(&mut self) -> Result<(), AdminServiceStoreError> {
         let circuit_file = File::open(&self.circuit_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to open YAML circuit state file",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to open YAML circuit state file".to_string(),
+            ))
         })?;
 
         let yaml_state_circuits: YamlCircuitState = serde_yaml::from_reader(&circuit_file)
             .map_err(|err| {
-                YamlAdminStoreError::general_error_with_source(
-                    "Failed to read YAML circuit state file",
+                AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                     Box::new(err),
-                )
+                    "Failed to read YAML circuit state file".to_string(),
+                ))
             })?;
 
-        let yaml_state = CircuitState::try_from(yaml_state_circuits).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to convert YAML to AdminServiceStore representation ",
-                Box::new(err),
-            )
-        })?;
+        let yaml_state = CircuitState::try_from(yaml_state_circuits)
+            .map_err(AdminServiceStoreError::InvalidStateError)?;
 
         let mut state = self.state.lock().map_err(|_| {
-            YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "YAML admin service store's internal lock poisoned".to_string(),
+            ))
         })?;
 
         for (circuit_id, circuit) in yaml_state.circuits.iter() {
@@ -138,31 +132,29 @@ impl YamlAdminServiceStore {
 
     /// Read circuit proposal state from the proposal file path and cache the contents in the
     /// store
-    fn read_proposal_state(&mut self) -> Result<(), YamlAdminStoreError> {
+    fn read_proposal_state(&mut self) -> Result<(), AdminServiceStoreError> {
         let proposal_file = File::open(&self.proposal_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to open YAML proposal state file",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to open YAML proposal state file".to_string(),
+            ))
         })?;
 
         let yaml_proposals_state: YamlProposalState = serde_yaml::from_reader(&proposal_file)
             .map_err(|err| {
-                YamlAdminStoreError::general_error_with_source(
-                    "Failed to read YAML proposal state file",
+                AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                     Box::new(err),
-                )
+                    "Failed to read YAML proposal state file".to_string(),
+                ))
             })?;
 
-        let proposals_state = ProposalState::try_from(yaml_proposals_state).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to convert YAML to AdminServiceStore representation",
-                Box::new(err),
-            )
-        })?;
+        let proposals_state = ProposalState::try_from(yaml_proposals_state)
+            .map_err(AdminServiceStoreError::InvalidStateError)?;
 
         let mut state = self.state.lock().map_err(|_| {
-            YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "YAML admin service store's internal lock poisoned".to_string(),
+            ))
         })?;
 
         state.proposal_state = proposals_state;
@@ -172,53 +164,47 @@ impl YamlAdminServiceStore {
     /// Read circuit state from the circuit file path and cache the contents in the store and then
     /// read circuit proposal state from the proposal file path and cache the contents in the
     /// store
-    fn read_state(&mut self) -> Result<(), YamlAdminStoreError> {
+    fn read_state(&mut self) -> Result<(), AdminServiceStoreError> {
         let circuit_file = File::open(&self.circuit_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to open YAML circuit state file",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to open YAML circuit state file".to_string(),
+            ))
         })?;
 
         let yaml_state_circuits: YamlCircuitState = serde_yaml::from_reader(&circuit_file)
             .map_err(|err| {
-                YamlAdminStoreError::general_error_with_source(
-                    "Failed to read YAML circuit state file",
+                AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                     Box::new(err),
-                )
+                    "Failed to read YAML circuit state file".to_string(),
+                ))
             })?;
 
-        let yaml_state = CircuitState::try_from(yaml_state_circuits).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to convert YAML to AdminServiceStore representation ",
-                Box::new(err),
-            )
-        })?;
+        let yaml_state = CircuitState::try_from(yaml_state_circuits)
+            .map_err(AdminServiceStoreError::InvalidStateError)?;
 
         let proposal_file = File::open(&self.proposal_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to open YAML proposal state file",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to open YAML proposal state file".to_string(),
+            ))
         })?;
 
         let yaml_proposals_state: YamlProposalState = serde_yaml::from_reader(&proposal_file)
             .map_err(|err| {
-                YamlAdminStoreError::general_error_with_source(
-                    "Failed to read YAML proposal state file",
+                AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                     Box::new(err),
-                )
+                    "Failed to read YAML proposal state file".to_string(),
+                ))
             })?;
 
-        let proposals_state = ProposalState::try_from(yaml_proposals_state).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to convert YAML to AdminServiceStore representation",
-                Box::new(err),
-            )
-        })?;
+        let proposals_state = ProposalState::try_from(yaml_proposals_state)
+            .map_err(AdminServiceStoreError::InvalidStateError)?;
 
         let mut state = self.state.lock().map_err(|_| {
-            YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "YAML admin service store's internal lock poisoned".to_string(),
+            ))
         })?;
 
         for (circuit_id, circuit) in yaml_state.circuits.iter() {
@@ -237,126 +223,130 @@ impl YamlAdminServiceStore {
     }
 
     /// Write the current circuit state to file at the circuit file path
-    fn write_circuit_state(&self) -> Result<(), YamlAdminStoreError> {
+    fn write_circuit_state(&self) -> Result<(), AdminServiceStoreError> {
         let state = self.state.lock().map_err(|_| {
-            YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "YAML admin service store's internal lock poisoned".to_string(),
+            ))
         })?;
 
         let circuit_output = serde_yaml::to_vec(&YamlCircuitState::from(
             state.circuit_state.clone(),
         ))
         .map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to write circuit state to YAML",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to write circuit state to YAML".to_string(),
+            ))
         })?;
 
         // write state to a temporary file to avoid state corruption if an IO error occurs during
         // write
         let temp_circuit_file = format!("{}.temp", self.circuit_file_path);
         let mut circuit_file = File::create(&temp_circuit_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to open YAML circuit state file '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         circuit_file.write_all(&circuit_output).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML circuit state file '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // Append newline to file
         writeln!(circuit_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML circuit file '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // rename temp file to circuit state filename
         rename(&temp_circuit_file, &self.circuit_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
-                    "Failed to rename temp circuit state file to final location '{}'",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
+                    "Failed to rename temp circuit state file to final location'{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         Ok(())
     }
 
     /// Write the current circuit proposal state to file at the proposal file path
-    fn write_proposal_state(&self) -> Result<(), YamlAdminStoreError> {
+    fn write_proposal_state(&self) -> Result<(), AdminServiceStoreError> {
         let state = self.state.lock().map_err(|_| {
-            YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "YAML admin service store's internal lock poisoned".to_string(),
+            ))
         })?;
 
         let proposal_output = serde_yaml::to_vec(&YamlProposalState::from(
             state.proposal_state.clone(),
         ))
         .map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to write proposals state to YAML",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to write proposals state to YAML".to_string(),
+            ))
         })?;
 
         let temp_proposal_file = format!("{}.temp", self.proposal_file_path);
         let mut proposal_file = File::create(&temp_proposal_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to open YAML proposal state file '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         proposal_file.write_all(&proposal_output).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
-                    "Failed to write to YAML proposal state file '{}'",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
+                    "Failed to write YAML proposal state file '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // Append newline to file
         writeln!(proposal_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML proposal file '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // rename temp file to proposal state filename
         rename(&temp_proposal_file, &self.proposal_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to rename temp proposal state file to final location '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         Ok(())
@@ -364,119 +354,121 @@ impl YamlAdminServiceStore {
 
     /// Write the current circuit state to file at the circuit file path and then write the current
     /// proposal state to the file at the proposal file path
-    fn write_state(&self) -> Result<(), YamlAdminStoreError> {
+    fn write_state(&self) -> Result<(), AdminServiceStoreError> {
         let state = self.state.lock().map_err(|_| {
-            YamlAdminStoreError::general_error("YAML admin service store's internal lock poisoned")
+            AdminServiceStoreError::InternalError(InternalError::with_message(
+                "YAML admin service store's internal lock poisoned".to_string(),
+            ))
         })?;
 
         let circuit_output = serde_yaml::to_vec(&YamlCircuitState::from(
             state.circuit_state.clone(),
         ))
         .map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to write circuit state to YAML",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to write circuit state to YAML".to_string(),
+            ))
         })?;
 
         // write state to a temporary file to avoid state corruption if an IO error occurs during
         // write
         let temp_circuit_file = format!("{}.temp", self.circuit_file_path);
         let mut circuit_file = File::create(&temp_circuit_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to open YAML circuit state file '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         circuit_file.write_all(&circuit_output).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML circuit state file '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // Append newline to file
         writeln!(circuit_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML circuit file '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // rename temp file to circuit state filename
         rename(&temp_circuit_file, &self.circuit_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to rename temp circuit state file to final location '{}'",
                     temp_circuit_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         let proposal_output = serde_yaml::to_vec(&YamlProposalState::from(
             state.proposal_state.clone(),
         ))
         .map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                "Failed to write proposals state to YAML",
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
                 Box::new(err),
-            )
+                "Failed to write proposals state to YAML".to_string(),
+            ))
         })?;
 
         // write state to a temporary file to avoid state corruption if an IO error occurs during
         // write
         let temp_proposal_file = format!("{}.temp", self.proposal_file_path);
         let mut proposal_file = File::create(&temp_proposal_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to open YAML proposal state file '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         proposal_file.write_all(&proposal_output).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML proposal state file '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // Append newline to file
         writeln!(proposal_file).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to write to YAML proposal file '{}'",
                     self.proposal_file_path
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         // rename temp file to proposal state filename
         rename(&temp_proposal_file, &self.proposal_file_path).map_err(|err| {
-            YamlAdminStoreError::general_error_with_source(
-                &format!(
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                format!(
                     "Failed to rename temp proposal state file to final location '{}'",
                     temp_proposal_file
                 ),
-                Box::new(err),
-            )
+            ))
         })?;
 
         Ok(())
