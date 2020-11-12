@@ -477,7 +477,6 @@ impl RequestGuard for ProtocolVersionRangeGuard {
 }
 
 /// `RestApi` is used to create an instance of a restful web server.
-#[derive(Clone)]
 pub struct RestApi {
     resources: Vec<Resource>,
     bind: String,
