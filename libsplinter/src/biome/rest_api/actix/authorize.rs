@@ -16,11 +16,16 @@ use std::sync::Arc;
 
 use jsonwebtoken::{decode, Validation};
 
-use crate::actix_web::HttpRequest;
+use crate::actix_web::{Error as ActixError, HttpRequest, HttpResponse};
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
-use crate::rest_api::get_authorization_token;
+use crate::biome::rest_api::BiomeRestConfig;
+use crate::biome::user::store::User;
+use crate::futures::{Future, IntoFuture};
 use crate::rest_api::secrets::SecretManager;
+#[cfg(not(feature = "auth"))]
+use crate::rest_api::sessions::default_validation;
 use crate::rest_api::sessions::Claims;
+use crate::rest_api::{get_authorization_token, ErrorResponse};
 
 /// Verifies the user has the correct permissions
 pub(crate) fn authorize_user(
@@ -63,6 +68,50 @@ pub(crate) fn validate_claims(
         Err(err) => {
             debug!("Invalid token: {}", err);
             AuthorizationResult::Unauthorized("User is not authorized".to_string())
+        }
+    }
+}
+
+type ErrorHttpResponse = Box<dyn Future<Item = HttpResponse, Error = ActixError>>;
+
+#[cfg(not(feature = "auth"))]
+pub(crate) fn get_authorized_user(
+    request: &HttpRequest,
+    secret_manager: &Arc<dyn SecretManager>,
+    rest_config: &BiomeRestConfig,
+) -> Result<User, ErrorHttpResponse> {
+    let validation = default_validation(&rest_config.issuer());
+
+    match authorize_user(&request, &*secret_manager, &validation) {
+        AuthorizationResult::Authorized(claims) => Ok(User::new(&claims.user_id())),
+        AuthorizationResult::Unauthorized(msg) => Err(Box::new(
+            HttpResponse::Unauthorized()
+                .json(ErrorResponse::unauthorized(&msg))
+                .into_future(),
+        )),
+        AuthorizationResult::Failed => Err(Box::new(
+            HttpResponse::InternalServerError()
+                .json(ErrorResponse::internal_error())
+                .into_future(),
+        )),
+    }
+}
+
+#[cfg(feature = "auth")]
+pub(crate) fn get_authorized_user(
+    request: &HttpRequest,
+    _secret_manager: &Arc<dyn SecretManager>,
+    _rest_config: &BiomeRestConfig,
+) -> Result<User, ErrorHttpResponse> {
+    match request.extensions().get::<User>().cloned() {
+        Some(user) => Ok(user),
+        None => {
+            error!("Biome routes have not been wrapped in an authorization middleware");
+            Err(Box::new(
+                HttpResponse::InternalServerError()
+                    .json(ErrorResponse::internal_error())
+                    .into_future(),
+            ))
         }
     }
 }
