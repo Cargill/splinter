@@ -29,10 +29,10 @@ mod rest_api;
 
 use std::thread;
 
+use cylinder::{secp256k1::Secp256k1Context, Context};
 use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use gameroom_database::ConnectionPool;
 use log::Record;
-use sawtooth_sdk::signing::create_context;
 use splinter::events::Reactor;
 
 use crate::config::{get_node, GameroomConfigBuilder};
@@ -98,9 +98,9 @@ fn run() -> Result<(), GameroomDaemonError> {
         gameroom_database::create_connection_pool(config.database_url())?;
 
     // Generate a public/private key pair
-    let context = create_context("secp256k1")?;
-    let private_key = context.new_random_private_key()?;
-    let public_key = context.get_public_key(&*private_key)?;
+    let context = Secp256k1Context::new();
+    let private_key = context.new_random_private_key();
+    let public_key = context.get_public_key(&private_key)?;
 
     // Get splinterd node information
     let node = get_node(config.splinterd_url())?;
