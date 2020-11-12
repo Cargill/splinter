@@ -70,11 +70,7 @@ where
                 service::all_columns,
                 service_argument::all_columns.nullable(),
             ))
-            .load::<(ServiceModel, Option<ServiceArgumentModel>)>(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Unable to load Service information"),
-                source: Box::new(err),
-            })?
+            .load::<(ServiceModel, Option<ServiceArgumentModel>)>(self.conn)?
         {
             if let Some(arg_model) = opt_arg {
                 if let Some(args) = arguments_map.get_mut(&service.service_id) {
@@ -106,10 +102,7 @@ where
                 }
                 builder
                     .build()
-                    .map_err(|err| AdminServiceStoreError::StorageError {
-                        context: String::from("Unable to build Service"),
-                        source: Some(Box::new(err)),
-                    })
+                    .map_err(AdminServiceStoreError::InvalidStateError)
             })
             .collect::<Result<Vec<Service>, AdminServiceStoreError>>()?;
         Ok(Box::new(ret_services.into_iter()))

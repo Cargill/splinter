@@ -52,11 +52,7 @@ where
             // As `circuit_member` and `node_endpoint` have a one-to-many relationship, this join
             // will return all matching entries as there are `node_endpoint` entries.
             .inner_join(node_endpoint::table.on(circuit_member::node_id.eq(node_endpoint::node_id)))
-            .load(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Unable to load node information"),
-                source: Box::new(err),
-            })?;
+            .load(self.conn)?;
         let mut node_map: HashMap<String, Vec<String>> = HashMap::new();
         // Iterate over the list of node data retrieved from the database, in order to collect all
         // endpoints associated with the `node_ids` in a HashMap.
@@ -79,10 +75,8 @@ where
                     .build()
             })
             .collect::<Result<Vec<CircuitNode>, InvalidStateError>>()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to build CircuitNode from stored state".to_string(),
-                source: Some(Box::new(err)),
-            })?;
+            .map_err(AdminServiceStoreError::InvalidStateError)?;
+
         Ok(Box::new(nodes.into_iter()))
     }
 }

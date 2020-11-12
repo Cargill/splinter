@@ -12,51 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Types for errors that can be raised while using an admin service store, as well as errors
-//! raised by the builders
-
+//! Types for errors that can be raised while using an admin service store
 use std::error::Error;
 use std::fmt;
+
+use crate::error::{
+    ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
+    ResourceTemporarilyUnavailableError,
+};
 
 /// Represents AdminServiceStore errors
 #[derive(Debug)]
 pub enum AdminServiceStoreError {
-    /// Represents CRUD operations failures
-    OperationError {
-        context: String,
-        source: Option<Box<dyn Error>>,
-    },
-    /// Represents store query failures
-    QueryError {
-        context: String,
-        source: Box<dyn Error>,
-    },
-    /// Represents general failures in the store
-    StorageError {
-        context: String,
-        source: Option<Box<dyn Error>>,
-    },
-    /// Represents an issue connecting to the store
-    ConnectionError(Box<dyn Error>),
-    NotFoundError(String),
+    /// Represents errors internal to the function.
+    InternalError(InternalError),
+    /// Represents constraint violations on the database's definition
+    ConstraintViolationError(ConstraintViolationError),
+    /// Represents when the underlying resource is unavailable
+    ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
+    /// Represents when cab operation cannot be completed because the state of the underlying
+    /// struct is inconsistent.
+    InvalidStateError(InvalidStateError),
 }
 
 impl Error for AdminServiceStoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            AdminServiceStoreError::OperationError {
-                source: Some(source),
-                ..
-            } => Some(&**source),
-            AdminServiceStoreError::OperationError { source: None, .. } => None,
-            AdminServiceStoreError::QueryError { source, .. } => Some(&**source),
-            AdminServiceStoreError::StorageError {
-                source: Some(source),
-                ..
-            } => Some(&**source),
-            AdminServiceStoreError::StorageError { source: None, .. } => None,
-            AdminServiceStoreError::ConnectionError(err) => Some(&**err),
-            AdminServiceStoreError::NotFoundError(_) => None,
+            AdminServiceStoreError::InternalError(err) => Some(err),
+            AdminServiceStoreError::ConstraintViolationError(err) => Some(err),
+            AdminServiceStoreError::ResourceTemporarilyUnavailableError(err) => Some(err),
+            AdminServiceStoreError::InvalidStateError(err) => Some(err),
         }
     }
 }
@@ -64,51 +49,12 @@ impl Error for AdminServiceStoreError {
 impl fmt::Display for AdminServiceStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AdminServiceStoreError::OperationError {
-                context,
-                source: Some(source),
-            } => write!(f, "failed to perform operation: {}: {}", context, source),
-            AdminServiceStoreError::OperationError {
-                context,
-                source: None,
-            } => write!(f, "failed to perform operation: {}", context),
-            AdminServiceStoreError::QueryError { context, source } => {
-                write!(f, "failed query: {}: {}", context, source)
+            AdminServiceStoreError::InternalError(err) => write!(f, "{}", err),
+            AdminServiceStoreError::ConstraintViolationError(err) => write!(f, "{}", err),
+            AdminServiceStoreError::ResourceTemporarilyUnavailableError(err) => {
+                write!(f, "{}", err)
             }
-            AdminServiceStoreError::StorageError {
-                context,
-                source: Some(source),
-            } => write!(
-                f,
-                "the underlying storage returned an error: {}: {}",
-                context, source
-            ),
-            AdminServiceStoreError::StorageError {
-                context,
-                source: None,
-            } => write!(f, "the underlying storage returned an error: {}", context),
-            AdminServiceStoreError::ConnectionError(err) => {
-                write!(f, "failed to connect to underlying storage: {}", err)
-            }
-            AdminServiceStoreError::NotFoundError(ref s) => write!(f, "Not found: {}", s),
-        }
-    }
-}
-
-#[cfg(feature = "diesel")]
-impl From<diesel::result::Error> for AdminServiceStoreError {
-    fn from(err: diesel::result::Error) -> Self {
-        match err {
-            diesel::result::Error::QueryBuilderError(std_err) => {
-                AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred building diesel query"),
-                    source: std_err,
-                }
-            }
-            _ => AdminServiceStoreError::StorageError {
-                context: String::from("A diesel error occurred"),
-                source: Some(Box::new(err)),
-            },
+            AdminServiceStoreError::InvalidStateError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -116,9 +62,38 @@ impl From<diesel::result::Error> for AdminServiceStoreError {
 #[cfg(feature = "diesel")]
 impl From<diesel::r2d2::PoolError> for AdminServiceStoreError {
     fn from(err: diesel::r2d2::PoolError) -> Self {
-        AdminServiceStoreError::StorageError {
-            context: String::from("Diesel error occurred"),
-            source: Some(Box::new(err)),
+        AdminServiceStoreError::ResourceTemporarilyUnavailableError(
+            ResourceTemporarilyUnavailableError::from_source(Box::new(err)),
+        )
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl From<diesel::result::Error> for AdminServiceStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        match err {
+            diesel::result::Error::DatabaseError(db_err_kind, _) => match db_err_kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    AdminServiceStoreError::ConstraintViolationError(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    AdminServiceStoreError::ConstraintViolationError(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => {
+                    AdminServiceStoreError::InternalError(InternalError::from_source(Box::new(err)))
+                }
+            },
+            _ => AdminServiceStoreError::InternalError(InternalError::from_source(Box::new(err))),
         }
     }
 }

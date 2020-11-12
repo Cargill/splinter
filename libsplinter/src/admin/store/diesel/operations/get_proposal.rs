@@ -74,13 +74,7 @@ where
                     // Filters the entries by the provided `proposal_id`
                     .filter(circuit_proposal::circuit_id.eq(proposal_id))
                     .first::<(CircuitProposalModel, ProposedCircuitModel)>(self.conn)
-                    .optional()
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from(
-                            "Error occurred fetching CircuitProposal and ProposedCircuit",
-                        ),
-                        source: Box::new(err),
-                    })? {
+                    .optional()? {
                     Some((proposal, proposed_circuit)) => (proposal, proposed_circuit),
                     None => return Ok(None),
                 };
@@ -101,11 +95,7 @@ where
                 // Selects only the necessary columns from the data being retrieved, used to
                 // populate the list of `ProposedNodes`.
                 .select((proposed_node::all_columns, proposed_node_endpoint::endpoint))
-                .load::<(ProposedNodeModel, String)>(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to load proposed node endpoints"),
-                    source: Box::new(err),
-                })?
+                .load::<(ProposedNodeModel, String)>(self.conn)?
             {
                 if let Some(endpoint_list) = proposed_node_endpoints.get_mut(&node.node_id) {
                     endpoint_list.push(endpoint.to_string());
@@ -128,10 +118,7 @@ where
                     }
                     builder
                         .build()
-                        .map_err(|err| AdminServiceStoreError::StorageError {
-                            context: String::from("Failed to build ProposedNode"),
-                            source: Some(Box::new(err)),
-                        })
+                        .map_err(AdminServiceStoreError::InvalidStateError)
                 })
                 .collect::<Result<Vec<ProposedNode>, AdminServiceStoreError>>()?;
 
@@ -162,11 +149,7 @@ where
                     proposed_service::all_columns,
                     proposed_service_argument::all_columns.nullable(),
                 ))
-                .load::<(ProposedServiceModel, Option<ProposedServiceArgumentModel>)>(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to load service information"),
-                    source: Box::new(err),
-                })?
+                .load::<(ProposedServiceModel, Option<ProposedServiceArgumentModel>)>(self.conn)?
             {
                 if let Some(arg_model) = opt_arg {
                     if let Some(args) = arguments_map.get_mut(&proposed_service.service_id) {
@@ -197,21 +180,14 @@ where
                     }
                     builder
                         .build()
-                        .map_err(|err| AdminServiceStoreError::StorageError {
-                            context: String::from("Unable to build ProposedService"),
-                            source: Some(Box::new(err)),
-                        })
+                        .map_err(AdminServiceStoreError::InvalidStateError)
                 })
                 .collect::<Result<Vec<ProposedService>, AdminServiceStoreError>>()?;
 
             // Retrieve all associated `VoteRecord` entries
             let vote_record: Vec<VoteRecord> = vote_record::table
                 .filter(vote_record::circuit_id.eq(&proposal.circuit_id))
-                .load::<VoteRecordModel>(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to load proposal's vote records"),
-                    source: Box::new(err),
-                })?
+                .load::<VoteRecordModel>(self.conn)?
                 .into_iter()
                 .filter_map(|vote| VoteRecord::try_from(&vote).ok())
                 .collect();
@@ -227,10 +203,8 @@ where
                 .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
                 .with_circuit_management_type(&proposed_circuit.circuit_management_type)
                 .build()
-                .map_err(|err| AdminServiceStoreError::StorageError {
-                    context: String::from("Failed to build ProposedCircuit"),
-                    source: Some(Box::new(err)),
-                })?;
+                .map_err(AdminServiceStoreError::InvalidStateError)?;
+
             Ok(Some(
                 CircuitProposalBuilder::new()
                     .with_proposal_type(&ProposalType::try_from(proposal.proposal_type)?)
@@ -241,10 +215,7 @@ where
                     .with_requester(&proposal.requester)
                     .with_requester_node_id(&proposal.requester_node_id)
                     .build()
-                    .map_err(|err| AdminServiceStoreError::StorageError {
-                        context: String::from("Failed to build CircuitProposal"),
-                        source: Some(Box::new(err)),
-                    })?,
+                    .map_err(AdminServiceStoreError::InvalidStateError)?,
             ))
         })
     }

@@ -89,11 +89,7 @@ where
 
                 let circuits: Vec<CircuitModel> = query
                     .order(circuit::circuit_id.desc())
-                    .load::<CircuitModel>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Unable to load Circuit information"),
-                        source: Box::new(err),
-                    })?;
+                    .load::<CircuitModel>(self.conn)?;
 
                 // Store circuit IDs separately to make it easier to filter following queries
                 let circuit_ids: Vec<&str> = circuits
@@ -106,11 +102,7 @@ where
                 let mut circuit_members: HashMap<String, Vec<String>> = HashMap::new();
                 for member in circuit_member::table
                     .filter(circuit_member::circuit_id.eq_any(&circuit_ids))
-                    .load::<CircuitMemberModel>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Unable to load Circuit member information"),
-                        source: Box::new(err),
-                    })?
+                    .load::<CircuitMemberModel>(self.conn)?
                 {
                     if let Some(members) = circuit_members.get_mut(&member.circuit_id) {
                         members.push(member.node_id.to_string());
@@ -150,11 +142,7 @@ where
                         service::all_columns,
                         service_argument::all_columns.nullable(),
                     ))
-                    .load::<(ServiceModel, Option<ServiceArgumentModel>)>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Unable to load Service information"),
-                        source: Box::new(err),
-                    })?
+                    .load::<(ServiceModel, Option<ServiceArgumentModel>)>(self.conn)?
                 {
                     if let Some(arg_model) = opt_arg {
                         if let Some(args) = arguments_map.get_mut(&(
@@ -194,13 +182,10 @@ where
                     {
                         builder = builder.with_arguments(&args);
                     }
-                    let service =
-                        builder
-                            .build()
-                            .map_err(|err| AdminServiceStoreError::StorageError {
-                                context: String::from("Unable to build Service"),
-                                source: Some(Box::new(err)),
-                            })?;
+                    let service = builder
+                        .build()
+                        .map_err(AdminServiceStoreError::InvalidStateError)?;
+
                     if let Some(service_list) = built_services.get_mut(&circuit_id) {
                         service_list.push(service);
                     } else {
@@ -227,12 +212,11 @@ where
                         circuit_builder = circuit_builder.with_roster(&services);
                     }
 
-                    ret_circuits.push(circuit_builder.build().map_err(|err| {
-                        AdminServiceStoreError::OperationError {
-                            context: String::from("Unable to build Circuit"),
-                            source: Some(Box::new(err)),
-                        }
-                    })?);
+                    ret_circuits.push(
+                        circuit_builder
+                            .build()
+                            .map_err(AdminServiceStoreError::InvalidStateError)?,
+                    );
                 }
 
                 Ok(Box::new(ret_circuits.into_iter()))

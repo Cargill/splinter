@@ -38,7 +38,9 @@ use super::{
     ServiceBuilder, ServiceId, Vote, VoteRecord, VoteRecordBuilder,
 };
 
-use crate::error::InvalidStateError;
+use crate::error::{
+    ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
+};
 use crate::hex::{parse_hex, to_hex};
 
 /// A YAML backed implementation of the `AdminServiceStore`
@@ -493,27 +495,20 @@ impl AdminServiceStore for YamlAdminServiceStore {
     ///  Returns an error if a `CircuitProposal` with the same ID already exists
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
 
             if state
                 .proposal_state
                 .proposals
                 .contains_key(proposal.circuit_id())
             {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!(
-                        "A proposal with ID {} already exists",
-                        proposal.circuit_id()
-                    ),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::ConstraintViolationError(
+                    ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+                ));
             } else {
                 state
                     .proposal_state
@@ -522,11 +517,12 @@ impl AdminServiceStore for YamlAdminServiceStore {
             }
         }
 
-        self.write_proposal_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write proposal state yaml file".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_proposal_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write proposal state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Updates a circuit proposal in the underlying storage
@@ -538,14 +534,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
     ///  Returns an error if a `CircuitProposal` with the same ID does not exist
     fn update_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
 
             if state
                 .proposal_state
@@ -557,21 +550,21 @@ impl AdminServiceStore for YamlAdminServiceStore {
                     .proposals
                     .insert(proposal.circuit_id().to_string(), proposal);
             } else {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!(
+                return Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
                         "A proposal with ID {} does not exist",
                         proposal.circuit_id()
-                    ),
-                    source: None,
-                });
+                    )),
+                ));
             }
         }
 
-        self.write_proposal_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write proposal state yaml file".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_proposal_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write proposal state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Removes a circuit proposal from the underlying storage
@@ -583,30 +576,30 @@ impl AdminServiceStore for YamlAdminServiceStore {
     ///  Returns an error if a `CircuitProposal` with specified ID does not exist
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
 
             if state.proposal_state.proposals.contains_key(proposal_id) {
                 state.proposal_state.proposals.remove(proposal_id);
             } else {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A proposal with ID {} does not exist", proposal_id),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "A proposal with ID {} does not exist",
+                        proposal_id
+                    )),
+                ));
             }
         }
 
-        self.write_proposal_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write proposal state yaml file".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_proposal_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write proposal state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Fetches a circuit proposal from the underlying storage
@@ -621,9 +614,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         Ok(self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .proposal_state
             .proposals
@@ -642,9 +636,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         let mut proposals: Vec<CircuitProposal> = self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .proposal_state
             .proposals
@@ -676,24 +671,20 @@ impl AdminServiceStore for YamlAdminServiceStore {
         nodes: Vec<CircuitNode>,
     ) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
 
             if state
                 .circuit_state
                 .circuits
                 .contains_key(circuit.circuit_id())
             {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A circuit with ID {} already exists", circuit.circuit_id()),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::ConstraintViolationError(
+                    ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+                ));
             } else {
                 for service in circuit.roster() {
                     let service_id = ServiceId::new(
@@ -720,11 +711,12 @@ impl AdminServiceStore for YamlAdminServiceStore {
             }
         }
 
-        self.write_circuit_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write circuit state yaml file".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_circuit_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write circuit state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Updates a circuit in the underlying storage
@@ -736,14 +728,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
     ///  Returns an error if a `CircuitProposal` with the same ID does not exist
     fn update_circuit(&self, circuit: Circuit) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
 
             if state
                 .circuit_state
@@ -755,18 +744,21 @@ impl AdminServiceStore for YamlAdminServiceStore {
                     .circuits
                     .insert(circuit.circuit_id().to_string(), circuit);
             } else {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A circuit with ID {} does not exist", circuit.circuit_id()),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "A circuit with ID {} does not exist",
+                        circuit.circuit_id()
+                    )),
+                ));
             }
         }
 
-        self.write_circuit_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write circuit state yaml file".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_circuit_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write circuit state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Removes a circuit from the underlying storage
@@ -778,14 +770,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
     ///  Returns an error if a `Circuit` with the specified ID does not exist
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
             if state.circuit_state.circuits.contains_key(circuit_id) {
                 let circuit = state.circuit_state.circuits.remove(circuit_id);
                 if let Some(circuit) = circuit {
@@ -798,18 +787,21 @@ impl AdminServiceStore for YamlAdminServiceStore {
                     }
                 }
             } else {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A circuit with ID {} does not exist", circuit_id),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "A circuit with ID {} does not exist",
+                        circuit_id
+                    )),
+                ));
             }
         }
 
-        self.write_circuit_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write circuit state yaml file".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_circuit_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write circuit state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Fetches a circuit from the underlying storage
@@ -821,9 +813,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         Ok(self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .circuit_state
             .circuits
@@ -842,9 +835,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         let mut circuits: Vec<Circuit> = self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .circuit_state
             .circuits
@@ -870,14 +864,11 @@ impl AdminServiceStore for YamlAdminServiceStore {
     ///  * `circuit_id` - The ID of the circuit proposal that should be converted to a circuit
     fn upgrade_proposal_to_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
         {
-            let mut state =
-                self.state
-                    .lock()
-                    .map_err(|_| AdminServiceStoreError::StorageError {
-                        context: "YAML admin service store's internal lock was poisoned"
-                            .to_string(),
-                        source: None,
-                    })?;
+            let mut state = self.state.lock().map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
+            })?;
 
             if let Some(proposal) = state.proposal_state.proposals.remove(circuit_id) {
                 let nodes = proposal.circuit().members().to_vec();
@@ -907,18 +898,21 @@ impl AdminServiceStore for YamlAdminServiceStore {
                     }
                 }
             } else {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: format!("A circuit with ID {} does not exist", circuit_id),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "A circuit proposal with ID {} does not exist",
+                        circuit_id
+                    )),
+                ));
             }
         }
 
-        self.write_state()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: "Unable to write circiut state yaml files".to_string(),
-                source: Some(Box::new(err)),
-            })
+        self.write_state().map_err(|err| {
+            AdminServiceStoreError::InternalError(InternalError::from_source_with_prefix(
+                Box::new(err),
+                "Unable to write circuit state yaml file".to_string(),
+            ))
+        })
     }
 
     /// Fetches a node from the underlying storage
@@ -930,9 +924,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         Ok(self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .circuit_state
             .nodes
@@ -947,9 +942,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         let nodes: Vec<CircuitNode> = self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .circuit_state
             .nodes
@@ -972,9 +968,10 @@ impl AdminServiceStore for YamlAdminServiceStore {
         Ok(self
             .state
             .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
+            .map_err(|_| {
+                AdminServiceStoreError::InternalError(InternalError::with_message(
+                    "YAML admin service store's internal lock was poisoned".to_string(),
+                ))
             })?
             .service_directory
             .get(service_id)
@@ -990,22 +987,24 @@ impl AdminServiceStore for YamlAdminServiceStore {
         &self,
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
-        let services: Vec<Service> = self
-            .state
-            .lock()
-            .map_err(|_| AdminServiceStoreError::StorageError {
-                context: "YAML admin service store's internal lock was poisoned".to_string(),
-                source: None,
-            })?
-            .circuit_state
-            .circuits
-            .get(circuit_id)
-            .ok_or(AdminServiceStoreError::OperationError {
-                context: format!("Circuit {} does not exist", circuit_id),
-                source: None,
-            })?
-            .roster()
-            .to_vec();
+        let services: Vec<Service> =
+            self.state
+                .lock()
+                .map_err(|_| {
+                    AdminServiceStoreError::InternalError(InternalError::with_message(
+                        "YAML admin service store's internal lock was poisoned".to_string(),
+                    ))
+                })?
+                .circuit_state
+                .circuits
+                .get(circuit_id)
+                .ok_or_else(|| {
+                    AdminServiceStoreError::InvalidStateError(InvalidStateError::with_message(
+                        format!("A circuit with ID {} does not exist", circuit_id),
+                    ))
+                })?
+                .roster()
+                .to_vec();
 
         Ok(Box::new(services.into_iter()))
     }

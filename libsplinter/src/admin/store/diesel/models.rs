@@ -29,6 +29,7 @@ use crate::admin::store::{
     VoteRecordBuilder,
 };
 use crate::admin::store::{Circuit, CircuitProposal, ProposedCircuit};
+use crate::error::InvalidStateError;
 
 /// Database model representation of a `CircuitProposal`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -120,10 +121,7 @@ impl TryFrom<&VoteRecordModel> for VoteRecord {
             .with_vote(&Vote::try_from(vote.vote.clone())?)
             .with_voter_node_id(&vote.voter_node_id)
             .build()
-            .map_err(|err| AdminServiceStoreError::StorageError {
-                context: String::from("Failed to build VoteRecord"),
-                source: Some(Box::new(err)),
-            })
+            .map_err(AdminServiceStoreError::InvalidStateError)
     }
 }
 
@@ -367,10 +365,9 @@ impl TryFrom<String> for Vote {
         match variant.as_ref() {
             "Accept" => Ok(Vote::Accept),
             "Reject" => Ok(Vote::Reject),
-            _ => Err(AdminServiceStoreError::StorageError {
-                context: "Unable to convert string to Vote".into(),
-                source: None,
-            }),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message("Unable to convert string to Vote".into()),
+            )),
         }
     }
 }
@@ -393,10 +390,9 @@ impl TryFrom<String> for ProposalType {
             "AddNode" => Ok(ProposalType::AddNode),
             "RemoveNode" => Ok(ProposalType::RemoveNode),
             "Destroy" => Ok(ProposalType::Destroy),
-            _ => Err(AdminServiceStoreError::StorageError {
-                context: "Unable to convert string to ProposalType".into(),
-                source: None,
-            }),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message("Unable to convert string to ProposalType".into()),
+            )),
         }
     }
 }
@@ -418,10 +414,11 @@ impl TryFrom<String> for AuthorizationType {
     fn try_from(variant: String) -> Result<Self, Self::Error> {
         match variant.as_ref() {
             "Trust" => Ok(AuthorizationType::Trust),
-            _ => Err(AdminServiceStoreError::StorageError {
-                context: "Unable to convert string to AuthorizationType".into(),
-                source: None,
-            }),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message(
+                    "Unable to convert string to AuthorizationType".into(),
+                ),
+            )),
         }
     }
 }
@@ -439,10 +436,11 @@ impl TryFrom<String> for PersistenceType {
     fn try_from(variant: String) -> Result<Self, Self::Error> {
         match variant.as_ref() {
             "Any" => Ok(PersistenceType::Any),
-            _ => Err(AdminServiceStoreError::StorageError {
-                context: "Unable to convert string to PersistenceType".into(),
-                source: None,
-            }),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message(
+                    "Unable to convert string to PersistenceType".into(),
+                ),
+            )),
         }
     }
 }
@@ -460,10 +458,11 @@ impl TryFrom<String> for DurabilityType {
     fn try_from(variant: String) -> Result<Self, Self::Error> {
         match variant.as_ref() {
             "NoDurability" => Ok(DurabilityType::NoDurability),
-            _ => Err(AdminServiceStoreError::StorageError {
-                context: "Unable to convert string to DurabilityType".into(),
-                source: None,
-            }),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message(
+                    "Unable to convert string to DurabilityType".into(),
+                ),
+            )),
         }
     }
 }
@@ -481,10 +480,9 @@ impl TryFrom<String> for RouteType {
     fn try_from(variant: String) -> Result<Self, Self::Error> {
         match variant.as_ref() {
             "Any" => Ok(RouteType::Any),
-            _ => Err(AdminServiceStoreError::StorageError {
-                context: "Unable to convert string to RouteType".into(),
-                source: None,
-            }),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message("Unable to convert string to RouteType".into()),
+            )),
         }
     }
 }

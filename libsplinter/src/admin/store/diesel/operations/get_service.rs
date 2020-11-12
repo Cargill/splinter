@@ -50,11 +50,8 @@ where
                 .filter(service::circuit_id.eq(&service_id.circuit_id))
                 .filter(service::service_id.eq(&service_id.service_id))
                 .first::<ServiceModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred fetching Service"),
-                    source: Box::new(err),
-                })? {
+                .optional()?
+            {
                 Some(service) => service,
                 None => return Ok(None),
             };
@@ -64,11 +61,7 @@ where
             let arguments: Vec<(String, String)> = service_argument::table
                 .filter(service_argument::circuit_id.eq(&service_id.circuit_id))
                 .filter(service_argument::service_id.eq(&service_id.service_id))
-                .load::<ServiceArgumentModel>(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred fetching Service arguments"),
-                    source: Box::new(err),
-                })?
+                .load::<ServiceArgumentModel>(self.conn)?
                 .iter()
                 .map(|arg| (arg.key.to_string(), arg.value.to_string()))
                 .collect();
@@ -79,10 +72,8 @@ where
                 .with_arguments(&arguments)
                 .with_node_id(&service.node_id)
                 .build()
-                .map_err(|err| AdminServiceStoreError::StorageError {
-                    context: String::from("Failed to build Service"),
-                    source: Some(Box::new(err)),
-                })?;
+                .map_err(AdminServiceStoreError::InvalidStateError)?;
+
             Ok(Some(return_service))
         })
     }

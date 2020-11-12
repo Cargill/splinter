@@ -41,12 +41,7 @@ where
                 // The `circuit_id` foreign key has cascade delete, meaning all related tables
                 // associated to the `circuit` table via the `circuit_id` will be deleted, if the
                 // corresponding `circuit` entry with the matching `circuit_id` is deleted.
-                delete(circuit::table.find(&circuit_id))
-                    .execute(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Failed to delete Circuit"),
-                        source: Box::new(err),
-                    })?;
+                delete(circuit::table.find(&circuit_id)).execute(self.conn)?;
 
                 // Must individually remove the circuit's members' `node_endpoint` entries, to
                 // check first if the `node_id` is a member of any other circuit, and the
@@ -60,22 +55,10 @@ where
                             .filter(circuit_member::node_id.eq(&node_id))
                             .count()
                             .first(self.conn)
-                            .optional()
-                            .map_err(|err| AdminServiceStoreError::QueryError {
-                                context: String::from(
-                                    "Error occurred counting CircuitNode endpoints",
-                                ),
-                                source: Box::new(err),
-                            })?
+                            .optional()?
                         {
                             delete(node_endpoint::table.filter(node_endpoint::node_id.eq(node_id)))
-                                .execute(self.conn)
-                                .map_err(|err| AdminServiceStoreError::QueryError {
-                                    context: String::from(
-                                        "Failed to delete `node_endpoint` entries",
-                                    ),
-                                    source: Box::new(err),
-                                })?;
+                                .execute(self.conn)?;
                         }
                     }
                 }

@@ -46,11 +46,8 @@ where
                 .select(circuit::all_columns)
                 .filter(circuit::circuit_id.eq(circuit_id.to_string()))
                 .first::<CircuitModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred fetching Circuit"),
-                    source: Box::new(err),
-                })? {
+                .optional()?
+            {
                 Some(circuit) => circuit,
                 None => return Ok(None),
             };
@@ -58,11 +55,7 @@ where
             // Collecting the members of the `Circuit`
             let members: Vec<CircuitMemberModel> = circuit_member::table
                 .filter(circuit_member::circuit_id.eq(circuit_id.to_string()))
-                .load(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to load Circuit members"),
-                    source: Box::new(err),
-                })?;
+                .load(self.conn)?;
 
             // Collecting services associated with the `Circuit` using the `list_services` method,
             // which provides a list of the `Services` with the matching `circuit_id`.
@@ -85,10 +78,7 @@ where
                     .with_routes(&RouteType::try_from(circuit.routes)?)
                     .with_circuit_management_type(&circuit.circuit_management_type)
                     .build()
-                    .map_err(|err| AdminServiceStoreError::StorageError {
-                        context: String::from("Failed to build Circuit"),
-                        source: Some(Box::new(err)),
-                    })?,
+                    .map_err(AdminServiceStoreError::InvalidStateError)?,
             ))
         })
     }

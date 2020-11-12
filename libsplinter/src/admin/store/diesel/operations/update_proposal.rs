@@ -34,6 +34,7 @@ use crate::admin::store::{
     error::AdminServiceStoreError,
     CircuitProposal,
 };
+use crate::error::InvalidStateError;
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreUpdateProposalOperation {
     fn update_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError>;
@@ -49,14 +50,10 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             circuit_proposal::table
                 .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Diesel error occurred fetching CircuitProposal"),
-                    source: Box::new(err),
-                })?
+                .optional()?
                 .ok_or_else(|| {
-                    AdminServiceStoreError::NotFoundError(String::from(
-                        "CircuitProposal does not exist in AdminServiceStore",
+                    AdminServiceStoreError::InvalidStateError(InvalidStateError::with_message(
+                        String::from("CircuitProposal does not exist in AdminServiceStore"),
                     ))
                 })?;
 
@@ -69,11 +66,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     circuit_proposal::requester.eq(proposal_model.requester),
                     circuit_proposal::requester_node_id.eq(proposal_model.requester_node_id),
                 ))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to update CircuitProposal"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Update existing `ProposedCircuit`
             let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
             update(proposed_circuit::table.find(proposal.circuit_id()))
@@ -89,113 +82,64 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                         .eq(proposed_circuit_model.application_metadata),
                     proposed_circuit::comments.eq(proposed_circuit_model.comments),
                 ))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to update ProposedCircuit"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             // Delete existing data associated with the `CircuitProposal` and `ProposedCircuit`
             let node_ids: Vec<String> = proposed_node::table
                 .filter(proposed_node::circuit_id.eq(proposal.circuit_id()))
                 .select(proposed_node::node_id)
-                .load(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to fetch old proposed nodes"),
-                    source: Box::new(err),
-                })?;
+                .load(self.conn)?;
 
             delete(
                 proposed_node::table.filter(proposed_node::circuit_id.eq(proposal.circuit_id())),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Nodes"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(
                 proposed_node_endpoint::table
                     .filter(proposed_node_endpoint::node_id.eq_any(&node_ids)),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old node endpoints"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(
                 proposed_service::table
                     .filter(proposed_service::circuit_id.eq(proposal.circuit_id())),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Services"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(
                 proposed_service_argument::table
                     .filter(proposed_service_argument::circuit_id.eq(proposal.circuit_id())),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Services' arguments"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(vote_record::table.filter(vote_record::circuit_id.eq(proposal.circuit_id())))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to remove old proposal's vote records"),
-                    source: Box::new(err),
-                })?;
-
+                .execute(self.conn)?;
             // Insert the updated info for all of the `CircuitProposal` and `ProposedCircuit`
             // associated data
             // Insert `members` of a `ProposedCircuit`
             let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
             insert_into(proposed_node::table)
                 .values(proposed_members)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedNode"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
                 Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedNode's endpoint"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
             let proposed_service: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
             insert_into(proposed_service::table)
                 .values(proposed_service)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedService"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
                 Vec::from(proposal.circuit());
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedService's arguments"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert `votes` from the `CircuitProposal`
             let vote_record: Vec<VoteRecordModel> = Vec::from(&proposal);
             insert_into(vote_record::table)
                 .values(vote_record)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert CircuitProposal's vote_records"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             Ok(())
         })
@@ -212,14 +156,10 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             circuit_proposal::table
                 .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Diesel error occurred fetching CircuitProposal"),
-                    source: Box::new(err),
-                })?
+                .optional()?
                 .ok_or_else(|| {
-                    AdminServiceStoreError::NotFoundError(String::from(
-                        "CircuitProposal does not exist in AdminServiceStore",
+                    AdminServiceStoreError::InvalidStateError(InvalidStateError::with_message(
+                        String::from("CircuitProposal does not exist in AdminServiceStore"),
                     ))
                 })?;
 
@@ -232,11 +172,7 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                     circuit_proposal::requester.eq(proposal_model.requester),
                     circuit_proposal::requester_node_id.eq(proposal_model.requester_node_id),
                 ))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to update CircuitProposal"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Update existing `ProposedCircuit`
             let proposed_circuit_model = ProposedCircuitModel::from(proposal.circuit());
             update(proposed_circuit::table.find(proposal.circuit_id()))
@@ -252,63 +188,35 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
                         .eq(proposed_circuit_model.application_metadata),
                     proposed_circuit::comments.eq(proposed_circuit_model.comments),
                 ))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to update ProposedCircuit"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             // Delete existing data associated with the `CircuitProposal` and `ProposedCircuit`
             let node_ids: Vec<String> = proposed_node::table
                 .filter(proposed_node::circuit_id.eq(proposal.circuit_id()))
                 .select(proposed_node::node_id)
-                .load(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to fetch old proposed nodes"),
-                    source: Box::new(err),
-                })?;
+                .load(self.conn)?;
 
             delete(
                 proposed_node::table.filter(proposed_node::circuit_id.eq(proposal.circuit_id())),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Nodes"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(
                 proposed_node_endpoint::table
                     .filter(proposed_node_endpoint::node_id.eq_any(&node_ids)),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old node endpoints"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(
                 proposed_service::table
                     .filter(proposed_service::circuit_id.eq(proposal.circuit_id())),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Services"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(
                 proposed_service_argument::table
                     .filter(proposed_service_argument::circuit_id.eq(proposal.circuit_id())),
             )
-            .execute(self.conn)
-            .map_err(|err| AdminServiceStoreError::QueryError {
-                context: String::from("Failed to remove old proposed Services' arguments"),
-                source: Box::new(err),
-            })?;
+            .execute(self.conn)?;
             delete(vote_record::table.filter(vote_record::circuit_id.eq(proposal.circuit_id())))
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to remove old proposal's vote records"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             // Insert the updated info for all of the `CircuitProposal` and `ProposedCircuit`
             // associated data
@@ -316,49 +224,29 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
             insert_into(proposed_node::table)
                 .values(proposed_members)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedNode"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
                 Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedNode's endpoint"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
             let proposed_service: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
             insert_into(proposed_service::table)
                 .values(proposed_service)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedService"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
                 Vec::from(proposal.circuit());
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert ProposedService's arguments"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Insert `votes` from the `CircuitProposal`
             let vote_record: Vec<VoteRecordModel> = Vec::from(&proposal);
             insert_into(vote_record::table)
                 .values(vote_record)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert CircuitProposal's vote_records"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             Ok(())
         })
