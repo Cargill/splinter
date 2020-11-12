@@ -48,8 +48,12 @@ mod resources;
 
 use std::sync::Arc;
 
+#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+use crate::auth::rest_api::identity::biome::BiomeUserIdentityProvider;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
+#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+use crate::rest_api::sessions::default_validation;
 use crate::rest_api::{Resource, RestResourceProvider};
 
 #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
@@ -125,6 +129,17 @@ pub struct BiomeRestResourceManager {
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Arc<dyn CredentialsStore>,
+}
+
+impl BiomeRestResourceManager {
+    /// Creates a new Biome user identity provider for the Splinter REST API
+    #[cfg(all(feature = "auth", feature = "biome-credentials"))]
+    pub fn get_identity_provider(&self) -> BiomeUserIdentityProvider {
+        BiomeUserIdentityProvider::new(
+            self.token_secret_manager.clone(),
+            default_validation(&self.rest_config.issuer()),
+        )
+    }
 }
 
 impl RestResourceProvider for BiomeRestResourceManager {

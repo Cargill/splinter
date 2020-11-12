@@ -534,15 +534,26 @@ impl SplinterDaemon {
                 });
             }
 
+            // Add Biome as an auth provider if the `biome-credentials` feature is enabled and Biome
+            // is configured. This informs the REST API that Biome is providing auth.
+            #[cfg(feature = "biome-credentials")]
+            if self.enable_biome {
+                auth_configs.push(AuthConfig::Biome {
+                    biome_resource_manager: build_biome_routes(&*store_factory)?,
+                });
+            }
+
             rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
         }
 
-        #[cfg(feature = "biome")]
-        {
-            if self.enable_biome {
-                let biome_resources = build_biome_routes(&*store_factory)?;
-                rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
-            }
+        // If Biome is enabled but wasn't already added as an auth provider, add it now
+        #[cfg(all(
+            feature = "biome",
+            not(all(feature = "auth", feature = "biome-credentials"))
+        ))]
+        if self.enable_biome {
+            let biome_resources = build_biome_routes(&*store_factory)?;
+            rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
         }
 
         let mut health_service_processor_join_handle: Option<_> = None;

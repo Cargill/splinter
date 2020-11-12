@@ -14,6 +14,8 @@
 
 //! Tools for identifying clients and users
 
+#[cfg(feature = "biome-credentials")]
+pub mod biome;
 mod error;
 #[cfg(feature = "oauth-github")]
 pub mod github;
@@ -75,6 +77,9 @@ impl FromStr for Authorization {
 
 /// A bearer token of a specific type
 pub enum BearerToken {
+    #[cfg(feature = "biome-credentials")]
+    /// Contains a Biome JWT
+    Biome(String),
     #[cfg(feature = "oauth")]
     /// Contains an OAuth2 token
     OAuth2(String),
@@ -88,6 +93,8 @@ impl FromStr for BearerToken {
         let mut parts = s.splitn(2, ':');
         match (parts.next(), parts.next()) {
             (Some(token_type), Some(token)) => match token_type {
+                #[cfg(feature = "biome-credentials")]
+                "Biome" => Ok(BearerToken::Biome(token.to_string())),
                 #[cfg(feature = "oauth")]
                 "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
                 other_type => Err(AuthorizationParseError::new(format!(
