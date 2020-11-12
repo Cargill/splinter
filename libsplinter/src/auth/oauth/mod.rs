@@ -28,6 +28,9 @@ use oauth2::{
     PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 
+#[cfg(feature = "oauth-github")]
+use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
+use crate::auth::rest_api::identity::IdentityProvider;
 use crate::collections::TtlMap;
 
 pub use error::{OAuthClientConfigurationError, OAuthClientError};
@@ -48,6 +51,8 @@ pub struct OAuthClient {
     pending_authorizations: Arc<Mutex<TtlMap<String, PendingAuthorization>>>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
+    /// OAuth2 identity provider used to retrieve the users' identity
+    identity_provider: Box<dyn IdentityProvider>,
 }
 
 impl OAuthClient {
@@ -63,6 +68,7 @@ impl OAuthClient {
     /// * `token_url` - The provider's endpoint for exchanging an authorization code for an access
     ///   token
     /// * `scopes` - The scopes that will be requested for each user
+    /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
     pub fn new(
         client_id: String,
         client_secret: String,
@@ -70,6 +76,7 @@ impl OAuthClient {
         redirect_url: String,
         token_url: String,
         scopes: Vec<String>,
+        identity_provider: Box<dyn IdentityProvider>,
     ) -> Result<Self, OAuthClientConfigurationError> {
         let client =
             BasicClient::new(
@@ -91,6 +98,7 @@ impl OAuthClient {
                 PENDING_AUTHORIZATION_EXPIRATION_SECS,
             )))),
             scopes,
+            identity_provider,
         })
     }
 
@@ -115,6 +123,7 @@ impl OAuthClient {
             redirect_url,
             "https://github.com/login/oauth/access_token".into(),
             vec![],
+            Box::new(GithubUserIdentityProvider),
         )
     }
 
@@ -262,10 +271,13 @@ impl From<BasicTokenResponse> for UserTokens {
 mod tests {
     use super::*;
 
+    use crate::auth::rest_api::identity::IdentityProviderError;
+
     /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
     #[test]
     fn client_construction() {
+        let identity_box: Box<TestIdentityProvider> = Box::new(TestIdentityProvider);
         OAuthClient::new(
             "client_id".into(),
             "client_secret".into(),
@@ -273,6 +285,7 @@ mod tests {
             "https://localhost/oauth/callback".into(),
             "https://provider.com/token".into(),
             vec![],
+            identity_box.clone_box(),
         )
         .expect("Failed to create client from valid inputs");
 
@@ -284,6 +297,7 @@ mod tests {
                 "https://localhost/oauth/callback".into(),
                 "https://provider.com/token".into(),
                 vec![],
+                identity_box.clone_box(),
             ),
             Err(OAuthClientConfigurationError::InvalidAuthUrl(_))
         ));
@@ -296,6 +310,7 @@ mod tests {
                 "invalid_redirect_url".into(),
                 "https://provider.com/token".into(),
                 vec![],
+                identity_box.clone_box(),
             ),
             Err(OAuthClientConfigurationError::InvalidRedirectUrl(_))
         ));
@@ -308,8 +323,22 @@ mod tests {
                 "https://localhost/oauth/callback".into(),
                 "invalid_token_url".into(),
                 vec![],
+                identity_box,
             ),
             Err(OAuthClientConfigurationError::InvalidTokenUrl(_))
         ));
+    }
+
+    #[derive(Clone)]
+    pub struct TestIdentityProvider;
+
+    impl IdentityProvider for TestIdentityProvider {
+        fn get_identity(&self, _: &Authorization) -> Result<String, IdentityProviderError> {
+            Ok("".to_string())
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
     }
 }
