@@ -425,6 +425,8 @@ mod tests {
     use crate::biome::{
         MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore, MemoryUserStore,
     };
+    #[cfg(feature = "auth")]
+    use crate::rest_api::AuthConfig;
     use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
 
     #[derive(Serialize)]
@@ -540,13 +542,23 @@ mod tests {
             .build()
             .unwrap();
 
-        RestApiBuilder::new()
+        let mut rest_api_builder = RestApiBuilder::new();
+
+        rest_api_builder = rest_api_builder
             .with_bind("127.0.0.1:0")
-            .add_resources(resource_manager.resources())
-            .build_insecure()
-            .unwrap()
-            .run_insecure()
-            .unwrap()
+            .add_resources(resource_manager.resources());
+
+        #[cfg(feature = "auth")]
+        {
+            rest_api_builder = rest_api_builder
+                .with_authorization_mapping(resource_manager.get_authorization_mapping());
+
+            rest_api_builder = rest_api_builder.with_auth_configs(vec![AuthConfig::Biome {
+                biome_resource_manager: resource_manager,
+            }]);
+        }
+
+        rest_api_builder.build().unwrap().run().unwrap()
     }
 
     fn create_and_authorize_user(
