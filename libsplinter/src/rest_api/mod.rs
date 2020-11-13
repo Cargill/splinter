@@ -73,7 +73,7 @@ use std::thread;
 
 #[cfg(feature = "oauth")]
 use crate::auth::oauth::{
-    rest_api::{OAuthResourceProvider, SaveTokensOperation, SaveTokensToNull},
+    rest_api::{OAuthResourceProvider, SaveUserInfoOperation, SaveUserInfoToNull},
     OAuthClient,
 };
 #[cfg(feature = "oauth-github")]
@@ -87,8 +87,8 @@ use crate::auth::rest_api::{
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::{
-    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveTokensOperation, OAuthUserStore,
-    UserStore,
+    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveUserInfoOperation,
+    OAuthUserStore, UserStore,
 };
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
@@ -820,7 +820,7 @@ impl RestApiBuilder {
                     #[cfg(feature = "oauth")]
                     AuthConfig::OAuth {
                         oauth_config,
-                        token_save_config,
+                        user_info_save_config,
                     } => {
                         if oauth_configured {
                             return Err(RestApiServerError::InvalidStateError(
@@ -853,11 +853,11 @@ impl RestApiBuilder {
                                 Box::new(GithubUserIdentityProvider),
                             ),
                         };
-
-                        let save_tokens_operation: Box<dyn SaveTokensOperation> =
-                            match token_save_config {
+                        // Save user information, including tokens
+                        let save_user_info_operation: Box<dyn SaveUserInfoOperation> =
+                            match user_info_save_config {
                                 #[cfg(feature = "biome-oauth")]
-                                TokenSaveConfig::Biome {
+                                UserInfoSaveConfig::Biome {
                                     user_store,
                                     oauth_user_store,
                                 } => {
@@ -865,19 +865,18 @@ impl RestApiBuilder {
                                         #[cfg(feature = "oauth-github")]
                                         OAuthConfig::GitHub { .. } => OAuthProvider::Github,
                                     };
-                                    Box::new(OAuthUserStoreSaveTokensOperation::new(
+                                    Box::new(OAuthUserStoreSaveUserInfoOperation::new(
                                         oauth_provider,
-                                        oauth_identity_provider.clone(),
                                         user_store,
                                         oauth_user_store,
                                     ))
                                 }
-                                TokenSaveConfig::NoOp => Box::new(SaveTokensToNull),
+                                UserInfoSaveConfig::NoOp => Box::new(SaveUserInfoToNull),
                             };
 
                         identity_providers.push(oauth_identity_provider);
                         self.resources.append(
-                            &mut OAuthResourceProvider::new(oauth_client, save_tokens_operation)
+                            &mut OAuthResourceProvider::new(oauth_client, save_user_info_operation)
                                 .resources(),
                         );
                         oauth_configured = true;
@@ -940,8 +939,8 @@ pub enum AuthConfig {
     OAuth {
         /// OAuth provider configuration
         oauth_config: OAuthConfig,
-        /// The configuration for the token save operation
-        token_save_config: TokenSaveConfig,
+        /// The configuration for the user info save operation
+        user_info_save_config: UserInfoSaveConfig,
     },
     /// A custom authentication method
     Custom {
@@ -968,16 +967,17 @@ pub enum OAuthConfig {
     },
 }
 
-/// Configurations for how users' tokens are saved when they're received from the OAuth provider
+/// Configurations for how users' information, including tokens and identity, are saved when
+/// they're received from the OAuth provider
 #[cfg(feature = "oauth")]
-pub enum TokenSaveConfig {
-    /// Saves users' tokens to Biome's OAuth user store
+pub enum UserInfoSaveConfig {
+    /// Saves users' information to Biome's OAuth user store
     #[cfg(feature = "biome-oauth")]
     Biome {
         user_store: Box<dyn UserStore>,
         oauth_user_store: Box<dyn OAuthUserStore>,
     },
-    /// Users' tokens will not be saved by the Splinter REST API
+    /// Users' information will not be saved by the Splinter REST API
     NoOp,
 }
 

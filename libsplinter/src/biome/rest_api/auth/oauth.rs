@@ -17,8 +17,8 @@
 use uuid::Uuid;
 
 use crate::auth::{
-    oauth::{rest_api::SaveTokensOperation, UserTokens},
-    rest_api::identity::{Authorization, BearerToken, GetByAuthorization, IdentityProvider},
+    oauth::{rest_api::SaveUserInfoOperation, UserInfo},
+    rest_api::identity::{Authorization, BearerToken, GetByAuthorization},
 };
 use crate::biome::oauth::store::{OAuthProvider, OAuthUserBuilder, OAuthUserStore};
 use crate::biome::user::store::{User, UserStore};
@@ -58,43 +58,34 @@ impl GetByAuthorization<User> for GetUserByOAuthAuthorization {
     }
 }
 
-/// Biome-backed implementation of the SaveTokensOperation trait.
+/// Biome-backed implementation of the SaveUserInfoOperation trait.
 ///
 /// This implementation stores the UserToken values using the OAuthUserStore provided by Biome.
 #[derive(Clone)]
-pub struct OAuthUserStoreSaveTokensOperation {
+pub struct OAuthUserStoreSaveUserInfoOperation {
     provider: OAuthProvider,
-    identity_provider: Box<dyn IdentityProvider>,
     user_store: Box<dyn UserStore>,
     oauth_user_store: Box<dyn OAuthUserStore>,
 }
 
-impl OAuthUserStoreSaveTokensOperation {
-    /// Construct a new OAuthUserStoreSaveTokensOperation.
+impl OAuthUserStoreSaveUserInfoOperation {
+    /// Construct a new OAuthUserStoreSaveUserInfoOperation.
     pub fn new(
         provider: OAuthProvider,
-        identity_provider: Box<dyn IdentityProvider>,
         user_store: Box<dyn UserStore>,
         oauth_user_store: Box<dyn OAuthUserStore>,
     ) -> Self {
         Self {
             provider,
-            identity_provider,
             user_store,
             oauth_user_store,
         }
     }
 }
 
-impl SaveTokensOperation for OAuthUserStoreSaveTokensOperation {
-    fn save_tokens(&self, user_tokens: &UserTokens) -> Result<(), InternalError> {
-        let authorization =
-            Authorization::Bearer(BearerToken::OAuth2(user_tokens.access_token().to_string()));
-
-        let provider_identity = self
-            .identity_provider
-            .get_identity(&authorization)
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+impl SaveUserInfoOperation for OAuthUserStoreSaveUserInfoOperation {
+    fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError> {
+        let provider_identity = user_info.identity().to_string();
 
         let existing_oauth_user = self
             .oauth_user_store
@@ -104,8 +95,8 @@ impl SaveTokensOperation for OAuthUserStoreSaveTokensOperation {
         if let Some(oauth_user) = existing_oauth_user {
             let updated_user = oauth_user
                 .into_update_builder()
-                .with_access_token(user_tokens.access_token().into())
-                .with_refresh_token(user_tokens.refresh_token().map(String::from))
+                .with_access_token(user_info.access_token().into())
+                .with_refresh_token(user_info.refresh_token().map(String::from))
                 .build()
                 .map_err(|e| {
                     InternalError::from_source_with_message(
@@ -128,8 +119,8 @@ impl SaveTokensOperation for OAuthUserStoreSaveTokensOperation {
             let oauth_user = OAuthUserBuilder::new()
                 .with_user_id(user_id)
                 .with_provider_user_ref(provider_identity)
-                .with_access_token(user_tokens.access_token().into())
-                .with_refresh_token(user_tokens.refresh_token().map(String::from))
+                .with_access_token(user_info.access_token().into())
+                .with_refresh_token(user_info.refresh_token().map(String::from))
                 .with_provider(self.provider.clone())
                 .build()
                 .map_err(|e| {
@@ -147,7 +138,7 @@ impl SaveTokensOperation for OAuthUserStoreSaveTokensOperation {
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn SaveTokensOperation> {
+    fn clone_box(&self) -> Box<dyn SaveUserInfoOperation> {
         Box::new(self.clone())
     }
 }

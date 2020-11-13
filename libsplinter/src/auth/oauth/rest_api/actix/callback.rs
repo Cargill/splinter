@@ -20,8 +20,8 @@ use futures::future::IntoFuture;
 
 use crate::auth::oauth::{
     rest_api::{
-        resources::callback::{user_tokens_to_query_string, CallbackQuery},
-        SaveTokensOperation,
+        resources::callback::{user_info_to_query_string, CallbackQuery},
+        SaveUserInfoOperation,
     },
     OAuthClient,
 };
@@ -30,7 +30,7 @@ use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource
 
 pub fn make_callback_route(
     client: OAuthClient,
-    save_token_op: Box<dyn SaveTokensOperation>,
+    save_info_op: Box<dyn SaveUserInfoOperation>,
 ) -> Resource {
     Resource::build("/oauth/callback")
         .add_request_guard(ProtocolVersionRangeGuard::new(
@@ -42,18 +42,18 @@ pub fn make_callback_route(
                 match Query::<CallbackQuery>::from_query(req.query_string()) {
                     Ok(query) => {
                         match client.exchange_authorization_code(query.code.clone(), &query.state) {
-                            Ok(Some((user_tokens, redirect_url))) => {
-                                if let Err(err) = save_token_op.save_tokens(&user_tokens) {
-                                    error!("Unable to store user tokens: {}", err);
+                            Ok(Some((user_info, redirect_url))) => {
+                                if let Err(err) = save_info_op.save_user_info(&user_info) {
+                                    error!("Unable to store user info: {}", err);
                                     HttpResponse::InternalServerError()
                                         .json(ErrorResponse::internal_error())
                                 } else {
-                                    // Adding the user tokens to the redirect URL, so the client may
+                                    // Adding the user info to the redirect URL, so the client may
                                     // access these values after a redirect
                                     let redirect_url = format!(
                                         "{}?{}",
                                         redirect_url,
-                                        user_tokens_to_query_string(&user_tokens)
+                                        user_info_to_query_string(&user_info)
                                     );
                                     HttpResponse::Found()
                                         .header(LOCATION, redirect_url)

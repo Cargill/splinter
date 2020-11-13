@@ -22,4 +22,4 @@ pub use credentials::GetUserByBiomeAuthorization;
 #[cfg(feature = "biome-oauth")]
 pub use oauth::GetUserByOAuthAuthorization;
 #[cfg(feature = "biome-oauth")]
-pub use oauth::OAuthUserStoreSaveTokensOperation;
+pub use oauth::OAuthUserStoreSaveUserInfoOperation;
