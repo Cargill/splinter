@@ -22,11 +22,8 @@ use std::fmt;
 pub enum IdentityProviderError {
     /// An unrecoverable error that cannot be handled by the caller
     InternalError(String),
-    /// The given authentication variant is supported by this identity provider, but could not be
-    /// resolved to an identity
+    /// The given authentication could not be resolved to an identity by this provider
     Unauthorized,
-    /// The given authentication is not supported by this identity provider
-    UnsupportedAuth,
 }
 
 impl fmt::Display for IdentityProviderError {
@@ -38,9 +35,6 @@ impl fmt::Display for IdentityProviderError {
                 msg,
             ),
             Self::Unauthorized => f.write_str("No identity was found for the given authentication"),
-            Self::UnsupportedAuth => {
-                f.write_str("The given authentication is not supported by this provider")
-            }
         }
     }
 }

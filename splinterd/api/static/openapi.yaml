@@ -38,12 +38,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Status'
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         500:
@@ -152,12 +146,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Proposal"
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         404:
@@ -339,12 +327,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Circuit"
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         404:
@@ -487,12 +469,6 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/RegisteredNode"
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         404:
@@ -566,12 +542,6 @@ paths:
       responses:
         200:
           description: The node has been deleted from the registry
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         404:
@@ -836,12 +806,6 @@ paths:
                 type: array
                 items:
                   type: integer
-        400:
-          description: The request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         404:
@@ -1154,12 +1118,6 @@ paths:
                       type: string
                       description: "Internal unique identifier for the user"
                       example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         500:
@@ -1321,12 +1279,6 @@ paths:
                   message:
                     type: string
                     example: "User deleted successfully"
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         404:
@@ -1359,12 +1311,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BiomeUserKey'
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         401:
           description: The client is unauthorized
         500:

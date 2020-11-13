@@ -24,8 +24,6 @@ use identity::{IdentityProvider, IdentityProviderError};
 enum AuthorizationResult {
     /// The client was authorized to the given identity
     Authorized(String),
-    /// The given authorization header isn't supported by any of the configured identity providers
-    InvalidAuthorization(String),
     /// The requested endpoint does not require authorization
     NoAuthorizationNecessary,
     /// The authorization header is empty or invalid
@@ -66,25 +64,18 @@ fn authorize(
     };
     let authorization = match auth_str.parse() {
         Ok(auth) => auth,
-        Err(_) => return AuthorizationResult::InvalidAuthorization(auth_str.into()),
+        Err(_) => return AuthorizationResult::Unauthorized,
     };
 
     // Attempt to get the client's identity
-    let mut authorization_supported = false;
     for provider in identity_providers {
         match provider.get_identity(&authorization) {
             Ok(identity) => return AuthorizationResult::Authorized(identity),
-            Err(IdentityProviderError::Unauthorized) => authorization_supported = true,
-            Err(IdentityProviderError::UnsupportedAuth) => {}
+            Err(IdentityProviderError::Unauthorized) => {}
             Err(err) => error!("{}", err),
         }
     }
 
-    // If no auth was successful, determine if it was an unsupported type or just not
-    // valid for any of the providers
-    if authorization_supported {
-        AuthorizationResult::Unauthorized
-    } else {
-        AuthorizationResult::InvalidAuthorization(auth_str.into())
-    }
+    // No identity provider could resolve the authorization to an identity
+    AuthorizationResult::Unauthorized
 }
