@@ -93,7 +93,6 @@ pub async fn propose_gameroom(
     create_gameroom: web::Json<CreateGameroomForm>,
     node_info: web::Data<NodeInfo>,
     client: web::Data<Client>,
-    splinterd_url: web::Data<String>,
     gameroomd_data: web::Data<GameroomdData>,
 ) -> HttpResponse {
     let mut template = match CircuitCreateTemplate::from_yaml_file("gameroom.yaml") {
@@ -104,7 +103,12 @@ pub async fn propose_gameroom(
         }
     };
 
-    let response = fetch_node_information(&create_gameroom.members, &splinterd_url, client).await;
+    let response = fetch_node_information(
+        &create_gameroom.members,
+        &gameroomd_data.splinterd_url,
+        client,
+    )
+    .await;
 
     let nodes = match response {
         Ok(nodes) => nodes,

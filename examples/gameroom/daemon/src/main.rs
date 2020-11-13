@@ -117,7 +117,7 @@ fn run() -> Result<(), GameroomDaemonError> {
 
     let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api::run(
         config.rest_api_endpoint(),
-        config.splinterd_url(),
+        config.splinterd_url().into(),
         node,
         connection_pool,
         public_key.as_hex(),
