@@ -944,6 +944,7 @@ pub enum AuthConfig {
     /// Biome credentials authentication
     #[cfg(feature = "biome-credentials")]
     Biome {
+        /// The resource provider that defines all Biome-related endpoints for the Splinter REST API
         biome_resource_manager: BiomeRestResourceManager,
     },
     /// Cylinder JWT authentication
