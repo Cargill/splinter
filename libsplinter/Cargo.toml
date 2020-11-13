@@ -100,6 +100,7 @@ experimental = [
     "auth",
     "biome-notifications",
     "biome-oauth",
+    "cylinder-jwt",
     "oauth",
     "oauth-github",
     "registry-database",
@@ -123,6 +124,7 @@ biome-key-management = ["biome"]
 biome-notifications = ["biome"]
 biome-oauth = ["biome"]
 circuit-template = ["glob"]
+cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 oauth = ["auth", "oauth2"]
 oauth-github = ["oauth"]
