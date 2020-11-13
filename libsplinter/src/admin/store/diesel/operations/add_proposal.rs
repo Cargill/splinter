@@ -137,10 +137,10 @@ impl<'a> AdminServiceStoreAddProposalOperation
     for AdminServiceStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError> {
-        // Insert `CircuitProposal` and all associated types into database
+        // Insert `CircuitProposal` and all associated types into database after verifying that
+        // the proposal exists
         self.conn.transaction::<(), _, _>(|| {
-            // Check if a `CircuitProposal` already exists with the given `circuit_id`, in which
-            // case an error is returned.
+            // Check if a `CircuitProposal` already exists with the given `circuit_id`
             if circuit_proposal::table
                 .filter(circuit_proposal::circuit_id.eq(proposal.circuit_id()))
                 .first::<CircuitProposalModel>(self.conn)
@@ -184,7 +184,7 @@ impl<'a> AdminServiceStoreAddProposalOperation
                     context: String::from("Unable to insert ProposedNode"),
                     source: Box::new(err),
                 })?;
-            // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
+            // Insert the node `endpoints` and the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
                 Vec::from(proposal.circuit());
             insert_into(proposed_node_endpoint::table)
