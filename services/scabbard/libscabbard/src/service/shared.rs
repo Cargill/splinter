@@ -14,15 +14,13 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
+use openssl::hash::{hash, MessageDigest};
 use transact::protocol::batch::BatchPair;
 use transact::protocol::transaction::{HashMethod, TransactionHeader};
 use transact::protos::FromBytes;
 
-use splinter::{
-    consensus::ProposalId,
-    service::ServiceNetworkSender,
-    signing::{hash::HashVerifier, SignatureVerifier},
-};
+use splinter::{consensus::ProposalId, service::ServiceNetworkSender};
 
 use crate::hex::parse_hex;
 
@@ -108,10 +106,9 @@ impl ScabbardShared {
                 .signature_verifier
                 .verify(
                     batch.batch().header(),
-                    parse_hex(batch.batch().header_signature())
-                        .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?
-                        .as_slice(),
-                    batch_pub_key,
+                    &Signature::from_hex(batch.batch().header_signature())
+                        .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?,
+                    &PublicKey::new(batch_pub_key.to_vec()),
                 )
                 .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?
             {
@@ -165,10 +162,9 @@ impl ScabbardShared {
                     .signature_verifier
                     .verify(
                         txn.header(),
-                        parse_hex(txn.header_signature())
-                            .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?
-                            .as_slice(),
-                        header.signer_public_key(),
+                        &Signature::from_hex(txn.header_signature())
+                            .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?,
+                        &PublicKey::new(header.signer_public_key().to_vec()),
                     )
                     .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?
                 {
@@ -181,9 +177,11 @@ impl ScabbardShared {
                 }
 
                 if !match header.payload_hash_method() {
-                    HashMethod::SHA512 => HashVerifier
-                        .verify(txn.payload(), header.payload_hash(), &[])
-                        .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?,
+                    HashMethod::SHA512 => {
+                        let expected_hash = hash(MessageDigest::sha512(), txn.payload())
+                            .map_err(|err| ScabbardError::BatchVerificationFailed(Box::new(err)))?;
+                        header.payload_hash() == expected_hash.as_ref()
+                    }
                 } {
                     warn!(
                         "Transaction payload hash doesn't match payload - txn: {}, batch: {}",
