@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey};
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
-use sawtooth_sdk::signing::secp256k1;
 use splinter::admin::messages::CreateCircuit;
 use splinter::protos::admin::{
     CircuitCreateRequest, CircuitManagementPayload, CircuitManagementPayload_Action as Action,
     CircuitManagementPayload_Header as Header, CircuitProposalVote, CircuitProposalVote_Vote,
 };
-use splinter::signing::{sawtooth, Signer};
 
 use crate::error::CliError;
 
@@ -56,16 +55,20 @@ where
 
     let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)?;
 
-    let signing_context = secp256k1::Secp256k1Context::new();
-    let private_key = secp256k1::Secp256k1PrivateKey::from_hex(private_key).map_err(|err| {
+    let private_key = PrivateKey::new_from_hex(private_key).map_err(|err| {
         CliError::ActionError(format!("Invalid secp256k1 private key provided: {}", err))
     })?;
+    let signer = Secp256k1Context::new().new_signer(private_key);
 
-    let signer = sawtooth::SawtoothSecp256k1RefSigner::new(&signing_context, private_key).map_err(
-        |err| CliError::ActionError(format!("Failed to create signer from private key: {}", err)),
-    )?;
-
-    let public_key = signer.public_key().to_vec();
+    let public_key = signer
+        .public_key()
+        .map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to get public key from secp256k1 private key: {}",
+                err
+            ))
+        })?
+        .into_bytes();
 
     let mut header = Header::new();
     header.set_action(action_type);
@@ -82,7 +85,7 @@ where
 
     let mut circuit_management_payload = CircuitManagementPayload::new();
     circuit_management_payload.set_header(header_bytes);
-    circuit_management_payload.set_signature(header_signature);
+    circuit_management_payload.set_signature(header_signature.take_bytes());
     action_proto.apply(&mut circuit_management_payload);
     let payload_bytes = circuit_management_payload
         .write_to_bytes()

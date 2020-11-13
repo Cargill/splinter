@@ -24,7 +24,7 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::MetadataExt;
 
 use clap::ArgMatches;
-use sawtooth_sdk::signing;
+use cylinder::{secp256k1::Secp256k1Context, Context};
 
 use crate::error::CliError;
 
@@ -83,14 +83,11 @@ fn create_key_pair(
         }
     }
 
-    let context = signing::create_context("secp256k1")
-        .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+    let context = Secp256k1Context::new();
 
-    let private_key = context
-        .new_random_private_key()
-        .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
+    let private_key = context.new_random_private_key();
     let public_key = context
-        .get_public_key(&*private_key)
+        .get_public_key(&private_key)
         .map_err(|err| CliError::EnvironmentError(format!("{}", err)))?;
 
     let key_dir_info =
@@ -137,7 +134,7 @@ fn create_key_pair(
         chown(public_key_path.as_path(), key_dir_uid, key_dir_gid)?;
     }
 
-    Ok(public_key.as_slice().to_vec())
+    Ok(public_key.into_bytes())
 }
 
 /// Write the given hex string to the given file, appending a newline at the end.
