@@ -23,7 +23,7 @@
 //! let reactor = Reactor::new();
 //!
 //! let mut ws = WebSocketClient::new(
-//!    "http://echo.websocket.org", |ctx, msg: Vec<u8>| {
+//!    "http://echo.websocket.org", "Bearer token", |ctx, msg: Vec<u8>| {
 //!    if let Ok(s) = String::from_utf8(msg.clone()) {
 //!         println!("Received {}", s);
 //!    } else {
@@ -135,6 +135,7 @@ enum WebSocketClientCmd {
 /// WebSocket client. Configures Websocket connection and produces `Listen` future.
 pub struct WebSocketClient<T: ParseBytes<T> + 'static = Vec<u8>> {
     url: String,
+    authorization: String,
     on_message: Arc<dyn Fn(Context<T>, T) -> WsResponse + Send + Sync + 'static>,
     on_open: Option<Arc<dyn Fn(Context<T>) -> WsResponse + Send + Sync + 'static>>,
     on_error: Option<Arc<OnErrorHandle<T>>>,
@@ -149,6 +150,7 @@ impl<T: ParseBytes<T> + 'static> Clone for WebSocketClient<T> {
     fn clone(&self) -> Self {
         WebSocketClient {
             url: self.url.clone(),
+            authorization: self.authorization.clone(),
             on_message: self.on_message.clone(),
             on_open: self.on_open.clone(),
             on_error: self.on_error.clone(),
@@ -162,12 +164,13 @@ impl<T: ParseBytes<T> + 'static> Clone for WebSocketClient<T> {
 }
 
 impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
-    pub fn new<F>(url: &str, on_message: F) -> Self
+    pub fn new<F>(url: &str, authorization: &str, on_message: F) -> Self
     where
         F: Fn(Context<T>, T) -> WsResponse + Send + Sync + 'static,
     {
         Self {
             url: url.to_string(),
+            authorization: authorization.to_string(),
             on_message: Arc::new(on_message),
             on_open: None,
             on_error: None,
@@ -181,6 +184,10 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
 
     pub fn url(&self) -> String {
         self.url.clone()
+    }
+
+    pub fn authorization(&self) -> String {
+        self.authorization.clone()
     }
 
     pub fn set_reconnect(&mut self, reconnect: bool) {
@@ -197,6 +204,10 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
 
     pub fn set_url(&mut self, url: &str) {
         self.url = url.to_string();
+    }
+
+    pub fn set_authorization(&mut self, authorization: &str) {
+        self.authorization = authorization.to_string();
     }
 
     pub fn header(&mut self, header: &str, value: String) {
@@ -273,7 +284,9 @@ impl<T: ParseBytes<T> + 'static> WebSocketClient<T> {
         debug!("starting: {}", url);
 
         let mut builder = Request::builder();
-        let mut request_builder = builder.uri(url);
+        let mut request_builder = builder
+            .uri(url)
+            .header("Authorization", &self.authorization);
 
         for (header, value) in self.additional_headers.iter() {
             request_builder = request_builder.header(header, value);
