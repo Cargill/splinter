@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementation of a `StoreFactory` for SQLite
+
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     sqlite::SqliteConnection,
@@ -19,12 +21,13 @@ use diesel::{
 
 use super::StoreFactory;
 
-/// A `StoryFactory` backed by a SQLite database.
+/// A `StoreFactory` backed by a SQLite database.
 pub struct SqliteStoreFactory {
     pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl SqliteStoreFactory {
+    /// Create a new `SqliteStoreFactory`.
     pub fn new(pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
         Self { pool }
     }
