@@ -88,7 +88,6 @@ mod tests {
     use splinter::{
         rest_api::{Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle},
         service::Service,
-        signing::hash::HashVerifier,
     };
 
     use crate::service::{compute_db_paths, state::ScabbardState, Scabbard};
@@ -155,7 +154,7 @@ mod tests {
             TEMP_DB_SIZE,
             paths.temp_dir.path(),
             TEMP_DB_SIZE,
-            Box::new(HashVerifier),
+            Secp256k1Context::new().new_verifier(),
             vec![],
             None,
         )
