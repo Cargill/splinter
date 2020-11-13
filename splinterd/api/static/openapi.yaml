@@ -1608,8 +1608,8 @@ components:
       in: header
       description: |
         The client's authorization, which the server resolves to an identity.
-        Currently supports Biome JWT (if Biome credentials is enabled) and OAuth2
-        bearer tokens.
+        Currently supports Biome JWT (if Biome credentials is enabled), Cylinder
+        JWT, and OAuth2 bearer tokens.
       required: true
       schema:
         type: string
@@ -1618,6 +1618,11 @@ components:
             IjoiZjM1YWFjYzEtYTljZC00ZWRhLWI2ZDAtMmVmYWRkZjBjOGE0IiwiaXNzIjoic2V\
             sZi1pc3N1ZWQiLCJleHAiOjE1ODAyMzkyMjh9.P8hA0ru_xriYX7qryl08ZEp86t5HD\
             _AEVPEUXY70Ehc
+          Cylinder: Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmR\
+            lcitqd3QifQ==.eyJpc3MiOiIwMjc5YmU2NjdlZjlkY2JiYWM1NWEwNjI5NWNlODcwY\
+            jA3MDI5YmZjZGIyZGNlMjhkOTU5ZjI4MTViMTZmODE3OTgifQ==.71Vw3+m9R4b8iZU\
+            zhRHOAtX/hO5WYA9PgMe27/CeZ6NhIXFYkBBzreoIGpHbfJ8UxT+1MLUgjsQB8TISaf\
+            neRA==
           OAuth2: Bearer OAuth2:55eeea7ce2b472d69d406990939baa698e34e955
 
     protocol_version:

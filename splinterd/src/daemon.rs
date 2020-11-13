@@ -486,6 +486,11 @@ impl SplinterDaemon {
         {
             let mut auth_configs = vec![];
 
+            // Add Cylinder JWT as an auth provider
+            auth_configs.push(AuthConfig::Cylinder {
+                verifier: Secp256k1Context::new().new_verifier(),
+            });
+
             // Handle OAuth config. If no OAuth config values are provided, just skip this;
             // otherwise, require that all are set.
             let any_oauth_args_provided = self.oauth_provider.is_some()
