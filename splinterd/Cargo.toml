@@ -33,6 +33,7 @@ bytes = "0.4"
 clap = "2.32"
 crossbeam-channel = "0.3"
 ctrlc = "3.0"
+cylinder = "0.2"
 flexi_logger = "0.14"
 health = { path = "../services/health", optional = true }
 log = "0.4"
@@ -58,7 +59,6 @@ features = [
   "registry-remote",
   "rest-api",
   "rest-api-actix",
-  "sawtooth-signing-compat",
 ]
 
 [features]
