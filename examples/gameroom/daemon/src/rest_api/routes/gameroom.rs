@@ -106,6 +106,7 @@ pub async fn propose_gameroom(
     let response = fetch_node_information(
         &create_gameroom.members,
         &gameroomd_data.splinterd_url,
+        &gameroomd_data.authorization,
         client,
     )
     .await;
@@ -210,6 +211,7 @@ pub async fn propose_gameroom(
 async fn fetch_node_information(
     node_ids: &[String],
     splinterd_url: &str,
+    authorization: &str,
     client: web::Data<Client>,
 ) -> Result<Vec<NodeResponse>, RestApiResponseError> {
     let node_ids = node_ids.to_owned();
@@ -219,6 +221,7 @@ async fn fetch_node_information(
             splinterd_url,
             std::i64::MAX
         ))
+        .header("Authorization", authorization)
         .header(
             "SplinterProtocolVersion",
             protocol::ADMIN_PROTOCOL_VERSION.to_string(),

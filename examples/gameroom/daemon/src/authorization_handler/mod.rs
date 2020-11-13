@@ -72,6 +72,7 @@ impl ParseBytes<Event> for Event {
 
 pub fn run(
     splinterd_url: String,
+    authorization: String,
     node_id: String,
     db_conn: ConnectionPool,
     private_key: String,
@@ -91,15 +92,17 @@ pub fn run(
         .unwrap_or_else(|| format!("{}/ws/admin/register/gameroom", splinterd_url));
 
     let ws_url = splinterd_url.clone();
+    let ws_authorization = authorization.clone();
     let ws_node_id = node_id.clone();
     let ws_db_conn = db_conn.clone();
-    let mut ws = WebSocketClient::new(&registration_route, move |ctx, event| {
+    let mut ws = WebSocketClient::new(&registration_route, &authorization, move |ctx, event| {
         if let Err(err) = process_admin_event(
             event,
             &ws_db_conn,
             &ws_node_id,
             &private_key,
             &ws_url,
+            &ws_authorization,
             ctx.igniter(),
         ) {
             error!("Failed to process admin event: {}", err);
@@ -110,6 +113,7 @@ pub fn run(
     let on_open_db_conn = db_conn.clone();
     let on_open_igniter = igniter.clone();
     let on_open_url = splinterd_url.clone();
+    let on_open_authorization = authorization.clone();
     ws.on_open(move |_| {
         let conn = match on_open_db_conn.get() {
             Ok(conn) => conn,
@@ -128,7 +132,12 @@ pub fn run(
         };
 
         for gameroom in gamerooms.iter() {
-            let ws = resubscribe(&on_open_url, gameroom, &on_open_db_conn);
+            let ws = resubscribe(
+                &on_open_url,
+                &on_open_authorization,
+                gameroom,
+                &on_open_db_conn,
+            );
             if let Err(err) = on_open_igniter.start_ws(&ws) {
                 error!("Failed to resubscribe to active gameroom: {}", err);
             }
@@ -192,10 +201,11 @@ pub fn run(
 
                 debug!("Checking for splinterd server");
                 while now.elapsed() <= Duration::from_secs(30) {
-                    match reqwest::blocking::get(&format!(
-                        "{}/ws/admin/register/gameroom",
-                        on_error_url
-                    )) {
+                    match reqwest::blocking::Client::new()
+                        .get(&format!("{}/ws/admin/register/gameroom", on_error_url))
+                        .header("Authorization", &authorization)
+                        .send()
+                    {
                         Ok(res) => {
                             if res.status().is_success() {
                                 debug!(
@@ -227,6 +237,7 @@ fn process_admin_event(
     node_id: &str,
     private_key: &str,
     url: &str,
+    authorization: &str,
     igniter: Igniter,
 ) -> Result<(), AppAuthHandlerError> {
     debug!("Received the event at {}", event.timestamp);
@@ -488,6 +499,7 @@ fn process_admin_event(
                     "{}/scabbard/{}/{}/ws/subscribe",
                     url, msg_proposal.circuit_id, service_id
                 ),
+                &authorization,
                 move |_, event| {
                     if let Err(err) = processor.handle_state_change_event(event) {
                         error!(
@@ -505,6 +517,7 @@ fn process_admin_event(
             );
 
             let url_to_string = url.to_string();
+            let authorization_to_string = authorization.to_string();
             let private_key_to_string = private_key.to_string();
             xo_ws.on_open(move |ctx| {
                 debug!("Starting XO State Delta Export");
@@ -512,6 +525,7 @@ fn process_admin_event(
                     &private_key_to_string,
                     scabbard_admin_keys.clone(),
                     &url_to_string,
+                    &authorization_to_string,
                     &msg_proposal.circuit_id.clone(),
                     &service_id.clone(),
                 ) {
@@ -545,6 +559,7 @@ fn process_admin_event(
 
 fn resubscribe(
     url: &str,
+    authorization: &str,
     gameroom: &ActiveGameroom,
     db_pool: &ConnectionPool,
 ) -> WebSocketClient<StateChangeEvent> {
@@ -566,6 +581,7 @@ fn resubscribe(
             "{}/scabbard/{}/{}/ws/subscribe{}",
             url, gameroom.circuit_id, gameroom.service_id, query_string,
         ),
+        &authorization,
         move |_, event| {
             match &processor {
                 Ok(processor) => {
@@ -737,7 +753,7 @@ mod test {
         clear_gameroom_notification_table(&pool);
 
         let message = get_submit_proposal_msg("01234-ABCDE");
-        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
@@ -767,7 +783,7 @@ mod test {
         clear_gameroom_notification_table(&pool);
 
         let message = get_submit_proposal_msg("01234-ABCDE");
-        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let gamerooms = query_gameroom_table(&pool);
@@ -805,7 +821,7 @@ mod test {
         clear_gameroom_notification_table(&pool);
 
         let message = get_submit_proposal_msg("01234-ABCDE");
-        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let members = query_gameroom_members_table(&pool);
@@ -831,7 +847,7 @@ mod test {
         clear_gameroom_notification_table(&pool);
 
         let message = get_submit_proposal_msg("01234-ABCDE");
-        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let services = query_gameroom_service_table(&pool);
@@ -858,7 +874,7 @@ mod test {
         clear_gameroom_notification_table(&pool);
 
         let message = get_submit_proposal_msg("01234-ABCDE");
-        process_admin_event(message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let notifications = query_gameroom_notification_table(&pool);
@@ -912,7 +928,7 @@ mod test {
         let accept_message = get_accept_proposal_msg("01234-ABCDE");
 
         // accept proposal
-        process_admin_event(accept_message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(accept_message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
@@ -963,7 +979,7 @@ mod test {
         let accept_message = get_accept_proposal_msg("01234-ABCDE");
 
         // accept proposal
-        match process_admin_event(accept_message, &pool, "", "", "", reactor.igniter()) {
+        match process_admin_event(accept_message, &pool, "", "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
             Err(AppAuthHandlerError::DatabaseError(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: 01234-ABCDE"));
@@ -1006,7 +1022,7 @@ mod test {
         let rejected_message = get_reject_proposal_msg("01234-ABCDE");
 
         // reject proposal
-        process_admin_event(rejected_message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(rejected_message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
@@ -1068,7 +1084,7 @@ mod test {
         let rejected_message = get_reject_proposal_msg("01234-ABCDE");
 
         // reject proposal
-        match process_admin_event(rejected_message, &pool, "", "", "", reactor.igniter()) {
+        match process_admin_event(rejected_message, &pool, "", "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
             Err(AppAuthHandlerError::DatabaseError(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: 01234-ABCDE"));
@@ -1102,7 +1118,7 @@ mod test {
         let vote_message = get_vote_proposal_msg("01234-ABCDE");
 
         // vote proposal
-        process_admin_event(vote_message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(vote_message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let proposals = query_proposals_table(&pool);
@@ -1149,7 +1165,7 @@ mod test {
         let vote_message = get_vote_proposal_msg("01234-ABCDE");
 
         // vote proposal
-        process_admin_event(vote_message, &pool, "", "", "", reactor.igniter())
+        process_admin_event(vote_message, &pool, "", "", "", "", reactor.igniter())
             .expect("Error processing message");
 
         let notifications = query_gameroom_notification_table(&pool);
@@ -1188,7 +1204,7 @@ mod test {
         let vote_message = get_vote_proposal_msg("01234-ABCDE");
 
         // vote proposal
-        match process_admin_event(vote_message, &pool, "", "", "", reactor.igniter()) {
+        match process_admin_event(vote_message, &pool, "", "", "", "", reactor.igniter()) {
             Ok(()) => panic!("Pending proposal for circuit is missing, error should be returned"),
             Err(AppAuthHandlerError::DatabaseError(msg)) => {
                 assert!(msg.contains("Could not find open proposal for circuit: 01234-ABCDE"));

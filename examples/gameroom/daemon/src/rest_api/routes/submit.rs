@@ -38,6 +38,7 @@ pub async fn submit_signed_payload(
 ) -> Result<HttpResponse, Error> {
     let mut response = client
         .post(format!("{}/admin/submit", &gameroomd_data.splinterd_url))
+        .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
             ADMIN_PROTOCOL_VERSION.to_string(),
@@ -120,6 +121,7 @@ pub async fn submit_scabbard_payload(
             "{}/scabbard/{}/{}/batches",
             &gameroomd_data.splinterd_url, &circuit_id, &service_id
         ))
+        .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
             SCABBARD_PROTOCOL_VERSION.to_string(),
@@ -169,7 +171,16 @@ pub async fn submit_scabbard_payload(
         }
     };
     let start = Instant::now();
-    match check_batch_status(client, &gameroomd_data.splinterd_url, &link, start, wait).await {
+    match check_batch_status(
+        client,
+        &gameroomd_data.splinterd_url,
+        &gameroomd_data.authorization,
+        &link,
+        start,
+        wait,
+    )
+    .await
+    {
         Ok(batches_info) => {
             let invalid_batches = batches_info
                 .iter()
@@ -265,6 +276,7 @@ fn process_failed_baches(invalid_batches: &[&BatchInfo]) -> String {
 async fn check_batch_status(
     client: web::Data<Client>,
     splinterd_url: &str,
+    authorization: &str,
     link: &str,
     start_time: Instant,
     wait: u64,
@@ -276,6 +288,7 @@ async fn check_batch_status(
         debug!("Checking batch status {}", link);
         let mut response = match client
             .get(format!("{}{}", splinterd_url, link))
+            .header("Authorization", authorization)
             .header(
                 "SplinterProtocolVersion",
                 SCABBARD_PROTOCOL_VERSION.to_string(),

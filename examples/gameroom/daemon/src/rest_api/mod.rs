@@ -33,6 +33,7 @@ use routes::ErrorResponse;
 pub struct GameroomdData {
     pub public_key: String,
     pub splinterd_url: String,
+    pub authorization: String,
 }
 
 pub struct RestApiShutdownHandle {
@@ -48,6 +49,7 @@ impl RestApiShutdownHandle {
 pub fn run(
     bind_url: &str,
     splinterd_url: String,
+    authorization: String,
     node: NodeInfo,
     database_connection: ConnectionPool,
     public_key: String,
@@ -62,6 +64,7 @@ pub fn run(
     let gameroomd_data = GameroomdData {
         public_key,
         splinterd_url,
+        authorization,
     };
     let (tx, rx) = mpsc::channel();
     let join_handle = thread::Builder::new()

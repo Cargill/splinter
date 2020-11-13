@@ -51,6 +51,7 @@ pub fn setup_xo(
     private_key: &str,
     scabbard_admin_keys: Vec<String>,
     splinterd_url: &str,
+    authorization: &str,
     circuit_id: &str,
     service_id: &str,
 ) -> Result<Box<dyn Future<Item = (), Error = ()> + Send + 'static>, AppAuthHandlerError> {
@@ -86,6 +87,7 @@ pub fn setup_xo(
             splinterd_url, circuit_id, service_id
         ))
         .method("POST")
+        .header("Authorization", authorization)
         .header(
             "SplinterProtocolVersion",
             protocol::SCABBARD_PROTOCOL_VERSION.to_string(),

@@ -17,7 +17,7 @@
 
 use actix_web::Result;
 use futures::{Future, Stream};
-use hyper::{Client as HyperClient, StatusCode, Uri};
+use hyper::{Body, Client as HyperClient, Request, StatusCode, Uri};
 use tokio::runtime::Runtime;
 
 use crate::error::{ConfigurationError, GetNodeError};
@@ -98,7 +98,7 @@ impl GameroomConfigBuilder {
     }
 }
 
-pub fn get_node(splinterd_url: &str) -> Result<NodeInfo, GetNodeError> {
+pub fn get_node(splinterd_url: &str, authorization: &str) -> Result<NodeInfo, GetNodeError> {
     let mut runtime = Runtime::new()
         .map_err(|err| GetNodeError(format!("Failed to get set up runtime: {}", err)))?;
     let client = HyperClient::new();
@@ -106,10 +106,21 @@ pub fn get_node(splinterd_url: &str) -> Result<NodeInfo, GetNodeError> {
     let uri = format!("{}/status", splinterd_url)
         .parse::<Uri>()
         .map_err(|err| GetNodeError(format!("Failed to get set up request: {}", err)))?;
+    let request = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .header("Authorization", authorization)
+        .body(Body::from(""))
+        .map_err(|err| {
+            GetNodeError(format!(
+                "Failed to construct splinter node metadata request: {}",
+                err
+            ))
+        })?;
 
     runtime.block_on(
         client
-            .get(uri)
+            .request(request)
             .map_err(|err| GetNodeError(format!("Failed to get splinter node metadata: {}", err)))
             .and_then(|resp| {
                 if resp.status() != StatusCode::OK {

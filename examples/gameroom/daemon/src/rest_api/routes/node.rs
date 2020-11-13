@@ -31,6 +31,7 @@ pub async fn fetch_node(
             "{}/registry/nodes/{}",
             &gameroomd_data.splinterd_url, identity
         ))
+        .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
             protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
@@ -89,6 +90,7 @@ pub async fn list_nodes(
 
     let mut response = client
         .get(&request_url)
+        .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
             protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
@@ -143,6 +145,10 @@ mod test {
     };
 
     static SPLINTERD_URL: &str = "http://splinterd-node:8085";
+    static AUTHORIZATION: &str = "Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmRlcitq\
+        d3QifQ==.eyJpc3MiOiIwMjc5YmU2NjdlZjlkY2JiYWM1NWEwNjI5NWNlODcwYjA3MDI5YmZjZGIyZGNlMjhkOTU5Z\
+        jI4MTViMTZmODE3OTgifQ==.71Vw3+m9R4b8iZUzhRHOAtX/hO5WYA9PgMe27/CeZ6NhIXFYkBBzreoIGpHbfJ8UxT\
+        +1MLUgjsQB8TISafneRA==";
 
     #[actix_rt::test]
     /// Tests a GET /registry/nodes/{identity} request returns the expected node.
@@ -153,6 +159,7 @@ mod test {
                 .data(GameroomdData {
                     public_key: "".into(),
                     splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
                 })
                 .service(
                     web::resource("/registry/nodes/{identity}").route(web::get().to(fetch_node)),
@@ -181,6 +188,7 @@ mod test {
                 .data(GameroomdData {
                     public_key: "".into(),
                     splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
                 })
                 .service(
                     web::resource("/registry/nodes/{identity}").route(web::get().to(fetch_node)),
@@ -206,6 +214,7 @@ mod test {
                 .data(GameroomdData {
                     public_key: "".into(),
                     splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
                 })
                 .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
@@ -244,6 +253,7 @@ mod test {
                 .data(GameroomdData {
                     public_key: "".into(),
                     splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
                 })
                 .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
@@ -279,6 +289,7 @@ mod test {
                 .data(GameroomdData {
                     public_key: "".into(),
                     splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
                 })
                 .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
