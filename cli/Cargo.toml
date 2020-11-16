@@ -54,6 +54,7 @@ default = [
     "circuit-template",
     "database",
     "database-migrate-biome",
+    "postgres",
 ]
 
 stable = [
@@ -64,9 +65,9 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "health",
-    "postgres",
     "circuit-auth-type",
+    "health",
+    "sqlite",
 ]
 
 circuit-auth-type = []
@@ -75,10 +76,14 @@ database-migrate-biome = ["splinter/biome"]
 
 health = []
 
-database = ["splinter/postgres", "diesel", "postgres"]
+database = ["diesel"]
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
+]
+sqlite = [
+    "diesel/sqlite",
+    "splinter/sqlite",
 ]
 
 [package.metadata.deb]

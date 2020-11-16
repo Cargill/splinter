@@ -14,7 +14,7 @@
 
 //! Provides database migrations for the `DieselAdminServiceStore`.
 
-#[cfg(all(feature = "admin-service-store-postgres", feature = "postgres"))]
+#[cfg(feature = "admin-service-store-postgres")]
 pub mod postgres;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
@@ -22,7 +22,7 @@ pub mod sqlite;
 use std::error::Error;
 use std::fmt;
 
-#[cfg(all(feature = "admin-service-store-postgres", feature = "postgres"))]
+#[cfg(feature = "admin-service-store-postgres")]
 pub use postgres::run_migrations as run_postgres_migrations;
 #[cfg(feature = "sqlite")]
 pub use sqlite::run_migrations as run_sqlite_migrations;

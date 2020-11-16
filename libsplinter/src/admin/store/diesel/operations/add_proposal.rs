@@ -38,7 +38,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreAddProposalOperation 
     fn add_proposal(&self, proposal: CircuitProposal) -> Result<(), AdminServiceStoreError>;
 }
 
-#[cfg(all(feature = "admin-service-store-postgres", feature = "postgres"))]
+#[cfg(feature = "admin-service-store-postgres")]
 impl<'a> AdminServiceStoreAddProposalOperation
     for AdminServiceStoreOperations<'a, diesel::pg::PgConnection>
 {
