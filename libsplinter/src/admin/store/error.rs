@@ -16,9 +16,10 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "diesel")]
+use crate::error::ConstraintViolationType;
 use crate::error::{
-    ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
-    ResourceTemporarilyUnavailableError,
+    ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
 };
 
 /// Represents AdminServiceStore errors
