@@ -17,6 +17,7 @@
 use diesel::prelude::*;
 
 use crate::admin::store::{error::AdminServiceStoreError, CircuitBuilder, CircuitNode, Service};
+use crate::error::InvalidStateError;
 
 use super::{
     add_circuit::AdminServiceStoreAddCircuitOperation,
@@ -37,10 +38,11 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
             // Attempting to fetch the proposal to be upgraded. If not found, an error is returned.
             let proposal = match self.get_proposal(circuit_id)? {
                 Some(proposal) => Ok(proposal),
-                None => Err(AdminServiceStoreError::NotFoundError(format!(
-                    "Cannot find circuit proposal with id: {}",
-                    circuit_id
-                ))),
+                None => Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(String::from(
+                        "CircuitProposal does not exist in AdminServiceStore",
+                    )),
+                )),
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
             let proposed_circuit = proposal.circuit();
@@ -66,10 +68,8 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .with_routes(proposed_circuit.routes())
                 .with_circuit_management_type(proposed_circuit.circuit_management_type())
                 .build()
-                .map_err(|err| AdminServiceStoreError::StorageError {
-                    context: String::from("Failed to build Circuit"),
-                    source: Some(Box::new(err)),
-                })?;
+                .map_err(AdminServiceStoreError::InvalidStateError)?;
+
             let circuit_nodes = proposed_circuit
                 .members()
                 .iter()
@@ -92,10 +92,11 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
             // Attempting to fetch the proposal to be upgraded. If not found, an error is returned.
             let proposal = match self.get_proposal(circuit_id)? {
                 Some(proposal) => Ok(proposal),
-                None => Err(AdminServiceStoreError::NotFoundError(format!(
-                    "Cannot find circuit proposal with id: {}",
-                    circuit_id
-                ))),
+                None => Err(AdminServiceStoreError::InvalidStateError(
+                    InvalidStateError::with_message(String::from(
+                        "CircuitProposal does not exist in AdminServiceStore",
+                    )),
+                )),
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
             let proposed_circuit = proposal.circuit();
@@ -121,10 +122,8 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .with_routes(proposed_circuit.routes())
                 .with_circuit_management_type(proposed_circuit.circuit_management_type())
                 .build()
-                .map_err(|err| AdminServiceStoreError::StorageError {
-                    context: String::from("Failed to build Circuit"),
-                    source: Some(Box::new(err)),
-                })?;
+                .map_err(AdminServiceStoreError::InvalidStateError)?;
+
             let circuit_nodes = proposed_circuit
                 .members()
                 .iter()

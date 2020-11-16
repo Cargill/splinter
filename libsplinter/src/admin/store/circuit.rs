@@ -15,8 +15,8 @@
 //! Structs for building circuits
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::error::InvalidStateError;
 
-use super::error::BuilderError;
 use super::{ProposedCircuit, Service};
 
 /// Native representation of a circuit in state
@@ -256,28 +256,32 @@ impl CircuitBuilder {
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
     /// type are not set.
-    pub fn build(self) -> Result<Circuit, BuilderError> {
+    pub fn build(self) -> Result<Circuit, InvalidStateError> {
         let circuit_id = match self.circuit_id {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
             Some(circuit_id) => {
-                return Err(BuilderError::InvalidField(format!(
+                return Err(InvalidStateError::with_message(format!(
                     "circuit_id is invalid ({}): must be an 11 character string composed of two, \
                      5 character base62 strings joined with a '-' (example: abcDE-F0123)",
                     circuit_id,
                 )))
             }
-            None => return Err(BuilderError::MissingField("circuit_id".to_string())),
+            None => {
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `circuit_id`".to_string(),
+                ))
+            }
         };
 
-        let mut roster = self
-            .roster
-            .ok_or_else(|| BuilderError::MissingField("roster".to_string()))?;
+        let mut roster = self.roster.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `roster`".to_string())
+        })?;
 
         roster.sort_by_key(|service| service.service_id().to_string());
 
-        let mut members = self
-            .members
-            .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
+        let mut members = self.members.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `members`".to_string())
+        })?;
 
         members.sort();
 
@@ -293,9 +297,11 @@ impl CircuitBuilder {
 
         let routes = self.routes.unwrap_or_else(RouteType::default);
 
-        let circuit_management_type = self
-            .circuit_management_type
-            .ok_or_else(|| BuilderError::MissingField("circuit_management_type".to_string()))?;
+        let circuit_management_type = self.circuit_management_type.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `circuit_management_type`".to_string(),
+            )
+        })?;
 
         let create_circuit_message = Circuit {
             id: circuit_id,

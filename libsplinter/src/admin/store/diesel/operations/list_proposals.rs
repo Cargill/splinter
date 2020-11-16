@@ -39,6 +39,7 @@ use crate::admin::store::{
     PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder,
     ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
+use crate::error::InvalidStateError;
 
 use super::AdminServiceStoreOperations;
 
@@ -108,11 +109,7 @@ where
                 // Collects proposed circuits which match the circuit predicates
                 let proposed_circuits: Vec<ProposedCircuitModel> = query
                     .order(proposed_circuit::circuit_id.desc())
-                    .load::<ProposedCircuitModel>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Unable to load proposed Circuit information"),
-                        source: Box::new(err),
-                    })?;
+                    .load::<ProposedCircuitModel>(self.conn)?;
 
                 // Store circuit IDs separately to make it easier to filter following queries
                 let circuit_ids: Vec<&str> = proposed_circuits
@@ -123,11 +120,7 @@ where
                 let circuit_proposals: HashMap<String, CircuitProposalModel> =
                     circuit_proposal::table
                         .filter(circuit_proposal::circuit_id.eq_any(&circuit_ids))
-                        .load::<CircuitProposalModel>(self.conn)
-                        .map_err(|err| AdminServiceStoreError::QueryError {
-                            context: String::from("Unable to load proposal information"),
-                            source: Box::new(err),
-                        })?
+                        .load::<CircuitProposalModel>(self.conn)?
                         // Once the `CircuitProposalModels` have been
                         // collected,  organize into a HashMap.
                         .into_iter()
@@ -142,12 +135,13 @@ where
                     .map(|proposed_circuit| {
                         let proposal = circuit_proposals
                             .get(&proposed_circuit.circuit_id)
-                            .ok_or_else(|| AdminServiceStoreError::StorageError {
-                                context: format!(
-                                    "Missing proposal for proposed_circuit {}",
-                                    proposed_circuit.circuit_id
-                                ),
-                                source: None,
+                            .ok_or_else(|| {
+                                AdminServiceStoreError::InvalidStateError(
+                                    InvalidStateError::with_message(format!(
+                                        "Missing proposal for proposed_circuit {}",
+                                        proposed_circuit.circuit_id
+                                    )),
+                                )
                             })?;
 
                         let proposal_builder = CircuitProposalBuilder::new()
@@ -200,11 +194,9 @@ where
                         proposed_service::all_columns,
                         proposed_service_argument::all_columns.nullable(),
                     ))
-                    .load::<(ProposedServiceModel, Option<ProposedServiceArgumentModel>)>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Unable to load ProposedService information"),
-                        source: Box::new(err),
-                    })?
+                    .load::<(ProposedServiceModel, Option<ProposedServiceArgumentModel>)>(
+                        self.conn,
+                    )?
                 {
                     if let Some(arg_model) = opt_arg {
                         if let Some(args) = arguments_map.get_mut(&(
@@ -244,13 +236,10 @@ where
                     {
                         builder = builder.with_arguments(&args);
                     }
-                    let proposed_service =
-                        builder
-                            .build()
-                            .map_err(|err| AdminServiceStoreError::StorageError {
-                                context: String::from("Unable to build ProposedService"),
-                                source: Some(Box::new(err)),
-                            })?;
+                    let proposed_service = builder
+                        .build()
+                        .map_err(AdminServiceStoreError::InvalidStateError)?;
+
                     if let Some(service_list) = built_proposed_services.get_mut(&circuit_id) {
                         service_list.push(proposed_service);
                     } else {
@@ -268,11 +257,7 @@ where
                             .and(proposed_node_endpoint::circuit_id.eq(proposed_node::circuit_id))),
                     )
                     .select((proposed_node::all_columns, proposed_node_endpoint::endpoint))
-                    .load::<(ProposedNodeModel, String)>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Failed to load proposed nodes"),
-                        source: Box::new(err),
-                    })?
+                    .load::<(ProposedNodeModel, String)>(self.conn)?
                 {
                     if let Some(proposed_node) = proposed_nodes
                         .remove(&(node.circuit_id.to_string(), node.node_id.to_string()))
@@ -295,21 +280,17 @@ where
                 let mut built_proposed_nodes: HashMap<String, Vec<ProposedNode>> = HashMap::new();
                 for ((circuit_id, _), builder) in proposed_nodes.into_iter() {
                     if let Some(nodes) = built_proposed_nodes.get_mut(&circuit_id) {
-                        nodes.push(builder.build().map_err(|err| {
-                            AdminServiceStoreError::StorageError {
-                                context: String::from("Failed to build ProposedNode"),
-                                source: Some(Box::new(err)),
-                            }
-                        })?);
+                        nodes.push(
+                            builder
+                                .build()
+                                .map_err(AdminServiceStoreError::InvalidStateError)?,
+                        )
                     } else {
                         built_proposed_nodes.insert(
                             circuit_id.to_string(),
-                            vec![builder.build().map_err(|err| {
-                                AdminServiceStoreError::StorageError {
-                                    context: String::from("Failed to build ProposedNode"),
-                                    source: Some(Box::new(err)),
-                                }
-                            })?],
+                            vec![builder
+                                .build()
+                                .map_err(AdminServiceStoreError::InvalidStateError)?],
                         );
                     }
                 }
@@ -317,11 +298,7 @@ where
                 // Collect votes to apply to the 'CircuitProposal'
                 let mut vote_records: HashMap<String, Vec<VoteRecord>> = HashMap::new();
                 for vote in vote_record::table
-                    .load::<VoteRecordModel>(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Failed to load proposal's vote records"),
-                        source: Box::new(err),
-                    })?
+                    .load::<VoteRecordModel>(self.conn)?
                     .into_iter()
                 {
                     if let Some(votes) = vote_records.get_mut(&vote.circuit_id) {
@@ -349,17 +326,13 @@ where
                     }
                     proposals.push(
                         proposal_builder
-                            .with_circuit(&proposed_circuit_builder.build().map_err(|err| {
-                                AdminServiceStoreError::StorageError {
-                                    context: String::from("Failed to build ProposedCircuit"),
-                                    source: Some(Box::new(err)),
-                                }
-                            })?)
+                            .with_circuit(
+                                &proposed_circuit_builder.build().map_err(|err| {
+                                    AdminServiceStoreError::InvalidStateError(err)
+                                })?,
+                            )
                             .build()
-                            .map_err(|err| AdminServiceStoreError::StorageError {
-                                context: String::from("Failed to build CircuitProposal"),
-                                source: Some(Box::new(err)),
-                            })?,
+                            .map_err(AdminServiceStoreError::InvalidStateError)?,
                     )
                 }
 

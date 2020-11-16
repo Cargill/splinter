@@ -15,8 +15,8 @@
 //! Structs for building services
 
 use crate::admin::messages::is_valid_service_id;
+use crate::error::InvalidStateError;
 
-use super::error::BuilderError;
 use super::ProposedService;
 
 /// Native representation of a service that is a part of circuit
@@ -128,25 +128,31 @@ impl ServiceBuilder {
     /// Builds the `Service`
     ///
     /// Returns an error if the service ID, service_type, or allowed nodes is not set
-    pub fn build(self) -> Result<Service, BuilderError> {
+    pub fn build(self) -> Result<Service, InvalidStateError> {
         let service_id = match self.service_id {
             Some(service_id) if is_valid_service_id(&service_id) => service_id,
             Some(service_id) => {
-                return Err(BuilderError::InvalidField(format!(
+                return Err(InvalidStateError::with_message(format!(
                     "service_id is invalid ({}): must be a 4 character base62 string",
                     service_id,
                 )))
             }
-            None => return Err(BuilderError::MissingField("service_id".to_string())),
+            None => {
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `service_id`".to_string(),
+                ))
+            }
         };
 
-        let service_type = self
-            .service_type
-            .ok_or_else(|| BuilderError::MissingField("service_type".to_string()))?;
+        let service_type = self.service_type.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `service_type`".to_string(),
+            )
+        })?;
 
-        let node_id = self
-            .node_id
-            .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
+        let node_id = self.node_id.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `node_id`".to_string())
+        })?;
 
         let arguments = self.arguments.unwrap_or_default();
 

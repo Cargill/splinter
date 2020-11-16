@@ -13,8 +13,8 @@
 // limitations under the License.
 
 //! Structs for building circuits nodes
+use crate::error::InvalidStateError;
 
-use super::error::BuilderError;
 use super::ProposedNode;
 
 /// Native representation of a node included in circuit
@@ -100,14 +100,16 @@ impl CircuitNodeBuilder {
     /// Builds the `CircuitNode`
     ///
     /// Returns an error if the node ID or endpoints are not set
-    pub fn build(self) -> Result<CircuitNode, BuilderError> {
-        let node_id = self
-            .node_id
-            .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
+    pub fn build(self) -> Result<CircuitNode, InvalidStateError> {
+        let node_id = self.node_id.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `node_id`".to_string())
+        })?;
 
-        let endpoints = self
-            .endpoints
-            .ok_or_else(|| BuilderError::MissingField("endpoints".to_string()))?;
+        let endpoints = self.endpoints.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `endpoints`".to_string(),
+            )
+        })?;
 
         let node = CircuitNode {
             id: node_id,

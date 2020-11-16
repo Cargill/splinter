@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use diesel::{dsl::insert_into, prelude::*};
 
 use super::AdminServiceStoreOperations;
+
 use crate::admin::store::{
     diesel::{
         models::{
@@ -29,6 +30,7 @@ use crate::admin::store::{
     error::AdminServiceStoreError,
     Circuit, CircuitNode,
 };
+use crate::error::{ConstraintViolationError, ConstraintViolationType};
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreAddCircuitOperation {
     fn add_circuit(
@@ -53,28 +55,19 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             if circuit::table
                 .filter(circuit::circuit_id.eq(circuit.circuit_id()))
                 .first::<CircuitModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred fetching Circuit"),
-                    source: Box::new(err),
-                })?
+                .optional()?
                 .is_some()
             {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: String::from("Circuit already exists in AdminServiceStore"),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::ConstraintViolationError(
+                    ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+                ));
             }
 
             // Create a `CircuitModel` from the `Circuit` to add to database
             let circuit_model: CircuitModel = CircuitModel::from(&circuit);
             insert_into(circuit::table)
                 .values(circuit_model)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Circuit"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Create a list of circuit members from `nodes`
             let circuit_members: Vec<CircuitMemberModel> = nodes
                 .iter()
@@ -85,11 +78,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .collect();
             insert_into(circuit_member::table)
                 .values(circuit_members)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Circuit members"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Iterate over the list of `CircuitNodes` to extract the `node_id` and `endpoints`, to
             // convert them into the `NodeEndpointModel`. Then, verify the `node_id` does not
             // already have associated `node_endpoint` entries before inserting the list of
@@ -115,19 +104,11 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                     .filter(node_endpoint::node_id.eq(&node_id))
                     .count()
                     .first(self.conn)
-                    .optional()
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Error occurred counting CircuitNode endpoints"),
-                        source: Box::new(err),
-                    })?
+                    .optional()?
                 {
                     insert_into(node_endpoint::table)
                         .values(endpoints)
-                        .execute(self.conn)
-                        .map_err(|err| AdminServiceStoreError::QueryError {
-                            context: String::from("Unable to insert Circuit members"),
-                            source: Box::new(err),
-                        })?;
+                        .execute(self.conn)?;
                 }
             }
 
@@ -135,19 +116,11 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             let circuit_services: Vec<ServiceModel> = Vec::from(&circuit);
             insert_into(service::table)
                 .values(&circuit_services)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Services"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
             insert_into(service_argument::table)
                 .values(&service_argument)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Service arguments"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             Ok(())
         })
@@ -169,28 +142,19 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             if circuit::table
                 .filter(circuit::circuit_id.eq(circuit.circuit_id()))
                 .first::<CircuitModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Error occurred fetching Circuit"),
-                    source: Box::new(err),
-                })?
+                .optional()?
                 .is_some()
             {
-                return Err(AdminServiceStoreError::OperationError {
-                    context: String::from("Circuit already exists in AdminServiceStore"),
-                    source: None,
-                });
+                return Err(AdminServiceStoreError::ConstraintViolationError(
+                    ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+                ));
             }
 
             // Create a `CircuitModel` from the `Circuit` to add to database
             let circuit_model: CircuitModel = CircuitModel::from(&circuit);
             insert_into(circuit::table)
                 .values(circuit_model)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Circuit"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Create a list of circuit members from `nodes`
             let circuit_members: Vec<CircuitMemberModel> = nodes
                 .iter()
@@ -201,11 +165,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 .collect();
             insert_into(circuit_member::table)
                 .values(circuit_members)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Circuit members"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             // Iterate over the list of `CircuitNodes` to extract the `node_id` and `endpoints`, to
             // convert them into the `NodeEndpointModel`. Then, verify the `node_id` does not
             // already have associated `node_endpoint` entries before inserting the list of
@@ -231,19 +191,11 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                     .filter(node_endpoint::node_id.eq(&node_id))
                     .count()
                     .first(self.conn)
-                    .optional()
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Error occurred counting CircuitNode endpoints"),
-                        source: Box::new(err),
-                    })?
+                    .optional()?
                 {
                     insert_into(node_endpoint::table)
                         .values(endpoints)
-                        .execute(self.conn)
-                        .map_err(|err| AdminServiceStoreError::QueryError {
-                            context: String::from("Unable to insert Circuit members"),
-                            source: Box::new(err),
-                        })?;
+                        .execute(self.conn)?;
                 }
             }
 
@@ -251,19 +203,11 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             let circuit_services: Vec<ServiceModel> = Vec::from(&circuit);
             insert_into(service::table)
                 .values(&circuit_services)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Services"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
             let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
             insert_into(service_argument::table)
                 .values(&service_argument)
-                .execute(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Unable to insert Service arguments"),
-                    source: Box::new(err),
-                })?;
+                .execute(self.conn)?;
 
             Ok(())
         })

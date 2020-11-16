@@ -15,9 +15,9 @@
 //! Structs for building circuit proposals
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::error::InvalidStateError;
 use crate::protos::admin;
 
-use super::error::BuilderError;
 use super::ProposedCircuit;
 
 /// Native representation of a circuit proposal
@@ -79,7 +79,7 @@ impl CircuitProposal {
             .with_requester_node_id(self.requester_node_id())
     }
 
-    pub fn from_proto(mut proto: admin::CircuitProposal) -> Result<Self, BuilderError> {
+    pub fn from_proto(mut proto: admin::CircuitProposal) -> Result<Self, InvalidStateError> {
         let proposal_type = match proto.get_proposal_type() {
             admin::CircuitProposal_ProposalType::CREATE => ProposalType::Create,
             admin::CircuitProposal_ProposalType::UPDATE_ROSTER => ProposalType::UpdateRoster,
@@ -87,7 +87,9 @@ impl CircuitProposal {
             admin::CircuitProposal_ProposalType::REMOVE_NODE => ProposalType::RemoveNode,
             admin::CircuitProposal_ProposalType::DESTROY => ProposalType::Destroy,
             admin::CircuitProposal_ProposalType::UNSET_PROPOSAL_TYPE => {
-                return Err(BuilderError::MissingField("proposal type".to_string()));
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `proposal type`".to_string(),
+                ));
             }
         };
 
@@ -95,7 +97,7 @@ impl CircuitProposal {
             .take_votes()
             .into_iter()
             .map(VoteRecord::from_proto)
-            .collect::<Result<Vec<VoteRecord>, BuilderError>>()?;
+            .collect::<Result<Vec<VoteRecord>, InvalidStateError>>()?;
 
         Ok(Self {
             proposal_type,
@@ -267,42 +269,54 @@ impl CircuitProposalBuilder {
     ///
     /// Returns an error if the circuit ID, circuit, circuit hash, requester, or requester node id
     /// is not set.
-    pub fn build(self) -> Result<CircuitProposal, BuilderError> {
+    pub fn build(self) -> Result<CircuitProposal, InvalidStateError> {
         let circuit_id = match self.circuit_id {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
             Some(circuit_id) => {
-                return Err(BuilderError::InvalidField(format!(
+                return Err(InvalidStateError::with_message(format!(
                     "circuit_id is invalid ({}): must be an 11 character string composed of two, \
                      5 character base62 strings joined with a '-' (example: abcDE-F0123)",
                     circuit_id,
                 )))
             }
-            None => return Err(BuilderError::MissingField("circuit_id".to_string())),
+            None => {
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `circuit_id`".to_string(),
+                ))
+            }
         };
 
-        let proposal_type = self
-            .proposal_type
-            .ok_or_else(|| BuilderError::MissingField("proposal_type".to_string()))?;
+        let proposal_type = self.proposal_type.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `proposal_type`".to_string(),
+            )
+        })?;
 
-        let circuit_hash = self
-            .circuit_hash
-            .ok_or_else(|| BuilderError::MissingField("circuit_hash".to_string()))?;
+        let circuit_hash = self.circuit_hash.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `circuit_hash`".to_string(),
+            )
+        })?;
 
-        let circuit = self
-            .circuit
-            .ok_or_else(|| BuilderError::MissingField("circuit".to_string()))?;
+        let circuit = self.circuit.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `circuit`".to_string())
+        })?;
 
         let mut votes = self.votes.unwrap_or_default();
 
         votes.sort_by_key(|vote| vote.voter_node_id().to_string());
 
-        let requester = self
-            .requester
-            .ok_or_else(|| BuilderError::MissingField("requester".to_string()))?;
+        let requester = self.requester.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `requester`".to_string(),
+            )
+        })?;
 
-        let requester_node_id = self
-            .requester_node_id
-            .ok_or_else(|| BuilderError::MissingField("requester node id".to_string()))?;
+        let requester_node_id = self.requester_node_id.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `requester_node_id`".to_string(),
+            )
+        })?;
 
         Ok(CircuitProposal {
             proposal_type,
@@ -340,12 +354,14 @@ impl VoteRecord {
         &self.voter_node_id
     }
 
-    fn from_proto(mut proto: admin::CircuitProposal_VoteRecord) -> Result<Self, BuilderError> {
+    fn from_proto(mut proto: admin::CircuitProposal_VoteRecord) -> Result<Self, InvalidStateError> {
         let vote = match proto.get_vote() {
             admin::CircuitProposalVote_Vote::ACCEPT => Vote::Accept,
             admin::CircuitProposalVote_Vote::REJECT => Vote::Reject,
             admin::CircuitProposalVote_Vote::UNSET_VOTE => {
-                return Err(BuilderError::MissingField("vote".to_string()));
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `vote".to_string(),
+                ));
             }
         };
 
@@ -413,18 +429,20 @@ impl VoteRecordBuilder {
         self
     }
 
-    pub fn build(self) -> Result<VoteRecord, BuilderError> {
-        let public_key = self
-            .public_key
-            .ok_or_else(|| BuilderError::MissingField("public_key".to_string()))?;
+    pub fn build(self) -> Result<VoteRecord, InvalidStateError> {
+        let public_key = self.public_key.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `public_key`".to_string(),
+            )
+        })?;
 
-        let vote = self
-            .vote
-            .ok_or_else(|| BuilderError::MissingField("vote".to_string()))?;
+        let vote = self.vote.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `vote`".to_string())
+        })?;
 
-        let voter_node_id = self
-            .voter_node_id
-            .ok_or_else(|| BuilderError::MissingField("vote_node_id".to_string()))?;
+        let voter_node_id = self.voter_node_id.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `voter_`".to_string())
+        })?;
 
         Ok(VoteRecord {
             public_key,

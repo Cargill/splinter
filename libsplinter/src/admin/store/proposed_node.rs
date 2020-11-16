@@ -14,9 +14,8 @@
 
 //! Structs for building proposed nodes
 
+use crate::error::InvalidStateError;
 use crate::protos::admin;
-
-use super::error::BuilderError;
 
 /// Native representation of a node in a proposed circuit
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -99,14 +98,16 @@ impl ProposedNodeBuilder {
     /// Builds the `ProposedNode`
     ///
     /// Returns an error if the node ID or endpoints are not set
-    pub fn build(self) -> Result<ProposedNode, BuilderError> {
-        let node_id = self
-            .node_id
-            .ok_or_else(|| BuilderError::MissingField("node_id".to_string()))?;
+    pub fn build(self) -> Result<ProposedNode, InvalidStateError> {
+        let node_id = self.node_id.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `node_id`".to_string())
+        })?;
 
-        let mut endpoints = self
-            .endpoints
-            .ok_or_else(|| BuilderError::MissingField("endpoints".to_string()))?;
+        let mut endpoints = self.endpoints.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `endpoints`".to_string(),
+            )
+        })?;
 
         endpoints.sort();
 

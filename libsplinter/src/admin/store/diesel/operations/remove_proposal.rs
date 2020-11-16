@@ -53,12 +53,7 @@ where
                 // The `circuit_id` foreign key has cascade delete, meaning all related tables
                 // associated to the `circuit` table via the `circuit_id` will be deleted, if the
                 // corresponding `circuit` entry with the matching `circuit_id` is deleted.
-                delete(circuit_proposal::table.find(&proposal_id))
-                    .execute(self.conn)
-                    .map_err(|err| AdminServiceStoreError::QueryError {
-                        context: String::from("Failed to delete CircuitProposal"),
-                        source: Box::new(err),
-                    })?;
+                delete(circuit_proposal::table.find(&proposal_id)).execute(self.conn)?;
                 Ok(())
             })
         })

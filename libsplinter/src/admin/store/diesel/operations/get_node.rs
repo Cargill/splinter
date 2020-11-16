@@ -43,22 +43,15 @@ where
             let member: CircuitMemberModel = match circuit_member::table
                 .filter(circuit_member::node_id.eq(&node_id))
                 .first::<CircuitMemberModel>(self.conn)
-                .optional()
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Diesel error occurred fetching Node"),
-                    source: Box::new(err),
-                })? {
+                .optional()?
+            {
                 Some(node) => node,
                 None => return Ok(None),
             };
             // Collect all `node_endpoint` entries with the matching `node_id`.
             let endpoints: Vec<String> = node_endpoint::table
                 .filter(node_endpoint::node_id.eq(&member.node_id))
-                .load(self.conn)
-                .map_err(|err| AdminServiceStoreError::QueryError {
-                    context: String::from("Failed to load CircuitNode endpoints"),
-                    source: Box::new(err),
-                })?
+                .load(self.conn)?
                 .into_iter()
                 .map(|endpoint_model: NodeEndpointModel| endpoint_model.endpoint)
                 .collect();
@@ -67,10 +60,7 @@ where
                     .with_node_id(&member.node_id)
                     .with_endpoints(&endpoints)
                     .build()
-                    .map_err(|err| AdminServiceStoreError::StorageError {
-                        context: "Unable to build CircuitNode from stored state".to_string(),
-                        source: Some(Box::new(err)),
-                    })?,
+                    .map_err(AdminServiceStoreError::InvalidStateError)?,
             ))
         })
     }

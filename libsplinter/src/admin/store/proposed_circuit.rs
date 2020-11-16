@@ -15,9 +15,9 @@
 //! Structs for building proposed circuits
 
 use crate::admin::messages::is_valid_circuit_id;
+use crate::error::InvalidStateError;
 use crate::protos::admin;
 
-use super::error::BuilderError;
 use super::{
     AuthorizationType, DurabilityType, PersistenceType, ProposedNode, ProposedService, RouteType,
 };
@@ -87,32 +87,40 @@ impl ProposedCircuit {
         &self.comments
     }
 
-    pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, BuilderError> {
+    pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, InvalidStateError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
             admin::Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE => {
-                return Err(BuilderError::MissingField("authorization type".to_string()));
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `authorization_type`".to_string(),
+                ));
             }
         };
 
         let persistence = match proto.get_persistence() {
             admin::Circuit_PersistenceType::ANY_PERSISTENCE => PersistenceType::Any,
             admin::Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE => {
-                return Err(BuilderError::MissingField("persistence type".to_string()));
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `persistence type`".to_string(),
+                ));
             }
         };
 
         let durability = match proto.get_durability() {
             admin::Circuit_DurabilityType::NO_DURABILITY => DurabilityType::NoDurability,
             admin::Circuit_DurabilityType::UNSET_DURABILITY_TYPE => {
-                return Err(BuilderError::MissingField("durability type".to_string()));
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `durability type`".to_string(),
+                ));
             }
         };
 
         let routes = match proto.get_routes() {
             admin::Circuit_RouteType::ANY_ROUTE => RouteType::Any,
             admin::Circuit_RouteType::UNSET_ROUTE_TYPE => {
-                return Err(BuilderError::MissingField("route type".to_string()));
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `route type`".to_string(),
+                ));
             }
         };
 
@@ -122,7 +130,7 @@ impl ProposedCircuit {
                 .take_roster()
                 .into_iter()
                 .map(ProposedService::from_proto)
-                .collect::<Result<Vec<ProposedService>, BuilderError>>()?,
+                .collect::<Result<Vec<ProposedService>, InvalidStateError>>()?,
             members: proto
                 .take_members()
                 .into_iter()
@@ -366,28 +374,32 @@ impl ProposedCircuitBuilder {
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
     /// type are not set.
-    pub fn build(self) -> Result<ProposedCircuit, BuilderError> {
+    pub fn build(self) -> Result<ProposedCircuit, InvalidStateError> {
         let circuit_id = match self.circuit_id {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
             Some(circuit_id) => {
-                return Err(BuilderError::InvalidField(format!(
+                return Err(InvalidStateError::with_message(format!(
                     "circuit_id is invalid ({}): must be an 11 character string composed of two, \
                      5 character base62 strings joined with a '-' (example: abcDE-F0123)",
                     circuit_id,
                 )))
             }
-            None => return Err(BuilderError::MissingField("circuit_id".to_string())),
+            None => {
+                return Err(InvalidStateError::with_message(
+                    "unable to build, missing field: `circuit_id`".to_string(),
+                ))
+            }
         };
 
-        let mut roster = self
-            .roster
-            .ok_or_else(|| BuilderError::MissingField("roster".to_string()))?;
+        let mut roster = self.roster.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `roster`".to_string())
+        })?;
 
         roster.sort_by_key(|service| service.service_id().to_string());
 
-        let mut members = self
-            .members
-            .ok_or_else(|| BuilderError::MissingField("members".to_string()))?;
+        let mut members = self.members.ok_or_else(|| {
+            InvalidStateError::with_message("unable to build, missing field: `members`".to_string())
+        })?;
 
         members.sort_by_key(|node| node.node_id().to_string());
 
@@ -403,9 +415,11 @@ impl ProposedCircuitBuilder {
 
         let routes = self.routes.unwrap_or_else(RouteType::default);
 
-        let circuit_management_type = self
-            .circuit_management_type
-            .ok_or_else(|| BuilderError::MissingField("circuit_management_type".to_string()))?;
+        let circuit_management_type = self.circuit_management_type.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `circuit_management_type`".to_string(),
+            )
+        })?;
 
         let application_metadata = self.application_metadata.unwrap_or_default();
 
