@@ -1069,6 +1069,8 @@ mod test {
     /// provided.
     #[test]
     fn rest_api_builder_successful() {
+        // Allowing unused_mut because builder must be mutable if feature auth is enabled
+        #[allow(unused_mut)]
         let mut builder = RestApiBuilder::new().with_bind("test");
 
         #[cfg(feature = "auth")]
