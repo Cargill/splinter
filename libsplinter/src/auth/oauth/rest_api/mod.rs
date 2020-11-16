@@ -21,37 +21,37 @@ mod resources;
 use crate::error::InternalError;
 use crate::rest_api::{Resource, RestResourceProvider};
 
-use super::{OAuthClient, UserTokens};
+use super::{OAuthClient, UserInfo};
 
-/// Perform a save operation on a set of UserTokens.
-pub trait SaveTokensOperation: Sync + Send {
-    /// Execute a save operation on the given UserTokens.
+/// Perform a save operation on a set of UserInfo.
+pub trait SaveUserInfoOperation: Sync + Send {
+    /// Execute a save operation on the given UserInfo.
     ///
     /// # Errors
     ///
     /// Returns an InternalError, if the implementation produces an error during the save
     /// operation.
-    fn save_tokens(&self, user_tokens: &UserTokens) -> Result<(), InternalError>;
+    fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError>;
 
-    fn clone_box(&self) -> Box<dyn SaveTokensOperation>;
+    fn clone_box(&self) -> Box<dyn SaveUserInfoOperation>;
 }
 
-impl Clone for Box<dyn SaveTokensOperation> {
+impl Clone for Box<dyn SaveUserInfoOperation> {
     fn clone(&self) -> Self {
         self.clone_box()
     }
 }
 
-/// A No-Op SaveTokensOperation.
-pub struct SaveTokensToNull;
+/// A No-Op SaveUserInfoOperation.
+pub struct SaveUserInfoToNull;
 
-impl SaveTokensOperation for SaveTokensToNull {
-    fn save_tokens(&self, _user_tokens: &UserTokens) -> Result<(), InternalError> {
+impl SaveUserInfoOperation for SaveUserInfoToNull {
+    fn save_user_info(&self, _user_info: &UserInfo) -> Result<(), InternalError> {
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn SaveTokensOperation> {
-        Box::new(SaveTokensToNull)
+    fn clone_box(&self) -> Box<dyn SaveUserInfoOperation> {
+        Box::new(SaveUserInfoToNull)
     }
 }
 
@@ -67,15 +67,18 @@ impl SaveTokensOperation for SaveTokensToNull {
 #[derive(Clone)]
 pub(crate) struct OAuthResourceProvider {
     client: OAuthClient,
-    save_tokens_operation: Box<dyn SaveTokensOperation>,
+    save_user_info_operation: Box<dyn SaveUserInfoOperation>,
 }
 
 impl OAuthResourceProvider {
     /// Creates a new `OAuthResourceProvider`
-    pub fn new(client: OAuthClient, save_tokens_operation: Box<dyn SaveTokensOperation>) -> Self {
+    pub fn new(
+        client: OAuthClient,
+        save_user_info_operation: Box<dyn SaveUserInfoOperation>,
+    ) -> Self {
         Self {
             client,
-            save_tokens_operation,
+            save_user_info_operation,
         }
     }
 }
@@ -101,7 +104,7 @@ impl RestResourceProvider for OAuthResourceProvider {
                 actix::login::make_login_route(self.client.clone()),
                 actix::callback::make_callback_route(
                     self.client.clone(),
-                    self.save_tokens_operation.clone(),
+                    self.save_user_info_operation.clone(),
                 ),
             ]);
         }

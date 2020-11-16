@@ -22,12 +22,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use oauth2::{
-    basic::{BasicClient, BasicTokenResponse},
-    reqwest::http_client,
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
+    CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 
+#[cfg(feature = "oauth-github")]
+use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
+use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
 
 pub use error::{OAuthClientConfigurationError, OAuthClientError};
@@ -48,6 +49,8 @@ pub struct OAuthClient {
     pending_authorizations: Arc<Mutex<TtlMap<String, PendingAuthorization>>>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
+    /// OAuth2 identity provider used to retrieve the users' identity
+    identity_provider: Box<dyn IdentityProvider>,
 }
 
 impl OAuthClient {
@@ -63,6 +66,7 @@ impl OAuthClient {
     /// * `token_url` - The provider's endpoint for exchanging an authorization code for an access
     ///   token
     /// * `scopes` - The scopes that will be requested for each user
+    /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
     pub fn new(
         client_id: String,
         client_secret: String,
@@ -70,6 +74,7 @@ impl OAuthClient {
         redirect_url: String,
         token_url: String,
         scopes: Vec<String>,
+        identity_provider: Box<dyn IdentityProvider>,
     ) -> Result<Self, OAuthClientConfigurationError> {
         let client =
             BasicClient::new(
@@ -91,6 +96,7 @@ impl OAuthClient {
                 PENDING_AUTHORIZATION_EXPIRATION_SECS,
             )))),
             scopes,
+            identity_provider,
         })
     }
 
@@ -115,6 +121,7 @@ impl OAuthClient {
             redirect_url,
             "https://github.com/login/oauth/access_token".into(),
             vec![],
+            Box::new(GithubUserIdentityProvider),
         )
     }
 
@@ -166,7 +173,7 @@ impl OAuthClient {
         &self,
         auth_code: String,
         csrf_token: &str,
-    ) -> Result<Option<(UserTokens, String)>, OAuthClientError> {
+    ) -> Result<Option<(UserInfo, String)>, OAuthClientError> {
         let pending_authorization = match self
             .pending_authorizations
             .lock()
@@ -189,10 +196,26 @@ impl OAuthClient {
                 ))
             })?;
 
-        Ok(Some((
-            UserTokens::from(token_response),
-            pending_authorization.client_redirect_url,
-        )))
+        // Create `Authorization` necessary to fetch the user's identity from OAuth provider
+        let authorization = Authorization::Bearer(BearerToken::OAuth2(
+            token_response.access_token().secret().to_string(),
+        ));
+        // Fetch user identity from OAuth provider
+        let identity = self
+            .identity_provider
+            .get_identity(&authorization)
+            .map_err(|err| OAuthClientError::new(&format!("failed to get identity: {}", err,)))?;
+
+        let user_info = UserInfo {
+            access_token: token_response.access_token().secret().into(),
+            expires_in: token_response.expires_in(),
+            refresh_token: token_response
+                .refresh_token()
+                .map(|token| token.secret().into()),
+            identity,
+        };
+
+        Ok(Some((user_info, pending_authorization.client_redirect_url)))
     }
 }
 
@@ -204,7 +227,7 @@ struct PendingAuthorization {
 }
 
 /// User information returned by the OAuth2 client
-pub struct UserTokens {
+pub struct UserInfo {
     /// The access token to be used for authentication in future requests
     access_token: String,
     /// The amount of time (if the provider gives it) until the access token expires and the refresh
@@ -212,9 +235,11 @@ pub struct UserTokens {
     expires_in: Option<Duration>,
     /// The refresh token (if the provider gives one) for refreshing the access token
     refresh_token: Option<String>,
+    /// The identity of the user, from the OAuth provider
+    identity: String,
 }
 
-impl UserTokens {
+impl UserInfo {
     /// Gets the user's access token
     pub fn access_token(&self) -> &str {
         &self.access_token
@@ -231,30 +256,24 @@ impl UserTokens {
     pub fn refresh_token(&self) -> Option<&str> {
         self.refresh_token.as_deref()
     }
+
+    /// Gets the user's identity.
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
 }
 
-impl std::fmt::Debug for UserTokens {
+impl std::fmt::Debug for UserInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("UserTokens")
+        f.debug_struct("UserInfo")
             .field("access_token", &"<Redacted>".to_string())
             .field("expires_in", &self.expires_in)
             .field(
                 "refresh_token",
                 &self.refresh_token.as_deref().map(|_| "<Redacted>"),
             )
+            .field("identity", &self.identity)
             .finish()
-    }
-}
-
-impl From<BasicTokenResponse> for UserTokens {
-    fn from(token_response: BasicTokenResponse) -> Self {
-        Self {
-            access_token: token_response.access_token().secret().into(),
-            expires_in: token_response.expires_in(),
-            refresh_token: token_response
-                .refresh_token()
-                .map(|token| token.secret().into()),
-        }
     }
 }
 
@@ -262,10 +281,13 @@ impl From<BasicTokenResponse> for UserTokens {
 mod tests {
     use super::*;
 
+    use crate::auth::rest_api::identity::IdentityProviderError;
+
     /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
     #[test]
     fn client_construction() {
+        let identity_box: Box<TestIdentityProvider> = Box::new(TestIdentityProvider);
         OAuthClient::new(
             "client_id".into(),
             "client_secret".into(),
@@ -273,6 +295,7 @@ mod tests {
             "https://localhost/oauth/callback".into(),
             "https://provider.com/token".into(),
             vec![],
+            identity_box.clone_box(),
         )
         .expect("Failed to create client from valid inputs");
 
@@ -284,6 +307,7 @@ mod tests {
                 "https://localhost/oauth/callback".into(),
                 "https://provider.com/token".into(),
                 vec![],
+                identity_box.clone_box(),
             ),
             Err(OAuthClientConfigurationError::InvalidAuthUrl(_))
         ));
@@ -296,6 +320,7 @@ mod tests {
                 "invalid_redirect_url".into(),
                 "https://provider.com/token".into(),
                 vec![],
+                identity_box.clone_box(),
             ),
             Err(OAuthClientConfigurationError::InvalidRedirectUrl(_))
         ));
@@ -308,8 +333,22 @@ mod tests {
                 "https://localhost/oauth/callback".into(),
                 "invalid_token_url".into(),
                 vec![],
+                identity_box,
             ),
             Err(OAuthClientConfigurationError::InvalidTokenUrl(_))
         ));
+    }
+
+    #[derive(Clone)]
+    pub struct TestIdentityProvider;
+
+    impl IdentityProvider for TestIdentityProvider {
+        fn get_identity(&self, _: &Authorization) -> Result<String, IdentityProviderError> {
+            Ok("".to_string())
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
     }
 }
