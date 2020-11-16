@@ -13,9 +13,11 @@
 // limitations under the License.
 
 use clap::ArgMatches;
-use reqwest::StatusCode;
+use reqwest::{blocking::Client, StatusCode};
 use serde_json::Value;
 
+#[cfg(feature = "splinter-cli-jwt")]
+use super::create_cylinder_jwt_auth;
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
 use crate::error::CliError;
@@ -34,7 +36,23 @@ impl Action for StatusAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-        reqwest::blocking::get(&format!("{}/health/status", url))
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(&format!("{}/health/status", url));
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+
+            request = request.header(
+                "Authorization",
+                format!("Bearer Cylinder:{}", create_cylinder_jwt_auth(key)?),
+            );
+        }
+
+        request
+            .send()
             .map_err(|err| match err.status() {
                 Some(StatusCode::NOT_FOUND) => {
                     CliError::ActionError(SPLINTERD_MISSING_HEALTH_STATUS.into())
