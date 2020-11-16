@@ -67,8 +67,17 @@ pub struct SplinterRestClient {
 impl SplinterRestClient {
     /// Gets the Splinter node's status.
     pub fn get_node_status(&self) -> Result<NodeStatus, CliError> {
-        Client::new()
-            .get(&format!("{}/status", self.url))
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(&format!("{}/status", self.url));
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
+        request
             .send()
             .map_err(|err| CliError::ActionError(format!("Failed to fetch node ID: {}", err)))
             .and_then(|res| {
