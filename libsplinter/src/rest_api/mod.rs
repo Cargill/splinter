@@ -79,7 +79,10 @@ use crate::auth::oauth::{
 #[cfg(feature = "oauth-github")]
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
-use crate::auth::rest_api::{actix::Authorization, identity::IdentityProvider};
+use crate::auth::rest_api::{
+    actix::Authorization,
+    identity::{GetByAuthorization, IdentityProvider},
+};
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
@@ -476,8 +479,37 @@ impl RequestGuard for ProtocolVersionRangeGuard {
     }
 }
 
+#[cfg(feature = "auth")]
+struct ConfigureAuthorizationMapping {
+    config_fn: Box<dyn FnMut(Authorization) -> Authorization>,
+}
+
+#[cfg(feature = "auth")]
+impl ConfigureAuthorizationMapping {
+    fn new<G, T>(get_by_auth: G) -> Self
+    where
+        T: 'static,
+        G: GetByAuthorization<T> + Send + Sync + 'static,
+    {
+        let mut auth_mapping = Some(get_by_auth);
+        Self {
+            config_fn: Box::new(move |authorization| {
+                if let Some(auth_mapping) = auth_mapping.take() {
+                    debug!("Configuring auth mapping {}", std::any::type_name::<G>());
+                    authorization.with_authorization_mapping(auth_mapping)
+                } else {
+                    authorization
+                }
+            }),
+        }
+    }
+
+    fn configure(&mut self, authorization: Authorization) -> Authorization {
+        (*self.config_fn)(authorization)
+    }
+}
+
 /// `RestApi` is used to create an instance of a restful web server.
-#[derive(Clone)]
 pub struct RestApi {
     resources: Vec<Resource>,
     bind: String,
@@ -485,6 +517,8 @@ pub struct RestApi {
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     identity_providers: Vec<Box<dyn IdentityProvider>>,
+    #[cfg(feature = "auth")]
+    authorization_mappings: Vec<ConfigureAuthorizationMapping>,
 }
 
 impl RestApi {
@@ -493,12 +527,22 @@ impl RestApi {
     ) -> Result<(RestApiShutdownHandle, thread::JoinHandle<()>), RestApiServerError> {
         let (tx, rx) = mpsc::channel();
 
+        let bind_url_for_err = self.bind.to_owned();
         let bind_url = self.bind.to_owned();
-        let resources = self.resources.to_owned();
+        let resources = self.resources;
         #[cfg(feature = "rest-api-cors")]
-        let whitelist = self.whitelist.to_owned();
+        let whitelist = self.whitelist;
         #[cfg(feature = "auth")]
-        let authorization = Authorization::new(self.identity_providers.to_owned());
+        let mut authorization = Authorization::new(self.identity_providers.to_owned());
+
+        #[cfg(feature = "auth")]
+        {
+            let mut auth_mappings = self.authorization_mappings;
+            for auth_mapping in auth_mappings.iter_mut() {
+                authorization = auth_mapping.configure(authorization);
+            }
+        }
+
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -556,7 +600,7 @@ impl RestApi {
             .map_err(|err| {
                 RestApiServerError::BindError(format!(
                     "Failed to bind to URL {}: {}",
-                    self.bind, err
+                    bind_url_for_err, err
                 ))
             })?;
 
@@ -677,6 +721,8 @@ pub struct RestApiBuilder {
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     auth_configs: Vec<AuthConfig>,
+    #[cfg(feature = "auth")]
+    authorization_mappings: Vec<ConfigureAuthorizationMapping>,
 }
 
 impl Default for RestApiBuilder {
@@ -688,6 +734,8 @@ impl Default for RestApiBuilder {
             whitelist: None,
             #[cfg(feature = "auth")]
             auth_configs: Vec::new(),
+            #[cfg(feature = "auth")]
+            authorization_mappings: vec![],
         }
     }
 }
@@ -721,6 +769,19 @@ impl RestApiBuilder {
     #[cfg(feature = "auth")]
     pub fn with_auth_configs(mut self, auth_configs: Vec<AuthConfig>) -> Self {
         self.auth_configs = auth_configs;
+        self
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn with_authorization_mapping<G, T>(mut self, authorization_mapping: G) -> Self
+    where
+        T: 'static,
+        G: GetByAuthorization<T> + Send + Sync + 'static,
+    {
+        debug!("Adding auth mapping {}", std::any::type_name::<G>());
+        self.authorization_mappings
+            .push(ConfigureAuthorizationMapping::new(authorization_mapping));
+
         self
     }
 
@@ -841,6 +902,8 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers,
+            #[cfg(feature = "auth")]
+            authorization_mappings: self.authorization_mappings,
         })
     }
 
@@ -858,6 +921,8 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers: vec![],
+            #[cfg(feature = "auth")]
+            authorization_mappings: self.authorization_mappings,
         })
     }
 }

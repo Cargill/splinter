@@ -18,12 +18,15 @@
 pub mod actix;
 pub mod identity;
 
-use identity::{IdentityProvider, IdentityProviderError};
+use identity::{Authorization, IdentityProvider, IdentityProviderError};
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
     /// The client was authorized to the given identity
-    Authorized(String),
+    Authorized {
+        identity: String,
+        authorization: Authorization,
+    },
     /// The requested endpoint does not require authorization
     NoAuthorizationNecessary,
     /// The authorization header is empty or invalid
@@ -70,7 +73,12 @@ fn authorize(
     // Attempt to get the client's identity
     for provider in identity_providers {
         match provider.get_identity(&authorization) {
-            Ok(identity) => return AuthorizationResult::Authorized(identity),
+            Ok(identity) => {
+                return AuthorizationResult::Authorized {
+                    identity,
+                    authorization,
+                }
+            }
             Err(IdentityProviderError::Unauthorized) => {}
             Err(err) => error!("{}", err),
         }

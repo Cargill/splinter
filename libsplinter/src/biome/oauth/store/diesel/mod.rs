@@ -24,6 +24,7 @@ use super::{OAuthProvider, OAuthUser, OAuthUserStore, OAuthUserStoreError};
 
 use models::{NewOAuthUserModel, OAuthUserModel, ProviderId};
 use operations::add_oauth_user::OAuthUserStoreAddOAuthUserOperation as _;
+use operations::get_by_access_token::OAuthUserStoreGetByAccessToken as _;
 use operations::get_by_provider_user_ref::OAuthUserStoreGetByProviderUserRef as _;
 use operations::get_by_user_id::OAuthUserStoreGetByUserId as _;
 use operations::update_oauth_user::OAuthUserStoreUpdateOAuthUserOperation as _;
@@ -59,6 +60,14 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
         OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
     }
 
+    fn get_by_access_token(
+        &self,
+        access_token: &str,
+    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserStoreOperations::new(&*connection).get_by_access_token(access_token)
+    }
+
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
@@ -89,6 +98,14 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
+    }
+
+    fn get_by_access_token(
+        &self,
+        access_token: &str,
+    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+        let connection = self.connection_pool.get()?;
+        OAuthUserStoreOperations::new(&*connection).get_by_access_token(access_token)
     }
 
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {

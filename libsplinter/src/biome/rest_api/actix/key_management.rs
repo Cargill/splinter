@@ -14,21 +14,20 @@
 
 use std::sync::Arc;
 
-use super::authorize::authorize_user;
+use super::authorize::get_authorized_user;
 use crate::actix_web::HttpResponse;
 use crate::biome::key_management::{
     store::{KeyStore, KeyStoreError},
     Key,
 };
-use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey, UpdatedKey};
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
+use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
     into_bytes, ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
 };
-use crate::rest_api::{secrets::SecretManager, sessions::default_validation};
 
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
 pub fn make_key_management_route(
@@ -71,24 +70,10 @@ fn handle_post(
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let validation = default_validation(&rest_config.issuer());
 
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -107,7 +92,7 @@ fn handle_post(
             let key = Key::new(
                 &new_key.public_key,
                 &new_key.encrypted_private_key,
-                &user_id,
+                user.id(),
                 &new_key.display_name,
             );
             let response_key = ResponseKey::from(&key);
@@ -143,27 +128,13 @@ fn handle_get(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let validation = default_validation(&rest_config.issuer());
 
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
-        match key_store.list_keys(Some(&user_id)) {
+        match key_store.list_keys(Some(user.id())) {
             Ok(keys) => Box::new(
                 HttpResponse::Ok()
                     .json(json!(
@@ -195,24 +166,9 @@ fn handle_patch(
 ) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let validation = default_validation(&rest_config.issuer());
-
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -231,7 +187,7 @@ fn handle_patch(
 
             match key_store.update_key(
                 &updated_key.public_key,
-                &user_id,
+                user.id(),
                 &updated_key.new_display_name,
             ) {
                 Ok(()) => HttpResponse::Ok()
@@ -286,7 +242,6 @@ fn handle_fetch(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let validation = default_validation(&rest_config.issuer());
 
         let public_key = match request.match_info().get("public_key") {
             Some(id) => id.to_owned(),
@@ -302,25 +257,12 @@ fn handle_fetch(
             }
         };
 
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
-        match key_store.fetch_key(&public_key, &user_id) {
+        match key_store.fetch_key(&public_key, user.id()) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
                     .json(json!({ "data": ResponseKey::from(&key) }))
@@ -356,7 +298,6 @@ fn handle_delete(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
-        let validation = default_validation(&rest_config.issuer());
 
         let public_key = match request.match_info().get("public_key") {
             Some(id) => id.to_owned(),
@@ -372,25 +313,12 @@ fn handle_delete(
             }
         };
 
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
-        match key_store.remove_key(&public_key, &user_id) {
+        match key_store.remove_key(&public_key, user.id()) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
                     .json(json!(

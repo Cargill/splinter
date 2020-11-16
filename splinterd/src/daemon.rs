@@ -29,6 +29,8 @@ use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
+#[cfg(feature = "biome-oauth")]
+use splinter::biome::rest_api::auth::GetUserByOAuthAuthorization;
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
 use splinter::circuit::directory::CircuitDirectory;
@@ -526,6 +528,12 @@ impl SplinterDaemon {
                         user_store: store_factory.get_biome_user_store(),
                         oauth_user_store: store_factory.get_biome_oauth_user_store(),
                     };
+
+                    rest_api_builder = rest_api_builder.with_authorization_mapping(
+                        GetUserByOAuthAuthorization::new(
+                            store_factory.get_biome_oauth_user_store(),
+                        ),
+                    );
                 }
 
                 auth_configs.push(AuthConfig::OAuth {
@@ -538,9 +546,13 @@ impl SplinterDaemon {
             // is configured. This informs the REST API that Biome is providing auth.
             #[cfg(feature = "biome-credentials")]
             if self.enable_biome {
+                let biome_resource_manager = build_biome_routes(&*store_factory)?;
+                let authorization_mapping = biome_resource_manager.get_authorization_mapping();
                 auth_configs.push(AuthConfig::Biome {
-                    biome_resource_manager: build_biome_routes(&*store_factory)?,
+                    biome_resource_manager,
                 });
+                rest_api_builder =
+                    rest_api_builder.with_authorization_mapping(authorization_mapping);
             }
 
             rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);

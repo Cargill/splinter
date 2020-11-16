@@ -22,6 +22,8 @@ pub mod github;
 
 use std::str::FromStr;
 
+use crate::error::InternalError;
+
 pub use error::{AuthorizationParseError, IdentityProviderError};
 
 /// A service that fetches identities from a backing provider
@@ -46,6 +48,12 @@ impl Clone for Box<dyn IdentityProvider> {
     fn clone(&self) -> Box<dyn IdentityProvider> {
         self.clone_box()
     }
+}
+
+/// A trait that fetches a value based on an Authorization.
+pub trait GetByAuthorization<T> {
+    /// Return a value based on the given authorization value.
+    fn get(&self, authorization: &Authorization) -> Result<Option<T>, InternalError>;
 }
 
 /// The authorization that is passed to an `IdentityProvider`
@@ -76,6 +84,7 @@ impl FromStr for Authorization {
 }
 
 /// A bearer token of a specific type
+#[non_exhaustive]
 pub enum BearerToken {
     #[cfg(feature = "biome-credentials")]
     /// Contains a Biome JWT

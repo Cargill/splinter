@@ -55,7 +55,7 @@ impl UserStore for MemoryUserStore {
                 source: None,
             })?;
 
-        inner.insert(user.id(), user);
+        inner.insert(user.id().to_string(), user);
         Ok(())
     }
 
@@ -68,8 +68,8 @@ impl UserStore for MemoryUserStore {
                 source: None,
             })?;
 
-        if inner.contains_key(&updated_user.id()) {
-            inner.insert(updated_user.id(), updated_user);
+        if inner.contains_key(updated_user.id()) {
+            inner.insert(updated_user.id().to_string(), updated_user);
             Ok(())
         } else {
             Err(UserStoreError::NotFoundError(format!(

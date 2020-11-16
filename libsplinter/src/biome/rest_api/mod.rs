@@ -86,6 +86,8 @@ use self::actix::token::make_token_route;
 use self::actix::user::make_user_routes;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
 use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
+#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+use self::auth::GetUserByBiomeAuthorization;
 #[cfg(feature = "biome-credentials")]
 use super::credentials::store::CredentialsStore;
 
@@ -138,6 +140,15 @@ impl BiomeRestResourceManager {
         BiomeUserIdentityProvider::new(
             self.token_secret_manager.clone(),
             default_validation(&self.rest_config.issuer()),
+        )
+    }
+
+    /// Creates a new Biome authorization mapping for Users
+    #[cfg(all(feature = "auth", feature = "biome-credentials"))]
+    pub fn get_authorization_mapping(&self) -> GetUserByBiomeAuthorization {
+        GetUserByBiomeAuthorization::new(
+            self.rest_config.clone(),
+            self.token_secret_manager.clone(),
         )
     }
 }
@@ -414,6 +425,8 @@ mod tests {
     use crate::biome::{
         MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore, MemoryUserStore,
     };
+    #[cfg(feature = "auth")]
+    use crate::rest_api::AuthConfig;
     use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
 
     #[derive(Serialize)]
@@ -529,13 +542,23 @@ mod tests {
             .build()
             .unwrap();
 
-        RestApiBuilder::new()
+        let mut rest_api_builder = RestApiBuilder::new();
+
+        rest_api_builder = rest_api_builder
             .with_bind("127.0.0.1:0")
-            .add_resources(resource_manager.resources())
-            .build_insecure()
-            .unwrap()
-            .run_insecure()
-            .unwrap()
+            .add_resources(resource_manager.resources());
+
+        #[cfg(feature = "auth")]
+        {
+            rest_api_builder = rest_api_builder
+                .with_authorization_mapping(resource_manager.get_authorization_mapping());
+
+            rest_api_builder = rest_api_builder.with_auth_configs(vec![AuthConfig::Biome {
+                biome_resource_manager: resource_manager,
+            }]);
+        }
+
+        rest_api_builder.build().unwrap().run().unwrap()
     }
 
     fn create_and_authorize_user(

@@ -16,14 +16,12 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
-use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::{UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
-    into_bytes, sessions::default_validation, ErrorResponse, HandlerFunction, Method,
-    ProtocolVersionRangeGuard, Resource,
+    into_bytes, ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
 };
 
 #[cfg(feature = "biome-key-management")]
@@ -33,7 +31,7 @@ use crate::biome::key_management::{
 };
 use crate::rest_api::secrets::SecretManager;
 
-use crate::biome::rest_api::actix::authorize::authorize_user;
+use crate::biome::rest_api::actix::authorize::get_authorized_user;
 #[cfg(feature = "biome-key-management")]
 use crate::biome::rest_api::resources::{key_management::ResponseKey, user::ModifyUser};
 
@@ -152,23 +150,9 @@ fn add_modify_user_method(
     Box::new(move |request, payload| {
         let credentials_store = credentials_store.clone();
         let key_store = key_store.clone();
-        let validation = default_validation(&rest_config.issuer());
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -191,7 +175,7 @@ fn add_modify_user_method(
                     Key::new(
                         &new_key.public_key,
                         &new_key.encrypted_private_key,
-                        &user_id,
+                        user.id(),
                         &new_key.display_name,
                     )
                 })
@@ -233,7 +217,7 @@ fn add_modify_user_method(
                         .collect::<Vec<ResponseKey>>();
 
                     match key_store.update_keys_and_password(
-                        &user_id,
+                        user.id(),
                         &new_password,
                         encryption_cost,
                         &new_key_pairs,
@@ -279,26 +263,12 @@ fn add_delete_user_method(
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let user_store = user_store.clone();
-        let validation = default_validation(&rest_config.issuer());
-        let user_id = match authorize_user(&request, &secret_manager, &validation) {
-            AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
-                return Box::new(
-                    HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
-                        .into_future(),
-                )
-            }
-            AuthorizationResult::Failed => {
-                return Box::new(
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future(),
-                );
-            }
+        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+            Ok(user) => user,
+            Err(response) => return response,
         };
 
-        Box::new(match user_store.remove_user(&user_id) {
+        Box::new(match user_store.remove_user(user.id()) {
             Ok(()) => HttpResponse::Ok()
                 .json(json!({ "message": "User deleted sucessfully" }))
                 .into_future(),
@@ -308,7 +278,7 @@ fn add_delete_user_method(
                     HttpResponse::NotFound()
                         .json(ErrorResponse::not_found(&format!(
                             "User ID not found: {}",
-                            &user_id
+                            user.id()
                         )))
                         .into_future()
                 }
