@@ -41,7 +41,6 @@ splinter = { path = "../../../libsplinter" }
 transact = { version = "0.3", features = ["sawtooth-compat"] }
 
 [dev-dependencies]
-cylinder = "0.2"
 tempdir = "0.3"
 transact = { version = "0.3", features = ["family-command", "sawtooth-compat"] }
 
