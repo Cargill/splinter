@@ -103,7 +103,6 @@ experimental = [
     "oauth",
     "oauth-github",
     "registry-database",
-    "routing-table",
     "service-arg-validation",
     "service-network",
     "store-factory",
@@ -141,7 +140,6 @@ rest-api = [
 ]
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
-routing-table = []
 service-arg-validation = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
