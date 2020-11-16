@@ -25,15 +25,13 @@ mod benchmarks;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 
-use super::error::{
-    AddCircuitError, AddCircuitsError, AddNodeError, AddNodesError, AddServiceError,
-    FetchCircuitError, FetchNodeError, FetchServiceError, ListCircuitsError, ListNodesError,
-    ListServiceError, RemoveCircuitError, RemoveNodeError, RemoveServiceError,
-};
+use super::error::RoutingTableReaderError;
 use super::{
     Circuit, CircuitIter, CircuitNode, CircuitNodeIter, RoutingTableReader, RoutingTableWriter,
     Service, ServiceId,
 };
+
+use crate::error::{InternalError, InvalidStateError};
 
 const ADMIN_CIRCUIT_ID: &str = "admin";
 
@@ -63,11 +61,18 @@ impl RoutingTableReader for RoutingTable {
     /// * `service_id` - The unique ID for the service to be fetched
     ///
     /// Returns an error if the lock is poisoned.
-    fn get_service(&self, service_id: &ServiceId) -> Result<Option<Service>, FetchServiceError> {
+    fn get_service(
+        &self,
+        service_id: &ServiceId,
+    ) -> Result<Option<Service>, RoutingTableReaderError> {
         Ok(self
             .state
             .read()
-            .map_err(|_| FetchServiceError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| {
+                RoutingTableReaderError::InternalError(InternalError::with_message(String::from(
+                    "RoutingTable lock poisoned",
+                )))
+            })?
             .service_directory
             .get(service_id)
             .map(Service::clone))
@@ -80,19 +85,23 @@ impl RoutingTableReader for RoutingTable {
     /// * `circuit_id` - The unique ID the circuit whose services should be returned
     ///
     /// Returns an error if the lock is poisoned or if the circuit does not exist
-    fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, ListServiceError> {
+    fn list_services(&self, circuit_id: &str) -> Result<Vec<Service>, RoutingTableReaderError> {
         if let Some(circuit) = self
             .state
             .read()
             .map_err(|_| {
-                ListServiceError::InternalError(String::from("RoutingTable lock poisoned"))
+                RoutingTableReaderError::InternalError(InternalError::with_message(String::from(
+                    "RoutingTable lock poisoned",
+                )))
             })?
             .circuits
             .get(circuit_id)
         {
             Ok(circuit.roster.clone())
         } else {
-            Err(ListServiceError::CircuitNotFound(circuit_id.to_string()))
+            Err(RoutingTableReaderError::InvalidStateError(
+                InvalidStateError::with_message(format!("Circuit {} was not found", circuit_id)),
+            ))
         }
     }
 
@@ -101,11 +110,15 @@ impl RoutingTableReader for RoutingTable {
     /// Returns the nodes in the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn list_nodes(&self) -> Result<CircuitNodeIter, ListNodesError> {
+    fn list_nodes(&self) -> Result<CircuitNodeIter, RoutingTableReaderError> {
         Ok(Box::new(
             self.state
                 .read()
-                .map_err(|_| ListNodesError(String::from("RoutingTable lock poisoned")))?
+                .map_err(|_| {
+                    RoutingTableReaderError::InternalError(InternalError::with_message(
+                        String::from("RoutingTable lock poisoned"),
+                    ))
+                })?
                 .nodes
                 .clone()
                 .into_iter(),
@@ -119,11 +132,15 @@ impl RoutingTableReader for RoutingTable {
     /// * `node_id` - The unique ID for the node to be fetched
     ///
     /// Returns an error if the lock was poisoned
-    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, FetchNodeError> {
+    fn get_node(&self, node_id: &str) -> Result<Option<CircuitNode>, RoutingTableReaderError> {
         Ok(self
             .state
             .read()
-            .map_err(|_| FetchNodeError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| {
+                RoutingTableReaderError::InternalError(InternalError::with_message(String::from(
+                    "RoutingTable lock poisoned",
+                )))
+            })?
             .nodes
             .get(node_id)
             .cloned())
@@ -132,11 +149,15 @@ impl RoutingTableReader for RoutingTable {
     /// Returns the circuits in the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn list_circuits(&self) -> Result<CircuitIter, ListCircuitsError> {
+    fn list_circuits(&self) -> Result<CircuitIter, RoutingTableReaderError> {
         Ok(Box::new(
             self.state
                 .read()
-                .map_err(|_| ListCircuitsError(String::from("RoutingTable lock poisoned")))?
+                .map_err(|_| {
+                    RoutingTableReaderError::InternalError(InternalError::with_message(
+                        String::from("RoutingTable lock poisoned"),
+                    ))
+                })?
                 .circuits
                 .clone()
                 .into_iter(),
@@ -150,7 +171,7 @@ impl RoutingTableReader for RoutingTable {
     /// * `circuit_id` - The unique ID for the circuit to be fetched
     ///
     /// Returns an error if the lock is poisoned
-    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, FetchCircuitError> {
+    fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, RoutingTableReaderError> {
         if circuit_id == ADMIN_CIRCUIT_ID {
             Ok(Some(Circuit::new(
                 ADMIN_CIRCUIT_ID.to_string(),
@@ -161,7 +182,11 @@ impl RoutingTableReader for RoutingTable {
             Ok(self
                 .state
                 .read()
-                .map_err(|_| FetchCircuitError(String::from("RoutingTable lock poisoned")))?
+                .map_err(|_| {
+                    RoutingTableReaderError::InternalError(InternalError::with_message(
+                        String::from("RoutingTable lock poisoned"),
+                    ))
+                })?
                 .circuits
                 .get(circuit_id)
                 .cloned())
@@ -186,10 +211,10 @@ impl RoutingTableWriter for RoutingTable {
         &mut self,
         service_id: ServiceId,
         service: Service,
-    ) -> Result<(), AddServiceError> {
+    ) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| AddServiceError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .service_directory
             .insert(service_id, service);
         Ok(())
@@ -202,10 +227,10 @@ impl RoutingTableWriter for RoutingTable {
     /// * `service_id` - The unique ServiceId for the service
     ///
     /// Returns an error if the lock is poisoned
-    fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), RemoveServiceError> {
+    fn remove_service(&mut self, service_id: &ServiceId) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| RemoveServiceError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .service_directory
             .remove(service_id);
         Ok(())
@@ -225,11 +250,11 @@ impl RoutingTableWriter for RoutingTable {
         circuit_id: String,
         circuit: Circuit,
         nodes: Vec<CircuitNode>,
-    ) -> Result<(), AddCircuitError> {
+    ) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| AddCircuitError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
 
         for service in circuit.roster.iter() {
             let service_id = ServiceId::new(
@@ -257,11 +282,11 @@ impl RoutingTableWriter for RoutingTable {
     /// * `circuits` - The list of circuits to be added to the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), AddCircuitsError> {
+    fn add_circuits(&mut self, circuits: Vec<Circuit>) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| AddCircuitsError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
         for circuit in circuits.into_iter() {
             for service in circuit.roster.iter() {
                 let service_id = ServiceId::new(
@@ -286,11 +311,11 @@ impl RoutingTableWriter for RoutingTable {
     /// * `circuit_id` - The unique ID for the circuit
     ///
     /// Returns an error if the lock is poisoned
-    fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), RemoveCircuitError> {
+    fn remove_circuit(&mut self, circuit_id: &str) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| RemoveCircuitError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
 
         let circuit = state.circuits.remove(circuit_id);
 
@@ -315,10 +340,10 @@ impl RoutingTableWriter for RoutingTable {
     /// * `node`- The node to add to the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn add_node(&mut self, id: String, node: CircuitNode) -> Result<(), AddNodeError> {
+    fn add_node(&mut self, id: String, node: CircuitNode) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| AddNodeError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .nodes
             .insert(id, node);
         Ok(())
@@ -331,11 +356,11 @@ impl RoutingTableWriter for RoutingTable {
     /// * `nodes`- The list of nodes to add to the routing table
     ///
     /// Returns an error if the lock is poisoned
-    fn add_nodes(&mut self, nodes: Vec<CircuitNode>) -> Result<(), AddNodesError> {
+    fn add_nodes(&mut self, nodes: Vec<CircuitNode>) -> Result<(), InternalError> {
         let mut state = self
             .state
             .write()
-            .map_err(|_| AddNodesError(String::from("RoutingTable lock poisoned")))?;
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?;
         for node in nodes {
             if !state.nodes.contains_key(&node.node_id) {
                 state.nodes.insert(node.node_id.to_string(), node);
@@ -351,10 +376,10 @@ impl RoutingTableWriter for RoutingTable {
     /// * `node_id` -  The unique ID for the node that should be removed
     ///
     /// Returns an error if the lock is poisoned
-    fn remove_node(&mut self, id: &str) -> Result<(), RemoveNodeError> {
+    fn remove_node(&mut self, id: &str) -> Result<(), InternalError> {
         self.state
             .write()
-            .map_err(|_| RemoveNodeError(String::from("RoutingTable lock poisoned")))?
+            .map_err(|_| InternalError::with_message(String::from("RoutingTable lock poisoned")))?
             .nodes
             .remove(id);
         Ok(())
