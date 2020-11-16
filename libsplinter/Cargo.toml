@@ -89,6 +89,7 @@ stable = [
     "rest-api-actix",
     "rest-api-cors",
     "sawtooth-signing-compat",
+    "sqlite",
 ]
 
 experimental = [
@@ -106,7 +107,6 @@ experimental = [
     "routing-table",
     "service-arg-validation",
     "service-network",
-    "sqlite",
     "store-factory",
     "ws-transport",
     "zmq-transport",
