@@ -167,7 +167,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                 context: String::from("Failed to remove old Service arguments"),
                 source: Box::new(err),
             })?;
-            // Insert new `Circuit` data
+            // Insert new data associate with the `Circuit`
             let services: Vec<ServiceModel> = Vec::from(&circuit);
             insert_into(service::table)
                 .values(&services)

@@ -192,7 +192,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                     source: Box::new(err),
                 })?;
             // Create a list of circuit members from `nodes`
-            let circuit_member: Vec<CircuitMemberModel> = nodes
+            let circuit_members: Vec<CircuitMemberModel> = nodes
                 .iter()
                 .map(|node| CircuitMemberModel {
                     circuit_id: circuit.circuit_id().into(),
@@ -200,7 +200,7 @@ impl<'a> AdminServiceStoreAddCircuitOperation
                 })
                 .collect();
             insert_into(circuit_member::table)
-                .values(circuit_member)
+                .values(circuit_members)
                 .execute(self.conn)
                 .map_err(|err| AdminServiceStoreError::QueryError {
                     context: String::from("Unable to insert Circuit members"),
