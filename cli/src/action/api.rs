@@ -19,17 +19,52 @@ use serde::Deserialize;
 
 use super::CliError;
 
-/// A wrapper around the Splinter REST API.
-pub struct SplinterRestClient<'a> {
-    pub url: &'a str,
+#[derive(Default)]
+pub struct SplinterRestClientBuilder {
+    pub url: Option<String>,
+    #[cfg(feature = "splinter-cli-jwt")]
+    pub auth: Option<String>,
 }
 
-impl<'a> SplinterRestClient<'a> {
-    /// Constructs a new client for a Splinter node at the given URL.
-    pub fn new(url: &'a str) -> Self {
-        Self { url }
+impl SplinterRestClientBuilder {
+    pub fn new() -> Self {
+        SplinterRestClientBuilder::default()
     }
 
+    pub fn with_url(mut self, url: String) -> Self {
+        self.url = Some(url);
+        self
+    }
+
+    #[cfg(feature = "splinter-cli-jwt")]
+    pub fn with_auth(mut self, auth: String) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
+    pub fn build(self) -> Result<SplinterRestClient, CliError> {
+        Ok(SplinterRestClient {
+            url: self.url.ok_or_else(|| {
+                CliError::ActionError("Failed to build client, url not provided".to_string())
+            })?,
+            #[cfg(feature = "splinter-cli-jwt")]
+            auth: self.auth.ok_or_else(|| {
+                CliError::ActionError(
+                    "Failed to build client, jwt authorization not provided".to_string(),
+                )
+            })?,
+        })
+    }
+}
+
+/// A wrapper around the Splinter REST API.
+pub struct SplinterRestClient {
+    pub url: String,
+    #[cfg(feature = "splinter-cli-jwt")]
+    pub auth: String,
+}
+
+impl SplinterRestClient {
     /// Gets the Splinter node's status.
     pub fn get_node_status(&self) -> Result<NodeStatus, CliError> {
         Client::new()
