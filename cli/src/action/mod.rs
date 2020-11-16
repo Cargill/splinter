@@ -31,6 +31,8 @@ use std::io::{Error as IoError, ErrorKind, Read};
 use std::path::Path;
 
 use clap::ArgMatches;
+#[cfg(feature = "splinter-cli-jwt")]
+use cylinder::{jwt::JsonWebTokenBuilder, load_user_key, secp256k1::Secp256k1Context, Context};
 
 use super::error::CliError;
 
@@ -127,4 +129,37 @@ fn msg_from_io_error(err: IoError) -> String {
         ErrorKind::InvalidData => "Invalid data".into(),
         _ => "Unknown I/O error".into(),
     }
+}
+
+#[cfg(feature = "splinter-cli-jwt")]
+// build a signed json web token using the private key
+fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
+    let default_key_path = dirs::home_dir()
+        .map(|mut p| {
+            p.push(".splinter/keys");
+            p
+        })
+        .ok_or_else(|| CliError::EnvironmentError("Home directory not found".into()))?;
+    let default_path_string = {
+        if let Some(path) = default_key_path.to_str() {
+            path
+        } else {
+            return Err(CliError::ActionError(
+                "Path is not valid unicode".to_string(),
+            ));
+        }
+    };
+
+    let private_key = load_user_key(key_name, default_path_string).map_err(|err| {
+        CliError::ActionError(format!("Unable to get private key from file: {}", err))
+    })?;
+
+    let context = Secp256k1Context::new();
+    let signer = context.new_signer(private_key);
+
+    let encoded_token = JsonWebTokenBuilder::new()
+        .build(&*signer)
+        .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;
+
+    Ok(format!("Bearer Cylinder:{}", encoded_token))
 }
