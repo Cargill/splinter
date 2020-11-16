@@ -30,11 +30,14 @@ use crate::error::CliError;
 #[cfg(feature = "circuit-template")]
 use crate::template::CircuitTemplate;
 
-use super::api::SplinterRestClient;
+use super::api::SplinterRestClientBuilder;
 use super::{
     msg_from_io_error, read_private_key, Action, DEFAULT_SPLINTER_REST_API_URL,
     SPLINTER_REST_API_URL_ENV,
 };
+
+#[cfg(feature = "splinter-cli-jwt")]
+use super::create_cylinder_jwt_auth;
 
 use api::{CircuitServiceSlice, CircuitSlice};
 pub(crate) use builder::CreateCircuitMessageBuilder;
@@ -166,11 +169,21 @@ impl Action for CircuitProposeAction {
                 .map(ToOwned::to_owned)
                 .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
                 .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-            let key = args.value_of("key").unwrap_or("./splinter.priv");
 
-            let client = SplinterRestClient::new(&url);
+            let key = args.value_of("key");
+
+            let mut builder = SplinterRestClientBuilder::new();
+            builder = builder.with_url(url);
+
+            #[cfg(feature = "splinter-cli-jwt")]
+            {
+                builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
+            }
+
+            let client = builder.build()?;
+
             let requester_node = client.get_node_status()?.node_id;
-            let private_key_hex = read_private_key(key)?;
+            let private_key_hex = read_private_key(&key.unwrap_or("./splinter.priv"))?;
 
             let signed_payload =
                 make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
@@ -536,7 +549,8 @@ impl Action for CircuitVoteAction {
             .map(ToOwned::to_owned)
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let key = args.value_of("private_key_file").unwrap_or("splinter");
+        let key = args.value_of("private_key_file");
+
         let circuit_id = args
             .value_of("circuit_id")
             .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
@@ -556,12 +570,21 @@ impl Action for CircuitVoteAction {
 
 fn vote_on_circuit_proposal(
     url: &str,
-    key: &str,
+    key: Option<&str>,
     circuit_id: &str,
     vote: Vote,
 ) -> Result<(), CliError> {
-    let client = SplinterRestClient::new(url);
-    let private_key_hex = read_private_key(key)?;
+    let mut builder = SplinterRestClientBuilder::new();
+    builder = builder.with_url(url.to_string());
+
+    #[cfg(feature = "splinter-cli-jwt")]
+    {
+        builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
+    }
+
+    let client = builder.build()?;
+
+    let private_key_hex = read_private_key(key.unwrap_or("splinter"))?;
 
     let requester_node = client.get_node_status()?.node_id;
     let proposal = client.fetch_proposal(circuit_id)?;
@@ -604,12 +627,34 @@ impl Action for CircuitListAction {
             })
             .unwrap_or("human");
 
-        list_circuits(&url, filter, format)
+        #[cfg(feature = "splinter-cli-jwt")]
+        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+
+        list_circuits(
+            &url,
+            filter,
+            format,
+            #[cfg(feature = "splinter-cli-jwt")]
+            key,
+        )
     }
 }
 
-fn list_circuits(url: &str, filter: Option<&str>, format: &str) -> Result<(), CliError> {
-    let client = SplinterRestClient::new(url);
+fn list_circuits(
+    url: &str,
+    filter: Option<&str>,
+    format: &str,
+    #[cfg(feature = "splinter-cli-jwt")] key: Option<&str>,
+) -> Result<(), CliError> {
+    let mut builder = SplinterRestClientBuilder::new();
+    builder = builder.with_url(url.to_string());
+
+    #[cfg(feature = "splinter-cli-jwt")]
+    {
+        builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
+    }
+
+    let client = builder.build()?;
 
     let circuits = client.list_circuits(filter)?;
     let mut data = Vec::new();
@@ -658,12 +703,35 @@ impl Action for CircuitShowAction {
             args.value_of("format").unwrap_or("human")
         };
 
-        show_circuit(&url, circuit_id, format)
+        #[cfg(feature = "splinter-cli-jwt")]
+        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+
+        show_circuit(
+            &url,
+            circuit_id,
+            format,
+            #[cfg(feature = "splinter-cli-jwt")]
+            key,
+        )
     }
 }
 
-fn show_circuit(url: &str, circuit_id: &str, format: &str) -> Result<(), CliError> {
-    let client = SplinterRestClient::new(url);
+fn show_circuit(
+    url: &str,
+    circuit_id: &str,
+    format: &str,
+    #[cfg(feature = "splinter-cli-jwt")] key: Option<&str>,
+) -> Result<(), CliError> {
+    let mut builder = SplinterRestClientBuilder::new();
+    builder = builder.with_url(url.to_string());
+
+    #[cfg(feature = "splinter-cli-jwt")]
+    {
+        builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
+    }
+
+    let client = builder.build()?;
+
     let circuit = client.fetch_circuit(circuit_id)?;
     let mut print_circuit = false;
     let mut print_proposal = false;
@@ -745,7 +813,17 @@ impl Action for CircuitProposalsAction {
             })
             .unwrap_or("human");
 
-        list_proposals(&url, management_type_filter, member_filter, format)
+        #[cfg(feature = "splinter-cli-jwt")]
+        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+
+        list_proposals(
+            &url,
+            management_type_filter,
+            member_filter,
+            format,
+            #[cfg(feature = "splinter-cli-jwt")]
+            key,
+        )
     }
 }
 
@@ -754,8 +832,17 @@ fn list_proposals(
     management_type_filter: Option<&str>,
     member_filter: Option<&str>,
     format: &str,
+    #[cfg(feature = "splinter-cli-jwt")] key: Option<&str>,
 ) -> Result<(), CliError> {
-    let client = SplinterRestClient::new(url);
+    let mut builder = SplinterRestClientBuilder::new();
+    builder = builder.with_url(url.to_string());
+
+    #[cfg(feature = "splinter-cli-jwt")]
+    {
+        builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
+    }
+
+    let client = builder.build()?;
 
     let proposals = client.list_proposals(management_type_filter, member_filter)?;
     let mut data = Vec::new();
