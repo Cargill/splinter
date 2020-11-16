@@ -67,6 +67,7 @@ experimental = [
     # The following features are experimental:
     "circuit-auth-type",
     "health",
+    "sqlite",
 ]
 
 circuit-auth-type = []
@@ -79,6 +80,10 @@ database = ["diesel"]
 postgres = [
     "diesel/postgres",
     "splinter/postgres",
+]
+sqlite = [
+    "diesel/sqlite",
+    "splinter/sqlite",
 ]
 
 [package.metadata.deb]
