@@ -21,7 +21,7 @@ DESCRIPTION
 This command generates secp256k1 public/private keys for Splinter.
 
 If no option is specified, this command generates user keys that are stored in
-the directory `$HOME/splinter/keys`. The `--system` flag generates keys for the
+the directory `$HOME/.splinter/keys`. The `--system` flag generates keys for the
 Splinter daemon (`splinterd`) that are stored in `/etc/splinter/keys`. The
 `--key-dir` option generates keys in the specified directory.
 
@@ -73,8 +73,8 @@ This example generates user keys for a Splinter user who is logged in as
 
 ```
 $ splinter keygen
-writing file: "/Users/paulbunyan/splinter/keys/paulbunyan.priv"
-writing file: "/Users/paulbunyan/splinter/keys/paulbunyan.pub"
+writing file: "/Users/paulbunyan/.splinter/keys/paulbunyan.priv"
+writing file: "/Users/paulbunyan/.splinter/keys/paulbunyan.pub"
 ```
 
 This example generates keys for the user `babe` in the `/tmp` directory:

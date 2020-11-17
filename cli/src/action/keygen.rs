@@ -49,7 +49,7 @@ impl Action for KeyGenAction {
         } else {
             dirs::home_dir()
                 .map(|mut p| {
-                    p.push("splinter/keys");
+                    p.push(".splinter/keys");
                     p
                 })
                 .ok_or_else(|| CliError::EnvironmentError("Home directory not found".into()))?
