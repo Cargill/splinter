@@ -549,6 +549,12 @@ impl RestApi {
             }
         }
 
+        #[cfg(feature = "rest-api-cors")]
+        let cors = match &whitelist {
+            Some(list) => cors::Cors::new(list.to_vec()),
+            None => cors::Cors::new_allow_any(),
+        };
+
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -557,10 +563,8 @@ impl RestApi {
                     let app = App::new();
 
                     #[cfg(feature = "rest-api-cors")]
-                    let app = app.wrap(match &whitelist {
-                        Some(list) => cors::Cors::new(list.to_vec()),
-                        None => cors::Cors::new_allow_any(),
-                    });
+                    let app = app.wrap(cors.clone());
+
                     #[cfg(feature = "auth")]
                     let app = app.wrap(authorization.clone());
 
@@ -640,6 +644,13 @@ impl RestApi {
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist.to_owned();
+
+        #[cfg(feature = "rest-api-cors")]
+        let cors = match &whitelist {
+            Some(list) => cors::Cors::new(list.to_vec()),
+            None => cors::Cors::new_allow_any(),
+        };
+
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -648,10 +659,7 @@ impl RestApi {
                     let app = App::new();
 
                     #[cfg(feature = "rest-api-cors")]
-                    let app = app.wrap(match &whitelist {
-                        Some(list) => cors::Cors::new(list.to_vec()),
-                        None => cors::Cors::new_allow_any(),
-                    });
+                    let app = app.wrap(cors.clone());
 
                     let mut app = app.wrap(middleware::Logger::default());
 
