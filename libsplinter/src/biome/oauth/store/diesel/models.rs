@@ -78,7 +78,7 @@ pub struct OAuthUserModel {
     pub id: i64,
     pub user_id: String,
     pub provider_user_ref: String,
-    pub access_token: String,
+    pub access_token: Option<String>,
     pub refresh_token: Option<String>,
     pub provider_id: ProviderId,
 }
@@ -88,7 +88,7 @@ pub struct OAuthUserModel {
 pub struct NewOAuthUserModel<'a> {
     pub user_id: &'a str,
     pub provider_user_ref: &'a str,
-    pub access_token: &'a str,
+    pub access_token: Option<&'a str>,
     pub refresh_token: Option<&'a str>,
     pub provider_id: ProviderId,
 }

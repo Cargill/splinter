@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS oauth_user (
     id                  BIGSERIAL     PRIMARY KEY,
     user_id             TEXT          NOT NULL UNIQUE,
     provider_user_ref   TEXT          NOT NULL UNIQUE,
-    access_token        TEXT          NOT NULL,
+    access_token        TEXT,
     refresh_token       TEXT,
     provider_id         SMALLINT      NULL,
 

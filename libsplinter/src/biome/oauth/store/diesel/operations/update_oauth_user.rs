@@ -16,7 +16,9 @@ use diesel::{dsl::update, prelude::*, result::DatabaseErrorKind, result::Error a
 
 use crate::error::InternalError;
 
-use crate::biome::oauth::store::{diesel::schema::oauth_user, OAuthUser, OAuthUserStoreError};
+use crate::biome::oauth::store::{
+    diesel::schema::oauth_user, AccessToken, OAuthUser, OAuthUserStoreError,
+};
 
 use super::OAuthUserStoreOperations;
 
@@ -29,9 +31,13 @@ where
     C: diesel::Connection,
 {
     fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+        let access_token = match oauth_user.access_token() {
+            AccessToken::Authorized(token) => Some(token),
+            AccessToken::Unauthorized => None,
+        };
         update(oauth_user::table.filter(oauth_user::user_id.eq(oauth_user.user_id())))
             .set((
-                oauth_user::access_token.eq(oauth_user.access_token()),
+                oauth_user::access_token.eq(access_token),
                 oauth_user::refresh_token.eq(&oauth_user.refresh_token()),
             ))
             .execute(self.conn)

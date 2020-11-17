@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::InternalError;
 
-use super::{OAuthUser, OAuthUserStore, OAuthUserStoreError};
+use super::{AccessToken, OAuthUser, OAuthUserStore, OAuthUserStoreError};
 
 #[derive(Default, Clone)]
 pub struct MemoryOAuthUserStore {
@@ -81,7 +81,9 @@ impl OAuthUserStore for MemoryOAuthUserStore {
 
         Ok(inner
             .values()
-            .find(|oauth_user| oauth_user.access_token() == access_token)
+            .find(|oauth_user| {
+                oauth_user.access_token() == &AccessToken::Authorized(access_token.to_string())
+            })
             .cloned())
     }
 

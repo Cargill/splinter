@@ -20,7 +20,7 @@ use crate::auth::{
     oauth::{rest_api::SaveUserInfoOperation, UserInfo},
     rest_api::identity::{Authorization, BearerToken, GetByAuthorization},
 };
-use crate::biome::oauth::store::{OAuthProvider, OAuthUserBuilder, OAuthUserStore};
+use crate::biome::oauth::store::{AccessToken, OAuthProvider, OAuthUserBuilder, OAuthUserStore};
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
 
@@ -95,7 +95,9 @@ impl SaveUserInfoOperation for OAuthUserStoreSaveUserInfoOperation {
         if let Some(oauth_user) = existing_oauth_user {
             let updated_user = oauth_user
                 .into_update_builder()
-                .with_access_token(user_info.access_token().into())
+                .with_access_token(AccessToken::Authorized(
+                    user_info.access_token().to_string(),
+                ))
                 .with_refresh_token(user_info.refresh_token().map(String::from))
                 .build()
                 .map_err(|e| {
@@ -119,7 +121,9 @@ impl SaveUserInfoOperation for OAuthUserStoreSaveUserInfoOperation {
             let oauth_user = OAuthUserBuilder::new()
                 .with_user_id(user_id)
                 .with_provider_user_ref(provider_identity)
-                .with_access_token(user_info.access_token().into())
+                .with_access_token(AccessToken::Authorized(
+                    user_info.access_token().to_string(),
+                ))
                 .with_refresh_token(user_info.refresh_token().map(String::from))
                 .with_provider(self.provider.clone())
                 .build()
