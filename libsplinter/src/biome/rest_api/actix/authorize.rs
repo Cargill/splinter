@@ -105,13 +105,10 @@ pub(crate) fn get_authorized_user(
 ) -> Result<User, ErrorHttpResponse> {
     match request.extensions().get::<User>().cloned() {
         Some(user) => Ok(user),
-        None => {
-            error!("Biome routes have not been wrapped in an authorization middleware");
-            Err(Box::new(
-                HttpResponse::InternalServerError()
-                    .json(ErrorResponse::internal_error())
-                    .into_future(),
-            ))
-        }
+        None => Err(Box::new(
+            HttpResponse::Unauthorized()
+                .json(ErrorResponse::unauthorized())
+                .into_future(),
+        )),
     }
 }
