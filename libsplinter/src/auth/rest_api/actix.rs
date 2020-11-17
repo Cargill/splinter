@@ -206,8 +206,12 @@ where
             AuthorizationResult::NoAuthorizationNecessary => {}
             AuthorizationResult::Unauthorized => {
                 return Box::new(
-                    req.into_response(HttpResponse::Unauthorized().finish().into_body())
-                        .into_future(),
+                    req.into_response(
+                        HttpResponse::Unauthorized()
+                            .json(ErrorResponse::unauthorized())
+                            .into_body(),
+                    )
+                    .into_future(),
                 )
             }
         }
