@@ -41,7 +41,7 @@
 #[cfg(feature = "rest-api-actix")]
 mod actix;
 #[cfg(feature = "auth")]
-pub mod auth;
+pub(crate) mod auth;
 mod config;
 mod error;
 mod resources;

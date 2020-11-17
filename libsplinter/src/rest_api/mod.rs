@@ -93,7 +93,8 @@ use crate::auth::rest_api::{
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::{
-    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveUserInfoOperation,
+    oauth::store::OAuthProvider,
+    rest_api::auth::{GetUserByOAuthAuthorization, OAuthUserStoreSaveUserInfoOperation},
     OAuthUserStore, UserStore,
 };
 #[cfg(feature = "auth")]
@@ -828,6 +829,10 @@ impl RestApiBuilder {
                     } => {
                         identity_providers
                             .push(Box::new(biome_resource_manager.get_identity_provider()));
+                        self.authorization_mappings
+                            .push(ConfigureAuthorizationMapping::new(
+                                biome_resource_manager.get_authorization_mapping(),
+                            ));
                         self.resources
                             .append(&mut biome_resource_manager.resources());
                     }
@@ -885,6 +890,14 @@ impl RestApiBuilder {
                                         #[cfg(feature = "oauth-github")]
                                         OAuthConfig::GitHub { .. } => OAuthProvider::Github,
                                     };
+                                    // Add the configuration mapping for the User value.
+                                    self.authorization_mappings.push(
+                                        ConfigureAuthorizationMapping::new(
+                                            GetUserByOAuthAuthorization::new(
+                                                oauth_user_store.clone(),
+                                            ),
+                                        ),
+                                    );
                                     Box::new(OAuthUserStoreSaveUserInfoOperation::new(
                                         oauth_provider,
                                         user_store,
