@@ -95,7 +95,6 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "admin-service-store",
     "admin-service-store-postgres",
     "auth",
     "biome-notifications",
@@ -115,8 +114,7 @@ experimental = [
 benchmark = []
 
 auth = []
-admin-service-store = []
-admin-service-store-postgres = ["admin-service-store", "postgres"]
+admin-service-store-postgres = ["postgres"]
 biome = []
 biome-credentials = ["biome", "bcrypt"]
 biome-key-management = ["biome"]

@@ -17,5 +17,4 @@ pub mod messages;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod service;
-#[cfg(feature = "admin-service-store")]
 pub mod store;
