@@ -21,11 +21,14 @@ use splinter::registry::Node;
 
 use crate::error::CliError;
 
-use super::api::SplinterRestClient;
+use super::api::SplinterRestClientBuilder;
 use super::{
     msg_from_io_error, read_private_key, Action, DEFAULT_SPLINTER_REST_API_URL,
     SPLINTER_REST_API_URL_ENV,
 };
+
+#[cfg(feature = "splinter-cli-jwt")]
+use super::create_cylinder_jwt_auth;
 
 const DEFAULT_OUTPUT_FILE: &str = "./nodes.yaml";
 
@@ -60,7 +63,19 @@ impl Action for RegistryGenerateAction {
             .map(ToOwned::to_owned)
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let node_status = SplinterRestClient::new(&url).get_node_status()?;
+
+        let mut builder = SplinterRestClientBuilder::new();
+        builder = builder.with_url(url);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+            builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
+        }
+
+        let client = builder.build()?;
+
+        let node_status = client.get_node_status()?;
 
         let keys = args
             .values_of("key_files")

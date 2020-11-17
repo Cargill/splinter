@@ -68,11 +68,14 @@ experimental = [
     "circuit-auth-type",
     "health",
     "sqlite",
+    "splinter-cli-jwt",
 ]
 
 circuit-auth-type = []
 circuit-template = ["splinter/circuit-template"]
 database-migrate-biome = ["splinter/biome"]
+
+splinter-cli-jwt = ["cylinder/jwt", "cylinder/key-load"]
 
 health = []
 

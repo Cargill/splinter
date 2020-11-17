@@ -25,14 +25,24 @@ use crate::error::CliError;
 
 const PAGING_LIMIT: &str = "1000";
 
-impl<'a> SplinterRestClient<'a> {
+impl SplinterRestClient {
     /// Submits an admin payload to this client's Splinter node.
     pub fn submit_admin_payload(&self, payload: Vec<u8>) -> Result<(), CliError> {
-        Client::new()
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new()
             .post(&format!("{}/admin/submit", self.url))
             .header(header::CONTENT_TYPE, "octet-stream")
             .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
-            .body(payload)
+            .body(payload);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
+        request
             .send()
             .map_err(|err| {
                 CliError::ActionError(format!("Failed to submit admin payload: {}", err))
@@ -62,14 +72,23 @@ impl<'a> SplinterRestClient<'a> {
     }
 
     pub fn list_circuits(&self, filter: Option<&str>) -> Result<CircuitListSlice, CliError> {
-        let mut request = format!("{}/admin/circuits?limit={}", self.url, PAGING_LIMIT);
+        let mut url = format!("{}/admin/circuits?limit={}", self.url, PAGING_LIMIT);
         if let Some(filter) = filter {
-            request = format!("{}&filter={}", &request, &filter);
+            url = format!("{}&filter={}", &url, &filter);
+        }
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new()
+            .get(&url)
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
         }
 
-        Client::new()
-            .get(&request)
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+        request
             .send()
             .map_err(|err| CliError::ActionError(format!("Failed to list circuits: {}", err)))
             .and_then(|res| {
@@ -101,9 +120,19 @@ impl<'a> SplinterRestClient<'a> {
     }
 
     pub fn fetch_circuit(&self, circuit_id: &str) -> Result<Option<CircuitSlice>, CliError> {
-        Client::new()
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new()
             .get(&format!("{}/admin/circuits/{}", self.url, circuit_id))
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
+        request
             .send()
             .map_err(|err| CliError::ActionError(format!("Failed to fetch circuit: {}", err)))
             .and_then(|res| {
@@ -149,14 +178,23 @@ impl<'a> SplinterRestClient<'a> {
             filters.push(format!("member={}", member));
         }
 
-        let mut request = format!("{}/admin/proposals?limit={}", self.url, PAGING_LIMIT);
+        let mut url = format!("{}/admin/proposals?limit={}", self.url, PAGING_LIMIT);
         if !filters.is_empty() {
-            request.push_str(&format!("&{}", filters.join("&")));
+            url.push_str(&format!("&{}", filters.join("&")));
+        }
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new()
+            .get(&url)
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
         }
 
-        Client::new()
-            .get(&request)
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+        request
             .send()
             .map_err(|err| CliError::ActionError(format!("Failed to list proposals: {}", err)))
             .and_then(|res| {
@@ -188,9 +226,19 @@ impl<'a> SplinterRestClient<'a> {
     }
 
     pub fn fetch_proposal(&self, circuit_id: &str) -> Result<Option<ProposalSlice>, CliError> {
-        Client::new()
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new()
             .get(&format!("{}/admin/proposals/{}", self.url, circuit_id))
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
+        request
             .send()
             .map_err(|err| CliError::ActionError(format!("Failed to fetch proposal: {}", err)))
             .and_then(|res| {
