@@ -202,6 +202,8 @@ where
                 .with_durability(&DurabilityType::try_from(proposed_circuit.durability)?)
                 .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
                 .with_circuit_management_type(&proposed_circuit.circuit_management_type)
+                .with_application_metadata(&proposed_circuit.application_metadata)
+                .with_comments(&proposed_circuit.comments)
                 .build()
                 .map_err(AdminServiceStoreError::InvalidStateError)?;
 

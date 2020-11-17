@@ -876,6 +876,8 @@ pub mod tests {
                             .build().expect("Unable to build node"),
                         ]
                     )
+                    .with_application_metadata(b"test")
+                    .with_comments("This is a test")
                     .with_circuit_management_type("gameroom")
                     .build().expect("Unable to build circuit")
             )
