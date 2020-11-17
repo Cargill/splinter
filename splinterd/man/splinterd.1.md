@@ -310,9 +310,10 @@ is set to `/tmp/testing` and `SPLINTER_STATE_DIR` is set to
 AUTHORIZATION CONFIGURATION
 ===========================
 
-Currently, splinterd supports two authorization types: Biome credentials and
-OAuth. The REST API requires that one of these authorization providers is
-configured.
+Currently, splinterd supports three authorization types: Biome credentials,
+Cylinder JWT, and OAuth.
+
+Cylinder JWT authorization is enabled by default.
 
 Biome credentials for the splinter REST API can be enabled using the
 `--enable-biome` flag.

@@ -64,10 +64,14 @@ use actix_web::{
     error::ErrorBadRequest, http::header, middleware, web, App, Error as ActixError, HttpRequest,
     HttpResponse, HttpServer,
 };
+#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+use cylinder::Verifier;
 use futures::{future::FutureResult, stream::Stream, Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
 use protobuf::{self, Message};
 use std::boxed::Box;
+#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
@@ -76,6 +80,8 @@ use crate::auth::oauth::{
     rest_api::{OAuthResourceProvider, SaveUserInfoOperation, SaveUserInfoToNull},
     OAuthClient,
 };
+#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+use crate::auth::rest_api::identity::cylinder::CylinderKeyIdentityProvider;
 #[cfg(feature = "oauth-github")]
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
@@ -817,6 +823,12 @@ impl RestApiBuilder {
                         self.resources
                             .append(&mut biome_resource_manager.resources());
                     }
+                    #[cfg(feature = "cylinder-jwt")]
+                    AuthConfig::Cylinder { verifier } => {
+                        identity_providers.push(Box::new(CylinderKeyIdentityProvider::new(
+                            Arc::new(Mutex::new(verifier)),
+                        )));
+                    }
                     #[cfg(feature = "oauth")]
                     AuthConfig::OAuth {
                         oauth_config,
@@ -932,7 +944,14 @@ pub enum AuthConfig {
     /// Biome credentials authentication
     #[cfg(feature = "biome-credentials")]
     Biome {
+        /// The resource provider that defines all Biome-related endpoints for the Splinter REST API
         biome_resource_manager: BiomeRestResourceManager,
+    },
+    /// Cylinder JWT authentication
+    #[cfg(feature = "cylinder-jwt")]
+    Cylinder {
+        /// The signature verifier used to validate Cylinder JWTs
+        verifier: Box<dyn Verifier>,
     },
     /// OAuth authentication
     #[cfg(feature = "oauth")]
