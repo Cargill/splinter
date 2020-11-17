@@ -86,7 +86,6 @@ pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod service;
-pub mod signing;
 pub mod storage;
 #[cfg(feature = "store-factory")]
 pub mod store;

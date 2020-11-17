@@ -17,12 +17,10 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::time::Duration;
 
+use cylinder::VerifierFactory;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::{ServiceArgValidationError, ServiceArgValidator};
-use splinter::{
-    service::{FactoryCreateError, Service, ServiceFactory},
-    signing::SignatureVerifierFactory,
-};
+use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 
 #[cfg(feature = "service-arg-validation")]
 use crate::hex::parse_hex;
@@ -40,7 +38,7 @@ pub struct ScabbardFactory {
     state_db_size: usize,
     receipt_db_dir: String,
     receipt_db_size: usize,
-    signature_verifier_factory: Box<dyn SignatureVerifierFactory>,
+    signature_verifier_factory: Box<dyn VerifierFactory>,
 }
 
 impl ScabbardFactory {
@@ -49,7 +47,7 @@ impl ScabbardFactory {
         state_db_size: Option<usize>,
         receipt_db_dir: Option<String>,
         receipt_db_size: Option<usize>,
-        signature_verifier_factory: Box<dyn SignatureVerifierFactory>,
+        signature_verifier_factory: Box<dyn VerifierFactory>,
     ) -> Self {
         ScabbardFactory {
             service_types: vec![SERVICE_TYPE.into()],
@@ -169,7 +167,7 @@ impl ServiceFactory for ScabbardFactory {
             self.state_db_size,
             &receipt_db_dir,
             self.receipt_db_size,
-            self.signature_verifier_factory.create_verifier(),
+            self.signature_verifier_factory.new_verifier(),
             admin_keys,
             coordinator_timeout,
         )
@@ -221,7 +219,7 @@ impl ServiceFactory for ScabbardFactory {
 mod tests {
     use super::*;
 
-    use splinter::signing::hash::HashVerifier;
+    use cylinder::secp256k1::Secp256k1Context;
 
     /// Verify that the scabbard factory produces a valid `Scabbard` instance.
     #[test]
@@ -292,7 +290,7 @@ mod tests {
             Some(1024 * 1024),
             Some("/tmp".into()),
             Some(1024 * 1024),
-            Box::new(HashVerifier),
+            Box::new(Secp256k1Context::new()),
         )
     }
 

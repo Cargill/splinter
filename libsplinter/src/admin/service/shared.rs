@@ -16,11 +16,12 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 use std::path::Path;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
+use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
-use std::sync::mpsc::Sender;
 
 use crate::circuit::SplinterState;
 use crate::circuit::{
@@ -50,7 +51,6 @@ use crate::service::error::ServiceError;
 use crate::service::validation::ServiceArgValidator;
 
 use crate::service::ServiceNetworkSender;
-use crate::signing::SignatureVerifier;
 use crate::storage::sets::mem::DurableBTreeSet;
 
 use super::error::{AdminSharedError, MarshallingError};
@@ -196,7 +196,7 @@ pub struct AdminServiceShared {
     // copy of splinter state
     splinter_state: SplinterState,
     // signature verifier
-    signature_verifier: Box<dyn SignatureVerifier + Send>,
+    signature_verifier: Box<dyn SignatureVerifier>,
     key_verifier: Box<dyn AdminKeyVerifier>,
     key_permission_manager: Box<dyn KeyPermissionManager>,
     proposal_sender: Option<Sender<ProposalUpdate>>,
@@ -215,7 +215,7 @@ impl AdminServiceShared {
         >,
         peer_connector: PeerManagerConnector,
         splinter_state: SplinterState,
-        signature_verifier: Box<dyn SignatureVerifier + Send>,
+        signature_verifier: Box<dyn SignatureVerifier>,
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         storage_type: &str,
@@ -1911,11 +1911,15 @@ impl AdminServiceShared {
         let header =
             protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.get_header())?;
 
-        let signature = payload.get_signature();
-        let public_key = header.get_requester();
+        let signature = payload.get_signature().to_vec();
+        let public_key = header.get_requester().to_vec();
 
         self.signature_verifier
-            .verify(&payload.get_header(), &signature, &public_key)
+            .verify(
+                &payload.get_header(),
+                &Signature::new(signature),
+                &PublicKey::new(public_key),
+            )
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
     }
 }
@@ -1926,6 +1930,7 @@ mod tests {
 
     use std::sync::{Arc, Mutex};
 
+    use cylinder::{secp256k1::Secp256k1Context, Context};
     use protobuf::{Message, RepeatedField};
 
     use crate::admin::service::AdminKeyVerifierError;
@@ -1946,10 +1951,6 @@ mod tests {
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::protos::prelude::*;
     use crate::service::{ServiceMessageContext, ServiceSendError};
-    use crate::signing::{
-        hash::{HashSigner, HashVerifier},
-        Signer,
-    };
     use crate::storage::get_storage;
     use crate::transport::{
         inproc::InprocTransport, ConnectError, Connection, DisconnectError, RecvError, SendError,
@@ -1987,6 +1988,9 @@ mod tests {
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
         let state = setup_splinter_state();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -1994,7 +1998,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2110,6 +2114,9 @@ mod tests {
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
         let state = setup_splinter_state();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let mut shared = AdminServiceShared::new(
             "test-node".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2117,7 +2124,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2200,6 +2207,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2207,7 +2216,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2231,6 +2240,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2238,7 +2249,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2261,6 +2272,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2268,7 +2281,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2297,6 +2310,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2304,7 +2319,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2333,6 +2348,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2340,7 +2357,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2372,6 +2389,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2379,7 +2398,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2408,6 +2427,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2415,7 +2436,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2444,6 +2465,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2451,7 +2474,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2485,6 +2508,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2492,7 +2517,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2515,6 +2540,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2522,7 +2549,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2547,6 +2574,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2554,7 +2583,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2583,6 +2612,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2590,7 +2621,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2626,6 +2657,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2633,7 +2666,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2669,6 +2702,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2676,7 +2711,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2700,6 +2735,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2707,7 +2744,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2731,6 +2768,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2738,7 +2777,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2770,6 +2809,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2777,7 +2818,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2809,6 +2850,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2816,7 +2859,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2848,6 +2891,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2855,7 +2900,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2879,6 +2924,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2886,7 +2933,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2910,6 +2957,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2917,7 +2966,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2941,6 +2990,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2948,7 +2999,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -2972,6 +3023,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2979,7 +3032,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3003,6 +3056,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3010,7 +3065,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3035,6 +3090,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3042,7 +3099,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3066,6 +3123,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3073,7 +3132,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3097,6 +3156,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3104,7 +3165,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3136,6 +3197,8 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3143,7 +3206,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3170,6 +3233,11 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3177,7 +3245,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3204,7 +3272,7 @@ mod tests {
             panic!("Should have been invalid due to empty signature");
         }
 
-        payload.set_signature(HashSigner.sign(&payload.header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
         // Asserting the payload passed through validation.
         if let Err(_) = shared.validate_circuit_management_payload(&payload, &header) {
             panic!("Should have been valid");
@@ -3220,6 +3288,11 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3227,7 +3300,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3245,7 +3318,7 @@ mod tests {
         header.set_requester(PUB_KEY.into());
         header.set_requester_node_id("node_b".to_string());
         let mut payload = admin::CircuitManagementPayload::new();
-        payload.set_signature(HashSigner.sign(&payload.header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
         payload.set_circuit_create_request(request);
 
         // Asserting the payload will be deemed invalid as the header is empty.
@@ -3271,6 +3344,11 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3278,7 +3356,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3295,7 +3373,7 @@ mod tests {
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
         header.set_requester_node_id("node_b".to_string());
         let mut payload = admin::CircuitManagementPayload::new();
-        payload.set_signature(HashSigner.sign(&payload.header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
         payload.set_circuit_create_request(request);
 
         payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
@@ -3324,6 +3402,11 @@ mod tests {
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
         let shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -3331,7 +3414,7 @@ mod tests {
             HashMap::new(),
             peer_connector,
             state,
-            Box::new(HashVerifier),
+            signature_verifier,
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             "memory",
@@ -3348,7 +3431,7 @@ mod tests {
         header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST);
         header.set_requester(PUB_KEY.into());
         let mut payload = admin::CircuitManagementPayload::new();
-        payload.set_signature(HashSigner.sign(&payload.header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
         payload.set_circuit_create_request(request);
 
         payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());

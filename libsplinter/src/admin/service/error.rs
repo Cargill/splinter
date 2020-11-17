@@ -19,7 +19,6 @@ use crate::circuit;
 use crate::consensus::error::ProposalManagerError;
 use crate::orchestrator::InitializeServiceError;
 use crate::service::error::{ServiceError, ServiceSendError};
-use crate::signing;
 
 use protobuf::error;
 
@@ -169,9 +168,6 @@ pub enum AdminSharedError {
     /// An error occurred while trying to add an admin service event subscriber to the service.
     UnableToAddSubscriber(String),
 
-    /// An error occured while attempting to verify a payload's signature
-    SignerError(signing::error::Error),
-
     // Returned if a circuit cannot be added to splinter state
     CommitError(String),
     UpdateProposalsError(OpenProposalError),
@@ -196,7 +192,6 @@ impl Error for AdminSharedError {
             AdminSharedError::ServiceSendError(err) => Some(err),
             AdminSharedError::UnknownAction(_) => None,
             AdminSharedError::ValidationFailed(_) => None,
-            AdminSharedError::SignerError(_) => None,
             AdminSharedError::CommitError(_) => None,
             AdminSharedError::UpdateProposalsError(err) => Some(err),
             AdminSharedError::UnableToAddSubscriber(_) => None,
@@ -230,7 +225,6 @@ impl fmt::Display for AdminSharedError {
                 write!(f, "received message with unknown action: {}", msg)
             }
             AdminSharedError::ValidationFailed(msg) => write!(f, "validation failed: {}", msg),
-            AdminSharedError::SignerError(ref msg) => write!(f, "Signing error: {}", msg),
             AdminSharedError::CommitError(msg) => write!(f, "unable to commit circuit: {}", msg),
             AdminSharedError::UpdateProposalsError(err) => {
                 write!(f, "received error while update open proposal: {}", err)
@@ -250,12 +244,6 @@ impl fmt::Display for AdminSharedError {
 impl From<ServiceSendError> for AdminSharedError {
     fn from(err: ServiceSendError) -> Self {
         AdminSharedError::ServiceSendError(err)
-    }
-}
-
-impl From<signing::error::Error> for AdminSharedError {
-    fn from(err: signing::error::Error) -> Self {
-        AdminSharedError::SignerError(err)
     }
 }
 
