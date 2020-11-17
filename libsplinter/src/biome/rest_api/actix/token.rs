@@ -68,9 +68,9 @@ pub fn make_token_route(
             Box::new(into_bytes(payload).and_then(move |bytes| {
                 let claims = match authorize_user(&req, &secret_manager, &validation) {
                     AuthorizationResult::Authorized(claims) => claims,
-                    AuthorizationResult::Unauthorized(msg) => {
+                    AuthorizationResult::Unauthorized => {
                         return HttpResponse::Unauthorized()
-                            .json(ErrorResponse::unauthorized(&msg))
+                            .json(ErrorResponse::unauthorized())
                             .into_future();
                     }
                     AuthorizationResult::Failed => {
@@ -121,7 +121,7 @@ pub fn make_token_route(
                     &refresh_token_validation,
                 ) {
                     AuthorizationResult::Authorized(_) => (),
-                    AuthorizationResult::Unauthorized(msg) => {
+                    AuthorizationResult::Unauthorized => {
                         if let Err(err) = refresh_token_store.remove_token(&claims.user_id()) {
                             error!("Failed to delete refresh token {}", err);
                             return HttpResponse::InternalServerError()
@@ -129,7 +129,7 @@ pub fn make_token_route(
                                 .into_future();
                         } else {
                             return HttpResponse::Unauthorized()
-                                .json(ErrorResponse::unauthorized(&msg))
+                                .json(ErrorResponse::unauthorized())
                                 .into_future();
                         }
                     }

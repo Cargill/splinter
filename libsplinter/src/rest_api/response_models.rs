@@ -41,10 +41,10 @@ impl ErrorResponse {
         }
     }
 
-    pub fn unauthorized(message: &str) -> ErrorResponse {
+    pub fn unauthorized() -> ErrorResponse {
         ErrorResponse {
             code: "401".to_string(),
-            message: message.to_string(),
+            message: "Client is not authorized".to_string(),
         }
     }
 

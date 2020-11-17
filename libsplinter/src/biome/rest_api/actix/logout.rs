@@ -57,10 +57,10 @@ pub fn add_logout_route(
         let validation = default_validation(&rest_config.issuer());
         let user_id = match authorize_user(&request, &secret_manager, &validation) {
             AuthorizationResult::Authorized(claims) => claims.user_id(),
-            AuthorizationResult::Unauthorized(msg) => {
+            AuthorizationResult::Unauthorized => {
                 return Box::new(
                     HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
+                        .json(ErrorResponse::unauthorized())
                         .into_future(),
                 )
             }

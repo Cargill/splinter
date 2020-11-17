@@ -111,8 +111,8 @@ pub fn make_verify_route(
                             }
                         }
                     }
-                    AuthorizationResult::Unauthorized(msg) => HttpResponse::Unauthorized()
-                        .json(ErrorResponse::unauthorized(&msg))
+                    AuthorizationResult::Unauthorized => HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
                         .into_future(),
                     AuthorizationResult::Failed => {
                         error!("Failed to authorize user");
