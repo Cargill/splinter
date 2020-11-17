@@ -29,7 +29,7 @@ mod rest_api;
 
 use std::thread;
 
-use cylinder::{jwt::JsonWebTokenBuilder, secp256k1::Secp256k1Context, Context};
+use cylinder::{jwt::JsonWebTokenBuilder, load_user_key, secp256k1::Secp256k1Context, Context};
 use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use gameroom_database::ConnectionPool;
 use log::Record;
@@ -69,6 +69,7 @@ fn run() -> Result<(), GameroomDaemonError> {
         (@arg database_url: --("database-url") +takes_value "Database connection for Gameroom rest API")
         (@arg bind: -b --bind +takes_value "connection endpoint for Gameroom rest API")
         (@arg splinterd_url: --("splinterd-url") +takes_value "connection endpoint to SplinterD rest API")
+        (@arg key: --("key") +takes_value "path to the GameroomD signing key")
     )
     .get_matches();
 
@@ -97,9 +98,10 @@ fn run() -> Result<(), GameroomDaemonError> {
     let connection_pool: ConnectionPool =
         gameroom_database::create_connection_pool(config.database_url())?;
 
-    // Generate a public/private key pair
+    // Get the public/private key pair
     let context = Secp256k1Context::new();
-    let private_key = context.new_random_private_key();
+    let private_key = load_user_key(Some(config.key()), "")
+        .map_err(|err| GameroomDaemonError::SigningError(err.to_string()))?;
     let private_key_hex = private_key.as_hex();
     let public_key_hex = context.get_public_key(&private_key)?.as_hex();
 
