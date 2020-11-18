@@ -14,7 +14,7 @@
 
 //! Provides structures for the REST resources.
 
-#[cfg(any(feature = "biome-key-management", feature = "biome-credentials"))]
+#[cfg(feature = "biome-credentials")]
 pub(in crate::biome::rest_api) mod authorize;
 #[cfg(feature = "biome-credentials")]
 pub(in crate::biome::rest_api) mod credentials;
