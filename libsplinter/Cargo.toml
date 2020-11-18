@@ -59,7 +59,6 @@ serde_yaml = "0.8"
 tokio = { version = "0.1.22", optional = true }
 tungstenite = { version = "0.10", optional = true }
 url = "1.7.1"
-ursa = { version = "0.1", optional = true }
 uuid = { version = "0.7", features = ["v4"]}
 zmq = { version = "0.9", optional = true }
 
@@ -146,12 +145,6 @@ sqlite = ["diesel/sqlite", "diesel_migrations"]
 store-factory = []
 ws-transport = ["tungstenite"]
 zmq-transport = ["zmq"]
-
-# The following features are broken and should not be used.
-
-# The `ursa` dependency is currently broken, and will need to be fixed before
-# the `ursa-compat` feature can be added back to `experimental`.
-ursa-compat = ["ursa"]
 
 [package.metadata.docs.rs]
 features = [
