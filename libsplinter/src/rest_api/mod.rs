@@ -87,13 +87,14 @@ use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::auth::rest_api::{
     actix::Authorization,
-    identity::{GetByAuthorization, IdentityProvider},
+    identity::{AuthorizationMapping, IdentityProvider},
 };
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::{
-    oauth::store::OAuthProvider, rest_api::auth::OAuthUserStoreSaveUserInfoOperation,
+    oauth::store::OAuthProvider,
+    rest_api::auth::{GetUserByOAuthAuthorization, OAuthUserStoreSaveUserInfoOperation},
     OAuthUserStore, UserStore,
 };
 #[cfg(feature = "auth")]
@@ -492,16 +493,15 @@ struct ConfigureAuthorizationMapping {
 
 #[cfg(feature = "auth")]
 impl ConfigureAuthorizationMapping {
-    fn new<G, T>(get_by_auth: G) -> Self
+    fn new<M, T>(auth_mapping: M) -> Self
     where
         T: 'static,
-        G: GetByAuthorization<T> + Send + Sync + 'static,
+        M: AuthorizationMapping<T> + Send + Sync + 'static,
     {
-        let mut auth_mapping = Some(get_by_auth);
+        let mut auth_mapping = Some(auth_mapping);
         Self {
             config_fn: Box::new(move |authorization| {
                 if let Some(auth_mapping) = auth_mapping.take() {
-                    debug!("Configuring auth mapping {}", std::any::type_name::<G>());
                     authorization.with_authorization_mapping(auth_mapping)
                 } else {
                     authorization
@@ -549,6 +549,12 @@ impl RestApi {
             }
         }
 
+        #[cfg(feature = "rest-api-cors")]
+        let cors = match &whitelist {
+            Some(list) => cors::Cors::new(list.to_vec()),
+            None => cors::Cors::new_allow_any(),
+        };
+
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -557,10 +563,8 @@ impl RestApi {
                     let app = App::new();
 
                     #[cfg(feature = "rest-api-cors")]
-                    let app = app.wrap(match &whitelist {
-                        Some(list) => cors::Cors::new(list.to_vec()),
-                        None => cors::Cors::new_allow_any(),
-                    });
+                    let app = app.wrap(cors.clone());
+
                     #[cfg(feature = "auth")]
                     let app = app.wrap(authorization.clone());
 
@@ -640,6 +644,13 @@ impl RestApi {
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist.to_owned();
+
+        #[cfg(feature = "rest-api-cors")]
+        let cors = match &whitelist {
+            Some(list) => cors::Cors::new(list.to_vec()),
+            None => cors::Cors::new_allow_any(),
+        };
+
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
@@ -648,10 +659,7 @@ impl RestApi {
                     let app = App::new();
 
                     #[cfg(feature = "rest-api-cors")]
-                    let app = app.wrap(match &whitelist {
-                        Some(list) => cors::Cors::new(list.to_vec()),
-                        None => cors::Cors::new_allow_any(),
-                    });
+                    let app = app.wrap(cors.clone());
 
                     let mut app = app.wrap(middleware::Logger::default());
 
@@ -779,12 +787,11 @@ impl RestApiBuilder {
     }
 
     #[cfg(feature = "auth")]
-    pub fn with_authorization_mapping<G, T>(mut self, authorization_mapping: G) -> Self
+    pub fn with_authorization_mapping<M, T>(mut self, authorization_mapping: M) -> Self
     where
         T: 'static,
-        G: GetByAuthorization<T> + Send + Sync + 'static,
+        M: AuthorizationMapping<T> + Send + Sync + 'static,
     {
-        debug!("Adding auth mapping {}", std::any::type_name::<G>());
         self.authorization_mappings
             .push(ConfigureAuthorizationMapping::new(authorization_mapping));
 
@@ -820,6 +827,10 @@ impl RestApiBuilder {
                     } => {
                         identity_providers
                             .push(Box::new(biome_resource_manager.get_identity_provider()));
+                        self.authorization_mappings
+                            .push(ConfigureAuthorizationMapping::new(
+                                biome_resource_manager.get_authorization_mapping(),
+                            ));
                         self.resources
                             .append(&mut biome_resource_manager.resources());
                     }
@@ -877,6 +888,14 @@ impl RestApiBuilder {
                                         #[cfg(feature = "oauth-github")]
                                         OAuthConfig::GitHub { .. } => OAuthProvider::Github,
                                     };
+                                    // Add the configuration mapping for the User value.
+                                    self.authorization_mappings.push(
+                                        ConfigureAuthorizationMapping::new(
+                                            GetUserByOAuthAuthorization::new(
+                                                oauth_user_store.clone(),
+                                            ),
+                                        ),
+                                    );
                                     Box::new(OAuthUserStoreSaveUserInfoOperation::new(
                                         oauth_provider,
                                         user_store,

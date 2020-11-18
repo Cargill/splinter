@@ -53,7 +53,7 @@ impl Clone for Box<dyn IdentityProvider> {
 }
 
 /// A trait that fetches a value based on an Authorization.
-pub trait GetByAuthorization<T> {
+pub trait AuthorizationMapping<T> {
     /// Return a value based on the given authorization value.
     fn get(&self, authorization: &Authorization) -> Result<Option<T>, InternalError>;
 }

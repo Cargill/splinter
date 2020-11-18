@@ -16,19 +16,24 @@ use std::sync::Arc;
 
 use jsonwebtoken::decode;
 
-use crate::auth::rest_api::identity::{Authorization, BearerToken, GetByAuthorization};
+use crate::auth::rest_api::identity::{Authorization, AuthorizationMapping, BearerToken};
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::User;
 use crate::error::InternalError;
 use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::sessions::{default_validation, Claims};
 
+/// An `AuthorizationMapping` implementation that returns an `User`.
+///
+/// This mapping gets a User based on a Biome authorization token.
 pub struct GetUserByBiomeAuthorization {
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 }
 
 impl GetUserByBiomeAuthorization {
+    /// Constructs a new `GetUserByBiomeAuthorization` with the REST configuation and a secret
+    /// manager.
     pub fn new(rest_config: Arc<BiomeRestConfig>, secret_manager: Arc<dyn SecretManager>) -> Self {
         Self {
             rest_config,
@@ -37,7 +42,7 @@ impl GetUserByBiomeAuthorization {
     }
 }
 
-impl GetByAuthorization<User> for GetUserByBiomeAuthorization {
+impl AuthorizationMapping<User> for GetUserByBiomeAuthorization {
     fn get(&self, authorization: &Authorization) -> Result<Option<User>, InternalError> {
         match authorization {
             Authorization::Bearer(BearerToken::Biome(token)) => {

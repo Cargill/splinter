@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use diesel::{
-    dsl::insert_into, prelude::*, result::DatabaseErrorKind, result::Error as DieselError,
-};
-
-use crate::error::InternalError;
+use diesel::{dsl::insert_into, prelude::*};
 
 use crate::biome::oauth::store::{
     diesel::{models::NewOAuthUserModel, schema::oauth_user, OAuthUser},
@@ -40,17 +36,7 @@ impl<'a> OAuthUserStoreAddOAuthUserOperation
             .values(new_oauth_user)
             .execute(self.conn)
             .map(|_| ())
-            .map_err(|err| match err {
-                DieselError::DatabaseError(ref kind, _) => match kind {
-                    DatabaseErrorKind::UniqueViolation | DatabaseErrorKind::ForeignKeyViolation => {
-                        OAuthUserStoreError::ConstraintViolation(Box::new(err))
-                    }
-                    _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(
-                        err,
-                    ))),
-                },
-                _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err))),
-            })
+            .map_err(OAuthUserStoreError::from)
     }
 }
 
@@ -65,16 +51,6 @@ impl<'a> OAuthUserStoreAddOAuthUserOperation
             .values(new_oauth_user)
             .execute(self.conn)
             .map(|_| ())
-            .map_err(|err| match err {
-                DieselError::DatabaseError(ref kind, _) => match kind {
-                    DatabaseErrorKind::UniqueViolation | DatabaseErrorKind::ForeignKeyViolation => {
-                        OAuthUserStoreError::ConstraintViolation(Box::new(err))
-                    }
-                    _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(
-                        err,
-                    ))),
-                },
-                _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err))),
-            })
+            .map_err(OAuthUserStoreError::from)
     }
 }

@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use diesel::{dsl::update, prelude::*, result::DatabaseErrorKind, result::Error as DieselError};
-
-use crate::error::InternalError;
+use diesel::{dsl::update, prelude::*};
 
 use crate::biome::oauth::store::{diesel::schema::oauth_user, OAuthUser, OAuthUserStoreError};
 
@@ -36,16 +34,6 @@ where
             ))
             .execute(self.conn)
             .map(|_| ())
-            .map_err(|err| match err {
-                DieselError::DatabaseError(ref kind, _) => match kind {
-                    DatabaseErrorKind::UniqueViolation | DatabaseErrorKind::ForeignKeyViolation => {
-                        OAuthUserStoreError::ConstraintViolation(Box::new(err))
-                    }
-                    _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(
-                        err,
-                    ))),
-                },
-                _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err))),
-            })
+            .map_err(OAuthUserStoreError::from)
     }
 }

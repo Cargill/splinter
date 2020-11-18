@@ -18,13 +18,13 @@ use uuid::Uuid;
 
 use crate::auth::{
     oauth::{rest_api::SaveUserInfoOperation, UserInfo},
-    rest_api::identity::{Authorization, BearerToken, GetByAuthorization},
+    rest_api::identity::{Authorization, AuthorizationMapping, BearerToken},
 };
 use crate::biome::oauth::store::{OAuthProvider, OAuthUserBuilder, OAuthUserStore};
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
 
-/// A `GetByAuthorization` implementation that returns an `User`.
+/// An `AuthorizationMapping` implementation that returns an `User`.
 pub struct GetUserByOAuthAuthorization {
     oauth_user_store: Box<dyn OAuthUserStore>,
 }
@@ -36,7 +36,7 @@ impl GetUserByOAuthAuthorization {
     }
 }
 
-impl GetByAuthorization<User> for GetUserByOAuthAuthorization {
+impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
     fn get(&self, authorization: &Authorization) -> Result<Option<User>, InternalError> {
         match authorization {
             Authorization::Bearer(BearerToken::OAuth2(access_token)) => {

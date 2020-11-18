@@ -17,15 +17,13 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::error::InternalError;
-
-type ConstraintViolation = Box<dyn Error>;
+use crate::error::{ConstraintViolationError, InternalError};
 
 /// Errors that may occur during OAuthUserStore operations.
 #[derive(Debug)]
 pub enum OAuthUserStoreError {
     InternalError(InternalError),
-    ConstraintViolation(ConstraintViolation),
+    ConstraintViolation(ConstraintViolationError),
 }
 
 impl Error for OAuthUserStoreError {
