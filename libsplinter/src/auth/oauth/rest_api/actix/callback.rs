@@ -65,16 +65,8 @@ pub fn make_callback_route(
                                     "Received OAuth callback request that does not correlate to an \
                                      open authorization request"
                                 );
-                                match req.headers().get("referer") {
-                                    Some(referer) => HttpResponse::Found()
-                                        .header(LOCATION, referer.clone())
-                                        .finish(),
-                                    None => {
-                                        HttpResponse::BadRequest().json(ErrorResponse::bad_request(
-                                            "No `redirect_url` supplied, no `referer` found",
-                                        ))
-                                    }
-                                }
+                                HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
                             }
                             Err(err) => {
                                 error!("{}", err);
