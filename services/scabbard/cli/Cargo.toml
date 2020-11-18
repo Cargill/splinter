@@ -36,7 +36,7 @@ flexi_logger = "0.14"
 log = "0.4"
 sabre-sdk = "0.6"
 transact = { version = "0.3", features = ["contract-archive"] }
-scabbard = { path = "../libscabbard", features = ["client"] }
+scabbard = { path = "../libscabbard", features = ["client", "client-auth"] }
 
 [dev-dependencies]
 serial_test = "0.3"
@@ -52,8 +52,10 @@ experimental = [
   "stable",
   # The following features are experimental:
   "smart-permissions",
+  "scabbard-cli-jwt"
 ]
 
+scabbard-cli-jwt = ["cylinder/jwt", "cylinder/key-load", "scabbard/client-auth"]
 smart-permissions = []
 
 [package.metadata.deb]

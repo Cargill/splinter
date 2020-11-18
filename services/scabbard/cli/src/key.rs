@@ -16,6 +16,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
+#[cfg(feature = "scabbard-cli-jwt")]
+use cylinder::{jwt::JsonWebTokenBuilder, load_user_key};
 use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey, Signer};
 
 use super::error::CliError;
@@ -83,6 +85,43 @@ fn determine_key_file_path(key: &str) -> Result<PathBuf, CliError> {
             }
         }
     }
+}
+
+/// Gets the private key from the private key file. Creates a json web token signed using
+/// the private key. Creates a string containing the jwt that will be sent to the
+/// REST API in an authorization header.
+///
+/// # Arguments
+///
+/// * `key_name` - name or path of the private key file
+#[cfg(feature = "scabbard-cli-jwt")]
+pub fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
+    let default_key_path = dirs::home_dir()
+        .map(|mut p| {
+            p.push(".splinter/keys");
+            p
+        })
+        .ok_or_else(|| CliError::action_error("Home directory not found"))?;
+    let default_path_string = {
+        if let Some(path) = default_key_path.to_str() {
+            path
+        } else {
+            return Err(CliError::action_error("Path is not valid unicode"));
+        }
+    };
+
+    let private_key = load_user_key(key_name, default_path_string).map_err(|err| {
+        CliError::action_error_with_source("unable to get private key from file", err.into())
+    })?;
+
+    let context = Secp256k1Context::new();
+    let signer = context.new_signer(private_key);
+
+    let encoded_token = JsonWebTokenBuilder::new().build(&*signer).map_err(|err| {
+        CliError::action_error_with_source("failed to build json web token", err.into())
+    })?;
+
+    Ok(format!("Bearer Cylinder:{}", encoded_token))
 }
 
 #[cfg(test)]
