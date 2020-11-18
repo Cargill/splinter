@@ -23,16 +23,21 @@ use crate::rest_api::{Resource, RestResourceProvider};
 
 use super::{OAuthClient, UserInfo};
 
-/// Perform a save operation on a set of UserInfo.
+/// Saves a set of user info.
 pub trait SaveUserInfoOperation: Sync + Send {
-    /// Execute a save operation on the given UserInfo.
-    ///
-    /// # Errors
-    ///
-    /// Returns an InternalError, if the implementation produces an error during the save
-    /// operation.
+    /// Executes a save operation on the given user info.
     fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError>;
 
+    /// Clone implementation for `SaveUserInfoOperation`. The implementation of the `Clone` trait
+    /// for`Box<dyn SaveUserInfoOperation>` calls this method.
+    ///
+    /// # Example
+    ///
+    ///```ignore
+    ///  fn clone_box(&self) -> Box<dyn SaveUserInfoOperation> {
+    ///     Box::new(self.clone())
+    ///  }
+    ///```
     fn clone_box(&self) -> Box<dyn SaveUserInfoOperation>;
 }
 
@@ -42,7 +47,7 @@ impl Clone for Box<dyn SaveUserInfoOperation> {
     }
 }
 
-/// A No-Op SaveUserInfoOperation.
+/// A no-op implementation of `SaveUserInfoOperation`.
 pub struct SaveUserInfoToNull;
 
 impl SaveUserInfoOperation for SaveUserInfoToNull {
