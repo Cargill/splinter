@@ -502,7 +502,6 @@ impl ConfigureAuthorizationMapping {
         Self {
             config_fn: Box::new(move |authorization| {
                 if let Some(auth_mapping) = auth_mapping.take() {
-                    debug!("Configuring auth mapping {}", std::any::type_name::<G>());
                     authorization.with_authorization_mapping(auth_mapping)
                 } else {
                     authorization
@@ -793,7 +792,6 @@ impl RestApiBuilder {
         T: 'static,
         M: AuthorizationMapping<T> + Send + Sync + 'static,
     {
-        debug!("Adding auth mapping {}", std::any::type_name::<G>());
         self.authorization_mappings
             .push(ConfigureAuthorizationMapping::new(authorization_mapping));
 
