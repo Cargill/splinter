@@ -62,8 +62,8 @@ pub fn make_callback_route(
                             }
                             Ok(None) => {
                                 error!(
-                                "Received OAuth callback request that does not correlate to an \
-                                 open authorization request"
+                                    "Received OAuth callback request that does not correlate to an \
+                                     open authorization request"
                                 );
                                 match req.headers().get("referer") {
                                     Some(referer) => HttpResponse::Found()
