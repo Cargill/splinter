@@ -38,12 +38,12 @@ pub(crate) fn authorize_user(
             Some(token) => token.to_string(),
             None => {
                 debug!("Invalid token; should be in the format 'Biome:<JWT>'");
-                return AuthorizationResult::Unauthorized("User is not authorized".to_string());
+                return AuthorizationResult::Unauthorized;
             }
         },
         Err(err) => {
             debug!("Failed to get token: {}", err);
-            return AuthorizationResult::Unauthorized("User is not authorized".to_string());
+            return AuthorizationResult::Unauthorized;
         }
     };
 
@@ -67,7 +67,7 @@ pub(crate) fn validate_claims(
         Ok(claims) => AuthorizationResult::Authorized(claims.claims),
         Err(err) => {
             debug!("Invalid token: {}", err);
-            AuthorizationResult::Unauthorized("User is not authorized".to_string())
+            AuthorizationResult::Unauthorized
         }
     }
 }
@@ -84,9 +84,9 @@ pub(crate) fn get_authorized_user(
 
     match authorize_user(&request, &*secret_manager, &validation) {
         AuthorizationResult::Authorized(claims) => Ok(User::new(&claims.user_id())),
-        AuthorizationResult::Unauthorized(msg) => Err(Box::new(
+        AuthorizationResult::Unauthorized => Err(Box::new(
             HttpResponse::Unauthorized()
-                .json(ErrorResponse::unauthorized(&msg))
+                .json(ErrorResponse::unauthorized())
                 .into_future(),
         )),
         AuthorizationResult::Failed => Err(Box::new(

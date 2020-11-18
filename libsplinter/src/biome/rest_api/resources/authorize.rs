@@ -18,6 +18,6 @@ use crate::rest_api::sessions::Claims;
 
 pub(crate) enum AuthorizationResult {
     Authorized(Claims),
-    Unauthorized(String),
+    Unauthorized,
     Failed,
 }
