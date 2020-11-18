@@ -23,12 +23,17 @@ use crate::error::InternalError;
 use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::sessions::{default_validation, Claims};
 
+/// An `AuthorizationMapping` implementation that returns an `User`.
+///
+/// This mapping gets a User based on a Biome authorization token.
 pub struct GetUserByBiomeAuthorization {
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 }
 
 impl GetUserByBiomeAuthorization {
+    /// Constructs a new `GetUserByBiomeAuthorization` with the REST configuation and a secret
+    /// manager.
     pub fn new(rest_config: Arc<BiomeRestConfig>, secret_manager: Arc<dyn SecretManager>) -> Self {
         Self {
             rest_config,
