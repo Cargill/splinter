@@ -16,9 +16,12 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
-use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    result,
+};
 
-use crate::error::InternalError;
+use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
 
 use super::{OAuthProvider, OAuthUser, OAuthUserStore, OAuthUserStoreError};
 
@@ -159,6 +162,33 @@ impl<'a> From<&'a OAuthUser> for NewOAuthUserModel<'a> {
 impl From<diesel::r2d2::PoolError> for OAuthUserStoreError {
     fn from(err: diesel::r2d2::PoolError) -> Self {
         OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err)))
+    }
+}
+
+impl From<result::Error> for OAuthUserStoreError {
+    fn from(err: result::Error) -> Self {
+        match err {
+            result::Error::DatabaseError(ref kind, _) => match kind {
+                result::DatabaseErrorKind::UniqueViolation => {
+                    OAuthUserStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                result::DatabaseErrorKind::ForeignKeyViolation => {
+                    OAuthUserStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err))),
+            },
+            _ => OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err))),
+        }
     }
 }
 
