@@ -44,10 +44,12 @@ use sabre_sdk::{
     },
     protos::FromBytes,
 };
-use scabbard::client::{ScabbardClient, ServiceId};
+use scabbard::client::{ScabbardClientBuilder, ServiceId};
 use transact::contract::archive::{default_scar_path, SmartContractArchive};
 
 use error::CliError;
+#[cfg(feature = "scabbard-cli-jwt")]
+use key::create_cylinder_jwt_auth;
 
 fn main() {
     if let Err(e) = run() {
@@ -749,7 +751,19 @@ fn run() -> Result<(), CliError> {
         ("contract", Some(matches)) => match matches.subcommand() {
             ("upload", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
+                let key = matches
+                    .value_of("key")
+                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -764,9 +778,6 @@ fn run() -> Result<(), CliError> {
                         CliError::InvalidArgument("'wait' argument must be a valid integer".into())
                     })?;
 
-                let key = matches
-                    .value_of("key")
-                    .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
                 let scar = matches
@@ -800,7 +811,17 @@ fn run() -> Result<(), CliError> {
             }
             ("list", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    let key = matches.value_of("key");
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(key)?);
+                }
+
+                let client = builder.build()?;
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -850,7 +871,17 @@ fn run() -> Result<(), CliError> {
             }
             ("show", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    let key = matches.value_of("key");
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(key)?);
+                }
+
+                let client = builder.build()?;
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -895,7 +926,6 @@ fn run() -> Result<(), CliError> {
         },
         ("exec", Some(matches)) => {
             let url = matches.value_of("url").expect("default not set for --url");
-            let client = ScabbardClient::new(url);
 
             let full_service_id = matches
                 .value_of("service-id")
@@ -914,6 +944,16 @@ fn run() -> Result<(), CliError> {
                 .value_of("key")
                 .ok_or_else(|| CliError::MissingArgument("key".into()))?;
             let signer = key::load_signer(key)?;
+
+            let mut builder = ScabbardClientBuilder::new();
+            builder = builder.with_url(url);
+
+            #[cfg(feature = "scabbard-cli-jwt")]
+            {
+                builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+            }
+
+            let client = builder.build()?;
 
             let contract = matches
                 .value_of("contract")
@@ -955,7 +995,6 @@ fn run() -> Result<(), CliError> {
         ("ns", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -974,6 +1013,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let namespace = matches
                     .value_of("namespace")
@@ -996,7 +1045,6 @@ fn run() -> Result<(), CliError> {
             }
             ("update", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1015,6 +1063,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let namespace = matches
                     .value_of("namespace")
@@ -1037,7 +1095,6 @@ fn run() -> Result<(), CliError> {
             }
             ("delete", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1057,6 +1114,16 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
+
                 let namespace = matches
                     .value_of("namespace")
                     .ok_or_else(|| CliError::MissingArgument("namespace".into()))?;
@@ -1074,7 +1141,6 @@ fn run() -> Result<(), CliError> {
         },
         ("perm", Some(matches)) => {
             let url = matches.value_of("url").expect("default not set for --url");
-            let client = ScabbardClient::new(url);
 
             let full_service_id = matches
                 .value_of("service-id")
@@ -1093,6 +1159,16 @@ fn run() -> Result<(), CliError> {
                 .value_of("key")
                 .ok_or_else(|| CliError::MissingArgument("key".into()))?;
             let signer = key::load_signer(key)?;
+
+            let mut builder = ScabbardClientBuilder::new();
+            builder = builder.with_url(url);
+
+            #[cfg(feature = "scabbard-cli-jwt")]
+            {
+                builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+            }
+
+            let client = builder.build()?;
 
             let namespace = matches
                 .value_of("namespace")
@@ -1127,7 +1203,6 @@ fn run() -> Result<(), CliError> {
         ("cr", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1146,6 +1221,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let name = matches
                     .value_of("name")
@@ -1168,7 +1253,6 @@ fn run() -> Result<(), CliError> {
             }
             ("update", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1187,6 +1271,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let name = matches
                     .value_of("name")
@@ -1209,7 +1303,6 @@ fn run() -> Result<(), CliError> {
             }
             ("delete", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1228,6 +1321,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let name = matches
                     .value_of("name")
@@ -1247,7 +1350,6 @@ fn run() -> Result<(), CliError> {
         ("sp", Some(matches)) => match matches.subcommand() {
             ("create", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1266,6 +1368,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let org_id = matches
                     .value_of("org_id")
@@ -1291,7 +1403,6 @@ fn run() -> Result<(), CliError> {
             }
             ("update", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1310,6 +1421,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let org_id = matches
                     .value_of("org_id")
@@ -1335,7 +1456,6 @@ fn run() -> Result<(), CliError> {
             }
             ("delete", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
 
                 let full_service_id = matches
                     .value_of("service-id")
@@ -1354,6 +1474,16 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(Some(key))?);
+                }
+
+                let client = builder.build()?;
 
                 let org_id = matches
                     .value_of("org_id")
@@ -1377,7 +1507,17 @@ fn run() -> Result<(), CliError> {
         ("state", Some(matches)) => match matches.subcommand() {
             ("root", Some(matches)) => {
                 let url = matches.value_of("url").expect("default not set for --url");
-                let client = ScabbardClient::new(url);
+
+                let mut builder = ScabbardClientBuilder::new();
+                builder = builder.with_url(url);
+
+                #[cfg(feature = "scabbard-cli-jwt")]
+                {
+                    let key = matches.value_of("key");
+                    builder = builder.with_auth(&create_cylinder_jwt_auth(key)?);
+                }
+
+                let client = builder.build()?;
 
                 let full_service_id = matches
                     .value_of("service-id")
