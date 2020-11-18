@@ -150,6 +150,11 @@ fn run() -> Result<(), CliError> {
                                 .takes_value(true)
                                 .possible_values(&["human", "csv"])
                                 .default_value("human"),
+                            Arg::with_name("key")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
                         ]),
                 )
                 .subcommand(
@@ -177,6 +182,11 @@ fn run() -> Result<(), CliError> {
                                 )
                                 .takes_value(true)
                                 .required(true),
+                            Arg::with_name("key")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
                         ]),
                 ),
         )
@@ -575,6 +585,11 @@ fn run() -> Result<(), CliError> {
                                 .long("service-id")
                                 .takes_value(true)
                                 .required(true),
+                            Arg::with_name("key")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
                         ]),
                 ),
         );
