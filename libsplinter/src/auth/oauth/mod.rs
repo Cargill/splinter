@@ -204,7 +204,8 @@ impl OAuthClient {
         let identity = self
             .identity_provider
             .get_identity(&authorization)
-            .map_err(|err| OAuthClientError::new(&format!("failed to get identity: {}", err,)))?;
+            .map_err(|err| OAuthClientError::new(&format!("failed to get identity: {}", err,)))?
+            .ok_or_else(|| OAuthClientError::new("identity not found"))?;
 
         let user_info = UserInfo {
             access_token: token_response.access_token().secret().into(),
@@ -281,7 +282,7 @@ impl std::fmt::Debug for UserInfo {
 mod tests {
     use super::*;
 
-    use crate::auth::rest_api::identity::IdentityProviderError;
+    use crate::error::InternalError;
 
     /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
@@ -343,8 +344,8 @@ mod tests {
     pub struct TestIdentityProvider;
 
     impl IdentityProvider for TestIdentityProvider {
-        fn get_identity(&self, _: &Authorization) -> Result<String, IdentityProviderError> {
-            Ok("".to_string())
+        fn get_identity(&self, _: &Authorization) -> Result<Option<String>, InternalError> {
+            Ok(Some("".to_string()))
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {

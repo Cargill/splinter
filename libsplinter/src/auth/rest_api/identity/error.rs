@@ -17,30 +17,6 @@
 use std::error::Error;
 use std::fmt;
 
-/// An error that can occur when using an identity provider
-#[derive(Debug)]
-pub enum IdentityProviderError {
-    /// An unrecoverable error that cannot be handled by the caller
-    InternalError(String),
-    /// The given authentication could not be resolved to an identity by this provider
-    Unauthorized,
-}
-
-impl fmt::Display for IdentityProviderError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::InternalError(msg) => write!(
-                f,
-                "Identity provider encountered an unrecoverable error: {}",
-                msg,
-            ),
-            Self::Unauthorized => f.write_str("No identity was found for the given authentication"),
-        }
-    }
-}
-
-impl Error for IdentityProviderError {}
-
 /// An error that can occur when parsing an `Authorization`
 #[derive(Debug)]
 pub struct AuthorizationParseError {

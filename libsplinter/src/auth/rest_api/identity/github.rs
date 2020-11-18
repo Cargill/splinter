@@ -16,7 +16,9 @@
 
 use reqwest::{blocking::Client, StatusCode};
 
-use super::{Authorization, BearerToken, IdentityProvider, IdentityProviderError};
+use crate::error::InternalError;
+
+use super::{Authorization, BearerToken, IdentityProvider};
 
 /// Retrieves a GitHub username from the GitHub servers
 ///
@@ -26,26 +28,26 @@ use super::{Authorization, BearerToken, IdentityProvider, IdentityProviderError}
 pub struct GithubUserIdentityProvider;
 
 impl IdentityProvider for GithubUserIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError> {
+    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
         let token = match authorization {
             Authorization::Bearer(BearerToken::OAuth2(token)) => token,
-            _ => return Err(IdentityProviderError::Unauthorized),
+            _ => return Ok(None),
         };
 
         let response = Client::builder()
             .build()
-            .map_err(|err| IdentityProviderError::InternalError(err.to_string()))?
+            .map_err(|err| InternalError::from_source(err.into()))?
             .get("https://api.github.com/user")
             .header("Authorization", format!("Bearer {}", token))
             .header("User-Agent", "splinter")
             .send()
-            .map_err(|err| IdentityProviderError::InternalError(err.to_string()))?;
+            .map_err(|err| InternalError::from_source(err.into()))?;
 
         if !response.status().is_success() {
             match response.status() {
-                StatusCode::UNAUTHORIZED => return Err(IdentityProviderError::Unauthorized),
+                StatusCode::UNAUTHORIZED => return Ok(None),
                 status_code => {
-                    return Err(IdentityProviderError::InternalError(format!(
+                    return Err(InternalError::with_message(format!(
                         "Received unexpected response code: {}",
                         status_code
                     )))
@@ -55,12 +57,10 @@ impl IdentityProvider for GithubUserIdentityProvider {
 
         let username = response
             .json::<UserResponse>()
-            .map_err(|_| {
-                IdentityProviderError::InternalError("Received unexpected response body".into())
-            })?
+            .map_err(|_| InternalError::with_message("Received unexpected response body".into()))?
             .login;
 
-        Ok(username)
+        Ok(Some(username))
     }
 
     fn clone_box(&self) -> Box<dyn IdentityProvider> {

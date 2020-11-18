@@ -18,7 +18,7 @@
 pub mod actix;
 pub mod identity;
 
-use identity::{Authorization, IdentityProvider, IdentityProviderError};
+use identity::{Authorization, IdentityProvider};
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
@@ -73,13 +73,13 @@ fn authorize(
     // Attempt to get the client's identity
     for provider in identity_providers {
         match provider.get_identity(&authorization) {
-            Ok(identity) => {
+            Ok(Some(identity)) => {
                 return AuthorizationResult::Authorized {
                     identity,
                     authorization,
                 }
             }
-            Err(IdentityProviderError::Unauthorized) => {}
+            Ok(None) => {}
             Err(err) => error!("{}", err),
         }
     }

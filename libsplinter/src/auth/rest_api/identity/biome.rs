@@ -18,9 +18,10 @@ use std::sync::Arc;
 
 use jsonwebtoken::{decode, Validation};
 
+use crate::error::InternalError;
 use crate::rest_api::{secrets::SecretManager, sessions::Claims};
 
-use super::{Authorization, BearerToken, IdentityProvider, IdentityProviderError};
+use super::{Authorization, BearerToken, IdentityProvider};
 
 /// Extracts the user ID from a Biome JWT
 ///
@@ -43,20 +44,20 @@ impl BiomeUserIdentityProvider {
 }
 
 impl IdentityProvider for BiomeUserIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError> {
+    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
         let token = match authorization {
             Authorization::Bearer(BearerToken::Biome(token)) => token,
-            _ => return Err(IdentityProviderError::Unauthorized),
+            _ => return Ok(None),
         };
 
         let secret = self
             .token_secret_manager
             .secret()
-            .map_err(|err| IdentityProviderError::InternalError(err.to_string()))?;
+            .map_err(|err| InternalError::from_source(err.into()))?;
 
-        decode::<Claims>(&token, secret.as_ref(), &self.validation)
+        Ok(decode::<Claims>(&token, secret.as_ref(), &self.validation)
             .map(|token_data| token_data.claims.user_id())
-            .map_err(|_| IdentityProviderError::Unauthorized)
+            .ok())
     }
 
     fn clone_box(&self) -> Box<dyn IdentityProvider> {

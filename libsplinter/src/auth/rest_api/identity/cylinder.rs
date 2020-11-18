@@ -18,7 +18,9 @@ use std::sync::{Arc, Mutex};
 
 use cylinder::{jwt::JsonWebTokenParser, Verifier};
 
-use super::{Authorization, BearerToken, IdentityProvider, IdentityProviderError};
+use crate::error::InternalError;
+
+use super::{Authorization, BearerToken, IdentityProvider};
 
 /// Extracts the public key from a Cylinder JWT
 ///
@@ -38,21 +40,22 @@ impl CylinderKeyIdentityProvider {
 }
 
 impl IdentityProvider for CylinderKeyIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError> {
+    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
         let token = match authorization {
             Authorization::Bearer(BearerToken::Cylinder(token)) => token,
-            _ => return Err(IdentityProviderError::Unauthorized),
+            _ => return Ok(None),
         };
 
-        let parsed_token = JsonWebTokenParser::new(&**self.verifier.lock().map_err(|_| {
-            IdentityProviderError::InternalError(
-                "Cylinder key identity provider's verifier lock poisoned".into(),
-            )
-        })?)
-        .parse(token)
-        .map_err(|_| IdentityProviderError::Unauthorized)?;
-
-        Ok(parsed_token.issuer().as_hex())
+        Ok(
+            JsonWebTokenParser::new(&**self.verifier.lock().map_err(|_| {
+                InternalError::with_message(
+                    "Cylinder key identity provider's verifier lock poisoned".into(),
+                )
+            })?)
+            .parse(token)
+            .ok()
+            .map(|parsed_token| parsed_token.issuer().as_hex()),
+        )
     }
 
     fn clone_box(&self) -> Box<dyn IdentityProvider> {
