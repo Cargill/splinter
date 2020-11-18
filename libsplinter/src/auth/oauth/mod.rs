@@ -14,7 +14,6 @@
 
 //! Support for OAuth2 authorization in Splinter
 
-mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 
@@ -30,9 +29,7 @@ use oauth2::{
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
-use crate::error::InternalError;
-
-pub use error::OAuthClientConfigurationError;
+use crate::error::{InternalError, InvalidArgumentError};
 
 /// The amount of time before a pending authorization expires and a new request must be made
 const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
@@ -68,6 +65,10 @@ impl OAuthClient {
     ///   token
     /// * `scopes` - The scopes that will be requested for each user
     /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the auth, redirect, or token URLs are invalid
     pub fn new(
         client_id: String,
         client_secret: String,
@@ -76,21 +77,22 @@ impl OAuthClient {
         token_url: String,
         scopes: Vec<String>,
         identity_provider: Box<dyn IdentityProvider>,
-    ) -> Result<Self, OAuthClientConfigurationError> {
-        let client =
-            BasicClient::new(
-                ClientId::new(client_id),
-                Some(ClientSecret::new(client_secret)),
-                AuthUrl::new(auth_url).map_err(|err| {
-                    OAuthClientConfigurationError::InvalidAuthUrl(err.to_string())
+    ) -> Result<Self, InvalidArgumentError> {
+        let client = BasicClient::new(
+            ClientId::new(client_id),
+            Some(ClientSecret::new(client_secret)),
+            AuthUrl::new(auth_url)
+                .map_err(|err| InvalidArgumentError::new("auth_url".into(), err.to_string()))?,
+            Some(
+                TokenUrl::new(token_url).map_err(|err| {
+                    InvalidArgumentError::new("token_url".into(), err.to_string())
                 })?,
-                Some(TokenUrl::new(token_url).map_err(|err| {
-                    OAuthClientConfigurationError::InvalidTokenUrl(err.to_string())
-                })?),
-            )
-            .set_redirect_url(RedirectUrl::new(redirect_url).map_err(|err| {
-                OAuthClientConfigurationError::InvalidRedirectUrl(err.to_string())
-            })?);
+            ),
+        )
+        .set_redirect_url(
+            RedirectUrl::new(redirect_url)
+                .map_err(|err| InvalidArgumentError::new("redirect_url".into(), err.to_string()))?,
+        );
         Ok(Self {
             client,
             pending_authorizations: Arc::new(Mutex::new(TtlMap::new(Duration::from_secs(
@@ -109,12 +111,16 @@ impl OAuthClient {
     /// * `client_secret` - The GitHub OAuth client secret
     /// * `redirect_url` - The endpoint that GitHub will redirect to after it has completed
     ///   authorization
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the redirect URL is invalid
     #[cfg(feature = "oauth-github")]
     pub fn new_github(
         client_id: String,
         client_secret: String,
         redirect_url: String,
-    ) -> Result<Self, OAuthClientConfigurationError> {
+    ) -> Result<Self, InvalidArgumentError> {
         Self::new(
             client_id,
             client_secret,
@@ -317,7 +323,7 @@ mod tests {
                 vec![],
                 identity_box.clone_box(),
             ),
-            Err(OAuthClientConfigurationError::InvalidAuthUrl(_))
+            Err(err) if &err.argument() == "auth_url"
         ));
 
         assert!(matches!(
@@ -330,7 +336,7 @@ mod tests {
                 vec![],
                 identity_box.clone_box(),
             ),
-            Err(OAuthClientConfigurationError::InvalidRedirectUrl(_))
+            Err(err) if &err.argument() == "redirect_url"
         ));
 
         assert!(matches!(
@@ -343,7 +349,7 @@ mod tests {
                 vec![],
                 identity_box,
             ),
-            Err(OAuthClientConfigurationError::InvalidTokenUrl(_))
+            Err(err) if &err.argument() == "token_url"
         ));
     }
 
