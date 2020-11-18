@@ -87,7 +87,7 @@ use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::auth::rest_api::{
     actix::Authorization,
-    identity::{GetByAuthorization, IdentityProvider},
+    identity::{AuthorizationMapping, IdentityProvider},
 };
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
@@ -493,12 +493,12 @@ struct ConfigureAuthorizationMapping {
 
 #[cfg(feature = "auth")]
 impl ConfigureAuthorizationMapping {
-    fn new<G, T>(get_by_auth: G) -> Self
+    fn new<M, T>(auth_mapping: M) -> Self
     where
         T: 'static,
-        G: GetByAuthorization<T> + Send + Sync + 'static,
+        M: AuthorizationMapping<T> + Send + Sync + 'static,
     {
-        let mut auth_mapping = Some(get_by_auth);
+        let mut auth_mapping = Some(auth_mapping);
         Self {
             config_fn: Box::new(move |authorization| {
                 if let Some(auth_mapping) = auth_mapping.take() {
@@ -788,10 +788,10 @@ impl RestApiBuilder {
     }
 
     #[cfg(feature = "auth")]
-    pub fn with_authorization_mapping<G, T>(mut self, authorization_mapping: G) -> Self
+    pub fn with_authorization_mapping<M, T>(mut self, authorization_mapping: M) -> Self
     where
         T: 'static,
-        G: GetByAuthorization<T> + Send + Sync + 'static,
+        M: AuthorizationMapping<T> + Send + Sync + 'static,
     {
         debug!("Adding auth mapping {}", std::any::type_name::<G>());
         self.authorization_mappings

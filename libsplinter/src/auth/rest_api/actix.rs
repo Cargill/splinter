@@ -34,7 +34,7 @@ use crate::rest_api::ErrorResponse;
 
 use super::{
     authorize,
-    identity::{Authorization as IdentityAuthorization, GetByAuthorization, IdentityProvider},
+    identity::{Authorization as IdentityAuthorization, AuthorizationMapping, IdentityProvider},
     AuthorizationResult,
 };
 
@@ -53,12 +53,12 @@ struct IdentityExtension {
 }
 
 impl IdentityExtension {
-    /// Wrap a GetByAuthorization implementation in an IdentityExtension, to provide the ability to
-    /// add a value from the GetByAuthorization trait to the HttpRequest.
+    /// Wrap a AuthorizationMapping implementation in an IdentityExtension, to provide the ability to
+    /// add a value from the AuthorizationMapping trait to the HttpRequest.
     fn new<G, T>(get_by_auth: G) -> Self
     where
         T: 'static,
-        G: GetByAuthorization<T> + Send + Sync + 'static,
+        G: AuthorizationMapping<T> + Send + Sync + 'static,
     {
         Self {
             inner: Box::new(move |extensions, identity_auth| {
@@ -90,14 +90,14 @@ impl Authorization {
         }
     }
 
-    /// Add an authorization mapping, provided by a GetByAuthorization implementation.
-    pub fn with_authorization_mapping<G, T>(mut self, get_by_auth: G) -> Self
+    /// Add an authorization mapping, provided by a AuthorizationMapping implementation.
+    pub fn with_authorization_mapping<M, T>(mut self, auth_mapping: M) -> Self
     where
         T: 'static,
-        G: GetByAuthorization<T> + Send + Sync + 'static,
+        M: AuthorizationMapping<T> + Send + Sync + 'static,
     {
         self.identity_extensions
-            .push(Arc::new(IdentityExtension::new(get_by_auth)));
+            .push(Arc::new(IdentityExtension::new(auth_mapping)));
 
         self
     }

@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use jsonwebtoken::decode;
 
-use crate::auth::rest_api::identity::{Authorization, BearerToken, GetByAuthorization};
+use crate::auth::rest_api::identity::{Authorization, AuthorizationMapping, BearerToken};
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::User;
 use crate::error::InternalError;
@@ -37,7 +37,7 @@ impl GetUserByBiomeAuthorization {
     }
 }
 
-impl GetByAuthorization<User> for GetUserByBiomeAuthorization {
+impl AuthorizationMapping<User> for GetUserByBiomeAuthorization {
     fn get(&self, authorization: &Authorization) -> Result<Option<User>, InternalError> {
         match authorization {
             Authorization::Bearer(BearerToken::Biome(token)) => {
