@@ -30,8 +30,9 @@ use oauth2::{
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
+use crate::error::InternalError;
 
-pub use error::{OAuthClientConfigurationError, OAuthClientError};
+pub use error::OAuthClientConfigurationError;
 
 /// The amount of time before a pending authorization expires and a new request must be made
 const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
@@ -134,7 +135,7 @@ impl OAuthClient {
     pub fn get_authorization_url(
         &self,
         client_redirect_url: String,
-    ) -> Result<String, OAuthClientError> {
+    ) -> Result<String, InternalError> {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
         let mut request = self
@@ -148,7 +149,9 @@ impl OAuthClient {
 
         self.pending_authorizations
             .lock()
-            .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
+            .map_err(|_| {
+                InternalError::with_message("pending authorizations lock was poisoned".into())
+            })?
             .insert(
                 csrf_state.secret().into(),
                 PendingAuthorization {
@@ -173,11 +176,13 @@ impl OAuthClient {
         &self,
         auth_code: String,
         csrf_token: &str,
-    ) -> Result<Option<(UserInfo, String)>, OAuthClientError> {
+    ) -> Result<Option<(UserInfo, String)>, InternalError> {
         let pending_authorization = match self
             .pending_authorizations
             .lock()
-            .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
+            .map_err(|_| {
+                InternalError::with_message("pending authorizations lock was poisoned".into())
+            })?
             .remove(csrf_token)
         {
             Some(pending_authorization) => pending_authorization,
@@ -190,7 +195,7 @@ impl OAuthClient {
             .set_pkce_verifier(PkceCodeVerifier::new(pending_authorization.pkce_verifier))
             .request(http_client)
             .map_err(|err| {
-                OAuthClientError::new(&format!(
+                InternalError::with_message(format!(
                     "failed to make authorization code exchange request: {}",
                     err,
                 ))
@@ -204,8 +209,10 @@ impl OAuthClient {
         let identity = self
             .identity_provider
             .get_identity(&authorization)
-            .map_err(|err| OAuthClientError::new(&format!("failed to get identity: {}", err,)))?
-            .ok_or_else(|| OAuthClientError::new("identity not found"))?;
+            .map_err(|err| {
+                InternalError::with_message(format!("failed to get identity: {}", err,))
+            })?
+            .ok_or_else(|| InternalError::with_message("identity not found".into()))?;
 
         let user_info = UserInfo {
             access_token: token_response.access_token().secret().into(),

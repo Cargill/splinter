@@ -17,32 +17,6 @@
 use std::error::Error;
 use std::fmt;
 
-/// An unrecoverable error that can occur when using an OAuth client
-#[derive(Debug)]
-pub struct OAuthClientError {
-    message: String,
-}
-
-impl OAuthClientError {
-    pub fn new(message: &str) -> Self {
-        Self {
-            message: message.into(),
-        }
-    }
-}
-
-impl fmt::Display for OAuthClientError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "OAuth client encountered an unrecoverable error: {}",
-            self.message,
-        )
-    }
-}
-
-impl Error for OAuthClientError {}
-
 /// An error that can occur when configuring an OAuth client
 #[derive(Debug)]
 pub enum OAuthClientConfigurationError {
