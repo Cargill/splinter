@@ -18,7 +18,7 @@
 use uuid::Uuid;
 
 use crate::auth::{
-    oauth::{rest_api::SaveUserInfoOperation, UserInfo},
+    oauth::{rest_api::OAuthUserInfoStore, UserInfo},
     rest_api::identity::{Authorization, AuthorizationMapping, BearerToken},
 };
 use crate::biome::oauth::store::{AccessToken, OAuthProvider, OAuthUserBuilder, OAuthUserStore};
@@ -59,18 +59,18 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
     }
 }
 
-/// Biome-backed implementation of the SaveUserInfoOperation trait.
+/// Biome-backed implementation of the `OAuthUserInfoStore` trait.
 ///
-/// This implementation stores the UserToken values using the OAuthUserStore provided by Biome.
+/// This implementation uses the `OAuthUserStore` provided by Biome.
 #[derive(Clone)]
-pub struct OAuthUserStoreSaveUserInfoOperation {
+pub struct BiomeOAuthUserInfoStore {
     provider: OAuthProvider,
     user_store: Box<dyn UserStore>,
     oauth_user_store: Box<dyn OAuthUserStore>,
 }
 
-impl OAuthUserStoreSaveUserInfoOperation {
-    /// Construct a new OAuthUserStoreSaveUserInfoOperation.
+impl BiomeOAuthUserInfoStore {
+    /// Construct a new `BiomeOAuthUserInfoStore`.
     pub fn new(
         provider: OAuthProvider,
         user_store: Box<dyn UserStore>,
@@ -84,7 +84,7 @@ impl OAuthUserStoreSaveUserInfoOperation {
     }
 }
 
-impl SaveUserInfoOperation for OAuthUserStoreSaveUserInfoOperation {
+impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
     fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError> {
         let provider_identity = user_info.identity().to_string();
 
@@ -143,7 +143,7 @@ impl SaveUserInfoOperation for OAuthUserStoreSaveUserInfoOperation {
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn SaveUserInfoOperation> {
+    fn clone_box(&self) -> Box<dyn OAuthUserInfoStore> {
         Box::new(self.clone())
     }
 }
