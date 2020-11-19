@@ -35,7 +35,7 @@ pub struct KeyGenAction;
 
 impl Action for KeyGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
         let key_name = args
             .value_of("key-name")

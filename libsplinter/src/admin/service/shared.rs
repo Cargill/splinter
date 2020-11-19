@@ -937,7 +937,7 @@ impl AdminServiceShared {
             self.add_pending_consensus_proposal(proposal.id.clone(), (proposal.clone(), payload));
             self.proposal_sender
                 .as_ref()
-                .ok_or_else(|| ServiceError::NotStarted)?
+                .ok_or(ServiceError::NotStarted)?
                 .send(ProposalUpdate::ProposalReceived(
                     proposal,
                     message_sender.as_bytes().into(),
