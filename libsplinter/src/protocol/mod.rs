@@ -20,20 +20,21 @@ pub mod service;
 
 pub const ADMIN_PROTOCOL_VERSION: u32 = 1;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
+#[cfg(feature = "admin-service")]
 pub(crate) const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 
-#[cfg(feature = "rest-api-actix")]
+#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_LIST_CIRCUITS_MIN: u32 = 1;
-#[cfg(feature = "rest-api-actix")]
+#[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_FETCH_CIRCUIT_MIN: u32 = 1;
 
 #[cfg(feature = "oauth")]

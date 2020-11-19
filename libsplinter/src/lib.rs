@@ -16,6 +16,7 @@
 
 #[macro_use]
 extern crate log;
+#[cfg(any(feature = "admin-service", feature = "rest-api", feature = "registry"))]
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -58,6 +59,7 @@ macro_rules! mutex_lock_unwrap {
     };
 }
 
+#[cfg(feature = "admin-service")]
 pub mod admin;
 #[cfg(feature = "auth")]
 pub mod auth;

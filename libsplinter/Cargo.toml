@@ -75,6 +75,7 @@ glob = "0.2"
 default = []
 
 stable = [
+    "admin-service",
     "biome",
     "biome-credentials",
     "biome-key-management",
@@ -112,14 +113,15 @@ experimental = [
 # used for turning benchmark tests on
 benchmark = []
 
+admin-service = []
+admin-service-store-postgres = ["admin-service", "postgres"]
 auth = []
-admin-service-store-postgres = ["postgres"]
 biome = []
 biome-credentials = ["biome", "bcrypt"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
 biome-oauth = ["biome"]
-circuit-template = ["glob"]
+circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 oauth = ["auth", "oauth2"]
