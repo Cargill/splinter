@@ -202,9 +202,9 @@ impl From<result::Error> for OAuthUserStoreError {
 pub mod tests {
     use super::*;
 
-    use crate::biome::migrations::run_sqlite_migrations;
     use crate::biome::oauth::store::{AccessToken, OAuthUserBuilder};
     use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
+    use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},

@@ -14,11 +14,11 @@
 
 //! Defines methods and utilities to interact with biome tables in a SQLite database.
 
-embed_migrations!("./src/biome/migrations/diesel/sqlite/migrations");
+embed_migrations!("./src/migrations/diesel/sqlite/migrations");
 
 use diesel::sqlite::SqliteConnection;
 
-use crate::biome::migrations::MigrationError;
+use crate::migrations::MigrationError;
 
 /// Run database migrations to create tables defined by biome
 ///

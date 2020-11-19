@@ -73,8 +73,8 @@ impl RefreshTokenStore for DieselRefreshTokenStore<diesel::sqlite::SqliteConnect
 pub mod tests {
     use super::*;
 
-    use crate::biome::migrations::run_sqlite_migrations;
     use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
+    use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},

@@ -171,7 +171,8 @@ impl From<CredentialsModel> for Credentials {
 pub mod tests {
     use super::*;
 
-    use crate::biome::{credentials::store::CredentialsBuilder, migrations::run_sqlite_migrations};
+    use crate::biome::credentials::store::CredentialsBuilder;
+    use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},

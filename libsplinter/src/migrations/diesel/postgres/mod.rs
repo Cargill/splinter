@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines methods and utilities to interact with biome tables in a PostgreSQL database.
+//! Defines methods and utilities to interact with tables in a PostgreSQL database.
 
-embed_migrations!("./src/biome/migrations/diesel/postgres/migrations");
+embed_migrations!("./src/migrations/diesel/postgres/migrations");
 
 use diesel::pg::PgConnection;
 
-use crate::biome::migrations::MigrationError;
+use crate::migrations::MigrationError;
 
 /// Run database migrations to create tables defined by biome
 ///
