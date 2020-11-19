@@ -71,7 +71,7 @@ impl<'a> SubcommandActions<'a> {
 
 impl<'s> Action for SubcommandActions<'s> {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
         let (subcommand, args) = args.subcommand();
 

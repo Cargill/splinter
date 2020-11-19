@@ -47,7 +47,7 @@ pub struct CircuitProposeAction;
 
 impl Action for CircuitProposeAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
         let mut builder = CreateCircuitMessageBuilder::new();
 
@@ -543,7 +543,7 @@ pub struct CircuitVoteAction;
 
 impl Action for CircuitVoteAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
         let url = args
             .value_of("url")
             .map(ToOwned::to_owned)
@@ -686,7 +686,7 @@ pub struct CircuitShowAction;
 
 impl Action for CircuitShowAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
         let url = args
             .value_of("url")

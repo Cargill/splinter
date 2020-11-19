@@ -441,7 +441,7 @@ impl Service for AdminService {
         // Shutdown consensus
         self.consensus
             .take()
-            .ok_or_else(|| ServiceStopError::NotStarted)?
+            .ok_or(ServiceStopError::NotStarted)?
             .shutdown()
             .map_err(|err| ServiceStopError::Internal(Box::new(err)))?;
 
@@ -507,7 +507,7 @@ impl Service for AdminService {
             AdminMessage_Type::CONSENSUS_MESSAGE => self
                 .consensus
                 .as_ref()
-                .ok_or_else(|| ServiceError::NotStarted)?
+                .ok_or(ServiceError::NotStarted)?
                 .handle_message(admin_message.get_consensus_message())
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err))),
             AdminMessage_Type::PROPOSED_CIRCUIT => {
@@ -569,7 +569,7 @@ impl Service for AdminService {
                 admin_service_shared
                     .network_sender()
                     .as_ref()
-                    .ok_or_else(|| ServiceError::NotStarted)?
+                    .ok_or(ServiceError::NotStarted)?
                     .send(&message_context.sender.to_string(), &envelope_bytes)
                     .map_err(|err| ServiceError::UnableToSendMessage(Box::new(err)))?;
                 admin_service_shared

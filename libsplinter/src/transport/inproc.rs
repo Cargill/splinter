@@ -48,8 +48,8 @@ impl Transport for InprocTransport {
                 endpoint
             )));
         }
-        let address = if endpoint.starts_with(PROTOCOL_PREFIX) {
-            &endpoint[PROTOCOL_PREFIX.len()..]
+        let address = if let Some(address) = endpoint.strip_prefix(PROTOCOL_PREFIX) {
+            address
         } else {
             endpoint
         };
@@ -74,8 +74,8 @@ impl Transport for InprocTransport {
                 bind
             )));
         }
-        let address = if bind.starts_with(PROTOCOL_PREFIX) {
-            &bind[PROTOCOL_PREFIX.len()..]
+        let address = if let Some(address) = bind.strip_prefix(PROTOCOL_PREFIX) {
+            address
         } else {
             bind
         };

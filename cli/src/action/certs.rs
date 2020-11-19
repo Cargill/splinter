@@ -53,7 +53,7 @@ const CA_KEY: &str = "generated_ca.key";
 
 impl Action for CertGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
         let common_name = args
             .value_of("common_name")

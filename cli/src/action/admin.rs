@@ -34,7 +34,7 @@ pub struct AdminKeyGenAction;
 
 impl Action for AdminKeyGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
         let key_name = args.value_of("key_name").unwrap_or("splinter");
         let key_dir = args

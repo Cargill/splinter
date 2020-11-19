@@ -329,14 +329,14 @@ pub async fn list_gamerooms(
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| DEFAULT_OFFSET.to_string())
         .parse()
-        .unwrap_or_else(|_| DEFAULT_OFFSET);
+        .unwrap_or(DEFAULT_OFFSET);
 
     let limit: usize = query
         .get("limit")
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| DEFAULT_LIMIT.to_string())
         .parse()
-        .unwrap_or_else(|_| DEFAULT_LIMIT);
+        .unwrap_or(DEFAULT_LIMIT);
 
     let status_optional = query.get("status").map(ToOwned::to_owned);
 
