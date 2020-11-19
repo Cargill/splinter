@@ -132,8 +132,7 @@ impl Transport for WsTransport {
     }
 
     fn connect(&mut self, endpoint: &str) -> Result<Box<dyn Connection>, ConnectError> {
-        if endpoint.starts_with(WS_PROTOCOL_PREFIX) {
-            let address = &endpoint[WS_PROTOCOL_PREFIX.len()..];
+        if let Some(address) = endpoint.strip_prefix(WS_PROTOCOL_PREFIX) {
             let stream = TcpStream::connect(address)?;
 
             let remote_endpoint = format!("{}{}", WS_PROTOCOL_PREFIX, stream.peer_addr()?);
@@ -162,9 +161,7 @@ impl Transport for WsTransport {
                 remote_endpoint,
                 local_endpoint,
             )))
-        } else if endpoint.starts_with(WSS_PROTOCOL_PREFIX) {
-            let address = &endpoint[WSS_PROTOCOL_PREFIX.len()..];
-
+        } else if let Some(address) = endpoint.strip_prefix(WSS_PROTOCOL_PREFIX) {
             let dns_name = endpoint_to_dns_name(address)?;
 
             let stream = TcpStream::connect(address)?;
@@ -216,8 +213,7 @@ impl Transport for WsTransport {
     }
 
     fn listen(&mut self, bind: &str) -> Result<Box<dyn Listener>, ListenError> {
-        if bind.starts_with(WS_PROTOCOL_PREFIX) {
-            let address = &bind[WS_PROTOCOL_PREFIX.len()..];
+        if let Some(address) = bind.strip_prefix(WS_PROTOCOL_PREFIX) {
             let tcp_listener = TcpListener::bind(address).map_err(|err| {
                 ListenError::IoError(format!("Failed to bind to {}", address), err)
             })?;
@@ -234,14 +230,13 @@ impl Transport for WsTransport {
                 local_endpoint,
                 None,
             )))
-        } else if bind.starts_with(WSS_PROTOCOL_PREFIX) {
+        } else if let Some(address) = bind.strip_prefix(WSS_PROTOCOL_PREFIX) {
             let inner = self.tls_inner.as_ref().ok_or_else(|| {
                 ListenError::ProtocolError(
                     "TLS support required for the wss:// protocol".to_string(),
                 )
             })?;
 
-            let address = &bind[WSS_PROTOCOL_PREFIX.len()..];
             let tcp_listener = TcpListener::bind(address).map_err(|err| {
                 ListenError::IoError(format!("Failed to bind to {}", address), err)
             })?;
