@@ -33,7 +33,7 @@ pub trait IdentityProvider: Send + Sync {
     /// Attempts to get the identity that corresponds to the given authorization
     fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError>;
 
-    /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
+    /// Clone implementation for `IdentityProvider`. The implementation of the `Clone` trait for
     /// `Box<dyn IdentityProvider>` calls this method.
     ///
     /// # Example

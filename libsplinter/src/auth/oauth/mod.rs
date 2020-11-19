@@ -49,7 +49,7 @@ pub struct OAuthClient {
     pending_authorizations: Arc<Mutex<TtlMap<String, PendingAuthorization>>>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
-    /// OAuth2 identity provider used to retrieve the users' identity
+    /// OAuth2 identity provider used to retrieve users' identities
     identity_provider: Box<dyn IdentityProvider>,
 }
 
