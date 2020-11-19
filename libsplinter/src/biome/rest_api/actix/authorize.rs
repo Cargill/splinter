@@ -14,9 +14,11 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "biome-credentials")]
 use jsonwebtoken::{decode, Validation};
 
 use crate::actix_web::{Error as ActixError, HttpRequest, HttpResponse};
+#[cfg(feature = "biome-credentials")]
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::User;
@@ -24,10 +26,12 @@ use crate::futures::{Future, IntoFuture};
 use crate::rest_api::secrets::SecretManager;
 #[cfg(not(feature = "auth"))]
 use crate::rest_api::sessions::default_validation;
-use crate::rest_api::sessions::Claims;
-use crate::rest_api::{get_authorization_token, ErrorResponse};
+use crate::rest_api::ErrorResponse;
+#[cfg(feature = "biome-credentials")]
+use crate::rest_api::{get_authorization_token, sessions::Claims};
 
 /// Verifies the user has the correct permissions
+#[cfg(feature = "biome-credentials")]
 pub(crate) fn authorize_user(
     request: &HttpRequest,
     secret_manager: &Arc<dyn SecretManager>,
@@ -50,6 +54,7 @@ pub(crate) fn authorize_user(
     validate_claims(&token, secret_manager, validation)
 }
 
+#[cfg(feature = "biome-credentials")]
 pub(crate) fn validate_claims(
     token: &str,
     secret_manager: &Arc<dyn SecretManager>,
@@ -74,7 +79,21 @@ pub(crate) fn validate_claims(
 
 type ErrorHttpResponse = Box<dyn Future<Item = HttpResponse, Error = ActixError>>;
 
-#[cfg(not(feature = "auth"))]
+#[cfg(all(not(feature = "auth"), not(feature = "biome-credentials")))]
+pub(crate) fn get_authorized_user(
+    request: &HttpRequest,
+    secret_manager: &Arc<dyn SecretManager>,
+    rest_config: &BiomeRestConfig,
+) -> Result<User, ErrorHttpResponse> {
+    /// Nothing is configured at compile-time, any route making use of this can't be authorized.
+    Err(Box::new(
+        HttpResponse::Unauthorized()
+            .json(ErrorResponse::unauthorized())
+            .into_future(),
+    ))
+}
+
+#[cfg(all(not(feature = "auth"), feature = "biome-credentials"))]
 pub(crate) fn get_authorized_user(
     request: &HttpRequest,
     secret_manager: &Arc<dyn SecretManager>,
