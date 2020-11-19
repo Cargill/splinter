@@ -143,6 +143,32 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
         Ok(())
     }
 
+    fn remove_user_tokens(&self, identity: &str) -> Result<(), InternalError> {
+        // Check if there is an existing `OAuthUser` with the corresponding `identity`
+        if let Some(oauth_user) = self
+            .oauth_user_store
+            .get_by_provider_user_ref(&identity)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?
+        {
+            // If the user does exist, remove any tokens associated with the user
+            let updated_user = oauth_user
+                .into_update_builder()
+                .with_access_token(AccessToken::Unauthorized)
+                .with_refresh_token(None)
+                .build()
+                .map_err(|e| {
+                    InternalError::from_source_with_message(
+                        Box::new(e),
+                        "Failed to properly construct an updated OAuth user".into(),
+                    )
+                })?;
+            self.oauth_user_store
+                .update_oauth_user(updated_user)
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+        }
+        Ok(())
+    }
+
     fn clone_box(&self) -> Box<dyn OAuthUserInfoStore> {
         Box::new(self.clone())
     }
