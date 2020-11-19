@@ -123,10 +123,10 @@ impl Transport for TlsTransport {
             )));
         }
 
-        let address = if endpoint.starts_with(PROTOCOL_PREFIX) {
-            &endpoint[PROTOCOL_PREFIX.len()..]
-        } else if endpoint.starts_with(DEPRECATED_PROTOCOL_PREFIX) {
-            &endpoint[DEPRECATED_PROTOCOL_PREFIX.len()..]
+        let address = if let Some(address) = endpoint.strip_prefix(PROTOCOL_PREFIX) {
+            address
+        } else if let Some(address) = endpoint.strip_prefix(DEPRECATED_PROTOCOL_PREFIX) {
+            address
         } else {
             endpoint
         };
@@ -162,10 +162,10 @@ impl Transport for TlsTransport {
             )));
         }
 
-        let address = if bind.starts_with(PROTOCOL_PREFIX) {
-            &bind[PROTOCOL_PREFIX.len()..]
-        } else if bind.starts_with(DEPRECATED_PROTOCOL_PREFIX) {
-            &bind[DEPRECATED_PROTOCOL_PREFIX.len()..]
+        let address = if let Some(address) = bind.strip_prefix(PROTOCOL_PREFIX) {
+            address
+        } else if let Some(address) = bind.strip_prefix(DEPRECATED_PROTOCOL_PREFIX) {
+            address
         } else {
             bind
         };
