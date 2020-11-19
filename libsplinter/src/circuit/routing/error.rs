@@ -28,6 +28,19 @@ pub enum RoutingTableReaderError {
     InvalidStateError(InvalidStateError),
 }
 
+impl RoutingTableReaderError {
+    /// Reduces the `RoutingTableReaderError to the display string
+    ///
+    /// If the error is `InternalError` and includes a source, the debug format will be logged to
+    /// provide information that may be lost on the conversion.
+    pub fn reduce_to_string(self) -> String {
+        match self {
+            RoutingTableReaderError::InternalError(err) => err.reduce_to_string(),
+            _ => self.to_string(),
+        }
+    }
+}
+
 impl Error for RoutingTableReaderError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
