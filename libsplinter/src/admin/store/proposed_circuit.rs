@@ -403,15 +403,11 @@ impl ProposedCircuitBuilder {
 
         members.sort_by_key(|node| node.node_id().to_string());
 
-        let authorization_type = self
-            .authorization_type
-            .unwrap_or_else(|| AuthorizationType::Trust);
+        let authorization_type = self.authorization_type.unwrap_or(AuthorizationType::Trust);
 
         let persistence = self.persistence.unwrap_or_else(PersistenceType::default);
 
-        let durability = self
-            .durability
-            .unwrap_or_else(|| DurabilityType::NoDurability);
+        let durability = self.durability.unwrap_or(DurabilityType::NoDurability);
 
         let routes = self.routes.unwrap_or_else(RouteType::default);
 

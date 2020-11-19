@@ -155,7 +155,7 @@ impl ProposalManager for AdminProposalManager {
             .network_sender()
             .as_ref()
             .cloned()
-            .ok_or_else(|| ServiceError::NotStarted)?;
+            .ok_or(ServiceError::NotStarted)?;
 
         let mut shared = self
             .shared

@@ -1234,7 +1234,7 @@ fn parse_registry_arg(registry: &str) -> Result<(&str, &str), &str> {
     let scheme = iter
         .next()
         .expect("str::split cannot return an empty iterator");
-    let path = iter.next().ok_or_else(|| "No URI scheme provided")?;
+    let path = iter.next().ok_or("No URI scheme provided")?;
     Ok((scheme, path))
 }
 

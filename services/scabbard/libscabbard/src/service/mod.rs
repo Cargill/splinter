@@ -277,7 +277,7 @@ impl Service for Scabbard {
             .lock()
             .map_err(|_| ServiceStopError::PoisonedLock("consensus lock poisoned".into()))?
             .take()
-            .ok_or_else(|| ServiceStopError::NotStarted)?
+            .ok_or(ServiceStopError::NotStarted)?
             .shutdown()
             .map_err(|err| ServiceStopError::Internal(Box::new(ScabbardError::from(err))))?;
 
@@ -323,7 +323,7 @@ impl Service for Scabbard {
                 .lock()
                 .map_err(|_| ServiceError::PoisonedLock("consensus lock poisoned".into()))?
                 .as_ref()
-                .ok_or_else(|| ServiceError::NotStarted)?
+                .ok_or(ServiceError::NotStarted)?
                 .handle_message(message.get_consensus_message())
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err))),
             ScabbardMessage_Type::PROPOSED_BATCH => {
@@ -342,7 +342,7 @@ impl Service for Scabbard {
                     .lock()
                     .map_err(|_| ServiceError::PoisonedLock("consensus lock poisoned".into()))?
                     .as_ref()
-                    .ok_or_else(|| ServiceError::NotStarted)?
+                    .ok_or(ServiceError::NotStarted)?
                     .send_update(ProposalUpdate::ProposalReceived(
                         proposal,
                         proposed_batch.get_service_id().as_bytes().into(),
