@@ -1601,6 +1601,44 @@ paths:
                 schema:
                   $ref: '#/components/schemas/Error'
 
+  /oauth/logout:
+    get:
+      tags:
+        - OAuth
+      description: Removes a user's access and refresh tokens from storage.
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User successfully logged out"
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+
 components:
   parameters:
     auth:

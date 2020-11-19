@@ -14,3 +14,4 @@
 
 pub(super) mod callback;
 pub(super) mod login;
+pub(super) mod logout;

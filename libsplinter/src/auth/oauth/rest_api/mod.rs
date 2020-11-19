@@ -72,6 +72,7 @@ impl OAuthUserInfoStore for OAuthUserInfoStoreNoOp {
 ///
 /// * `GET /oauth/login` - Get the URL for requesting authorization from the provider
 /// * `GET /oauth/callback` - Receive the authorization code from the provider
+/// * `GET /oauth/logout` - Remove the user's access and refresh tokens
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
@@ -96,6 +97,7 @@ impl OAuthResourceProvider {
 ///
 /// * `GET /oauth/login` - Get the URL for requesting authorization from the provider
 /// * `GET /oauth/callback` - Receive the authorization code from the provider
+/// * `GET /oauth/logout` - Remove the user's access and refresh tokens
 ///
 /// These endpoints are only available if the following REST API backend feature is enabled:
 ///
@@ -115,6 +117,7 @@ impl RestResourceProvider for OAuthResourceProvider {
                     self.client.clone(),
                     self.user_info_store.clone(),
                 ),
+                actix::logout::make_logout_route(self.user_info_store.clone()),
             ]);
         }
 
