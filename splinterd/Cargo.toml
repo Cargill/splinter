@@ -55,6 +55,7 @@ features = [
 [dependencies.splinter]
 path = "../libsplinter"
 features = [
+  "admin-service",
   "registry",
   "registry-remote",
   "rest-api",
