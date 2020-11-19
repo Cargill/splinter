@@ -21,7 +21,6 @@
 //! [`DieselAdminServiceStore`]: struct.DieselAdminServiceStore.html
 //! [`AdminServiceStore`]: ../trait.AdminServiceStore.html
 
-pub mod migrations;
 mod models;
 mod operations;
 mod schema;
@@ -257,13 +256,13 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
 pub mod tests {
     use super::*;
 
-    use crate::admin::store::diesel::migrations::run_sqlite_migrations;
     use crate::admin::store::{
         CircuitBuilder, CircuitNodeBuilder, CircuitProposal, CircuitProposalBuilder, ProposalType,
         ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder, ServiceBuilder, Vote,
         VoteRecordBuilder,
     };
     use crate::hex::parse_hex;
+    use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},
