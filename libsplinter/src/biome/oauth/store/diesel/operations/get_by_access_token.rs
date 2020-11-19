@@ -42,7 +42,7 @@ where
         access_token: &str,
     ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let oauth_user_model = oauth_user::table
-            .filter(oauth_user::access_token.eq(access_token))
+            .filter(oauth_user::access_token.eq(Some(access_token.to_string())))
             .first::<OAuthUserModel>(self.conn)
             .optional()
             .map_err(|err| {

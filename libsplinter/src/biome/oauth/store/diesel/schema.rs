@@ -17,7 +17,7 @@ table! {
         id -> Int8,
         user_id -> Text,
         provider_user_ref -> Text,
-        access_token -> Text,
+        access_token -> Nullable<Text>,
         refresh_token -> Nullable<Text>,
         provider_id -> SmallInt,
     }

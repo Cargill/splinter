@@ -30,6 +30,19 @@ pub enum OAuthProvider {
     Github,
 }
 
+/// Access token assigned to a user when they have been successfully authorized.
+#[derive(Clone, Debug, PartialEq)]
+pub enum AccessToken {
+    Authorized(String),
+    Unauthorized,
+}
+
+impl Default for AccessToken {
+    fn default() -> Self {
+        AccessToken::Unauthorized
+    }
+}
+
 /// A user defined by an OAuth Provider.
 ///
 /// This user is connected to a Biome User, via a user ID.
@@ -38,7 +51,7 @@ pub struct OAuthUser {
     user_id: String,
     provider_user_ref: String,
 
-    access_token: String,
+    access_token: AccessToken,
     refresh_token: Option<String>,
     provider: OAuthProvider,
 }
@@ -57,7 +70,7 @@ impl OAuthUser {
     }
 
     /// Return the user's current access token.
-    pub fn access_token(&self) -> &str {
+    pub fn access_token(&self) -> &AccessToken {
         &self.access_token
     }
 
@@ -96,7 +109,7 @@ pub struct OAuthUserBuilder {
     user_id: Option<String>,
     provider_user_ref: Option<String>,
 
-    access_token: Option<String>,
+    access_token: AccessToken,
     refresh_token: Option<String>,
     provider: Option<OAuthProvider>,
 }
@@ -121,8 +134,8 @@ impl OAuthUserBuilder {
     }
 
     /// Set the OAuth access token.
-    pub fn with_access_token(mut self, access_token: String) -> Self {
-        self.access_token = Some(access_token);
+    pub fn with_access_token(mut self, access_token: AccessToken) -> Self {
+        self.access_token = access_token;
 
         self
     }
@@ -159,11 +172,7 @@ impl OAuthUserBuilder {
                         .into(),
                 )
             })?,
-            access_token: self.access_token.ok_or_else(|| {
-                InvalidStateError(
-                    "An access token is required to successfully build an OAuthUser".into(),
-                )
-            })?,
+            access_token: self.access_token,
             refresh_token: self.refresh_token,
             provider: self.provider.ok_or_else(|| {
                 InvalidStateError(
@@ -185,13 +194,13 @@ pub struct OAuthUserUpdateBuilder {
     provider: OAuthProvider,
 
     // "mutable" items
-    access_token: String,
+    access_token: AccessToken,
     refresh_token: Option<String>,
 }
 
 impl OAuthUserUpdateBuilder {
     /// Set the OAuth access token.
-    pub fn with_access_token(mut self, access_token: String) -> Self {
+    pub fn with_access_token(mut self, access_token: AccessToken) -> Self {
         self.access_token = access_token;
 
         self
