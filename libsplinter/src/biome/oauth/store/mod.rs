@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines a representation of an OAuth user and provides an API to manage them.
+//! Defines a representation of OAuth users and provides an API to manage them.
 //!
 //! The OAuth user can be considered an extension of the base Biome user.
 
@@ -21,7 +21,8 @@ pub(in crate::biome) mod diesel;
 mod error;
 pub(in crate::biome) mod memory;
 
-pub use error::InvalidStateError;
+use crate::error::InvalidStateError;
+
 pub use error::OAuthUserStoreError;
 
 /// The set of supported OAuth providers.
@@ -164,10 +165,12 @@ impl OAuthUserBuilder {
     pub fn build(self) -> Result<OAuthUser, InvalidStateError> {
         Ok(OAuthUser {
             user_id: self.user_id.ok_or_else(|| {
-                InvalidStateError("A user ID is required to successfully build an OAuthUser".into())
+                InvalidStateError::with_message(
+                    "A user ID is required to successfully build an OAuthUser".into(),
+                )
             })?,
             provider_user_ref: self.provider_user_ref.ok_or_else(|| {
-                InvalidStateError(
+                InvalidStateError::with_message(
                     "A provider user identity is required to successfully build an OAuthUser"
                         .into(),
                 )
@@ -175,7 +178,7 @@ impl OAuthUserBuilder {
             access_token: self.access_token,
             refresh_token: self.refresh_token,
             provider: self.provider.ok_or_else(|| {
-                InvalidStateError(
+                InvalidStateError::with_message(
                     "A provider is required to successfully build an OAuthUser".into(),
                 )
             })?,

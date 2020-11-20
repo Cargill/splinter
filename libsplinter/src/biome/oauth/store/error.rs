@@ -43,14 +43,3 @@ impl fmt::Display for OAuthUserStoreError {
         }
     }
 }
-
-#[derive(Debug)]
-pub struct InvalidStateError(pub String);
-
-impl fmt::Display for InvalidStateError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl Error for InvalidStateError {}
