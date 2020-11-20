@@ -103,7 +103,7 @@ impl std::fmt::Display for ServiceDisconnectionError {
 pub enum ServiceStartError {
     AlreadyStarted,
     UnableToConnect(ServiceConnectionError),
-    Internal(Box<dyn Error + Send>),
+    Internal(String),
     PoisonedLock(String),
 }
 
@@ -112,7 +112,7 @@ impl Error for ServiceStartError {
         match self {
             ServiceStartError::AlreadyStarted => None,
             ServiceStartError::UnableToConnect(err) => Some(err),
-            ServiceStartError::Internal(err) => Some(&**err),
+            ServiceStartError::Internal(_) => None,
             ServiceStartError::PoisonedLock(_) => None,
         }
     }
@@ -125,7 +125,7 @@ impl std::fmt::Display for ServiceStartError {
             ServiceStartError::UnableToConnect(err) => {
                 write!(f, "unable to connect on start: {}", err)
             }
-            ServiceStartError::Internal(err) => write!(f, "unable to start service: {}", err),
+            ServiceStartError::Internal(msg) => write!(f, "unable to start service: {}", msg),
             ServiceStartError::PoisonedLock(msg) => write!(f, "a lock was poisoned: {}", msg),
         }
     }

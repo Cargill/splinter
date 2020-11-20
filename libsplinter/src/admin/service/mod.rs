@@ -257,7 +257,9 @@ impl AdminService {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .get_circuits()
-            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+            .map_err(|err| {
+                ServiceStartError::Internal(format!("Unable to get circuits: {}", err))
+            })?;
 
         let nodes = self
             .admin_service_shared
@@ -266,7 +268,7 @@ impl AdminService {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .get_nodes()
-            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+            .map_err(|err| ServiceStartError::Internal(format!("Unable to get nodes: {}", err)))?;
 
         let orchestrator = self.orchestrator.lock().map_err(|_| {
             ServiceStartError::PoisonedLock("the admin orchestrator lock was poisoned".into())
@@ -400,7 +402,10 @@ impl Service for AdminService {
             self.admin_service_shared.clone(),
             self.coordinator_timeout,
         )
-        .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+        .map_err(|err| {
+            ServiceStartError::Internal(format!("Unable to start consensus: {}", err))
+        })?;
+
         let proposal_sender = consensus.proposal_update_sender();
 
         self.consensus = Some(consensus);
@@ -420,7 +425,9 @@ impl Service for AdminService {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .add_services_to_directory()
-            .map_err(|err| ServiceStartError::Internal(Box::new(err)))?;
+            .map_err(|err| {
+                ServiceStartError::Internal(format!("Unable to add services to directory: {}", err))
+            })?;
 
         self.admin_service_shared
             .lock()

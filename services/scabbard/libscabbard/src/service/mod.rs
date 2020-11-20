@@ -260,7 +260,9 @@ impl Service for Scabbard {
                 self.state.clone(),
                 self.coordinator_timeout,
             )
-            .map_err(|err| ServiceStartError::Internal(Box::new(ScabbardError::from(err))))?,
+            .map_err(|err| {
+                ServiceStartError::Internal(format!("Unable to start consensus: {}", err))
+            })?,
         );
 
         Ok(())
