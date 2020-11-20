@@ -17,19 +17,21 @@ use percent_encoding::utf8_percent_encode;
 use splinter::protocol;
 use std::collections::HashMap;
 
+use crate::rest_api::GameroomdData;
+
 use super::{ErrorResponse, SuccessResponse, DEFAULT_LIMIT, DEFAULT_OFFSET, QUERY_ENCODE_SET};
 
 pub async fn fetch_node(
     identity: web::Path<String>,
     client: web::Data<Client>,
-    splinterd_url: web::Data<String>,
+    gameroomd_data: web::Data<GameroomdData>,
 ) -> Result<HttpResponse, Error> {
     let mut response = client
         .get(&format!(
             "{}/registry/nodes/{}",
-            splinterd_url.get_ref(),
-            identity
+            &gameroomd_data.splinterd_url, identity
         ))
+        .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
             protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
@@ -62,10 +64,10 @@ pub async fn fetch_node(
 
 pub async fn list_nodes(
     client: web::Data<Client>,
-    splinterd_url: web::Data<String>,
+    gameroomd_data: web::Data<GameroomdData>,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
-    let mut request_url = format!("{}/registry/nodes", splinterd_url.get_ref());
+    let mut request_url = format!("{}/registry/nodes", &gameroomd_data.splinterd_url);
 
     let offset = query
         .get("offset")
@@ -88,6 +90,7 @@ pub async fn list_nodes(
 
     let mut response = client
         .get(&request_url)
+        .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
             protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
@@ -142,6 +145,10 @@ mod test {
     };
 
     static SPLINTERD_URL: &str = "http://splinterd-node:8085";
+    static AUTHORIZATION: &str = "Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmRlcitq\
+        d3QifQ==.eyJpc3MiOiIwMjc5YmU2NjdlZjlkY2JiYWM1NWEwNjI5NWNlODcwYjA3MDI5YmZjZGIyZGNlMjhkOTU5Z\
+        jI4MTViMTZmODE3OTgifQ==.71Vw3+m9R4b8iZUzhRHOAtX/hO5WYA9PgMe27/CeZ6NhIXFYkBBzreoIGpHbfJ8UxT\
+        +1MLUgjsQB8TISafneRA==";
 
     #[actix_rt::test]
     /// Tests a GET /registry/nodes/{identity} request returns the expected node.
@@ -149,7 +156,11 @@ mod test {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
-                .data(SPLINTERD_URL.to_string())
+                .data(GameroomdData {
+                    public_key: "".into(),
+                    splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
+                })
                 .service(
                     web::resource("/registry/nodes/{identity}").route(web::get().to(fetch_node)),
                 ),
@@ -174,7 +185,11 @@ mod test {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
-                .data(SPLINTERD_URL.to_string())
+                .data(GameroomdData {
+                    public_key: "".into(),
+                    splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
+                })
                 .service(
                     web::resource("/registry/nodes/{identity}").route(web::get().to(fetch_node)),
                 ),
@@ -196,7 +211,11 @@ mod test {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
-                .data(SPLINTERD_URL.to_string())
+                .data(GameroomdData {
+                    public_key: "".into(),
+                    splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
+                })
                 .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
         .await;
@@ -231,7 +250,11 @@ mod test {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
-                .data(SPLINTERD_URL.to_string())
+                .data(GameroomdData {
+                    public_key: "".into(),
+                    splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
+                })
                 .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
         .await;
@@ -263,7 +286,11 @@ mod test {
         let mut app = test::init_service(
             App::new()
                 .data(Client::new())
-                .data(SPLINTERD_URL.to_string())
+                .data(GameroomdData {
+                    public_key: "".into(),
+                    splinterd_url: SPLINTERD_URL.into(),
+                    authorization: AUTHORIZATION.into(),
+                })
                 .service(web::resource("/registry/nodes").route(web::get().to(list_nodes))),
         )
         .await;

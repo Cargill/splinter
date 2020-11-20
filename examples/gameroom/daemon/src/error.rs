@@ -15,7 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
-use cylinder::ContextError;
+use cylinder::{jwt::JsonWebTokenBuildError, ContextError};
 
 use crate::authorization_handler::AppAuthHandlerError;
 use crate::rest_api::RestApiServerError;
@@ -28,7 +28,7 @@ pub enum GameroomDaemonError {
     DatabaseError(Box<DatabaseError>),
     RestApiError(RestApiServerError),
     AppAuthHandlerError(AppAuthHandlerError),
-    SigningContextError(ContextError),
+    SigningError(String),
     GetNodeError(GetNodeError),
 }
 
@@ -40,7 +40,7 @@ impl Error for GameroomDaemonError {
             GameroomDaemonError::DatabaseError(err) => Some(&**err),
             GameroomDaemonError::RestApiError(err) => Some(err),
             GameroomDaemonError::AppAuthHandlerError(err) => Some(err),
-            GameroomDaemonError::SigningContextError(err) => Some(err),
+            GameroomDaemonError::SigningError(_) => None,
             GameroomDaemonError::GetNodeError(err) => Some(err),
         }
     }
@@ -60,9 +60,7 @@ impl fmt::Display for GameroomDaemonError {
                 "The application authorization handler returned an error: {}",
                 e
             ),
-            GameroomDaemonError::SigningContextError(e) => {
-                write!(f, "A signing error occurred: {}", e)
-            }
+            GameroomDaemonError::SigningError(e) => write!(f, "A signing error occurred: {}", e),
             GameroomDaemonError::GetNodeError(e) => write!(
                 f,
                 "an error occurred while getting splinterd node information: {}",
@@ -98,7 +96,13 @@ impl From<AppAuthHandlerError> for GameroomDaemonError {
 
 impl From<ContextError> for GameroomDaemonError {
     fn from(err: ContextError) -> GameroomDaemonError {
-        GameroomDaemonError::SigningContextError(err)
+        GameroomDaemonError::SigningError(err.to_string())
+    }
+}
+
+impl From<JsonWebTokenBuildError> for GameroomDaemonError {
+    fn from(err: JsonWebTokenBuildError) -> GameroomDaemonError {
+        GameroomDaemonError::SigningError(err.to_string())
     }
 }
 

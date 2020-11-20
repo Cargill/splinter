@@ -93,7 +93,6 @@ pub async fn propose_gameroom(
     create_gameroom: web::Json<CreateGameroomForm>,
     node_info: web::Data<NodeInfo>,
     client: web::Data<Client>,
-    splinterd_url: web::Data<String>,
     gameroomd_data: web::Data<GameroomdData>,
 ) -> HttpResponse {
     let mut template = match CircuitCreateTemplate::from_yaml_file("gameroom.yaml") {
@@ -104,7 +103,13 @@ pub async fn propose_gameroom(
         }
     };
 
-    let response = fetch_node_information(&create_gameroom.members, &splinterd_url, client).await;
+    let response = fetch_node_information(
+        &create_gameroom.members,
+        &gameroomd_data.splinterd_url,
+        &gameroomd_data.authorization,
+        client,
+    )
+    .await;
 
     let nodes = match response {
         Ok(nodes) => nodes,
@@ -206,6 +211,7 @@ pub async fn propose_gameroom(
 async fn fetch_node_information(
     node_ids: &[String],
     splinterd_url: &str,
+    authorization: &str,
     client: web::Data<Client>,
 ) -> Result<Vec<NodeResponse>, RestApiResponseError> {
     let node_ids = node_ids.to_owned();
@@ -215,6 +221,7 @@ async fn fetch_node_information(
             splinterd_url,
             std::i64::MAX
         ))
+        .header("Authorization", authorization)
         .header(
             "SplinterProtocolVersion",
             protocol::ADMIN_PROTOCOL_VERSION.to_string(),

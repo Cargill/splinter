@@ -16,6 +16,8 @@ use actix_web::{client::Client, http::StatusCode, web, Error, HttpResponse};
 use serde::{Deserialize, Serialize};
 use splinter::protocol;
 
+use crate::rest_api::GameroomdData;
+
 use super::{ErrorResponse, SuccessResponse};
 
 #[derive(Debug, Serialize)]
@@ -77,12 +79,12 @@ struct NewKey {
 
 pub async fn login(
     auth_data: web::Json<AuthData>,
-    splinterd_url: web::Data<String>,
     client: web::Data<Client>,
+    gameroomd_data: web::Data<GameroomdData>,
 ) -> Result<HttpResponse, Error> {
     // forward login to splinterd
     let mut login_response = client
-        .post(format!("{}/biome/login", splinterd_url.get_ref()))
+        .post(format!("{}/biome/login", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),
@@ -121,7 +123,7 @@ pub async fn login(
 
     // Get user's key
     let mut key_response = client
-        .get(format!("{}/biome/keys", splinterd_url.get_ref(),))
+        .get(format!("{}/biome/keys", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),
@@ -180,8 +182,8 @@ pub struct UserCreate {
 
 pub async fn register(
     json_wrapper: web::Json<UserCreate>,
-    splinterd_url: web::Data<String>,
     client: web::Data<Client>,
+    gameroomd_data: web::Data<GameroomdData>,
 ) -> Result<HttpResponse, Error> {
     let new_user = json_wrapper.into_inner();
 
@@ -191,7 +193,7 @@ pub async fn register(
     };
 
     let mut registered_response = client
-        .post(format!("{}/biome/register", splinterd_url.get_ref()))
+        .post(format!("{}/biome/register", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),
@@ -220,7 +222,7 @@ pub async fn register(
     };
 
     let mut login_response = client
-        .post(format!("{}/biome/login", splinterd_url.get_ref()))
+        .post(format!("{}/biome/login", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),
@@ -250,7 +252,7 @@ pub async fn register(
 
     // Create Key
     let create_key_response = client
-        .post(format!("{}/biome/keys", splinterd_url.get_ref(),))
+        .post(format!("{}/biome/keys", &gameroomd_data.splinterd_url))
         .header(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),

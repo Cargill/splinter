@@ -16,6 +16,7 @@ version: "3.7"
 
 volumes:
   cargo-registry:
+  cypress-keys:
 
 services:
 
@@ -57,6 +58,7 @@ services:
         - REPO_VERSION=${REPO_VERSION}
     volumes:
       - cargo-registry:/root/.cargo/registry
+      - cypress-keys:/keys
     expose:
       - 8000
     ports:
@@ -80,7 +82,9 @@ services:
         gameroom -vv database migrate --database-url postgres://gameroom_test:gameroom_test@db-cypress-test:5432/gameroom_test
 
         gameroomd -vv --database-url postgres://gameroom_test:gameroom_test@db-cypress-test:5432/gameroom_test \
-          -b gameroomd-acme:8000 --splinterd-url http://splinterd-node:8085
+          -b gameroomd-acme:8000 \
+          --splinterd-url http://splinterd-node:8085 \
+          --key /keys/cypress.priv
       "
 
   splinterd-node:
@@ -94,6 +98,7 @@ services:
       - 8090:8085
     volumes:
       - ../:/project/tests
+      - cypress-keys:/keys
     build:
       context: ../../../..
       dockerfile: splinterd/Dockerfile-installed-${DISTRO}
@@ -102,6 +107,10 @@ services:
         - REPO_VERSION=${REPO_VERSION}
     entrypoint: |
       bash -c "
+        if [ ! -f /keys/cypress.priv ]
+        then
+          splinter admin keygen cypress -d /keys
+        fi && \
         until PGPASSWORD=admin psql -h splinterd-db-node -U admin -d splinter -c '\q'; do
           >&2 echo \"Database is unavailable - sleeping\"
           sleep 1
