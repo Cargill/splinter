@@ -14,7 +14,6 @@
 
 //! Support for OAuth2 authorization in Splinter
 
-mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 
@@ -30,8 +29,7 @@ use oauth2::{
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
-
-pub use error::{OAuthClientConfigurationError, OAuthClientError};
+use crate::error::{InternalError, InvalidArgumentError};
 
 /// The amount of time before a pending authorization expires and a new request must be made
 const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
@@ -67,6 +65,10 @@ impl OAuthClient {
     ///   token
     /// * `scopes` - The scopes that will be requested for each user
     /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the auth, redirect, or token URLs are invalid
     pub fn new(
         client_id: String,
         client_secret: String,
@@ -75,21 +77,22 @@ impl OAuthClient {
         token_url: String,
         scopes: Vec<String>,
         identity_provider: Box<dyn IdentityProvider>,
-    ) -> Result<Self, OAuthClientConfigurationError> {
-        let client =
-            BasicClient::new(
-                ClientId::new(client_id),
-                Some(ClientSecret::new(client_secret)),
-                AuthUrl::new(auth_url).map_err(|err| {
-                    OAuthClientConfigurationError::InvalidAuthUrl(err.to_string())
+    ) -> Result<Self, InvalidArgumentError> {
+        let client = BasicClient::new(
+            ClientId::new(client_id),
+            Some(ClientSecret::new(client_secret)),
+            AuthUrl::new(auth_url)
+                .map_err(|err| InvalidArgumentError::new("auth_url".into(), err.to_string()))?,
+            Some(
+                TokenUrl::new(token_url).map_err(|err| {
+                    InvalidArgumentError::new("token_url".into(), err.to_string())
                 })?,
-                Some(TokenUrl::new(token_url).map_err(|err| {
-                    OAuthClientConfigurationError::InvalidTokenUrl(err.to_string())
-                })?),
-            )
-            .set_redirect_url(RedirectUrl::new(redirect_url).map_err(|err| {
-                OAuthClientConfigurationError::InvalidRedirectUrl(err.to_string())
-            })?);
+            ),
+        )
+        .set_redirect_url(
+            RedirectUrl::new(redirect_url)
+                .map_err(|err| InvalidArgumentError::new("redirect_url".into(), err.to_string()))?,
+        );
         Ok(Self {
             client,
             pending_authorizations: Arc::new(Mutex::new(TtlMap::new(Duration::from_secs(
@@ -108,12 +111,16 @@ impl OAuthClient {
     /// * `client_secret` - The GitHub OAuth client secret
     /// * `redirect_url` - The endpoint that GitHub will redirect to after it has completed
     ///   authorization
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the redirect URL is invalid
     #[cfg(feature = "oauth-github")]
     pub fn new_github(
         client_id: String,
         client_secret: String,
         redirect_url: String,
-    ) -> Result<Self, OAuthClientConfigurationError> {
+    ) -> Result<Self, InvalidArgumentError> {
         Self::new(
             client_id,
             client_secret,
@@ -134,7 +141,7 @@ impl OAuthClient {
     pub fn get_authorization_url(
         &self,
         client_redirect_url: String,
-    ) -> Result<String, OAuthClientError> {
+    ) -> Result<String, InternalError> {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
         let mut request = self
@@ -148,7 +155,9 @@ impl OAuthClient {
 
         self.pending_authorizations
             .lock()
-            .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
+            .map_err(|_| {
+                InternalError::with_message("pending authorizations lock was poisoned".into())
+            })?
             .insert(
                 csrf_state.secret().into(),
                 PendingAuthorization {
@@ -173,11 +182,13 @@ impl OAuthClient {
         &self,
         auth_code: String,
         csrf_token: &str,
-    ) -> Result<Option<(UserInfo, String)>, OAuthClientError> {
+    ) -> Result<Option<(UserInfo, String)>, InternalError> {
         let pending_authorization = match self
             .pending_authorizations
             .lock()
-            .map_err(|_| OAuthClientError::new("pending authorizations lock was poisoned"))?
+            .map_err(|_| {
+                InternalError::with_message("pending authorizations lock was poisoned".into())
+            })?
             .remove(csrf_token)
         {
             Some(pending_authorization) => pending_authorization,
@@ -190,7 +201,7 @@ impl OAuthClient {
             .set_pkce_verifier(PkceCodeVerifier::new(pending_authorization.pkce_verifier))
             .request(http_client)
             .map_err(|err| {
-                OAuthClientError::new(&format!(
+                InternalError::with_message(format!(
                     "failed to make authorization code exchange request: {}",
                     err,
                 ))
@@ -204,7 +215,10 @@ impl OAuthClient {
         let identity = self
             .identity_provider
             .get_identity(&authorization)
-            .map_err(|err| OAuthClientError::new(&format!("failed to get identity: {}", err,)))?;
+            .map_err(|err| {
+                InternalError::with_message(format!("failed to get identity: {}", err,))
+            })?
+            .ok_or_else(|| InternalError::with_message("identity not found".into()))?;
 
         let user_info = UserInfo {
             access_token: token_response.access_token().secret().into(),
@@ -281,7 +295,7 @@ impl std::fmt::Debug for UserInfo {
 mod tests {
     use super::*;
 
-    use crate::auth::rest_api::identity::IdentityProviderError;
+    use crate::error::InternalError;
 
     /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
@@ -309,7 +323,7 @@ mod tests {
                 vec![],
                 identity_box.clone_box(),
             ),
-            Err(OAuthClientConfigurationError::InvalidAuthUrl(_))
+            Err(err) if &err.argument() == "auth_url"
         ));
 
         assert!(matches!(
@@ -322,7 +336,7 @@ mod tests {
                 vec![],
                 identity_box.clone_box(),
             ),
-            Err(OAuthClientConfigurationError::InvalidRedirectUrl(_))
+            Err(err) if &err.argument() == "redirect_url"
         ));
 
         assert!(matches!(
@@ -335,7 +349,7 @@ mod tests {
                 vec![],
                 identity_box,
             ),
-            Err(OAuthClientConfigurationError::InvalidTokenUrl(_))
+            Err(err) if &err.argument() == "token_url"
         ));
     }
 
@@ -343,8 +357,8 @@ mod tests {
     pub struct TestIdentityProvider;
 
     impl IdentityProvider for TestIdentityProvider {
-        fn get_identity(&self, _: &Authorization) -> Result<String, IdentityProviderError> {
-            Ok("".to_string())
+        fn get_identity(&self, _: &Authorization) -> Result<Option<String>, InternalError> {
+            Ok(Some("".to_string()))
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {

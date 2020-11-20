@@ -18,20 +18,19 @@
 pub mod biome;
 #[cfg(feature = "cylinder-jwt")]
 pub mod cylinder;
-mod error;
 #[cfg(feature = "oauth-github")]
 pub mod github;
 
 use std::str::FromStr;
 
-use crate::error::InternalError;
-
-pub use error::{AuthorizationParseError, IdentityProviderError};
+use crate::error::{InternalError, InvalidArgumentError};
 
 /// A service that fetches identities from a backing provider
 pub trait IdentityProvider: Send + Sync {
-    /// Attempts to get the identity that corresponds to the given authorization
-    fn get_identity(&self, authorization: &Authorization) -> Result<String, IdentityProviderError>;
+    /// Attempts to get the identity that corresponds to the given authorization. This method will
+    /// return `Ok(None)` if the identity provider was not able to resolve the authorization to an
+    /// identity.
+    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError>;
 
     /// Clone implementation for `IdentityProvider`. The implementation of the `Clone` trait for
     /// `Box<dyn IdentityProvider>` calls this method.
@@ -65,19 +64,20 @@ pub enum Authorization {
 
 /// Parses an authorization string, which must be in the format "<scheme> <value>"
 impl FromStr for Authorization {
-    type Err = AuthorizationParseError;
+    type Err = InvalidArgumentError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.splitn(2, ' ');
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        let mut parts = str.splitn(2, ' ');
         match (parts.next(), parts.next()) {
             (Some(auth_scheme), Some(token)) => match auth_scheme {
                 "Bearer" => Ok(Authorization::Bearer(token.parse()?)),
-                other_scheme => Err(AuthorizationParseError::new(format!(
-                    "unsupported authorization scheme: {}",
-                    other_scheme
-                ))),
+                other_scheme => Err(InvalidArgumentError::new(
+                    "str".into(),
+                    format!("unsupported authorization scheme: {}", other_scheme),
+                )),
             },
-            (Some(_), None) => Err(AuthorizationParseError::new(
+            (Some(_), None) => Err(InvalidArgumentError::new(
+                "str".into(),
                 "malformed authorization".into(),
             )),
             _ => unreachable!(), // splitn always returns at least one item
@@ -101,10 +101,10 @@ pub enum BearerToken {
 
 /// Parses a bearer token string, which must be in the format "<type>:<value>"
 impl FromStr for BearerToken {
-    type Err = AuthorizationParseError;
+    type Err = InvalidArgumentError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.splitn(2, ':');
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        let mut parts = str.splitn(2, ':');
         match (parts.next(), parts.next()) {
             (Some(token_type), Some(token)) => match token_type {
                 #[cfg(feature = "biome-credentials")]
@@ -113,12 +113,15 @@ impl FromStr for BearerToken {
                 "Cylinder" => Ok(BearerToken::Cylinder(token.to_string())),
                 #[cfg(feature = "oauth")]
                 "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
-                other_type => Err(AuthorizationParseError::new(format!(
-                    "unsupported token type: {}",
-                    other_type
-                ))),
+                other_type => Err(InvalidArgumentError::new(
+                    "str".into(),
+                    format!("unsupported token type: {}", other_type),
+                )),
             },
-            (Some(_), None) => Err(AuthorizationParseError::new("malformed token".into())),
+            (Some(_), None) => Err(InvalidArgumentError::new(
+                "str".into(),
+                "malformed token".into(),
+            )),
             _ => unreachable!(), // splitn always returns at least one item
         }
     }

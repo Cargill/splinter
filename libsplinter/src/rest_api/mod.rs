@@ -1080,7 +1080,9 @@ mod test {
     use futures::IntoFuture;
 
     #[cfg(feature = "auth")]
-    use crate::auth::rest_api::identity::{Authorization, IdentityProviderError};
+    use crate::auth::rest_api::identity::Authorization;
+    #[cfg(feature = "auth")]
+    use crate::error::InternalError;
 
     #[test]
     fn test_resource() {
@@ -1143,8 +1145,8 @@ mod test {
         fn get_identity(
             &self,
             _authorization: &Authorization,
-        ) -> Result<String, IdentityProviderError> {
-            Ok("".into())
+        ) -> Result<Option<String>, InternalError> {
+            Ok(Some("".into()))
         }
 
         /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
