@@ -162,7 +162,7 @@ pub mod tests {
         diesel::DieselCredentialsStore, CredentialsBuilder, CredentialsStore,
         PasswordEncryptionCost,
     };
-    use crate::biome::migrations::run_sqlite_migrations;
+    use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines utilities to interact with AdminServiceStore tables in a PostgreSQL database.
+//! Defines methods and utilities to interact with tables in a PostgreSQL database.
 
-embed_migrations!("./src/admin/store/diesel/migrations/postgres/migrations");
+embed_migrations!("./src/migrations/diesel/postgres/migrations");
 
 use diesel::pg::PgConnection;
 
-use super::MigrationError;
+use crate::migrations::MigrationError;
 
-/// Run database migrations to create tables defined by the AdminServiceStore
+/// Run database migrations to create tables defined by biome
 ///
 /// # Arguments
 ///
@@ -32,7 +32,7 @@ pub fn run_migrations(conn: &PgConnection) -> Result<(), MigrationError> {
         source: Box::new(err),
     })?;
 
-    info!("Successfully applied PostgreSQL AdminServiceStore migrations");
+    info!("Successfully applied PostgreSQL biome migrations");
 
     Ok(())
 }

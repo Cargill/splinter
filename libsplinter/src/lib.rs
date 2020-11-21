@@ -78,6 +78,7 @@ pub mod events;
 mod hex;
 pub mod keys;
 pub mod mesh;
+pub mod migrations;
 pub mod network;
 pub mod orchestrator;
 pub mod peer;

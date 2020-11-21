@@ -12,27 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines methods and utilities to interact with registry tables in a PostgreSQL database.
+//! Defines methods and utilities to interact with biome tables in a SQLite database.
 
-embed_migrations!("./src/registry/diesel/migrations/postgres/migrations");
+embed_migrations!("./src/migrations/diesel/sqlite/migrations");
 
-use diesel::pg::PgConnection;
+use diesel::sqlite::SqliteConnection;
 
-use super::MigrationError;
+use crate::migrations::MigrationError;
 
-/// Run database migrations to create tables defined by registry
+/// Run database migrations to create tables defined by biome
 ///
 /// # Arguments
 ///
-/// * `conn` - Connection to PostgreSQL database
+/// * `conn` - Connection to SQLite database
 ///
-pub fn run_migrations(conn: &PgConnection) -> Result<(), MigrationError> {
+pub fn run_migrations(conn: &SqliteConnection) -> Result<(), MigrationError> {
     embedded_migrations::run(conn).map_err(|err| MigrationError {
         context: "Failed to embed migrations".to_string(),
         source: Box::new(err),
     })?;
 
-    info!("Successfully applied PostgreSQL registry migrations");
+    info!("Successfully applied SQLite biome migrations");
 
     Ok(())
 }

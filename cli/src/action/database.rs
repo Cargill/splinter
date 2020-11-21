@@ -18,7 +18,7 @@ use super::Action;
 use crate::error::CliError;
 use diesel::{connection::Connection as _, pg::PgConnection};
 #[cfg(feature = "database-migrate-biome")]
-use splinter::biome::migrations::run_postgres_migrations;
+use splinter::migrations::run_postgres_migrations;
 
 pub struct MigrateAction;
 

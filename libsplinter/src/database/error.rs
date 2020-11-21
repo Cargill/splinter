@@ -15,6 +15,6 @@
 #[cfg(feature = "biome")]
 #[deprecated(
     since = "0.5.1",
-    note = "replaced by `crate::biome::migrations::MigrationError`"
+    note = "replaced by `crate::migrations::MigrationError`"
 )]
-pub type ConnectionError = crate::biome::migrations::MigrationError;
+pub type ConnectionError = crate::migrations::MigrationError;

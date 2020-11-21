@@ -108,7 +108,7 @@ impl UserStore for DieselUserStore<diesel::sqlite::SqliteConnection> {
 pub mod tests {
     use super::*;
 
-    use crate::biome::migrations::run_sqlite_migrations;
+    use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
         r2d2::{ConnectionManager, Pool},

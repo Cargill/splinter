@@ -20,7 +20,6 @@
 //! [`DieselRegistry`]: ../struct.DieselRegistry.html
 //! [`RwRegistry`]: ../trait.RwRegistry.html
 
-pub mod migrations;
 mod models;
 mod operations;
 mod schema;
