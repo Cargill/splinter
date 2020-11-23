@@ -36,7 +36,7 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
         let mut inner = self.inner.lock().map_err(|_| {
             OAuthUserStoreError::InternalError(InternalError::with_message(
-                "Cannot access refresh token store: mutex lock poisoned".to_string(),
+                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
         inner.insert(oauth_user.user_id().to_string(), oauth_user);
@@ -46,7 +46,7 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
         let mut inner = self.inner.lock().map_err(|_| {
             OAuthUserStoreError::InternalError(InternalError::with_message(
-                "Cannot access refresh token store: mutex lock poisoned".to_string(),
+                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
         inner.insert(oauth_user.user_id().to_string(), oauth_user);
@@ -59,7 +59,7 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let inner = self.inner.lock().map_err(|_| {
             OAuthUserStoreError::InternalError(InternalError::with_message(
-                "Cannot access refresh token store: mutex lock poisoned".to_string(),
+                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
 
@@ -75,7 +75,7 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let inner = self.inner.lock().map_err(|_| {
             OAuthUserStoreError::InternalError(InternalError::with_message(
-                "Cannot access refresh token store: mutex lock poisoned".to_string(),
+                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
 
@@ -90,7 +90,7 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
         let inner = self.inner.lock().map_err(|_| {
             OAuthUserStoreError::InternalError(InternalError::with_message(
-                "Cannot access refresh token store: mutex lock poisoned".to_string(),
+                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
 
