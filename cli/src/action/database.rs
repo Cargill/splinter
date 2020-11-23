@@ -17,7 +17,7 @@ use clap::ArgMatches;
 use super::Action;
 use crate::error::CliError;
 use diesel::{connection::Connection as _, pg::PgConnection};
-#[cfg(feature = "database-migrate-biome")]
+
 use splinter::migrations::run_postgres_migrations;
 
 pub struct MigrateAction;
@@ -38,7 +38,6 @@ impl Action for MigrateAction {
             ))
         })?;
 
-        #[cfg(feature = "database-migrate-biome")]
         run_postgres_migrations(&connection).map_err(|err| {
             CliError::ActionError(format!("Unable to run Biome migrations: {}", err))
         })?;

@@ -42,8 +42,15 @@ reqwest = { version = "0.10", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
-splinter = { path = "../libsplinter", features = ["registry", "admin-service"] }
 whoami = "0.7.0"
+
+[dependencies.splinter]
+path = "../libsplinter"
+features = [
+  "biome",
+  "registry",
+  "admin-service"
+]
 
 [dev-dependencies]
 gag = "0.1"
@@ -53,7 +60,6 @@ serial_test = "0.3"
 default = [
     "circuit-template",
     "database",
-    "database-migrate-biome",
     "postgres",
 ]
 
@@ -73,7 +79,6 @@ experimental = [
 
 circuit-auth-type = []
 circuit-template = ["splinter/circuit-template"]
-database-migrate-biome = ["splinter/biome"]
 
 splinter-cli-jwt = ["cylinder/jwt", "cylinder/key-load"]
 
