@@ -96,7 +96,9 @@ use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::{
     oauth::store::OAuthProvider,
-    rest_api::auth::{BiomeOAuthUserInfoStore, GetUserByOAuthAuthorization},
+    rest_api::auth::{
+        BiomeOAuthUserInfoStore, GetUserByOAuthAuthorization, GetUserIdentityByOAuthAuthorization,
+    },
     OAuthUserStore, UserStore,
 };
 #[cfg(feature = "auth")]
@@ -919,6 +921,13 @@ impl RestApiBuilder {
                                     self.authorization_mappings.push(
                                         ConfigureAuthorizationMapping::new(
                                             GetUserByOAuthAuthorization::new(
+                                                oauth_user_store.clone(),
+                                            ),
+                                        ),
+                                    );
+                                    self.authorization_mappings.push(
+                                        ConfigureAuthorizationMapping::new(
+                                            GetUserIdentityByOAuthAuthorization::new(
                                                 oauth_user_store.clone(),
                                             ),
                                         ),
