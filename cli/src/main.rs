@@ -653,7 +653,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("migrate")
-                        .about("Runs database migrations for the enabled Splinter features")
+                        .about("Runs database migrations Splinter")
                         .arg(
                             Arg::with_name("connect")
                                 .short("C")
