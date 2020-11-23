@@ -32,7 +32,7 @@ pub fn run_migrations(conn: &SqliteConnection) -> Result<(), MigrationError> {
         source: Box::new(err),
     })?;
 
-    info!("Successfully applied SQLite biome migrations");
+    info!("Successfully applied SQLite migrations");
 
     Ok(())
 }
