@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Database backend support for the OAuthUserStore, powered by
+//! [`Diesel`](https://crates.io/crates/diesel).
+
 pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
@@ -33,6 +36,8 @@ use operations::get_by_user_id::OAuthUserStoreGetByUserId as _;
 use operations::update_oauth_user::OAuthUserStoreUpdateOAuthUserOperation as _;
 use operations::OAuthUserStoreOperations;
 
+/// A database-backed [`OAuthUserStore`](`crate::biome::oauth::store::OAuthUserStore`), powered by
+/// [`Diesel`](https://crates.io/crates/diesel).
 pub struct DieselOAuthUserStore<C: diesel::Connection + 'static> {
     connection_pool: Pool<ConnectionManager<C>>,
 }
