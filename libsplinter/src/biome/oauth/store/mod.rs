@@ -16,7 +16,7 @@
 //!
 //! The OAuth user can be considered an extension of the base Biome user.
 
-#[cfg(feature = "diesel")]
+#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
 pub(in crate::biome) mod diesel;
 mod error;
 pub(in crate::biome) mod memory;
