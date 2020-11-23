@@ -59,7 +59,7 @@ impl RestResourceProvider for AdminService {
     }
 }
 
-/// Provides the REST API [Resource](splinter::rest_api::Resource) definitions for
+/// Provides the REST API [`Resource`](crate::rest_api::Resource) definitions for
 /// listing and fetching the circuits in the splinter node's state.
 ///
 /// The following endpoints are provided:
