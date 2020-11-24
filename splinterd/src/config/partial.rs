@@ -71,6 +71,8 @@ pub struct PartialConfig {
     oauth_client_secret: Option<String>,
     #[cfg(feature = "auth")]
     oauth_redirect_url: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_openid_url: Option<String>,
     strict_ref_counts: Option<bool>,
 }
 
@@ -117,6 +119,8 @@ impl PartialConfig {
             oauth_client_secret: None,
             #[cfg(feature = "auth")]
             oauth_redirect_url: None,
+            #[cfg(feature = "auth")]
+            oauth_openid_url: None,
             strict_ref_counts: None,
         }
     }
@@ -251,6 +255,11 @@ impl PartialConfig {
     #[cfg(feature = "auth")]
     pub fn oauth_redirect_url(&self) -> Option<String> {
         self.oauth_redirect_url.clone()
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_openid_url(&self) -> Option<String> {
+        self.oauth_openid_url.clone()
     }
 
     pub fn strict_ref_counts(&self) -> Option<bool> {
@@ -601,6 +610,18 @@ impl PartialConfig {
     ///
     pub fn with_oauth_redirect_url(mut self, oauth_redirect_url: Option<String>) -> Self {
         self.oauth_redirect_url = oauth_redirect_url;
+        self
+    }
+
+    #[cfg(feature = "auth")]
+    /// Adds an `with_oauth_openid_url` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `with_oauth_openid_url` - Add OAuth OpenID URL to the REST API OAuth configuration
+    ///
+    pub fn with_oauth_openid_url(mut self, oauth_openid_url: Option<String>) -> Self {
+        self.oauth_openid_url = oauth_openid_url;
         self
     }
 

@@ -121,6 +121,8 @@ pub struct SplinterDaemon {
     oauth_client_secret: Option<String>,
     #[cfg(feature = "auth")]
     oauth_redirect_url: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_openid_url: Option<String>,
     heartbeat: u64,
     strict_ref_counts: bool,
 }
@@ -514,6 +516,16 @@ impl SplinterDaemon {
                         client_secret,
                         redirect_url,
                     },
+                    "openid" => OAuthConfig::OpenId {
+                        client_id,
+                        client_secret,
+                        redirect_url,
+                        oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
+                            StartError::RestApiError(
+                                "missing OAuth OpenID discovery document URL configuration".into(),
+                            )
+                        })?,
+                    },
                     other_provider => {
                         return Err(StartError::RestApiError(format!(
                             "invalid OAuth provider: {}",
@@ -855,6 +867,8 @@ pub struct SplinterDaemonBuilder {
     oauth_client_secret: Option<String>,
     #[cfg(feature = "auth")]
     oauth_redirect_url: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_openid_url: Option<String>,
     strict_ref_counts: Option<bool>,
 }
 
@@ -976,6 +990,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "auth")]
+    pub fn with_oauth_openid_url(mut self, value: Option<String>) -> Self {
+        self.oauth_openid_url = value;
+        self
+    }
+
     pub fn with_strict_ref_counts(mut self, strict_ref_counts: bool) -> Self {
         self.strict_ref_counts = Some(strict_ref_counts);
         self
@@ -1079,6 +1099,8 @@ impl SplinterDaemonBuilder {
             oauth_client_secret: self.oauth_client_secret,
             #[cfg(feature = "auth")]
             oauth_redirect_url: self.oauth_redirect_url,
+            #[cfg(feature = "auth")]
+            oauth_openid_url: self.oauth_openid_url,
             heartbeat,
             strict_ref_counts,
         })

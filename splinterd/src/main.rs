@@ -336,7 +336,7 @@ fn main() {
                 .long("oauth-provider")
                 .long_help("The OAuth provider used by the REST API")
                 .takes_value(true)
-                .possible_values(&["github"]),
+                .possible_values(&["github", "openid"]),
         )
         .arg(
             Arg::with_name("oauth_client_id")
@@ -354,6 +354,12 @@ fn main() {
             Arg::with_name("oauth_redirect_url")
                 .long("oauth-redirect-url")
                 .long_help("Redirect URL for the OAuth provider used by the REST API")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("oauth_openid_url")
+                .long("oauth-openid-url")
+                .long_help("URL for the OAuth provider's discovery document used by the REST API")
                 .takes_value(true),
         );
 
@@ -479,7 +485,8 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
             .with_oauth_provider(config.oauth_provider().map(ToOwned::to_owned))
             .with_oauth_client_id(config.oauth_client_id().map(ToOwned::to_owned))
             .with_oauth_client_secret(config.oauth_client_secret().map(ToOwned::to_owned))
-            .with_oauth_redirect_url(config.oauth_redirect_url().map(ToOwned::to_owned));
+            .with_oauth_redirect_url(config.oauth_redirect_url().map(ToOwned::to_owned))
+            .with_oauth_openid_url(config.oauth_openid_url().map(ToOwned::to_owned));
     }
 
     let mut node = daemon_builder.build().map_err(|err| {

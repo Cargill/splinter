@@ -157,10 +157,14 @@ OPTIONS
 : Specifies the client secret for the OAuth provider used by the REST API.
 
 `--oauth-provider OAUTH-PROVIDER`
-: Specifies the OAuth provider used by the REST API. Accepted values: `github`.
+: Specifies the OAuth provider used by the REST API. Accepted values: `github`,
+  `openid`.
 
 `--oauth-redirect-url OAUTH-REDIRECT-URL`
 : Redirect URL for the OAuth provider used by the REST API.
+
+`--oauth-openid-url OAUTH-OPENID-URL`
+: OpenID discovery document URL for the OAuth provider used by the REST API.
 
 `--peers PEER-URL` `[,...]`
 : Specifies one or more Splinter nodes that `splinterd` will automatically
@@ -321,7 +325,7 @@ Biome credentials for the splinter REST API can be enabled using the
 The Splinter daemon provides 4 options for configuring OAuth for the REST API:
 
 * `oauth-provider` for specifying the OAuth provider that splinterd will use to
-  get the client's identity. Currently, only `github` is supported.
+  get the client's identity. Currently, `github` and `openid` are supported.
 
 * `oauth-client-id` for specifying the client ID, which is a public identifier
   for an app that's registered with the chosen OAuth provider.
@@ -388,6 +392,10 @@ ENVIRONMENT VARIABLES
 **OAUTH_REDIRECT_URL**
 : Redirect URL for the OAuth provider used by the REST API. See
   `--oauth-redirect-url`.
+
+**OAUTH_OPENID_URL**
+: URL for the OpenID provider's discovery document used by the REST API. See
+  `--oauth-openid-url`.
 
 FILES
 =====

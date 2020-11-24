@@ -138,6 +138,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                         .value_of("oauth_redirect_url")
                         .map(String::from),
                 )
+                .with_oauth_openid_url(self.matches.value_of("oauth_openid_url").map(String::from))
         }
 
         Ok(partial_config)
