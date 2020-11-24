@@ -16,8 +16,6 @@
 
 use crate::config::{ConfigError, ConfigSource, PartialConfig, PartialConfigBuilder};
 
-const STORAGE: &str = "yaml";
-
 const CONFIG_DIR: &str = "/etc/splinter";
 const TLS_CERT_DIR: &str = "/etc/splinter/certs";
 const STATE_DIR: &str = "/var/lib/splinter";
@@ -33,7 +31,7 @@ const REST_API_ENDPOINT: &str = "127.0.0.1:8080";
 const SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
 const NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
 #[cfg(feature = "database")]
-const DATABASE: &str = "127.0.0.1:5432";
+const DATABASE: &str = "splinter_state.db";
 
 const REGISTRY_AUTO_REFRESH: u64 = 600; // 600 seconds = 10 minutes
 const REGISTRY_FORCED_REFRESH: u64 = 10; // 10 seconds
@@ -55,7 +53,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
 
         partial_config = partial_config
             .with_config_dir(Some(String::from(CONFIG_DIR)))
-            .with_storage(Some(String::from(STORAGE)))
             .with_tls_cert_dir(Some(String::from(TLS_CERT_DIR)))
             .with_tls_ca_file(Some(String::from(TLS_CA_FILE)))
             .with_tls_client_cert(Some(String::from(TLS_CLIENT_CERT)))
@@ -102,7 +99,7 @@ mod tests {
 
     /// Asserts config values based on the default values.
     fn assert_default_values(config: PartialConfig) {
-        assert_eq!(config.storage(), Some(String::from(STORAGE)));
+        assert_eq!(config.storage(), None);
         assert_eq!(config.tls_cert_dir(), Some(String::from(TLS_CERT_DIR)));
         assert_eq!(config.tls_ca_file(), Some(String::from(TLS_CA_FILE)));
         assert_eq!(

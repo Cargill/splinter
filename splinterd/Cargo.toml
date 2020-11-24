@@ -60,6 +60,7 @@ features = [
   "registry-remote",
   "rest-api",
   "rest-api-actix",
+  "admin-service",
 ]
 
 [features]
@@ -67,6 +68,7 @@ default = [
     "biome",
     "biome-credentials",
     "biome-key-management",
+    "database"
 ]
 
 stable = [

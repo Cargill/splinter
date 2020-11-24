@@ -47,6 +47,36 @@ fn get_tls_file_path(cert_dir: &str, file: &str) -> String {
     }
 }
 
+fn get_database_path(state_dir: &str, database_file: &str) -> String {
+    if database_file.starts_with("postgres://") {
+        database_file.to_string()
+    } else {
+        match database_file {
+            "memory" | ":memory:" => database_file.to_string(),
+            _ => {
+                // if the database_file is a file path, return path
+                let file_path = Path::new(database_file);
+                if file_path.is_absolute()
+                    || file_path.starts_with("../")
+                    || file_path.starts_with("./")
+                {
+                    file_path
+                        .to_str()
+                        .map(ToOwned::to_owned)
+                        .unwrap_or_else(|| String::from(database_file))
+                } else {
+                    // return state_dir/database_file
+                    Path::new(state_dir)
+                        .join(database_file)
+                        .to_str()
+                        .map(ToOwned::to_owned)
+                        .unwrap_or_else(|| String::from(database_file))
+                }
+            }
+        }
+    }
+}
+
 /// ConfigBuilder collects `PartialConfig` objects from various sources to be used to generate a
 /// `Config` object.
 pub struct ConfigBuilder {
@@ -138,18 +168,34 @@ impl ConfigBuilder {
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("network endpoints".to_string()))?;
+
+        let state_dir = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.state_dir() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("state directory".to_string()))?;
+
+        #[cfg(feature = "database")]
+        let database = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.database() {
+                Some(v) => Some((get_database_path(&state_dir.0, &v), p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("database".to_string()))?;
+
         // Iterates over the list of `PartialConfig` objects to find the first config with a value
         // for the specific field. If no value is found, an error is returned.
         Ok(Config {
             config_dir,
-            storage: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.storage() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("storage".to_string()))?,
+            storage: self.partial_configs.iter().find_map(|p| match p.storage() {
+                Some(v) => Some((v, p.source())),
+                None => None,
+            }),
             tls_cert_dir,
             tls_ca_file,
             tls_client_cert,
@@ -203,14 +249,7 @@ impl ConfigBuilder {
                 })
                 .ok_or_else(|| ConfigError::MissingValue("rest api endpoint".to_string()))?,
             #[cfg(feature = "database")]
-            database: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.database() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("database".to_string()))?,
+            database,
             registries: self
                 .partial_configs
                 .iter()
@@ -257,15 +296,7 @@ impl ConfigBuilder {
                 .ok_or_else(|| {
                     ConfigError::MissingValue("admin service coordinator timeout".to_string())
                 })?,
-
-            state_dir: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.state_dir() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("state directory".to_string()))?,
+            state_dir,
             tls_insecure: self
                 .partial_configs
                 .iter()

@@ -30,14 +30,14 @@ use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
+use splinter::admin::store::yaml::YamlAdminServiceStore;
 #[cfg(feature = "biome")]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
-use splinter::circuit::directory::CircuitDirectory;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
 };
-use splinter::circuit::{SplinterState, SplinterStateError};
+use splinter::circuit::routing::{memory::RoutingTable, RoutingTableReader, RoutingTableWriter};
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::AuthorizationManager;
@@ -66,7 +66,6 @@ use splinter::rest_api::{
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 use splinter::service::{self, ServiceProcessor, ShutdownHandle};
-use splinter::storage::get_storage;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
     Incoming, ListenError, Listener, Transport,
@@ -109,7 +108,7 @@ pub struct SplinterDaemon {
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
-    storage_type: String,
+    storage_type: Option<String>,
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
@@ -133,28 +132,65 @@ impl SplinterDaemon {
         let mut service_transport = InprocTransport::default();
         transport.add_transport(Box::new(service_transport.clone()));
 
-        // Load initial state from the configured storage type and state directory, then create the
-        // new SplinterState from the retrieved circuit directory
-        let storage_location = match &self.storage_type as &str {
-            "yaml" => Path::new(&self.state_dir)
-                .join("circuits.yaml")
-                .to_str()
-                .ok_or_else(|| {
-                    StartError::StorageError("'state_dir' is not a valid UTF-8 string".into())
-                })?
-                .to_string(),
-            "memory" => "memory".to_string(),
-            _ => {
-                return Err(StartError::StorageError(format!(
-                    "storage type is not supported: {}",
-                    self.storage_type
-                )))
+        let admin_service_store = {
+            if let Some(storage) = &self.storage_type {
+                // Load initial state from the configured storage type and state directory, then create
+                // the new SplinterState from the retrieved circuit directory
+                match &storage as &str {
+                    "yaml" => {
+                        let circuits_location = Path::new(&self.state_dir)
+                            .join("circuits.yaml")
+                            .to_str()
+                            .ok_or_else(|| {
+                                StartError::StorageError(
+                                    "'state_dir' is not a valid UTF-8 string".into(),
+                                )
+                            })?
+                            .to_string();
+                        let proposals_location = Path::new(&self.state_dir)
+                            .join("circuit_proposals.yaml")
+                            .to_str()
+                            .ok_or_else(|| {
+                                StartError::StorageError(
+                                    "'state_dir' is not a valid UTF-8 string".into(),
+                                )
+                            })?
+                            .to_string();
+
+                        Box::new(
+                            YamlAdminServiceStore::new(circuits_location, proposals_location)
+                                .map_err(|err| {
+                                    StartError::StorageError(format!(
+                                        "Unable to create YamlAdminServiceStore: {}",
+                                        err
+                                    ))
+                                })?,
+                        )
+                    }
+                    "memory" => {
+                        let store_factory = create_store_factory("memory")?;
+                        store_factory.get_admin_service_store()
+                    }
+                    _ => {
+                        return Err(StartError::StorageError(format!(
+                            "storage type is not supported: {}",
+                            storage
+                        )))
+                    }
+                }
+            } else {
+                //
+                let db_url = self.db_url.clone().ok_or_else(|| {
+                    StartError::StorageError("No database string was provided".into())
+                })?;
+                let store_factory = create_store_factory(&db_url)?;
+                store_factory.get_admin_service_store()
             }
         };
-        let storage = get_storage(&storage_location, CircuitDirectory::new)
-            .map_err(StartError::StorageError)?;
-        let circuit_directory = storage.read().clone();
-        let state = SplinterState::new(storage_location, circuit_directory);
+
+        let table = RoutingTable::default();
+        let routing_reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let routing_writer: Box<dyn RoutingTableWriter> = Box::new(table);
 
         // set up the listeners on the transport. This will set up listeners for different
         // transports based on the protocol prefix of the endpoint.
@@ -299,8 +335,8 @@ impl SplinterDaemon {
         let circuit_dispatcher = set_up_circuit_dispatcher(
             network_sender.clone(),
             &self.node_id,
-            &self.network_endpoints,
-            state.clone(),
+            routing_reader.clone(),
+            routing_writer.clone(),
         );
         let circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
@@ -410,13 +446,12 @@ impl SplinterDaemon {
                 validators
             },
             peer_connector,
-            state.clone(),
+            admin_service_store.clone(),
             admin_service_verifier,
             Box::new(registry.clone_box_as_reader()),
             Box::new(AllowAllKeyPermissionManager),
-            &self.storage_type,
-            &self.state_dir,
             Some(self.admin_timeout),
+            routing_writer.clone(),
         )
         .map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
@@ -430,7 +465,7 @@ impl SplinterDaemon {
         let advertised_endpoints = self.advertised_endpoints.clone();
 
         let circuit_resource_provider =
-            CircuitResourceProvider::new(self.node_id.to_string(), state);
+            CircuitResourceProvider::new(self.node_id.to_string(), admin_service_store);
 
         // Allowing unused_mut because rest_api_builder must be mutable if feature biome is enabled
         #[allow(unused_mut)]
@@ -931,8 +966,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    pub fn with_storage_type(mut self, value: String) -> Self {
-        self.storage_type = Some(value);
+    pub fn with_storage_type(mut self, value: Option<String>) -> Self {
+        self.storage_type = value;
         self
     }
 
@@ -1041,9 +1076,7 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: registry_forced_refresh".to_string())
         })?;
 
-        let storage_type = self.storage_type.ok_or_else(|| {
-            CreateError::MissingRequiredField("Missing field: storage_type".to_string())
-        })?;
+        let storage_type = self.storage_type;
 
         let strict_ref_counts = self.strict_ref_counts.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: strict_ref_counts".to_string())
@@ -1108,27 +1141,33 @@ fn set_up_network_dispatcher(
 fn set_up_circuit_dispatcher(
     network_sender: NetworkMessageSender,
     node_id: &str,
-    endpoints: &[String],
-    state: SplinterState,
+    routing_reader: Box<dyn RoutingTableReader>,
+    routing_writer: Box<dyn RoutingTableWriter>,
 ) -> Dispatcher<CircuitMessageType> {
     let mut dispatcher = Dispatcher::<CircuitMessageType>::new(Box::new(network_sender));
 
-    let service_connect_request_handler =
-        ServiceConnectRequestHandler::new(node_id.to_string(), endpoints.to_vec(), state.clone());
+    let service_connect_request_handler = ServiceConnectRequestHandler::new(
+        node_id.to_string(),
+        routing_reader.clone(),
+        routing_writer.clone(),
+    );
     dispatcher.set_handler(Box::new(service_connect_request_handler));
 
-    let service_disconnect_request_handler = ServiceDisconnectRequestHandler::new(state.clone());
+    let service_disconnect_request_handler =
+        ServiceDisconnectRequestHandler::new(routing_reader.clone(), routing_writer.clone());
     dispatcher.set_handler(Box::new(service_disconnect_request_handler));
 
     let direct_message_handler =
-        CircuitDirectMessageHandler::new(node_id.to_string(), state.clone());
+        CircuitDirectMessageHandler::new(node_id.to_string(), routing_reader.clone());
     dispatcher.set_handler(Box::new(direct_message_handler));
 
-    let circuit_error_handler = CircuitErrorHandler::new(node_id.to_string(), state.clone());
+    let circuit_error_handler =
+        CircuitErrorHandler::new(node_id.to_string(), routing_reader.clone());
     dispatcher.set_handler(Box::new(circuit_error_handler));
 
     // Circuit Admin handlers
-    let admin_direct_message_handler = AdminDirectMessageHandler::new(node_id.to_string(), state);
+    let admin_direct_message_handler =
+        AdminDirectMessageHandler::new(node_id.to_string(), routing_reader);
     dispatcher.set_handler(Box::new(admin_direct_message_handler));
 
     dispatcher
@@ -1286,7 +1325,6 @@ pub enum StartError {
     #[cfg(feature = "health")]
     HealthServiceError(String),
     OrchestratorError(String),
-    StateError(String),
 }
 
 impl Error for StartError {}
@@ -1310,7 +1348,6 @@ impl fmt::Display for StartError {
             StartError::OrchestratorError(msg) => {
                 write!(f, "the orchestrator encountered an error: {}", msg)
             }
-            StartError::StateError(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -1348,11 +1385,5 @@ impl From<protobuf::ProtobufError> for StartError {
 impl From<NewOrchestratorError> for StartError {
     fn from(err: NewOrchestratorError) -> Self {
         StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
-    }
-}
-
-impl From<SplinterStateError> for StartError {
-    fn from(err: SplinterStateError) -> Self {
-        StartError::StateError(err.context())
     }
 }
