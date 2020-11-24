@@ -19,6 +19,8 @@
 //!
 //! [`AdminServiceEventStore`]: trait.AdminServiceEventStore.html
 
+#[cfg(feature = "diesel")]
+mod diesel;
 mod error;
 
 use std::time::SystemTime;
