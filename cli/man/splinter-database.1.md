@@ -18,8 +18,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-This command provides subcommands for working with the Biome database.
-(Biome provides user management functionality for Splinter applications.)
+This command provides subcommands for working with the Splinter daemon database.
 For example, the `migrate` subcommand updates the Biome database to a
 new release.
 
@@ -44,7 +43,7 @@ SUBCOMMANDS
 ===========
 
 `migrate`
-: Updates the Biome database for a new Splinter release
+: Updates the database for a new Splinter release
 
 SEE ALSO
 ========

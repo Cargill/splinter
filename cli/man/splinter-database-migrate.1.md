@@ -8,7 +8,7 @@
 NAME
 ====
 
-**splinter-database-migrate** — Updates the Biome database for a new Splinter
+**splinter-database-migrate** — Updates the database for a new Splinter
 release
 
 SYNOPSIS
@@ -19,12 +19,11 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Biome is the Splinter module that manages users, credentials, and private keys,
-using a PostgreSQL database to store this information.
+Splinter state can be stored in a PostgreSQL database or a SQLite database.
 
-This command migrates the Biome database from one Splinter release to the next.
+This command migrates the database from one Splinter release to the next.
 If a new release adds new database tables or changes existing table formats,
-run this command to update the Biome database to the new format.
+run this command to update the database to the new format.
 
 FLAGS
 =====
@@ -51,7 +50,7 @@ OPTIONS
 
 EXAMPLES
 ========
-This example migrates the Biome database by connecting to a PostgreSQL server
+This example migrates the database by connecting to a PostgreSQL server
 with the example hostname and port `splinter-db-alpha:5432`.
 
 ```
