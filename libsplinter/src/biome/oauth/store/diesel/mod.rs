@@ -83,7 +83,7 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "biome-oauth-user-store-postgres")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;

@@ -52,8 +52,15 @@ impl StoreFactory for PgStoreFactory {
         Box::new(crate::biome::DieselUserStore::new(self.pool.clone()))
     }
 
-    #[cfg(feature = "biome-oauth")]
+    #[cfg(feature = "biome-oauth-user-store-postgres")]
     fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
         Box::new(crate::biome::DieselOAuthUserStore::new(self.pool.clone()))
+    }
+
+    #[cfg(all(feature = "biome-oauth", not(feature = "postgres")))]
+    fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
+        // This configuration cannot be reached within this implementation as the whole struct is
+        // guarded by "postgres". It merely satisfies the compiler.
+        unreachable!()
     }
 }

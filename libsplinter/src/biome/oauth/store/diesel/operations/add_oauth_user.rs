@@ -40,7 +40,7 @@ impl<'a> OAuthUserStoreAddOAuthUserOperation
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "biome-oauth-user-store-postgres")]
 impl<'a> OAuthUserStoreAddOAuthUserOperation
     for OAuthUserStoreOperations<'a, diesel::pg::PgConnection>
 {
