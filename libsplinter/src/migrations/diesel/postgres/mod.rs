@@ -32,7 +32,7 @@ pub fn run_migrations(conn: &PgConnection) -> Result<(), MigrationError> {
         source: Box::new(err),
     })?;
 
-    info!("Successfully applied PostgreSQL biome migrations");
+    info!("Successfully applied PostgreSQL migrations");
 
     Ok(())
 }
