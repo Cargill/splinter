@@ -29,6 +29,7 @@ pub use error::OAuthUserStoreError;
 #[derive(Clone, Debug, PartialEq)]
 pub enum OAuthProvider {
     Github,
+    OpenId,
 }
 
 /// Access token assigned to a user when they have been successfully authorized.

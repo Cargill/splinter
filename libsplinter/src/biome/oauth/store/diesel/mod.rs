@@ -143,6 +143,7 @@ impl From<OAuthUserModel> for OAuthUser {
             refresh_token,
             provider: match provider_id {
                 ProviderId::Github => OAuthProvider::Github,
+                ProviderId::OpenId => OAuthProvider::OpenId,
             },
         }
     }
@@ -160,6 +161,7 @@ impl<'a> From<&'a OAuthUser> for NewOAuthUserModel<'a> {
             refresh_token: user.refresh_token(),
             provider_id: match user.provider() {
                 OAuthProvider::Github => ProviderId::Github,
+                OAuthProvider::OpenId => ProviderId::OpenId,
             },
         }
     }

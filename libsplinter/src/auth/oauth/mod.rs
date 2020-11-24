@@ -24,9 +24,13 @@ use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
     CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
+#[cfg(feature = "oauth-openid")]
+use reqwest::blocking::Client;
 
 #[cfg(feature = "oauth-github")]
 use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
+#[cfg(feature = "oauth-openid")]
+use crate::auth::rest_api::identity::openid::OpenIdUserIdentityProvider;
 use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
 use crate::error::{InternalError, InvalidArgumentError};
@@ -129,6 +133,39 @@ impl OAuthClient {
             "https://github.com/login/oauth/access_token".into(),
             vec![],
             Box::new(GithubUserIdentityProvider),
+        )
+    }
+
+    /// Creates a new `OAuthClient` with the authorization and token URLs from an OpenId
+    /// discovery document
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - The OpenID provider's client ID
+    /// * `client_secret` - The OpenID provider's client secret
+    /// * `auth_url` - The URL of the OpenID provider's authentication endpoint
+    /// * `redirect_url` - The URL of the endpoint that the OpenID provider will
+    ///                    redirect to after authentication
+    /// * `token_url` - The URL of the OpenID provider's token endpoint
+    /// * `scopes` - The scopes available from the OpenID provider
+    #[cfg(feature = "oauth-openid")]
+    pub fn new_openid(
+        client_id: String,
+        client_secret: String,
+        auth_url: String,
+        redirect_url: String,
+        token_url: String,
+        scopes: Vec<String>,
+        userinfo_endpoint: String,
+    ) -> Result<Self, InvalidArgumentError> {
+        Self::new(
+            client_id,
+            client_secret,
+            auth_url,
+            redirect_url,
+            token_url,
+            scopes,
+            Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)),
         )
     }
 
@@ -289,6 +326,59 @@ impl std::fmt::Debug for UserInfo {
             .field("identity", &self.identity)
             .finish()
     }
+}
+
+/// Retrieve the OpenId discovery document from the given link
+#[cfg(feature = "oauth-openid")]
+pub fn oauth_client_from_discovery_doc(
+    client_id: String,
+    client_secret: String,
+    redirect_url: String,
+    oauth_openid_url: String,
+) -> Result<(OAuthClient, Box<dyn IdentityProvider>), InternalError> {
+    // make a call to the discovery document
+    let response = Client::new().get(&oauth_openid_url).send().map_err(|err| {
+        InternalError::with_message(format!(
+            "Unable to retrieve OpenID discovery document: {}",
+            err
+        ))
+    })?;
+    // deserialize response
+    let discovery_document_response =
+        response.json::<DiscoveryDocumentResponse>().map_err(|_| {
+            InternalError::with_message(
+                "Unable to deserialize OpenID discovery document".to_string(),
+            )
+        })?;
+
+    let userinfo_endpoint = discovery_document_response.userinfo_endpoint;
+
+    // return tuple
+    Ok((
+        OAuthClient::new_openid(
+            client_id,
+            client_secret,
+            discovery_document_response.authorization_endpoint,
+            redirect_url,
+            discovery_document_response.token_endpoint,
+            discovery_document_response.scopes_supported,
+            userinfo_endpoint.clone(),
+        )
+        .map_err(|err| {
+            InternalError::with_message(format!("Invalid OpenID OAuth config provided: {}", err))
+        })?,
+        Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)),
+    ))
+}
+
+/// Deserializes the OpenId discovery document response
+#[cfg(feature = "oauth-openid")]
+#[derive(Debug, Deserialize)]
+struct DiscoveryDocumentResponse {
+    authorization_endpoint: String,
+    token_endpoint: String,
+    userinfo_endpoint: String,
+    scopes_supported: Vec<String>,
 }
 
 #[cfg(test)]
