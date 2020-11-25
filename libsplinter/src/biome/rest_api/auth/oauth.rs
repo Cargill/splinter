@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! SaveTokenOperation implementation, backed by Biome's OAuthUserStore.
+//! SaveTokenOperation implementation, backed by Biome's OAuthUserStore. It also includes
+//! an AuthorizationMapping implementation for use with OAuth2 bearer tokens.
 
 use uuid::Uuid;
 
