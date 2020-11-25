@@ -78,6 +78,8 @@ pub struct Config {
     oauth_client_secret: Option<(String, ConfigSource)>,
     #[cfg(feature = "auth")]
     oauth_redirect_url: Option<(String, ConfigSource)>,
+    #[cfg(feature = "auth")]
+    oauth_openid_url: Option<(String, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
 }
 
@@ -238,6 +240,15 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "auth")]
+    pub fn oauth_openid_url(&self) -> Option<&str> {
+        if let Some((openid_url, _)) = &self.oauth_openid_url {
+            Some(openid_url)
+        } else {
+            None
+        }
+    }
+
     pub fn strict_ref_counts(&self) -> bool {
         self.strict_ref_counts.0
     }
@@ -392,6 +403,15 @@ impl Config {
     #[cfg(feature = "auth")]
     pub fn oauth_redirect_url_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.oauth_redirect_url {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "auth")]
+    pub fn oauth_openid_url_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_openid_url {
             Some(source)
         } else {
             None
@@ -564,6 +584,14 @@ impl Config {
                 debug!(
                     "Config: oauth_redirect_url: {} (source: {:?})",
                     redirect_url, source,
+                );
+            }
+            if let (Some(openid_url), Some(source)) =
+                (self.oauth_openid_url(), self.oauth_openid_url_source())
+            {
+                debug!(
+                    "Config: oauth_openid_url: {} (source: {:?})",
+                    openid_url, source,
                 );
             }
         }

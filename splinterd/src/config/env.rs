@@ -33,6 +33,8 @@ const OAUTH_CLIENT_ID_ENV: &str = "OAUTH_CLIENT_ID";
 const OAUTH_CLIENT_SECRET_ENV: &str = "OAUTH_CLIENT_SECRET";
 #[cfg(feature = "auth")]
 const OAUTH_REDIRECT_URL_ENV: &str = "OAUTH_REDIRECT_URL";
+#[cfg(feature = "auth")]
+const OAUTH_OPENID_URL_ENV: &str = "OAUTH_OPENID_URL";
 
 pub struct EnvPartialConfigBuilder;
 
@@ -111,7 +113,8 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
                 .with_oauth_provider(env::var(OAUTH_PROVIDER_ENV).ok())
                 .with_oauth_client_id(env::var(OAUTH_CLIENT_ID_ENV).ok())
                 .with_oauth_client_secret(env::var(OAUTH_CLIENT_SECRET_ENV).ok())
-                .with_oauth_redirect_url(env::var(OAUTH_REDIRECT_URL_ENV).ok());
+                .with_oauth_redirect_url(env::var(OAUTH_REDIRECT_URL_ENV).ok())
+                .with_oauth_openid_url(env::var(OAUTH_OPENID_URL_ENV).ok());
         }
 
         Ok(config)

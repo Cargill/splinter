@@ -69,6 +69,7 @@ use cylinder::Verifier;
 use futures::{future::FutureResult, stream::Stream, Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
 use protobuf::{self, Message};
+
 use std::boxed::Box;
 #[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
 use std::sync::Mutex;
@@ -77,6 +78,7 @@ use std::thread;
 
 #[cfg(feature = "oauth")]
 use crate::auth::oauth::{
+    oauth_client_from_discovery_doc,
     rest_api::{OAuthResourceProvider, SaveUserInfoOperation, SaveUserInfoToNull},
     OAuthClient,
 };
@@ -853,7 +855,10 @@ impl RestApiBuilder {
                             ));
                         }
 
-                        let (oauth_client, oauth_identity_provider) = match &oauth_config {
+                        let (oauth_client, oauth_identity_provider): (
+                            OAuthClient,
+                            Box<dyn IdentityProvider>,
+                        ) = match &oauth_config {
                             #[cfg(feature = "oauth-github")]
                             OAuthConfig::GitHub {
                                 client_id,
@@ -875,6 +880,26 @@ impl RestApiBuilder {
                                 })?,
                                 Box::new(GithubUserIdentityProvider),
                             ),
+                            #[cfg(feature = "oauth-openid")]
+                            OAuthConfig::OpenId {
+                                client_id,
+                                client_secret,
+                                redirect_url,
+                                oauth_openid_url,
+                            } => oauth_client_from_discovery_doc(
+                                client_id.to_string(),
+                                client_secret.to_string(),
+                                redirect_url.to_string(),
+                                oauth_openid_url.to_string(),
+                            )
+                            .map_err(|err| {
+                                RestApiServerError::InvalidStateError(
+                                    InvalidStateError::with_message(format!(
+                                        "Invalid OpenID OAuth config provided: {}",
+                                        err
+                                    )),
+                                )
+                            })?,
                         };
                         // Save user information, including tokens
                         let save_user_info_operation: Box<dyn SaveUserInfoOperation> =
@@ -887,6 +912,8 @@ impl RestApiBuilder {
                                     let oauth_provider = match oauth_config {
                                         #[cfg(feature = "oauth-github")]
                                         OAuthConfig::GitHub { .. } => OAuthProvider::Github,
+                                        #[cfg(feature = "oauth-openid")]
+                                        OAuthConfig::OpenId { .. } => OAuthProvider::OpenId,
                                     };
                                     // Add the configuration mapping for the User value.
                                     self.authorization_mappings.push(
@@ -1002,6 +1029,17 @@ pub enum OAuthConfig {
         client_secret: String,
         /// The redirect URL that is configured for the GitHub OAuth app
         redirect_url: String,
+    },
+    #[cfg(feature = "oauth-openid")]
+    OpenId {
+        /// The client ID of the OpenID OAuth app
+        client_id: String,
+        /// The client secret of the OpenID OAuth app
+        client_secret: String,
+        /// The redirect URL that is configured for the OpenID OAuth app
+        redirect_url: String,
+        /// The URL of the OpenID discovery document
+        oauth_openid_url: String,
     },
 }
 

@@ -61,6 +61,8 @@ struct TomlConfig {
     oauth_client_secret: Option<String>,
     #[cfg(feature = "auth")]
     oauth_redirect_url: Option<String>,
+    #[cfg(feature = "auth")]
+    oauth_openid_url: Option<String>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -163,7 +165,8 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_oauth_provider(self.toml_config.oauth_provider)
                 .with_oauth_client_id(self.toml_config.oauth_client_id)
                 .with_oauth_client_secret(self.toml_config.oauth_client_secret)
-                .with_oauth_redirect_url(self.toml_config.oauth_redirect_url);
+                .with_oauth_redirect_url(self.toml_config.oauth_redirect_url)
+                .with_oauth_openid_url(self.toml_config.oauth_openid_url);
         }
 
         // deprecated values, only set if the current value was not set

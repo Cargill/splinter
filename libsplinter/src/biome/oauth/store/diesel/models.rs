@@ -30,6 +30,7 @@ use super::schema::oauth_user;
 #[derive(Debug, PartialEq, FromSqlRow, Clone, Copy)]
 pub enum ProviderId {
     Github = 1,
+    OpenId = 2,
 }
 
 impl<DB> ToSql<SmallInt, DB> for ProviderId
@@ -66,6 +67,7 @@ where
     fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
         match i16::from_sql(bytes)? {
             1 => Ok(ProviderId::Github),
+            2 => Ok(ProviderId::OpenId),
             int => Err(format!("Invalid provider {}", int).into()),
         }
     }
