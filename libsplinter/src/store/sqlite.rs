@@ -15,7 +15,8 @@
 //! Implementation of a `StoreFactory` for SQLite
 
 use diesel::{
-    r2d2::{ConnectionManager, Pool},
+    connection::SimpleConnection,
+    r2d2::{ConnectionManager, CustomizeConnection, Pool},
     sqlite::SqliteConnection,
 };
 
@@ -58,5 +59,17 @@ impl StoreFactory for SqliteStoreFactory {
     #[cfg(feature = "biome-oauth")]
     fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
         Box::new(crate::biome::DieselOAuthUserStore::new(self.pool.clone()))
+    }
+}
+
+#[derive(Default, Debug)]
+/// Foreign keys must be enabled on a per connection basis. This customizer will be added to the
+/// SQLite pool builder and then ran against every connection returned from the pool.
+pub struct ForeignKeyCustomizer;
+
+impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ForeignKeyCustomizer {
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        conn.batch_execute("PRAGMA foreign_keys = ON;")
+            .map_err(diesel::r2d2::Error::QueryError)
     }
 }
