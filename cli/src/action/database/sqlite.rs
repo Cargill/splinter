@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Provides sqlite migration support to the database action
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -30,6 +32,7 @@ const SPLINTER_STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const DEFAULT_STATE_DIR: &str = "/var/lib/splinter";
 const DEFAULT_SQLITE: &str = "splinter_state.db";
 
+/// Run the sqlite migrations against the provided connection string
 pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
     let connection_manager = ConnectionManager::<SqliteConnection>::new(&connection_string);
     let mut pool_builder = Pool::builder();
@@ -50,6 +53,11 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
     Ok(())
 }
 
+/// Returns the path to the default sqlite database
+///
+/// If `SPLINTER_STATE_DIR` is set, returns `SPLINTER_STATE_DIR/splinter_state.db`.
+/// If `SPLINTER_HOME` is set, returns `SPLINTER_HOME/data/splinter_state.db`.
+/// Otherwise, returns `/var/lib/splinter/splinter_state.db`
 pub fn get_default_database() -> Result<String, CliError> {
     let mut opt_path = {
         if let Ok(state_dir) = env::var(SPLINTER_STATE_DIR_ENV) {
