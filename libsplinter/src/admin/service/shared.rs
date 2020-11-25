@@ -48,7 +48,7 @@ use crate::service::error::ServiceError;
 use crate::service::validation::ServiceArgValidator;
 
 use crate::service::ServiceNetworkSender;
-use crate::storage::sets::mem::DurableBTreeSet;
+use crate::sets::mem::DurableBTreeSet;
 
 use super::error::{AdminSharedError, MarshallingError};
 use super::mailbox::Mailbox;

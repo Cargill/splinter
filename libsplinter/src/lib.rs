@@ -89,7 +89,7 @@ pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod service;
-pub mod storage;
+pub mod sets;
 #[cfg(feature = "store-factory")]
 pub mod store;
 mod threading;

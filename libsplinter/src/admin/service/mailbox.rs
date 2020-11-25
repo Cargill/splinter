@@ -19,7 +19,7 @@ use std::fmt;
 use std::ops::Bound;
 use std::time::SystemTime;
 
-use crate::storage::sets::DurableOrderedSet;
+use crate::sets::DurableOrderedSet;
 
 use super::messages::AdminServiceEvent;
 
@@ -212,7 +212,7 @@ impl fmt::Display for MailboxError {
 #[cfg(test)]
 mod tests {
     use crate::admin::messages::{self, AdminServiceEvent, CircuitProposal, ProposalType};
-    use crate::storage::sets::mem::DurableBTreeSet;
+    use crate::sets::mem::DurableBTreeSet;
 
     use super::*;
 
