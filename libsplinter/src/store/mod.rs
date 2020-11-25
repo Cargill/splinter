@@ -20,6 +20,8 @@ pub mod sqlite;
 
 use std::str::FromStr;
 
+#[cfg(feature = "sqlite")]
+use self::sqlite::ForeignKeyCustomizer;
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 
@@ -68,7 +70,8 @@ pub fn create_store_factory(
         ConnectionUri::Sqlite(conn_str) => {
             let connection_manager =
                 ConnectionManager::<diesel::sqlite::SqliteConnection>::new(&conn_str);
-            let mut pool_builder = Pool::builder();
+            let mut pool_builder =
+                Pool::builder().connection_customizer(Box::new(ForeignKeyCustomizer::default()));
             // A new database is created for each connection to the in-memory SQLite
             // implementation; to ensure that the resulting stores will operate on the same
             // database, only one connection is allowed.
