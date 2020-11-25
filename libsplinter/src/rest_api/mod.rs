@@ -77,19 +77,21 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 #[cfg(feature = "oauth")]
-use crate::auth::oauth::{
-    oauth_client_from_discovery_doc,
-    rest_api::{OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp},
-    OAuthClient,
+use crate::auth::oauth::rest_api::{
+    OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp,
 };
+#[cfg(feature = "oauth-openid")]
+use crate::auth::oauth::OpenIdOAuthClientBuilder;
 #[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
 use crate::auth::rest_api::identity::cylinder::CylinderKeyIdentityProvider;
-#[cfg(feature = "oauth-github")]
-use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::auth::rest_api::{
     actix::Authorization,
     identity::{AuthorizationMapping, IdentityProvider},
+};
+#[cfg(feature = "oauth-github")]
+use crate::auth::{
+    oauth::GithubOAuthClientBuilder, rest_api::identity::github::GithubUserIdentityProvider,
 };
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
@@ -858,7 +860,7 @@ impl RestApiBuilder {
                         }
 
                         let (oauth_client, oauth_identity_provider): (
-                            OAuthClient,
+                            _,
                             Box<dyn IdentityProvider>,
                         ) = match &oauth_config {
                             #[cfg(feature = "oauth-github")]
@@ -867,19 +869,19 @@ impl RestApiBuilder {
                                 client_secret,
                                 redirect_url,
                             } => (
-                                OAuthClient::new_github(
-                                    client_id.to_string(),
-                                    client_secret.to_string(),
-                                    redirect_url.to_string(),
-                                )
-                                .map_err(|err| {
-                                    RestApiServerError::InvalidStateError(
-                                        InvalidStateError::with_message(format!(
-                                            "Invalid GitHub OAuth config provided: {}",
-                                            err
-                                        )),
-                                    )
-                                })?,
+                                GithubOAuthClientBuilder::new()
+                                    .with_client_id(client_id.into())
+                                    .with_client_secret(client_secret.into())
+                                    .with_redirect_url(redirect_url.into())
+                                    .build()
+                                    .map_err(|err| {
+                                        RestApiServerError::InvalidStateError(
+                                            InvalidStateError::with_message(format!(
+                                                "Invalid GitHub OAuth config provided: {}",
+                                                err
+                                            )),
+                                        )
+                                    })?,
                                 Box::new(GithubUserIdentityProvider),
                             ),
                             #[cfg(feature = "oauth-openid")]
@@ -888,20 +890,20 @@ impl RestApiBuilder {
                                 client_secret,
                                 redirect_url,
                                 oauth_openid_url,
-                            } => oauth_client_from_discovery_doc(
-                                client_id.to_string(),
-                                client_secret.to_string(),
-                                redirect_url.to_string(),
-                                oauth_openid_url.to_string(),
-                            )
-                            .map_err(|err| {
-                                RestApiServerError::InvalidStateError(
-                                    InvalidStateError::with_message(format!(
-                                        "Invalid OpenID OAuth config provided: {}",
-                                        err
-                                    )),
-                                )
-                            })?,
+                            } => OpenIdOAuthClientBuilder::new()
+                                .with_discovery_url(oauth_openid_url.into())
+                                .with_client_id(client_id.into())
+                                .with_client_secret(client_secret.into())
+                                .with_redirect_url(redirect_url.into())
+                                .build()
+                                .map_err(|err| {
+                                    RestApiServerError::InvalidStateError(
+                                        InvalidStateError::with_message(format!(
+                                            "Invalid OpenID OAuth config provided: {}",
+                                            err
+                                        )),
+                                    )
+                                })?,
                         };
                         // Save user information, including tokens
                         let user_info_store: Box<dyn OAuthUserInfoStore> =

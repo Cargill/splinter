@@ -14,6 +14,8 @@
 
 //! Support for OAuth2 authorization in Splinter
 
+mod builder;
+mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 
@@ -24,16 +26,17 @@ use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
     CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
-#[cfg(feature = "oauth-openid")]
-use reqwest::blocking::Client;
 
-#[cfg(feature = "oauth-github")]
-use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
-#[cfg(feature = "oauth-openid")]
-use crate::auth::rest_api::identity::openid::OpenIdUserIdentityProvider;
 use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
 use crate::error::{InternalError, InvalidArgumentError};
+
+#[cfg(feature = "oauth-github")]
+pub use builder::GithubOAuthClientBuilder;
+pub use builder::OAuthClientBuilder;
+#[cfg(feature = "oauth-openid")]
+pub use builder::OpenIdOAuthClientBuilder;
+pub use error::OAuthClientBuildError;
 
 /// The amount of time before a pending authorization expires and a new request must be made
 const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
@@ -73,7 +76,7 @@ impl OAuthClient {
     /// # Errors
     ///
     /// Returns an error if any of the auth, redirect, or token URLs are invalid
-    pub fn new(
+    fn new(
         client_id: String,
         client_secret: String,
         auth_url: String,
@@ -105,68 +108,6 @@ impl OAuthClient {
             scopes,
             identity_provider,
         })
-    }
-
-    /// Creates a new `OAuthClient` with GitHub's authorization and token URLs.
-    ///
-    /// # Arguments
-    ///
-    /// * `client_id` - The GitHub OAuth client ID
-    /// * `client_secret` - The GitHub OAuth client secret
-    /// * `redirect_url` - The endpoint that GitHub will redirect to after it has completed
-    ///   authorization
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any of the redirect URL is invalid
-    #[cfg(feature = "oauth-github")]
-    pub fn new_github(
-        client_id: String,
-        client_secret: String,
-        redirect_url: String,
-    ) -> Result<Self, InvalidArgumentError> {
-        Self::new(
-            client_id,
-            client_secret,
-            "https://github.com/login/oauth/authorize".into(),
-            redirect_url,
-            "https://github.com/login/oauth/access_token".into(),
-            vec![],
-            Box::new(GithubUserIdentityProvider),
-        )
-    }
-
-    /// Creates a new `OAuthClient` with the authorization and token URLs from an OpenId
-    /// discovery document
-    ///
-    /// # Arguments
-    ///
-    /// * `client_id` - The OpenID provider's client ID
-    /// * `client_secret` - The OpenID provider's client secret
-    /// * `auth_url` - The URL of the OpenID provider's authentication endpoint
-    /// * `redirect_url` - The URL of the endpoint that the OpenID provider will
-    ///                    redirect to after authentication
-    /// * `token_url` - The URL of the OpenID provider's token endpoint
-    /// * `scopes` - The scopes available from the OpenID provider
-    #[cfg(feature = "oauth-openid")]
-    pub fn new_openid(
-        client_id: String,
-        client_secret: String,
-        auth_url: String,
-        redirect_url: String,
-        token_url: String,
-        scopes: Vec<String>,
-        userinfo_endpoint: String,
-    ) -> Result<Self, InvalidArgumentError> {
-        Self::new(
-            client_id,
-            client_secret,
-            auth_url,
-            redirect_url,
-            token_url,
-            scopes,
-            Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)),
-        )
     }
 
     /// Generates the URL that the end user should be redirected to for authorization
@@ -326,59 +267,6 @@ impl std::fmt::Debug for UserInfo {
             .field("identity", &self.identity)
             .finish()
     }
-}
-
-/// Retrieve the OpenId discovery document from the given link
-#[cfg(feature = "oauth-openid")]
-pub fn oauth_client_from_discovery_doc(
-    client_id: String,
-    client_secret: String,
-    redirect_url: String,
-    oauth_openid_url: String,
-) -> Result<(OAuthClient, Box<dyn IdentityProvider>), InternalError> {
-    // make a call to the discovery document
-    let response = Client::new().get(&oauth_openid_url).send().map_err(|err| {
-        InternalError::with_message(format!(
-            "Unable to retrieve OpenID discovery document: {}",
-            err
-        ))
-    })?;
-    // deserialize response
-    let discovery_document_response =
-        response.json::<DiscoveryDocumentResponse>().map_err(|_| {
-            InternalError::with_message(
-                "Unable to deserialize OpenID discovery document".to_string(),
-            )
-        })?;
-
-    let userinfo_endpoint = discovery_document_response.userinfo_endpoint;
-
-    // return tuple
-    Ok((
-        OAuthClient::new_openid(
-            client_id,
-            client_secret,
-            discovery_document_response.authorization_endpoint,
-            redirect_url,
-            discovery_document_response.token_endpoint,
-            discovery_document_response.scopes_supported,
-            userinfo_endpoint.clone(),
-        )
-        .map_err(|err| {
-            InternalError::with_message(format!("Invalid OpenID OAuth config provided: {}", err))
-        })?,
-        Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)),
-    ))
-}
-
-/// Deserializes the OpenId discovery document response
-#[cfg(feature = "oauth-openid")]
-#[derive(Debug, Deserialize)]
-struct DiscoveryDocumentResponse {
-    authorization_endpoint: String,
-    token_endpoint: String,
-    userinfo_endpoint: String,
-    scopes_supported: Vec<String>,
 }
 
 #[cfg(test)]
