@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::oauth::{builder::OAuthClientBuilder, error::OAuthClientBuildError, OAuthClient};
+use crate::oauth::{
+    builder::OAuthClientBuilder, error::OAuthClientBuildError, InflightOAuthRequestStore,
+    OAuthClient,
+};
 use crate::rest_api::auth::identity::{github::GithubUserIdentityProvider, IdentityProvider};
 
 /// Builds a new `OAuthClient` with GitHub's authorization and token URLs.
@@ -52,7 +55,20 @@ impl GithubOAuthClientBuilder {
         }
     }
 
-    /// Builds an `OAuthClient` and returns it along with the `IdentityProvider` for GitHub.
+    /// Sets the in-flight request store in order to store values between requests to and from the
+    /// OAuth2 provider.
+    pub fn with_inflight_request_store(
+        self,
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+    ) -> Self {
+        Self {
+            inner: self
+                .inner
+                .with_inflight_request_store(inflight_request_store),
+        }
+    }
+
+    /// Builds an OAuthClient.
     ///
     /// # Errors
     ///

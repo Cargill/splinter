@@ -92,6 +92,8 @@ use crate::biome::{
 use crate::error::InvalidStateError;
 #[cfg(feature = "oauth")]
 use crate::oauth::rest_api::{OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp};
+#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+use crate::oauth::store::MemoryInflightOAuthRequestStore;
 #[cfg(feature = "oauth-github")]
 use crate::oauth::GithubOAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
@@ -870,6 +872,9 @@ impl RestApiBuilder {
                                 .with_client_id(client_id.into())
                                 .with_client_secret(client_secret.into())
                                 .with_redirect_url(redirect_url.into())
+                                .with_inflight_request_store(Box::new(
+                                    MemoryInflightOAuthRequestStore::new(),
+                                ))
                                 .build()
                                 .map_err(|err| {
                                     RestApiServerError::InvalidStateError(
@@ -890,6 +895,9 @@ impl RestApiBuilder {
                                 .with_client_id(client_id.into())
                                 .with_client_secret(client_secret.into())
                                 .with_redirect_url(redirect_url.into())
+                                .with_inflight_request_store(Box::new(
+                                    MemoryInflightOAuthRequestStore::new(),
+                                ))
                                 .build()
                                 .map_err(|err| {
                                     RestApiServerError::InvalidStateError(

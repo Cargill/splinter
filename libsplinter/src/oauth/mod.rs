@@ -18,8 +18,8 @@ mod builder;
 mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
+pub mod store;
 
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use oauth2::{
@@ -27,7 +27,6 @@ use oauth2::{
     CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 
-use crate::collections::TtlMap;
 use crate::error::{InternalError, InvalidArgumentError};
 use crate::rest_api::auth::identity::{Authorization, BearerToken, IdentityProvider};
 
@@ -38,9 +37,6 @@ pub use builder::OAuthClientBuilder;
 pub use builder::OpenIdOAuthClientBuilder;
 pub use error::OAuthClientBuildError;
 
-/// The amount of time before a pending authorization expires and a new request must be made
-const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
-
 /// An OAuth2 client for Splinter
 ///
 /// This client currently supports OAuth2 authorization code grants
@@ -49,13 +45,14 @@ const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
 pub struct OAuthClient {
     /// The inner OAuth2 client
     client: BasicClient,
-    /// Pending authorization requests, including the CSRF token, PKCE verifier, and client's
-    /// redirect URL
-    pending_authorizations: Arc<Mutex<TtlMap<String, PendingAuthorization>>>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
     /// OAuth2 identity provider used to retrieve users' identities
     identity_provider: Box<dyn IdentityProvider>,
+
+    /// Store for pending authorization requests, including the CSRF token, PKCE verifier, and
+    /// client's redirect URL
+    inflight_request_store: Box<dyn InflightOAuthRequestStore>,
 }
 
 impl OAuthClient {
@@ -72,6 +69,8 @@ impl OAuthClient {
     ///   token
     /// * `scopes` - The scopes that will be requested for each user
     /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
+    /// * `inflight_request_store` - The store for information about in-flight request to a
+    /// provider.
     ///
     /// # Errors
     ///
@@ -84,6 +83,7 @@ impl OAuthClient {
         token_url: String,
         scopes: Vec<String>,
         identity_provider: Box<dyn IdentityProvider>,
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     ) -> Result<Self, InvalidArgumentError> {
         let client = BasicClient::new(
             ClientId::new(client_id),
@@ -102,11 +102,9 @@ impl OAuthClient {
         );
         Ok(Self {
             client,
-            pending_authorizations: Arc::new(Mutex::new(TtlMap::new(Duration::from_secs(
-                PENDING_AUTHORIZATION_EXPIRATION_SECS,
-            )))),
             scopes,
             identity_provider,
+            inflight_request_store,
         })
     }
 
@@ -131,18 +129,13 @@ impl OAuthClient {
         }
         let (authorize_url, csrf_state) = request.url();
 
-        self.pending_authorizations
-            .lock()
-            .map_err(|_| {
-                InternalError::with_message("pending authorizations lock was poisoned".into())
-            })?
-            .insert(
-                csrf_state.secret().into(),
-                PendingAuthorization {
-                    pkce_verifier: pkce_verifier.secret().into(),
-                    client_redirect_url,
-                },
-            );
+        self.inflight_request_store.insert_request(
+            csrf_state.secret().into(),
+            PendingAuthorization {
+                pkce_verifier: pkce_verifier.secret().into(),
+                client_redirect_url,
+            },
+        )?;
 
         Ok(authorize_url.to_string())
     }
@@ -161,14 +154,7 @@ impl OAuthClient {
         auth_code: String,
         csrf_token: &str,
     ) -> Result<Option<(UserInfo, String)>, InternalError> {
-        let pending_authorization = match self
-            .pending_authorizations
-            .lock()
-            .map_err(|_| {
-                InternalError::with_message("pending authorizations lock was poisoned".into())
-            })?
-            .remove(csrf_token)
-        {
+        let pending_authorization = match self.inflight_request_store.remove_request(csrf_token)? {
             Some(pending_authorization) => pending_authorization,
             None => return Ok(None),
         };
@@ -211,9 +197,39 @@ impl OAuthClient {
     }
 }
 
+/// A Store for the in-flight information pertaining to an OAauth2 request.
+///
+/// An OAuth2 request consists of a request to the provider, and then a callback request back to
+/// the library user's REST API.  There is information created for the first request that must be
+/// verified by the second request. This store manages that information.
+pub trait InflightOAuthRequestStore: Sync + Send {
+    /// Insert a request into the store.
+    fn insert_request(
+        &self,
+        request_id: String,
+        authorization: PendingAuthorization,
+    ) -> Result<(), InternalError>;
+
+    /// Remove a request from the store and return it, if it exists.
+    fn remove_request(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<PendingAuthorization>, InternalError>;
+
+    /// Clone the store for dynamic dispatch.
+    fn clone_box(&self) -> Box<dyn InflightOAuthRequestStore>;
+}
+
+impl Clone for Box<dyn InflightOAuthRequestStore> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
 /// Information pertaining to pending authorization requests, including the PKCE verifier, and
 /// client's redirect URL
-struct PendingAuthorization {
+#[derive(Debug, PartialEq)]
+pub struct PendingAuthorization {
     pkce_verifier: String,
     client_redirect_url: String,
 }
@@ -280,6 +296,7 @@ mod tests {
     #[test]
     fn client_construction() {
         let identity_box: Box<TestIdentityProvider> = Box::new(TestIdentityProvider);
+        let inflight_request_store = Box::new(TestInflightOAuthRequestStore);
         OAuthClient::new(
             "client_id".into(),
             "client_secret".into(),
@@ -288,6 +305,7 @@ mod tests {
             "https://provider.com/token".into(),
             vec![],
             identity_box.clone_box(),
+            inflight_request_store.clone_box(),
         )
         .expect("Failed to create client from valid inputs");
 
@@ -300,6 +318,7 @@ mod tests {
                 "https://provider.com/token".into(),
                 vec![],
                 identity_box.clone_box(),
+                inflight_request_store.clone_box(),
             ),
             Err(err) if &err.argument() == "auth_url"
         ));
@@ -313,6 +332,7 @@ mod tests {
                 "https://provider.com/token".into(),
                 vec![],
                 identity_box.clone_box(),
+                inflight_request_store.clone_box(),
             ),
             Err(err) if &err.argument() == "redirect_url"
         ));
@@ -326,6 +346,7 @@ mod tests {
                 "invalid_token_url".into(),
                 vec![],
                 identity_box,
+                inflight_request_store,
             ),
             Err(err) if &err.argument() == "token_url"
         ));
@@ -342,5 +363,68 @@ mod tests {
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
             Box::new(self.clone())
         }
+    }
+
+    #[derive(Clone)]
+    pub struct TestInflightOAuthRequestStore;
+
+    impl InflightOAuthRequestStore for TestInflightOAuthRequestStore {
+        fn insert_request(
+            &self,
+            _request_id: String,
+            _authorization: PendingAuthorization,
+        ) -> Result<(), InternalError> {
+            Ok(())
+        }
+
+        fn remove_request(
+            &self,
+            _request_id: &str,
+        ) -> Result<Option<PendingAuthorization>, InternalError> {
+            Ok(None)
+        }
+
+        fn clone_box(&self) -> Box<dyn InflightOAuthRequestStore> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// This test checks that a store implementation provides the insert and remove functionality
+    /// correctly.  It does the following:
+    /// 1. Insert a Pending authorization
+    /// 2. Remove it and verify that the pending authorization is removed
+    /// 3. Remove it a second time and verify that None is returned, indicating that the request
+    ///    has been handled.
+    pub fn test_request_store_insert_and_remove(
+        inflight_request_store: &dyn InflightOAuthRequestStore,
+    ) {
+        inflight_request_store
+            .insert_request(
+                "test_request".to_string(),
+                PendingAuthorization {
+                    pkce_verifier: "this is a pkce_verifier".into(),
+                    client_redirect_url: "http://example.com/someplace/nice".into(),
+                },
+            )
+            .expect("Unable to insert pending request");
+
+        let request = inflight_request_store
+            .remove_request("test_request")
+            .expect("Unable to remove and return the pending request");
+
+        assert_eq!(
+            Some(PendingAuthorization {
+                pkce_verifier: "this is a pkce_verifier".into(),
+                client_redirect_url: "http://example.com/someplace/nice".into(),
+            }),
+            request
+        );
+
+        // Attempt to remove again, and receive a None value
+        let request = inflight_request_store
+            .remove_request("test_request")
+            .expect("Unable to remove and return the pending request");
+
+        assert_eq!(None, request);
     }
 }

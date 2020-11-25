@@ -15,7 +15,10 @@
 use reqwest::blocking::Client;
 
 use crate::error::{InternalError, InvalidStateError};
-use crate::oauth::{builder::OAuthClientBuilder, error::OAuthClientBuildError, OAuthClient};
+use crate::oauth::{
+    builder::OAuthClientBuilder, error::OAuthClientBuildError, InflightOAuthRequestStore,
+    OAuthClient,
+};
 use crate::rest_api::auth::identity::{openid::OpenIdUserIdentityProvider, IdentityProvider};
 
 /// Builds a new `OAuthClient` using an OpenID discovery document.
@@ -46,6 +49,20 @@ impl OpenIdOAuthClientBuilder {
         Self {
             openid_discovery_url: self.openid_discovery_url,
             inner: self.inner.with_client_secret(client_secret),
+        }
+    }
+
+    /// Sets the in-flight request store in order to store values between requests to and from the
+    /// OAuth2 provider.
+    pub fn with_inflight_request_store(
+        self,
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+    ) -> Self {
+        Self {
+            openid_discovery_url: self.openid_discovery_url,
+            inner: self
+                .inner
+                .with_inflight_request_store(inflight_request_store),
         }
     }
 
