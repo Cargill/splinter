@@ -45,7 +45,7 @@ FLAGS
 OPTIONS
 =======
 
-`-C` *CONNECTION-STRING*
+`-C` CONNECT
 : Specifies the connection string or URI for the database server.
 
 EXAMPLES
