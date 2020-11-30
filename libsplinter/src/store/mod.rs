@@ -28,7 +28,7 @@ use self::sqlite::ForeignKeyCustomizer;
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 
-use crate::error::InternalError;
+use crate::error::{InternalError, InvalidArgumentError};
 
 /// An abstract factory for creating Splinter stores backed by the same storage
 pub trait StoreFactory {
@@ -110,7 +110,7 @@ pub enum ConnectionUri {
 }
 
 impl FromStr for ConnectionUri {
-    type Err = ParseConnectionUriError;
+    type Err = InvalidArgumentError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -120,22 +120,10 @@ impl FromStr for ConnectionUri {
             #[cfg(feature = "sqlite")]
             _ => Ok(ConnectionUri::Sqlite(s.into())),
             #[cfg(not(feature = "sqlite"))]
-            _ => Err(ParseConnectionUriError(format!(
-                "No compatible connection type: {}",
-                s
-            ))),
+            _ => Err(InvalidArgumentError(
+                "s",
+                format!("No compatible connection type: {}", s),
+            )),
         }
-    }
-}
-
-/// Errors raised by trying to parse a `ConnectionUri`
-#[derive(Debug)]
-pub struct ParseConnectionUriError(pub String);
-
-impl std::error::Error for ParseConnectionUriError {}
-
-impl std::fmt::Display for ParseConnectionUriError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Unable to parse connection URI from string: {}", self.0)
     }
 }
