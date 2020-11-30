@@ -59,7 +59,7 @@ use splinter::registry::{
     UnifiedRegistry,
 };
 #[cfg(feature = "auth")]
-use splinter::rest_api::{AuthConfig, OAuthConfig, UserInfoSaveConfig};
+use splinter::rest_api::{AuthConfig, OAuthConfig, OAuthUserInfoStoreConfig};
 use splinter::rest_api::{
     Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };
@@ -534,13 +534,13 @@ impl SplinterDaemon {
                     }
                 };
 
-                // Allowing unused_mut because user_info_save_config must be mutable if feature
+                // Allowing unused_mut because `user_info_store_config` must be mutable if feature
                 // biome-oauth is enabled
                 #[allow(unused_mut)]
-                let mut user_info_save_config = UserInfoSaveConfig::NoOp;
+                let mut user_info_store_config = OAuthUserInfoStoreConfig::NoOp;
                 #[cfg(feature = "biome-oauth")]
                 if self.enable_biome {
-                    user_info_save_config = UserInfoSaveConfig::Biome {
+                    user_info_store_config = OAuthUserInfoStoreConfig::Biome {
                         user_store: store_factory.get_biome_user_store(),
                         oauth_user_store: store_factory.get_biome_oauth_user_store(),
                     };
@@ -548,7 +548,7 @@ impl SplinterDaemon {
 
                 auth_configs.push(AuthConfig::OAuth {
                     oauth_config,
-                    user_info_save_config,
+                    user_info_store_config,
                 });
             }
 

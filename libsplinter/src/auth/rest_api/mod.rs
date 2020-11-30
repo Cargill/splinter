@@ -53,7 +53,7 @@ fn authorize(
         is_auth_endpoint = true;
     }
     #[cfg(feature = "oauth")]
-    if endpoint.starts_with("/oauth") {
+    if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
         is_auth_endpoint = true;
     }
     if is_auth_endpoint {

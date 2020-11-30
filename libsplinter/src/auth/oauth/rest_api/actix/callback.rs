@@ -21,7 +21,7 @@ use futures::future::IntoFuture;
 use crate::auth::oauth::{
     rest_api::{
         resources::callback::{user_info_to_query_string, CallbackQuery},
-        SaveUserInfoOperation,
+        OAuthUserInfoStore,
     },
     OAuthClient,
 };
@@ -30,7 +30,7 @@ use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource
 
 pub fn make_callback_route(
     client: OAuthClient,
-    save_info_op: Box<dyn SaveUserInfoOperation>,
+    user_info_store: Box<dyn OAuthUserInfoStore>,
 ) -> Resource {
     Resource::build("/oauth/callback")
         .add_request_guard(ProtocolVersionRangeGuard::new(
@@ -43,7 +43,7 @@ pub fn make_callback_route(
                     Ok(query) => {
                         match client.exchange_authorization_code(query.code.clone(), &query.state) {
                             Ok(Some((user_info, redirect_url))) => {
-                                if let Err(err) = save_info_op.save_user_info(&user_info) {
+                                if let Err(err) = user_info_store.save_user_info(&user_info) {
                                     error!("Unable to store user info: {}", err);
                                     HttpResponse::InternalServerError()
                                         .json(ErrorResponse::internal_error())

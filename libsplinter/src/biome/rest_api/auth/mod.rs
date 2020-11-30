@@ -20,6 +20,10 @@ mod oauth;
 #[cfg(feature = "biome-credentials")]
 pub use credentials::GetUserByBiomeAuthorization;
 #[cfg(feature = "biome-oauth")]
+pub use oauth::BiomeOAuthUserInfoStore;
+#[cfg(feature = "biome-oauth")]
 pub use oauth::GetUserByOAuthAuthorization;
 #[cfg(feature = "biome-oauth")]
-pub use oauth::OAuthUserStoreSaveUserInfoOperation;
+pub use oauth::GetUserIdentityByOAuthAuthorization;
+#[cfg(feature = "biome-oauth")]
+pub use oauth::OAuthUserIdentityRef;

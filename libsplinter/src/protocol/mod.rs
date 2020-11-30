@@ -44,6 +44,8 @@ pub const OAUTH_PROTOCOL_VERSION: u32 = 1;
 pub(crate) const OAUTH_CALLBACK_MIN: u32 = 1;
 #[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
 pub(crate) const OAUTH_LOGIN_MIN: u32 = 1;
+#[cfg(all(feature = "oauth", feature = "rest-api-actix"))]
+pub(crate) const OAUTH_LOGOUT_MIN: u32 = 1;
 
 #[cfg(feature = "registry")]
 pub const REGISTRY_PROTOCOL_VERSION: u32 = 1;
