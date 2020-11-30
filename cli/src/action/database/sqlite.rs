@@ -42,6 +42,23 @@ pub fn sqlite_migrations(connection_string: String) -> Result<(), CliError> {
         .build(connection_manager)
         .map_err(|_| CliError::ActionError("Failed to build connection pool".to_string()))?;
 
+    if connection_string != ":memory:" {
+        let path = PathBuf::from(&connection_string);
+        let full_path = fs::canonicalize(&path).map_err(|err| {
+            CliError::ActionError(format!(
+                "Unable to get absolute path for connection string {}: {}",
+                connection_string, err,
+            ))
+        })?;
+
+        info!(
+            "Running migrations against SQLite database: {}",
+            full_path.display()
+        );
+    } else {
+        info!("Running migrations against SQLite database: :memory: ");
+    };
+
     run_sqlite_migrations(&*pool.get().map_err(|_| {
         CliError::ActionError("Failed to get connection for migrations".to_string())
     })?)
