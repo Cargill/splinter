@@ -30,7 +30,7 @@
 mod circuit;
 mod circuit_node;
 mod circuit_proposal;
-#[cfg(any(feature = "admin-service-store-postgres", feature = "sqlite"))]
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub mod diesel;
 pub mod error;
 mod proposed_circuit;
