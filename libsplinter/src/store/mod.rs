@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains a `StoreFactory` trait, which is an abstract factory for building stores
+//! backed by a single storage mechanism (e.g. database)
+
 pub mod memory;
 #[cfg(feature = "postgres")]
 pub mod postgres;

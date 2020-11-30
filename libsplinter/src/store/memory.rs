@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementation of a `StoreFactory` for in memory
+
 #[cfg(feature = "sqlite")]
 use diesel::{
     r2d2::{ConnectionManager, Pool},
