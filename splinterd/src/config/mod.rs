@@ -569,13 +569,13 @@ impl Config {
                     client_id, source,
                 );
             }
-            if let (Some(client_secret), Some(source)) = (
+            if let (Some(_), Some(source)) = (
                 self.oauth_client_secret(),
                 self.oauth_client_secret_source(),
             ) {
                 debug!(
-                    "Config: oauth_client_secret: {} (source: {:?})",
-                    client_secret, source,
+                    "Config: oauth_client_secret: <HIDDEN> (source: {:?})",
+                    source,
                 );
             }
             if let (Some(redirect_url), Some(source)) =
