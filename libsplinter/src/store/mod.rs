@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains a `StoreFactory` trait, which is an abstract factory for building stores
+//! backed by a single storage mechanism (e.g. database)
+
 pub mod memory;
 #[cfg(feature = "postgres")]
 pub mod postgres;
@@ -24,6 +27,8 @@ use std::str::FromStr;
 use self::sqlite::ForeignKeyCustomizer;
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
+
+use crate::error::{InternalError, InvalidArgumentError};
 
 /// An abstract factory for creating Splinter stores backed by the same storage
 pub trait StoreFactory {
@@ -58,14 +63,17 @@ pub trait StoreFactory {
 ///   created by the resulting factory
 pub fn create_store_factory(
     connection_uri: ConnectionUri,
-) -> Result<Box<dyn StoreFactory>, StoreFactoryCreationError> {
+) -> Result<Box<dyn StoreFactory>, InternalError> {
     match connection_uri {
         ConnectionUri::Memory => Ok(Box::new(memory::MemoryStoreFactory::new())),
         #[cfg(feature = "postgres")]
         ConnectionUri::Postgres(url) => {
             let connection_manager = ConnectionManager::<diesel::pg::PgConnection>::new(url);
             let pool = Pool::builder().build(connection_manager).map_err(|err| {
-                StoreFactoryCreationError(format!("Failed to build connection pool: {}", err))
+                InternalError::from_source_with_prefix(
+                    Box::new(err),
+                    "Failed to build connection pool".to_string(),
+                )
             })?;
             Ok(Box::new(postgres::PgStoreFactory::new(pool)))
         }
@@ -82,22 +90,13 @@ pub fn create_store_factory(
                 pool_builder = pool_builder.max_size(1);
             }
             let pool = pool_builder.build(connection_manager).map_err(|err| {
-                StoreFactoryCreationError(format!("Failed to build connection pool: {}", err))
+                InternalError::from_source_with_prefix(
+                    Box::new(err),
+                    "Failed to build connection pool".to_string(),
+                )
             })?;
             Ok(Box::new(sqlite::SqliteStoreFactory::new(pool)))
         }
-    }
-}
-
-/// Errors raised by trying to create a `StoreFactory`
-#[derive(Debug)]
-pub struct StoreFactoryCreationError(pub String);
-
-impl std::error::Error for StoreFactoryCreationError {}
-
-impl std::fmt::Display for StoreFactoryCreationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Unable to create store factory: {}", self.0)
     }
 }
 
@@ -111,7 +110,7 @@ pub enum ConnectionUri {
 }
 
 impl FromStr for ConnectionUri {
-    type Err = ParseConnectionUriError;
+    type Err = InvalidArgumentError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -121,22 +120,10 @@ impl FromStr for ConnectionUri {
             #[cfg(feature = "sqlite")]
             _ => Ok(ConnectionUri::Sqlite(s.into())),
             #[cfg(not(feature = "sqlite"))]
-            _ => Err(ParseConnectionUriError(format!(
-                "No compatible connection type: {}",
-                s
-            ))),
+            _ => Err(InvalidArgumentError(
+                "s",
+                format!("No compatible connection type: {}", s),
+            )),
         }
-    }
-}
-
-/// Errors raised by trying to parse a `ConnectionUri`
-#[derive(Debug)]
-pub struct ParseConnectionUriError(pub String);
-
-impl std::error::Error for ParseConnectionUriError {}
-
-impl std::fmt::Display for ParseConnectionUriError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Unable to parse connection URI from string: {}", self.0)
     }
 }

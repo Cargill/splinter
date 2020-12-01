@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementation of a `StoreFactory` for PostgreSQL
+
 use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, Pool},
