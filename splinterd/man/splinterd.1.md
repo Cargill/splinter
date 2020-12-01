@@ -445,6 +445,42 @@ node_id = "mynode"
 heartbeat = 60
 ```
 
+The next example demonstrates how to configure GitHub as an OAuth provider for
+REST API authentication, where the placeholder values for the client ID and
+secret would be replaced with actual values for a registered GitHub OAuth app:
+
+```
+$ splinterd --node-id mynode \
+  --oauth-provider github \
+  --oauth-client-id <my-client-id> \
+  --oauth-client-secret <my-client-secret> \
+  --oauth-redirect http://localhost:8080/oauth/callback
+```
+
+The above example assumes that the splinterd REST API is accessible to the web
+browser at the address `http://localhost:8080/`; if the REST API has a different
+address, this argument would be changed accordingly. For example, if the REST
+API is proxied to the address `http://localhost:8080/splinterd`, the redirect
+URL would be `http://localhost:8080/splinterd/oauth/callback`. If the REST API
+is hosted at `https://www.example.com/`, the redirect would be
+`https://www.example.com/oauth/callback`.
+
+Similar to the GitHub example, here is how you would configure a Google OAuth
+provider for REST API authentication:
+
+```
+$ splinterd --node-id mynode \
+  --oauth-provider openid \
+  --oauth-client-id <my-client-id> \
+  --oauth-client-secret <my-client-secret> \
+  --oauth-redirect http://localhost:8080/oauth/callback \
+  --oauth-openid-url https://accounts.google.com/.well-known/openid-configuration
+```
+
+To configure a different OAuth provider that conforms to the OpenID
+specification, you would start splinterd just like the Google example, but with
+the appropriate OpenID discovery document URL for the desired OAuth provider.
+
 SEE ALSO
 ========
 | `splinter-circuit-propose(1)`
