@@ -66,15 +66,10 @@ impl StoreFactory for PgStoreFactory {
         unreachable!()
     }
 
-    #[cfg(feature = "admin-service-store-postgres")]
+    #[cfg(feature = "admin-service")]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
         Box::new(crate::admin::store::diesel::DieselAdminServiceStore::new(
             self.pool.clone(),
         ))
-    }
-
-    #[cfg(not(feature = "admin-service-store-postgres"))]
-    fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
-        unimplemented!()
     }
 }
