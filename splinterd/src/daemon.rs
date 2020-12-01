@@ -136,8 +136,8 @@ impl SplinterDaemon {
 
         let admin_service_store = {
             if let Some(storage) = &self.storage_type {
-                // Load initial state from the configured storage type and state directory, then create
-                // the new SplinterState from the retrieved circuit directory
+                // Get state from the configured storage type and state directory, then
+                // create the new AdminServiceStore
                 match &storage as &str {
                     "yaml" => {
                         let circuits_location = Path::new(&self.state_dir)
@@ -181,7 +181,7 @@ impl SplinterDaemon {
                     }
                 }
             } else {
-                //
+                // If storage is not provided, db_url is required
                 let db_url = self.db_url.clone().ok_or_else(|| {
                     StartError::StorageError("No database string was provided".into())
                 })?;
