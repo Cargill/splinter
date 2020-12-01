@@ -40,7 +40,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreAddCircuitOperation {
     ) -> Result<(), AdminServiceStoreError>;
 }
 
-#[cfg(feature = "admin-service-store-postgres")]
+#[cfg(feature = "postgres")]
 impl<'a> AdminServiceStoreAddCircuitOperation
     for AdminServiceStoreOperations<'a, diesel::pg::PgConnection>
 {
