@@ -105,6 +105,7 @@ where
                     .map_err(AdminServiceStoreError::InvalidStateError)
             })
             .collect::<Result<Vec<Service>, AdminServiceStoreError>>()?;
+
         Ok(Box::new(ret_services.into_iter()))
     }
 }

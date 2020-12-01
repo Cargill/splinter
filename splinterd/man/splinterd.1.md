@@ -57,7 +57,7 @@ the certificate-related options and CERTIFICATE FILES, below.
 This command includes several options that change default Splinter directory
 locations. These directory locations can also be changed with environment
 variables or settings in the `splinterd` TOML configuration file. For more
-information, see `--config-dir`, `--storage` `--tls-cert-dir`, and
+information, see `--config-dir`, `--tls-cert-dir`, and
 "SPLINTER DIRECTORY PATHS", below.
 
 FLAGS
@@ -128,8 +128,14 @@ OPTIONS
 : Specifies a human-readable name for the node (Default: "Node NODE-ID")
 
 `--database DB-URL`
-: Specifies the URL for the PostgreSQL database used for Biome. (Default:
-  127.0.0.1:5432.) This option is required when `--enable-biome` is used.
+: Specifies the URL or connection string for the PostgreSQL or SQLite database
+  used for Splinter state, including circuits, proposals and Biome. (Default:
+  SQLite database splinter_state.db) This option is required. The default SQLite
+  database will go in the directory, `/var/lib/splinter`, unless
+  `SPLINTER_STATE_DIR` or `SPLINTER_HOME` is set.
+
+  Using `memory` or `:memory:` as the DB-URL means that state will not
+  persist when `splinterd` restarts.
 
 `--heartbeat SECONDS`
 : Specifies how often, in seconds, to send a heartbeat. (Default: 30 seconds.)
@@ -195,15 +201,6 @@ OPTIONS
   (Default: `/var/lib/splinter`.)
 
   This option overrides the `SPLINTER_STATE_DIR` environment variable, if set.
-
-`--storage STORAGE-TYPE`
-: Specifies whether to store circuit state in memory or in a local YAML file.
-  *STORAGE-TYPE* can be `memory` or `yaml` (the default). For `yaml`, the file
-  is stored in the default state directory, `/var/lib/splinter`, unless
-  `SPLINTER_STATE_DIR` or `SPLINTER_HOME` is set.
-
-  Using `memory` for storage means that circuits will not persist when
-  `splinterd` restarts.
 
 `--tls-ca-file CERT-FILE`
 : Specifies the path and file name for the trusted CA certificate.
@@ -288,10 +285,8 @@ Several Splinter directories have the following default locations:
 
 For the configuration and certificate directories, the directory paths can be
 changed individually with a `splinterd` option, a setting in a TOML config file,
-or an environment variable. (The state directory location is controlled only by
-an environment variable when the default YAML storage type is used; no config
-setting or command option is available.) For more information, see
-`--config-dir`, `--storage` and `--tls-cert-dir`.
+or an environment variable. For more information, see `--config-dir`,
+`--database` and `--tls-cert-dir`.
 
 In addition, the `SPLINTER_HOME` environment variable provides a simple way to
 change the base path for all of these directories. This variable is intended for
@@ -374,9 +369,9 @@ ENVIRONMENT VARIABLES
   is set (`SPLINTER_CERT_DIR`, `SPLINTER_CONFIG_DIR`, or `SPLINTER_STATE_DIR`).
 
 **SPLINTER_STATE_DIR**
-: Specifies where to store the circuit state YAML file, if `--storage` is
-  set to `yaml`. (See `--storage`.) By default, this file is stored in
-  `/var/lib/splinter`.
+: Specifies where to store the circuit state SQLite database file, if
+  `--database` is not set. (See `--database`.) By default, this file is stored
+  in `/var/lib/splinter`.
 
 **SPLINTER_STRICT_REF_COUNT**
 : Turns on strict peer reference counting. If `SPLINTER_STRICT_REF_COUNT`is set
@@ -418,7 +413,7 @@ FILES
 
 `/var/lib/splinter/`
 : Default location for the Splinter state directory, which stores the circuit
-  state YAML file (unless `--storage` is set to `memory`). Note: If
+  state SQLite database file (unless `--database` is set). Note: If
   `$SPLINTER_HOME` is set, the default location is `$SPLINTER_HOME/data/`.
 
 EXAMPLES

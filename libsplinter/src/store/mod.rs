@@ -45,6 +45,9 @@ pub trait StoreFactory {
 
     /// Get a new `UserStore`
     fn get_biome_user_store(&self) -> Box<dyn crate::biome::UserStore>;
+
+    #[cfg(feature = "admin-service")]
+    fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection

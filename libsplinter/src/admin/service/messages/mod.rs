@@ -16,6 +16,7 @@ pub mod builders;
 
 use protobuf::{self, RepeatedField};
 
+use crate::admin::store;
 use crate::hex::{as_hex, deserialize_hex};
 use crate::protos::admin::{self, CircuitCreateRequest};
 
@@ -345,6 +346,78 @@ impl CircuitProposal {
         proposal.set_requester_node_id(self.requester_node_id);
 
         Ok(proposal)
+    }
+}
+
+impl From<store::CircuitProposal> for CircuitProposal {
+    fn from(store_proposal: store::CircuitProposal) -> Self {
+        let proposal_type = match store_proposal.proposal_type() {
+            store::ProposalType::Create => ProposalType::Create,
+            store::ProposalType::UpdateRoster => ProposalType::UpdateRoster,
+            store::ProposalType::AddNode => ProposalType::AddNode,
+            store::ProposalType::RemoveNode => ProposalType::RemoveNode,
+            store::ProposalType::Destroy => ProposalType::Destroy,
+        };
+
+        let store_circuit = store_proposal.circuit();
+
+        let circuit = CreateCircuit {
+            circuit_id: store_proposal.circuit_id().into(),
+            roster: store_circuit
+                .roster()
+                .iter()
+                .map(|service| SplinterService {
+                    service_id: service.service_id().into(),
+                    service_type: service.service_type().into(),
+                    allowed_nodes: vec![service.node_id().to_string()],
+                    arguments: service
+                        .arguments()
+                        .iter()
+                        .map(|(key, value)| (key.to_string(), value.to_string()))
+                        .collect(),
+                })
+                .collect::<Vec<SplinterService>>(),
+            members: store_circuit
+                .members()
+                .iter()
+                .map(|node| SplinterNode {
+                    node_id: node.node_id().to_string(),
+                    endpoints: node.endpoints().to_vec(),
+                })
+                .collect::<Vec<SplinterNode>>(),
+            authorization_type: AuthorizationType::Trust,
+            persistence: PersistenceType::Any,
+            durability: DurabilityType::NoDurability,
+            routes: RouteType::Any,
+            circuit_management_type: store_circuit.circuit_management_type().into(),
+            application_metadata: store_circuit.application_metadata().into(),
+            comments: store_circuit.comments().into(),
+        };
+
+        Self {
+            proposal_type,
+            circuit_id: store_proposal.circuit_id().into(),
+            circuit_hash: store_proposal.circuit_hash().into(),
+            circuit,
+            votes: store_proposal
+                .votes()
+                .iter()
+                .map(|vote_record| {
+                    let vote = match vote_record.vote() {
+                        store::Vote::Accept => Vote::Accept,
+                        store::Vote::Reject => Vote::Reject,
+                    };
+
+                    VoteRecord {
+                        public_key: vote_record.public_key().into(),
+                        vote,
+                        voter_node_id: vote_record.voter_node_id().into(),
+                    }
+                })
+                .collect(),
+            requester: store_proposal.requester().into(),
+            requester_node_id: store_proposal.requester_node_id().into(),
+        }
     }
 }
 

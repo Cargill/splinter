@@ -169,8 +169,6 @@ fn main() {
           "Unique ID for the node ")
         (@arg display_name: --("display-name") +takes_value
           "Human-readable name for the node")
-        (@arg storage: --("storage") +takes_value
-          "Storage type used for the node; defaults to yaml")
         (@arg no_tls:  --("no-tls") "Turn off tls configuration")
         (@arg registry_auto_refresh: --("registry-auto-refresh") +takes_value
             "How often remote Splinter registries should attempt to fetch upstream changes in the \
@@ -301,6 +299,13 @@ fn main() {
             Arg::with_name("state_dir")
                 .long("state-dir")
                 .help("Storage directory when storage is YAML")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("storage")
+                .long("storage")
+                .help("Storage type used for the node; defaults to yaml")
+                .hidden(true)
                 .takes_value(true),
         );
 
@@ -441,7 +446,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_node_id(node_id)
         .with_display_name(display_name)
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
-        .with_storage_type(String::from(config.storage()))
+        .with_storage_type(config.storage().map(String::from))
         .with_registries(config.registries().to_vec())
         .with_registry_auto_refresh(config.registry_auto_refresh())
         .with_registry_forced_refresh(config.registry_forced_refresh())

@@ -41,7 +41,7 @@ pub use partial::{ConfigSource, PartialConfig};
 #[derive(Debug)]
 pub struct Config {
     config_dir: (String, ConfigSource),
-    storage: (String, ConfigSource),
+    storage: Option<(String, ConfigSource)>,
     tls_cert_dir: (String, ConfigSource),
     tls_ca_file: (String, ConfigSource),
     tls_client_cert: (String, ConfigSource),
@@ -88,8 +88,12 @@ impl Config {
         &self.config_dir.0
     }
 
-    pub fn storage(&self) -> &str {
-        &self.storage.0
+    pub fn storage(&self) -> Option<&str> {
+        if let Some((storage, _)) = &self.storage {
+            Some(storage)
+        } else {
+            None
+        }
     }
 
     pub fn tls_cert_dir(&self) -> &str {
@@ -257,8 +261,12 @@ impl Config {
         &self.config_dir.1
     }
 
-    fn storage_source(&self) -> &ConfigSource {
-        &self.storage.1
+    fn storage_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.storage {
+            Some(source)
+        } else {
+            None
+        }
     }
 
     fn tls_cert_dir_source(&self) -> &ConfigSource {
@@ -430,11 +438,9 @@ impl Config {
             self.config_dir(),
             self.config_dir_source()
         );
-        debug!(
-            "Config: storage: {} (source: {:?})",
-            self.storage(),
-            self.storage_source()
-        );
+        if let (Some(id), Some(source)) = (self.storage(), self.storage_source()) {
+            debug!("Config: storage: {} (source: {:?})", id, source,);
+        }
         debug!(
             "Config: tls_ca_file: {} (source: {:?})",
             self.tls_ca_file(),
@@ -912,10 +918,10 @@ mod tests {
         assert_eq!(
             (final_config.storage(), final_config.storage_source()),
             (
-                EXAMPLE_STORAGE,
-                &ConfigSource::Toml {
+                Some(EXAMPLE_STORAGE),
+                Some(&ConfigSource::Toml {
                     file: TEST_TOML.to_string()
-                }
+                })
             )
         );
 

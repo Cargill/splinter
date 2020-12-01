@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "sqlite")]
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    sqlite::SqliteConnection,
+};
+
 #[cfg(feature = "biome-oauth")]
 use crate::biome::MemoryOAuthUserStore;
 #[cfg(feature = "biome-credentials")]
@@ -93,5 +99,28 @@ impl StoreFactory for MemoryStoreFactory {
     #[cfg(feature = "biome-oauth")]
     fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
         Box::new(self.biome_oauth_user_store.clone())
+    }
+
+    #[cfg(all(feature = "admin-service", feature = "sqlite"))]
+    fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        crate::migrations::run_sqlite_migrations(
+            &*pool.get().expect("Failed to get connection for migrations"),
+        )
+        .expect("Failed to run migrations");
+
+        Box::new(crate::admin::store::diesel::DieselAdminServiceStore::new(
+            pool,
+        ))
+    }
+
+    #[cfg(all(feature = "admin-service", not(feature = "sqlite")))]
+    fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
+        unimplemented!()
     }
 }

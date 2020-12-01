@@ -25,10 +25,6 @@ network_endpoints = ["tcps://127.0.0.1:8044"]
 # connect to on start up.
 peers = []
 
-# The type of storage that should be used to store circuit state. Option are
-# currently "yaml" or "memory"
-storage = "memory"
-
 # Rest api address.
 rest_api_endpoint = "0.0.0.0:8080"
 

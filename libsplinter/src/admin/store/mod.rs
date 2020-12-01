@@ -301,4 +301,12 @@ pub trait AdminServiceStore: Send + Sync {
         &self,
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError>;
+
+    fn clone_boxed(&self) -> Box<dyn AdminServiceStore>;
+}
+
+impl Clone for Box<dyn AdminServiceStore> {
+    fn clone(&self) -> Self {
+        self.clone_boxed()
+    }
 }

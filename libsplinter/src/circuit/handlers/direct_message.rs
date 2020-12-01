@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::circuit::handlers::create_message;
-use crate::circuit::{ServiceId, SplinterState};
+use crate::circuit::routing::{RoutingTableReader, ServiceId};
 use crate::network::dispatch::{DispatchError, Handler, MessageContext, MessageSender, PeerId};
 use crate::protos::circuit::{
     CircuitDirectMessage, CircuitError, CircuitError_Error, CircuitMessageType,
@@ -24,7 +24,7 @@ use protobuf::Message;
 // Implements a handler that handles CircuitDirectMessage
 pub struct CircuitDirectMessageHandler {
     node_id: String,
-    state: SplinterState,
+    routing_table: Box<dyn RoutingTableReader>,
 }
 
 impl Handler for CircuitDirectMessageHandler {
@@ -64,20 +64,23 @@ impl Handler for CircuitDirectMessageHandler {
         let msg_sender = msg.get_sender();
         let recipient = msg.get_recipient();
         let recipient_id = ServiceId::new(circuit_name.to_string(), recipient.to_string());
-        let sender_id = ServiceId::new(circuit_name.to_string(), msg_sender.to_string());
 
         // msg bytes will either be message bytes of a direct message or an error message
         // the msg_recipient is either the service/node id to send the message to or is the
         // peer_id to send back the error message
         let (msg_bytes, msg_recipient) = {
             if let Some(circuit) = self
-                .state
-                .circuit(circuit_name)
-                .map_err(|err| DispatchError::HandleError(err.context()))?
+                .routing_table
+                .get_circuit(circuit_name)
+                .map_err(|err| DispatchError::HandleError(err.to_string()))?
             {
                 // Check if the message sender is allowed on the circuit
                 // if the sender is not allowed on the circuit
-                if !circuit.roster().contains(&msg_sender) {
+                if !circuit
+                    .roster()
+                    .iter()
+                    .any(|service| service.service_id() == msg_sender)
+                {
                     let mut error_message = CircuitError::new();
                     error_message.set_correlation_id(msg.get_correlation_id().to_string());
                     error_message.set_service_id(msg_sender.into());
@@ -92,36 +95,18 @@ impl Handler for CircuitDirectMessageHandler {
                     let network_msg_bytes =
                         create_message(msg_bytes, CircuitMessageType::CIRCUIT_ERROR_MESSAGE)?;
                     (network_msg_bytes, context.source_peer_id().to_string())
-                } else if self
-                    .state
-                    .get_service(&sender_id)
-                    .map_err(|err| DispatchError::HandleError(err.context()))?
-                    .is_none()
+                } else if circuit
+                    .roster()
+                    .iter()
+                    .any(|service| service.service_id() == recipient)
                 {
-                    // Check if the message sender is registered on the circuit
-                    // if the sender is not connected, send circuit error
-                    let mut error_message = CircuitError::new();
-                    error_message.set_correlation_id(msg.get_correlation_id().to_string());
-                    error_message.set_service_id(msg_sender.into());
-                    error_message.set_circuit_name(circuit_name.into());
-                    error_message.set_error(CircuitError_Error::ERROR_SENDER_NOT_IN_DIRECTORY);
-                    error_message.set_error_message(format!(
-                        "Sender is not in the service directory: {}",
-                        recipient
-                    ));
-
-                    let msg_bytes = error_message.write_to_bytes()?;
-                    let network_msg_bytes =
-                        create_message(msg_bytes, CircuitMessageType::CIRCUIT_ERROR_MESSAGE)?;
-                    (network_msg_bytes, context.source_peer_id().to_string())
-                } else if circuit.roster().contains(&recipient) {
                     // check if the recipient service is allowed on the circuit and registered
                     if let Some(service) = self
-                        .state
+                        .routing_table
                         .get_service(&recipient_id)
-                        .map_err(|err| DispatchError::HandleError(err.context()))?
+                        .map_err(|err| DispatchError::HandleError(err.to_string()))?
                     {
-                        let node_id = service.node().id().to_string();
+                        let node_id = service.node_id().to_string();
                         // If the service is on this node send message to the service, otherwise
                         // send the message to the node the service is connected to
                         if node_id != self.node_id {
@@ -213,8 +198,11 @@ impl Handler for CircuitDirectMessageHandler {
 }
 
 impl CircuitDirectMessageHandler {
-    pub fn new(node_id: String, state: SplinterState) -> Self {
-        CircuitDirectMessageHandler { node_id, state }
+    pub fn new(node_id: String, routing_table: Box<dyn RoutingTableReader>) -> Self {
+        CircuitDirectMessageHandler {
+            node_id,
+            routing_table,
+        }
     }
 }
 
@@ -225,9 +213,9 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
-    use crate::circuit::directory::CircuitDirectory;
-    use crate::circuit::service::{Service, SplinterNode};
-    use crate::circuit::{AuthorizationType, Circuit, DurabilityType, PersistenceType, RouteType};
+    use crate::circuit::routing::{
+        memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
+    };
     use crate::network::dispatch::Dispatcher;
     use crate::protos::circuit::CircuitMessage;
     use crate::protos::network::NetworkMessage;
@@ -240,38 +228,46 @@ mod tests {
         let mock_sender = MockSender::new();
         let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-        // Add circuit and service to splinter state
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into()])
-            .with_roster(vec!["abc".into(), "def".into()])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_direct_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()]);
 
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let service_abc = Service::new(
+        let mut service_abc = Service::new(
             "abc".to_string(),
-            Some("abc_network".to_string()),
-            node.clone(),
+            "test".to_string(),
+            "123".to_string(),
+            vec![],
         );
-        let service_def = Service::new("def".to_string(), Some("def_network".to_string()), node);
-        let abc_id = ServiceId::new("alpha".into(), "abc".into());
-        let def_id = ServiceId::new("alpha".into(), "def".into());
-        state.add_service(abc_id, service_abc).unwrap();
-        state.add_service(def_id, service_def).unwrap();
+        let mut service_def = Service::new(
+            "def".to_string(),
+            "test".to_string(),
+            "345".to_string(),
+            vec![],
+        );
+
+        service_abc.set_peer_id("abc_network".to_string());
+        service_def.set_peer_id("def_network".to_string());
+
+        // Add circuit and service to splinter state
+        let circuit = Circuit::new(
+            "alpha".into(),
+            vec![service_abc.clone(), service_def.clone()],
+            vec!["123".into(), "345".into()],
+        );
+
+        writer
+            .add_circuit(
+                circuit.circuit_id().into(),
+                circuit,
+                vec![node_123, node_345],
+            )
+            .expect("Unable to add circuits");
 
         // Add direct message handler to the the dispatcher
-        let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
+        let handler = CircuitDirectMessageHandler::new("123".to_string(), reader);
         dispatcher.set_handler(Box::new(handler));
 
         // Create the direct message
@@ -316,38 +312,46 @@ mod tests {
         let mock_sender = MockSender::new();
         let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()]);
+
+        let mut service_abc = Service::new(
+            "abc".to_string(),
+            "test".to_string(),
+            "123".to_string(),
+            vec![],
+        );
+        let mut service_def = Service::new(
+            "def".to_string(),
+            "test".to_string(),
+            "345".to_string(),
+            vec![],
+        );
+
+        service_abc.set_peer_id("abc_network".to_string());
+        service_def.set_peer_id("def_network".to_string());
+
         // Add circuit and service to splinter state
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into(), "345".into()])
-            .with_roster(vec!["abc".into(), "def".into()])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_direct_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
+        let circuit = Circuit::new(
+            "alpha".into(),
+            vec![service_abc.clone(), service_def.clone()],
+            vec!["123".into(), "345".into()],
+        );
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
-
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let node_123 = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let node_345 = SplinterNode::new("345".to_string(), vec!["123.0.0.1:0".to_string()]);
-
-        let service_abc =
-            Service::new("abc".to_string(), Some("abc_network".to_string()), node_123);
-        let service_def =
-            Service::new("def".to_string(), Some("def_network".to_string()), node_345);
-        let abc_id = ServiceId::new("alpha".into(), "abc".into());
-        let def_id = ServiceId::new("alpha".into(), "def".into());
-        state.add_service(abc_id, service_abc).unwrap();
-        state.add_service(def_id, service_def).unwrap();
+        writer
+            .add_circuit(
+                circuit.circuit_id().into(),
+                circuit,
+                vec![node_123, node_345],
+            )
+            .expect("Unable to add circuits");
 
         // Add direct message handler to dispatcher
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), reader);
 
         dispatcher.set_handler(Box::new(handler));
 
@@ -385,80 +389,6 @@ mod tests {
         )
     }
 
-    // Test that an error message is returned if the sender is not connected to the circuit
-    #[test]
-    fn test_circuit_direct_message_handler_sender_not_in_directory() {
-        // Set up dispatcher and mock sender
-        let mock_sender = MockSender::new();
-        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
-
-        // add the circuit and service to splinter state
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into()])
-            .with_roster(vec!["abc".into(), "def".into()])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_direct_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
-
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
-
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let service_abc = Service::new(
-            "abc".to_string(),
-            Some("abc_network".to_string()),
-            node.clone(),
-        );
-        let id = ServiceId::new("alpha".into(), "abc".into());
-        state.add_service(id.clone(), service_abc).unwrap();
-
-        // add direct message handler to the dispatcher
-        let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
-
-        dispatcher.set_handler(Box::new(handler));
-
-        // create direct message
-        let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
-        direct_message.set_payload(b"test".to_vec());
-        direct_message.set_correlation_id("1234".into());
-        let direct_bytes = direct_message.write_to_bytes().unwrap();
-
-        // dispatcher message
-        dispatcher
-            .dispatch(
-                "def".into(),
-                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                direct_bytes.clone(),
-            )
-            .unwrap();
-
-        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
-        assert_network_message(
-            message,
-            id.into(),
-            "def",
-            CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
-            |msg: CircuitError| {
-                assert_eq!(msg.get_service_id(), "def");
-                assert_eq!(
-                    msg.get_error(),
-                    CircuitError_Error::ERROR_SENDER_NOT_IN_DIRECTORY
-                );
-                assert_eq!(msg.get_correlation_id(), "1234");
-            },
-        )
-    }
-
     // Test that an error message is returned if the sender is not in the circuit roster
     #[test]
     fn test_circuit_direct_message_handler_sender_not_in_circuit_roster() {
@@ -466,34 +396,38 @@ mod tests {
         let mock_sender = MockSender::new();
         let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into()])
-            .with_roster(vec!["abc".into()])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_direct_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()]);
 
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let node = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let service_abc = Service::new(
+        let mut service_abc = Service::new(
             "abc".to_string(),
-            Some("abc_network".to_string()),
-            node.clone(),
+            "test".to_string(),
+            "123".to_string(),
+            vec![],
         );
-        let id = ServiceId::new("alpha".into(), "abc".into());
-        state.add_service(id.clone(), service_abc).unwrap();
+
+        service_abc.set_peer_id("abc_network".to_string());
+        // Add circuit and service to splinter state
+        let circuit = Circuit::new(
+            "alpha".into(),
+            vec![service_abc.clone()],
+            vec!["123".into(), "345".into()],
+        );
+
+        writer
+            .add_circuit(
+                circuit.circuit_id().into(),
+                circuit,
+                vec![node_123, node_345],
+            )
+            .expect("Unable to add circuits");
 
         // add direct message handler to the dispatcher
-        let handler = CircuitDirectMessageHandler::new("123".to_string(), state);
+        let handler = CircuitDirectMessageHandler::new("123".to_string(), reader);
 
         dispatcher.set_handler(Box::new(handler));
 
@@ -532,76 +466,6 @@ mod tests {
         )
     }
 
-    // Test that if the recipient is not connected a circuit error message is sent back
-    #[test]
-    fn test_circuit_direct_message_handler_recipient_not_in_directory() {
-        // Set up dispatcher and mock sender
-        let mock_sender = MockSender::new();
-        let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
-
-        // add circuits and service to splinter state
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into(), "345".into()])
-            .with_roster(vec!["abc".into(), "def".into()])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_direct_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
-
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
-
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let node_345 = SplinterNode::new("345".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let service_def =
-            Service::new("def".to_string(), Some("def_network".to_string()), node_345);
-        let id = ServiceId::new("alpha".into(), "def".into());
-        state.add_service(id.clone(), service_def).unwrap();
-
-        // add handler to dispatcher
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
-        dispatcher.set_handler(Box::new(handler));
-
-        // create direct message
-        let mut direct_message = CircuitDirectMessage::new();
-        direct_message.set_circuit("alpha".into());
-        direct_message.set_sender("def".into());
-        direct_message.set_recipient("abc".into());
-        direct_message.set_payload(b"test".to_vec());
-        direct_message.set_correlation_id("1234".into());
-        let direct_bytes = direct_message.write_to_bytes().unwrap();
-
-        // dispatch message
-        dispatcher
-            .dispatch(
-                "def".into(),
-                &CircuitMessageType::CIRCUIT_DIRECT_MESSAGE,
-                direct_bytes.clone(),
-            )
-            .unwrap();
-
-        let (id, message) = mock_sender.next_outbound().expect("No message was sent");
-        assert_network_message(
-            message,
-            id.into(),
-            "def",
-            CircuitMessageType::CIRCUIT_ERROR_MESSAGE,
-            |msg: CircuitError| {
-                assert_eq!(msg.get_service_id(), "def");
-                assert_eq!(
-                    msg.get_error(),
-                    CircuitError_Error::ERROR_RECIPIENT_NOT_IN_DIRECTORY
-                );
-                assert_eq!(msg.get_correlation_id(), "1234");
-            },
-        )
-    }
-
     // Test that an error message is returned if the recipient is not in the circuit roster
     #[test]
     fn test_circuit_direct_message_handler_recipient_not_in_circuit_roster() {
@@ -609,32 +473,39 @@ mod tests {
         let mock_sender = MockSender::new();
         let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-        // add circuits and service to splinter state
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into(), "345".into()])
-            .with_roster(vec!["def".into()])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("circuit_direct_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()]);
 
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let mut service_def = Service::new(
+            "def".to_string(),
+            "test".to_string(),
+            "345".to_string(),
+            vec![],
+        );
 
-        let node_345 = SplinterNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
-        let service_def =
-            Service::new("def".to_string(), Some("def_network".to_string()), node_345);
-        let id = ServiceId::new("alpha".into(), "def".into());
-        state.add_service(id.clone(), service_def).unwrap();
+        service_def.set_peer_id("def_network".to_string());
+
+        // Add circuit and service to splinter state
+        let circuit = Circuit::new(
+            "alpha".into(),
+            vec![service_def.clone()],
+            vec!["123".into(), "345".into()],
+        );
+
+        writer
+            .add_circuit(
+                circuit.circuit_id().into(),
+                circuit,
+                vec![node_123, node_345],
+            )
+            .expect("Unable to add circuits");
 
         // add direct message handler
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), reader);
         dispatcher.set_handler(Box::new(handler));
 
         // create direct message
@@ -679,13 +550,11 @@ mod tests {
         let mock_sender = MockSender::new();
         let mut dispatcher = Dispatcher::new(Box::new(mock_sender.clone()));
 
-        // create empty splinter state
-        let circuit_directory = CircuitDirectory::new();
-
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
 
         // add direct message handler to the dispatcher
-        let handler = CircuitDirectMessageHandler::new("345".to_string(), state);
+        let handler = CircuitDirectMessageHandler::new("345".to_string(), reader);
         dispatcher.set_handler(Box::new(handler));
 
         // create direct message

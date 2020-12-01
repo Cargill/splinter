@@ -14,104 +14,103 @@
 
 //! trait implementations to support service components.
 
-use crate::circuit::service::{Service, ServiceId, SplinterNode};
-use crate::circuit::{ServiceDefinition, SplinterState};
+use crate::circuit::routing::{RoutingTableReader, RoutingTableWriter, Service, ServiceId};
 use crate::service::network::handlers::{
     ServiceAddInstanceError, ServiceInstances, ServiceRemoveInstanceError,
 };
 
-/// A collection of service instances, backed by `SplinterState`.
-pub struct SplinterStateServiceInstances {
-    splinter_node: SplinterNode,
-    state: SplinterState,
+const ADMIN_SERVICE_ID_PREFIX: &str = "admin::";
+const ADMIN_CIRCUIT_ID: &str = "admin";
+
+/// A collection of service instances, backed by `RoutingTable`.
+pub struct RoutingTableServiceInstances {
+    node_id: String,
+    routing_table_reader: Box<dyn RoutingTableReader>,
+    routing_table_writer: Box<dyn RoutingTableWriter>,
 }
 
-impl SplinterStateServiceInstances {
+impl RoutingTableServiceInstances {
     /// Construct a new instance with the given local node information and an instance of splinter
     /// state.
     ///
     /// # Params
     ///
-    /// - `splinter_node`: the local node information
-    /// - `state`: an instance of splinter state, that will be used to store the service instances
-    pub fn new(splinter_node: SplinterNode, state: SplinterState) -> Self {
+    /// - `node_id`: the local node information
+    /// - `routing_table_reader`: reader to check existing service state
+    /// - `routing_table_writer`: writer to update service state
+    pub fn new(
+        node_id: String,
+        routing_table_reader: Box<dyn RoutingTableReader>,
+        routing_table_writer: Box<dyn RoutingTableWriter>,
+    ) -> Self {
         Self {
-            splinter_node,
-            state,
+            node_id,
+            routing_table_reader,
+            routing_table_writer,
         }
     }
 }
 
-impl ServiceInstances for SplinterStateServiceInstances {
+impl ServiceInstances for RoutingTableServiceInstances {
     fn add_service_instance(
         &self,
         service_id: ServiceId,
         component_id: String,
     ) -> Result<(), ServiceAddInstanceError> {
-        let has_service = self.state.has_service(&service_id).map_err(|err| {
-            ServiceAddInstanceError::InternalError {
-                context: format!(
-                    "unable to check if service {} is already registered",
-                    service_id
-                ),
-                source: Some(Box::new(err)),
-            }
-        })?;
-
-        if has_service {
-            return Err(ServiceAddInstanceError::AlreadyRegistered);
-        }
-
         let unique_id = service_id.clone();
         let (circuit_name, service_id) = service_id.into_parts();
 
         let circuit = self
-            .state
-            .circuit(&circuit_name)
+            .routing_table_reader
+            .get_circuit(&circuit_name)
             .map_err(|err| ServiceAddInstanceError::InternalError {
-                context: format!("unable to load circuit information for {}", unique_id),
-                source: Some(Box::new(err)),
+                context: err.reduce_to_string(),
+                source: None,
             })?
             .ok_or(ServiceAddInstanceError::CircuitDoesNotExist)?;
 
-        let service_def = if !service_id.starts_with("admin::") {
-            circuit
-                .roster()
-                .iter()
-                .find(|service| service.service_id == service_id)
-                .cloned()
+        if !circuit
+            .roster()
+            .iter()
+            .any(|service| service.service_id() == service_id)
+        {
+            return Err(ServiceAddInstanceError::NotInCircuit);
+        }
+
+        let mut service = if !service_id.starts_with(ADMIN_SERVICE_ID_PREFIX) {
+            self.routing_table_reader
+                .get_service(&unique_id)
+                .map_err(|err| ServiceAddInstanceError::InternalError {
+                    context: err.reduce_to_string(),
+                    source: None,
+                })?
+                .ok_or(ServiceAddInstanceError::NotInCircuit)?
         } else {
-            Some(
-                ServiceDefinition::builder(service_id.clone(), "admin".into())
-                    .with_allowed_nodes(vec![self.splinter_node.id().to_string()])
-                    .build(),
+            Service::new(
+                service_id,
+                ADMIN_CIRCUIT_ID.to_string(),
+                self.node_id.to_string(),
+                vec![],
             )
         };
 
-        if let Some(service_def) = service_def {
-            if !service_def
-                .allowed_nodes
-                .iter()
-                .any(|node_id| node_id == self.splinter_node.id())
-            {
-                return Err(ServiceAddInstanceError::NotAllowed);
-            }
-
-            let service = Service::new(
-                service_id.clone(),
-                Some(component_id),
-                self.splinter_node.clone(),
-            );
-
-            self.state.add_service(unique_id, service).map_err(|err| {
-                ServiceAddInstanceError::InternalError {
-                    context: format!("unable to add service {}", service_id),
-                    source: Some(Box::new(err)),
-                }
-            })?;
-        } else {
-            return Err(ServiceAddInstanceError::NotInCircuit);
+        if service.node_id() != self.node_id {
+            return Err(ServiceAddInstanceError::NotAllowed);
         }
+
+        if service.peer_id().is_some() {
+            return Err(ServiceAddInstanceError::AlreadyRegistered);
+        }
+
+        service.set_peer_id(component_id);
+
+        let mut writer = self.routing_table_writer.clone();
+        writer.add_service(unique_id, service).map_err(|err| {
+            ServiceAddInstanceError::InternalError {
+                context: err.reduce_to_string(),
+                source: None,
+            }
+        })?;
         Ok(())
     }
 
@@ -120,24 +119,28 @@ impl ServiceInstances for SplinterStateServiceInstances {
         service_id: ServiceId,
         _component_id: String,
     ) -> Result<(), ServiceRemoveInstanceError> {
-        let has_service = !self.state.has_service(&service_id).map_err(|err| {
-            ServiceRemoveInstanceError::InternalError {
-                context: format!("unable to check if service {} is registered", service_id),
-                source: Some(Box::new(err)),
-            }
-        })?;
+        let mut service = self
+            .routing_table_reader
+            .get_service(&service_id)
+            .map_err(|err| ServiceRemoveInstanceError::InternalError {
+                context: err.reduce_to_string(),
+                source: None,
+            })?
+            .ok_or(ServiceRemoveInstanceError::NotRegistered)?;
 
-        if has_service {
+        if service.peer_id().is_none() {
             return Err(ServiceRemoveInstanceError::NotRegistered);
         }
 
-        self.state
-            .remove_service(&service_id)
-            .map(|_| ())
-            .map_err(|err| ServiceRemoveInstanceError::InternalError {
-                context: format!("unable to remove service {}", service_id),
-                source: Some(Box::new(err)),
-            })
+        service.remove_peer_id();
+
+        let mut writer = self.routing_table_writer.clone();
+        writer.add_service(service_id, service).map_err(|err| {
+            ServiceRemoveInstanceError::InternalError {
+                context: err.reduce_to_string(),
+                source: None,
+            }
+        })
     }
 }
 
@@ -145,18 +148,19 @@ impl ServiceInstances for SplinterStateServiceInstances {
 mod tests {
     use super::*;
 
-    use crate::circuit::directory::CircuitDirectory;
-    use crate::circuit::{AuthorizationType, Circuit, DurabilityType, PersistenceType, RouteType};
+    use crate::circuit::routing::{
+        memory::RoutingTable, Circuit, CircuitNode, RoutingTableWriter, Service,
+    };
 
     #[test]
     // Test that if the circuit does not exist, a ServiceAddInstanceError::CircuitDoesNotExist
     // error is returned.
     fn test_add_service_instance_circuit_does_not_exist() {
-        let circuit_directory = CircuitDirectory::new();
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
-
-        let splinter_node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:0".into()]);
-        let service_instances = SplinterStateServiceInstances::new(splinter_node, state);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        let service_instances =
+            RoutingTableServiceInstances::new("123".to_string(), reader, writer);
 
         let res = service_instances.add_service_instance(
             ServiceId::new("alpha".into(), "abc".into()),
@@ -173,14 +177,18 @@ mod tests {
     // Test that if the service is not in circuit, a ServiceAddInstanceError::NotInCircuit error is
     // returned.
     fn test_add_service_instance_not_in_circuit() {
-        let circuit = build_circuit();
+        let (circuit, nodes) = build_circuit();
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".into(), circuit);
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let splinter_node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:0".into()]);
-        let service_instances = SplinterStateServiceInstances::new(splinter_node, state);
+        writer
+            .add_circuit(circuit.circuit_id().into(), circuit, nodes)
+            .expect("Unable to add circuit");
+
+        let service_instances =
+            RoutingTableServiceInstances::new("123".to_string(), reader, writer);
 
         let res = service_instances.add_service_instance(
             ServiceId::new("alpha".into(), "BAD".into()),
@@ -194,22 +202,28 @@ mod tests {
     // Test that if the service is already registered, a ServiceAddInstanceError::AlreadyRegistered
     // error is returned.
     fn test_add_service_instance_already_registered() {
-        let circuit = build_circuit();
+        let (circuit, nodes) = build_circuit();
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".into(), circuit);
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let splinter_node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:0".into()]);
-        let service = Service::new(
-            "abc".to_string(),
-            Some("abc_network".to_string()),
-            splinter_node.clone(),
-        );
+        writer
+            .add_circuit(circuit.circuit_id().into(), circuit, nodes)
+            .expect("Unable to add circuit");
+
         let id = ServiceId::new("alpha".into(), "abc".into());
-        state.add_service(id.clone(), service).unwrap();
+        let mut service = reader
+            .get_service(&id)
+            .expect("Unable to get service")
+            .expect("Missing service");
+        service.set_peer_id("abc_network".into());
+        writer
+            .add_service(id, service)
+            .expect("Unable to add service");
 
-        let service_instances = SplinterStateServiceInstances::new(splinter_node, state);
+        let service_instances =
+            RoutingTableServiceInstances::new("123".to_string(), reader, writer);
 
         let res = service_instances.add_service_instance(
             ServiceId::new("alpha".into(), "abc".into()),
@@ -226,37 +240,49 @@ mod tests {
     // Test that if the service is in a circuit and not connected, the service is accepted.
     // This is the happy-path test
     fn test_add_service_instance_accepted() {
-        let circuit = build_circuit();
+        let (circuit, nodes) = build_circuit();
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".to_string(), circuit);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        writer
+            .add_circuit(circuit.circuit_id().into(), circuit, nodes)
+            .expect("Unable to add circuit");
 
-        let splinter_node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:0".into()]);
-        let service_instances = SplinterStateServiceInstances::new(splinter_node, state.clone());
+        let service_instances =
+            RoutingTableServiceInstances::new("123".to_string(), reader.clone(), writer);
 
         let id = ServiceId::new("alpha".into(), "abc".into());
         let res = service_instances.add_service_instance(id.clone(), "my_component".into());
 
         assert!(matches!(res, Ok(())));
-        assert!(state
-            .has_service(&id)
-            .expect("cannot check if it has the service"));
+        assert_eq!(
+            reader
+                .get_service(&id)
+                .expect("cannot check if it has the service")
+                .expect("no service returned")
+                .peer_id(),
+            &Some("my_component".to_string())
+        );
     }
 
     #[test]
     // Test that if the circuit is not registered, a ServiceRemoveInstanceError::NotRegistered
     // should be returned.
     fn test_remove_service_instance_not_registred() {
-        let circuit = build_circuit();
+        let (circuit, nodes) = build_circuit();
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".into(), circuit);
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let splinter_node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:0".into()]);
-        let service_instances = SplinterStateServiceInstances::new(splinter_node, state);
+        writer
+            .add_circuit(circuit.circuit_id().into(), circuit, nodes)
+            .expect("Unable to add circuit");
+
+        let service_instances =
+            RoutingTableServiceInstances::new("123".to_string(), reader.clone(), writer);
 
         let res = service_instances.remove_service_instance(
             ServiceId::new("alpha".into(), "abc".into()),
@@ -271,53 +297,65 @@ mod tests {
 
     #[test]
     fn test_remove_service_instance_accepted() {
-        let circuit = build_circuit();
+        let (circuit, nodes) = build_circuit();
 
-        let mut circuit_directory = CircuitDirectory::new();
-        circuit_directory.add_circuit("alpha".into(), circuit);
-        let state = SplinterState::new("memory".to_string(), circuit_directory);
+        let table = RoutingTable::default();
+        let reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
+        let mut writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
-        let splinter_node = SplinterNode::new("123".into(), vec!["tcp://127.0.0.1:0".into()]);
-        let service = Service::new(
-            "abc".to_string(),
-            Some("abc_network".to_string()),
-            splinter_node.clone(),
-        );
+        writer
+            .add_circuit(circuit.circuit_id().into(), circuit, nodes)
+            .expect("Unable to add circuit");
+
         let id = ServiceId::new("alpha".into(), "abc".into());
-        state.add_service(id.clone(), service).unwrap();
+        let mut service = reader
+            .get_service(&id)
+            .expect("Unable to get service")
+            .expect("Missing service");
+        service.set_peer_id("abc_network".into());
+        writer
+            .add_service(id.clone(), service)
+            .expect("Unable to add service");
 
-        let service_instances = SplinterStateServiceInstances::new(splinter_node, state.clone());
+        let service_instances =
+            RoutingTableServiceInstances::new("123".to_string(), reader.clone(), writer);
 
         let res = service_instances.remove_service_instance(id.clone(), "my_component".into());
 
         assert!(matches!(res, Ok(())));
 
-        assert!(!state
-            .has_service(&id)
-            .expect("cannot check if it has the service"));
+        assert!(reader
+            .get_service(&id)
+            .expect("cannot check if it has the service")
+            .expect("no service returned")
+            .peer_id()
+            .is_none());
     }
 
-    fn build_circuit() -> Circuit {
-        let service_abc = ServiceDefinition::builder("abc".into(), "test".into())
-            .with_allowed_nodes(vec!["123".to_string()])
-            .build();
+    fn build_circuit() -> (Circuit, Vec<CircuitNode>) {
+        let node_123 = CircuitNode::new("123".to_string(), vec!["123.0.0.1:0".to_string()]);
+        let node_345 = CircuitNode::new("345".to_string(), vec!["123.0.0.1:1".to_string()]);
 
-        let service_def = ServiceDefinition::builder("def".into(), "test".into())
-            .with_allowed_nodes(vec!["345".to_string()])
-            .build();
+        let service_abc = Service::new(
+            "abc".to_string(),
+            "test".to_string(),
+            "123".to_string(),
+            vec![],
+        );
+        let service_def = Service::new(
+            "def".to_string(),
+            "test".to_string(),
+            "345".to_string(),
+            vec![],
+        );
 
-        let circuit = Circuit::builder()
-            .with_id("alpha".into())
-            .with_auth(AuthorizationType::Trust)
-            .with_members(vec!["123".into(), "345".into()])
-            .with_roster(vec![service_abc, service_def])
-            .with_persistence(PersistenceType::Any)
-            .with_durability(DurabilityType::NoDurability)
-            .with_routes(RouteType::Any)
-            .with_circuit_management_type("service_connect_test_app".into())
-            .build()
-            .expect("Should have built a correct circuit");
+        // Add circuit and service to splinter state
+        let circuit = Circuit::new(
+            "alpha".into(),
+            vec![service_abc.clone(), service_def.clone()],
+            vec!["123".into(), "345".into()],
+        );
 
-        circuit
+        (circuit, vec![node_123, node_345])
     }
 }
