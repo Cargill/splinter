@@ -41,7 +41,7 @@ impl Action for MigrateAction {
             get_default_database()?
         };
 
-        match ConnectionUri::from_str(&url).map_err(CliError::ActionError)? {
+        match ConnectionUri::from_str(&url)? {
             ConnectionUri::Postgres(url) => {
                 let connection = PgConnection::establish(&url).map_err(|err| {
                     CliError::ActionError(format!(
@@ -76,18 +76,24 @@ pub enum ConnectionUri {
 }
 
 impl FromStr for ConnectionUri {
-    type Err = String;
+    type Err = CliError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             // check specifically so it does not pass to sqlite
-            "memory" => Err(format!("No compatible connection type: {}", s)),
+            "memory" => Err(CliError::ActionError(format!(
+                "No compatible connection type: {}",
+                s
+            ))),
             #[cfg(feature = "postgres")]
             _ if s.starts_with("postgres://") => Ok(ConnectionUri::Postgres(s.into())),
             #[cfg(feature = "sqlite")]
             _ => Ok(ConnectionUri::Sqlite(s.into())),
             #[cfg(not(feature = "sqlite"))]
-            _ => Err(format!("No compatible connection type: {}", s)),
+            _ => Err(CliError::ActionError(format!(
+                "No compatible connection type: {}",
+                s
+            ))),
         }
     }
 }
