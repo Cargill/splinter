@@ -49,7 +49,7 @@ impl Action for MigrateAction {
                         url, err
                     ))
                 })?;
-
+                info!("Running migrations against PostgreSQL database: {}", url);
                 run_postgres_migrations(&connection).map_err(|err| {
                     CliError::ActionError(format!("Unable to run Postgres migrations: {}", err))
                 })?;
