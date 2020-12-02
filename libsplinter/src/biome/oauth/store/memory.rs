@@ -13,7 +13,10 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicI64, Ordering},
+    Arc, Mutex,
+};
 
 use crate::error::InternalError;
 
@@ -24,12 +27,14 @@ use super::{
 #[derive(Default, Clone)]
 pub struct MemoryOAuthUserStore {
     inner: Arc<Mutex<HashMap<String, OAuthUserAccess>>>,
+    id_sequence: Arc<AtomicI64>,
 }
 
 impl MemoryOAuthUserStore {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
+            id_sequence: Arc::new(AtomicI64::new(1)),
         }
     }
 }
@@ -50,7 +55,9 @@ impl OAuthUserStore for MemoryOAuthUserStore {
             provider,
         } = oauth_user;
 
+        let id = self.id_sequence.fetch_add(1, Ordering::SeqCst);
         let oauth_user_access = OAuthUserAccess {
+            id,
             user_id,
             provider_user_ref,
             access_token,

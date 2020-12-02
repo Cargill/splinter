@@ -140,7 +140,7 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
 impl From<OAuthUserModel> for OAuthUserAccess {
     fn from(model: OAuthUserModel) -> Self {
         let OAuthUserModel {
-            id: _,
+            id,
             user_id,
             provider_user_ref,
             access_token,
@@ -148,6 +148,7 @@ impl From<OAuthUserModel> for OAuthUserAccess {
             provider_id,
         } = model;
         Self {
+            id,
             user_id,
             provider_user_ref,
             access_token: match access_token {

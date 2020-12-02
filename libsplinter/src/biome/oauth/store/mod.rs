@@ -149,6 +149,7 @@ impl NewOAuthUserAccessBuilder {
 /// This user is connected to a Biome User, via a user ID.
 #[derive(Clone)]
 pub struct OAuthUserAccess {
+    id: i64,
     user_id: String,
     provider_user_ref: String,
 
@@ -158,6 +159,11 @@ pub struct OAuthUserAccess {
 }
 
 impl OAuthUserAccess {
+    /// Return the access id (this id is assigned by a store implementation).
+    pub fn id(&self) -> i64 {
+        self.id
+    }
+
     /// Return the user ID associated with this OAuth user
     pub fn user_id(&self) -> &str {
         &self.user_id
@@ -188,6 +194,7 @@ impl OAuthUserAccess {
     /// Convert this OAuthUserAccess into an update builder.
     pub fn into_update_builder(self) -> OAuthUserAccessUpdateBuilder {
         let Self {
+            id,
             user_id,
             provider_user_ref,
             access_token,
@@ -195,6 +202,7 @@ impl OAuthUserAccess {
             provider,
         } = self;
         OAuthUserAccessUpdateBuilder {
+            id,
             user_id,
             provider_user_ref,
             access_token,
@@ -210,6 +218,7 @@ impl OAuthUserAccess {
 /// updated.
 pub struct OAuthUserAccessUpdateBuilder {
     // "immutable" items
+    id: i64,
     user_id: String,
     provider_user_ref: String,
     provider: OAuthProvider,
@@ -239,6 +248,7 @@ impl OAuthUserAccessUpdateBuilder {
     /// Builds the updated OAuthUserAccess.
     pub fn build(self) -> Result<OAuthUserAccess, InvalidStateError> {
         let Self {
+            id,
             user_id,
             provider_user_ref,
             access_token,
@@ -246,6 +256,7 @@ impl OAuthUserAccessUpdateBuilder {
             provider,
         } = self;
         Ok(OAuthUserAccess {
+            id,
             user_id,
             provider_user_ref,
             access_token,
