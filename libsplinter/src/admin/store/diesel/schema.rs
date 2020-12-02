@@ -32,6 +32,7 @@ table! {
         circuit_management_type -> Text,
         application_metadata -> Binary,
         comments -> Text,
+        display_name -> Nullable<Text>,
     }
 }
 
@@ -103,6 +104,7 @@ table! {
         durability -> Text,
         routes -> Text,
         circuit_management_type -> Text,
+        display_name -> Nullable<Text>,
     }
 }
 

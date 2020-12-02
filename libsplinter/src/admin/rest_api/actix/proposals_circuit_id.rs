@@ -189,6 +189,7 @@ mod tests {
                 circuit_management_type: "mgmt_type".into(),
                 application_metadata: vec![],
                 comments: "mock circuit".into(),
+                display_name: "test_circuit".into(),
             },
             votes: vec![],
             requester: vec![],

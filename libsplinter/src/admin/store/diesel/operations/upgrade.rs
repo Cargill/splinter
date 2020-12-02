@@ -46,7 +46,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
             let proposed_circuit = proposal.circuit();
-            let circuit = CircuitBuilder::new()
+            let mut builder = CircuitBuilder::new()
                 .with_circuit_id(proposed_circuit.circuit_id())
                 .with_roster(
                     &proposed_circuit
@@ -66,7 +66,13 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .with_persistence(proposed_circuit.persistence())
                 .with_durability(proposed_circuit.durability())
                 .with_routes(proposed_circuit.routes())
-                .with_circuit_management_type(proposed_circuit.circuit_management_type())
+                .with_circuit_management_type(proposed_circuit.circuit_management_type());
+
+            if let Some(display_name) = proposed_circuit.display_name() {
+                builder = builder.with_display_name(display_name);
+            }
+
+            let circuit = builder
                 .build()
                 .map_err(AdminServiceStoreError::InvalidStateError)?;
 
@@ -100,7 +106,7 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
             }?;
             // Need to construct the `Circuit` from the `ProposedCircuit`
             let proposed_circuit = proposal.circuit();
-            let circuit = CircuitBuilder::new()
+            let mut builder = CircuitBuilder::new()
                 .with_circuit_id(proposed_circuit.circuit_id())
                 .with_roster(
                     &proposed_circuit
@@ -120,7 +126,13 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .with_persistence(proposed_circuit.persistence())
                 .with_durability(proposed_circuit.durability())
                 .with_routes(proposed_circuit.routes())
-                .with_circuit_management_type(proposed_circuit.circuit_management_type())
+                .with_circuit_management_type(proposed_circuit.circuit_management_type());
+
+            if let Some(display_name) = proposed_circuit.display_name() {
+                builder = builder.with_display_name(display_name);
+            }
+
+            let circuit = builder
                 .build()
                 .map_err(AdminServiceStoreError::InvalidStateError)?;
 

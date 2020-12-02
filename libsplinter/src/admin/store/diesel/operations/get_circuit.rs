@@ -65,18 +65,23 @@ where
                 .map(|member| member.node_id.to_string())
                 .collect();
 
+            let mut builder = CircuitBuilder::new()
+                .with_circuit_id(&circuit.circuit_id)
+                .with_roster(&services)
+                .with_members(&circuit_member)
+                .with_authorization_type(&AuthorizationType::try_from(circuit.authorization_type)?)
+                .with_persistence(&PersistenceType::try_from(circuit.persistence)?)
+                .with_durability(&DurabilityType::try_from(circuit.durability)?)
+                .with_routes(&RouteType::try_from(circuit.routes)?)
+                .with_circuit_management_type(&circuit.circuit_management_type);
+
+            // if display name is set, add to builder
+            if let Some(display_name) = circuit.display_name {
+                builder = builder.with_display_name(&display_name);
+            }
+
             Ok(Some(
-                CircuitBuilder::new()
-                    .with_circuit_id(&circuit.circuit_id)
-                    .with_roster(&services)
-                    .with_members(&circuit_member)
-                    .with_authorization_type(&AuthorizationType::try_from(
-                        circuit.authorization_type,
-                    )?)
-                    .with_persistence(&PersistenceType::try_from(circuit.persistence)?)
-                    .with_durability(&DurabilityType::try_from(circuit.durability)?)
-                    .with_routes(&RouteType::try_from(circuit.routes)?)
-                    .with_circuit_management_type(&circuit.circuit_management_type)
+                builder
                     .build()
                     .map_err(AdminServiceStoreError::InvalidStateError)?,
             ))

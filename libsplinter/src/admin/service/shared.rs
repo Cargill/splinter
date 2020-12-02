@@ -1950,6 +1950,7 @@ mod tests {
         circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
         circuit.set_circuit_management_type("test app auth handler".into());
         circuit.set_comments("test circuit".into());
+        circuit.set_display_name("test_display".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -2077,6 +2078,7 @@ mod tests {
         circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE);
         circuit.set_circuit_management_type("test app auth handler".into());
         circuit.set_comments("test circuit".into());
+        circuit.set_display_name("test_display".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -3506,6 +3508,7 @@ mod tests {
         circuit.set_circuit_management_type("test_circuit".to_string());
         circuit.set_application_metadata(b"test_data".to_vec());
         circuit.set_comments("test circuit".to_string());
+        circuit.set_display_name("test_display".into());
 
         circuit
     }

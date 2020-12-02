@@ -16,7 +16,7 @@
 
 use diesel::{
     prelude::*,
-    sql_types::{Binary, Text},
+    sql_types::{Binary, Nullable, Text},
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -52,8 +52,20 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     CircuitProposalModel: diesel::Queryable<(Text, Text, Text, Binary, Text), C::Backend>,
-    ProposedCircuitModel:
-        diesel::Queryable<(Text, Text, Text, Text, Text, Text, Binary, Text), C::Backend>,
+    ProposedCircuitModel: diesel::Queryable<
+        (
+            Text,
+            Text,
+            Text,
+            Text,
+            Text,
+            Text,
+            Binary,
+            Text,
+            Nullable<Text>,
+        ),
+        C::Backend,
+    >,
     VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text), C::Backend>,
 {
     fn get_proposal(
@@ -191,7 +203,7 @@ where
                 .into_iter()
                 .filter_map(|vote| VoteRecord::try_from(&vote).ok())
                 .collect();
-            let native_proposed_circuit = ProposedCircuitBuilder::new()
+            let mut builder = ProposedCircuitBuilder::new()
                 .with_circuit_id(&proposal.circuit_id)
                 .with_roster(&built_proposed_services)
                 .with_members(built_proposed_nodes.as_slice())
@@ -203,10 +215,15 @@ where
                 .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
                 .with_circuit_management_type(&proposed_circuit.circuit_management_type)
                 .with_application_metadata(&proposed_circuit.application_metadata)
-                .with_comments(&proposed_circuit.comments)
+                .with_comments(&proposed_circuit.comments);
+
+            if let Some(display_name) = &proposed_circuit.display_name {
+                builder = builder.with_display_name(&display_name)
+            }
+
+            let native_proposed_circuit = builder
                 .build()
                 .map_err(AdminServiceStoreError::InvalidStateError)?;
-
             Ok(Some(
                 CircuitProposalBuilder::new()
                     .with_proposal_type(&ProposalType::try_from(proposal.proposal_type)?)

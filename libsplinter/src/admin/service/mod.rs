@@ -907,6 +907,7 @@ mod tests {
         proposed_circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
         proposed_circuit.set_circuit_management_type("test app auth handler".into());
         proposed_circuit.set_comments("test circuit".into());
+        proposed_circuit.set_display_name("test_display".into());
 
         proposed_circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".into()]),

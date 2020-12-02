@@ -20,7 +20,7 @@ use std::convert::TryFrom;
 use diesel::{
     dsl::exists,
     prelude::*,
-    sql_types::{Binary, Text},
+    sql_types::{Binary, Nullable, Text},
 };
 
 use crate::admin::store::{
@@ -56,8 +56,20 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     CircuitProposalModel: diesel::Queryable<(Text, Text, Text, Binary, Text), C::Backend>,
-    ProposedCircuitModel:
-        diesel::Queryable<(Text, Text, Text, Text, Text, Text, Binary, Text), C::Backend>,
+    ProposedCircuitModel: diesel::Queryable<
+        (
+            Text,
+            Text,
+            Text,
+            Text,
+            Text,
+            Text,
+            Binary,
+            Text,
+            Nullable<Text>,
+        ),
+        C::Backend,
+    >,
     VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text), C::Backend>,
 {
     fn list_proposals(
@@ -152,7 +164,7 @@ where
                             .with_circuit_hash(&proposal.circuit_hash)
                             .with_requester(&proposal.requester)
                             .with_requester_node_id(&proposal.requester_node_id);
-                        let proposed_circuit_builder = ProposedCircuitBuilder::new()
+                        let mut proposed_circuit_builder = ProposedCircuitBuilder::new()
                             .with_circuit_id(&proposed_circuit.circuit_id)
                             .with_authorization_type(&AuthorizationType::try_from(
                                 proposed_circuit.authorization_type,
@@ -167,6 +179,12 @@ where
                             .with_circuit_management_type(&proposed_circuit.circuit_management_type)
                             .with_application_metadata(&proposed_circuit.application_metadata)
                             .with_comments(&proposed_circuit.comments);
+
+                        if let Some(display_name) = &proposed_circuit.display_name {
+                            proposed_circuit_builder =
+                                proposed_circuit_builder.with_display_name(&display_name);
+                        }
+
                         Ok((
                             proposed_circuit.circuit_id.to_string(),
                             (proposal_builder, proposed_circuit_builder),

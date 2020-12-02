@@ -33,6 +33,7 @@ pub struct CreateCircuitBuilder {
     circuit_management_type: Option<String>,
     application_metadata: Option<Vec<u8>>,
     comments: Option<String>,
+    display_name: Option<String>,
 }
 
 impl CreateCircuitBuilder {
@@ -78,6 +79,10 @@ impl CreateCircuitBuilder {
 
     pub fn comments(&self) -> Option<String> {
         self.comments.clone()
+    }
+
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     pub fn with_circuit_id(mut self, circuit_id: &str) -> CreateCircuitBuilder {
@@ -136,6 +141,11 @@ impl CreateCircuitBuilder {
 
     pub fn with_comments(mut self, comments: &str) -> CreateCircuitBuilder {
         self.comments = Some(comments.into());
+        self
+    }
+
+    pub fn with_display_name(mut self, display_name: &str) -> CreateCircuitBuilder {
+        self.display_name = Some(display_name.into());
         self
     }
 
@@ -200,6 +210,8 @@ impl CreateCircuitBuilder {
 
         let comments = self.comments.unwrap_or_default();
 
+        let display_name = self.display_name;
+
         let create_circuit_message = CreateCircuit {
             circuit_id,
             roster,
@@ -211,6 +223,7 @@ impl CreateCircuitBuilder {
             circuit_management_type,
             application_metadata,
             comments,
+            display_name,
         };
 
         Ok(create_circuit_message)

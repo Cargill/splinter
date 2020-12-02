@@ -30,6 +30,7 @@ pub struct Circuit {
     durability: DurabilityType,
     routes: RouteType,
     circuit_management_type: String,
+    display_name: Option<String>,
 }
 
 impl Circuit {
@@ -71,6 +72,11 @@ impl Circuit {
     /// Returns the mangement type of the circuit
     pub fn circuit_management_type(&self) -> &str {
         &self.circuit_management_type
+    }
+
+    /// Returns the display name for the circuit
+    pub fn display_name(&self) -> &Option<String> {
+        &self.display_name
     }
 }
 
@@ -121,6 +127,7 @@ pub struct CircuitBuilder {
     durability: Option<DurabilityType>,
     routes: Option<RouteType>,
     circuit_management_type: Option<String>,
+    display_name: Option<String>,
 }
 
 impl CircuitBuilder {
@@ -167,6 +174,11 @@ impl CircuitBuilder {
     /// Returns the circuit management type in the builder
     pub fn circuit_management_type(&self) -> Option<String> {
         self.circuit_management_type.clone()
+    }
+
+    /// Returns the display_name in the builder
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     /// Sets the circuit ID
@@ -252,6 +264,16 @@ impl CircuitBuilder {
         self
     }
 
+    /// Sets the display name for the circuit
+    ///
+    /// # Arguments
+    ///
+    ///  * `display_name` - The human readable display name for the circuit
+    pub fn with_display_name(mut self, display_name: &str) -> CircuitBuilder {
+        self.display_name = Some(display_name.into());
+        self
+    }
+
     /// Builds a `Circuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
@@ -299,7 +321,9 @@ impl CircuitBuilder {
             )
         })?;
 
-        let create_circuit_message = Circuit {
+        let display_name = self.display_name;
+
+        let circuit = Circuit {
             id: circuit_id,
             roster,
             members,
@@ -308,9 +332,10 @@ impl CircuitBuilder {
             durability,
             routes,
             circuit_management_type,
+            display_name,
         };
 
-        Ok(create_circuit_message)
+        Ok(circuit)
     }
 }
 
@@ -329,6 +354,7 @@ impl From<ProposedCircuit> for Circuit {
             durability: circuit.durability().clone(),
             routes: circuit.routes().clone(),
             circuit_management_type: circuit.circuit_management_type().into(),
+            display_name: circuit.display_name().clone(),
         }
     }
 }
