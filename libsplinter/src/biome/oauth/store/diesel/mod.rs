@@ -26,7 +26,10 @@ use diesel::{
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
 
-use super::{AccessToken, OAuthProvider, OAuthUserAccess, OAuthUserStore, OAuthUserStoreError};
+use super::{
+    AccessToken, NewOAuthUserAccess, OAuthProvider, OAuthUserAccess, OAuthUserStore,
+    OAuthUserStoreError,
+};
 
 use models::{NewOAuthUserModel, OAuthUserModel, ProviderId};
 use operations::add_oauth_user::OAuthUserStoreAddOAuthUserOperation as _;
@@ -50,9 +53,9 @@ impl<C: diesel::Connection + 'static> DieselOAuthUserStore<C> {
 
 #[cfg(feature = "sqlite")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
-    fn add_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
+        OAuthUserStoreOperations::new(&*connection).add_oauth_user((&oauth_user).into())
     }
 
     fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
@@ -93,9 +96,9 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
 
 #[cfg(feature = "biome-oauth-user-store-postgres")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
-    fn add_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
+        OAuthUserStoreOperations::new(&*connection).add_oauth_user((&oauth_user).into())
     }
 
     fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
@@ -160,17 +163,17 @@ impl From<OAuthUserModel> for OAuthUserAccess {
     }
 }
 
-impl<'a> From<&'a OAuthUserAccess> for NewOAuthUserModel<'a> {
-    fn from(user: &'a OAuthUserAccess) -> Self {
+impl<'a> From<&'a NewOAuthUserAccess> for NewOAuthUserModel<'a> {
+    fn from(user: &'a NewOAuthUserAccess) -> Self {
         NewOAuthUserModel {
-            user_id: user.user_id(),
-            provider_user_ref: user.provider_user_ref(),
-            access_token: match user.access_token() {
-                AccessToken::Authorized(token) => Some(token),
+            user_id: &user.user_id,
+            provider_user_ref: &user.provider_user_ref,
+            access_token: match &user.access_token {
+                AccessToken::Authorized(ref token) => Some(&token),
                 AccessToken::Unauthorized => None,
             },
-            refresh_token: user.refresh_token(),
-            provider_id: match user.provider() {
+            refresh_token: user.refresh_token.as_deref(),
+            provider_id: match user.provider {
                 OAuthProvider::Github => ProviderId::Github,
                 OAuthProvider::OpenId => ProviderId::OpenId,
             },
@@ -215,7 +218,7 @@ impl From<result::Error> for OAuthUserStoreError {
 pub mod tests {
     use super::*;
 
-    use crate::biome::oauth::store::{AccessToken, OAuthUserAccessBuilder};
+    use crate::biome::oauth::store::{AccessToken, NewOAuthUserAccessBuilder};
     use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
     use crate::migrations::run_sqlite_migrations;
 
@@ -247,7 +250,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserAccessBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -280,7 +283,7 @@ pub mod tests {
         assert!(unknown_oauth_user.is_none());
 
         // Create another user and try to connect it to the same user id.
-        let oauth_user = OAuthUserAccessBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser2".into())
             .with_access_token(AccessToken::Authorized("someotheraccesstoken".to_string()))
@@ -318,7 +321,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserAccessBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -379,7 +382,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserAccessBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))

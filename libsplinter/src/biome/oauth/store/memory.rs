@@ -17,7 +17,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::InternalError;
 
-use super::{AccessToken, OAuthUserAccess, OAuthUserStore, OAuthUserStoreError};
+use super::{
+    AccessToken, NewOAuthUserAccess, OAuthUserAccess, OAuthUserStore, OAuthUserStoreError,
+};
 
 #[derive(Default, Clone)]
 pub struct MemoryOAuthUserStore {
@@ -33,13 +35,29 @@ impl MemoryOAuthUserStore {
 }
 
 impl OAuthUserStore for MemoryOAuthUserStore {
-    fn add_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let mut inner = self.inner.lock().map_err(|_| {
             OAuthUserStoreError::InternalError(InternalError::with_message(
                 "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
-        inner.insert(oauth_user.user_id().to_string(), oauth_user);
+
+        let NewOAuthUserAccess {
+            user_id,
+            provider_user_ref,
+            access_token,
+            refresh_token,
+            provider,
+        } = oauth_user;
+
+        let oauth_user_access = OAuthUserAccess {
+            user_id,
+            provider_user_ref,
+            access_token,
+            refresh_token,
+            provider,
+        };
+        inner.insert(oauth_user_access.user_id().to_string(), oauth_user_access);
         Ok(())
     }
 

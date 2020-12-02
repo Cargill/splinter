@@ -18,7 +18,7 @@
 use uuid::Uuid;
 
 use crate::biome::oauth::store::{
-    AccessToken, OAuthProvider, OAuthUserAccessBuilder, OAuthUserStore,
+    AccessToken, NewOAuthUserAccessBuilder, OAuthProvider, OAuthUserStore,
 };
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
@@ -159,7 +159,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                 .add_user(user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-            let oauth_user = OAuthUserAccessBuilder::new()
+            let oauth_user = NewOAuthUserAccessBuilder::new()
                 .with_user_id(user_id)
                 .with_provider_user_ref(provider_identity)
                 .with_access_token(AccessToken::Authorized(
