@@ -62,26 +62,24 @@ pub trait AuthorizationMapping<T> {
 /// The authorization that is passed to an `IdentityProvider`
 pub enum Authorization {
     Bearer(BearerToken),
+    Custom(String),
 }
 
-/// Parses an authorization string, which must be in the format "<scheme> <value>"
+/// Parses an authorization string. This implementation will attempt to parse the string in the
+/// format "<scheme> <value>" to a known scheme. If the string does not match this format or the
+/// scheme is unknown, the `Authorization::Custom` variant will be returned with the whole
+/// authorization string.
 impl FromStr for Authorization {
     type Err = InvalidArgumentError;
 
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         let mut parts = str.splitn(2, ' ');
         match (parts.next(), parts.next()) {
-            (Some(auth_scheme), Some(token)) => match auth_scheme {
-                "Bearer" => Ok(Authorization::Bearer(token.parse()?)),
-                other_scheme => Err(InvalidArgumentError::new(
-                    "str".into(),
-                    format!("unsupported authorization scheme: {}", other_scheme),
-                )),
+            (Some(auth_scheme), Some(value)) => match auth_scheme {
+                "Bearer" => Ok(Authorization::Bearer(value.parse()?)),
+                _ => Ok(Authorization::Custom(str.to_string())),
             },
-            (Some(_), None) => Err(InvalidArgumentError::new(
-                "str".into(),
-                "malformed authorization".into(),
-            )),
+            (Some(_), None) => Ok(Authorization::Custom(str.to_string())),
             _ => unreachable!(), // splitn always returns at least one item
         }
     }
