@@ -88,11 +88,13 @@ impl FromStr for Authorization {
 }
 
 /// A bearer token of a specific type
-#[non_exhaustive]
 pub enum BearerToken {
     #[cfg(feature = "biome-credentials")]
     /// Contains a Biome JWT
     Biome(String),
+    /// Contains a custom token, which is any bearer token that does not match one of the other
+    /// variants of this enum
+    Custom(String),
     #[cfg(feature = "cylinder-jwt")]
     /// Contains a Cylinder JWT
     Cylinder(String),
@@ -101,7 +103,9 @@ pub enum BearerToken {
     OAuth2(String),
 }
 
-/// Parses a bearer token string, which must be in the format "<type>:<value>"
+/// Parses a bearer token string. This implementation will attempt to parse the token in the format
+/// "<type>:<value>" to a know type. If the token does not match this format or the type is unknown,
+/// the `BearerToken::Custom` variant will be returned with the whole token value.
 impl FromStr for BearerToken {
     type Err = InvalidArgumentError;
 
@@ -115,15 +119,9 @@ impl FromStr for BearerToken {
                 "Cylinder" => Ok(BearerToken::Cylinder(token.to_string())),
                 #[cfg(feature = "oauth")]
                 "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
-                other_type => Err(InvalidArgumentError::new(
-                    "str".into(),
-                    format!("unsupported token type: {}", other_type),
-                )),
+                _ => Ok(BearerToken::Custom(str.to_string())),
             },
-            (Some(_), None) => Err(InvalidArgumentError::new(
-                "str".into(),
-                "malformed token".into(),
-            )),
+            (Some(_), None) => Ok(BearerToken::Custom(str.to_string())),
             _ => unreachable!(), // splitn always returns at least one item
         }
     }
