@@ -304,7 +304,7 @@ services:
           splinter database migrate -C postgres://admin:admin@splinterd-db-bubba:5432/splinter && \
           splinter cert generate --skip && \
           splinterd -c ./configs/splinterd-node-bubba.toml -vv \
-              --database postgres://admin:admin@splinterd-db-acme:5432/splinter \
+              --database postgres://admin:admin@splinterd-db-bubba:5432/splinter \
               --network-endpoints tcps://0.0.0.0:8044 \
               --advertised-endpoints tcps://splinterd-node-bubba:8044 \
               --rest-api-endpoint 0.0.0.0:8085 \
