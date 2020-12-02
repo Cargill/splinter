@@ -15,20 +15,20 @@
 use diesel::{dsl::update, prelude::*};
 
 use crate::biome::oauth::store::{
-    diesel::schema::oauth_user, AccessToken, OAuthUser, OAuthUserStoreError,
+    diesel::schema::oauth_user, AccessToken, OAuthUserAccess, OAuthUserStoreError,
 };
 
 use super::OAuthUserStoreOperations;
 
 pub(in crate::biome::oauth) trait OAuthUserStoreUpdateOAuthUserOperation {
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError>;
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
 }
 
 impl<'a, C> OAuthUserStoreUpdateOAuthUserOperation for OAuthUserStoreOperations<'a, C>
 where
     C: diesel::Connection,
 {
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let access_token = match oauth_user.access_token() {
             AccessToken::Authorized(token) => Some(token),
             AccessToken::Unauthorized => None,

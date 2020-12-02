@@ -26,7 +26,7 @@ use diesel::{
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
 
-use super::{AccessToken, OAuthProvider, OAuthUser, OAuthUserStore, OAuthUserStoreError};
+use super::{AccessToken, OAuthProvider, OAuthUserAccess, OAuthUserStore, OAuthUserStoreError};
 
 use models::{NewOAuthUserModel, OAuthUserModel, ProviderId};
 use operations::add_oauth_user::OAuthUserStoreAddOAuthUserOperation as _;
@@ -50,12 +50,12 @@ impl<C: diesel::Connection + 'static> DieselOAuthUserStore<C> {
 
 #[cfg(feature = "sqlite")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
     }
 
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).update_oauth_user(oauth_user)
     }
@@ -63,7 +63,7 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
     fn get_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
     }
@@ -71,12 +71,15 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_access_token(access_token)
     }
 
-    fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    fn get_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
     }
@@ -90,12 +93,12 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
 
 #[cfg(feature = "biome-oauth-user-store-postgres")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
     }
 
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).update_oauth_user(oauth_user)
     }
@@ -103,7 +106,7 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     fn get_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
     }
@@ -111,12 +114,15 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_access_token(access_token)
     }
 
-    fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    fn get_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
     }
@@ -128,7 +134,7 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     }
 }
 
-impl From<OAuthUserModel> for OAuthUser {
+impl From<OAuthUserModel> for OAuthUserAccess {
     fn from(model: OAuthUserModel) -> Self {
         let OAuthUserModel {
             id: _,
@@ -154,8 +160,8 @@ impl From<OAuthUserModel> for OAuthUser {
     }
 }
 
-impl<'a> From<&'a OAuthUser> for NewOAuthUserModel<'a> {
-    fn from(user: &'a OAuthUser) -> Self {
+impl<'a> From<&'a OAuthUserAccess> for NewOAuthUserModel<'a> {
+    fn from(user: &'a OAuthUserAccess) -> Self {
         NewOAuthUserModel {
             user_id: user.user_id(),
             provider_user_ref: user.provider_user_ref(),
@@ -209,7 +215,7 @@ impl From<result::Error> for OAuthUserStoreError {
 pub mod tests {
     use super::*;
 
-    use crate::biome::oauth::store::{AccessToken, OAuthUserBuilder};
+    use crate::biome::oauth::store::{AccessToken, OAuthUserAccessBuilder};
     use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
     use crate::migrations::run_sqlite_migrations;
 
@@ -241,7 +247,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = OAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -274,7 +280,7 @@ pub mod tests {
         assert!(unknown_oauth_user.is_none());
 
         // Create another user and try to connect it to the same user id.
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = OAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser2".into())
             .with_access_token(AccessToken::Authorized("someotheraccesstoken".to_string()))
@@ -312,7 +318,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = OAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -351,11 +357,11 @@ pub mod tests {
     }
 
     /// Verify that a SQLite-backed `DieselOAuthUserStore` correctly supports updating an
-    /// OAuthUser's `access_token`.
+    /// OAuthUserAccess's `access_token`.
     ///
     /// 1. Create a connection pool for an in-memory SQLite database and run migrations.
     /// 2. Create a `DieselUserStore` and a `DieselOAuthUserStore`.
-    /// 3. Add a User and an OAuthUser
+    /// 3. Add a User and an OAuthUserAccess
     /// 4. Verify that the `get_by_user_id` method returns correct values for the
     ///    existing OAuth User.
     /// 5. Update the user to have an `Unauthorized` `access_token`.
@@ -373,7 +379,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = OAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))

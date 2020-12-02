@@ -49,7 +49,7 @@ impl Default for AccessToken {
 ///
 /// This user is connected to a Biome User, via a user ID.
 #[derive(Clone)]
-pub struct OAuthUser {
+pub struct OAuthUserAccess {
     user_id: String,
     provider_user_ref: String,
 
@@ -58,7 +58,7 @@ pub struct OAuthUser {
     provider: OAuthProvider,
 }
 
-impl OAuthUser {
+impl OAuthUserAccess {
     /// Return the user ID associated with this OAuth user
     pub fn user_id(&self) -> &str {
         &self.user_id
@@ -86,8 +86,8 @@ impl OAuthUser {
         &self.provider
     }
 
-    /// Convert this OAuthUser into an update builder.
-    pub fn into_update_builder(self) -> OAuthUserUpdateBuilder {
+    /// Convert this OAuthUserAccess into an update builder.
+    pub fn into_update_builder(self) -> OAuthUserAccessUpdateBuilder {
         let Self {
             user_id,
             provider_user_ref,
@@ -95,7 +95,7 @@ impl OAuthUser {
             refresh_token,
             provider,
         } = self;
-        OAuthUserUpdateBuilder {
+        OAuthUserAccessUpdateBuilder {
             user_id,
             provider_user_ref,
             access_token,
@@ -105,9 +105,9 @@ impl OAuthUser {
     }
 }
 
-/// Builder for OAuthUser structs
+/// Builder for OAuthUserAccess structs
 #[derive(Default)]
-pub struct OAuthUserBuilder {
+pub struct OAuthUserAccessBuilder {
     user_id: Option<String>,
     provider_user_ref: Option<String>,
 
@@ -116,7 +116,7 @@ pub struct OAuthUserBuilder {
     provider: Option<OAuthProvider>,
 }
 
-impl OAuthUserBuilder {
+impl OAuthUserAccessBuilder {
     pub fn new() -> Self {
         Self::default()
     }
@@ -158,21 +158,21 @@ impl OAuthUserBuilder {
         self
     }
 
-    /// Build an OAuthUser
+    /// Build an OAuthUserAccess
     ///
     /// # Errors
     ///
     /// Returns an `InvalidStateError` if there are required fields missing.
-    pub fn build(self) -> Result<OAuthUser, InvalidStateError> {
-        Ok(OAuthUser {
+    pub fn build(self) -> Result<OAuthUserAccess, InvalidStateError> {
+        Ok(OAuthUserAccess {
             user_id: self.user_id.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A user ID is required to successfully build an OAuthUser".into(),
+                    "A user ID is required to successfully build an OAuthUserAccess".into(),
                 )
             })?,
             provider_user_ref: self.provider_user_ref.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A provider user identity is required to successfully build an OAuthUser"
+                    "A provider user identity is required to successfully build an OAuthUserAccess"
                         .into(),
                 )
             })?,
@@ -180,18 +180,18 @@ impl OAuthUserBuilder {
             refresh_token: self.refresh_token,
             provider: self.provider.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A provider is required to successfully build an OAuthUser".into(),
+                    "A provider is required to successfully build an OAuthUserAccess".into(),
                 )
             })?,
         })
     }
 }
 
-/// Builds an updated `OAuthUser` struct.
+/// Builds an updated `OAuthUserAccess` struct.
 ///
-/// This builder only allows changes to the fields on an OAuthUser that may be
+/// This builder only allows changes to the fields on an OAuthUserAccess that may be
 /// updated.
-pub struct OAuthUserUpdateBuilder {
+pub struct OAuthUserAccessUpdateBuilder {
     // "immutable" items
     user_id: String,
     provider_user_ref: String,
@@ -202,7 +202,7 @@ pub struct OAuthUserUpdateBuilder {
     refresh_token: Option<String>,
 }
 
-impl OAuthUserUpdateBuilder {
+impl OAuthUserAccessUpdateBuilder {
     /// Set the OAuth access token.
     pub fn with_access_token(mut self, access_token: AccessToken) -> Self {
         self.access_token = access_token;
@@ -219,8 +219,8 @@ impl OAuthUserUpdateBuilder {
         self
     }
 
-    /// Builds the updated OAuthUser.
-    pub fn build(self) -> Result<OAuthUser, InvalidStateError> {
+    /// Builds the updated OAuthUserAccess.
+    pub fn build(self) -> Result<OAuthUserAccess, InvalidStateError> {
         let Self {
             user_id,
             provider_user_ref,
@@ -228,7 +228,7 @@ impl OAuthUserUpdateBuilder {
             refresh_token,
             provider,
         } = self;
-        Ok(OAuthUser {
+        Ok(OAuthUserAccess {
             user_id,
             provider_user_ref,
             access_token,
@@ -240,37 +240,38 @@ impl OAuthUserUpdateBuilder {
 
 /// Defines methods for CRUD operations and fetching OAuth user information.
 pub trait OAuthUserStore: Send + Sync {
-    /// Add an OAuthUser to the store.
+    /// Add an OAuthUserAccess to the store.
     ///
     /// # Errors
     ///
     /// Returns a ConstraintViolation if either there already is a user ID associated
     /// with another provider identity, or the provider identity has already been
     /// associated with a user ID.
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError>;
+    fn add_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
 
-    /// Updates an OAuthUser to the store.
+    /// Updates an OAuthUserAccess to the store.
     ///
     /// # Errors
     ///
     /// Returns a ConstraintViolation if the OAuthUser associated with the user ID provided doesn't
     /// exist.
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError>;
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
 
     /// Returns the stored OAuth user based on the provider_user_ref from the OAuth provider.
     fn get_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
 
     /// Returns the stored OAuth user based on the access token from the OAuth provider.
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
 
     /// Returns the stored OAuth user based on the biome user ID.
-    fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+    fn get_by_user_id(&self, user_id: &str)
+        -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
 
     /// Clone into a boxed, dynamic dispatched OAuthUserStore.
     fn clone_box(&self) -> Box<dyn OAuthUserStore>;

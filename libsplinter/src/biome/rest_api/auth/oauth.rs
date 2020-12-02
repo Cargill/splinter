@@ -17,7 +17,9 @@
 
 use uuid::Uuid;
 
-use crate::biome::oauth::store::{AccessToken, OAuthProvider, OAuthUserBuilder, OAuthUserStore};
+use crate::biome::oauth::store::{
+    AccessToken, OAuthProvider, OAuthUserAccessBuilder, OAuthUserStore,
+};
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
 use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
@@ -57,10 +59,10 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
     }
 }
 
-/// A wrapper struct for an `OAuthUser`'s identity.
+/// A wrapper struct for an `OAuthUserAccess`'s identity.
 pub struct OAuthUserIdentityRef(pub String);
 
-/// An `AuthorizationMapping` implementation that returns  an `OAuthUser`'s identity.
+/// An `AuthorizationMapping` implementation that returns  an `OAuthUserAccess`'s identity.
 pub struct GetUserIdentityByOAuthAuthorization {
     oauth_user_store: Box<dyn OAuthUserStore>,
 }
@@ -157,7 +159,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                 .add_user(user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-            let oauth_user = OAuthUserBuilder::new()
+            let oauth_user = OAuthUserAccessBuilder::new()
                 .with_user_id(user_id)
                 .with_provider_user_ref(provider_identity)
                 .with_access_token(AccessToken::Authorized(
@@ -182,7 +184,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
     }
 
     fn remove_user_tokens(&self, identity: &str) -> Result<(), InternalError> {
-        // Check if there is an existing `OAuthUser` with the corresponding `identity`
+        // Check if there is an existing `OAuthUserAccess` with the corresponding `identity`
         if let Some(oauth_user) = self
             .oauth_user_store
             .get_by_provider_user_ref(&identity)
