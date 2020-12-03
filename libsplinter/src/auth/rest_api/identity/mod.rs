@@ -60,6 +60,7 @@ pub trait AuthorizationMapping<T> {
 }
 
 /// The authorization that is passed to an `IdentityProvider`
+#[derive(PartialEq)]
 pub enum Authorization {
     Bearer(BearerToken),
     Custom(String),
@@ -86,6 +87,7 @@ impl FromStr for Authorization {
 }
 
 /// A bearer token of a specific type
+#[derive(PartialEq)]
 pub enum BearerToken {
     #[cfg(feature = "biome-credentials")]
     /// Contains a Biome JWT
@@ -122,5 +124,61 @@ impl FromStr for BearerToken {
             (Some(_), None) => Ok(BearerToken::Custom(str.to_string())),
             _ => unreachable!(), // splitn always returns at least one item
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verfifies that the `Authorization` enum is correctly parsed from strings
+    #[test]
+    fn parse_authorization() {
+        assert!(matches!(
+            "Bearer token".parse(),
+            Ok(Authorization::Bearer(token)) if token == "token".parse().unwrap()
+        ));
+
+        assert!(matches!(
+            "Unknown token".parse(),
+            Ok(Authorization::Custom(auth_str)) if auth_str == "Unknown token"
+        ));
+
+        assert!(matches!(
+            "test".parse(),
+            Ok(Authorization::Custom(auth_str)) if auth_str == "test"
+        ));
+    }
+
+    /// Verfifies that the `BearerToken` enum is correctly parsed from strings
+    #[test]
+    fn parse_bearer_token() {
+        #[cfg(feature = "biome-credentials")]
+        assert!(matches!(
+            "Biome:test".parse(),
+            Ok(BearerToken::Biome(token)) if token == "test"
+        ));
+
+        #[cfg(feature = "cylinder-jwt")]
+        assert!(matches!(
+            "Cylinder:test".parse(),
+            Ok(BearerToken::Cylinder(token)) if token == "test"
+        ));
+
+        #[cfg(feature = "oauth")]
+        assert!(matches!(
+            "OAuth2:test".parse(),
+            Ok(BearerToken::OAuth2(token)) if token == "test"
+        ));
+
+        assert!(matches!(
+            "Unknown:test".parse(),
+            Ok(BearerToken::Custom(token)) if token == "Unknown:test"
+        ));
+
+        assert!(matches!(
+            "test".parse(),
+            Ok(BearerToken::Custom(token)) if token == "test"
+        ));
     }
 }
