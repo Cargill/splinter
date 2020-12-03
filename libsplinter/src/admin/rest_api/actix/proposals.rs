@@ -24,7 +24,7 @@ use crate::rest_api::paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_O
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 use super::super::error::ProposalListError;
-use super::super::resources::proposals::{ListProposalsResponse, ProposalResponse};
+use super::super::resources;
 
 pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
     Resource::build("admin/proposals")
@@ -143,12 +143,15 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
         Ok((proposals, link, limit, offset, total))
     })
     .then(|res| match res {
-        Ok((proposals, link, limit, offset, total_count)) => {
-            Ok(HttpResponse::Ok().json(ListProposalsResponse {
-                data: proposals.iter().map(ProposalResponse::from).collect(),
+        Ok((proposals, link, limit, offset, total_count)) => Ok(HttpResponse::Ok().json(
+            resources::v1::proposals::ListProposalsResponse {
+                data: proposals
+                    .iter()
+                    .map(resources::v1::proposals::ProposalResponse::from)
+                    .collect(),
                 paging: get_response_paging_info(limit, offset, &link, total_count),
-            }))
-        }
+            },
+        )),
         Err(err) => match err {
             BlockingError::Error(err) => match err {
                 ProposalListError::InternalError(_) => {
@@ -202,9 +205,15 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&CircuitProposal::from(get_proposal_1())),
-                ProposalResponse::from(&CircuitProposal::from(get_proposal_2())),
-                ProposalResponse::from(&CircuitProposal::from(get_proposal_3())),
+                resources::v1::proposals::ProposalResponse::from(&CircuitProposal::from(
+                    get_proposal_1()
+                )),
+                resources::v1::proposals::ProposalResponse::from(&CircuitProposal::from(
+                    get_proposal_2()
+                )),
+                resources::v1::proposals::ProposalResponse::from(&CircuitProposal::from(
+                    get_proposal_3()
+                )),
             ])
             .expect("failed to convert expected data"),
         );
@@ -253,8 +262,10 @@ mod tests {
 
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
-            &to_value(vec![ProposalResponse::from(&get_proposal_1())])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v1::proposals::ProposalResponse::from(
+                &get_proposal_1()
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -302,8 +313,8 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&get_proposal_1()),
-                ProposalResponse::from(&get_proposal_3())
+                resources::v1::proposals::ProposalResponse::from(&get_proposal_1()),
+                resources::v1::proposals::ProposalResponse::from(&get_proposal_3())
             ])
             .expect("failed to convert expected data"),
         );
@@ -352,8 +363,10 @@ mod tests {
 
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
-            &to_value(vec![ProposalResponse::from(&get_proposal_3())])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v1::proposals::ProposalResponse::from(
+                &get_proposal_3()
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -396,8 +409,10 @@ mod tests {
 
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
-            &to_value(vec![ProposalResponse::from(&get_proposal_1())])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v1::proposals::ProposalResponse::from(
+                &get_proposal_1()
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -441,8 +456,8 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&get_proposal_2()),
-                ProposalResponse::from(&get_proposal_3())
+                resources::v1::proposals::ProposalResponse::from(&get_proposal_2()),
+                resources::v1::proposals::ProposalResponse::from(&get_proposal_3())
             ])
             .expect("failed to convert expected data"),
         );

@@ -23,7 +23,7 @@ use crate::admin::service::proposal_store::ProposalStore;
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
-use super::super::resources::proposals_circuit_id::ProposalResponse;
+use super::super::resources;
 
 pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
     Resource::build("admin/proposals/{circuit_id}")
@@ -55,7 +55,9 @@ fn fetch_proposal<PS: ProposalStore + 'static>(
                 })
         })
         .then(|res| match res {
-            Ok(proposal) => Ok(HttpResponse::Ok().json(ProposalResponse::from(&proposal))),
+            Ok(proposal) => Ok(HttpResponse::Ok().json(
+                resources::v1::proposals_circuit_id::ProposalResponse::from(&proposal),
+            )),
             Err(err) => match err {
                 BlockingError::Error(err) => match err {
                     ProposalFetchError::InternalError(_) => {
@@ -115,8 +117,10 @@ mod tests {
 
         assert_eq!(
             proposal,
-            to_value(ProposalResponse::from(&get_proposal()))
-                .expect("failed to convert expected data")
+            to_value(resources::v1::proposals_circuit_id::ProposalResponse::from(
+                &get_proposal()
+            ))
+            .expect("failed to convert expected data")
         );
 
         shutdown_handle

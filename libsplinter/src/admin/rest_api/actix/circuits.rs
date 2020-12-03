@@ -27,7 +27,7 @@ use crate::rest_api::{
 };
 
 use super::super::error::CircuitListError;
-use super::super::resources::circuits::{CircuitResponse, ListCircuitsResponse};
+use super::super::resources;
 
 pub fn make_list_circuits_resource(store: Box<dyn AdminServiceStore>) -> Resource {
     Resource::build("/admin/circuits")
@@ -140,12 +140,15 @@ fn query_list_circuits(
         Ok((circuits, link, limit, offset, total as usize))
     })
     .then(|res| match res {
-        Ok((circuits, link, limit, offset, total_count)) => {
-            Ok(HttpResponse::Ok().json(ListCircuitsResponse {
-                data: circuits.iter().map(CircuitResponse::from).collect(),
+        Ok((circuits, link, limit, offset, total_count)) => Ok(HttpResponse::Ok().json(
+            resources::v1::circuits::ListCircuitsResponse {
+                data: circuits
+                    .iter()
+                    .map(resources::v1::circuits::CircuitResponse::from)
+                    .collect(),
                 paging: get_response_paging_info(limit, offset, &link, total_count),
-            }))
-        }
+            },
+        )),
         Err(err) => match err {
             BlockingError::Error(err) => match err {
                 CircuitListError::CircuitStoreError(err) => {
@@ -201,8 +204,8 @@ mod tests {
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
             &to_value(vec![
-                CircuitResponse::from(&get_circuit_2().0),
-                CircuitResponse::from(&get_circuit_1().0)
+                resources::v1::circuits::CircuitResponse::from(&get_circuit_2().0),
+                resources::v1::circuits::CircuitResponse::from(&get_circuit_1().0)
             ])
             .expect("failed to convert expected data"),
         );
@@ -244,8 +247,10 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_1().0)])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v1::circuits::CircuitResponse::from(
+                &get_circuit_1().0
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -286,8 +291,10 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_2().0)])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v1::circuits::CircuitResponse::from(
+                &get_circuit_2().0
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -328,8 +335,10 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_1().0)])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v1::circuits::CircuitResponse::from(
+                &get_circuit_1().0
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(

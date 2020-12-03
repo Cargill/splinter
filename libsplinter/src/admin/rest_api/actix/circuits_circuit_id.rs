@@ -23,7 +23,7 @@ use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 use super::super::error::CircuitFetchError;
-use super::super::resources::circuits_circuit_id::CircuitResponse;
+use super::super::resources;
 
 pub fn make_fetch_circuit_resource(store: Box<dyn AdminServiceStore>) -> Resource {
     Resource::build("/admin/circuits/{circuit_id}")
@@ -55,7 +55,9 @@ fn fetch_circuit(
                 })
         })
         .then(|res| match res {
-            Ok(circuit) => Ok(HttpResponse::Ok().json(CircuitResponse::from(&circuit))),
+            Ok(circuit) => Ok(HttpResponse::Ok().json(
+                resources::v1::circuits_circuit_id::CircuitResponse::from(&circuit),
+            )),
             Err(err) => match err {
                 BlockingError::Error(err) => match err {
                     CircuitFetchError::CircuitStoreError(err) => {
@@ -118,8 +120,10 @@ mod tests {
 
         assert_eq!(
             circuit,
-            to_value(CircuitResponse::from(&get_circuit_1().0))
-                .expect("failed to convert expected circuit"),
+            to_value(resources::v1::circuits_circuit_id::CircuitResponse::from(
+                &get_circuit_1().0
+            ))
+            .expect("failed to convert expected circuit"),
         );
 
         shutdown_handle
