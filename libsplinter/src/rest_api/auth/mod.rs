@@ -15,7 +15,7 @@
 //! Authentication and authorization for Splinter
 
 #[cfg(feature = "rest-api-actix")]
-pub mod actix;
+pub(crate) mod actix;
 pub mod identity;
 
 use identity::{Authorization, IdentityProvider};
