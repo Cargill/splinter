@@ -51,6 +51,8 @@
 //!     .run();
 //! ```
 
+#[cfg(feature = "auth")]
+pub mod auth;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
 mod errors;
@@ -76,23 +78,6 @@ use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-#[cfg(feature = "oauth")]
-use crate::auth::oauth::rest_api::{
-    OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp,
-};
-#[cfg(feature = "oauth-openid")]
-use crate::auth::oauth::OpenIdOAuthClientBuilder;
-#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
-use crate::auth::rest_api::identity::cylinder::CylinderKeyIdentityProvider;
-#[cfg(feature = "auth")]
-use crate::auth::rest_api::{
-    actix::Authorization,
-    identity::{AuthorizationMapping, IdentityProvider},
-};
-#[cfg(feature = "oauth-github")]
-use crate::auth::{
-    oauth::GithubOAuthClientBuilder, rest_api::identity::github::GithubUserIdentityProvider,
-};
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
@@ -105,6 +90,21 @@ use crate::biome::{
 };
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
+#[cfg(feature = "oauth")]
+use crate::oauth::rest_api::{OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp};
+#[cfg(feature = "oauth-github")]
+use crate::oauth::GithubOAuthClientBuilder;
+#[cfg(feature = "oauth-openid")]
+use crate::oauth::OpenIdOAuthClientBuilder;
+#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+use auth::identity::cylinder::CylinderKeyIdentityProvider;
+#[cfg(feature = "oauth-github")]
+use auth::identity::github::GithubUserIdentityProvider;
+#[cfg(feature = "auth")]
+use auth::{
+    actix::Authorization,
+    identity::{AuthorizationMapping, IdentityProvider},
+};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -1128,9 +1128,9 @@ mod test {
     use futures::IntoFuture;
 
     #[cfg(feature = "auth")]
-    use crate::auth::rest_api::identity::Authorization;
-    #[cfg(feature = "auth")]
     use crate::error::InternalError;
+    #[cfg(feature = "auth")]
+    use crate::rest_api::auth::identity::Authorization;
 
     #[test]
     fn test_resource() {

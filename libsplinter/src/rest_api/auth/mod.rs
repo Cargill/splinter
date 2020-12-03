@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Authentication and authorization tools for the Splinter REST API
+//! Authentication and authorization for Splinter
 
 #[cfg(feature = "rest-api-actix")]
 pub mod actix;

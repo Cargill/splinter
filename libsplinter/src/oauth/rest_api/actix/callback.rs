@@ -18,7 +18,7 @@
 use actix_web::{http::header::LOCATION, web::Query, HttpResponse};
 use futures::future::IntoFuture;
 
-use crate::auth::oauth::{
+use crate::oauth::{
     rest_api::{
         resources::callback::{user_info_to_query_string, CallbackQuery},
         OAuthUserInfoStore,

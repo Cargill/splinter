@@ -14,9 +14,9 @@
 
 use reqwest::blocking::Client;
 
-use crate::auth::oauth::{builder::OAuthClientBuilder, error::OAuthClientBuildError, OAuthClient};
-use crate::auth::rest_api::identity::{openid::OpenIdUserIdentityProvider, IdentityProvider};
 use crate::error::{InternalError, InvalidStateError};
+use crate::oauth::{builder::OAuthClientBuilder, error::OAuthClientBuildError, OAuthClient};
+use crate::rest_api::auth::identity::{openid::OpenIdUserIdentityProvider, IdentityProvider};
 
 /// Builds a new `OAuthClient` using an OpenID discovery document.
 pub struct OpenIdOAuthClientBuilder {

@@ -27,9 +27,9 @@ use oauth2::{
     CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 
-use crate::auth::rest_api::identity::{Authorization, BearerToken, IdentityProvider};
 use crate::collections::TtlMap;
 use crate::error::{InternalError, InvalidArgumentError};
+use crate::rest_api::auth::identity::{Authorization, BearerToken, IdentityProvider};
 
 #[cfg(feature = "oauth-github")]
 pub use builder::GithubOAuthClientBuilder;

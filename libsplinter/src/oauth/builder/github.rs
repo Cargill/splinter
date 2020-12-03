@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::auth::oauth::{builder::OAuthClientBuilder, error::OAuthClientBuildError, OAuthClient};
-use crate::auth::rest_api::identity::github::GithubUserIdentityProvider;
+use crate::oauth::{builder::OAuthClientBuilder, error::OAuthClientBuildError, OAuthClient};
+use crate::rest_api::auth::identity::github::GithubUserIdentityProvider;
 
 /// Builds a new `OAuthClient` with GitHub's authorization and token URLs.
 pub struct GithubOAuthClientBuilder {

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Builders for [OAuthClient](crate::auth::oauth::OAuthClient) structs.
+//! Builders for [OAuthClient](crate::oauth::OAuthClient) structs.
 
 #[cfg(feature = "oauth-github")]
 mod github;
 #[cfg(feature = "oauth-openid")]
 mod openid;
 
-use crate::auth::rest_api::identity::IdentityProvider;
 use crate::error::InvalidStateError;
+use crate::rest_api::auth::identity::IdentityProvider;
 
 use super::error::OAuthClientBuildError;
 use super::OAuthClient;

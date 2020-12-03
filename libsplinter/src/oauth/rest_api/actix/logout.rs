@@ -17,7 +17,7 @@
 use actix_web::HttpResponse;
 use futures::future::IntoFuture;
 
-use crate::auth::oauth::rest_api::OAuthUserInfoStore;
+use crate::oauth::rest_api::OAuthUserInfoStore;
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 

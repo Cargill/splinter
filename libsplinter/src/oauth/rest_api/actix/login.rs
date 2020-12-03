@@ -18,7 +18,7 @@ use actix_web::{http::header::LOCATION, web, HttpResponse};
 use futures::future::IntoFuture;
 use std::collections::HashMap;
 
-use crate::auth::oauth::OAuthClient;
+use crate::oauth::OAuthClient;
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
