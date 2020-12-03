@@ -87,3 +87,280 @@ fn authorize(
     // No identity provider could resolve the authorization to an identity
     AuthorizationResult::Unauthorized
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::error::InternalError;
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when no
+    /// identity providers are specified. Without any identity providers, there's no way to properly
+    /// authorize.
+    #[test]
+    fn authorize_no_identity_providers() {
+        assert!(matches!(
+            authorize("/test/endpoint", Some("auth"), &[]),
+            AuthorizationResult::Unauthorized
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when no
+    /// identity provider returns an identity for the auth header.
+    #[test]
+    fn authorize_no_matching_identity_provider() {
+        assert!(matches!(
+            authorize(
+                "/test/endpoint",
+                Some("auth"),
+                &[Box::new(AlwaysRejectIdentityProvider)]
+            ),
+            AuthorizationResult::Unauthorized
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when no
+    /// auth header is provided. By using an identity provider that always successfully gets an
+    /// identity, we verify that the failure is because of the missing header value.
+    #[test]
+    fn authorize_no_header_provided() {
+        assert!(matches!(
+            authorize(
+                "/test/endpoint",
+                None,
+                &[Box::new(AlwaysAcceptIdentityProvider)]
+            ),
+            AuthorizationResult::Unauthorized
+        ));
+    }
+
+    /// Verifies that the `authorization` function returns
+    /// `AuthorizationResult::NoAuthorizationNecessary`when the requested endpoint does not require
+    /// authorization, whether the header is set or not. By using an identity provider that always
+    /// returns `None`, we verify that authorization is being ignored.
+    #[test]
+    fn authorize_no_authorization_necessary() {
+        // Verify with header not set
+        #[cfg(feature = "biome-credentials")]
+        {
+            assert!(matches!(
+                authorize(
+                    "/biome/register",
+                    None,
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+            assert!(matches!(
+                authorize(
+                    "/biome/login",
+                    None,
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+            assert!(matches!(
+                authorize(
+                    "/biome/token",
+                    None,
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+        }
+        #[cfg(feature = "oauth")]
+        {
+            assert!(matches!(
+                authorize(
+                    "/oauth/login",
+                    None,
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+            assert!(matches!(
+                authorize(
+                    "/oauth/callback",
+                    None,
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+        }
+
+        // Verify with header set
+        #[cfg(feature = "biome-credentials")]
+        {
+            assert!(matches!(
+                authorize(
+                    "/biome/register",
+                    Some("auth"),
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+            assert!(matches!(
+                authorize(
+                    "/biome/login",
+                    Some("auth"),
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+            assert!(matches!(
+                authorize(
+                    "/biome/token",
+                    Some("auth"),
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+        }
+        #[cfg(feature = "oauth")]
+        {
+            assert!(matches!(
+                authorize(
+                    "/oauth/login",
+                    Some("auth"),
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+            assert!(matches!(
+                authorize(
+                    "/oauth/callback",
+                    Some("auth"),
+                    &[Box::new(AlwaysRejectIdentityProvider)]
+                ),
+                AuthorizationResult::NoAuthorizationNecessary
+            ));
+        }
+    }
+
+    /// Verifies the simple case where `authorize` is called with a single identity provider that
+    /// successfully gets the client's identity.
+    #[test]
+    fn authorize_successful_one_provider() {
+        let expected_auth = "auth".parse().unwrap();
+        let expected_identity = AlwaysAcceptIdentityProvider
+            .get_identity(&expected_auth)
+            .unwrap()
+            .unwrap();
+
+        assert!(matches!(
+            authorize(
+                "/test/endpoint",
+                Some("auth"),
+                &[Box::new(AlwaysAcceptIdentityProvider)]
+            ),
+            AuthorizationResult::Authorized {
+                identity,
+                authorization,
+            } if identity == expected_identity && authorization == expected_auth
+        ));
+    }
+
+    /// Verifies the case where `authorize` is called with multile identity providers and only one
+    /// successfully gets the client's identity.
+    #[test]
+    fn authorize_successful_multiple_providers() {
+        let expected_auth = "auth".parse().unwrap();
+        let expected_identity = AlwaysAcceptIdentityProvider
+            .get_identity(&expected_auth)
+            .unwrap()
+            .unwrap();
+
+        assert!(matches!(
+            authorize(
+                "/test/endpoint",
+                Some("auth"),
+                &[
+                    Box::new(AlwaysRejectIdentityProvider),
+                    Box::new(AlwaysAcceptIdentityProvider),
+                    Box::new(AlwaysRejectIdentityProvider),
+                ]
+            ),
+            AuthorizationResult::Authorized {
+                identity,
+                authorization,
+            } if identity == expected_identity && authorization == expected_auth
+        ));
+    }
+
+    /// Verifies the case where `authorize` is called with multiple identity provider and one errors
+    /// before another successfully gets the client's identity.
+    #[test]
+    fn authorize_successful_after_error() {
+        let expected_auth = "auth".parse().unwrap();
+        let expected_identity = AlwaysAcceptIdentityProvider
+            .get_identity(&expected_auth)
+            .unwrap()
+            .unwrap();
+
+        assert!(matches!(
+            authorize(
+                "/test/endpoint",
+                Some("auth"),
+                &[
+                    Box::new(AlwaysErrIdentityProvider),
+                    Box::new(AlwaysAcceptIdentityProvider),
+                ]
+            ),
+            AuthorizationResult::Authorized {
+                identity,
+                authorization,
+            } if identity == expected_identity && authorization == expected_auth
+        ));
+    }
+
+    /// An identity provider that always returns `Ok(Some("identity"))`
+    #[derive(Clone)]
+    struct AlwaysAcceptIdentityProvider;
+
+    impl IdentityProvider for AlwaysAcceptIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &Authorization,
+        ) -> Result<Option<String>, InternalError> {
+            Ok(Some("identity".into()))
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An identity provider that always returns `Ok(None)`
+    #[derive(Clone)]
+    struct AlwaysRejectIdentityProvider;
+
+    impl IdentityProvider for AlwaysRejectIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &Authorization,
+        ) -> Result<Option<String>, InternalError> {
+            Ok(None)
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An identity provider that always returns `Err(_)`
+    #[derive(Clone)]
+    struct AlwaysErrIdentityProvider;
+
+    impl IdentityProvider for AlwaysErrIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &Authorization,
+        ) -> Result<Option<String>, InternalError> {
+            Err(InternalError::with_message("failed".into()))
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+}
