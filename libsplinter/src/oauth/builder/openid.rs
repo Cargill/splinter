@@ -98,17 +98,12 @@ impl OpenIdOAuthClientBuilder {
 
         let userinfo_endpoint = discovery_document_response.userinfo_endpoint;
 
-        Ok((
-            self.inner
-                .with_auth_url(discovery_document_response.authorization_endpoint)
-                .with_token_url(discovery_document_response.token_endpoint)
-                .with_scopes(discovery_document_response.scopes_supported)
-                .with_identity_provider(Box::new(OpenIdUserIdentityProvider::new(
-                    userinfo_endpoint.clone(),
-                )))
-                .build()?,
-            Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)),
-        ))
+        self.inner
+            .with_auth_url(discovery_document_response.authorization_endpoint)
+            .with_token_url(discovery_document_response.token_endpoint)
+            .with_scopes(discovery_document_response.scopes_supported)
+            .with_identity_provider(Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)))
+            .build()
     }
 }
 

@@ -98,8 +98,6 @@ use crate::oauth::GithubOAuthClientBuilder;
 use crate::oauth::OpenIdOAuthClientBuilder;
 #[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
 use auth::identity::cylinder::CylinderKeyIdentityProvider;
-#[cfg(feature = "oauth-github")]
-use auth::identity::github::GithubUserIdentityProvider;
 #[cfg(feature = "auth")]
 use auth::{
     actix::Authorization,
@@ -868,22 +866,19 @@ impl RestApiBuilder {
                                 client_id,
                                 client_secret,
                                 redirect_url,
-                            } => (
-                                GithubOAuthClientBuilder::new()
-                                    .with_client_id(client_id.into())
-                                    .with_client_secret(client_secret.into())
-                                    .with_redirect_url(redirect_url.into())
-                                    .build()
-                                    .map_err(|err| {
-                                        RestApiServerError::InvalidStateError(
-                                            InvalidStateError::with_message(format!(
-                                                "Invalid GitHub OAuth config provided: {}",
-                                                err
-                                            )),
-                                        )
-                                    })?,
-                                Box::new(GithubUserIdentityProvider),
-                            ),
+                            } => GithubOAuthClientBuilder::new()
+                                .with_client_id(client_id.into())
+                                .with_client_secret(client_secret.into())
+                                .with_redirect_url(redirect_url.into())
+                                .build()
+                                .map_err(|err| {
+                                    RestApiServerError::InvalidStateError(
+                                        InvalidStateError::with_message(format!(
+                                            "Invalid GitHub OAuth config provided: {}",
+                                            err
+                                        )),
+                                    )
+                                })?,
                             #[cfg(feature = "oauth-openid")]
                             OAuthConfig::OpenId {
                                 client_id,
