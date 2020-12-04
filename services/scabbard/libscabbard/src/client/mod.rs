@@ -14,6 +14,7 @@
 
 //! A convenient client for interacting with scabbard services on a Splinter node.
 
+mod builder;
 mod error;
 
 use std::time::{Duration, Instant, SystemTime};
@@ -27,20 +28,17 @@ use transact::{protocol::batch::Batch, protos::IntoBytes};
 use super::hex::parse_hex;
 use super::protocol::SCABBARD_PROTOCOL_VERSION;
 
+pub use builder::ScabbardClientBuilder;
 pub use error::ScabbardClientError;
 
 /// A client that can be used to interact with scabbard services on a Splinter node.
 pub struct ScabbardClient {
     url: String,
+    #[cfg(feature = "client-auth")]
+    auth: String,
 }
 
 impl ScabbardClient {
-    /// Create a new `ScabbardClient` with the given base `url`. The URL should be the bind endpoint
-    /// of the Splinter REST API; it should not include the path to the scabbard service itself.
-    pub fn new(url: &str) -> Self {
-        Self { url: url.into() }
-    }
-
     /// Submit the given `batches` to the scabbard service with the given `service_id`. If a `wait`
     /// time is specified, wait the given amount of time for the batches to commit.
     ///
@@ -68,7 +66,15 @@ impl ScabbardClient {
         let body = batches.into_bytes()?;
 
         debug!("Submitting batches via {}", url);
-        let request = Client::new().post(url).body(body);
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // client-auth is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().post(url).body(body);
+
+        #[cfg(feature = "client-auth")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
         let response = perform_request(request)?;
 
         let batch_link: Link = response.json().map_err(|err| {
@@ -79,7 +85,13 @@ impl ScabbardClient {
         })?;
 
         if let Some(wait) = wait {
-            wait_for_batches(&self.url, &batch_link.link, wait)
+            wait_for_batches(
+                &self.url,
+                &batch_link.link,
+                wait,
+                #[cfg(feature = "client-auth")]
+                &self.auth,
+            )
         } else {
             Ok(())
         }
@@ -111,8 +123,16 @@ impl ScabbardClient {
             address
         ))
         .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // client-auth is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(url);
 
-        let request = Client::new().get(url);
+        #[cfg(feature = "client-auth")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
@@ -175,8 +195,16 @@ impl ScabbardClient {
             }
             url.set_query(Some(&format!("prefix={}", prefix)))
         }
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // client-auth is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(url);
 
-        let request = Client::new().get(url);
+        #[cfg(feature = "client-auth")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
@@ -216,8 +244,16 @@ impl ScabbardClient {
             service_id.service_id()
         ))
         .map_err(|err| ScabbardClientError::new_with_source("invalid URL", err.into()))?;
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // client-auth is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(url);
 
-        let request = Client::new().get(url);
+        #[cfg(feature = "client-auth")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
         let response = request
             .header("SplinterProtocolVersion", SCABBARD_PROTOCOL_VERSION)
             .send()
@@ -260,6 +296,7 @@ fn wait_for_batches(
     base_url: &str,
     batch_link: &str,
     wait: Duration,
+    #[cfg(feature = "client-auth")] auth: &str,
 ) -> Result<(), ScabbardClientError> {
     let url = if batch_link.starts_with("http") || batch_link.starts_with("https") {
         parse_http_url(batch_link)
@@ -283,7 +320,16 @@ fn wait_for_batches(
         url_with_query.set_query(Some(&query_string));
 
         debug!("Checking batches via {}", url);
-        let request = Client::new().get(url.clone());
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // client-auth is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(url.clone());
+
+        #[cfg(feature = "client-auth")]
+        {
+            request = request.header("Authorization", auth.to_string());
+        }
+
         let response = perform_request(request)?;
 
         let batch_infos: Vec<BatchInfo> = response.json().map_err(|err| {
@@ -512,6 +558,10 @@ mod tests {
     const MOCK_BATCH_ID: &str = "batch_id";
     const MOCK_STATE_ROOT_HASH: &str = "abcd";
 
+    const MOCK_AUTH: &str = "Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmRlcitqd3QifQ==.\
+    eyJpc3MiOiIwMjA5MWEwNmNjNDZjNWUwZDg4ZTg5Mjg0OTM2ZWRiMTY4MDBiMDNiNTZhOGYxYjdlYzI5MmYyMzJiN2M4Mzg1YTIifQ==.\
+    tOMakxmebss0WGWcvKCQhYo2AAo3aaMDPS28y9nfVnMXiYq98Be08CdxB0gXCY5qYHZSw53+kjuIG+8gPhXLBA==";
+
     /// Verify that a `ServiceId` can be correctly parsed from a fully-qualified service ID string.
     #[test]
     fn service_id_from_string() {
@@ -533,7 +583,15 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClient::new(&format!("http://{}", bind_url));
+        let mut builder = ScabbardClientBuilder::new();
+
+        builder = builder.with_url(&format!("http://{}", bind_url));
+        #[cfg(feature = "client-auth")]
+        {
+            builder = builder.with_auth(MOCK_AUTH);
+        }
+        let client = builder.build().expect("unable to build client");
+
         let service_id = ServiceId::new(MOCK_CIRCUIT_ID, MOCK_SERVICE_ID);
 
         // Verify that a basic batch submission with no wait time is successful
@@ -547,9 +605,14 @@ mod tests {
             .expect("Failed to submit batches with wait");
 
         // Verify that an invalid URL results in an error being returned
-        assert!(ScabbardClient::new("not a valid URL")
-            .submit(&service_id, vec![], None,)
-            .is_err());
+        let mut invalid_builder = ScabbardClientBuilder::new();
+        invalid_builder = invalid_builder.with_url("not a valid URL");
+        #[cfg(feature = "client-auth")]
+        {
+            invalid_builder = invalid_builder.with_auth(MOCK_AUTH);
+        }
+        let client = invalid_builder.build().expect("unable to build client");
+        assert!(client.submit(&service_id, vec![], None,).is_err());
 
         // Verify that an error response code results in an error being returned
         resource_manager.internal_server_error(true);
@@ -584,7 +647,14 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClient::new(&format!("http://{}", bind_url));
+        let mut builder = ScabbardClientBuilder::new();
+
+        builder = builder.with_url(&format!("http://{}", bind_url));
+        #[cfg(feature = "client-auth")]
+        {
+            builder = builder.with_auth(MOCK_AUTH);
+        }
+        let client = builder.build().expect("unable to build client");
         let service_id = ServiceId::new(MOCK_CIRCUIT_ID, MOCK_SERVICE_ID);
 
         // Verify that a request for an existing entry is successful and returns the right value
@@ -600,9 +670,14 @@ mod tests {
         assert_eq!(value, None);
 
         // Verify that an invalid URL results in an error being returned
-        assert!(ScabbardClient::new("not a valid URL")
-            .get_state_at_address(&service_id, &mock_state_entry().address)
-            .is_err());
+        let mut invalid_builder = ScabbardClientBuilder::new();
+        invalid_builder = invalid_builder.with_url("not a valid URL");
+        #[cfg(feature = "client-auth")]
+        {
+            invalid_builder = invalid_builder.with_auth(MOCK_AUTH);
+        }
+        let client = invalid_builder.build().expect("unable to build client");
+        assert!(client.submit(&service_id, vec![], None,).is_err());
 
         // Verify that an invalid address results in an error being returned
         assert!(client
@@ -629,7 +704,14 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClient::new(&format!("http://{}", bind_url));
+        let mut builder = ScabbardClientBuilder::new();
+
+        builder = builder.with_url(&format!("http://{}", bind_url));
+        #[cfg(feature = "client-auth")]
+        {
+            builder = builder.with_auth(MOCK_AUTH);
+        }
+        let client = builder.build().expect("unable to build client");
         let service_id = ServiceId::new(MOCK_CIRCUIT_ID, MOCK_SERVICE_ID);
 
         // Verify that a request with no prefix is successful and returns the right value
@@ -653,9 +735,14 @@ mod tests {
         assert_eq!(entries, vec![]);
 
         // Verify that an invalid URL results in an error being returned
-        assert!(ScabbardClient::new("not a valid URL")
-            .get_state_with_prefix(&service_id, None)
-            .is_err());
+        let mut invalid_builder = ScabbardClientBuilder::new();
+        invalid_builder = invalid_builder.with_url("not a valid URL");
+        #[cfg(feature = "client-auth")]
+        {
+            invalid_builder = invalid_builder.with_auth(MOCK_AUTH);
+        }
+        let client = invalid_builder.build().expect("unable to build client");
+        assert!(client.submit(&service_id, vec![], None,).is_err());
 
         // Verify that an invalid address prefix results in an error being returned
         assert!(client
@@ -680,7 +767,14 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClient::new(&format!("http://{}", bind_url));
+        let mut builder = ScabbardClientBuilder::new();
+
+        builder = builder.with_url(&format!("http://{}", bind_url));
+        #[cfg(feature = "client-auth")]
+        {
+            builder = builder.with_auth(MOCK_AUTH);
+        }
+        let client = builder.build().expect("unable to build client");
         let service_id = ServiceId::new(MOCK_CIRCUIT_ID, MOCK_SERVICE_ID);
 
         // Verify that a request returns the right value
