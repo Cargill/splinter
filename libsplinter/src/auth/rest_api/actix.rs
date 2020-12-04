@@ -226,3 +226,111 @@ where
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use actix_web::{http::StatusCode, test, web, App, HttpRequest};
+
+    /// Verifies that the authorization middleware sets the `Access-Control-Allow-Credentials: true`
+    /// header for `OPTIONS` requests.
+    #[test]
+    fn auth_middleware_options_request_header() {
+        let mut app = test::init_service(
+            App::new().wrap(Authorization::new(vec![])).route(
+                "/",
+                web::route()
+                    .method(Method::OPTIONS)
+                    .to(|| HttpResponse::Ok()),
+            ),
+        );
+
+        let req = test::TestRequest::with_uri("/")
+            .method(Method::OPTIONS)
+            .to_request();
+        let resp = test::block_on(app.call(req)).unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get("Access-Control-Allow-Credentials"),
+            Some(&HeaderValue::from_static("true"))
+        );
+    }
+
+    /// Verifies that the authorization middleware returns a `403 Unauthorized` response when the
+    /// `authorize` function returns an "unauthorized" result. This is simulated by not configuring
+    /// and identity providers.
+    #[test]
+    fn auth_middleware_unauthorized() {
+        let mut app = test::init_service(
+            App::new()
+                .wrap(Authorization::new(vec![]))
+                .route("/", web::get().to(|| HttpResponse::Ok())),
+        );
+
+        let req = test::TestRequest::with_uri("/").to_request();
+        let resp = test::block_on(app.call(req)).unwrap();
+
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// Verifies that the authorization middleware allows requests that are properly authorized (the
+    /// `authorize` function returns an "authorized" result), and that
+    /// `AuthorizationMapping`s/`IdentityExtension`s are properly applied.
+    #[test]
+    fn auth_middleware_authorized() {
+        let auth_middleware = Authorization::new(vec![Box::new(AlwaysAcceptIdentityProvider)])
+            .with_authorization_mapping(MockAuthorizationMapping);
+
+        let mut app = test::init_service(App::new().wrap(auth_middleware).route(
+            "/",
+            web::get().to(|req: HttpRequest| {
+                // Verify that the expected string was added to the request extensions by the
+                // `MockAuthorizationMapping`
+                if req.extensions().get() == Some(&"test".to_string()) {
+                    HttpResponse::Ok()
+                } else {
+                    HttpResponse::InternalServerError()
+                }
+            }),
+        ));
+
+        // Need to provide some value for the `Authorization` header
+        let req = test::TestRequest::with_uri("/")
+            .header("Authorization", "test")
+            .to_request();
+        let resp = test::block_on(app.call(req)).unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    /// An identity provider that always returns `Ok(Some("identity"))`
+    #[derive(Clone)]
+    struct AlwaysAcceptIdentityProvider;
+
+    impl IdentityProvider for AlwaysAcceptIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &IdentityAuthorization,
+        ) -> Result<Option<String>, InternalError> {
+            Ok(Some("identity".into()))
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An `AuthorizationMapping` that just returns a string
+    struct MockAuthorizationMapping;
+
+    impl AuthorizationMapping<String> for MockAuthorizationMapping {
+        fn get(
+            &self,
+            _authorization: &IdentityAuthorization,
+        ) -> Result<Option<String>, InternalError> {
+            Ok(Some("test".to_string()))
+        }
+    }
+}
