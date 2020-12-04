@@ -14,6 +14,8 @@
 
 mod consensus;
 pub(crate) mod error;
+#[cfg(feature = "admin-service-event-store")]
+pub mod event;
 mod mailbox;
 pub(crate) mod messages;
 pub(super) mod proposal_store;
