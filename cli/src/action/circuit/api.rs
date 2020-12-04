@@ -18,12 +18,13 @@ use std::fmt;
 use reqwest::{blocking::Client, header, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::error::Result as JsonResult;
-use splinter::protocol::ADMIN_PROTOCOL_VERSION;
 
 use crate::action::api::{ServerError, SplinterRestClient};
 use crate::error::CliError;
 
 const PAGING_LIMIT: &str = "1000";
+// The admin protocol version supported by the current CLI
+const CLI_ADMIN_PROTOCOL_VERSION: &str = "1";
 
 impl SplinterRestClient {
     /// Submits an admin payload to this client's Splinter node.
@@ -34,7 +35,7 @@ impl SplinterRestClient {
         let mut request = Client::new()
             .post(&format!("{}/admin/submit", self.url))
             .header(header::CONTENT_TYPE, "octet-stream")
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION)
+            .header("SplinterProtocolVersion", CLI_ADMIN_PROTOCOL_VERSION)
             .body(payload);
 
         #[cfg(feature = "splinter-cli-jwt")]
@@ -81,7 +82,7 @@ impl SplinterRestClient {
         #[allow(unused_mut)]
         let mut request = Client::new()
             .get(&url)
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", CLI_ADMIN_PROTOCOL_VERSION);
 
         #[cfg(feature = "splinter-cli-jwt")]
         {
@@ -125,7 +126,7 @@ impl SplinterRestClient {
         #[allow(unused_mut)]
         let mut request = Client::new()
             .get(&format!("{}/admin/circuits/{}", self.url, circuit_id))
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", CLI_ADMIN_PROTOCOL_VERSION);
 
         #[cfg(feature = "splinter-cli-jwt")]
         {
@@ -187,7 +188,7 @@ impl SplinterRestClient {
         #[allow(unused_mut)]
         let mut request = Client::new()
             .get(&url)
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", CLI_ADMIN_PROTOCOL_VERSION);
 
         #[cfg(feature = "splinter-cli-jwt")]
         {
@@ -231,7 +232,7 @@ impl SplinterRestClient {
         #[allow(unused_mut)]
         let mut request = Client::new()
             .get(&format!("{}/admin/proposals/{}", self.url, circuit_id))
-            .header("SplinterProtocolVersion", ADMIN_PROTOCOL_VERSION);
+            .header("SplinterProtocolVersion", CLI_ADMIN_PROTOCOL_VERSION);
 
         #[cfg(feature = "splinter-cli-jwt")]
         {

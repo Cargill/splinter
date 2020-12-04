@@ -22,7 +22,6 @@ use scabbard::{
     protocol::SCABBARD_PROTOCOL_VERSION,
     service::{BatchInfo, BatchStatus},
 };
-use splinter::protocol::ADMIN_PROTOCOL_VERSION;
 
 use super::{ErrorResponse, SuccessResponse};
 
@@ -30,6 +29,9 @@ use crate::config::NodeInfo;
 use crate::rest_api::{GameroomdData, RestApiResponseError};
 
 const DEFAULT_WAIT: u64 = 30; // default wait time in seconds for batch to be commited
+
+// The admin protocol version supported by the gameroom app auth handler
+const GAMEROOM_ADMIN_PROTOCOL_VERSION: &str = "1";
 
 pub async fn submit_signed_payload(
     client: web::Data<Client>,
@@ -41,7 +43,7 @@ pub async fn submit_signed_payload(
         .header("Authorization", gameroomd_data.authorization.as_str())
         .header(
             "SplinterProtocolVersion",
-            ADMIN_PROTOCOL_VERSION.to_string(),
+            GAMEROOM_ADMIN_PROTOCOL_VERSION.to_string(),
         )
         .send_body(Body::Bytes(signed_payload))
         .await

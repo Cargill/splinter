@@ -19,7 +19,7 @@ pub mod component;
 pub mod service;
 
 // Admin REST API protocol versions
-pub const ADMIN_PROTOCOL_VERSION: u32 = 1;
+pub const ADMIN_PROTOCOL_VERSION: u32 = 2;
 
 #[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
