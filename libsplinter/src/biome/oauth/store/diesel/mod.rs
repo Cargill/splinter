@@ -283,20 +283,28 @@ pub mod tests {
             .expect("Could not query non-existent oauth user");
         assert!(unknown_oauth_user.is_none());
 
-        // Create another user and try to connect it to the same user id.
+        // Create an entry for the same user but with an alternative access token
         let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
-            .with_provider_user_ref("TestUser2".into())
+            .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someotheraccesstoken".to_string()))
             .with_provider(OAuthProvider::Github)
             .build()
             .expect("Unable to construct oauth user");
 
-        let err = oauth_user_store
+        oauth_user_store
             .add_oauth_user(oauth_user)
-            .expect_err("Did not return an error");
+            .expect("Did not insert the user access record");
 
-        assert!(matches!(err, OAuthUserStoreError::ConstraintViolation(_)));
+        let stored_oauth_user = oauth_user_store
+            .get_by_access_token("someotheraccesstoken")
+            .expect("Unable to lookup user by access token");
+        let stored_oauth_user = stored_oauth_user.expect("Did not find the oauth user (was None)");
+
+        assert_eq!(
+            &AccessToken::Authorized("someotheraccesstoken".to_string()),
+            stored_oauth_user.access_token()
+        );
     }
 
     /// Verify that a SQLite-backed `DieselOAuthUserStore` correctly supports updating an
