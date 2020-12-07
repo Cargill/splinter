@@ -28,6 +28,7 @@ use crate::biome::{
 };
 #[cfg(feature = "biome-key-management")]
 use crate::biome::{KeyStore, MemoryKeyStore};
+#[cfg(feature = "biome")]
 use crate::biome::{MemoryUserStore, UserStore};
 
 use super::StoreFactory;
@@ -41,6 +42,7 @@ pub struct MemoryStoreFactory {
     biome_key_store: MemoryKeyStore,
     #[cfg(feature = "biome-credentials")]
     biome_refresh_token_store: MemoryRefreshTokenStore,
+    #[cfg(feature = "biome")]
     biome_user_store: MemoryUserStore,
     #[cfg(feature = "biome-oauth")]
     biome_oauth_user_store: MemoryOAuthUserStore,
@@ -58,7 +60,8 @@ impl MemoryStoreFactory {
 
         #[cfg(feature = "biome-credentials")]
         let biome_user_store = MemoryUserStore::new(biome_credentials_store.clone());
-        #[cfg(not(feature = "biome-credentials"))]
+
+        #[cfg(all(not(feature = "biome-credentials"), features = "biome"))]
         let biome_user_store = MemoryUserStore::new();
 
         #[cfg(feature = "biome-oauth")]
@@ -71,6 +74,7 @@ impl MemoryStoreFactory {
             biome_key_store,
             #[cfg(feature = "biome-credentials")]
             biome_refresh_token_store: MemoryRefreshTokenStore::new(),
+            #[cfg(feature = "biome")]
             biome_user_store,
             #[cfg(feature = "biome-oauth")]
             biome_oauth_user_store,
@@ -94,6 +98,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(self.biome_refresh_token_store.clone())
     }
 
+    #[cfg(feature = "biome")]
     fn get_biome_user_store(&self) -> Box<dyn UserStore> {
         Box::new(self.biome_user_store.clone())
     }

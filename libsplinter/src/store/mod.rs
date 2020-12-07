@@ -49,6 +49,7 @@ pub trait StoreFactory {
     fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore>;
 
     /// Get a new `UserStore`
+    #[cfg(feature = "biome")]
     fn get_biome_user_store(&self) -> Box<dyn crate::biome::UserStore>;
 
     #[cfg(feature = "admin-service")]
@@ -120,8 +121,8 @@ impl FromStr for ConnectionUri {
             #[cfg(feature = "sqlite")]
             _ => Ok(ConnectionUri::Sqlite(s.into())),
             #[cfg(not(feature = "sqlite"))]
-            _ => Err(InvalidArgumentError(
-                "s",
+            _ => Err(InvalidArgumentError::new(
+                "s".to_string(),
                 format!("No compatible connection type: {}", s),
             )),
         }
