@@ -193,11 +193,11 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 
-    fn remove_user_tokens(&self, identity: &str) -> Result<(), InternalError> {
+    fn remove_user_tokens(&self, access_token: &str) -> Result<(), InternalError> {
         // Check if there is an existing `OAuthUserAccess` with the corresponding `identity`
         if let Some(oauth_user) = self
             .oauth_user_store
-            .get_by_provider_user_ref(&identity)
+            .get_by_access_token(access_token)
             .map_err(|e| InternalError::from_source(Box::new(e)))?
         {
             // If the user does exist, remove any tokens associated with the user
