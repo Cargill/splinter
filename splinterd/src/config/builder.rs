@@ -47,6 +47,7 @@ fn get_tls_file_path(cert_dir: &str, file: &str) -> String {
     }
 }
 
+#[cfg(feature = "database")]
 fn get_database_path(state_dir: &str, database_file: &str) -> String {
     if database_file.starts_with("postgres://") {
         database_file.to_string()

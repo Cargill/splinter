@@ -120,8 +120,8 @@ impl FromStr for ConnectionUri {
             #[cfg(feature = "sqlite")]
             _ => Ok(ConnectionUri::Sqlite(s.into())),
             #[cfg(not(feature = "sqlite"))]
-            _ => Err(InvalidArgumentError(
-                "s",
+            _ => Err(InvalidArgumentError::new(
+                "s".to_string(),
                 format!("No compatible connection type: {}", s),
             )),
         }

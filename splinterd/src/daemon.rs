@@ -181,12 +181,21 @@ impl SplinterDaemon {
                     }
                 }
             } else {
-                // If storage is not provided, db_url is required
-                let db_url = self.db_url.clone().ok_or_else(|| {
-                    StartError::StorageError("No database string was provided".into())
-                })?;
-                let store_factory = create_store_factory(&db_url)?;
-                store_factory.get_admin_service_store()
+                #[cfg(feature = "database")]
+                {
+                    // If storage is not provided, db_url is required
+                    let db_url = self.db_url.clone().ok_or_else(|| {
+                        StartError::StorageError("No database string was provided".into())
+                    })?;
+                    let store_factory = create_store_factory(&db_url)?;
+                    store_factory.get_admin_service_store()
+                }
+                #[cfg(not(feature = "database"))]
+                {
+                    return Err(StartError::StorageError(
+                        "No supported state configuration provided".to_string(),
+                    ));
+                }
             }
         };
 
@@ -832,7 +841,6 @@ fn start_health_service(
     })?
 }
 
-#[cfg(feature = "biome")]
 fn create_store_factory(
     db_url: &str,
 ) -> Result<Box<dyn splinter::store::StoreFactory>, StartError> {

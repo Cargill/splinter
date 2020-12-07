@@ -60,7 +60,7 @@ features = [
   "registry-remote",
   "rest-api",
   "rest-api-actix",
-  "admin-service",
+  "store-factory",
 ]
 
 [features]
@@ -89,7 +89,7 @@ experimental = [
 ]
 
 auth = ["splinter/cylinder-jwt", "splinter/oauth-github", "splinter/oauth-openid"]
-biome = ["splinter/biome", "splinter/store-factory", "database"]
+biome = ["splinter/biome", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]
 biome-oauth = [
