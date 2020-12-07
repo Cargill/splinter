@@ -45,6 +45,16 @@ impl Default for AccessToken {
     }
 }
 
+impl AccessToken {
+    /// Returns if this token is an unauthorized token placeholder.
+    pub fn is_unauthorized(&self) -> bool {
+        match self {
+            AccessToken::Unauthorized => true,
+            AccessToken::Authorized(_) => false,
+        }
+    }
+}
+
 /// A new OAuth User access.
 ///
 /// This user is connected to a Biome User, via a user ID.
