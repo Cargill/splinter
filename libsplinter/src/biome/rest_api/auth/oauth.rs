@@ -128,12 +128,14 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
     fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError> {
         let provider_identity = user_info.identity().to_string();
 
-        let existing_oauth_user = self
+        let (previously_unauthed, other_accesses): (Vec<_>, Vec<_>) = self
             .oauth_user_store
-            .get_by_provider_user_ref(&provider_identity)
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+            .list_by_provider_user_ref(&provider_identity)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?
+            .partition(|oauth_user| oauth_user.access_token().is_unauthorized());
 
-        if let Some(oauth_user) = existing_oauth_user {
+        // Convert the first found entry with no access token to use this access token
+        if let Some(oauth_user) = previously_unauthed.into_iter().next() {
             let updated_user = oauth_user
                 .into_update_builder()
                 .with_access_token(AccessToken::Authorized(
@@ -151,7 +153,15 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
             self.oauth_user_store
                 .update_oauth_user(updated_user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            return Ok(());
+        }
+
+        // If there is an existing connection, maintain the existing linkage
+        let user_id = if let Some(oauth_user) = other_accesses.into_iter().next() {
+            oauth_user.user_id().to_string()
         } else {
+            // otherwise, create a new user
             let user_id = Uuid::new_v4().to_string();
             let user = User::new(&user_id);
 
@@ -159,28 +169,28 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                 .add_user(user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-            let oauth_user = NewOAuthUserAccessBuilder::new()
-                .with_user_id(user_id)
-                .with_provider_user_ref(provider_identity)
-                .with_access_token(AccessToken::Authorized(
-                    user_info.access_token().to_string(),
-                ))
-                .with_refresh_token(user_info.refresh_token().map(String::from))
-                .with_provider(self.provider.clone())
-                .build()
-                .map_err(|e| {
-                    InternalError::from_source_with_message(
-                        Box::new(e),
-                        "Failed to properly construct a new OAuth user".into(),
-                    )
-                })?;
+            user_id
+        };
 
-            self.oauth_user_store
-                .add_oauth_user(oauth_user)
-                .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        }
+        let oauth_user = NewOAuthUserAccessBuilder::new()
+            .with_user_id(user_id)
+            .with_provider_user_ref(provider_identity)
+            .with_access_token(AccessToken::Authorized(
+                user_info.access_token().to_string(),
+            ))
+            .with_refresh_token(user_info.refresh_token().map(String::from))
+            .with_provider(self.provider.clone())
+            .build()
+            .map_err(|e| {
+                InternalError::from_source_with_message(
+                    Box::new(e),
+                    "Failed to properly construct a new OAuth user".into(),
+                )
+            })?;
 
-        Ok(())
+        self.oauth_user_store
+            .add_oauth_user(oauth_user)
+            .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 
     fn remove_user_tokens(&self, identity: &str) -> Result<(), InternalError> {

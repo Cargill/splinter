@@ -296,10 +296,10 @@ pub trait OAuthUserStore: Send + Sync {
     fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
 
     /// Returns the stored OAuth user based on the provider_user_ref from the OAuth provider.
-    fn get_by_provider_user_ref(
+    fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError>;
 
     /// Returns the stored OAuth user based on the access token from the OAuth provider.
     fn get_by_access_token(
@@ -308,8 +308,10 @@ pub trait OAuthUserStore: Send + Sync {
     ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
 
     /// Returns the stored OAuth user based on the biome user ID.
-    fn get_by_user_id(&self, user_id: &str)
-        -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
+    fn list_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError>;
 
     /// Clone into a boxed, dynamic dispatched OAuthUserStore.
     fn clone_box(&self) -> Box<dyn OAuthUserStore>;
