@@ -61,6 +61,7 @@ default = [
     "circuit-template",
     "database",
     "postgres",
+    "sqlite",
 ]
 
 stable = [
@@ -73,7 +74,6 @@ experimental = [
     # The following features are experimental:
     "circuit-auth-type",
     "health",
-    "sqlite",
     "splinter-cli-jwt",
 ]
 
