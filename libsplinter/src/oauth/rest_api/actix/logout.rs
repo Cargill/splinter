@@ -14,14 +14,13 @@
 
 //! The `GET /oauth/logout` endpoint for removing a user's tokens.
 
-use actix_web::HttpResponse;
-use futures::future::IntoFuture;
+use actix_web::{HttpRequest, HttpResponse};
+use futures::{future::IntoFuture, Future};
 
 use crate::oauth::rest_api::OAuthUserInfoStore;
 use crate::protocol;
+use crate::rest_api::auth::identity::{Authorization, BearerToken};
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
-
-use crate::biome::rest_api::auth::OAuthUserIdentityRef;
 
 pub fn make_logout_route(user_info_store: Box<dyn OAuthUserInfoStore>) -> Resource {
     Resource::build("/oauth/logout")
@@ -30,25 +29,61 @@ pub fn make_logout_route(user_info_store: Box<dyn OAuthUserInfoStore>) -> Resour
             protocol::OAUTH_PROTOCOL_VERSION,
         ))
         .add_method(Method::Get, move |req, _| {
-            Box::new(match req.extensions().get::<OAuthUserIdentityRef>() {
-                Some(OAuthUserIdentityRef(identity)) => {
-                    match user_info_store.remove_user_tokens(&identity) {
-                        Ok(()) => HttpResponse::Ok()
-                            .json(json!({
-                                "message": "User successfully logged out"
-                            }))
-                            .into_future(),
-                        Err(err) => {
-                            error!("Unable to remove user tokens: {}", err);
-                            HttpResponse::InternalServerError()
-                                .json(ErrorResponse::internal_error())
-                                .into_future()
-                        }
-                    }
-                }
-                None => HttpResponse::Unauthorized()
-                    .json(ErrorResponse::unauthorized())
+            let access_token = match get_access_token(req) {
+                Ok(access_token) => access_token,
+                Err(err_response) => return err_response,
+            };
+
+            Box::new(match user_info_store.remove_user_tokens(&access_token) {
+                Ok(()) => HttpResponse::Ok()
+                    .json(json!({
+                        "message": "User successfully logged out"
+                    }))
                     .into_future(),
+                Err(err) => {
+                    error!("Unable to remove user tokens: {}", err);
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future()
+                }
             })
         })
+}
+
+fn get_access_token(
+    req: HttpRequest,
+) -> Result<String, Box<dyn Future<Item = HttpResponse, Error = actix_web::Error>>> {
+    let auth_header = match req
+        .headers()
+        .get("Authorization")
+        .map(|auth| auth.to_str())
+        .transpose()
+    {
+        Ok(Some(header_str)) => header_str,
+        Ok(None) => {
+            return Err(Box::new(
+                HttpResponse::Unauthorized()
+                    .json(ErrorResponse::unauthorized())
+                    .into_future(),
+            ))
+        }
+        Err(_) => {
+            return Err(Box::new(
+                HttpResponse::BadRequest()
+                    .json(ErrorResponse::bad_request(
+                        "Authorization header must contain only visible ASCII characters",
+                    ))
+                    .into_future(),
+            ))
+        }
+    };
+
+    match auth_header.parse() {
+        Ok(Authorization::Bearer(BearerToken::OAuth2(access_token))) => Ok(access_token),
+        Ok(_) | Err(_) => Err(Box::new(
+            HttpResponse::Unauthorized()
+                .json(ErrorResponse::unauthorized())
+                .into_future(),
+        )),
+    }
 }
