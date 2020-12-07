@@ -59,46 +59,6 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
     }
 }
 
-/// A wrapper struct for an `OAuthUserAccess`'s identity.
-pub struct OAuthUserIdentityRef(pub String);
-
-/// An `AuthorizationMapping` implementation that returns  an `OAuthUserAccess`'s identity.
-pub struct GetUserIdentityByOAuthAuthorization {
-    oauth_user_store: Box<dyn OAuthUserStore>,
-}
-
-impl GetUserIdentityByOAuthAuthorization {
-    /// Construct a new `GetUserIdentityByOAuthAuthorization` over an `OAuthUserStore` implementation.
-    pub fn new(oauth_user_store: Box<dyn OAuthUserStore>) -> Self {
-        Self { oauth_user_store }
-    }
-}
-
-impl AuthorizationMapping<OAuthUserIdentityRef> for GetUserIdentityByOAuthAuthorization {
-    fn get(
-        &self,
-        authorization: &Authorization,
-    ) -> Result<Option<OAuthUserIdentityRef>, InternalError> {
-        match authorization {
-            Authorization::Bearer(BearerToken::OAuth2(access_token)) => self
-                .oauth_user_store
-                .get_by_access_token(&access_token)
-                .map(|opt_oauth_user| {
-                    opt_oauth_user.map(|oauth_user| {
-                        OAuthUserIdentityRef(oauth_user.provider_user_ref().to_string())
-                    })
-                })
-                .map_err(|e| {
-                    InternalError::from_source_with_message(
-                        Box::new(e),
-                        "Unable to load oauth user".into(),
-                    )
-                }),
-            _ => Ok(None),
-        }
-    }
-}
-
 /// Biome-backed implementation of the `OAuthUserInfoStore` trait.
 ///
 /// This implementation uses the `OAuthUserStore` provided by Biome.

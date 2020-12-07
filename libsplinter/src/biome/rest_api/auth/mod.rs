@@ -23,7 +23,3 @@ pub use credentials::GetUserByBiomeAuthorization;
 pub use oauth::BiomeOAuthUserInfoStore;
 #[cfg(feature = "biome-oauth")]
 pub use oauth::GetUserByOAuthAuthorization;
-#[cfg(feature = "biome-oauth")]
-pub use oauth::GetUserIdentityByOAuthAuthorization;
-#[cfg(feature = "biome-oauth")]
-pub use oauth::OAuthUserIdentityRef;
