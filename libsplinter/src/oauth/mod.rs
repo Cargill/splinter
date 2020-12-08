@@ -60,13 +60,7 @@ impl OAuthClient {
     ///
     /// # Arguments
     ///
-    /// * `client_id` - The OAuth client ID
-    /// * `client_secret` - The OAuth client secret
-    /// * `auth_url` - The provider's authorization endpoint
-    /// * `redirect_url` - The endpoint that the provider will redirect to after it has completed
-    ///   authorization
-    /// * `token_url` - The provider's endpoint for exchanging an authorization code for an access
-    ///   token
+    /// * `client` - the [oauth2::basic::BasicClient], used for requests to the provider
     /// * `scopes` - The scopes that will be requested for each user
     /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
     /// * `inflight_request_store` - The store for information about in-flight request to a
@@ -76,30 +70,11 @@ impl OAuthClient {
     ///
     /// Returns an error if any of the auth, redirect, or token URLs are invalid
     fn new(
-        client_id: String,
-        client_secret: String,
-        auth_url: String,
-        redirect_url: String,
-        token_url: String,
+        client: BasicClient,
         scopes: Vec<String>,
         identity_provider: Box<dyn IdentityProvider>,
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     ) -> Result<Self, InvalidArgumentError> {
-        let client = BasicClient::new(
-            ClientId::new(client_id),
-            Some(ClientSecret::new(client_secret)),
-            AuthUrl::new(auth_url)
-                .map_err(|err| InvalidArgumentError::new("auth_url".into(), err.to_string()))?,
-            Some(
-                TokenUrl::new(token_url).map_err(|err| {
-                    InvalidArgumentError::new("token_url".into(), err.to_string())
-                })?,
-            ),
-        )
-        .set_redirect_url(
-            RedirectUrl::new(redirect_url)
-                .map_err(|err| InvalidArgumentError::new("redirect_url".into(), err.to_string()))?,
-        );
         Ok(Self {
             client,
             scopes,
@@ -195,6 +170,29 @@ impl OAuthClient {
 
         Ok(Some((user_info, pending_authorization.client_redirect_url)))
     }
+}
+
+fn new_basic_client(
+    client_id: String,
+    client_secret: String,
+    auth_url: String,
+    redirect_url: String,
+    token_url: String,
+) -> Result<BasicClient, InvalidArgumentError> {
+    Ok(BasicClient::new(
+        ClientId::new(client_id),
+        Some(ClientSecret::new(client_secret)),
+        AuthUrl::new(auth_url)
+            .map_err(|err| InvalidArgumentError::new("auth_url".into(), err.to_string()))?,
+        Some(
+            TokenUrl::new(token_url)
+                .map_err(|err| InvalidArgumentError::new("token_url".into(), err.to_string()))?,
+        ),
+    )
+    .set_redirect_url(
+        RedirectUrl::new(redirect_url)
+            .map_err(|err| InvalidArgumentError::new("redirect_url".into(), err.to_string()))?,
+    ))
 }
 
 /// A Store for the in-flight information pertaining to an OAauth2 request.
@@ -298,11 +296,14 @@ mod tests {
         let identity_box: Box<TestIdentityProvider> = Box::new(TestIdentityProvider);
         let inflight_request_store = Box::new(TestInflightOAuthRequestStore);
         OAuthClient::new(
-            "client_id".into(),
-            "client_secret".into(),
-            "https://provider.com/auth".into(),
-            "https://localhost/oauth/callback".into(),
-            "https://provider.com/token".into(),
+            new_basic_client(
+                "client_id".into(),
+                "client_secret".into(),
+                "https://provider.com/auth".into(),
+                "https://localhost/oauth/callback".into(),
+                "https://provider.com/token".into(),
+            )
+            .expect("Failed to create basic client"),
             vec![],
             identity_box.clone_box(),
             inflight_request_store.clone_box(),
@@ -310,43 +311,34 @@ mod tests {
         .expect("Failed to create client from valid inputs");
 
         assert!(matches!(
-            OAuthClient::new(
+            new_basic_client(
                 "client_id".into(),
                 "client_secret".into(),
                 "invalid_auth_url".into(),
                 "https://localhost/oauth/callback".into(),
                 "https://provider.com/token".into(),
-                vec![],
-                identity_box.clone_box(),
-                inflight_request_store.clone_box(),
             ),
             Err(err) if &err.argument() == "auth_url"
         ));
 
         assert!(matches!(
-            OAuthClient::new(
+            new_basic_client(
                 "client_id".into(),
                 "client_secret".into(),
                 "https://provider.com/auth".into(),
                 "invalid_redirect_url".into(),
                 "https://provider.com/token".into(),
-                vec![],
-                identity_box.clone_box(),
-                inflight_request_store.clone_box(),
             ),
             Err(err) if &err.argument() == "redirect_url"
         ));
 
         assert!(matches!(
-            OAuthClient::new(
+            new_basic_client(
                 "client_id".into(),
                 "client_secret".into(),
                 "https://provider.com/auth".into(),
                 "https://localhost/oauth/callback".into(),
                 "invalid_token_url".into(),
-                vec![],
-                identity_box,
-                inflight_request_store,
             ),
             Err(err) if &err.argument() == "token_url"
         ));
