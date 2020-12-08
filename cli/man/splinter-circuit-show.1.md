@@ -82,6 +82,7 @@ the proposal will not be viewable by any nodes.
 $ splinter circuit show 01234-ABCDE \
   ---url URL-of-alpha-node-splinterd-REST-API
 Proposal to create: 01234-ABCDE
+    Display Name: -
     Management Type: mgmt001
 
     alpha-001 (tcps://splinterd-node-alpha001:8044)

@@ -61,18 +61,18 @@ OPTIONS
 EXAMPLES
 ========
 This command displays information about circuits with a default `human`
-formatting, meaning the information is displayed in a table. The `--member` option
-allows for filtering the circuits.
+formatting, meaning the information is displayed in a table. The `--member`
+option allows for filtering the circuits.
 
 The following command does not specify any filters, therefore all circuits
 the local node, `alpha-node-000` is a member of are displayed.
 ```
 $ splinter circuit list \
   --url URL-of-alpha-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
-43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
-56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
+ID            NAME      MANAGEMENT    MEMBERS
+01234-ABCDE   -         mgmt001       alpha-node-000;beta-node-000
+43210-ABCDE   circuit1  mgmt001       alpha-node-000;gamma-node-000
+56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
 The next command specifies a `--member` filter, therefore all circuits
@@ -82,9 +82,9 @@ ID will be listed.
 $ splinter circuit list \
   member gamma-node-000 \
   --url URL-of-alpha-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
-56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
+ID            NAME      MANAGEMENT    MEMBERS
+43210-ABCDE   circuit1  mgmt001       alpha-node-000;gamma-node-000
+56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
 Since all of the circuits listed have been accepted by each member, the same
@@ -95,9 +95,9 @@ following with no filters:
 ```
 $ splinter circuit list \
   --url URL-of-gamma-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
-56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
+ID            NAME      MANAGEMENT    MEMBERS
+43210-ABCDE   circuit1  mgmt001       alpha-node-000;gamma-node-000
+56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
 From the perspective of the `beta-node-000` node, this command will display the
@@ -105,8 +105,8 @@ following with no filters:
 ```
 $ splinter circuit list \
   --url URL-of-gamma-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
+ID            NAME  MANAGEMENT    MEMBERS
+01234-ABCDE   -     mgmt001       alpha-node-000;beta-node-000
 ```
 
 ENVIRONMENT VARIABLES

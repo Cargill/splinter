@@ -53,6 +53,9 @@ OPTIONS
 `--comments COMMENTS`
 : Adds human-readable comments to the circuit proposal.
 
+`--display-name DISPLAY-NAME`
+: Add human-readable name for the circuit.
+
 `-k, --key PRIVATE-KEY-FILE`
 : Specifies the full path to the private key file.
 
