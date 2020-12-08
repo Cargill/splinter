@@ -303,6 +303,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .help("Add human-readable comments to the proposal"),
         )
         .arg(
+            Arg::with_name("display_name")
+                .long("display-name")
+                .takes_value(true)
+                .help("Add human-readable name for the circuit"),
+        )
+        .arg(
             Arg::with_name("dry_run")
                 .long("dry-run")
                 .short("n")

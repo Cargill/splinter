@@ -34,6 +34,7 @@ pub struct CreateCircuitMessageBuilder {
     authorization_type: Option<AuthorizationType>,
     application_metadata: Vec<u8>,
     comments: Option<String>,
+    display_name: Option<String>,
 }
 
 impl CreateCircuitMessageBuilder {
@@ -47,6 +48,7 @@ impl CreateCircuitMessageBuilder {
             authorization_type: None,
             application_metadata: vec![],
             comments: None,
+            display_name: None,
         }
     }
 
@@ -232,6 +234,10 @@ impl CreateCircuitMessageBuilder {
         self.comments = Some(comments.into());
     }
 
+    pub fn set_display_name(&mut self, display_name: &str) {
+        self.display_name = Some(display_name.into());
+    }
+
     pub fn build(mut self) -> Result<CreateCircuit, CliError> {
         let circuit_builder = self.create_circuit_builder();
 
@@ -287,13 +293,17 @@ impl CreateCircuitMessageBuilder {
             comments.push_str(&format!("; {}", builder_comments));
         }
 
-        let create_circuit_builder = self
+        let mut create_circuit_builder = self
             .create_circuit_builder
             .with_members(&self.nodes)
             .with_roster(&services)
             .with_circuit_management_type(&management_type)
             .with_application_metadata(&self.application_metadata)
             .with_comments(&comments);
+
+        if let Some(display_name) = self.display_name {
+            create_circuit_builder = create_circuit_builder.with_display_name(&display_name);
+        }
 
         #[cfg(feature = "circuit-auth-type")]
         let create_circuit_builder = match self.authorization_type {

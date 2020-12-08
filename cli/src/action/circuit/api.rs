@@ -24,7 +24,7 @@ use crate::error::CliError;
 
 const PAGING_LIMIT: &str = "1000";
 // The admin protocol version supported by the current CLI
-const CLI_ADMIN_PROTOCOL_VERSION: &str = "1";
+const CLI_ADMIN_PROTOCOL_VERSION: &str = "2";
 
 impl SplinterRestClient {
     /// Submits an admin payload to this client's Splinter node.
@@ -279,19 +279,25 @@ pub struct CircuitSlice {
     pub members: Vec<String>,
     pub roster: Vec<CircuitServiceSlice>,
     pub management_type: String,
+    pub display_name: Option<String>,
 }
 
 impl fmt::Display for CircuitSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut display_string = format!(
-            "Circuit: {}\n    Management Type: {}\n",
-            self.id, self.management_type
-        );
+        let mut display_string = format!("Circuit: {}\n    ", self.id,);
+
+        if let Some(display_name) = &self.display_name {
+            display_string += &format!("Display Name: {}\n    ", display_name);
+        } else {
+            display_string += "Display Name: -\n    ";
+        }
+
+        display_string += &format!("Management Type: {}\n", self.management_type);
 
         for member in self.members.iter() {
             display_string += &format!("\n    {}\n", member);
             for service in self.roster.iter() {
-                if service.allowed_nodes.contains(member) {
+                if member == &service.node_id {
                     display_string += &format!(
                         "        Service ({}): {}\n",
                         service.service_type, service.service_id
@@ -326,7 +332,7 @@ impl fmt::Display for CircuitSlice {
 pub struct CircuitServiceSlice {
     pub service_id: String,
     pub service_type: String,
-    pub allowed_nodes: Vec<String>,
+    pub node_id: String,
     pub arguments: BTreeMap<String, String>,
 }
 
@@ -349,10 +355,15 @@ pub struct ProposalSlice {
 
 impl fmt::Display for ProposalSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut display_string = format!(
-            "Proposal to create: {}\n    Management Type: {}\n",
-            self.circuit_id, self.circuit.management_type
-        );
+        let mut display_string = format!("Proposal to create: {}\n    ", self.circuit_id,);
+
+        if let Some(display_name) = &self.circuit.display_name {
+            display_string += &format!("Display Name: {}\n    ", display_name);
+        } else {
+            display_string += "Display Name: -\n    ";
+        }
+
+        display_string += &format!("Management Type: {}\n", self.circuit.management_type);
 
         for member in self.circuit.members.iter() {
             display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
@@ -370,7 +381,7 @@ impl fmt::Display for ProposalSlice {
                 display_string += &format!("{}\n", vote_string);
             }
             for service in self.circuit.roster.iter() {
-                if service.allowed_nodes.contains(&member.node_id) {
+                if service.node_id == member.node_id {
                     display_string += &format!(
                         "        Service ({}): {}\n",
                         service.service_type, service.service_id
@@ -409,6 +420,7 @@ pub struct ProposalCircuitSlice {
     pub roster: Vec<CircuitService>,
     pub management_type: String,
     pub comments: String,
+    pub display_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -421,7 +433,7 @@ pub struct CircuitMembers {
 pub struct CircuitService {
     pub service_id: String,
     pub service_type: String,
-    pub allowed_nodes: Vec<String>,
+    pub node_id: String,
     pub arguments: Vec<Vec<String>>,
 }
 
