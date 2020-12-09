@@ -48,12 +48,12 @@ mod resources;
 
 use std::sync::Arc;
 
-#[cfg(all(feature = "auth", feature = "biome-credentials"))]
-use crate::auth::rest_api::identity::biome::BiomeUserIdentityProvider;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
-use crate::rest_api::sessions::default_validation;
+use crate::rest_api::{
+    auth::identity::biome::BiomeUserIdentityProvider, sessions::default_validation,
+};
 use crate::rest_api::{Resource, RestResourceProvider};
 
 #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]

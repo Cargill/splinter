@@ -61,8 +61,6 @@ macro_rules! mutex_lock_unwrap {
 
 #[cfg(feature = "admin-service")]
 pub mod admin;
-#[cfg(feature = "auth")]
-pub mod auth;
 mod base62;
 #[cfg(feature = "biome")]
 pub mod biome;
@@ -80,6 +78,8 @@ pub mod keys;
 pub mod mesh;
 pub mod migrations;
 pub mod network;
+#[cfg(feature = "oauth")]
+pub mod oauth;
 pub mod orchestrator;
 pub mod peer;
 pub mod protocol;

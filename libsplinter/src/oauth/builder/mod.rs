@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Builders for [OAuthClient](crate::auth::oauth::OAuthClient) structs.
+//! Builders for [OAuthClient](crate::oauth::OAuthClient) structs.
 
 #[cfg(feature = "oauth-github")]
 mod github;
 #[cfg(feature = "oauth-openid")]
 mod openid;
 
-use crate::auth::rest_api::identity::IdentityProvider;
 use crate::error::InvalidStateError;
+use crate::rest_api::auth::identity::IdentityProvider;
 
 use super::error::OAuthClientBuildError;
 use super::OAuthClient;
@@ -53,13 +53,13 @@ impl OAuthClientBuilder {
         Self::default()
     }
 
-    /// Builds an OAuthClient.
+    /// Builds an `OAuthClient` and returns it along with the configured `IdentityProvider`.
     ///
     /// # Errors
     ///
     /// Returns an [`OAuthClientBuildError`] if any of the auth, redirect, or token URLs are
     /// invalid.
-    pub fn build(self) -> Result<OAuthClient, OAuthClientBuildError> {
+    pub fn build(self) -> Result<(OAuthClient, Box<dyn IdentityProvider>), OAuthClientBuildError> {
         let client_id = self.client_id.ok_or_else(|| {
             InvalidStateError::with_message(
                 "A client ID is required to successfully build an OAuthClient".into(),
@@ -90,15 +90,18 @@ impl OAuthClientBuilder {
                 "An identity provider is required to successfully build an OAuthClient".into(),
             )
         })?;
-        Ok(OAuthClient::new(
-            client_id,
-            client_secret,
-            auth_url,
-            redirect_url,
-            token_url,
-            self.scopes,
+        Ok((
+            OAuthClient::new(
+                client_id,
+                client_secret,
+                auth_url,
+                redirect_url,
+                token_url,
+                self.scopes,
+                identity_provider.clone(),
+            )?,
             identity_provider,
-        )?)
+        ))
     }
 
     /// Sets the client ID for the OAuth2 provider.

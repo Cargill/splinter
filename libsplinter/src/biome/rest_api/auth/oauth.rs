@@ -17,13 +17,11 @@
 
 use uuid::Uuid;
 
-use crate::auth::{
-    oauth::{rest_api::OAuthUserInfoStore, UserInfo},
-    rest_api::identity::{Authorization, AuthorizationMapping, BearerToken},
-};
 use crate::biome::oauth::store::{AccessToken, OAuthProvider, OAuthUserBuilder, OAuthUserStore};
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
+use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
+use crate::rest_api::auth::identity::{Authorization, AuthorizationMapping, BearerToken};
 
 /// An `AuthorizationMapping` implementation that returns an `User`.
 pub struct GetUserByOAuthAuthorization {

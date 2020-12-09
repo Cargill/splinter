@@ -18,12 +18,14 @@ use std::sync::Arc;
 
 use jsonwebtoken::decode;
 
-use crate::auth::rest_api::identity::{Authorization, AuthorizationMapping, BearerToken};
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::biome::user::store::User;
 use crate::error::InternalError;
-use crate::rest_api::secrets::SecretManager;
-use crate::rest_api::sessions::{default_validation, Claims};
+use crate::rest_api::{
+    auth::identity::{Authorization, AuthorizationMapping, BearerToken},
+    secrets::SecretManager,
+    sessions::{default_validation, Claims},
+};
 
 /// An `AuthorizationMapping` implementation that returns an `User`.
 ///
