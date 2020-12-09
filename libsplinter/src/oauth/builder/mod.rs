@@ -23,7 +23,7 @@ use crate::error::InvalidStateError;
 use crate::rest_api::auth::identity::IdentityProvider;
 
 use super::error::OAuthClientBuildError;
-use super::{new_basic_client, InflightOAuthRequestStore, OAuthClient};
+use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient};
 
 #[cfg(feature = "oauth-github")]
 pub use github::GithubOAuthClientBuilder;
