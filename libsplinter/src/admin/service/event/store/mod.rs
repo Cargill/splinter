@@ -20,6 +20,7 @@
 //! [`AdminServiceEventStore`]: trait.AdminServiceEventStore.html
 
 mod error;
+pub mod memory;
 
 pub use self::error::AdminServiceEventStoreError;
 use crate::admin::service::messages::AdminServiceEvent;
