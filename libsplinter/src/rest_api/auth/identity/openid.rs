@@ -56,12 +56,12 @@ impl IdentityProvider for OpenIdUserIdentityProvider {
             }
         }
 
-        let email = response
+        let user_identity = response
             .json::<UserResponse>()
             .map_err(|_| InternalError::with_message("Received unexpected response body".into()))?
-            .email;
+            .sub;
 
-        Ok(Some(email))
+        Ok(Some(user_identity))
     }
 
     fn clone_box(&self) -> Box<dyn IdentityProvider> {
@@ -72,5 +72,5 @@ impl IdentityProvider for OpenIdUserIdentityProvider {
 /// Deserializes response
 #[derive(Debug, Deserialize)]
 struct UserResponse {
-    email: String,
+    sub: String,
 }
