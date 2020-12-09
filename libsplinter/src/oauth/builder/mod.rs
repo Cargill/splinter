@@ -23,7 +23,7 @@ use crate::error::InvalidStateError;
 use crate::rest_api::auth::identity::IdentityProvider;
 
 use super::error::OAuthClientBuildError;
-use super::OAuthClient;
+use super::{new_basic_client, InflightOAuthRequestStore, OAuthClient};
 
 #[cfg(feature = "oauth-github")]
 pub use github::GithubOAuthClientBuilder;
@@ -45,6 +45,7 @@ pub struct OAuthClientBuilder {
     token_url: Option<String>,
     scopes: Vec<String>,
     identity_provider: Option<Box<dyn IdentityProvider>>,
+    inflight_request_store: Option<Box<dyn InflightOAuthRequestStore>>,
 }
 
 impl OAuthClientBuilder {
@@ -90,15 +91,18 @@ impl OAuthClientBuilder {
                 "An identity provider is required to successfully build an OAuthClient".into(),
             )
         })?;
+        let inflight_request_store = self.inflight_request_store.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "An in-flight request store is required to successfully build an OAuthClient"
+                    .into(),
+            )
+        })?;
         Ok((
             OAuthClient::new(
-                client_id,
-                client_secret,
-                auth_url,
-                redirect_url,
-                token_url,
+                new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
                 self.scopes,
                 identity_provider.clone(),
+                inflight_request_store,
             )?,
             identity_provider,
         ))
@@ -145,6 +149,16 @@ impl OAuthClientBuilder {
     /// by the OAuth2 provider.
     pub fn with_identity_provider(mut self, identity_provider: Box<dyn IdentityProvider>) -> Self {
         self.identity_provider = Some(identity_provider);
+        self
+    }
+
+    /// Sets the in-flight request store in order to store values between requests to and from the
+    /// OAuth2 provider.
+    pub fn with_inflight_request_store(
+        mut self,
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+    ) -> Self {
+        self.inflight_request_store = Some(inflight_request_store);
         self
     }
 }
