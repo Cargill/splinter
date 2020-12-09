@@ -37,7 +37,7 @@ use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerManagerConnector, PeerManagerNotification};
-use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
+use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, CircuitManagementPayload, ServiceProtocolVersionResponse,
 };
@@ -622,7 +622,9 @@ impl Service for AdminService {
                     ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
                 })?;
 
-                if protocol > ADMIN_PROTOCOL_VERSION || protocol < ADMIN_SERVICE_PROTOCOL_MIN {
+                if protocol > ADMIN_SERVICE_PROTOCOL_VERSION
+                    || protocol < ADMIN_SERVICE_PROTOCOL_MIN
+                {
                     warn!(
                         "Received service protocol version is not supported: {}",
                         protocol
@@ -752,21 +754,29 @@ fn supported_protocol_version(min: u32, max: u32) -> u32 {
         return 0;
     }
 
-    if min > ADMIN_PROTOCOL_VERSION {
+    if min > ADMIN_SERVICE_PROTOCOL_VERSION {
         info!(
             "Request requires newer version than can be provided: {}",
             min
         );
         return 0;
-    } else if max < ADMIN_PROTOCOL_VERSION {
+    } else if max < ADMIN_SERVICE_PROTOCOL_MIN {
         info!(
-            "Request requires older version than van be provided: {}",
+            "Request requires older version than can be provided: {}",
             max
         );
         return 0;
     }
 
-    ADMIN_PROTOCOL_VERSION
+    if max >= ADMIN_SERVICE_PROTOCOL_VERSION {
+        ADMIN_SERVICE_PROTOCOL_VERSION
+    } else if max > ADMIN_SERVICE_PROTOCOL_MIN {
+        max
+    } else if min > ADMIN_SERVICE_PROTOCOL_MIN {
+        min
+    } else {
+        ADMIN_SERVICE_PROTOCOL_MIN
+    }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
