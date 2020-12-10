@@ -30,6 +30,8 @@ use crate::biome::{
 use crate::biome::{KeyStore, MemoryKeyStore};
 #[cfg(feature = "biome")]
 use crate::biome::{MemoryUserStore, UserStore};
+#[cfg(feature = "oauth")]
+use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
 use super::StoreFactory;
 
@@ -46,6 +48,8 @@ pub struct MemoryStoreFactory {
     biome_user_store: MemoryUserStore,
     #[cfg(feature = "biome-oauth")]
     biome_oauth_user_store: MemoryOAuthUserStore,
+    #[cfg(feature = "oauth")]
+    inflight_request_store: MemoryInflightOAuthRequestStore,
 }
 
 impl MemoryStoreFactory {
@@ -67,6 +71,9 @@ impl MemoryStoreFactory {
         #[cfg(feature = "biome-oauth")]
         let biome_oauth_user_store = MemoryOAuthUserStore::new();
 
+        #[cfg(feature = "oauth")]
+        let inflight_request_store = MemoryInflightOAuthRequestStore::new();
+
         Self {
             #[cfg(feature = "biome-credentials")]
             biome_credentials_store,
@@ -78,6 +85,8 @@ impl MemoryStoreFactory {
             biome_user_store,
             #[cfg(feature = "biome-oauth")]
             biome_oauth_user_store,
+            #[cfg(feature = "oauth")]
+            inflight_request_store,
         }
     }
 }
@@ -129,5 +138,12 @@ impl StoreFactory for MemoryStoreFactory {
     #[cfg(all(feature = "admin-service", not(feature = "sqlite")))]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
         unimplemented!()
+    }
+
+    #[cfg(feature = "oauth")]
+    fn get_oauth_inflight_request_store(
+        &self,
+    ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
+        Box::new(self.inflight_request_store.clone())
     }
 }
