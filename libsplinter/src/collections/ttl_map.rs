@@ -34,6 +34,13 @@ impl<K: Hash + Eq, V> TtlMap<K, V> {
         }
     }
 
+    /// Returns true if the key exists in the Map.
+    ///
+    /// Note, this does not remove any expired entries.
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.map.contains_key(key)
+    }
+
     /// Inserts a key-value pair into the map, returning the old value is the key was already
     /// present.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
