@@ -104,6 +104,7 @@ experimental = [
     "oauth",
     "oauth-github",
     "oauth-openid",
+    "oauth-inflight-request-store-postgres",
     "registry-database",
     "service-arg-validation",
     "service-network",
@@ -127,6 +128,7 @@ cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 oauth = ["auth", "oauth2"]
 oauth-github = ["oauth"]
+oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 oauth-openid = ["oauth", "reqwest"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
