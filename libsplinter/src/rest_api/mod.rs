@@ -93,7 +93,7 @@ use crate::error::InvalidStateError;
 #[cfg(feature = "oauth")]
 use crate::oauth::rest_api::{OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp};
 #[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
-use crate::oauth::store::MemoryInflightOAuthRequestStore;
+use crate::oauth::store::InflightOAuthRequestStore;
 #[cfg(feature = "oauth-github")]
 use crate::oauth::GithubOAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
@@ -825,7 +825,7 @@ impl RestApiBuilder {
             #[cfg(feature = "oauth")]
             let mut oauth_configured = false;
 
-            for auth_config in self.auth_configs {
+            for auth_config in self.auth_configs.into_iter() {
                 match auth_config {
                     #[cfg(feature = "biome-credentials")]
                     AuthConfig::Biome {
@@ -859,22 +859,28 @@ impl RestApiBuilder {
                             ));
                         }
 
+                        #[cfg(feature = "biome-oauth")]
+                        let oauth_provider = match &oauth_config {
+                            #[cfg(feature = "oauth-github")]
+                            OAuthConfig::GitHub { .. } => OAuthProvider::Github,
+                            #[cfg(feature = "oauth-openid")]
+                            OAuthConfig::OpenId { .. } => OAuthProvider::OpenId,
+                        };
                         let (oauth_client, oauth_identity_provider): (
                             _,
                             Box<dyn IdentityProvider>,
-                        ) = match &oauth_config {
+                        ) = match oauth_config {
                             #[cfg(feature = "oauth-github")]
                             OAuthConfig::GitHub {
                                 client_id,
                                 client_secret,
                                 redirect_url,
+                                inflight_request_store,
                             } => GithubOAuthClientBuilder::new()
-                                .with_client_id(client_id.into())
-                                .with_client_secret(client_secret.into())
-                                .with_redirect_url(redirect_url.into())
-                                .with_inflight_request_store(Box::new(
-                                    MemoryInflightOAuthRequestStore::new(),
-                                ))
+                                .with_client_id(client_id)
+                                .with_client_secret(client_secret)
+                                .with_redirect_url(redirect_url)
+                                .with_inflight_request_store(inflight_request_store)
                                 .build()
                                 .map_err(|err| {
                                     RestApiServerError::InvalidStateError(
@@ -890,14 +896,13 @@ impl RestApiBuilder {
                                 client_secret,
                                 redirect_url,
                                 oauth_openid_url,
+                                inflight_request_store,
                             } => OpenIdOAuthClientBuilder::new()
-                                .with_discovery_url(oauth_openid_url.into())
-                                .with_client_id(client_id.into())
-                                .with_client_secret(client_secret.into())
-                                .with_redirect_url(redirect_url.into())
-                                .with_inflight_request_store(Box::new(
-                                    MemoryInflightOAuthRequestStore::new(),
-                                ))
+                                .with_discovery_url(oauth_openid_url)
+                                .with_client_id(client_id)
+                                .with_client_secret(client_secret)
+                                .with_redirect_url(redirect_url)
+                                .with_inflight_request_store(inflight_request_store)
                                 .build()
                                 .map_err(|err| {
                                     RestApiServerError::InvalidStateError(
@@ -916,12 +921,6 @@ impl RestApiBuilder {
                                     user_store,
                                     oauth_user_store,
                                 } => {
-                                    let oauth_provider = match oauth_config {
-                                        #[cfg(feature = "oauth-github")]
-                                        OAuthConfig::GitHub { .. } => OAuthProvider::Github,
-                                        #[cfg(feature = "oauth-openid")]
-                                        OAuthConfig::OpenId { .. } => OAuthProvider::OpenId,
-                                    };
                                     // Add the configuration mapping for the User value.
                                     self.authorization_mappings.push(
                                         ConfigureAuthorizationMapping::new(
@@ -1043,6 +1042,8 @@ pub enum OAuthConfig {
         client_secret: String,
         /// The redirect URL that is configured for the GitHub OAuth app
         redirect_url: String,
+        /// The store for in-flight requests
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
     #[cfg(feature = "oauth-openid")]
     OpenId {
@@ -1054,6 +1055,8 @@ pub enum OAuthConfig {
         redirect_url: String,
         /// The URL of the OpenID discovery document
         oauth_openid_url: String,
+        /// The store for in-flight requests
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
 }
 
