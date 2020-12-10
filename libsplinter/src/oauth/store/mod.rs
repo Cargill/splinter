@@ -93,4 +93,31 @@ mod tests {
 
         assert_eq!(None, request);
     }
+
+    pub fn test_duplicate_id_insert(inflight_request_store: &dyn InflightOAuthRequestStore) {
+        inflight_request_store
+            .insert_request(
+                "test_request".to_string(),
+                PendingAuthorization {
+                    pkce_verifier: "this is a pkce_verifier".into(),
+                    client_redirect_url: "http://example.com/someplace/nice".into(),
+                },
+            )
+            .expect("Unable to insert pending request");
+
+        let err = inflight_request_store
+            .insert_request(
+                "test_request".to_string(),
+                PendingAuthorization {
+                    pkce_verifier: "this is a pkce_verifier".into(),
+                    client_redirect_url: "http://example.com/someplace/nice".into(),
+                },
+            )
+            .expect_err("Should have returned an error");
+
+        assert!(matches!(
+            err,
+            InflightOAuthRequestStoreError::ConstraintViolation(_)
+        ));
+    }
 }
