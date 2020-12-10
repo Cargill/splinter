@@ -106,13 +106,15 @@ impl OAuthClient {
         }
         let (authorize_url, csrf_state) = request.url();
 
-        self.inflight_request_store.insert_request(
-            csrf_state.secret().into(),
-            PendingAuthorization {
-                pkce_verifier: pkce_verifier.secret().into(),
-                client_redirect_url,
-            },
-        )?;
+        self.inflight_request_store
+            .insert_request(
+                csrf_state.secret().into(),
+                PendingAuthorization {
+                    pkce_verifier: pkce_verifier.secret().into(),
+                    client_redirect_url,
+                },
+            )
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         Ok(authorize_url.to_string())
     }
@@ -131,7 +133,11 @@ impl OAuthClient {
         auth_code: String,
         csrf_token: &str,
     ) -> Result<Option<(UserInfo, String)>, InternalError> {
-        let pending_authorization = match self.inflight_request_store.remove_request(csrf_token)? {
+        let pending_authorization = match self
+            .inflight_request_store
+            .remove_request(csrf_token)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?
+        {
             Some(pending_authorization) => pending_authorization,
             None => return Ok(None),
         };
@@ -260,7 +266,7 @@ impl std::fmt::Debug for UserInfo {
 mod tests {
     use super::*;
 
-    use crate::error::InternalError;
+    use super::store::InflightOAuthRequestStoreError;
 
     /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
@@ -338,14 +344,14 @@ mod tests {
             &self,
             _request_id: String,
             _authorization: PendingAuthorization,
-        ) -> Result<(), InternalError> {
+        ) -> Result<(), InflightOAuthRequestStoreError> {
             Ok(())
         }
 
         fn remove_request(
             &self,
             _request_id: &str,
-        ) -> Result<Option<PendingAuthorization>, InternalError> {
+        ) -> Result<Option<PendingAuthorization>, InflightOAuthRequestStoreError> {
             Ok(None)
         }
 

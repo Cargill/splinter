@@ -14,12 +14,12 @@
 
 //! Defines an API to manage in-flight OAuth2 requests.
 
+mod error;
 mod memory;
-
-use crate::error::InternalError;
 
 use super::PendingAuthorization;
 
+pub use error::InflightOAuthRequestStoreError;
 pub use memory::MemoryInflightOAuthRequestStore;
 
 /// A Store for the in-flight information pertaining to an OAauth2 request.
@@ -33,13 +33,13 @@ pub trait InflightOAuthRequestStore: Sync + Send {
         &self,
         request_id: String,
         authorization: PendingAuthorization,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), InflightOAuthRequestStoreError>;
 
     /// Remove a request from the store and return it, if it exists.
     fn remove_request(
         &self,
         request_id: &str,
-    ) -> Result<Option<PendingAuthorization>, InternalError>;
+    ) -> Result<Option<PendingAuthorization>, InflightOAuthRequestStoreError>;
 
     /// Clone the store for dynamic dispatch.
     fn clone_box(&self) -> Box<dyn InflightOAuthRequestStore>;
