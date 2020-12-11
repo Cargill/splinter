@@ -309,6 +309,13 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .help("Add human-readable name for the circuit"),
         )
         .arg(
+            Arg::with_name("compat_version")
+                .long("compat")
+                .takes_value(true)
+                .possible_values(&["0.4"])
+                .help("Enforce that the proposed circuit is compatible with a specific version"),
+        )
+        .arg(
             Arg::with_name("dry_run")
                 .long("dry-run")
                 .short("n")

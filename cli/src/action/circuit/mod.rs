@@ -160,8 +160,13 @@ impl Action for CircuitProposeAction {
             builder.set_comments(comments);
         }
 
-        if let Some(comments) = args.value_of("display_name") {
-            builder.set_display_name(comments);
+        if let Some(display_name) = args.value_of("display_name") {
+            if args.value_of("compat_version") == Some("0.4") {
+                return Err(CliError::ActionError(
+                    "Display name is not compatible with Splinter v0.4".to_string(),
+                ));
+            }
+            builder.set_display_name(display_name);
         }
 
         let create_circuit = builder.build()?;
