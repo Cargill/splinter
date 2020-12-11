@@ -34,9 +34,10 @@ pub struct MigrateAction;
 impl Action for MigrateAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let url = if let Some(args) = arg_matches {
-            args.value_of("connect")
-                .map(ToOwned::to_owned)
-                .unwrap_or(get_default_database()?)
+            match args.value_of("connect") {
+                Some(url) => url.to_owned(),
+                None => get_default_database()?,
+            }
         } else {
             get_default_database()?
         };
