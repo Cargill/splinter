@@ -971,7 +971,7 @@ mod tests {
             .admin_service_shared
             .lock()
             .unwrap()
-            .on_protocol_agreement("admin::other-node", 1)
+            .on_protocol_agreement("admin::other-node", ADMIN_SERVICE_PROTOCOL_VERSION)
             .expect("Unable to set protocol agreement");
 
         // wait up to 60 second for the proposed circuit message
