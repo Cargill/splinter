@@ -15,6 +15,8 @@
 use actix_web::{web, HttpResponse};
 use futures::IntoFuture;
 use std::collections::HashMap;
+#[cfg(feature = "admin-service-event-store")]
+use std::convert::TryInto;
 use std::time;
 
 use crate::admin::messages::AdminServiceEvent;
@@ -61,34 +63,68 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                     Err(_) => return Box::new(HttpResponse::BadRequest().finish().into_future()),
                 };
 
-            let (skip, last_seen_timestamp) = query
-                .remove("last")
-                .map(|since_millis| {
-                    // Since this is the last seen event, we will skip it in our since
-                    // query
-                    debug!("Catching up on events since {}", since_millis);
-                    (
-                        1usize,
-                        time::SystemTime::UNIX_EPOCH + time::Duration::from_millis(since_millis),
-                    )
-                })
-                .unwrap_or((0, time::SystemTime::UNIX_EPOCH));
+            #[cfg(not(feature = "admin-service-event-store"))]
+            let initial_events = {
+                let (skip, last_seen_timestamp) = query
+                    .remove("last")
+                    .map(|since_millis| {
+                        // Since this is the last seen event, we will skip it in our since
+                        // query
+                        debug!("Catching up on events since {}", since_millis);
+                        (
+                            1usize,
+                            time::SystemTime::UNIX_EPOCH
+                                + time::Duration::from_millis(since_millis),
+                        )
+                    })
+                    .unwrap_or((0, time::SystemTime::UNIX_EPOCH));
 
-            let initial_events = match admin_commands
-                .get_events_since(&last_seen_timestamp, &circuit_management_type)
-            {
-                Ok(events) => events.map(JsonAdminEvent::from),
-                Err(err) => {
-                    error!(
-                        "Unable to load initial set of admin events for {}: {}",
-                        &circuit_management_type, err
-                    );
-                    return Box::new(HttpResponse::InternalServerError().finish().into_future());
+                match admin_commands
+                    .get_events_since(&last_seen_timestamp, &circuit_management_type)
+                {
+                    Ok(events) => events.map(JsonAdminEvent::from).skip(skip),
+                    Err(err) => {
+                        error!(
+                            "Unable to load initial set of admin events for {}: {}",
+                            &circuit_management_type, err
+                        );
+                        return Box::new(
+                            HttpResponse::InternalServerError().finish().into_future(),
+                        );
+                    }
+                }
+            };
+
+            #[cfg(feature = "admin-service-event-store")]
+            let initial_events = {
+                let (skip, last_seen_event_id) = query
+                    .remove("last")
+                    .map(|since_evt_id| {
+                        // Since this is the last seen event, we will skip it in our since
+                        // query
+                        let id: i64 = since_evt_id.try_into().unwrap_or(0);
+                        debug!("Catching up on events since {}", id);
+                        (1usize, id)
+                    })
+                    .unwrap_or((0, 0));
+
+                match admin_commands.get_events_since(&last_seen_event_id, &circuit_management_type)
+                {
+                    Ok(events) => events.map(JsonAdminEvent::from).skip(skip),
+                    Err(err) => {
+                        error!(
+                            "Unable to load initial set of admin events for {}: {}",
+                            &circuit_management_type, err
+                        );
+                        return Box::new(
+                            HttpResponse::InternalServerError().finish().into_future(),
+                        );
+                    }
                 }
             };
 
             let request = Request::from((request, payload));
-            match new_websocket_event_sender(request, Box::new(initial_events.skip(skip))) {
+            match new_websocket_event_sender(request, Box::new(initial_events)) {
                 Ok((sender, res)) => {
                     if let Err(err) = admin_commands.add_event_subscriber(
                         &circuit_management_type,
@@ -115,6 +151,7 @@ struct WsAdminServiceEventSubscriber {
 }
 
 impl AdminServiceEventSubscriber for WsAdminServiceEventSubscriber {
+    #[cfg(not(feature = "admin-service-event-store"))]
     fn handle_event(
         &self,
         event: &AdminServiceEvent,
@@ -123,6 +160,24 @@ impl AdminServiceEventSubscriber for WsAdminServiceEventSubscriber {
         let json_event = JsonAdminEvent {
             timestamp: *timestamp,
             event: event.clone(),
+            event_id: None,
+        };
+        self.sender.send(json_event).map_err(|_| {
+            debug!("Dropping admin service event and unsubscribing due to websocket being closed");
+            AdminSubscriberError::Unsubscribe
+        })
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn handle_event(
+        &self,
+        event: &AdminServiceEvent,
+        event_id: &i64,
+    ) -> Result<(), AdminSubscriberError> {
+        let json_event = JsonAdminEvent {
+            timestamp: time::SystemTime::now(),
+            event: event.clone(),
+            event_id: Some(*event_id),
         };
         self.sender.send(json_event).map_err(|_| {
             debug!("Dropping admin service event and unsubscribing due to websocket being closed");
@@ -138,13 +193,35 @@ struct JsonAdminEvent {
 
     #[serde(flatten)]
     event: AdminServiceEvent,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    event_id: Option<i64>,
 }
 
+// Conversion for the `JsonAdminEvent` sent to subscribers when the `Mailbox` is used to store
+// admin events.
+#[cfg(not(feature = "admin-service-event-store"))]
 impl From<(time::SystemTime, AdminServiceEvent)> for JsonAdminEvent {
     fn from(raw_evt: (time::SystemTime, AdminServiceEvent)) -> Self {
         Self {
             timestamp: raw_evt.0,
             event: raw_evt.1,
+            event_id: None,
+        }
+    }
+}
+
+// Conversion for the `JsonAdminEvent` sent to subscribers when the `AdminServiceEventStore` is
+// used to store admin events.
+// `timestamp` is set to the `UNIX_EPOCH` value to allow for backward-compatibility, as the
+// `timestamp` is not used by the `AdminServiceEventStore`.
+#[cfg(feature = "admin-service-event-store")]
+impl From<(i64, AdminServiceEvent)> for JsonAdminEvent {
+    fn from(raw_evt: (i64, AdminServiceEvent)) -> Self {
+        Self {
+            timestamp: time::SystemTime::now(),
+            event: raw_evt.1,
+            event_id: Some(raw_evt.0),
         }
     }
 }
