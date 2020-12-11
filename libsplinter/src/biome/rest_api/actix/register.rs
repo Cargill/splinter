@@ -25,6 +25,12 @@ use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
+/// This is the UUID namespace for Biome user IDs generated for users that register with Biome
+/// credentials. This will prevent collisions with Biome user IDs generated for users that login
+/// with OAuth. The `u128` was calculated by creating a v5 UUID with the nil namespace and the name
+/// `b"biome credentials"`.
+const UUID_NAMESPACE: Uuid = Uuid::from_u128(140899893353887994607859851180695869034);
+
 /// Defines a REST endpoint to add a user and credentials to the database
 ///
 /// The payload should be in the JSON format:
@@ -57,7 +63,7 @@ pub fn make_register_route(
                             .into_future();
                     }
                 };
-                let user_id = Uuid::new_v4().to_string();
+                let user_id = Uuid::new_v5(&UUID_NAMESPACE, Uuid::new_v4().as_bytes()).to_string();
                 let credentials_builder = CredentialsBuilder::default();
                 let credentials = match credentials_builder
                     .with_user_id(&user_id)
