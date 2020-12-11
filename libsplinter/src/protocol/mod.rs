@@ -18,12 +18,11 @@ pub mod authorization;
 pub mod component;
 pub mod service;
 
+// Admin REST API protocol versions
 pub const ADMIN_PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN: u32 = 1;
-#[cfg(feature = "admin-service")]
-pub(crate) const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
 #[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_SUBMIT_PROTOCOL_MIN: u32 = 1;
 
@@ -36,6 +35,12 @@ pub(crate) const ADMIN_LIST_PROPOSALS_PROTOCOL_MIN: u32 = 1;
 pub(crate) const ADMIN_LIST_CIRCUITS_MIN: u32 = 1;
 #[cfg(all(feature = "rest-api-actix", feature = "admin-service"))]
 pub(crate) const ADMIN_FETCH_CIRCUIT_MIN: u32 = 1;
+
+// Admin Service protocol versions
+pub const ADMIN_SERVICE_PROTOCOL_VERSION: u32 = 1;
+
+#[cfg(feature = "admin-service")]
+pub(crate) const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
 
 #[cfg(feature = "oauth")]
 pub const OAUTH_PROTOCOL_VERSION: u32 = 1;

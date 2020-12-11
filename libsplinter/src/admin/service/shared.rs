@@ -33,7 +33,7 @@ use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerManagerConnector, PeerRef};
-use crate::protocol::{ADMIN_PROTOCOL_VERSION, ADMIN_SERVICE_PROTOCOL_MIN};
+use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
 #[cfg(feature = "service-arg-validation")]
 use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
@@ -746,7 +746,7 @@ impl AdminServiceShared {
                 );
                 let mut request = ServiceProtocolVersionRequest::new();
                 request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
-                request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+                request.set_protocol_max(ADMIN_SERVICE_PROTOCOL_VERSION);
                 let mut msg = AdminMessage::new();
                 msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST);
                 msg.set_protocol_request(request);
@@ -1141,7 +1141,7 @@ impl AdminServiceShared {
             );
             let mut request = ServiceProtocolVersionRequest::new();
             request.set_protocol_min(ADMIN_SERVICE_PROTOCOL_MIN);
-            request.set_protocol_max(ADMIN_PROTOCOL_VERSION);
+            request.set_protocol_max(ADMIN_SERVICE_PROTOCOL_VERSION);
             let mut msg = AdminMessage::new();
             msg.set_message_type(AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST);
             msg.set_protocol_request(request);
