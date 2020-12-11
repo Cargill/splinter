@@ -13,11 +13,9 @@
 // limitations under the License.
 
 use super::schema::user_credentials;
-use crate::biome::user::store::diesel::models::UserModel;
 
 #[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
 #[table_name = "user_credentials"]
-#[belongs_to(UserModel, foreign_key = "user_id")]
 pub struct CredentialsModel {
     pub id: i64,
     pub user_id: String,

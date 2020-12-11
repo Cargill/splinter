@@ -84,7 +84,7 @@ use crate::biome::rest_api::BiomeRestResourceManager;
 use crate::biome::{
     oauth::store::OAuthProvider,
     rest_api::auth::{BiomeOAuthUserInfoStore, GetUserByOAuthAuthorization},
-    OAuthUserStore, UserStore,
+    OAuthUserStore,
 };
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
@@ -915,10 +915,7 @@ impl RestApiBuilder {
                         let user_info_store: Box<dyn OAuthUserInfoStore> =
                             match user_info_store_config {
                                 #[cfg(feature = "biome-oauth")]
-                                OAuthUserInfoStoreConfig::Biome {
-                                    user_store,
-                                    oauth_user_store,
-                                } => {
+                                OAuthUserInfoStoreConfig::Biome { oauth_user_store } => {
                                     // Add the configuration mapping for the User value.
                                     self.authorization_mappings.push(
                                         ConfigureAuthorizationMapping::new(
@@ -929,7 +926,6 @@ impl RestApiBuilder {
                                     );
                                     Box::new(BiomeOAuthUserInfoStore::new(
                                         oauth_provider,
-                                        user_store,
                                         oauth_user_store,
                                     ))
                                 }
@@ -1057,7 +1053,6 @@ pub enum OAuthUserInfoStoreConfig {
     /// Uses Biome's OAuth user store as the underlying storage
     #[cfg(feature = "biome-oauth")]
     Biome {
-        user_store: Box<dyn UserStore>,
         oauth_user_store: Box<dyn OAuthUserStore>,
     },
     /// Users' information is not handled by the Splinter REST API

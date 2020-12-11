@@ -226,7 +226,6 @@ pub mod tests {
     use super::*;
 
     use crate::biome::oauth::store::{AccessToken, NewOAuthUserAccessBuilder};
-    use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
     use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
@@ -238,8 +237,8 @@ pub mod tests {
     /// an oauth user by provider user ref.
     ///
     /// 1. Create a connection pool for an in-memory SQLite database and run migrations.
-    /// 2. Create a `DieselUserStore` and a `DieselOAuthUserStore`.
-    /// 3. Add a User and an OAuthUser
+    /// 2. Create a `DieselOAuthUserStore`.
+    /// 3. Add an OAuthUser
     /// 4. Verify that the `get_by_provider_user_ref` method returns correct values for the
     ///    existing OAuth User.
     /// 5. Verify that the `get_by_provider_user_ref` method returns `None` for
@@ -249,14 +248,9 @@ pub mod tests {
     fn sqlite_add_and_fetch_by_provider_user_ref() {
         let pool = create_connection_pool_and_migrate();
 
-        let user_store = DieselUserStore::new(pool.clone());
         let oauth_user_store = DieselOAuthUserStore::new(pool);
 
         let user_id = "test_biome_user_id";
-        user_store
-            .add_user(User::new(user_id))
-            .expect("unable to insert user");
-
         let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
@@ -332,8 +326,8 @@ pub mod tests {
     /// OAuthUser's `refresh_token`.
     ///
     /// 1. Create a connection pool for an in-memory SQLite database and run migrations.
-    /// 2. Create a `DieselUserStore` and a `DieselOAuthUserStore`.
-    /// 3. Add a User and an OAuthUser
+    /// 2. Create a `DieselOAuthUserStore`.
+    /// 3. Add an OAuthUser
     /// 4. Verify that the `get_by_user_id` method returns correct values for the
     ///    existing OAuth User.
     /// 5. Update the user to have a refresh token.
@@ -343,14 +337,9 @@ pub mod tests {
     fn sqlite_update_oauth_user_refresh_token() {
         let pool = create_connection_pool_and_migrate();
 
-        let user_store = DieselUserStore::new(pool.clone());
         let oauth_user_store = DieselOAuthUserStore::new(pool);
 
         let user_id = "test_biome_user_id";
-        user_store
-            .add_user(User::new(user_id))
-            .expect("unable to insert user");
-
         let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
@@ -397,8 +386,8 @@ pub mod tests {
     /// OAuthUserAccess's `access_token`.
     ///
     /// 1. Create a connection pool for an in-memory SQLite database and run migrations.
-    /// 2. Create a `DieselUserStore` and a `DieselOAuthUserStore`.
-    /// 3. Add a User and an OAuthUserAccess
+    /// 2. Create a `DieselOAuthUserStore`.
+    /// 3. Add an OAuthUserAccess
     /// 4. Verify that the `get_by_user_id` method returns correct values for the
     ///    existing OAuth User.
     /// 5. Update the user to have an `Unauthorized` `access_token`.
@@ -408,14 +397,9 @@ pub mod tests {
     fn sqlite_update_oauth_user_access_token() {
         let pool = create_connection_pool_and_migrate();
 
-        let user_store = DieselUserStore::new(pool.clone());
         let oauth_user_store = DieselOAuthUserStore::new(pool);
 
         let user_id = "test_biome_user_id";
-        user_store
-            .add_user(User::new(user_id))
-            .expect("unable to insert user");
-
         let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())

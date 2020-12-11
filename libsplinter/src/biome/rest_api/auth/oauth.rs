@@ -17,10 +17,10 @@
 
 use uuid::Uuid;
 
-use crate::biome::oauth::store::{
-    AccessToken, NewOAuthUserAccessBuilder, OAuthProvider, OAuthUserStore,
+use crate::biome::{
+    oauth::store::{AccessToken, NewOAuthUserAccessBuilder, OAuthProvider, OAuthUserStore},
+    rest_api::resources::User,
 };
-use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
 use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
 use crate::rest_api::auth::identity::{Authorization, AuthorizationMapping, BearerToken};
@@ -60,25 +60,17 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
 }
 
 /// Biome-backed implementation of the `OAuthUserInfoStore` trait.
-///
-/// This implementation uses the `OAuthUserStore` provided by Biome.
 #[derive(Clone)]
 pub struct BiomeOAuthUserInfoStore {
     provider: OAuthProvider,
-    user_store: Box<dyn UserStore>,
     oauth_user_store: Box<dyn OAuthUserStore>,
 }
 
 impl BiomeOAuthUserInfoStore {
     /// Construct a new `BiomeOAuthUserInfoStore`.
-    pub fn new(
-        provider: OAuthProvider,
-        user_store: Box<dyn UserStore>,
-        oauth_user_store: Box<dyn OAuthUserStore>,
-    ) -> Self {
+    pub fn new(provider: OAuthProvider, oauth_user_store: Box<dyn OAuthUserStore>) -> Self {
         Self {
             provider,
-            user_store,
             oauth_user_store,
         }
     }
@@ -122,14 +114,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
             oauth_user.user_id().to_string()
         } else {
             // otherwise, create a new user
-            let user_id = Uuid::new_v4().to_string();
-            let user = User::new(&user_id);
-
-            self.user_store
-                .add_user(user)
-                .map_err(|e| InternalError::from_source(Box::new(e)))?;
-
-            user_id
+            Uuid::new_v4().to_string()
         };
 
         let oauth_user = NewOAuthUserAccessBuilder::new()

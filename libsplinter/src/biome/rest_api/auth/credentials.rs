@@ -18,8 +18,7 @@ use std::sync::Arc;
 
 use jsonwebtoken::decode;
 
-use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::User;
+use crate::biome::rest_api::{resources::User, BiomeRestConfig};
 use crate::error::InternalError;
 use crate::rest_api::{
     auth::identity::{Authorization, AuthorizationMapping, BearerToken},

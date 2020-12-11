@@ -48,10 +48,6 @@ pub trait StoreFactory {
     #[cfg(feature = "biome-oauth")]
     fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore>;
 
-    /// Get a new `UserStore`
-    #[cfg(feature = "biome")]
-    fn get_biome_user_store(&self) -> Box<dyn crate::biome::UserStore>;
-
     #[cfg(feature = "admin-service")]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore>;
 

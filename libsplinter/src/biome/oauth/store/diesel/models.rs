@@ -22,8 +22,6 @@ use diesel::{
     sql_types::SmallInt,
 };
 
-use crate::biome::user::store::diesel::models::UserModel;
-
 use super::schema::oauth_user;
 
 #[repr(i16)]
@@ -75,7 +73,6 @@ where
 
 #[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
 #[table_name = "oauth_user"]
-#[belongs_to(UserModel, foreign_key = "user_id")]
 pub struct OAuthUserModel {
     pub id: i64,
     pub user_id: String,
