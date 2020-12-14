@@ -16,27 +16,6 @@
 //!
 //! Below is an example of building an instance of BiomeRestResourceManager and passing its
 //! resources to a running instance of `RestApi`.
-//!
-//! ```ignore
-//! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
-//! use splinter::biome::{
-//!     rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder},
-//!     MemoryUserStore,
-//! };
-//!
-//! let biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
-//! let biome_rest_provider = biome_rest_provider_builder
-//!     .with_user_store(MemoryUserStore::new())
-//!     .build()
-//!     .unwrap();
-//!
-//! RestApiBuilder::new()
-//!     .add_resources(biome_rest_provider.resources())
-//!     .with_bind("localhost:8080")
-//!     .build()
-//!     .unwrap()
-//!     .run();
-//! ```
 
 #[cfg(feature = "rest-api-actix")]
 mod actix;
@@ -63,7 +42,6 @@ use self::actix::key_management::{
 
 #[cfg(feature = "biome-key-management")]
 use super::key_management::store::KeyStore;
-use super::user::store::UserStore;
 
 #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
 use crate::rest_api::secrets::AutoSecretManager;
@@ -117,8 +95,6 @@ use crate::rest_api::sessions::AccessTokenIssuer;
 /// * `GET /biome/user/{id}` - Retrieve user with specified ID
 /// * `DELETE /biome/user/{id}` - Remove user with specified ID
 pub struct BiomeRestResourceManager {
-    #[cfg(feature = "biome-credentials")]
-    user_store: Arc<dyn UserStore>,
     #[cfg(feature = "biome-key-management")]
     key_store: Arc<dyn KeyStore>,
     #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
@@ -169,7 +145,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
                 self.rest_config.clone(),
                 self.token_secret_manager.clone(),
                 self.credentials_store.clone(),
-                self.user_store.clone(),
                 self.key_store.clone(),
             ));
         }
@@ -209,7 +184,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
 
             resources.push(make_register_route(
                 self.credentials_store.clone(),
-                self.user_store.clone(),
                 self.rest_config.clone(),
             ));
         }
@@ -234,7 +208,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
 /// Builder for BiomeRestResourceManager
 #[derive(Default)]
 pub struct BiomeRestResourceManagerBuilder {
-    user_store: Option<Arc<dyn UserStore>>,
     #[cfg(feature = "biome-key-management")]
     key_store: Option<Arc<dyn KeyStore>>,
     rest_config: Option<BiomeRestConfig>,
@@ -248,19 +221,6 @@ pub struct BiomeRestResourceManagerBuilder {
 }
 
 impl BiomeRestResourceManagerBuilder {
-    /// Sets a UserStore for the BiomeRestResourceManager
-    ///
-    /// # Arguments
-    ///
-    /// * `pool`: ConnectionPool to database that will serve as backend for UserStore
-    pub fn with_user_store(
-        mut self,
-        store: impl UserStore + 'static,
-    ) -> BiomeRestResourceManagerBuilder {
-        self.user_store = Some(Arc::new(store));
-        self
-    }
-
     /// Sets a KeyStore for the BiomeRestResourceManager
     ///
     /// # Arguments
@@ -346,12 +306,6 @@ impl BiomeRestResourceManagerBuilder {
 
     /// Consumes the builder and returns a BiomeRestResourceManager
     pub fn build(self) -> Result<BiomeRestResourceManager, BiomeRestResourceManagerBuilderError> {
-        #[cfg(feature = "biome-credentials")]
-        let user_store = self.user_store.ok_or_else(|| {
-            BiomeRestResourceManagerBuilderError::MissingRequiredField(
-                "Missing user store".to_string(),
-            )
-        })?;
         #[cfg(feature = "biome-key-management")]
         let key_store = self.key_store.ok_or_else(|| {
             BiomeRestResourceManagerBuilderError::MissingRequiredField(
@@ -395,8 +349,6 @@ impl BiomeRestResourceManagerBuilder {
         })?;
 
         Ok(BiomeRestResourceManager {
-            #[cfg(feature = "biome-credentials")]
-            user_store,
             #[cfg(feature = "biome-key-management")]
             key_store,
             #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
@@ -422,9 +374,7 @@ mod tests {
 
     use reqwest::blocking::Client;
 
-    use crate::biome::{
-        MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore, MemoryUserStore,
-    };
+    use crate::biome::{MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore};
     #[cfg(feature = "auth")]
     use crate::rest_api::AuthConfig;
     use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
@@ -526,7 +476,6 @@ mod tests {
     fn start_biome_rest_api() -> (RestApiShutdownHandle, thread::JoinHandle<()>) {
         let refresh_token_store = MemoryRefreshTokenStore::new();
         let cred_store = MemoryCredentialsStore::new();
-        let user_store = MemoryUserStore::new(cred_store.clone());
         let key_store = MemoryKeyStore::new(cred_store.clone());
         let config = BiomeRestConfigBuilder::default()
             .with_password_encryption_cost("low")
@@ -534,7 +483,6 @@ mod tests {
             .unwrap();
 
         let resource_manager = BiomeRestResourceManagerBuilder::default()
-            .with_user_store(user_store)
             .with_refresh_token_store(refresh_token_store)
             .with_credentials_store(cred_store)
             .with_key_store(key_store)

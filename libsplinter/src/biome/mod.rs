@@ -42,7 +42,6 @@ pub mod refresh_tokens;
 
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
-mod user;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use credentials::store::diesel::DieselCredentialsStore;
@@ -71,8 +70,3 @@ pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;
 pub use refresh_tokens::store::memory::MemoryRefreshTokenStore;
 #[cfg(feature = "biome-credentials")]
 pub use refresh_tokens::store::RefreshTokenStore;
-
-#[cfg(feature = "diesel")]
-pub use user::store::diesel::DieselUserStore;
-pub use user::store::memory::MemoryUserStore;
-pub use user::store::UserStore;

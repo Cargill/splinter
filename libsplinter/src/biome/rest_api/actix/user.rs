@@ -17,7 +17,6 @@ use std::sync::Arc;
 use crate::actix_web::HttpResponse;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::{UserStore, UserStoreError};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
@@ -62,7 +61,6 @@ pub fn make_user_routes(
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
     credentials_store: Arc<dyn CredentialsStore>,
-    user_store: Arc<dyn UserStore>,
     key_store: Arc<dyn KeyStore>,
 ) -> Resource {
     Resource::build("/biome/users/{id}")
@@ -79,10 +77,13 @@ pub fn make_user_routes(
                 key_store,
             ),
         )
-        .add_method(Method::Get, add_fetch_user_method(credentials_store))
+        .add_method(
+            Method::Get,
+            add_fetch_user_method(credentials_store.clone()),
+        )
         .add_method(
             Method::Delete,
-            add_delete_user_method(rest_config, secret_manager, user_store),
+            add_delete_user_method(credentials_store, rest_config, secret_manager),
         )
 }
 
@@ -257,23 +258,23 @@ fn add_modify_user_method(
 
 /// Defines a REST endpoint to delete a user from the database
 fn add_delete_user_method(
+    credentials_store: Arc<dyn CredentialsStore>,
     rest_config: Arc<BiomeRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
-    user_store: Arc<dyn UserStore>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
-        let user_store = user_store.clone();
+        let credentials_store = credentials_store.clone();
         let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
             Ok(user) => user,
             Err(response) => return response,
         };
 
-        Box::new(match user_store.remove_user(user.id()) {
+        Box::new(match credentials_store.remove_credentials(user.id()) {
             Ok(()) => HttpResponse::Ok()
                 .json(json!({ "message": "User deleted sucessfully" }))
                 .into_future(),
             Err(err) => match err {
-                UserStoreError::NotFoundError(msg) => {
+                CredentialsStoreError::NotFoundError(msg) => {
                     debug!("User not found: {}", msg);
                     HttpResponse::NotFound()
                         .json(ErrorResponse::not_found(&format!(

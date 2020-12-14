@@ -17,8 +17,7 @@ use crate::biome::refresh_tokens::store::{
     diesel::{models::NewRefreshToken, schema::refresh_tokens},
     RefreshTokenError,
 };
-use crate::biome::user::store::diesel::{models::UserModel, schema::splinter_user};
-use diesel::{dsl::insert_into, prelude::*, result::Error::NotFound};
+use diesel::{dsl::insert_into, prelude::*};
 
 pub(in crate::biome) trait RefreshTokenStoreAddTokenOperation {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError>;
@@ -29,20 +28,6 @@ impl<'a> RefreshTokenStoreAddTokenOperation
     for RefreshTokenStoreOperations<'a, diesel::pg::PgConnection>
 {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
-        splinter_user::table
-            .filter(splinter_user::id.eq(&user_id))
-            .first::<UserModel>(self.conn)
-            .map_err(|err| {
-                if err == NotFound {
-                    RefreshTokenError::QueryError {
-                        context: "Failed to check if user exists".into(),
-                        source: Box::new(err),
-                    }
-                } else {
-                    RefreshTokenError::NotFoundError(format!("User {} not found", user_id))
-                }
-            })?;
-
         insert_into(refresh_tokens::table)
             .values(NewRefreshToken { user_id, token })
             .execute(self.conn)
@@ -59,20 +44,6 @@ impl<'a> RefreshTokenStoreAddTokenOperation
     for RefreshTokenStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn add_token(&self, user_id: &str, token: &str) -> Result<(), RefreshTokenError> {
-        splinter_user::table
-            .filter(splinter_user::id.eq(&user_id))
-            .first::<UserModel>(self.conn)
-            .map_err(|err| {
-                if err == NotFound {
-                    RefreshTokenError::QueryError {
-                        context: "Failed to check if user exists".into(),
-                        source: Box::new(err),
-                    }
-                } else {
-                    RefreshTokenError::NotFoundError(format!("User {} not found", user_id))
-                }
-            })?;
-
         insert_into(refresh_tokens::table)
             .values(NewRefreshToken { user_id, token })
             .execute(self.conn)

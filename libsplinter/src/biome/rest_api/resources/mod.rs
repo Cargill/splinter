@@ -24,3 +24,27 @@ pub(in crate::biome::rest_api) mod key_management;
 pub(in crate::biome::rest_api) mod token;
 #[cfg(all(feature = "biome-key-management", feature = "biome-credentials"))]
 pub(in crate::biome::rest_api) mod user;
+
+/// Represents a user of a splinter application
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub(crate) struct User {
+    id: String,
+}
+
+impl User {
+    /// Creates a new User
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id`: unique identifier for the user being created
+    pub fn new(user_id: &str) -> Self {
+        User {
+            id: user_id.to_string(),
+        }
+    }
+
+    /// Returns the user's id.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}

@@ -20,8 +20,7 @@ use jsonwebtoken::{decode, Validation};
 use crate::actix_web::{Error as ActixError, HttpRequest, HttpResponse};
 #[cfg(feature = "biome-credentials")]
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
-use crate::biome::rest_api::BiomeRestConfig;
-use crate::biome::user::store::User;
+use crate::biome::rest_api::{resources::User, BiomeRestConfig};
 use crate::futures::{Future, IntoFuture};
 use crate::rest_api::secrets::SecretManager;
 #[cfg(not(feature = "auth"))]

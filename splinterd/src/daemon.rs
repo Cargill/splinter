@@ -583,7 +583,6 @@ impl SplinterDaemon {
                 #[cfg(feature = "biome-oauth")]
                 if self.enable_biome {
                     user_info_store_config = OAuthUserInfoStoreConfig::Biome {
-                        user_store: store_factory.get_biome_user_store(),
                         oauth_user_store: store_factory.get_biome_oauth_user_store(),
                     };
                 }
@@ -855,9 +854,8 @@ fn build_biome_routes(
     store_factory: &dyn splinter::store::StoreFactory,
 ) -> Result<BiomeRestResourceManager, StartError> {
     info!("Adding biome routes");
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
-    biome_rest_provider_builder =
-        biome_rest_provider_builder.with_user_store(store_factory.get_biome_user_store());
     #[cfg(feature = "biome-credentials")]
     {
         biome_rest_provider_builder = biome_rest_provider_builder
