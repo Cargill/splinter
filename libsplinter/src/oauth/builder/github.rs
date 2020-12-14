@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::oauth::{
-    builder::OAuthClientBuilder, error::OAuthClientBuildError, InflightOAuthRequestStore,
+    builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
     OAuthClient,
 };
 use crate::rest_api::auth::identity::{github::GithubUserIdentityProvider, IdentityProvider};

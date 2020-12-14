@@ -54,6 +54,11 @@ pub trait StoreFactory {
 
     #[cfg(feature = "admin-service")]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore>;
+
+    #[cfg(feature = "oauth")]
+    fn get_oauth_inflight_request_store(
+        &self,
+    ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection

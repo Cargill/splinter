@@ -68,6 +68,15 @@ impl StoreFactory for SqliteStoreFactory {
             self.pool.clone(),
         ))
     }
+
+    #[cfg(feature = "oauth")]
+    fn get_oauth_inflight_request_store(
+        &self,
+    ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
+        Box::new(crate::oauth::store::DieselInflightOAuthRequestStore::new(
+            self.pool.clone(),
+        ))
+    }
 }
 
 #[derive(Default, Debug)]

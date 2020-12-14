@@ -16,7 +16,7 @@ use reqwest::blocking::Client;
 
 use crate::error::{InternalError, InvalidStateError};
 use crate::oauth::{
-    builder::OAuthClientBuilder, error::OAuthClientBuildError, InflightOAuthRequestStore,
+    builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
     OAuthClient,
 };
 use crate::rest_api::auth::identity::{openid::OpenIdUserIdentityProvider, IdentityProvider};

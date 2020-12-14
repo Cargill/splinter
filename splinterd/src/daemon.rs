@@ -134,6 +134,21 @@ impl SplinterDaemon {
         let mut service_transport = InprocTransport::default();
         transport.add_transport(Box::new(service_transport.clone()));
 
+        #[cfg(feature = "database")]
+        let db_url = self.db_url.clone().ok_or_else(|| {
+            StartError::StorageError(
+                "biome was enabled but the builder failed to require the db URL".into(),
+            )
+        })?;
+
+        // Default to memory, as stores are still in use, but there is no compiled code to persist
+        // the information.
+        #[cfg(all(not(feature = "database"), any(feature = "auth", feature = "biome")))]
+        let db_url = "memory".to_string();
+
+        #[cfg(any(feature = "database", feature = "auth", feature = "biome"))]
+        let store_factory = create_store_factory(&db_url)?;
+
         let admin_service_store = {
             if let Some(storage) = &self.storage_type {
                 // Get state from the configured storage type and state directory, then
@@ -170,6 +185,8 @@ impl SplinterDaemon {
                         )
                     }
                     "memory" => {
+                        // this overrides the store factory version, as this may be different then
+                        // the DB URL value.
                         let store_factory = create_store_factory("memory")?;
                         store_factory.get_admin_service_store()
                     }
@@ -183,11 +200,6 @@ impl SplinterDaemon {
             } else {
                 #[cfg(feature = "database")]
                 {
-                    // If storage is not provided, db_url is required
-                    let db_url = self.db_url.clone().ok_or_else(|| {
-                        StartError::StorageError("No database string was provided".into())
-                    })?;
-                    let store_factory = create_store_factory(&db_url)?;
                     store_factory.get_admin_service_store()
                 }
                 #[cfg(not(feature = "database"))]
@@ -510,22 +522,6 @@ impl SplinterDaemon {
             }
         }
 
-        #[cfg(feature = "biome")]
-        let db_url = if self.enable_biome {
-            self.db_url.clone().ok_or_else(|| {
-                StartError::StorageError(
-                    "biome was enabled but the builder failed to require the db URL".into(),
-                )
-            })?
-        } else {
-            // Default to memory, as no components other than biome use the db_url value. This line
-            // merely makes the compiler happy by providing an assignment.
-            "memory".into()
-        };
-
-        #[cfg(feature = "biome")]
-        let store_factory = create_store_factory(&db_url)?;
-
         #[cfg(feature = "auth")]
         {
             let mut auth_configs = vec![];
@@ -559,6 +555,7 @@ impl SplinterDaemon {
                         client_id,
                         client_secret,
                         redirect_url,
+                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
                     },
                     "openid" => OAuthConfig::OpenId {
                         client_id,
@@ -569,6 +566,7 @@ impl SplinterDaemon {
                                 "missing OAuth OpenID discovery document URL configuration".into(),
                             )
                         })?,
+                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
                     },
                     other_provider => {
                         return Err(StartError::RestApiError(format!(

@@ -88,7 +88,12 @@ experimental = [
     "ws-transport",
 ]
 
-auth = ["splinter/cylinder-jwt", "splinter/oauth-github", "splinter/oauth-openid"]
+auth = [
+    "splinter/cylinder-jwt",
+    "splinter/oauth-github",
+    "splinter/oauth-inflight-request-store-postgres",
+    "splinter/oauth-openid"
+]
 biome = ["splinter/biome", "database"]
 biome-credentials = ["splinter/biome-credentials", "biome"]
 biome-key-management = ["splinter/biome-key-management", "biome"]

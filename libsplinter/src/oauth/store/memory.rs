@@ -18,8 +18,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::collections::TtlMap;
-use crate::error::InternalError;
-use crate::oauth::{InflightOAuthRequestStore, PendingAuthorization};
+use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
+use crate::oauth::PendingAuthorization;
+
+use super::{InflightOAuthRequestStore, InflightOAuthRequestStoreError};
 
 /// The amount of time before a pending authorization expires and a new request must be made
 const PENDING_AUTHORIZATION_EXPIRATION_SECS: u64 = 3600; // 1 hour
@@ -54,21 +56,25 @@ impl InflightOAuthRequestStore for MemoryInflightOAuthRequestStore {
         &self,
         request_id: String,
         pending_authorization: PendingAuthorization,
-    ) -> Result<(), InternalError> {
-        self.pending_authorizations
-            .lock()
-            .map_err(|_| {
-                InternalError::with_message("pending authorizations lock was poisoned".into())
-            })?
-            .insert(request_id, pending_authorization);
+    ) -> Result<(), InflightOAuthRequestStoreError> {
+        let mut inner = self.pending_authorizations.lock().map_err(|_| {
+            InternalError::with_message("pending authorizations lock was poisoned".into())
+        })?;
 
-        Ok(())
+        if !inner.contains_key(&request_id) {
+            inner.insert(request_id, pending_authorization);
+            Ok(())
+        } else {
+            Err(InflightOAuthRequestStoreError::ConstraintViolation(
+                ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+            ))
+        }
     }
 
     fn remove_request(
         &self,
         request_id: &str,
-    ) -> Result<Option<PendingAuthorization>, InternalError> {
+    ) -> Result<Option<PendingAuthorization>, InflightOAuthRequestStoreError> {
         Ok(self
             .pending_authorizations
             .lock()
@@ -87,11 +93,19 @@ impl InflightOAuthRequestStore for MemoryInflightOAuthRequestStore {
 mod tests {
     use super::*;
 
-    use crate::oauth::tests::test_request_store_insert_and_remove;
+    use crate::oauth::store::tests::{
+        test_duplicate_id_insert, test_request_store_insert_and_remove,
+    };
 
     #[test]
     fn memory_insert_request_and_remove() {
         let inflight_request_store = MemoryInflightOAuthRequestStore::new();
         test_request_store_insert_and_remove(&inflight_request_store);
+    }
+
+    #[test]
+    fn memory_duplicate_id_insert() {
+        let inflight_request_store = MemoryInflightOAuthRequestStore::new();
+        test_duplicate_id_insert(&inflight_request_store);
     }
 }
