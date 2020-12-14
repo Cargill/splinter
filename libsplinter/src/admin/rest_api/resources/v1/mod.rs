@@ -12,5 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod v1;
-pub mod v2;
+//! Defines the REST API resources for protocol version 1
+
+pub(in super::super) mod circuits;
+pub(in super::super) mod circuits_circuit_id;
+pub(in super::super) mod proposals;
+pub(in super::super) mod proposals_circuit_id;

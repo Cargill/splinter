@@ -27,7 +27,7 @@ use crate::rest_api::{
 };
 
 use super::super::error::CircuitListError;
-use super::super::resources::circuits::{CircuitResponse, ListCircuitsResponse};
+use super::super::resources;
 
 pub fn make_list_circuits_resource(store: Box<dyn AdminServiceStore>) -> Resource {
     Resource::build("/admin/circuits")
@@ -99,12 +99,29 @@ fn list_circuits(
         None => None,
     };
 
+    let protocol_version = match req.headers().get("SplinterProtocolVersion") {
+        Some(header_value) => match header_value.to_str() {
+            Ok(protocol_version) => protocol_version.to_string(),
+            Err(_) => {
+                return Box::new(
+                    HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(
+                            "Unable to get SplinterProtocolVersion",
+                        ))
+                        .into_future(),
+                )
+            }
+        },
+        None => format!("{}", protocol::ADMIN_PROTOCOL_VERSION),
+    };
+
     Box::new(query_list_circuits(
         store,
         link,
         filters,
         Some(offset),
         Some(limit),
+        protocol_version,
     ))
 }
 
@@ -114,6 +131,7 @@ fn query_list_circuits(
     filters: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
+    protocol_version: String,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
         let filters = {
@@ -137,14 +155,39 @@ fn query_list_circuits(
             .take(limit_value)
             .collect::<Vec<_>>();
 
-        Ok((circuits, link, limit, offset, total as usize))
+        Ok((
+            circuits,
+            link,
+            limit,
+            offset,
+            total as usize,
+            protocol_version,
+        ))
     })
     .then(|res| match res {
-        Ok((circuits, link, limit, offset, total_count)) => {
-            Ok(HttpResponse::Ok().json(ListCircuitsResponse {
-                data: circuits.iter().map(CircuitResponse::from).collect(),
-                paging: get_response_paging_info(limit, offset, &link, total_count),
-            }))
+        Ok((circuits, link, limit, offset, total_count, protocol_version)) => {
+            match protocol_version.as_str() {
+                "1" => Ok(
+                    HttpResponse::Ok().json(resources::v1::circuits::ListCircuitsResponse {
+                        data: circuits
+                            .iter()
+                            .map(resources::v1::circuits::CircuitResponse::from)
+                            .collect(),
+                        paging: get_response_paging_info(limit, offset, &link, total_count),
+                    }),
+                ),
+
+                // Handles 2 (and catch all)
+                _ => Ok(
+                    HttpResponse::Ok().json(resources::v2::circuits::ListCircuitsResponse {
+                        data: circuits
+                            .iter()
+                            .map(resources::v2::circuits::CircuitResponse::from)
+                            .collect(),
+                        paging: get_response_paging_info(limit, offset, &link, total_count),
+                    }),
+                ),
+            }
         }
         Err(err) => match err {
             BlockingError::Error(err) => match err {
@@ -201,8 +244,53 @@ mod tests {
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
             &to_value(vec![
-                CircuitResponse::from(&get_circuit_2().0),
-                CircuitResponse::from(&get_circuit_1().0)
+                resources::v2::circuits::CircuitResponse::from(&get_circuit_2().0),
+                resources::v2::circuits::CircuitResponse::from(&get_circuit_1().0)
+            ])
+            .expect("failed to convert expected data"),
+        );
+        assert_eq!(
+            circuits.get("paging").expect("no paging field in response"),
+            &to_value(create_test_paging_response(
+                0,
+                100,
+                0,
+                0,
+                0,
+                2,
+                "/admin/circuits?",
+            ))
+            .expect("failed to convert expected paging")
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    #[test]
+    /// Tests a GET /admin/circuits request using protocol 1, with no filters returns the expected
+    /// circuits. This test is for backwards compatibility.
+    fn test_list_circuits_ok_v1() {
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
+
+        let url = Url::parse(&format!("http://{}/admin/circuits", bind_url))
+            .expect("Failed to parse URL");
+        let req = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", "1");
+        let resp = req.send().expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let circuits: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        assert_eq!(
+            circuits.get("data").expect("no data field in response"),
+            &to_value(vec![
+                resources::v1::circuits::CircuitResponse::from(&get_circuit_2().0),
+                resources::v1::circuits::CircuitResponse::from(&get_circuit_1().0)
             ])
             .expect("failed to convert expected data"),
         );
@@ -244,8 +332,10 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_1().0)])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v2::circuits::CircuitResponse::from(
+                &get_circuit_1().0
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -286,8 +376,10 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_2().0)])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v2::circuits::CircuitResponse::from(
+                &get_circuit_2().0
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -328,8 +420,10 @@ mod tests {
 
         assert_eq!(
             circuits.get("data").expect("no data field in response"),
-            &to_value(vec![CircuitResponse::from(&get_circuit_1().0)])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v2::circuits::CircuitResponse::from(
+                &get_circuit_1().0
+            )])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -411,6 +505,7 @@ mod tests {
                 .with_durability(&DurabilityType::NoDurability)
                 .with_routes(&RouteType::Any)
                 .with_circuit_management_type("circuit_1_type")
+                .with_display_name("test_display")
                 .build()
                 .expect("Should have built a correct circuit"),
             nodes,

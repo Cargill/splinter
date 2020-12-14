@@ -17,7 +17,7 @@
 use diesel::{
     dsl::delete,
     prelude::*,
-    sql_types::{Binary, Text},
+    sql_types::{Binary, Nullable, Text},
 };
 
 use crate::admin::store::{
@@ -40,8 +40,20 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     CircuitProposalModel: diesel::Queryable<(Text, Text, Text, Binary, Text), C::Backend>,
-    ProposedCircuitModel:
-        diesel::Queryable<(Text, Text, Text, Text, Text, Text, Binary, Text), C::Backend>,
+    ProposedCircuitModel: diesel::Queryable<
+        (
+            Text,
+            Text,
+            Text,
+            Text,
+            Text,
+            Text,
+            Binary,
+            Text,
+            Nullable<Text>,
+        ),
+        C::Backend,
+    >,
     VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text), C::Backend>,
 {
     fn remove_proposal(&self, proposal_id: &str) -> Result<(), AdminServiceStoreError> {

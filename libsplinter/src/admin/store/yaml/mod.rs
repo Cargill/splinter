@@ -1021,13 +1021,14 @@ struct YamlCircuit {
     durability: YamlDurabilityType,
     routes: YamlRouteType,
     circuit_management_type: String,
+    display_name: Option<String>,
 }
 
 impl TryFrom<YamlCircuit> for Circuit {
     type Error = InvalidStateError;
 
     fn try_from(circuit: YamlCircuit) -> Result<Self, Self::Error> {
-        CircuitBuilder::new()
+        let mut builder = CircuitBuilder::new()
             .with_circuit_id(&circuit.id)
             .with_roster(
                 &circuit
@@ -1041,8 +1042,13 @@ impl TryFrom<YamlCircuit> for Circuit {
             .with_persistence(&PersistenceType::from(circuit.persistence))
             .with_durability(&DurabilityType::from(circuit.durability))
             .with_routes(&RouteType::from(circuit.routes))
-            .with_circuit_management_type(&circuit.circuit_management_type)
-            .build()
+            .with_circuit_management_type(&circuit.circuit_management_type);
+
+        if let Some(display_name) = &circuit.display_name {
+            builder = builder.with_display_name(display_name);
+        }
+
+        builder.build()
     }
 }
 
@@ -1061,6 +1067,7 @@ impl From<Circuit> for YamlCircuit {
             durability: circuit.durability().clone().into(),
             routes: circuit.routes().clone().into(),
             circuit_management_type: circuit.circuit_management_type().into(),
+            display_name: circuit.display_name().clone(),
         }
     }
 }
@@ -1334,13 +1341,14 @@ struct YamlProposedCircuit {
     circuit_management_type: String,
     application_metadata: String,
     comments: String,
+    display_name: Option<String>,
 }
 
 impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
     type Error = InvalidStateError;
 
     fn try_from(circuit: YamlProposedCircuit) -> Result<Self, Self::Error> {
-        ProposedCircuitBuilder::new()
+        let mut builder = ProposedCircuitBuilder::new()
             .with_circuit_id(&circuit.circuit_id)
             .with_roster(
                 &circuit
@@ -1364,8 +1372,13 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
             .with_application_metadata(&parse_hex(&circuit.application_metadata).map_err(|_| {
                 InvalidStateError::with_message("Requester public key is not valid hex".to_string())
             })?)
-            .with_comments(&circuit.comments)
-            .build()
+            .with_comments(&circuit.comments);
+
+        if let Some(display_name) = &circuit.display_name {
+            builder = builder.with_display_name(display_name);
+        }
+
+        builder.build()
     }
 }
 
@@ -1392,6 +1405,7 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
             circuit_management_type: circuit.circuit_management_type().into(),
             application_metadata: to_hex(circuit.application_metadata()),
             comments: circuit.comments().into(),
+            display_name: circuit.display_name().clone(),
         }
     }
 }
@@ -1720,6 +1734,7 @@ proposals:
             circuit_management_type: gameroom
             application_metadata: ''
             comments: \"\"
+            display_name: \"test_display\"
         votes: []
         requester: 0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482
         requester_node_id: acme-node-000";
@@ -2332,6 +2347,7 @@ proposals:
                         ]
                     )
                     .with_circuit_management_type("gameroom")
+                    .with_display_name("test_display")
                     .build().expect("Unable to build circuit")
             )
             .with_requester(

@@ -35,6 +35,7 @@ pub struct ProposedCircuit {
     circuit_management_type: String,
     application_metadata: Vec<u8>,
     comments: String,
+    display_name: Option<String>,
 }
 
 impl ProposedCircuit {
@@ -87,6 +88,11 @@ impl ProposedCircuit {
         &self.comments
     }
 
+    /// Returns the display name for the circuit
+    pub fn display_name(&self) -> &Option<String> {
+        &self.display_name
+    }
+
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, InvalidStateError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
@@ -124,6 +130,12 @@ impl ProposedCircuit {
             }
         };
 
+        let display_name = if proto.get_display_name().is_empty() {
+            None
+        } else {
+            Some(proto.take_display_name())
+        };
+
         Ok(Self {
             circuit_id: proto.take_circuit_id(),
             roster: proto
@@ -143,6 +155,7 @@ impl ProposedCircuit {
             circuit_management_type: proto.take_circuit_management_type(),
             application_metadata: proto.take_application_metadata(),
             comments: proto.take_comments(),
+            display_name,
         })
     }
 
@@ -166,6 +179,10 @@ impl ProposedCircuit {
         circuit.set_circuit_management_type(self.circuit_management_type);
         circuit.set_application_metadata(self.application_metadata);
         circuit.set_comments(self.comments);
+
+        if let Some(display_name) = self.display_name {
+            circuit.set_display_name(display_name);
+        }
 
         match self.authorization_type {
             AuthorizationType::Trust => {
@@ -206,6 +223,7 @@ pub struct ProposedCircuitBuilder {
     circuit_management_type: Option<String>,
     application_metadata: Option<Vec<u8>>,
     comments: Option<String>,
+    display_name: Option<String>,
 }
 
 impl ProposedCircuitBuilder {
@@ -262,6 +280,11 @@ impl ProposedCircuitBuilder {
     /// Returns the comments describing the circuit proposal in the builder
     pub fn comments(&self) -> Option<String> {
         self.comments.clone()
+    }
+
+    /// Returns the display name for the circuit proposal in the builder
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     /// Sets the circuit ID
@@ -370,6 +393,16 @@ impl ProposedCircuitBuilder {
         self
     }
 
+    /// Sets the display name
+    ///
+    /// # Arguments
+    ///
+    ///  * `display_name` - The human readable display name of the proposed circuit
+    pub fn with_display_name(mut self, display_name: &str) -> ProposedCircuitBuilder {
+        self.display_name = Some(display_name.into());
+        self
+    }
+
     /// Builds a `ProposedCircuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
@@ -421,6 +454,8 @@ impl ProposedCircuitBuilder {
 
         let comments = self.comments.unwrap_or_default();
 
+        let display_name = self.display_name;
+
         let create_circuit_message = ProposedCircuit {
             circuit_id,
             roster,
@@ -432,6 +467,7 @@ impl ProposedCircuitBuilder {
             circuit_management_type,
             application_metadata,
             comments,
+            display_name,
         };
 
         Ok(create_circuit_message)

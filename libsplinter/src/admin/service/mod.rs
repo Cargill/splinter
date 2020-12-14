@@ -907,6 +907,7 @@ mod tests {
         proposed_circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
         proposed_circuit.set_circuit_management_type("test app auth handler".into());
         proposed_circuit.set_comments("test circuit".into());
+        proposed_circuit.set_display_name("test_display".into());
 
         proposed_circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".into()]),
@@ -970,7 +971,7 @@ mod tests {
             .admin_service_shared
             .lock()
             .unwrap()
-            .on_protocol_agreement("admin::other-node", 1)
+            .on_protocol_agreement("admin::other-node", ADMIN_SERVICE_PROTOCOL_VERSION)
             .expect("Unable to set protocol agreement");
 
         // wait up to 60 second for the proposed circuit message

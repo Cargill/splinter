@@ -39,7 +39,6 @@ use splinter::{
         AdminServiceEvent, CircuitProposal, CreateCircuit, SplinterNode, SplinterService,
     },
     events::{Igniter, ParseBytes, ParseError, WebSocketClient, WebSocketError, WsResponse},
-    protocol::ADMIN_PROTOCOL_VERSION,
 };
 use state_delta::XoStateDeltaProcessor;
 
@@ -55,6 +54,9 @@ const RECONNECT_LIMIT: u64 = 10;
 
 /// default timeout in seconds if no message is received from server
 const CONNECTION_TIMEOUT: u64 = 60;
+
+// The admin protocol version supported by the gameroom  app auth handler
+const GAMEROOM_ADMIN_PROTOCOL_VERSION: &str = "1";
 
 #[derive(Deserialize, Debug, Clone)]
 struct Event {
@@ -148,7 +150,7 @@ pub fn run(
 
     ws.header(
         "SplinterProtocolVersion",
-        ADMIN_PROTOCOL_VERSION.to_string(),
+        GAMEROOM_ADMIN_PROTOCOL_VERSION.to_string(),
     );
 
     ws.set_reconnect(RECONNECT);
@@ -1290,6 +1292,7 @@ mod test {
             circuit_management_type: "gameroom".to_string(),
             application_metadata,
             comments: "test circuit".to_string(),
+            display_name: None,
         }
     }
 

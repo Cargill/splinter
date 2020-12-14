@@ -18,6 +18,7 @@ use std::error::Error;
 pub enum ProposalFetchError {
     NotFound(String),
     InternalError(String),
+    BadRequest(String),
 }
 
 impl Error for ProposalFetchError {
@@ -25,6 +26,7 @@ impl Error for ProposalFetchError {
         match self {
             ProposalFetchError::NotFound(_) => None,
             ProposalFetchError::InternalError(_) => None,
+            ProposalFetchError::BadRequest(_) => None,
         }
     }
 }
@@ -34,6 +36,7 @@ impl std::fmt::Display for ProposalFetchError {
         match self {
             ProposalFetchError::NotFound(msg) => write!(f, "Proposal not found: {}", msg),
             ProposalFetchError::InternalError(msg) => write!(f, "Ran into internal error: {}", msg),
+            ProposalFetchError::BadRequest(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -63,6 +66,7 @@ impl std::fmt::Display for ProposalListError {
 pub enum CircuitFetchError {
     NotFound(String),
     CircuitStoreError(String),
+    BadRequest(String),
 }
 
 impl Error for CircuitFetchError {}
@@ -72,6 +76,7 @@ impl std::fmt::Display for CircuitFetchError {
         match self {
             CircuitFetchError::NotFound(msg) => write!(f, "Circuit not found: {}", msg),
             CircuitFetchError::CircuitStoreError(msg) => write!(f, "{}", msg),
+            CircuitFetchError::BadRequest(msg) => write!(f, "{}", msg),
         }
     }
 }

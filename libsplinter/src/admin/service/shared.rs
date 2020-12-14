@@ -531,8 +531,18 @@ impl AdminServiceShared {
                 let mut create_request = circuit_payload.take_circuit_create_request();
                 let proposed_circuit = create_request.take_circuit();
                 let mut verifiers = vec![];
+                let mut protocol = ADMIN_SERVICE_PROTOCOL_VERSION;
                 for member in proposed_circuit.get_members() {
                     verifiers.push(admin_service_id(member.get_node_id()));
+                    // Figure out what protocol version should be used for this proposal
+                    if let Some(protocol_version) = self
+                        .service_protocols
+                        .get(&admin_service_id(member.get_node_id()))
+                    {
+                        if protocol_version < &protocol {
+                            protocol = *protocol_version
+                        }
+                    }
                 }
 
                 let signer_public_key = header.get_requester();
@@ -542,6 +552,7 @@ impl AdminServiceShared {
                     &proposed_circuit,
                     signer_public_key,
                     requester_node_id,
+                    protocol,
                 )
                 .map_err(|err| {
                     // remove peer_ref because we will not accept this proposal
@@ -884,6 +895,7 @@ impl AdminServiceShared {
                     payload.get_circuit_create_request().get_circuit(),
                     signer_public_key,
                     requester_node_id,
+                    ADMIN_SERVICE_PROTOCOL_VERSION,
                 )
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
@@ -1398,7 +1410,28 @@ impl AdminServiceShared {
         circuit: &Circuit,
         signer_public_key: &[u8],
         requester_node_id: &str,
+        protocol: u32,
     ) -> Result<(), AdminSharedError> {
+        match protocol {
+            // if using the current most versionm, no extra checks are required
+            ADMIN_SERVICE_PROTOCOL_VERSION => (),
+            // if using the previous version, display name cannot be set
+            1 => {
+                if !circuit.get_display_name().is_empty() {
+                    return Err(AdminSharedError::ValidationFailed(
+                        "Proposed circuit cannot have a display name on protocol 1".to_string(),
+                    ));
+                }
+            }
+            // Unsupported version, this should never happen
+            _ => {
+                return Err(AdminSharedError::ServiceProtocolError(format!(
+                    "Agreed upon unsupported protocol version: {}",
+                    protocol
+                )))
+            }
+        }
+
         if requester_node_id.is_empty() {
             return Err(AdminSharedError::ValidationFailed(
                 "requester_node_id is empty".to_string(),
@@ -1950,6 +1983,7 @@ mod tests {
         circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
         circuit.set_circuit_management_type("test app auth handler".into());
         circuit.set_comments("test circuit".into());
+        circuit.set_display_name("test_display".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -2077,6 +2111,7 @@ mod tests {
         circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE);
         circuit.set_circuit_management_type("test app auth handler".into());
         circuit.set_comments("test circuit".into());
+        circuit.set_display_name("test_display".into());
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -2162,8 +2197,49 @@ mod tests {
         .unwrap();
         let circuit = setup_test_circuit();
 
-        if let Err(err) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Err(err) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been valid: {}", err);
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[test]
+    // Test that a valid circuit on version 2, would fail on protocol 1 because display_name is
+    // set. Protocol 1 should fail any circuit that has display name set, as display name is not
+    // included in the protobuf.
+    fn test_validate_invalid_protocol_display_name() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+        )
+        .unwrap();
+        let circuit = setup_test_circuit();
+
+        if let Ok(()) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a", 1) {
+            panic!("Should have been invalid because display name is set");
         }
 
         shutdown(mesh, cm, pm);
@@ -2197,7 +2273,12 @@ mod tests {
         .unwrap();
         let circuit = setup_test_circuit();
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to requester node not being registered");
         }
         shutdown(mesh, cm, pm);
@@ -2233,11 +2314,21 @@ mod tests {
 
         let pub_key = (0u8..50).collect::<Vec<_>>();
         // too short
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key[0..10], "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            &pub_key[0..10],
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to key being too short");
         }
         // too long
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, &pub_key, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            &pub_key,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to key being too long");
         }
         shutdown(mesh, cm, pm);
@@ -2278,7 +2369,12 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_bad]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to service having an allowed node not in members");
         }
         shutdown(mesh, cm, pm);
@@ -2321,7 +2417,12 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_bad]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to service having too many allowed nodes");
         }
         shutdown(mesh, cm, pm);
@@ -2361,7 +2462,12 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to service's id being empty");
         }
         shutdown(mesh, cm, pm);
@@ -2401,7 +2507,12 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to service's id being empty");
         }
         shutdown(mesh, cm, pm);
@@ -2446,7 +2557,12 @@ mod tests {
 
         circuit.set_roster(RepeatedField::from_vec(vec![service_a, service_a2]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to service's id being a duplicate");
         }
         shutdown(mesh, cm, pm);
@@ -2480,7 +2596,12 @@ mod tests {
         let mut circuit = setup_test_circuit();
         circuit.set_roster(RepeatedField::from_vec(vec![]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid due to empty roster");
         }
         shutdown(mesh, cm, pm);
@@ -2515,7 +2636,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid empty members");
         }
         shutdown(mesh, cm, pm);
@@ -2555,7 +2681,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because node_a is not in members");
         }
         shutdown(mesh, cm, pm);
@@ -2603,7 +2734,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b, node_]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because node_ is has an empty node id");
         }
         shutdown(mesh, cm, pm);
@@ -2650,7 +2786,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b, node_b2]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because there are duplicate members");
         }
         shutdown(mesh, cm, pm);
@@ -2685,7 +2826,12 @@ mod tests {
 
         circuit.set_circuit_id("".to_string());
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because the circuit ID is empty");
         }
         shutdown(mesh, cm, pm);
@@ -2720,7 +2866,12 @@ mod tests {
 
         circuit.set_circuit_id("invalid_circuit_id".to_string());
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because the circuit ID is invalid");
         }
         shutdown(mesh, cm, pm);
@@ -2763,7 +2914,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because a member has no endpoints");
         }
         shutdown(mesh, cm, pm);
@@ -2806,7 +2962,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because a member has an empty endpoint");
         }
         shutdown(mesh, cm, pm);
@@ -2849,7 +3010,12 @@ mod tests {
 
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because a member has a duplicate endpoint");
         }
         shutdown(mesh, cm, pm);
@@ -2884,7 +3050,12 @@ mod tests {
 
         circuit.set_authorization_type(Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because authorizaiton type is unset");
         }
         shutdown(mesh, cm, pm);
@@ -2919,7 +3090,12 @@ mod tests {
 
         circuit.set_persistence(Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because persistence type is unset");
         }
         shutdown(mesh, cm, pm);
@@ -2954,7 +3130,12 @@ mod tests {
 
         circuit.set_durability(Circuit_DurabilityType::UNSET_DURABILITY_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because durabilty type is unset");
         }
         shutdown(mesh, cm, pm);
@@ -2989,7 +3170,12 @@ mod tests {
 
         circuit.set_routes(Circuit_RouteType::UNSET_ROUTE_TYPE);
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because route type is unset");
         }
         shutdown(mesh, cm, pm);
@@ -3024,7 +3210,12 @@ mod tests {
 
         circuit.set_circuit_management_type("".to_string());
 
-        if let Ok(_) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a") {
+        if let Ok(_) = admin_shared.validate_create_circuit(
+            &circuit,
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
             panic!("Should have been invalid because route type is unset");
         }
         shutdown(mesh, cm, pm);
@@ -3506,6 +3697,7 @@ mod tests {
         circuit.set_circuit_management_type("test_circuit".to_string());
         circuit.set_application_metadata(b"test_data".to_vec());
         circuit.set_comments("test circuit".to_string());
+        circuit.set_display_name("test_display".into());
 
         circuit
     }

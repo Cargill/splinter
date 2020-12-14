@@ -13,9 +13,11 @@
 
 //! Provides the `GET /admin/proposals` endpoint for listing circuit proposals.
 
+use std::collections::HashMap;
+use std::convert::TryFrom;
+
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
-use std::collections::HashMap;
 
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::admin::store::CircuitPredicate;
@@ -24,7 +26,7 @@ use crate::rest_api::paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_O
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 use super::super::error::ProposalListError;
-use super::super::resources::proposals::{ListProposalsResponse, ProposalResponse};
+use super::super::resources;
 
 pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
     Resource::build("admin/proposals")
@@ -101,6 +103,22 @@ fn list_proposals<PS: ProposalStore + 'static>(
         link.push_str(&format!("?{}&", new_queries.join("&")));
     }
 
+    let protocol_version = match req.headers().get("SplinterProtocolVersion") {
+        Some(header_value) => match header_value.to_str() {
+            Ok(protocol_version) => protocol_version.to_string(),
+            Err(_) => {
+                return Box::new(
+                    HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(
+                            "Unable to get SplinterProtocolVersion",
+                        ))
+                        .into_future(),
+                )
+            }
+        },
+        None => format!("{}", protocol::ADMIN_PROTOCOL_VERSION),
+    };
+
     Box::new(query_list_proposals(
         proposal_store,
         link,
@@ -108,6 +126,7 @@ fn list_proposals<PS: ProposalStore + 'static>(
         member_filter,
         Some(offset),
         Some(limit),
+        protocol_version,
     ))
 }
 
@@ -118,6 +137,7 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
     member_filter: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
+    protocol_version: String,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
         let mut filters = vec![];
@@ -140,14 +160,42 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
             .take(limit_value)
             .collect::<Vec<_>>();
 
-        Ok((proposals, link, limit, offset, total))
+        Ok((proposals, link, limit, offset, total, protocol_version))
     })
     .then(|res| match res {
-        Ok((proposals, link, limit, offset, total_count)) => {
-            Ok(HttpResponse::Ok().json(ListProposalsResponse {
-                data: proposals.iter().map(ProposalResponse::from).collect(),
-                paging: get_response_paging_info(limit, offset, &link, total_count),
-            }))
+        Ok((proposals, link, limit, offset, total_count, protocol_version)) => {
+            match protocol_version.as_str() {
+                "1" => Ok(HttpResponse::Ok().json(
+                    resources::v1::proposals::ListProposalsResponse {
+                        data: proposals
+                            .iter()
+                            .map(resources::v1::proposals::ProposalResponse::from)
+                            .collect(),
+                        paging: get_response_paging_info(limit, offset, &link, total_count),
+                    },
+                )),
+                // Handles 2 (and catch all)
+                _ => {
+                    let proposal_responses = match proposals
+                        .iter()
+                        .map(resources::v2::proposals::ProposalResponse::try_from)
+                        .collect::<Result<
+                            Vec<resources::v2::proposals::ProposalResponse>, &'static str>>()
+                    {
+                        Ok(proposal) => proposal,
+                        Err(err) => {
+                            error!("{}", err);
+                            return Ok(HttpResponse::InternalServerError().into());
+                        }
+                    };
+                    Ok(
+                        HttpResponse::Ok().json(resources::v2::proposals::ListProposalsResponse {
+                            data: proposal_responses,
+                            paging: get_response_paging_info(limit, offset, &link, total_count),
+                        }),
+                    )
+                }
+            }
         }
         Err(err) => match err {
             BlockingError::Error(err) => match err {
@@ -202,9 +250,73 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&CircuitProposal::from(get_proposal_1())),
-                ProposalResponse::from(&CircuitProposal::from(get_proposal_2())),
-                ProposalResponse::from(&CircuitProposal::from(get_proposal_3())),
+                resources::v2::proposals::ProposalResponse::try_from(&CircuitProposal::from(
+                    get_proposal_1()
+                ))
+                .expect("Unable to get ProposalResponse"),
+                resources::v2::proposals::ProposalResponse::try_from(&CircuitProposal::from(
+                    get_proposal_2()
+                ))
+                .expect("Unable to get ProposalResponse"),
+                resources::v2::proposals::ProposalResponse::try_from(&CircuitProposal::from(
+                    get_proposal_3()
+                ))
+                .expect("Unable to get ProposalResponse"),
+            ])
+            .expect("failed to convert expected data"),
+        );
+
+        assert_eq!(
+            proposals
+                .get("paging")
+                .expect("no paging field in response"),
+            &to_value(create_test_paging_response(
+                0,
+                100,
+                0,
+                0,
+                0,
+                3,
+                "/admin/proposals?"
+            ))
+            .expect("failed to convert expected paging")
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    #[test]
+    /// Tests a GET /admin/proposals request with protocol 1 and no filters returns the expected
+    /// proposals. This test is for backwards compatibility.
+    fn test_list_proposals_ok_v1() {
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_list_proposals_resource(MockProposalStore)]);
+
+        let url = Url::parse(&format!("http://{}/admin/proposals", bind_url))
+            .expect("Failed to parse URL");
+        let req = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", "1");
+        let resp = req.send().expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let proposals: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        assert_eq!(
+            proposals.get("data").expect("no data field in response"),
+            &to_value(vec![
+                resources::v1::proposals::ProposalResponse::from(&CircuitProposal::from(
+                    get_proposal_1()
+                )),
+                resources::v1::proposals::ProposalResponse::from(&CircuitProposal::from(
+                    get_proposal_2()
+                )),
+                resources::v1::proposals::ProposalResponse::from(&CircuitProposal::from(
+                    get_proposal_3()
+                )),
             ])
             .expect("failed to convert expected data"),
         );
@@ -253,8 +365,11 @@ mod tests {
 
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
-            &to_value(vec![ProposalResponse::from(&get_proposal_1())])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v2::proposals::ProposalResponse::try_from(
+                &get_proposal_1()
+            )
+            .expect("Unable to get ProposalResponse")])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -302,8 +417,10 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&get_proposal_1()),
-                ProposalResponse::from(&get_proposal_3())
+                resources::v2::proposals::ProposalResponse::try_from(&get_proposal_1())
+                    .expect("Unable to get ProposalResponse"),
+                resources::v2::proposals::ProposalResponse::try_from(&get_proposal_3())
+                    .expect("Unable to get ProposalResponse")
             ])
             .expect("failed to convert expected data"),
         );
@@ -352,8 +469,11 @@ mod tests {
 
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
-            &to_value(vec![ProposalResponse::from(&get_proposal_3())])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v2::proposals::ProposalResponse::try_from(
+                &get_proposal_3()
+            )
+            .expect("Unable to get ProposalResponse")])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -396,8 +516,11 @@ mod tests {
 
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
-            &to_value(vec![ProposalResponse::from(&get_proposal_1())])
-                .expect("failed to convert expected data"),
+            &to_value(vec![resources::v2::proposals::ProposalResponse::try_from(
+                &get_proposal_1()
+            )
+            .expect("Unable to get ProposalResponse")])
+            .expect("failed to convert expected data"),
         );
 
         assert_eq!(
@@ -441,8 +564,10 @@ mod tests {
         assert_eq!(
             proposals.get("data").expect("no data field in response"),
             &to_value(vec![
-                ProposalResponse::from(&get_proposal_2()),
-                ProposalResponse::from(&get_proposal_3())
+                resources::v2::proposals::ProposalResponse::try_from(&get_proposal_2())
+                    .expect("Unable to get ProposalResponse"),
+                resources::v2::proposals::ProposalResponse::try_from(&get_proposal_3())
+                    .expect("Unable to get ProposalResponse")
             ])
             .expect("failed to convert expected data"),
         );
@@ -545,6 +670,7 @@ mod tests {
                         .with_routes(&store::RouteType::Any)
                         .with_circuit_management_type("mgmt_type_1")
                         .with_comments("mock circuit 1")
+                        .with_display_name("circuit_1")
                         .build()
                         .expect("Unable to create proposed circuit"),
                 )
@@ -567,6 +693,7 @@ mod tests {
                         .with_routes(&store::RouteType::Any)
                         .with_circuit_management_type("mgmt_type_2")
                         .with_comments("mock circuit 2")
+                        .with_display_name("circuit_2")
                         .build()
                         .expect("Unable to create proposed circuit"),
                 )
@@ -622,6 +749,7 @@ mod tests {
                 circuit_management_type: "mgmt_type_1".into(),
                 application_metadata: vec![],
                 comments: "mock circuit 1".into(),
+                display_name: Some("circuit_1".into()),
             },
             votes: vec![],
             requester: vec![],
@@ -645,6 +773,7 @@ mod tests {
                 circuit_management_type: "mgmt_type_2".into(),
                 application_metadata: vec![],
                 comments: "mock circuit 2".into(),
+                display_name: Some("circuit_2".into()),
             },
             votes: vec![],
             requester: vec![],
@@ -671,6 +800,7 @@ mod tests {
                 circuit_management_type: "mgmt_type_2".into(),
                 application_metadata: vec![],
                 comments: "mock circuit 3".into(),
+                display_name: None,
             },
             votes: vec![],
             requester: vec![],

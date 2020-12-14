@@ -69,6 +69,7 @@ pub struct ProposedCircuitModel {
     pub circuit_management_type: String,
     pub application_metadata: Vec<u8>,
     pub comments: String,
+    pub display_name: Option<String>,
 }
 
 impl From<&ProposedCircuit> for ProposedCircuitModel {
@@ -82,6 +83,7 @@ impl From<&ProposedCircuit> for ProposedCircuitModel {
             circuit_management_type: proposed_circuit.circuit_management_type().into(),
             application_metadata: proposed_circuit.application_metadata().into(),
             comments: proposed_circuit.comments().into(),
+            display_name: proposed_circuit.display_name().clone(),
         }
     }
 }
@@ -309,6 +311,7 @@ pub struct CircuitModel {
     pub durability: String,
     pub routes: String,
     pub circuit_management_type: String,
+    pub display_name: Option<String>,
 }
 
 impl From<&Circuit> for CircuitModel {
@@ -320,6 +323,7 @@ impl From<&Circuit> for CircuitModel {
             durability: String::from(circuit.durability()),
             routes: String::from(circuit.routes()),
             circuit_management_type: circuit.circuit_management_type().into(),
+            display_name: circuit.display_name().clone(),
         }
     }
 }

@@ -205,6 +205,9 @@ where
                         .with_routes(&RouteType::try_from(model.routes)?)
                         .with_circuit_management_type(&model.circuit_management_type);
 
+                    if let Some(display_name) = &model.display_name {
+                        circuit_builder = circuit_builder.with_display_name(&display_name);
+                    }
                     if let Some(members) = circuit_members.get(&model.circuit_id) {
                         circuit_builder = circuit_builder.with_members(&members);
                     }

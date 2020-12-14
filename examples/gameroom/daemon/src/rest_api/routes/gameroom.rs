@@ -224,7 +224,7 @@ async fn fetch_node_information(
         .header("Authorization", authorization)
         .header(
             "SplinterProtocolVersion",
-            protocol::ADMIN_PROTOCOL_VERSION.to_string(),
+            protocol::REGISTRY_PROTOCOL_VERSION.to_string(),
         )
         .send()
         .await
