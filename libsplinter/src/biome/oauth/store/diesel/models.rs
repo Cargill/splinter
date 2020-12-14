@@ -71,7 +71,7 @@ where
     }
 }
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, PartialEq, Debug)]
 #[table_name = "oauth_user"]
 pub struct OAuthUserModel {
     pub id: i64,
