@@ -15,25 +15,29 @@
 use diesel::{dsl::insert_into, prelude::*};
 
 use crate::biome::oauth::store::{
-    diesel::{models::NewOAuthUserModel, schema::oauth_user, OAuthUser},
+    diesel::{models::NewOAuthUserModel, schema::oauth_user},
     OAuthUserStoreError,
 };
 
 use super::OAuthUserStoreOperations;
 
 pub(in crate::biome::oauth) trait OAuthUserStoreAddOAuthUserOperation {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError>;
+    fn add_oauth_user<'a>(
+        &self,
+        oauth_user: NewOAuthUserModel<'a>,
+    ) -> Result<(), OAuthUserStoreError>;
 }
 
 #[cfg(feature = "sqlite")]
 impl<'a> OAuthUserStoreAddOAuthUserOperation
     for OAuthUserStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
-        let new_oauth_user = NewOAuthUserModel::from(&oauth_user);
-
+    fn add_oauth_user<'b>(
+        &self,
+        oauth_user: NewOAuthUserModel<'b>,
+    ) -> Result<(), OAuthUserStoreError> {
         insert_into(oauth_user::table)
-            .values(new_oauth_user)
+            .values(oauth_user)
             .execute(self.conn)
             .map(|_| ())
             .map_err(OAuthUserStoreError::from)
@@ -44,11 +48,12 @@ impl<'a> OAuthUserStoreAddOAuthUserOperation
 impl<'a> OAuthUserStoreAddOAuthUserOperation
     for OAuthUserStoreOperations<'a, diesel::pg::PgConnection>
 {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
-        let new_oauth_user = NewOAuthUserModel::from(&oauth_user);
-
+    fn add_oauth_user<'b>(
+        &self,
+        oauth_user: NewOAuthUserModel<'b>,
+    ) -> Result<(), OAuthUserStoreError> {
         insert_into(oauth_user::table)
-            .values(new_oauth_user)
+            .values(oauth_user)
             .execute(self.conn)
             .map(|_| ())
             .map_err(OAuthUserStoreError::from)

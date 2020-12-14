@@ -29,7 +29,7 @@ pub trait OAuthUserInfoStore: Sync + Send {
     fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError>;
 
     /// Executes an update operation to remove the user's tokens.
-    fn remove_user_tokens(&self, identity: &str) -> Result<(), InternalError>;
+    fn remove_user_tokens(&self, access_token: &str) -> Result<(), InternalError>;
 
     /// Clone implementation for `OAuthUserInfoStore`. The implementation of the `Clone` trait
     /// for `Box<dyn OAuthUserInfoStore>` calls this method.
@@ -58,7 +58,7 @@ impl OAuthUserInfoStore for OAuthUserInfoStoreNoOp {
         Ok(())
     }
 
-    fn remove_user_tokens(&self, _identity: &str) -> Result<(), InternalError> {
+    fn remove_user_tokens(&self, _access_token: &str) -> Result<(), InternalError> {
         Ok(())
     }
 

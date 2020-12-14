@@ -18,7 +18,7 @@ use crate::error::InternalError;
 
 use crate::biome::oauth::store::{
     diesel::{models::OAuthUserModel, schema::oauth_user},
-    OAuthUser, OAuthUserStoreError,
+    OAuthUserAccess, OAuthUserStoreError,
 };
 
 use super::OAuthUserStoreOperations;
@@ -27,7 +27,7 @@ pub(in crate::biome::oauth) trait OAuthUserStoreGetByAccessToken {
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError>;
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
 }
 
 impl<'a, C> OAuthUserStoreGetByAccessToken for OAuthUserStoreOperations<'a, C>
@@ -40,7 +40,7 @@ where
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let oauth_user_model = oauth_user::table
             .filter(oauth_user::access_token.eq(Some(access_token.to_string())))
             .first::<OAuthUserModel>(self.conn)
@@ -49,6 +49,6 @@ where
                 OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err)))
             })?;
 
-        Ok(oauth_user_model.map(OAuthUser::from))
+        Ok(oauth_user_model.map(OAuthUserAccess::from))
     }
 }

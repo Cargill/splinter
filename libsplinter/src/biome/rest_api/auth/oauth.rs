@@ -17,7 +17,9 @@
 
 use uuid::Uuid;
 
-use crate::biome::oauth::store::{AccessToken, OAuthProvider, OAuthUserBuilder, OAuthUserStore};
+use crate::biome::oauth::store::{
+    AccessToken, NewOAuthUserAccessBuilder, OAuthProvider, OAuthUserStore,
+};
 use crate::biome::user::store::{User, UserStore};
 use crate::error::InternalError;
 use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
@@ -57,46 +59,6 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
     }
 }
 
-/// A wrapper struct for an `OAuthUser`'s identity.
-pub struct OAuthUserIdentityRef(pub String);
-
-/// An `AuthorizationMapping` implementation that returns  an `OAuthUser`'s identity.
-pub struct GetUserIdentityByOAuthAuthorization {
-    oauth_user_store: Box<dyn OAuthUserStore>,
-}
-
-impl GetUserIdentityByOAuthAuthorization {
-    /// Construct a new `GetUserIdentityByOAuthAuthorization` over an `OAuthUserStore` implementation.
-    pub fn new(oauth_user_store: Box<dyn OAuthUserStore>) -> Self {
-        Self { oauth_user_store }
-    }
-}
-
-impl AuthorizationMapping<OAuthUserIdentityRef> for GetUserIdentityByOAuthAuthorization {
-    fn get(
-        &self,
-        authorization: &Authorization,
-    ) -> Result<Option<OAuthUserIdentityRef>, InternalError> {
-        match authorization {
-            Authorization::Bearer(BearerToken::OAuth2(access_token)) => self
-                .oauth_user_store
-                .get_by_access_token(&access_token)
-                .map(|opt_oauth_user| {
-                    opt_oauth_user.map(|oauth_user| {
-                        OAuthUserIdentityRef(oauth_user.provider_user_ref().to_string())
-                    })
-                })
-                .map_err(|e| {
-                    InternalError::from_source_with_message(
-                        Box::new(e),
-                        "Unable to load oauth user".into(),
-                    )
-                }),
-            _ => Ok(None),
-        }
-    }
-}
-
 /// Biome-backed implementation of the `OAuthUserInfoStore` trait.
 ///
 /// This implementation uses the `OAuthUserStore` provided by Biome.
@@ -126,12 +88,14 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
     fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError> {
         let provider_identity = user_info.identity().to_string();
 
-        let existing_oauth_user = self
+        let (previously_unauthed, other_accesses): (Vec<_>, Vec<_>) = self
             .oauth_user_store
-            .get_by_provider_user_ref(&provider_identity)
-            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+            .list_by_provider_user_ref(&provider_identity)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?
+            .partition(|oauth_user| oauth_user.access_token().is_unauthorized());
 
-        if let Some(oauth_user) = existing_oauth_user {
+        // Convert the first found entry with no access token to use this access token
+        if let Some(oauth_user) = previously_unauthed.into_iter().next() {
             let updated_user = oauth_user
                 .into_update_builder()
                 .with_access_token(AccessToken::Authorized(
@@ -149,7 +113,15 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
             self.oauth_user_store
                 .update_oauth_user(updated_user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            return Ok(());
+        }
+
+        // If there is an existing connection, maintain the existing linkage
+        let user_id = if let Some(oauth_user) = other_accesses.into_iter().next() {
+            oauth_user.user_id().to_string()
         } else {
+            // otherwise, create a new user
             let user_id = Uuid::new_v4().to_string();
             let user = User::new(&user_id);
 
@@ -157,35 +129,35 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                 .add_user(user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
-            let oauth_user = OAuthUserBuilder::new()
-                .with_user_id(user_id)
-                .with_provider_user_ref(provider_identity)
-                .with_access_token(AccessToken::Authorized(
-                    user_info.access_token().to_string(),
-                ))
-                .with_refresh_token(user_info.refresh_token().map(String::from))
-                .with_provider(self.provider.clone())
-                .build()
-                .map_err(|e| {
-                    InternalError::from_source_with_message(
-                        Box::new(e),
-                        "Failed to properly construct a new OAuth user".into(),
-                    )
-                })?;
+            user_id
+        };
 
-            self.oauth_user_store
-                .add_oauth_user(oauth_user)
-                .map_err(|e| InternalError::from_source(Box::new(e)))?;
-        }
+        let oauth_user = NewOAuthUserAccessBuilder::new()
+            .with_user_id(user_id)
+            .with_provider_user_ref(provider_identity)
+            .with_access_token(AccessToken::Authorized(
+                user_info.access_token().to_string(),
+            ))
+            .with_refresh_token(user_info.refresh_token().map(String::from))
+            .with_provider(self.provider.clone())
+            .build()
+            .map_err(|e| {
+                InternalError::from_source_with_message(
+                    Box::new(e),
+                    "Failed to properly construct a new OAuth user".into(),
+                )
+            })?;
 
-        Ok(())
+        self.oauth_user_store
+            .add_oauth_user(oauth_user)
+            .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 
-    fn remove_user_tokens(&self, identity: &str) -> Result<(), InternalError> {
-        // Check if there is an existing `OAuthUser` with the corresponding `identity`
+    fn remove_user_tokens(&self, access_token: &str) -> Result<(), InternalError> {
+        // Check if there is an existing `OAuthUserAccess` with the corresponding `identity`
         if let Some(oauth_user) = self
             .oauth_user_store
-            .get_by_provider_user_ref(&identity)
+            .get_by_access_token(access_token)
             .map_err(|e| InternalError::from_source(Box::new(e)))?
         {
             // If the user does exist, remove any tokens associated with the user

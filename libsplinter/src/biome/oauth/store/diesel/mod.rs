@@ -26,13 +26,16 @@ use diesel::{
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
 
-use super::{AccessToken, OAuthProvider, OAuthUser, OAuthUserStore, OAuthUserStoreError};
+use super::{
+    AccessToken, NewOAuthUserAccess, OAuthProvider, OAuthUserAccess, OAuthUserStore,
+    OAuthUserStoreError,
+};
 
 use models::{NewOAuthUserModel, OAuthUserModel, ProviderId};
 use operations::add_oauth_user::OAuthUserStoreAddOAuthUserOperation as _;
 use operations::get_by_access_token::OAuthUserStoreGetByAccessToken as _;
-use operations::get_by_provider_user_ref::OAuthUserStoreGetByProviderUserRef as _;
-use operations::get_by_user_id::OAuthUserStoreGetByUserId as _;
+use operations::list_by_provider_user_ref::OAuthUserStoreListByProviderUserRef as _;
+use operations::list_by_user_id::OAuthUserStoreListByUserId as _;
 use operations::update_oauth_user::OAuthUserStoreUpdateOAuthUserOperation as _;
 use operations::OAuthUserStoreOperations;
 
@@ -50,35 +53,41 @@ impl<C: diesel::Connection + 'static> DieselOAuthUserStore<C> {
 
 #[cfg(feature = "sqlite")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
+        OAuthUserStoreOperations::new(&*connection).add_oauth_user((&oauth_user).into())
     }
 
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).update_oauth_user(oauth_user)
     }
 
-    fn get_by_provider_user_ref(
+    fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
+        let records = OAuthUserStoreOperations::new(&*connection)
+            .list_by_provider_user_ref(provider_user_ref)?;
+        Ok(Box::new(records.into_iter().map(OAuthUserAccess::from)))
     }
 
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_access_token(access_token)
     }
 
-    fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    fn list_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
+        let records = OAuthUserStoreOperations::new(&*connection).list_by_user_id(user_id)?;
+        Ok(Box::new(records.into_iter().map(OAuthUserAccess::from)))
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserStore> {
@@ -90,35 +99,41 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::sqlite::SqliteConnection> {
 
 #[cfg(feature = "biome-oauth-user-store-postgres")]
 impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
-    fn add_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).add_oauth_user(oauth_user)
+        OAuthUserStoreOperations::new(&*connection).add_oauth_user((&oauth_user).into())
     }
 
-    fn update_oauth_user(&self, oauth_user: OAuthUser) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).update_oauth_user(oauth_user)
     }
 
-    fn get_by_provider_user_ref(
+    fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).get_by_provider_user_ref(provider_user_ref)
+        let records = OAuthUserStoreOperations::new(&*connection)
+            .list_by_provider_user_ref(provider_user_ref)?;
+        Ok(Box::new(records.into_iter().map(OAuthUserAccess::from)))
     }
 
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
         OAuthUserStoreOperations::new(&*connection).get_by_access_token(access_token)
     }
 
-    fn get_by_user_id(&self, user_id: &str) -> Result<Option<OAuthUser>, OAuthUserStoreError> {
+    fn list_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError> {
         let connection = self.connection_pool.get()?;
-        OAuthUserStoreOperations::new(&*connection).get_by_user_id(user_id)
+        let records = OAuthUserStoreOperations::new(&*connection).list_by_user_id(user_id)?;
+        Ok(Box::new(records.into_iter().map(OAuthUserAccess::from)))
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserStore> {
@@ -128,10 +143,10 @@ impl OAuthUserStore for DieselOAuthUserStore<diesel::pg::PgConnection> {
     }
 }
 
-impl From<OAuthUserModel> for OAuthUser {
+impl From<OAuthUserModel> for OAuthUserAccess {
     fn from(model: OAuthUserModel) -> Self {
         let OAuthUserModel {
-            id: _,
+            id,
             user_id,
             provider_user_ref,
             access_token,
@@ -139,6 +154,7 @@ impl From<OAuthUserModel> for OAuthUser {
             provider_id,
         } = model;
         Self {
+            id,
             user_id,
             provider_user_ref,
             access_token: match access_token {
@@ -154,17 +170,17 @@ impl From<OAuthUserModel> for OAuthUser {
     }
 }
 
-impl<'a> From<&'a OAuthUser> for NewOAuthUserModel<'a> {
-    fn from(user: &'a OAuthUser) -> Self {
+impl<'a> From<&'a NewOAuthUserAccess> for NewOAuthUserModel<'a> {
+    fn from(user: &'a NewOAuthUserAccess) -> Self {
         NewOAuthUserModel {
-            user_id: user.user_id(),
-            provider_user_ref: user.provider_user_ref(),
-            access_token: match user.access_token() {
-                AccessToken::Authorized(token) => Some(token),
+            user_id: &user.user_id,
+            provider_user_ref: &user.provider_user_ref,
+            access_token: match &user.access_token {
+                AccessToken::Authorized(ref token) => Some(&token),
                 AccessToken::Unauthorized => None,
             },
-            refresh_token: user.refresh_token(),
-            provider_id: match user.provider() {
+            refresh_token: user.refresh_token.as_deref(),
+            provider_id: match user.provider {
                 OAuthProvider::Github => ProviderId::Github,
                 OAuthProvider::OpenId => ProviderId::OpenId,
             },
@@ -209,7 +225,7 @@ impl From<result::Error> for OAuthUserStoreError {
 pub mod tests {
     use super::*;
 
-    use crate::biome::oauth::store::{AccessToken, OAuthUserBuilder};
+    use crate::biome::oauth::store::{AccessToken, NewOAuthUserAccessBuilder};
     use crate::biome::user::store::{diesel::DieselUserStore, User, UserStore};
     use crate::migrations::run_sqlite_migrations;
 
@@ -241,7 +257,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -253,11 +269,16 @@ pub mod tests {
             .add_oauth_user(oauth_user)
             .expect("Unable to store oauth user");
 
-        let stored_oauth_user = oauth_user_store
-            .get_by_provider_user_ref("TestUser")
-            .expect("Unable to look up oath user");
+        let stored_oauth_users = oauth_user_store
+            .list_by_provider_user_ref("TestUser")
+            .expect("Unable to list users")
+            .collect::<Vec<_>>();
 
-        let stored_oauth_user = stored_oauth_user.expect("Did not find the oauth user (was None)");
+        assert_eq!(1, stored_oauth_users.len());
+        let stored_oauth_user = stored_oauth_users
+            .into_iter()
+            .next()
+            .expect("Did not find the oauth user (was empty)");
 
         assert_eq!("test_biome_user_id", stored_oauth_user.user_id());
         assert_eq!("TestUser", stored_oauth_user.provider_user_ref());
@@ -268,25 +289,43 @@ pub mod tests {
         assert_eq!(None, stored_oauth_user.refresh_token());
         assert_eq!(&OAuthProvider::Github, stored_oauth_user.provider());
 
-        let unknown_oauth_user = oauth_user_store
-            .get_by_provider_user_ref("NonExistentUserRef".into())
+        let mut unknown_oauth_user = oauth_user_store
+            .list_by_provider_user_ref("NonExistentUserRef".into())
             .expect("Could not query non-existent oauth user");
-        assert!(unknown_oauth_user.is_none());
 
-        // Create another user and try to connect it to the same user id.
-        let oauth_user = OAuthUserBuilder::new()
+        assert!(
+            unknown_oauth_user.next().is_none(),
+            "No user should have been returned"
+        );
+
+        // Create an entry for the same user but with an alternative access token
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
-            .with_provider_user_ref("TestUser2".into())
+            .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someotheraccesstoken".to_string()))
             .with_provider(OAuthProvider::Github)
             .build()
             .expect("Unable to construct oauth user");
 
-        let err = oauth_user_store
+        oauth_user_store
             .add_oauth_user(oauth_user)
-            .expect_err("Did not return an error");
+            .expect("Did not insert the user access record");
 
-        assert!(matches!(err, OAuthUserStoreError::ConstraintViolation(_)));
+        let stored_oauth_user = oauth_user_store
+            .get_by_access_token("someotheraccesstoken")
+            .expect("Unable to lookup user by access token");
+        let stored_oauth_user = stored_oauth_user.expect("Did not find the oauth user (was None)");
+
+        assert_eq!(
+            &AccessToken::Authorized("someotheraccesstoken".to_string()),
+            stored_oauth_user.access_token()
+        );
+
+        let stored_oauth_users = oauth_user_store
+            .list_by_provider_user_ref("TestUser")
+            .expect("unable to list users")
+            .collect::<Vec<_>>();
+        assert_eq!(2, stored_oauth_users.len());
     }
 
     /// Verify that a SQLite-backed `DieselOAuthUserStore` correctly supports updating an
@@ -312,7 +351,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -325,8 +364,10 @@ pub mod tests {
             .expect("Unable to store oauth user");
 
         let stored_oauth_user = oauth_user_store
-            .get_by_user_id("test_biome_user_id")
+            .list_by_user_id("test_biome_user_id")
             .expect("Unable to look up oath user")
+            .into_iter()
+            .next()
             .expect("Did not find the oauth user (was None)");
 
         assert_eq!(None, stored_oauth_user.refresh_token());
@@ -343,19 +384,21 @@ pub mod tests {
 
         // Verify that the user was updated
         let stored_oauth_user = oauth_user_store
-            .get_by_user_id("test_biome_user_id")
+            .list_by_user_id("test_biome_user_id")
             .expect("Unable to look up oath user")
+            .into_iter()
+            .next()
             .expect("Did not find the oauth user (was None)");
 
         assert_eq!(Some("somerefreshtoken"), stored_oauth_user.refresh_token());
     }
 
     /// Verify that a SQLite-backed `DieselOAuthUserStore` correctly supports updating an
-    /// OAuthUser's `access_token`.
+    /// OAuthUserAccess's `access_token`.
     ///
     /// 1. Create a connection pool for an in-memory SQLite database and run migrations.
     /// 2. Create a `DieselUserStore` and a `DieselOAuthUserStore`.
-    /// 3. Add a User and an OAuthUser
+    /// 3. Add a User and an OAuthUserAccess
     /// 4. Verify that the `get_by_user_id` method returns correct values for the
     ///    existing OAuth User.
     /// 5. Update the user to have an `Unauthorized` `access_token`.
@@ -373,7 +416,7 @@ pub mod tests {
             .add_user(User::new(user_id))
             .expect("unable to insert user");
 
-        let oauth_user = OAuthUserBuilder::new()
+        let oauth_user = NewOAuthUserAccessBuilder::new()
             .with_user_id(user_id.into())
             .with_provider_user_ref("TestUser".into())
             .with_access_token(AccessToken::Authorized("someaccesstoken".to_string()))
@@ -386,7 +429,7 @@ pub mod tests {
             .expect("Unable to store oauth user");
 
         let stored_oauth_user = oauth_user_store
-            .get_by_user_id("test_biome_user_id")
+            .get_by_access_token("someaccesstoken")
             .expect("Unable to look up oath user")
             .expect("Did not find the oauth user (was None)");
 
@@ -407,8 +450,10 @@ pub mod tests {
 
         // Verify that the user was updated
         let stored_oauth_user = oauth_user_store
-            .get_by_user_id("test_biome_user_id")
+            .list_by_user_id("test_biome_user_id")
             .expect("Unable to look up oath user")
+            .into_iter()
+            .next()
             .expect("Did not find the oauth user (was None)");
 
         assert_eq!(&AccessToken::Unauthorized, stored_oauth_user.access_token());
