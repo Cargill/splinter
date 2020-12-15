@@ -25,6 +25,12 @@ use crate::error::InternalError;
 use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
 use crate::rest_api::auth::identity::{Authorization, AuthorizationMapping, BearerToken};
 
+/// This is the UUID namespace for Biome user IDs generated for users that login with OAuth. This
+/// will prevent collisions with Biome user IDs generated for users that register with Biome
+/// credentials. The `u128` was calculated by creating a v5 UUID with the nil namespace and the
+/// name `b"biome oauth"`.
+const UUID_NAMESPACE: Uuid = Uuid::from_u128(187643141867173602676740887132833008173);
+
 /// An `AuthorizationMapping` implementation that returns an `User`.
 pub struct GetUserByOAuthAuthorization {
     oauth_user_store: Box<dyn OAuthUserStore>,
@@ -114,7 +120,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
             oauth_user.user_id().to_string()
         } else {
             // otherwise, create a new user
-            Uuid::new_v4().to_string()
+            Uuid::new_v5(&UUID_NAMESPACE, Uuid::new_v4().as_bytes()).to_string()
         };
 
         let oauth_user = NewOAuthUserAccessBuilder::new()
