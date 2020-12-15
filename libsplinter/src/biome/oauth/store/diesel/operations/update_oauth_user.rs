@@ -33,7 +33,7 @@ where
             AccessToken::Authorized(token) => Some(token),
             AccessToken::Unauthorized => None,
         };
-        update(oauth_user::table.filter(oauth_user::user_id.eq(oauth_user.user_id())))
+        update(oauth_user::table.filter(oauth_user::id.eq(oauth_user.id)))
             .set((
                 oauth_user::access_token.eq(access_token),
                 oauth_user::refresh_token.eq(&oauth_user.refresh_token()),
