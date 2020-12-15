@@ -53,6 +53,13 @@ OPTIONS
 `--comments COMMENTS`
 : Adds human-readable comments to the circuit proposal.
 
+`--compat COMPAT_VERSION`
+: Enforce that the proposed circuit is compatible with a specific version.
+  Accepted values: `0.4`
+
+`--display-name DISPLAY-NAME`
+: Add human-readable name for the circuit.
+
 `-k, --key PRIVATE-KEY-FILE`
 : Specifies the full path to the private key file.
 

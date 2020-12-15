@@ -20,6 +20,7 @@ pub mod template;
 
 #[cfg(feature = "circuit-template")]
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fs::File;
 
 use clap::ArgMatches;
@@ -159,9 +160,18 @@ impl Action for CircuitProposeAction {
             builder.set_comments(comments);
         }
 
+        if let Some(display_name) = args.value_of("display_name") {
+            if args.value_of("compat_version") == Some("0.4") {
+                return Err(CliError::ActionError(
+                    "Display name is not compatible with Splinter v0.4".to_string(),
+                ));
+            }
+            builder.set_display_name(display_name);
+        }
+
         let create_circuit = builder.build()?;
 
-        let circuit_slice = CircuitSlice::from(&create_circuit);
+        let circuit_slice = CircuitSlice::try_from(&create_circuit)?;
 
         if !args.is_present("dry_run") {
             let url = args
@@ -498,9 +508,11 @@ fn parse_service_type_argument(service_type: &str) -> Result<(String, String), C
     Ok((service_id, service_type))
 }
 
-impl From<&CreateCircuit> for CircuitSlice {
-    fn from(circuit: &CreateCircuit) -> Self {
-        Self {
+impl TryFrom<&CreateCircuit> for CircuitSlice {
+    type Error = CliError;
+
+    fn try_from(circuit: &CreateCircuit) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: circuit.circuit_id.clone(),
             members: circuit
                 .members
@@ -510,21 +522,33 @@ impl From<&CreateCircuit> for CircuitSlice {
             roster: circuit
                 .roster
                 .iter()
-                .map(|service| service.into())
-                .collect(),
+                .map(CircuitServiceSlice::try_from)
+                .collect::<Result<Vec<CircuitServiceSlice>, CliError>>()?,
             management_type: circuit.circuit_management_type.clone(),
-        }
+            display_name: circuit.display_name.clone(),
+        })
     }
 }
 
-impl From<&SplinterService> for CircuitServiceSlice {
-    fn from(service: &SplinterService) -> Self {
-        Self {
+impl TryFrom<&SplinterService> for CircuitServiceSlice {
+    type Error = CliError;
+
+    fn try_from(service: &SplinterService) -> Result<Self, Self::Error> {
+        Ok(Self {
             service_id: service.service_id.clone(),
             service_type: service.service_type.clone(),
-            allowed_nodes: service.allowed_nodes.clone(),
+            node_id: service
+                .allowed_nodes
+                .get(0)
+                .ok_or_else(|| {
+                    CliError::ActionError(format!(
+                        "Service {} is missing node_id",
+                        service.service_id
+                    ))
+                })?
+                .to_string(),
             arguments: service.arguments.iter().cloned().collect(),
-        }
+        })
     }
 }
 
@@ -660,13 +684,25 @@ fn list_circuits(
     let mut data = Vec::new();
     data.push(vec![
         "ID".to_string(),
+        "NAME".to_string(),
         "MANAGEMENT".to_string(),
         "MEMBERS".to_string(),
     ]);
     circuits.data.iter().for_each(|circuit| {
         let members = circuit.members.join(";");
+        let display_name = {
+            if format == "csv" {
+                circuit.display_name.clone().unwrap_or_default()
+            } else {
+                circuit
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| "-".to_string())
+            }
+        };
         data.push(vec![
             circuit.id.to_string(),
+            display_name,
             circuit.management_type.to_string(),
             members,
         ]);
@@ -848,11 +884,24 @@ fn list_proposals(
     let mut data = Vec::new();
     data.push(vec![
         "ID".to_string(),
+        "NAME".to_string(),
         "MANAGEMENT".to_string(),
         "MEMBERS".to_string(),
         "COMMENTS".to_string(),
     ]);
     proposals.data.iter().for_each(|proposal| {
+        let display_name = {
+            if format == "csv" {
+                proposal.circuit.display_name.clone().unwrap_or_default()
+            } else {
+                proposal
+                    .circuit
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| "-".to_string())
+            }
+        };
+
         let members = proposal
             .circuit
             .members
@@ -862,6 +911,7 @@ fn list_proposals(
             .join(";");
         data.push(vec![
             proposal.circuit_id.to_string(),
+            display_name,
             proposal.circuit.management_type.to_string(),
             members,
             proposal.circuit.comments.to_string(),

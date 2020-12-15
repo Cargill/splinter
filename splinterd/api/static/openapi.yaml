@@ -1672,7 +1672,7 @@ components:
       required: false
       schema:
         type: integer
-        example: 1
+        example: 2
 
   schemas:
     Error:
@@ -1840,6 +1840,10 @@ components:
         management_type:
           type: string
           example: gameroom
+        display_name:
+          description: Human readable name for the circuit
+          type: string
+          nullable: true
 
     CircuitService:
       type: object
@@ -1850,11 +1854,10 @@ components:
         service_type:
           type: string
           example: scabbard
-        allowed_nodes:
-          description: IDs of the nodes that are allowed to run this service
-          type: array
-          items:
-            type: string
+        node_id:
+          description: The node ID that is allowed to run this service
+          type: string
+          example: alpha-node-000
 
     Proposal:
       type: object
@@ -1896,6 +1899,10 @@ components:
               comments:
                 description: Arbitrary comments to describe the proposed circuit
                 type: string
+              display_name:
+                description: Human readable name for the circuit
+                type: string
+                nullable: true
         votes:
           type: array
           items:
@@ -1928,12 +1935,10 @@ components:
         service_type:
           type: string
           example: scabbard
-        allowed_nodes:
-          description: List of node IDs that are allowed to run this service
-          type: array
-          items:
-            type: string
-            example: alpha-node-000
+        node_id:
+          description: The node ID that is allowed to run this service
+          type: string
+          example: alpha-node-000
         arguments:
           description: |-
             Arbitrary arguments to be passed to this service on initialization,

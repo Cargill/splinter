@@ -18,10 +18,10 @@ DESCRIPTION
 ===========
 Lists all of the circuit proposals that the local node is a proposed member of.
 This command displays abbreviated information pertaining to proposed circuits in
-columns, with the headers `ID`, `MANAGEMENT` and `MEMBERS`. This makes it possible
-to verify that circuit proposals have been successfully proposed as well as being
-able to access the generated circuit ID assigned to a proposal. Circuit proposals
-have not necessarily been voted on by all proposed members.
+columns, with the headers `ID`, `MANAGEMENT` and `MEMBERS`. This makes it
+possible to verify that circuit proposals have been successfully proposed as
+well as being able to access the generated circuit ID assigned to a proposal.
+Circuit proposals have not necessarily been voted on by all proposed members.
 
 FLAGS
 =====
@@ -55,8 +55,8 @@ OPTIONS
 : Filter the circuit proposals by their circuit management type.
 
 `-m`, `--member` MEMBER
-: Filter the circuits list by a node ID that is present in the circuit proposal’s
-  members list.
+: Filter the circuits list by a node ID that is present in the circuit
+  proposal’s members list.
 
 `-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
@@ -68,39 +68,39 @@ This command displays information about circuit proposals with a default `human`
 formatting, meaning the information is displayed in a table. The `--member` and
 `--management-type` options allow for filtering the circuit proposals.
 
-The following command does not specify any filters, therefore all circuit proposals
-the local node, `alpha-node-000` is a part of are displayed.
+The following command does not specify any filters, therefore all circuit
+proposals the local node, `alpha-node-000` is a part of are displayed.
 ```
 $ splinter circuit proposals \
   --url URL-of-alpha-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
-43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
-56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
+ID           NAME      MANAGEMENT    MEMBERS
+01234-ABCDE  -         mgmt001       alpha-node-000;beta-node-000
+43210-ABCDE  circuit1  mgmt001       alpha-node-000;gamma-node-000
+56789-ABCDE  -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
 The next command specifies a `--management-type` filter, therefore all circuit
-proposals the local node, `alpha-node-000` is a part of with a `circuit_management_type`
-of `mgmt001` will be listed.
+proposals the local node, `alpha-node-000` is a part of with a
+`circuit_management_type` of `mgmt001` will be listed.
 ```
 $ splinter circuit proposals \
   --management-type mgmt001 \
   --url URL-of-alpha-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-01234-ABCDE   mgmt001       alpha-node-000;beta-node-000
-43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
+ID           NAME      MANAGEMENT    MEMBERS
+01234-ABCDE  -         mgmt001       alpha-node-000;beta-node-000
+43210-ABCDE  circuit1  mgmt001       alpha-node-000;gamma-node-000
 ```
 
 The next command specifies a `--member` filter, therefore all circuit proposals
-the local node, `alpha-node-000` is a part of including the `gamma-node-000` node
-ID will be listed.
+the local node, `alpha-node-000` is a part of including the `gamma-node-000`
+node ID will be listed.
 ```
 $ splinter circuit proposals \
   member gamma-node-000 \
   --url URL-of-alpha-node-splinterd-REST-API
-ID            MANAGEMENT    MEMBERS
-43210-ABCDE   mgmt001       alpha-node-000;gamma-node-000
-56789-ABCDE   mgmt002       alpha-node-000;gamma-node-000
+ID            NAME      MANAGEMENT    MEMBERS
+43210-ABCDE   circuit1  mgmt001       alpha-node-000;gamma-node-000
+56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
 ENVIRONMENT VARIABLES
