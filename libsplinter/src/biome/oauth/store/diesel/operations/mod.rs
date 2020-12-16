@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides OAuthUserStoreOperations implemented for a diesel backend
+//! Provides OAuthUserSessionStoreOperations implemented for a diesel backend
 
 pub(super) mod add_oauth_user;
 pub(super) mod get_by_access_token;
@@ -20,15 +20,15 @@ pub(super) mod list_by_provider_user_ref;
 pub(super) mod list_by_user_id;
 pub(super) mod update_oauth_user;
 
-pub(super) struct OAuthUserStoreOperations<'a, C> {
+pub(super) struct OAuthUserSessionStoreOperations<'a, C> {
     conn: &'a C,
 }
 
-impl<'a, C> OAuthUserStoreOperations<'a, C>
+impl<'a, C> OAuthUserSessionStoreOperations<'a, C>
 where
     C: diesel::Connection,
 {
     pub fn new(conn: &'a C) -> Self {
-        OAuthUserStoreOperations { conn }
+        OAuthUserSessionStoreOperations { conn }
     }
 }

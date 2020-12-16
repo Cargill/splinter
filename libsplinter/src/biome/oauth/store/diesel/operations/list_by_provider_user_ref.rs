@@ -18,19 +18,19 @@ use crate::error::InternalError;
 
 use crate::biome::oauth::store::{
     diesel::{models::OAuthUserModel, schema::oauth_user},
-    OAuthUserStoreError,
+    OAuthUserSessionStoreError,
 };
 
-use super::OAuthUserStoreOperations;
+use super::OAuthUserSessionStoreOperations;
 
-pub(in crate::biome::oauth) trait OAuthUserStoreListByProviderUserRef {
+pub(in crate::biome::oauth) trait OAuthUserSessionStoreListByProviderUserRef {
     fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Vec<OAuthUserModel>, OAuthUserStoreError>;
+    ) -> Result<Vec<OAuthUserModel>, OAuthUserSessionStoreError>;
 }
 
-impl<'a, C> OAuthUserStoreListByProviderUserRef for OAuthUserStoreOperations<'a, C>
+impl<'a, C> OAuthUserSessionStoreListByProviderUserRef for OAuthUserSessionStoreOperations<'a, C>
 where
     C: diesel::Connection,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
@@ -40,14 +40,14 @@ where
     fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Vec<OAuthUserModel>, OAuthUserStoreError> {
+    ) -> Result<Vec<OAuthUserModel>, OAuthUserSessionStoreError> {
         oauth_user::table
             .into_boxed()
             .select(oauth_user::all_columns)
             .filter(oauth_user::provider_user_ref.eq(provider_user_ref))
             .load::<OAuthUserModel>(self.conn)
             .map_err(|err| {
-                OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err)))
+                OAuthUserSessionStoreError::InternalError(InternalError::from_source(Box::new(err)))
             })
     }
 }

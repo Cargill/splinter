@@ -16,46 +16,46 @@ use diesel::{dsl::insert_into, prelude::*};
 
 use crate::biome::oauth::store::{
     diesel::{models::NewOAuthUserModel, schema::oauth_user},
-    OAuthUserStoreError,
+    OAuthUserSessionStoreError,
 };
 
-use super::OAuthUserStoreOperations;
+use super::OAuthUserSessionStoreOperations;
 
-pub(in crate::biome::oauth) trait OAuthUserStoreAddOAuthUserOperation {
+pub(in crate::biome::oauth) trait OAuthUserSessionStoreAddOAuthUserOperation {
     fn add_oauth_user<'a>(
         &self,
         oauth_user: NewOAuthUserModel<'a>,
-    ) -> Result<(), OAuthUserStoreError>;
+    ) -> Result<(), OAuthUserSessionStoreError>;
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> OAuthUserStoreAddOAuthUserOperation
-    for OAuthUserStoreOperations<'a, diesel::sqlite::SqliteConnection>
+impl<'a> OAuthUserSessionStoreAddOAuthUserOperation
+    for OAuthUserSessionStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn add_oauth_user<'b>(
         &self,
         oauth_user: NewOAuthUserModel<'b>,
-    ) -> Result<(), OAuthUserStoreError> {
+    ) -> Result<(), OAuthUserSessionStoreError> {
         insert_into(oauth_user::table)
             .values(oauth_user)
             .execute(self.conn)
             .map(|_| ())
-            .map_err(OAuthUserStoreError::from)
+            .map_err(OAuthUserSessionStoreError::from)
     }
 }
 
 #[cfg(feature = "biome-oauth-user-store-postgres")]
-impl<'a> OAuthUserStoreAddOAuthUserOperation
-    for OAuthUserStoreOperations<'a, diesel::pg::PgConnection>
+impl<'a> OAuthUserSessionStoreAddOAuthUserOperation
+    for OAuthUserSessionStoreOperations<'a, diesel::pg::PgConnection>
 {
     fn add_oauth_user<'b>(
         &self,
         oauth_user: NewOAuthUserModel<'b>,
-    ) -> Result<(), OAuthUserStoreError> {
+    ) -> Result<(), OAuthUserSessionStoreError> {
         insert_into(oauth_user::table)
             .values(oauth_user)
             .execute(self.conn)
             .map(|_| ())
-            .map_err(OAuthUserStoreError::from)
+            .map_err(OAuthUserSessionStoreError::from)
     }
 }

@@ -18,30 +18,36 @@ use crate::error::InternalError;
 
 use crate::biome::oauth::store::{
     diesel::{models::OAuthUserModel, schema::oauth_user},
-    OAuthUserStoreError,
+    OAuthUserSessionStoreError,
 };
 
-use super::OAuthUserStoreOperations;
+use super::OAuthUserSessionStoreOperations;
 
-pub(in crate::biome::oauth) trait OAuthUserStoreListByUserId {
-    fn list_by_user_id(&self, user_id: &str) -> Result<Vec<OAuthUserModel>, OAuthUserStoreError>;
+pub(in crate::biome::oauth) trait OAuthUserSessionStoreListByUserId {
+    fn list_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<OAuthUserModel>, OAuthUserSessionStoreError>;
 }
 
-impl<'a, C> OAuthUserStoreListByUserId for OAuthUserStoreOperations<'a, C>
+impl<'a, C> OAuthUserSessionStoreListByUserId for OAuthUserSessionStoreOperations<'a, C>
 where
     C: diesel::Connection,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn list_by_user_id(&self, user_id: &str) -> Result<Vec<OAuthUserModel>, OAuthUserStoreError> {
+    fn list_by_user_id(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<OAuthUserModel>, OAuthUserSessionStoreError> {
         oauth_user::table
             .into_boxed()
             .select(oauth_user::all_columns)
             .filter(oauth_user::user_id.eq(user_id))
             .load::<OAuthUserModel>(self.conn)
             .map_err(|err| {
-                OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err)))
+                OAuthUserSessionStoreError::InternalError(InternalError::from_source(Box::new(err)))
             })
     }
 }

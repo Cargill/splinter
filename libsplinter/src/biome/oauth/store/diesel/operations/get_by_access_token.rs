@@ -18,19 +18,19 @@ use crate::error::InternalError;
 
 use crate::biome::oauth::store::{
     diesel::{models::OAuthUserModel, schema::oauth_user},
-    OAuthUserAccess, OAuthUserStoreError,
+    OAuthUserAccess, OAuthUserSessionStoreError,
 };
 
-use super::OAuthUserStoreOperations;
+use super::OAuthUserSessionStoreOperations;
 
-pub(in crate::biome::oauth) trait OAuthUserStoreGetByAccessToken {
+pub(in crate::biome::oauth) trait OAuthUserSessionStoreGetByAccessToken {
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserSessionStoreError>;
 }
 
-impl<'a, C> OAuthUserStoreGetByAccessToken for OAuthUserStoreOperations<'a, C>
+impl<'a, C> OAuthUserSessionStoreGetByAccessToken for OAuthUserSessionStoreOperations<'a, C>
 where
     C: diesel::Connection,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
@@ -40,13 +40,13 @@ where
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserSessionStoreError> {
         let oauth_user_model = oauth_user::table
             .filter(oauth_user::access_token.eq(Some(access_token.to_string())))
             .first::<OAuthUserModel>(self.conn)
             .optional()
             .map_err(|err| {
-                OAuthUserStoreError::InternalError(InternalError::from_source(Box::new(err)))
+                OAuthUserSessionStoreError::InternalError(InternalError::from_source(Box::new(err)))
             })?;
 
         Ok(oauth_user_model.map(OAuthUserAccess::from))

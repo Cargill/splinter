@@ -89,7 +89,7 @@ use crate::biome::rest_api::BiomeRestResourceManager;
 use crate::biome::{
     oauth::store::OAuthProvider,
     rest_api::auth::{BiomeOAuthUserInfoStore, GetUserByOAuthAuthorization},
-    OAuthUserStore,
+    OAuthUserSessionStore,
 };
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
@@ -992,18 +992,20 @@ impl RestApiBuilder {
                         let user_info_store: Box<dyn OAuthUserInfoStore> =
                             match user_info_store_config {
                                 #[cfg(feature = "biome-oauth")]
-                                OAuthUserInfoStoreConfig::Biome { oauth_user_store } => {
+                                OAuthUserInfoStoreConfig::Biome {
+                                    oauth_user_session_store,
+                                } => {
                                     // Add the configuration mapping for the User value.
                                     self.authorization_mappings.push(
                                         ConfigureAuthorizationMapping::new(
                                             GetUserByOAuthAuthorization::new(
-                                                oauth_user_store.clone(),
+                                                oauth_user_session_store.clone(),
                                             ),
                                         ),
                                     );
                                     Box::new(BiomeOAuthUserInfoStore::new(
                                         oauth_provider,
-                                        oauth_user_store,
+                                        oauth_user_session_store,
                                     ))
                                 }
                                 OAuthUserInfoStoreConfig::NoOp => Box::new(OAuthUserInfoStoreNoOp),
@@ -1136,7 +1138,7 @@ pub enum OAuthUserInfoStoreConfig {
     /// Uses Biome's OAuth user store as the underlying storage
     #[cfg(feature = "biome-oauth")]
     Biome {
-        oauth_user_store: Box<dyn OAuthUserStore>,
+        oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
     },
     /// Users' information is not handled by the Splinter REST API
     NoOp,

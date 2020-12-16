@@ -23,7 +23,7 @@ pub(in crate::biome) mod memory;
 
 use crate::error::InvalidStateError;
 
-pub use error::OAuthUserStoreError;
+pub use error::OAuthUserSessionStoreError;
 
 /// The set of supported OAuth providers.
 #[derive(Clone, Debug, PartialEq)]
@@ -277,7 +277,7 @@ impl OAuthUserAccessUpdateBuilder {
 }
 
 /// Defines methods for CRUD operations and fetching OAuth user information.
-pub trait OAuthUserStore: Send + Sync {
+pub trait OAuthUserSessionStore: Send + Sync {
     /// Add an OAuthUserAccess to the store.
     ///
     /// # Errors
@@ -285,7 +285,10 @@ pub trait OAuthUserStore: Send + Sync {
     /// Returns a ConstraintViolation if either there already is a user ID associated
     /// with another provider identity, or the provider identity has already been
     /// associated with a user ID.
-    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError>;
+    fn add_oauth_user(
+        &self,
+        oauth_user: NewOAuthUserAccess,
+    ) -> Result<(), OAuthUserSessionStoreError>;
 
     /// Updates an OAuthUserAccess to the store.
     ///
@@ -293,31 +296,34 @@ pub trait OAuthUserStore: Send + Sync {
     ///
     /// Returns a ConstraintViolation if the OAuthUser associated with the user ID provided doesn't
     /// exist.
-    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
+    fn update_oauth_user(
+        &self,
+        oauth_user: OAuthUserAccess,
+    ) -> Result<(), OAuthUserSessionStoreError>;
 
     /// Returns the stored OAuth user based on the provider_user_ref from the OAuth provider.
     fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError>;
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserSessionStoreError>;
 
     /// Returns the stored OAuth user based on the access token from the OAuth provider.
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserSessionStoreError>;
 
     /// Returns the stored OAuth user based on the biome user ID.
     fn list_by_user_id(
         &self,
         user_id: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError>;
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserSessionStoreError>;
 
-    /// Clone into a boxed, dynamic dispatched OAuthUserStore.
-    fn clone_box(&self) -> Box<dyn OAuthUserStore>;
+    /// Clone into a boxed, dynamic dispatched OAuthUserSessionStore.
+    fn clone_box(&self) -> Box<dyn OAuthUserSessionStore>;
 }
 
-impl Clone for Box<dyn OAuthUserStore> {
+impl Clone for Box<dyn OAuthUserSessionStore> {
     fn clone(&self) -> Self {
         self.clone_box()
     }

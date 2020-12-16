@@ -21,16 +21,17 @@ use std::sync::{
 use crate::error::InternalError;
 
 use super::{
-    AccessToken, NewOAuthUserAccess, OAuthUserAccess, OAuthUserStore, OAuthUserStoreError,
+    AccessToken, NewOAuthUserAccess, OAuthUserAccess, OAuthUserSessionStore,
+    OAuthUserSessionStoreError,
 };
 
 #[derive(Default, Clone)]
-pub struct MemoryOAuthUserStore {
+pub struct MemoryOAuthUserSessionStore {
     inner: Arc<Mutex<HashMap<i64, OAuthUserAccess>>>,
     id_sequence: Arc<AtomicI64>,
 }
 
-impl MemoryOAuthUserStore {
+impl MemoryOAuthUserSessionStore {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
@@ -39,10 +40,13 @@ impl MemoryOAuthUserStore {
     }
 }
 
-impl OAuthUserStore for MemoryOAuthUserStore {
-    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError> {
+impl OAuthUserSessionStore for MemoryOAuthUserSessionStore {
+    fn add_oauth_user(
+        &self,
+        oauth_user: NewOAuthUserAccess,
+    ) -> Result<(), OAuthUserSessionStoreError> {
         let mut inner = self.inner.lock().map_err(|_| {
-            OAuthUserStoreError::InternalError(InternalError::with_message(
+            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
                 "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
@@ -68,9 +72,12 @@ impl OAuthUserStore for MemoryOAuthUserStore {
         Ok(())
     }
 
-    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(
+        &self,
+        oauth_user: OAuthUserAccess,
+    ) -> Result<(), OAuthUserSessionStoreError> {
         let mut inner = self.inner.lock().map_err(|_| {
-            OAuthUserStoreError::InternalError(InternalError::with_message(
+            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
                 "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
@@ -81,9 +88,9 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     fn list_by_provider_user_ref(
         &self,
         provider_user_ref: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError> {
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserSessionStoreError> {
         let inner = self.inner.lock().map_err(|_| {
-            OAuthUserStoreError::InternalError(InternalError::with_message(
+            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
                 "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
@@ -105,9 +112,9 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     fn get_by_access_token(
         &self,
         access_token: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError> {
+    ) -> Result<Option<OAuthUserAccess>, OAuthUserSessionStoreError> {
         let inner = self.inner.lock().map_err(|_| {
-            OAuthUserStoreError::InternalError(InternalError::with_message(
+            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
                 "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
@@ -123,9 +130,9 @@ impl OAuthUserStore for MemoryOAuthUserStore {
     fn list_by_user_id(
         &self,
         user_id: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError> {
+    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserSessionStoreError> {
         let inner = self.inner.lock().map_err(|_| {
-            OAuthUserStoreError::InternalError(InternalError::with_message(
+            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
                 "Cannot access OAuth user store: mutex lock poisoned".to_string(),
             ))
         })?;
@@ -143,7 +150,7 @@ impl OAuthUserStore for MemoryOAuthUserStore {
         Ok(Box::new(results.into_iter()))
     }
 
-    fn clone_box(&self) -> Box<dyn OAuthUserStore> {
+    fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
         Box::new(self.clone())
     }
 }

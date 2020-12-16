@@ -597,7 +597,7 @@ impl SplinterDaemon {
                 #[cfg(feature = "biome-oauth")]
                 if self.enable_biome {
                     user_info_store_config = OAuthUserInfoStoreConfig::Biome {
-                        oauth_user_store: store_factory.get_biome_oauth_user_store(),
+                        oauth_user_session_store: store_factory.get_biome_oauth_user_session_store(),
                     };
                 }
 

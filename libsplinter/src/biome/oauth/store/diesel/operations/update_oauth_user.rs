@@ -15,20 +15,26 @@
 use diesel::{dsl::update, prelude::*};
 
 use crate::biome::oauth::store::{
-    diesel::schema::oauth_user, AccessToken, OAuthUserAccess, OAuthUserStoreError,
+    diesel::schema::oauth_user, AccessToken, OAuthUserAccess, OAuthUserSessionStoreError,
 };
 
-use super::OAuthUserStoreOperations;
+use super::OAuthUserSessionStoreOperations;
 
-pub(in crate::biome::oauth) trait OAuthUserStoreUpdateOAuthUserOperation {
-    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
+pub(in crate::biome::oauth) trait OAuthUserSessionStoreUpdateOAuthUserOperation {
+    fn update_oauth_user(
+        &self,
+        oauth_user: OAuthUserAccess,
+    ) -> Result<(), OAuthUserSessionStoreError>;
 }
 
-impl<'a, C> OAuthUserStoreUpdateOAuthUserOperation for OAuthUserStoreOperations<'a, C>
+impl<'a, C> OAuthUserSessionStoreUpdateOAuthUserOperation for OAuthUserSessionStoreOperations<'a, C>
 where
     C: diesel::Connection,
 {
-    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError> {
+    fn update_oauth_user(
+        &self,
+        oauth_user: OAuthUserAccess,
+    ) -> Result<(), OAuthUserSessionStoreError> {
         let access_token = match oauth_user.access_token() {
             AccessToken::Authorized(token) => Some(token),
             AccessToken::Unauthorized => None,
@@ -40,6 +46,6 @@ where
             ))
             .execute(self.conn)
             .map(|_| ())
-            .map_err(OAuthUserStoreError::from)
+            .map_err(OAuthUserSessionStoreError::from)
     }
 }

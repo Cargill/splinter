@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! SaveTokenOperation implementation, backed by Biome's OAuthUserStore. It also includes
+//! SaveTokenOperation implementation, backed by Biome's OAuthUserSessionStore. It also includes
 //! an AuthorizationMapping implementation for use with OAuth2 bearer tokens.
 
 use uuid::Uuid;
 
 use crate::biome::{
-    oauth::store::{AccessToken, NewOAuthUserAccessBuilder, OAuthProvider, OAuthUserStore},
+    oauth::store::{AccessToken, NewOAuthUserAccessBuilder, OAuthProvider, OAuthUserSessionStore},
     rest_api::resources::User,
 };
 use crate::error::InternalError;
@@ -33,13 +33,15 @@ const UUID_NAMESPACE: Uuid = Uuid::from_u128(18764314186717360267674088713283300
 
 /// An `AuthorizationMapping` implementation that returns an `User`.
 pub struct GetUserByOAuthAuthorization {
-    oauth_user_store: Box<dyn OAuthUserStore>,
+    oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 }
 
 impl GetUserByOAuthAuthorization {
-    /// Construct a new `GetUserByOAuthAuthorization` over an `OAuthUserStore` implementation.
-    pub fn new(oauth_user_store: Box<dyn OAuthUserStore>) -> Self {
-        Self { oauth_user_store }
+    /// Construct a new `GetUserByOAuthAuthorization` over an `OAuthUserSessionStore` implementation.
+    pub fn new(oauth_user_session_store: Box<dyn OAuthUserSessionStore>) -> Self {
+        Self {
+            oauth_user_session_store,
+        }
     }
 }
 
@@ -48,7 +50,7 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
         match authorization {
             AuthorizationHeader::Bearer(BearerToken::OAuth2(access_token)) => {
                 debug!("Getting user for access token {}", access_token);
-                self.oauth_user_store
+                self.oauth_user_session_store
                     .get_by_access_token(&access_token)
                     .map(|opt_oauth_user| {
                         opt_oauth_user.map(|oauth_user| User::new(oauth_user.user_id()))
@@ -69,15 +71,18 @@ impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
 #[derive(Clone)]
 pub struct BiomeOAuthUserInfoStore {
     provider: OAuthProvider,
-    oauth_user_store: Box<dyn OAuthUserStore>,
+    oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 }
 
 impl BiomeOAuthUserInfoStore {
     /// Construct a new `BiomeOAuthUserInfoStore`.
-    pub fn new(provider: OAuthProvider, oauth_user_store: Box<dyn OAuthUserStore>) -> Self {
+    pub fn new(
+        provider: OAuthProvider,
+        oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
+    ) -> Self {
         Self {
             provider,
-            oauth_user_store,
+            oauth_user_session_store,
         }
     }
 }
@@ -87,7 +92,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
         let provider_identity = user_info.identity().to_string();
 
         let (previously_unauthed, other_accesses): (Vec<_>, Vec<_>) = self
-            .oauth_user_store
+            .oauth_user_session_store
             .list_by_provider_user_ref(&provider_identity)
             .map_err(|e| InternalError::from_source(Box::new(e)))?
             .partition(|oauth_user| oauth_user.access_token().is_unauthorized());
@@ -108,7 +113,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                     )
                 })?;
 
-            self.oauth_user_store
+            self.oauth_user_session_store
                 .update_oauth_user(updated_user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
@@ -139,7 +144,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                 )
             })?;
 
-        self.oauth_user_store
+        self.oauth_user_session_store
             .add_oauth_user(oauth_user)
             .map_err(|e| InternalError::from_source(Box::new(e)))
     }
@@ -147,7 +152,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
     fn remove_user_tokens(&self, access_token: &str) -> Result<(), InternalError> {
         // Check if there is an existing `OAuthUserAccess` with the corresponding `identity`
         if let Some(oauth_user) = self
-            .oauth_user_store
+            .oauth_user_session_store
             .get_by_access_token(access_token)
             .map_err(|e| InternalError::from_source(Box::new(e)))?
         {
@@ -163,7 +168,7 @@ impl OAuthUserInfoStore for BiomeOAuthUserInfoStore {
                         "Failed to properly construct an updated OAuth user".into(),
                     )
                 })?;
-            self.oauth_user_store
+            self.oauth_user_session_store
                 .update_oauth_user(updated_user)
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
         }
