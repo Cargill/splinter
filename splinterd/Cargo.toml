@@ -83,6 +83,7 @@ experimental = [
     "auth",
     "biome-oauth",
     "health",
+    "registry-database",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
@@ -103,6 +104,7 @@ biome-oauth = [
     "splinter/biome-oauth-user-store-postgres"
 ]
 database = ["splinter/postgres", "splinter/sqlite"]
+registry-database = ["database", "splinter/registry-database"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
     "scabbard/service-arg-validation",
