@@ -72,6 +72,11 @@ impl StoreFactory for SqliteStoreFactory {
             self.pool.clone(),
         ))
     }
+
+    #[cfg(feature = "registry-database")]
+    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
+        Box::new(crate::registry::DieselRegistry::new(self.pool.clone()))
+    }
 }
 
 #[derive(Default, Debug)]

@@ -55,6 +55,9 @@ pub trait StoreFactory {
     fn get_oauth_inflight_request_store(
         &self,
     ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore>;
+
+    #[cfg(feature = "registry-database")]
+    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection

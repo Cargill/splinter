@@ -129,4 +129,25 @@ impl StoreFactory for MemoryStoreFactory {
     ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
         Box::new(self.inflight_request_store.clone())
     }
+
+    #[cfg(all(feature = "registry-database", feature = "sqlite"))]
+    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        crate::migrations::run_sqlite_migrations(
+            &*pool.get().expect("Failed to get connection for migrations"),
+        )
+        .expect("Failed to run migrations");
+
+        Box::new(crate::registry::DieselRegistry::new(pool))
+    }
+
+    #[cfg(all(feature = "registry-database", not(feature = "sqlite")))]
+    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
+        unimplemented!()
+    }
 }
