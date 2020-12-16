@@ -17,6 +17,8 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+use crate::error::ConstraintViolationType;
 use crate::error::{
     ConstraintViolationError, InternalError, InvalidArgumentError, InvalidStateError,
 };
@@ -48,6 +50,43 @@ impl fmt::Display for OAuthUserSessionStoreError {
             OAuthUserSessionStoreError::Internal(err) => f.write_str(&err.to_string()),
             OAuthUserSessionStoreError::InvalidArgument(err) => f.write_str(&err.to_string()),
             OAuthUserSessionStoreError::InvalidState(err) => f.write_str(&err.to_string()),
+        }
+    }
+}
+
+#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+impl From<diesel::r2d2::PoolError> for OAuthUserSessionStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        OAuthUserSessionStoreError::Internal(InternalError::from_source(Box::new(err)))
+    }
+}
+
+#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+impl From<diesel::result::Error> for OAuthUserSessionStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        match err {
+            diesel::result::Error::DatabaseError(ref kind, _) => match kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    OAuthUserSessionStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    OAuthUserSessionStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => {
+                    OAuthUserSessionStoreError::Internal(InternalError::from_source(Box::new(err)))
+                }
+            },
+            _ => OAuthUserSessionStoreError::Internal(InternalError::from_source(Box::new(err))),
         }
     }
 }

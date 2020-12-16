@@ -19,12 +19,7 @@ pub(in crate::biome) mod models;
 mod operations;
 pub(in crate::biome) mod schema;
 
-use diesel::{
-    r2d2::{ConnectionManager, Pool},
-    result,
-};
-
-use crate::error::{ConstraintViolationError, ConstraintViolationType, InternalError};
+use diesel::r2d2::{ConnectionManager, Pool};
 
 use super::{
     AccessToken, NewOAuthUserAccess, OAuthProvider, OAuthUserAccess, OAuthUserSessionStore,
@@ -198,43 +193,6 @@ impl<'a> From<&'a NewOAuthUserAccess> for NewOAuthUserModel<'a> {
                 OAuthProvider::Github => ProviderId::Github,
                 OAuthProvider::OpenId => ProviderId::OpenId,
             },
-        }
-    }
-}
-
-impl From<diesel::r2d2::PoolError> for OAuthUserSessionStoreError {
-    fn from(err: diesel::r2d2::PoolError) -> Self {
-        OAuthUserSessionStoreError::InternalError(InternalError::from_source(Box::new(err)))
-    }
-}
-
-impl From<result::Error> for OAuthUserSessionStoreError {
-    fn from(err: result::Error) -> Self {
-        match err {
-            result::Error::DatabaseError(ref kind, _) => match kind {
-                result::DatabaseErrorKind::UniqueViolation => {
-                    OAuthUserSessionStoreError::ConstraintViolation(
-                        ConstraintViolationError::from_source_with_violation_type(
-                            ConstraintViolationType::Unique,
-                            Box::new(err),
-                        ),
-                    )
-                }
-                result::DatabaseErrorKind::ForeignKeyViolation => {
-                    OAuthUserSessionStoreError::ConstraintViolation(
-                        ConstraintViolationError::from_source_with_violation_type(
-                            ConstraintViolationType::ForeignKey,
-                            Box::new(err),
-                        ),
-                    )
-                }
-                _ => OAuthUserSessionStoreError::InternalError(InternalError::from_source(
-                    Box::new(err),
-                )),
-            },
-            _ => {
-                OAuthUserSessionStoreError::InternalError(InternalError::from_source(Box::new(err)))
-            }
         }
     }
 }
