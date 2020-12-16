@@ -17,20 +17,26 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::error::{ConstraintViolationError, InternalError};
+use crate::error::{
+    ConstraintViolationError, InternalError, InvalidArgumentError, InvalidStateError,
+};
 
-/// Errors that may occur during OAuthUserSessionStore operations.
+/// Errors that may occur during [OAuthUserSessionStore] operations.
 #[derive(Debug)]
 pub enum OAuthUserSessionStoreError {
-    InternalError(InternalError),
     ConstraintViolation(ConstraintViolationError),
+    Internal(InternalError),
+    InvalidArgument(InvalidArgumentError),
+    InvalidState(InvalidStateError),
 }
 
 impl Error for OAuthUserSessionStoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            OAuthUserSessionStoreError::InternalError(err) => err.source(),
             OAuthUserSessionStoreError::ConstraintViolation(err) => err.source(),
+            OAuthUserSessionStoreError::Internal(err) => err.source(),
+            OAuthUserSessionStoreError::InvalidArgument(err) => err.source(),
+            OAuthUserSessionStoreError::InvalidState(err) => err.source(),
         }
     }
 }
@@ -38,8 +44,10 @@ impl Error for OAuthUserSessionStoreError {
 impl fmt::Display for OAuthUserSessionStoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OAuthUserSessionStoreError::InternalError(err) => f.write_str(&err.to_string()),
             OAuthUserSessionStoreError::ConstraintViolation(err) => f.write_str(&err.to_string()),
+            OAuthUserSessionStoreError::Internal(err) => f.write_str(&err.to_string()),
+            OAuthUserSessionStoreError::InvalidArgument(err) => f.write_str(&err.to_string()),
+            OAuthUserSessionStoreError::InvalidState(err) => f.write_str(&err.to_string()),
         }
     }
 }
