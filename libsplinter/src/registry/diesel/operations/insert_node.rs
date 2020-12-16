@@ -15,7 +15,7 @@
 //! Provides the "insert node" operation for the `DieselRegistry`.
 
 use diesel::{
-    dsl::{delete, insert_into, sql_query, update},
+    dsl::{delete, insert_into, update},
     prelude::*,
 };
 
@@ -43,26 +43,24 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
         check_node_required_fields_are_not_empty(&node)?;
 
         self.conn.transaction::<(), _, _>(|| {
-            // Verify that the node's endpoints are unique. This requires a raw SQL query because of
-            // the complicated `WHERE` statement.
+            // Verify that the node's endpoints are unique.
             let filters = node
                 .endpoints
                 .iter()
-                .map(|endpoint| format!("endpoint = {}", endpoint))
-                .collect::<Vec<_>>()
-                .join(" OR ");
-            let duplicate_endpoint = sql_query(format!(
-                "SELECT * FROM splinter_nodes_endpoints WHERE identity <> {} AND ({})",
-                node.identity, filters
-            ))
-            .get_result::<NodeEndpointsModel>(self.conn)
-            .optional()
-            .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to check for duplicate endpoints",
-                    Box::new(err),
-                )
-            })?;
+                .map(|endpoint| endpoint.to_string())
+                .collect::<Vec<_>>();
+
+            let duplicate_endpoint = splinter_nodes_endpoints::table
+                .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
+                .first::<NodeEndpointsModel>(self.conn)
+                .optional()
+                .map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to check for duplicate endpoints",
+                        Box::new(err),
+                    )
+                })?;
+
             if let Some(endpoint) = duplicate_endpoint {
                 return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
                     endpoint.endpoint,
@@ -183,26 +181,24 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::sqlite::
         check_node_required_fields_are_not_empty(&node)?;
 
         self.conn.transaction::<(), _, _>(|| {
-            // Verify that the node's endpoints are unique. This requires a raw SQL query because of
-            // the complicated `WHERE` statement.
+            // Verify that the node's endpoints are unique.
             let filters = node
                 .endpoints
                 .iter()
-                .map(|endpoint| format!("endpoint = {}", endpoint))
-                .collect::<Vec<_>>()
-                .join(" OR ");
-            let duplicate_endpoint = sql_query(format!(
-                "SELECT * FROM splinter_nodes_endpoints WHERE identity <> {} AND ({})",
-                node.identity, filters
-            ))
-            .get_result::<NodeEndpointsModel>(self.conn)
-            .optional()
-            .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to check for duplicate endpoints",
-                    Box::new(err),
-                )
-            })?;
+                .map(|endpoint| endpoint.to_string())
+                .collect::<Vec<_>>();
+
+            let duplicate_endpoint = splinter_nodes_endpoints::table
+                .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
+                .first::<NodeEndpointsModel>(self.conn)
+                .optional()
+                .map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to check for duplicate endpoints",
+                        Box::new(err),
+                    )
+                })?;
+
             if let Some(endpoint) = duplicate_endpoint {
                 return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
                     endpoint.endpoint,
