@@ -12,145 +12,216 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A memory-backed implementation of the [OAuthUserSessionStore]
+
 use std::collections::HashMap;
-use std::sync::{
-    atomic::{AtomicI64, Ordering},
-    Arc, Mutex,
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+
+use crate::error::{
+    ConstraintViolationError, ConstraintViolationType, InternalError, InvalidArgumentError,
+    InvalidStateError,
 };
 
-use crate::error::InternalError;
-
 use super::{
-    AccessToken, NewOAuthUserAccess, OAuthUserAccess, OAuthUserSessionStore,
+    InsertableOAuthUserSession, OAuthUser, OAuthUserSession, OAuthUserSessionStore,
     OAuthUserSessionStoreError,
 };
 
+/// A memory-backed implementation of the [OAuthUserSessionStore]
 #[derive(Default, Clone)]
 pub struct MemoryOAuthUserSessionStore {
-    inner: Arc<Mutex<HashMap<i64, OAuthUserAccess>>>,
-    id_sequence: Arc<AtomicI64>,
+    internal: Arc<Mutex<Internal>>,
 }
 
 impl MemoryOAuthUserSessionStore {
+    /// Creates a new memory-backed OAuth user session store
     pub fn new() -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(HashMap::new())),
-            id_sequence: Arc::new(AtomicI64::new(1)),
-        }
+        Self::default()
     }
 }
 
 impl OAuthUserSessionStore for MemoryOAuthUserSessionStore {
-    fn add_oauth_user(
+    fn add_session(
         &self,
-        oauth_user: NewOAuthUserAccess,
+        session: InsertableOAuthUserSession,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let mut inner = self.inner.lock().map_err(|_| {
-            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
-                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
+        let mut internal = self.internal.lock().map_err(|_| {
+            OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                "Cannot access OAuth user session store: mutex lock poisoned".to_string(),
             ))
         })?;
 
-        let NewOAuthUserAccess {
-            user_id,
-            provider_user_ref,
-            access_token,
-            refresh_token,
-            provider,
-        } = oauth_user;
+        if internal
+            .sessions
+            .contains_key(session.splinter_access_token())
+        {
+            return Err(OAuthUserSessionStoreError::ConstraintViolation(
+                ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+            ));
+        }
 
-        let id = self.id_sequence.fetch_add(1, Ordering::SeqCst);
-        let oauth_user_access = OAuthUserAccess {
-            id,
-            user_id,
-            provider_user_ref,
-            access_token,
-            refresh_token,
-            provider,
-        };
-        inner.insert(id, oauth_user_access);
+        if !internal.users.contains_key(session.subject()) {
+            internal.users.insert(
+                session.subject().to_string(),
+                OAuthUser::new(session.subject().to_string()),
+            );
+        }
+
+        internal
+            .sessions
+            .insert(session.splinter_access_token().into(), session.into());
+
         Ok(())
     }
 
-    fn update_oauth_user(
+    fn update_session(
         &self,
-        oauth_user: OAuthUserAccess,
+        session: InsertableOAuthUserSession,
     ) -> Result<(), OAuthUserSessionStoreError> {
-        let mut inner = self.inner.lock().map_err(|_| {
-            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
-                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
+        let mut internal = self.internal.lock().map_err(|_| {
+            OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                "Cannot access OAuth user session store: mutex lock poisoned".to_string(),
             ))
         })?;
-        inner.insert(oauth_user.id, oauth_user);
-        Ok(())
+
+        match internal.sessions.get(session.splinter_access_token()) {
+            Some(existing_session) => {
+                if session.subject() != existing_session.subject {
+                    Err(OAuthUserSessionStoreError::InvalidArgument(
+                        InvalidArgumentError::new(
+                            "session".to_string(),
+                            "Cannot update the 'subject' field for an OAuth user session".into(),
+                        ),
+                    ))
+                } else {
+                    internal
+                        .sessions
+                        .insert(session.splinter_access_token().into(), session.into());
+                    Ok(())
+                }
+            }
+            None => Err(OAuthUserSessionStoreError::InvalidState(
+                InvalidStateError::with_message(
+                    "An OAuth user session for the given Splinter access token does not exist"
+                        .to_string(),
+                ),
+            )),
+        }
     }
 
-    fn list_by_provider_user_ref(
+    fn remove_session(
         &self,
-        provider_user_ref: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserSessionStoreError> {
-        let inner = self.inner.lock().map_err(|_| {
-            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
-                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
-            ))
-        })?;
-
-        // a trick to work around the needless-collect warning which is a false positive when
-        // retrieving the items.
-        let mut results = vec![];
-
-        results.extend(
-            inner
-                .values()
-                .filter(|oauth_user| oauth_user.provider_user_ref() == provider_user_ref)
-                .cloned(),
-        );
-
-        Ok(Box::new(results.into_iter()))
-    }
-
-    fn get_by_access_token(
-        &self,
-        access_token: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserSessionStoreError> {
-        let inner = self.inner.lock().map_err(|_| {
-            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
-                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
-            ))
-        })?;
-
-        Ok(inner
-            .values()
-            .find(|oauth_user| {
-                oauth_user.access_token() == &AccessToken::Authorized(access_token.to_string())
+        splinter_access_token: &str,
+    ) -> Result<(), OAuthUserSessionStoreError> {
+        self.internal
+            .lock()
+            .map_err(|_| {
+                OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                    "Cannot access OAuth user session store: mutex lock poisoned".to_string(),
+                ))
+            })?
+            .sessions
+            .remove(splinter_access_token)
+            .map(|_| ())
+            .ok_or_else(|| {
+                OAuthUserSessionStoreError::InvalidState(InvalidStateError::with_message(
+                    "An OAuth user session for the given Splinter access token does not exist"
+                        .to_string(),
+                ))
             })
-            .cloned())
     }
 
-    fn list_by_user_id(
+    fn get_session(
         &self,
-        user_id: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserSessionStoreError> {
-        let inner = self.inner.lock().map_err(|_| {
-            OAuthUserSessionStoreError::InternalError(InternalError::with_message(
-                "Cannot access OAuth user store: mutex lock poisoned".to_string(),
+        splinter_access_token: &str,
+    ) -> Result<Option<OAuthUserSession>, OAuthUserSessionStoreError> {
+        let internal = self.internal.lock().map_err(|_| {
+            OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                "Cannot access OAuth user session store: mutex lock poisoned".to_string(),
             ))
         })?;
-        // a trick to work around the needless-collect warning which is a false positive when
-        // retrieving the items.
-        let mut results = vec![];
 
-        results.extend(
-            inner
-                .values()
-                .filter(|oauth_user| oauth_user.user_id() == user_id)
-                .cloned(),
-        );
+        internal
+            .sessions
+            .get(splinter_access_token)
+            .cloned()
+            .map(|session| {
+                let InternalOAuthUserSession {
+                    splinter_access_token,
+                    subject,
+                    oauth_access_token,
+                    oauth_refresh_token,
+                    last_authenticated,
+                } = session;
 
-        Ok(Box::new(results.into_iter()))
+                let user = internal.users.get(&subject).cloned().ok_or_else(|| {
+                    OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                        "Unknown session subject".to_string(),
+                    ))
+                })?;
+
+                Ok(OAuthUserSession {
+                    splinter_access_token,
+                    user,
+                    oauth_access_token,
+                    oauth_refresh_token,
+                    last_authenticated,
+                })
+            })
+            .transpose()
+    }
+
+    fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError> {
+        Ok(self
+            .internal
+            .lock()
+            .map_err(|_| {
+                OAuthUserSessionStoreError::Internal(InternalError::with_message(
+                    "Cannot access OAuth user session store: mutex lock poisoned".to_string(),
+                ))
+            })?
+            .users
+            .get(subject)
+            .cloned())
     }
 
     fn clone_box(&self) -> Box<dyn OAuthUserSessionStore> {
         Box::new(self.clone())
+    }
+}
+
+#[derive(Default)]
+struct Internal {
+    /// Map of subject identifier -> user
+    pub users: HashMap<String, OAuthUser>,
+    /// Map of splinter access token -> session
+    pub sessions: HashMap<String, InternalOAuthUserSession>,
+}
+
+#[derive(Clone)]
+struct InternalOAuthUserSession {
+    pub splinter_access_token: String,
+    pub subject: String,
+    pub oauth_access_token: String,
+    pub oauth_refresh_token: Option<String>,
+    pub last_authenticated: SystemTime,
+}
+
+impl From<InsertableOAuthUserSession> for InternalOAuthUserSession {
+    fn from(session: InsertableOAuthUserSession) -> Self {
+        let InsertableOAuthUserSession {
+            splinter_access_token,
+            subject,
+            oauth_access_token,
+            oauth_refresh_token,
+        } = session;
+        Self {
+            splinter_access_token,
+            subject,
+            oauth_access_token,
+            oauth_refresh_token,
+            last_authenticated: SystemTime::now(),
+        }
     }
 }
