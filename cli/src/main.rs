@@ -312,7 +312,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             Arg::with_name("compat_version")
                 .long("compat")
                 .takes_value(true)
-                .possible_values(&["0.4"])
+                .possible_values(&["0.4", "0.6"])
                 .help("Enforce that the proposed circuit is compatible with a specific version"),
         )
         .arg(

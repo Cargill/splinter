@@ -55,7 +55,7 @@ OPTIONS
 
 `--compat COMPAT_VERSION`
 : Enforce that the proposed circuit is compatible with a specific version.
-  Accepted values: `0.4`
+  Accepted values: `0.4`, `0.6`
 
 `--display-name DISPLAY-NAME`
 : Add human-readable name for the circuit.
