@@ -659,52 +659,118 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     app = app.subcommand(circuit_command);
 
-    app = app.subcommand(
-        SubCommand::with_name("registry")
-            .about("Splinter registry commands")
-            .setting(AppSettings::SubcommandRequiredElseHelp)
-            .subcommand(
-                SubCommand::with_name("build")
-                    .about("Add a node to a YAML file")
-                    .arg(Arg::with_name("file").long("file").takes_value(true).help(
-                        "Path of registry file to add node to; defaults to \
+    let registry_command = SubCommand::with_name("registry")
+        .about("Splinter registry commands")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .subcommand(
+            SubCommand::with_name("build")
+                .about("Add a node to a YAML file")
+                .arg(Arg::with_name("file").long("file").takes_value(true).help(
+                    "Path of registry file to add node to; defaults to \
                                 './nodes.yaml'",
-                    ))
-                    .arg(
-                        Arg::with_name("force")
-                            .long("force")
-                            .help("Overwrite node if it already exists"),
-                    )
-                    .arg(
-                        Arg::with_name("status_url")
-                            .takes_value(true)
-                            .help("URL of splinter REST API to query for node data"),
-                    )
-                    .arg(
-                        Arg::with_name("key_files")
-                            .long("key-file")
-                            .takes_value(true)
-                            .multiple(true)
-                            .required(true)
-                            .help("Path of public key file to include with node"),
-                    )
-                    .arg(
-                        Arg::with_name("metadata")
-                            .long("metadata")
-                            .takes_value(true)
-                            .multiple(true)
-                            .help("Metadata to include with node (<key>=<value>)"),
-                    )
-                    .arg(
-                        Arg::with_name("private_key_file")
-                            .value_name("private-key-file")
-                            .short("k")
-                            .long("key")
-                            .takes_value(true)
-                            .help("Name or path of private key"),
-                    ),
+                ))
+                .arg(
+                    Arg::with_name("force")
+                        .long("force")
+                        .help("Overwrite node if it already exists"),
+                )
+                .arg(
+                    Arg::with_name("status_url")
+                        .takes_value(true)
+                        .help("URL of splinter REST API to query for node data"),
+                )
+                .arg(
+                    Arg::with_name("key_files")
+                        .long("key-file")
+                        .takes_value(true)
+                        .multiple(true)
+                        .required(true)
+                        .help("Path of public key file to include with node"),
+                )
+                .arg(
+                    Arg::with_name("metadata")
+                        .long("metadata")
+                        .takes_value(true)
+                        .multiple(true)
+                        .help("Metadata to include with node (<key>=<value>)"),
+                )
+                .arg(
+                    Arg::with_name("private_key_file")
+                        .value_name("private-key-file")
+                        .short("k")
+                        .long("key")
+                        .takes_value(true)
+                        .help("Name or path of private key"),
+                ),
+        );
+
+    #[cfg(feature = "registry")]
+    let registry_command = registry_command.subcommand(
+        SubCommand::with_name("add")
+            .about("Add a node to the local registry")
+            .arg(
+                Arg::with_name("display_name")
+                    .long("display-name")
+                    .takes_value(true)
+                    .help("Human-readable name for the new node"),
+            )
+            .arg(
+                Arg::with_name("dry_run")
+                    .long("dry-run")
+                    .help("Show the expected changes without submitting the node"),
+            )
+            .arg(
+                Arg::with_name("endpoint")
+                    .long("endpoint")
+                    .takes_value(true)
+                    .multiple(true)
+                    .required_unless("from_remote")
+                    .help("Network endpoint for the new node"),
+            )
+            .arg(
+                Arg::with_name("from_remote")
+                    .long("from-remote")
+                    .conflicts_with_all(&["display_name", "endpoint", "key_files", "metadata"])
+                    .help("Copies an existing node definition from the remote registries"),
+            )
+            .arg(
+                Arg::with_name("identity")
+                    .required(true)
+                    .help("Identity of the new node. Must be unique in the local registry"),
+            )
+            .arg(
+                Arg::with_name("key_files")
+                    .long("key-file")
+                    .takes_value(true)
+                    .multiple(true)
+                    .required_unless("from_remote")
+                    .help("Path of public key file to include with node"),
+            )
+            .arg(
+                Arg::with_name("metadata")
+                    .long("metadata")
+                    .takes_value(true)
+                    .multiple(true)
+                    .help("Metadata to include with node (<key>:<value>)"),
+            )
+            .arg(
+                Arg::with_name("private_key_file")
+                    .value_name("private-key-file")
+                    .short("k")
+                    .long("key")
+                    .takes_value(true)
+                    .help("Name or path of private key to be used for REST API authorization"),
+            )
+            .arg(
+                Arg::with_name("url")
+                    .short("U")
+                    .long("url")
+                    .takes_value(true)
+                    .help("URL of the splinter REST API"),
             ),
     );
+
+    app = app.subcommand(registry_command);
 
     #[cfg(feature = "health")]
     {
