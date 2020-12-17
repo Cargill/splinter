@@ -12,82 +12,66 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::Write;
+use crate::biome::oauth::store::{InsertableOAuthUserSession, OAuthUser};
 
-use diesel::{
-    backend::Backend,
-    deserialize::{self, FromSql},
-    expression::{helper_types::AsExprOf, AsExpression},
-    serialize::{self, Output, ToSql},
-    sql_types::SmallInt,
-};
+use super::schema::{oauth_user_sessions, oauth_users};
 
-use super::schema::oauth_user;
-
-#[repr(i16)]
-#[derive(Debug, PartialEq, FromSqlRow, Clone, Copy)]
-pub enum ProviderId {
-    Github = 1,
-    OpenId = 2,
+#[derive(Debug, PartialEq, Identifiable, Insertable, Queryable)]
+#[table_name = "oauth_users"]
+#[primary_key(subject)]
+pub struct OAuthUserModel {
+    pub subject: String,
+    pub user_id: String,
 }
 
-impl<DB> ToSql<SmallInt, DB> for ProviderId
-where
-    DB: Backend,
-    i16: ToSql<SmallInt, DB>,
-{
-    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
-        (*self as i16).to_sql(out)
+#[derive(Debug, PartialEq, Associations, Identifiable, Queryable)]
+#[table_name = "oauth_user_sessions"]
+#[belongs_to(OAuthUserModel, foreign_key = "subject")]
+#[primary_key(splinter_access_token)]
+pub struct OAuthUserSessionModel {
+    pub splinter_access_token: String,
+    pub subject: String,
+    pub oauth_access_token: String,
+    pub oauth_refresh_token: Option<String>,
+    pub last_authenticated: i64,
+}
+
+#[derive(Debug, PartialEq, Insertable)]
+#[table_name = "oauth_user_sessions"]
+pub struct InsertableOAuthUserSessionModel {
+    pub splinter_access_token: String,
+    pub subject: String,
+    pub oauth_access_token: String,
+    pub oauth_refresh_token: Option<String>,
+}
+
+impl From<OAuthUser> for OAuthUserModel {
+    fn from(user: OAuthUser) -> Self {
+        let OAuthUser { subject, user_id } = user;
+        OAuthUserModel { subject, user_id }
     }
 }
 
-impl AsExpression<SmallInt> for ProviderId {
-    type Expression = AsExprOf<i16, SmallInt>;
-
-    fn as_expression(self) -> Self::Expression {
-        <i16 as AsExpression<SmallInt>>::as_expression(self as i16)
+impl From<OAuthUserModel> for OAuthUser {
+    fn from(user: OAuthUserModel) -> Self {
+        let OAuthUserModel { subject, user_id } = user;
+        OAuthUser { subject, user_id }
     }
 }
 
-impl<'a> AsExpression<SmallInt> for &'a ProviderId {
-    type Expression = AsExprOf<i16, SmallInt>;
-
-    fn as_expression(self) -> Self::Expression {
-        <i16 as AsExpression<SmallInt>>::as_expression((*self) as i16)
-    }
-}
-
-impl<DB> FromSql<SmallInt, DB> for ProviderId
-where
-    DB: Backend,
-    i16: FromSql<SmallInt, DB>,
-{
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
-        match i16::from_sql(bytes)? {
-            1 => Ok(ProviderId::Github),
-            2 => Ok(ProviderId::OpenId),
-            int => Err(format!("Invalid provider {}", int).into()),
+impl From<InsertableOAuthUserSession> for InsertableOAuthUserSessionModel {
+    fn from(session: InsertableOAuthUserSession) -> Self {
+        let InsertableOAuthUserSession {
+            splinter_access_token,
+            subject,
+            oauth_access_token,
+            oauth_refresh_token,
+        } = session;
+        InsertableOAuthUserSessionModel {
+            splinter_access_token,
+            subject,
+            oauth_access_token,
+            oauth_refresh_token,
         }
     }
-}
-
-#[derive(Queryable, Identifiable, PartialEq, Debug)]
-#[table_name = "oauth_user"]
-pub struct OAuthUserModel {
-    pub id: i64,
-    pub user_id: String,
-    pub provider_user_ref: String,
-    pub access_token: Option<String>,
-    pub refresh_token: Option<String>,
-    pub provider_id: ProviderId,
-}
-
-#[derive(Insertable, PartialEq, Debug)]
-#[table_name = "oauth_user"]
-pub struct NewOAuthUserModel<'a> {
-    pub user_id: &'a str,
-    pub provider_user_ref: &'a str,
-    pub access_token: Option<&'a str>,
-    pub refresh_token: Option<&'a str>,
-    pub provider_id: ProviderId,
 }

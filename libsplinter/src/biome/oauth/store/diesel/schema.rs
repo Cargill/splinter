@@ -13,12 +13,18 @@
 // limitations under the License.
 
 table! {
-    oauth_user (id) {
-        id -> Int8,
+    oauth_users (subject) {
+        subject -> Text,
         user_id -> Text,
-        provider_user_ref -> Text,
-        access_token -> Nullable<Text>,
-        refresh_token -> Nullable<Text>,
-        provider_id -> SmallInt,
+    }
+}
+
+table! {
+    oauth_user_sessions (splinter_access_token) {
+        splinter_access_token -> Text,
+        subject -> Text,
+        oauth_access_token -> Text,
+        oauth_refresh_token -> Nullable<Text>,
+        last_authenticated -> BigInt,
     }
 }
