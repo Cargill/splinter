@@ -17,10 +17,12 @@
 
 use actix_web::{http::header::LOCATION, web::Query, HttpResponse};
 use futures::future::IntoFuture;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 
 use crate::oauth::{
     rest_api::{
-        resources::callback::{user_info_to_query_string, CallbackQuery},
+        resources::callback::{generate_redirect_query, CallbackQuery},
         OAuthUserInfoStore,
     },
     OAuthClient,
@@ -43,18 +45,28 @@ pub fn make_callback_route(
                     Ok(query) => {
                         match client.exchange_authorization_code(query.code.clone(), &query.state) {
                             Ok(Some((user_info, redirect_url))) => {
-                                if let Err(err) = user_info_store.save_user_info(&user_info) {
+                                // Generate a Splinter access token for the new session
+                                let splinter_access_token = new_splinter_access_token();
+
+                                // Adding the token and identity to the redirect URL so the client
+                                // may access these values after a redirect
+                                let redirect_url = format!(
+                                    "{}?{}",
+                                    redirect_url,
+                                    generate_redirect_query(
+                                        &splinter_access_token,
+                                        user_info.identity()
+                                    )
+                                );
+
+                                // Save the new session
+                                if let Err(err) = user_info_store
+                                    .save_user_info(splinter_access_token, &user_info)
+                                {
                                     error!("Unable to store user info: {}", err);
                                     HttpResponse::InternalServerError()
                                         .json(ErrorResponse::internal_error())
                                 } else {
-                                    // Adding the user info to the redirect URL, so the client may
-                                    // access these values after a redirect
-                                    let redirect_url = format!(
-                                        "{}?{}",
-                                        redirect_url,
-                                        user_info_to_query_string(&user_info)
-                                    );
                                     HttpResponse::Found()
                                         .header(LOCATION, redirect_url)
                                         .finish()
@@ -86,4 +98,9 @@ pub fn make_callback_route(
                 .into_future(),
             )
         })
+}
+
+/// Generates a new Splinter access token, which is a string of 32 random alphanumeric characters
+fn new_splinter_access_token() -> String {
+    thread_rng().sample_iter(&Alphanumeric).take(32).collect()
 }

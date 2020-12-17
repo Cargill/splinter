@@ -25,8 +25,12 @@ use super::{OAuthClient, UserInfo};
 
 /// Operations that handle an OAuth user.
 pub trait OAuthUserInfoStore: Sync + Send {
-    /// Executes a save operation on the given user info.
-    fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError>;
+    /// Executes a save operation on the given user info with the given access token
+    fn save_user_info(
+        &self,
+        splinter_access_token: String,
+        user_info: &UserInfo,
+    ) -> Result<(), InternalError>;
 
     /// Executes an update operation to remove the user's tokens.
     fn remove_user_tokens(&self, access_token: &str) -> Result<(), InternalError>;
@@ -54,7 +58,11 @@ impl Clone for Box<dyn OAuthUserInfoStore> {
 pub struct OAuthUserInfoStoreNoOp;
 
 impl OAuthUserInfoStore for OAuthUserInfoStoreNoOp {
-    fn save_user_info(&self, _user_info: &UserInfo) -> Result<(), InternalError> {
+    fn save_user_info(
+        &self,
+        _splinter_access_token: String,
+        _user_info: &UserInfo,
+    ) -> Result<(), InternalError> {
         Ok(())
     }
 

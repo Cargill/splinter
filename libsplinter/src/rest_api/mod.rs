@@ -87,7 +87,6 @@ use std::thread;
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::{
-    oauth::store::OAuthProvider,
     rest_api::auth::{BiomeOAuthUserInfoStore, GetUserByOAuthAuthorization},
     OAuthUserSessionStore,
 };
@@ -934,13 +933,6 @@ impl RestApiBuilder {
                             ));
                         }
 
-                        #[cfg(feature = "biome-oauth")]
-                        let oauth_provider = match &oauth_config {
-                            #[cfg(feature = "oauth-github")]
-                            OAuthConfig::GitHub { .. } => OAuthProvider::Github,
-                            #[cfg(feature = "oauth-openid")]
-                            OAuthConfig::OpenId { .. } => OAuthProvider::OpenId,
-                        };
                         let (oauth_client, oauth_identity_provider): (
                             _,
                             Box<dyn IdentityProvider>,
@@ -1003,10 +995,7 @@ impl RestApiBuilder {
                                             ),
                                         ),
                                     );
-                                    Box::new(BiomeOAuthUserInfoStore::new(
-                                        oauth_provider,
-                                        oauth_user_session_store,
-                                    ))
+                                    Box::new(BiomeOAuthUserInfoStore::new(oauth_user_session_store))
                                 }
                                 OAuthUserInfoStoreConfig::NoOp => Box::new(OAuthUserInfoStoreNoOp),
                             };
