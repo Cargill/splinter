@@ -91,7 +91,7 @@ impl OpenIdOAuthClientBuilder {
     pub fn build(self) -> Result<(OAuthClient, Box<dyn IdentityProvider>), OAuthClientBuildError> {
         let discovery_url = self.openid_discovery_url.ok_or_else(|| {
             InvalidStateError::with_message(
-                "An OpenID discovery URL  is required to successfully build an OAuthClient".into(),
+                "An OpenID discovery URL is required to successfully build an OAuthClient".into(),
             )
         })?;
 
