@@ -14,7 +14,7 @@
 
 //! Provides the "list nodes" operation for the `DieselRegistry`.
 
-use diesel::{dsl::sql_query, prelude::*};
+use diesel::prelude::*;
 
 use crate::registry::{
     diesel::{
@@ -26,7 +26,7 @@ use crate::registry::{
     MetadataPredicate, Node, NodeBuilder, RegistryError,
 };
 
-use super::{exists_statements_from_metadata_predicates, RegistryOperations};
+use super::{apply_predicate_filters, RegistryOperations};
 
 pub(in crate::registry::diesel) trait RegistryListNodesOperation {
     fn list_nodes(&self, predicates: &[MetadataPredicate]) -> Result<Vec<Node>, RegistryError>;
@@ -48,17 +48,18 @@ where
                     )
                 })?
             } else {
-                // With predicates, this query is too complicated for pure Diesel, so a raw SQL
-                // query is needed.
-                let filters = exists_statements_from_metadata_predicates(predicates);
-                sql_query(format!("SELECT * FROM splinter_nodes WHERE {}", filters))
-                    .load(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to get nodes matching metadata predicates",
-                            Box::new(err),
-                        )
-                    })?
+                // With predicates
+                let mut query = splinter_nodes::table
+                    .into_boxed()
+                    .select(splinter_nodes::all_columns);
+
+                query = apply_predicate_filters(query, predicates);
+                query.load(self.conn).map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to get nodes matching metadata predicates",
+                        Box::new(err),
+                    )
+                })?
             };
 
             // Checking if there are any nodes here serves two purposes: 1) It saves time by

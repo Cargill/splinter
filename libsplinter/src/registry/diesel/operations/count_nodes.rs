@@ -14,14 +14,11 @@
 
 //! Provides the "count nodes" operation for the `DieselRegistry`.
 
-use diesel::{dsl::sql_query, prelude::*};
+use diesel::{dsl::count_star, prelude::*};
 
-use crate::registry::{
-    diesel::{models::Count, schema::splinter_nodes},
-    MetadataPredicate, RegistryError,
-};
+use crate::registry::{diesel::schema::splinter_nodes, MetadataPredicate, RegistryError};
 
-use super::{exists_statements_from_metadata_predicates, RegistryOperations};
+use super::{apply_predicate_filters, RegistryOperations};
 
 pub(in crate::registry::diesel) trait RegistryCountNodesOperation {
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError>;
@@ -47,23 +44,20 @@ where
                     )
                 })
         } else {
-            // With predicates, this query is too complicated for pure Diesel, so a raw SQL
-            // query is needed.
-            let filters = exists_statements_from_metadata_predicates(predicates);
-            sql_query(format!(
-                "SELECT COUNT(*) FROM splinter_nodes WHERE {}",
-                filters
-            ))
-            // The `Count` struct is required because the deserialized type for a `sql_query` must
-            // implement the `QueryableByName` trait, which a raw `i64` does not.
-            .get_result::<Count>(self.conn)
-            .map(|count| count.count as u32)
-            .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to count nodes matching metadata predicates",
-                    Box::new(err),
-                )
-            })
+            let mut query = splinter_nodes::table
+                .into_boxed()
+                .select(splinter_nodes::all_columns);
+            query = apply_predicate_filters(query, predicates);
+            query
+                .select(count_star())
+                .first::<i64>(self.conn)
+                .map(|count| count as u32)
+                .map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to count nodes matching metadata predicates",
+                        Box::new(err),
+                    )
+                })
         }
     }
 }

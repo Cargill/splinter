@@ -42,3 +42,10 @@ table! {
         value -> Text,
     }
 }
+
+allow_tables_to_appear_in_same_query!(
+    splinter_nodes,
+    splinter_nodes_endpoints,
+    splinter_nodes_keys,
+    splinter_nodes_metadata
+);
