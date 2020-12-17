@@ -130,7 +130,7 @@ impl Default for OpenIdOAuthClientBuilder {
     }
 }
 
-/// Deserializes the OpenId discovery document response
+/// Deserializes the OpenID discovery document response
 #[derive(Debug, Deserialize)]
 struct DiscoveryDocumentResponse {
     authorization_endpoint: String,
