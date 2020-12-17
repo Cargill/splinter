@@ -74,12 +74,15 @@ experimental = [
     "health",
     "https-certs",
     "permissions",
+    "registry",
 ]
 
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
 circuit-auth-type = []
 circuit-template = ["splinter/circuit-template"]
+
+registry = []
 
 health = []
 
