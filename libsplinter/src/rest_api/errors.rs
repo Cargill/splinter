@@ -114,3 +114,10 @@ impl fmt::Display for RequestError {
         }
     }
 }
+
+#[cfg(feature = "https-bind")]
+impl From<openssl::error::ErrorStack> for RestApiServerError {
+    fn from(err: openssl::error::ErrorStack) -> Self {
+        RestApiServerError::InternalError(InternalError::from_source(Box::new(err)))
+    }
+}

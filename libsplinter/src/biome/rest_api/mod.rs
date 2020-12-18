@@ -492,8 +492,13 @@ mod tests {
 
         let mut rest_api_builder = RestApiBuilder::new();
 
+        #[cfg(not(feature = "https-bind"))]
+        let bind = "127.0.0.1:0";
+        #[cfg(feature = "https-bind")]
+        let bind = crate::rest_api::RestApiBind::Insecure("127.0.0.1:0".into());
+
         rest_api_builder = rest_api_builder
-            .with_bind("127.0.0.1:0")
+            .with_bind(bind)
             .add_resources(resource_manager.resources());
 
         #[cfg(feature = "auth")]
