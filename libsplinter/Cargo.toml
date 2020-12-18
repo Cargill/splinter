@@ -76,7 +76,6 @@ default = []
 
 stable = [
     "admin-service",
-    "biome",
     "biome-credentials",
     "biome-key-management",
     "circuit-template",
@@ -117,11 +116,10 @@ benchmark = []
 
 admin-service = []
 auth = []
-biome = []
-biome-credentials = ["biome", "bcrypt"]
-biome-key-management = ["biome"]
-biome-notifications = ["biome"]
-biome-oauth = ["biome"]
+biome-credentials = ["bcrypt"]
+biome-key-management = []
+biome-notifications = []
+biome-oauth = []
 biome-oauth-user-store-postgres = ["biome-oauth", "postgres"]
 circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt"]

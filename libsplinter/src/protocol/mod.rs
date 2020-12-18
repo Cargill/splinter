@@ -60,7 +60,12 @@ pub(crate) const REGISTRY_LIST_NODES_MIN: u32 = 1;
 #[cfg(all(feature = "registry", feature = "rest-api-actix"))]
 pub(crate) const REGISTRY_FETCH_NODE_MIN: u32 = 1;
 
-#[cfg(feature = "biome")]
+#[cfg(any(
+    feature = "biome-credentials",
+    feature = "biome-key-management",
+    feature = "biome-notifications",
+    feature = "biome-oauth"
+))]
 pub const BIOME_PROTOCOL_VERSION: u32 = 1;
 
 #[cfg(all(feature = "biome-credentials", feature = "rest-api",))]
