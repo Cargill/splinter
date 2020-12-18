@@ -96,6 +96,7 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "admin-service-event-store",
     "auth",
     "biome-notifications",
     "biome-oauth",
@@ -116,6 +117,7 @@ experimental = [
 benchmark = []
 
 admin-service = []
+admin-service-event-store = ["admin-service"]
 auth = []
 biome = []
 biome-credentials = ["biome", "bcrypt"]

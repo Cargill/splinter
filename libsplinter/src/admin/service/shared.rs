@@ -18,6 +18,7 @@ use std::iter::ExactSizeIterator;
 use std::iter::FromIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+#[cfg(not(feature = "admin-service-event-store"))]
 use std::time::SystemTime;
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
@@ -48,14 +49,20 @@ use crate::service::error::ServiceError;
 use crate::service::validation::ServiceArgValidator;
 
 use crate::service::ServiceNetworkSender;
+#[cfg(not(feature = "admin-service-event-store"))]
 use crate::sets::mem::DurableBTreeSet;
 
 use super::error::{AdminSharedError, MarshallingError};
+#[cfg(not(feature = "admin-service-event-store"))]
 use super::mailbox::Mailbox;
 use super::messages;
 use super::{
     admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, AdminSubscriberError,
     Events,
+};
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::service::event::store::{
+    memory::MemoryAdminServiceEventStore, AdminServiceEventStore,
 };
 
 static VOTER_ROLE: &str = "voter";
@@ -112,6 +119,7 @@ impl SubscriberMap {
         }
     }
 
+    #[cfg(not(feature = "admin-service-event-store"))]
     fn broadcast_by_type(
         &self,
         event_type: &str,
@@ -122,6 +130,28 @@ impl SubscriberMap {
         if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
             subscribers.retain(|subscriber| {
                 match subscriber.handle_event(admin_service_event, timestamp) {
+                    Ok(()) => true,
+                    Err(AdminSubscriberError::Unsubscribe) => false,
+                    Err(AdminSubscriberError::UnableToHandleEvent(msg)) => {
+                        error!("Unable to send event: {}", msg);
+                        true
+                    }
+                }
+            });
+        }
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn broadcast_by_type(
+        &self,
+        event_type: &str,
+        admin_service_event: &messages::AdminServiceEvent,
+        event_id: &i64,
+    ) {
+        let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
+        if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
+            subscribers.retain(|subscriber| {
+                match subscriber.handle_event(admin_service_event, event_id) {
                     Ok(()) => true,
                     Err(AdminSubscriberError::Unsubscribe) => false,
                     Err(AdminSubscriberError::UnableToHandleEvent(msg)) => {
@@ -186,6 +216,7 @@ pub struct AdminServiceShared {
     // Admin Service Event Subscribers
     event_subscribers: SubscriberMap,
     // Mailbox of AdminServiceEvent values
+    #[cfg(not(feature = "admin-service-event-store"))]
     event_mailbox: Mailbox,
     // AdminServiceStore
     admin_store: Box<dyn AdminServiceStore>,
@@ -197,6 +228,9 @@ pub struct AdminServiceShared {
 
     admin_service_status: AdminServiceStatus,
     routing_table_writer: Box<dyn RoutingTableWriter>,
+
+    #[cfg(feature = "admin-service-event-store")]
+    admin_event_store: Box<dyn AdminServiceEventStore>,
 }
 
 impl AdminServiceShared {
@@ -215,9 +249,14 @@ impl AdminServiceShared {
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
     ) -> Result<Self, ServiceError> {
+        #[cfg(not(feature = "admin-service-event-store"))]
         let event_mailbox = Mailbox::new(DurableBTreeSet::new_boxed_with_bound(
             std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
         ));
+        #[cfg(feature = "admin-service-event-store")]
+        let admin_event_store = MemoryAdminServiceEventStore::new_boxed_with_bound(
+            std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
+        );
 
         Ok(AdminServiceShared {
             node_id,
@@ -236,6 +275,7 @@ impl AdminServiceShared {
             pending_changes: None,
             current_consensus_verifiers: Vec::new(),
             event_subscribers: SubscriberMap::new(),
+            #[cfg(not(feature = "admin-service-event-store"))]
             event_mailbox,
             admin_store,
             signature_verifier,
@@ -244,6 +284,8 @@ impl AdminServiceShared {
             proposal_sender: None,
             admin_service_status: AdminServiceStatus::NotRunning,
             routing_table_writer,
+            #[cfg(feature = "admin-service-event-store")]
+            admin_event_store,
         })
     }
 
@@ -1029,6 +1071,7 @@ impl AdminServiceShared {
         }
     }
 
+    #[cfg(not(feature = "admin-service-event-store"))]
     pub fn get_events_since(
         &self,
         since_timestamp: &SystemTime,
@@ -1047,6 +1090,22 @@ impl AdminServiceShared {
         })
     }
 
+    #[cfg(feature = "admin-service-event-store")]
+    pub fn get_events_since(
+        &self,
+        since_event_id: &i64,
+        circuit_management_type: &str,
+    ) -> Result<Events, AdminSharedError> {
+        let events = self
+            .admin_event_store
+            .list_events_by_management_type_since(
+                circuit_management_type.to_string(),
+                *since_event_id,
+            )
+            .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?;
+        Ok(Events { inner: events })
+    }
+
     pub fn add_subscriber(
         &mut self,
         circuit_management_type: String,
@@ -1058,6 +1117,7 @@ impl AdminServiceShared {
         Ok(())
     }
 
+    #[cfg(not(feature = "admin-service-event-store"))]
     pub fn send_event(
         &mut self,
         circuit_management_type: &str,
@@ -1073,6 +1133,24 @@ impl AdminServiceShared {
 
         self.event_subscribers
             .broadcast_by_type(&circuit_management_type, &event, &ts);
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    pub fn send_event(
+        &mut self,
+        circuit_management_type: &str,
+        event: messages::AdminServiceEvent,
+    ) {
+        let (event_id, event) = match self.admin_event_store.add_event(event) {
+            Ok((id, event)) => (id, event),
+            Err(err) => {
+                error!("Unable to store admin event: {}", err);
+                return;
+            }
+        };
+
+        self.event_subscribers
+            .broadcast_by_type(&circuit_management_type, &event, &event_id);
     }
 
     pub fn remove_all_event_subscribers(&mut self) {

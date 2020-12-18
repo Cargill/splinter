@@ -56,6 +56,7 @@ features = [
 path = "../libsplinter"
 features = [
   "admin-service",
+  "admin-service-event-store",
   "registry",
   "registry-remote",
   "rest-api",
@@ -81,6 +82,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "auth",
+    "admin-service-event-store",
     "biome-oauth",
     "health",
     "registry-database",
@@ -89,6 +91,10 @@ experimental = [
     "ws-transport",
 ]
 
+admin-service-event-store = [
+  "splinter/admin-service-event-store",
+  "splinter/admin-service"
+]
 auth = [
     "splinter/cylinder-jwt",
     "splinter/oauth-github",

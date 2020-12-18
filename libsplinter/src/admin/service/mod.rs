@@ -14,6 +14,9 @@
 
 mod consensus;
 pub(crate) mod error;
+#[cfg(feature = "admin-service-event-store")]
+pub mod event;
+#[cfg(not(feature = "admin-service-event-store"))]
 mod mailbox;
 pub(crate) mod messages;
 pub(super) mod proposal_store;
@@ -24,7 +27,9 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
+#[cfg(not(feature = "admin-service-event-store"))]
+use std::time::SystemTime;
 
 use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
@@ -63,10 +68,18 @@ pub use self::shared::AdminServiceStatus;
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 pub trait AdminServiceEventSubscriber: Send {
+    #[cfg(not(feature = "admin-service-event-store"))]
     fn handle_event(
         &self,
         admin_service_event: &messages::AdminServiceEvent,
         timestamp: &SystemTime,
+    ) -> Result<(), AdminSubscriberError>;
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn handle_event(
+        &self,
+        admin_service_event: &messages::AdminServiceEvent,
+        event_id: &i64,
     ) -> Result<(), AdminSubscriberError>;
 }
 
@@ -82,9 +95,17 @@ pub trait AdminCommands: Send + Sync {
         subscriber: Box<dyn AdminServiceEventSubscriber>,
     ) -> Result<(), AdminServiceError>;
 
+    #[cfg(not(feature = "admin-service-event-store"))]
     fn get_events_since(
         &self,
         since_timestamp: &SystemTime,
+        event_type: &str,
+    ) -> Result<Events, AdminServiceError>;
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn get_events_since(
+        &self,
+        since_event_id: &i64,
         event_type: &str,
     ) -> Result<Events, AdminServiceError>;
 
@@ -130,13 +151,29 @@ impl AdminKeyVerifier for Box<dyn RegistryReader> {
     }
 }
 
+#[cfg(not(feature = "admin-service-event-store"))]
 /// An iterator over AdminServiceEvents and the time that each occurred.
 pub struct Events {
     inner: Box<dyn Iterator<Item = (SystemTime, messages::AdminServiceEvent)> + Send>,
 }
 
+#[cfg(not(feature = "admin-service-event-store"))]
 impl Iterator for Events {
     type Item = (SystemTime, messages::AdminServiceEvent);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+pub struct Events {
+    inner: Box<dyn ExactSizeIterator<Item = (i64, messages::AdminServiceEvent)> + Send>,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl Iterator for Events {
+    type Item = (i64, messages::AdminServiceEvent);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
@@ -705,6 +742,7 @@ impl AdminCommands for AdminServiceCommands {
             })
     }
 
+    #[cfg(not(feature = "admin-service-event-store"))]
     fn get_events_since(
         &self,
         since_timestamp: &SystemTime,
@@ -714,6 +752,21 @@ impl AdminCommands for AdminServiceCommands {
             .lock()
             .map_err(|_| AdminServiceError::general_error("Admin shared lock was lock poisoned"))?
             .get_events_since(since_timestamp, event_type)
+            .map_err(|err| {
+                AdminServiceError::general_error_with_source("Unable to get events", Box::new(err))
+            })
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn get_events_since(
+        &self,
+        since_event_id: &i64,
+        event_type: &str,
+    ) -> Result<Events, AdminServiceError> {
+        self.shared
+            .lock()
+            .map_err(|_| AdminServiceError::general_error("Admin shared lock was lock poisoned"))?
+            .get_events_since(since_event_id, event_type)
             .map_err(|err| {
                 AdminServiceError::general_error_with_source("Unable to get events", Box::new(err))
             })
