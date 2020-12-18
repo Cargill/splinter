@@ -20,11 +20,9 @@ use futures::future::IntoFuture;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
+use crate::biome::oauth::store::{InsertableOAuthUserSessionBuilder, OAuthUserSessionStore};
 use crate::oauth::{
-    rest_api::{
-        resources::callback::{generate_redirect_query, CallbackQuery},
-        OAuthUserInfoStore,
-    },
+    rest_api::resources::callback::{generate_redirect_query, CallbackQuery},
     OAuthClient,
 };
 use crate::protocol;
@@ -32,7 +30,7 @@ use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource
 
 pub fn make_callback_route(
     client: OAuthClient,
-    user_info_store: Box<dyn OAuthUserInfoStore>,
+    oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 ) -> Resource {
     Resource::build("/oauth/callback")
         .add_request_guard(ProtocolVersionRangeGuard::new(
@@ -60,16 +58,32 @@ pub fn make_callback_route(
                                 );
 
                                 // Save the new session
-                                if let Err(err) = user_info_store
-                                    .save_user_info(splinter_access_token, &user_info)
+                                match InsertableOAuthUserSessionBuilder::new()
+                                    .with_splinter_access_token(splinter_access_token)
+                                    .with_subject(user_info.identity().to_string())
+                                    .with_oauth_access_token(user_info.access_token().to_string())
+                                    .with_oauth_refresh_token(
+                                        user_info.refresh_token().map(ToOwned::to_owned),
+                                    )
+                                    .build()
                                 {
-                                    error!("Unable to store user info: {}", err);
-                                    HttpResponse::InternalServerError()
-                                        .json(ErrorResponse::internal_error())
-                                } else {
-                                    HttpResponse::Found()
-                                        .header(LOCATION, redirect_url)
-                                        .finish()
+                                    Ok(session) => {
+                                        match oauth_user_session_store.add_session(session) {
+                                            Ok(_) => HttpResponse::Found()
+                                                .header(LOCATION, redirect_url)
+                                                .finish(),
+                                            Err(err) => {
+                                                error!("Unable to store user session: {}", err);
+                                                HttpResponse::InternalServerError()
+                                                    .json(ErrorResponse::internal_error())
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        error!("Unable to build user session: {}", err);
+                                        HttpResponse::InternalServerError()
+                                            .json(ErrorResponse::internal_error())
+                                    }
                                 }
                             }
                             Ok(None) => {

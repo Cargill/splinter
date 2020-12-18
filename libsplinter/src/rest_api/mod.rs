@@ -85,15 +85,12 @@ use std::thread;
 
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
-#[cfg(feature = "biome-oauth")]
-use crate::biome::{
-    rest_api::auth::{BiomeOAuthUserInfoStore, GetUserByOAuthAuthorization},
-    OAuthUserSessionStore,
-};
+#[cfg(feature = "oauth")]
+use crate::biome::{rest_api::auth::GetUserByOAuthAuthorization, OAuthUserSessionStore};
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
 #[cfg(feature = "oauth")]
-use crate::oauth::rest_api::{OAuthResourceProvider, OAuthUserInfoStore, OAuthUserInfoStoreNoOp};
+use crate::oauth::rest_api::OAuthResourceProvider;
 #[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
 use crate::oauth::store::InflightOAuthRequestStore;
 #[cfg(feature = "oauth-github")]
@@ -923,7 +920,7 @@ impl RestApiBuilder {
                     #[cfg(feature = "oauth")]
                     AuthConfig::OAuth {
                         oauth_config,
-                        user_info_store_config,
+                        oauth_user_session_store,
                     } => {
                         if oauth_configured {
                             return Err(RestApiServerError::InvalidStateError(
@@ -980,29 +977,16 @@ impl RestApiBuilder {
                                     )
                                 })?,
                         };
-                        // Save user information, including tokens
-                        let user_info_store: Box<dyn OAuthUserInfoStore> =
-                            match user_info_store_config {
-                                #[cfg(feature = "biome-oauth")]
-                                OAuthUserInfoStoreConfig::Biome {
-                                    oauth_user_session_store,
-                                } => {
-                                    // Add the configuration mapping for the User value.
-                                    self.authorization_mappings.push(
-                                        ConfigureAuthorizationMapping::new(
-                                            GetUserByOAuthAuthorization::new(
-                                                oauth_user_session_store.clone(),
-                                            ),
-                                        ),
-                                    );
-                                    Box::new(BiomeOAuthUserInfoStore::new(oauth_user_session_store))
-                                }
-                                OAuthUserInfoStoreConfig::NoOp => Box::new(OAuthUserInfoStoreNoOp),
-                            };
+
+                        // Add the configuration mapping for the Biome User value.
+                        self.authorization_mappings
+                            .push(ConfigureAuthorizationMapping::new(
+                                GetUserByOAuthAuthorization::new(oauth_user_session_store.clone()),
+                            ));
 
                         identity_providers.push(oauth_identity_provider);
                         self.resources.append(
-                            &mut OAuthResourceProvider::new(oauth_client, user_info_store)
+                            &mut OAuthResourceProvider::new(oauth_client, oauth_user_session_store)
                                 .resources(),
                         );
                         oauth_configured = true;
@@ -1078,8 +1062,8 @@ pub enum AuthConfig {
     OAuth {
         /// OAuth provider configuration
         oauth_config: OAuthConfig,
-        /// The configuration for user info storage
-        user_info_store_config: OAuthUserInfoStoreConfig,
+        /// The Biome OAuth user session store
+        oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
     },
     /// A custom authentication method
     Custom {
@@ -1119,18 +1103,6 @@ pub enum OAuthConfig {
         /// The store for in-flight requests
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
-}
-
-/// Configurations for how users' information, including tokens and identity, are handled
-#[cfg(feature = "oauth")]
-pub enum OAuthUserInfoStoreConfig {
-    /// Uses Biome's OAuth user store as the underlying storage
-    #[cfg(feature = "biome-oauth")]
-    Biome {
-        oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
-    },
-    /// Users' information is not handled by the Splinter REST API
-    NoOp,
 }
 
 pub fn into_protobuf<M: Message>(
