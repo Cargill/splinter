@@ -99,6 +99,8 @@ use crate::oauth::GithubOAuthClientBuilder;
 use crate::oauth::OpenIdOAuthClientBuilder;
 #[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
 use auth::identity::cylinder::CylinderKeyIdentityProvider;
+#[cfg(feature = "oauth")]
+use auth::identity::oauth::OAuthUserIdentityProvider;
 #[cfg(feature = "auth")]
 use auth::{actix::Authorization, identity::IdentityProvider, AuthorizationMapping};
 
@@ -984,7 +986,10 @@ impl RestApiBuilder {
                                 GetUserByOAuthAuthorization::new(oauth_user_session_store.clone()),
                             ));
 
-                        identity_providers.push(oauth_identity_provider);
+                        identity_providers.push(Box::new(OAuthUserIdentityProvider::new(
+                            oauth_identity_provider,
+                            oauth_user_session_store.clone(),
+                        )));
                         self.resources.append(
                             &mut OAuthResourceProvider::new(oauth_client, oauth_user_session_store)
                                 .resources(),
