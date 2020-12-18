@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! Provides the "count nodes" operation for the `DieselRegistry`.
+use std::convert::TryFrom;
 
 use diesel::{dsl::count_star, prelude::*};
 
@@ -32,32 +33,38 @@ where
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
         if predicates.is_empty() {
             // No predicates were specified, just count all nodes
-            splinter_nodes::table
+            let count = splinter_nodes::table
                 .count()
                 // Parse as an i64 here because Diesel knows how to convert a `BigInt` into an i64
                 .get_result::<i64>(self.conn)
-                .map(|count| count as u32)
                 .map_err(|err| {
                     RegistryError::general_error_with_source(
                         "Failed to count all nodes",
                         Box::new(err),
                     )
-                })
+                })?;
+
+            Ok(u32::try_from(count).map_err(|_| {
+                RegistryError::general_error("The number of nodes is larger than the max u32")
+            })?)
         } else {
             let mut query = splinter_nodes::table
                 .into_boxed()
                 .select(splinter_nodes::all_columns);
             query = apply_predicate_filters(query, predicates);
-            query
+            let count = query
                 .select(count_star())
                 .first::<i64>(self.conn)
-                .map(|count| count as u32)
                 .map_err(|err| {
                     RegistryError::general_error_with_source(
                         "Failed to count nodes matching metadata predicates",
                         Box::new(err),
                     )
-                })
+                })?;
+
+            Ok(u32::try_from(count).map_err(|_| {
+                RegistryError::general_error("The number of nodes is larger than the max u32")
+            })?)
         }
     }
 }
