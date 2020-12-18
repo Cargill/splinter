@@ -60,7 +60,8 @@ transact = "0.3"
 [dependencies.splinter]
 path = "../../../libsplinter"
 features = [
-    "biome",
+    "biome-credentials",
+    "biome-key-management",
     "events",
     "postgres",
     "registry",
