@@ -66,7 +66,7 @@ pub struct Config {
     state_dir: (String, ConfigSource),
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
@@ -194,7 +194,7 @@ impl Config {
         self.no_tls.0
     }
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     pub fn enable_biome(&self) -> bool {
         self.enable_biome.0
     }
@@ -367,7 +367,7 @@ impl Config {
         &self.no_tls.1
     }
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     fn enable_biome_source(&self) -> &ConfigSource {
         &self.enable_biome.1
     }
@@ -549,7 +549,7 @@ impl Config {
             self.no_tls(),
             self.no_tls_source()
         );
-        #[cfg(feature = "biome")]
+        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
         debug!(
             "Config: enable_biome: {:?} (source: {:?})",
             self.enable_biome(),

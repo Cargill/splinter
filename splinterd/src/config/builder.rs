@@ -314,7 +314,7 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
-            #[cfg(feature = "biome")]
+            #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
             enable_biome: self
                 .partial_configs
                 .iter()

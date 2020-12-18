@@ -59,7 +59,7 @@ pub struct PartialConfig {
     state_dir: Option<String>,
     tls_insecure: Option<bool>,
     no_tls: Option<bool>,
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     enable_biome: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
@@ -107,7 +107,7 @@ impl PartialConfig {
             state_dir: None,
             tls_insecure: None,
             no_tls: None,
-            #[cfg(feature = "biome")]
+            #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
             enable_biome: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
@@ -227,7 +227,7 @@ impl PartialConfig {
         self.no_tls
     }
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     pub fn enable_biome(&self) -> Option<bool> {
         self.enable_biome
     }
@@ -541,7 +541,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     /// Adds a `enable_biome` value to the `PartialConfig` object.
     ///
     /// # Arguments
