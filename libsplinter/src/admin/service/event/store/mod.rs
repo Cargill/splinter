@@ -19,6 +19,8 @@
 //!
 //! [`AdminServiceEventStore`]: trait.AdminServiceEventStore.html
 
+#[cfg(feature = "admin-service-event-store-diesel")]
+mod diesel;
 mod error;
 pub mod memory;
 
