@@ -95,107 +95,36 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     );
 
-    app = app
-        .subcommand(
-            SubCommand::with_name("cert")
-                .about("Generates certificates that can be used for development")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommand(
-                    SubCommand::with_name("generate")
-                        .long_about(
-                            "Generates test certificates and keys for running splinterd with \
-                         TLS (in insecure mode)",
-                        )
-                        .arg(
-                            Arg::with_name("common_name")
-                                .long("common-name")
-                                .takes_value(true)
-                                .long_help(
-                                    "String that specifies a common name for the generated \
-                             certificate (defaults to localhost). Use this option if the \
-                             splinterd URL uses a DNS address instead of a numerical IP \
-                             address.",
-                                ),
-                        )
-                        .arg(
-                            Arg::with_name("cert_dir")
-                                .long("cert-dir")
-                                .short("d")
-                                .takes_value(true)
-                                .long_help(
-                                    "Path to the directory certificates are created in. \
-                             Defaults to /etc/splinter/certs/. This location can also be \
-                             changed with the SPLINTER_CERT_DIR environment variable. \
-                             This directory must exist.
-                        ",
-                                ),
-                        )
-                        .arg(
-                            Arg::with_name("force")
-                                .long("force")
-                                .conflicts_with("skip")
-                                .long_help(
-                                    "Overwrites files if they exist. If this flag is not \
-                            provided and the file exists, an error is returned.
-                        ",
-                                ),
-                        )
-                        .arg(
-                            Arg::with_name("skip")
-                                .long("skip")
-                                .conflicts_with("force")
-                                .long_help(
-                                    "Checks if the files exists and generates the files that \
-                             are missing. If this flag is not \
-                             provided and the file exists, an error is returned.",
-                                ),
-                        )
-                        .after_help(
-                            "DETAILS: \n\n\
-                    The files are generated in the location specified by --cert-dir, the \
-                    SPLINTER_CERT_DIR environment variable, or in the default location \
-                     /etc/splinter/certs/. \n\n\
-                    The following files are created: \n    \
-                        - client.crt \n    \
-                        - client.key \n    \
-                        - server.crt \n    \
-                        - server.key \n    \
-                        - generated_ca.pem \n    \
-                        - generated_ca.key
-                                    ",
-                        ),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("keygen")
-                .about("Generates secp256k1 keys")
-                .arg(
-                    Arg::with_name("key-name")
-                        .takes_value(true)
-                        .help("Name of keys generated; defaults to user name"),
-                )
-                .arg(
-                    Arg::with_name("key_dir")
-                        .long("key-dir")
-                        .takes_value(true)
-                        .conflicts_with("system")
-                        .help(
-                            "Name of the directory in which to create the keys; defaults to \
+    app = app.subcommand(
+        SubCommand::with_name("keygen")
+            .about("Generates secp256k1 keys")
+            .arg(
+                Arg::with_name("key-name")
+                    .takes_value(true)
+                    .help("Name of keys generated; defaults to user name"),
+            )
+            .arg(
+                Arg::with_name("key_dir")
+                    .long("key-dir")
+                    .takes_value(true)
+                    .conflicts_with("system")
+                    .help(
+                        "Name of the directory in which to create the keys; defaults to \
                              $HOME/splinter/keys",
-                        ),
-                )
-                .arg(
-                    Arg::with_name("force")
-                        .short("f")
-                        .long("force")
-                        .help("Overwrite files if they exist"),
-                )
-                .arg(
-                    Arg::with_name("system")
-                        .long("system")
-                        .help("Generate system keys in /etc/splinter/keys"),
-                ),
-        );
+                    ),
+            )
+            .arg(
+                Arg::with_name("force")
+                    .short("f")
+                    .long("force")
+                    .help("Overwrite files if they exist"),
+            )
+            .arg(
+                Arg::with_name("system")
+                    .long("system")
+                    .help("Generate system keys in /etc/splinter/keys"),
+            ),
+    );
 
     let propose_circuit = SubCommand::with_name("propose")
         .about("Propose that a new circuit is created")
@@ -537,6 +466,156 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .help("Name or path of private key"),
                 ),
         );
+
+    #[cfg(not(feature = "https-certs"))]
+    let cert_generate_subcommand = SubCommand::with_name("generate")
+        .long_about(
+            "Generates test certificates and keys for running splinterd with \
+                         TLS (in insecure mode)",
+        )
+        .arg(
+            Arg::with_name("common_name")
+                .long("common-name")
+                .takes_value(true)
+                .long_help(
+                    "String that specifies a common name for the generated \
+                             certificate (defaults to localhost). Use this option if the \
+                             splinterd URL uses a DNS address instead of a numerical IP \
+                             address.",
+                ),
+        )
+        .arg(
+            Arg::with_name("cert_dir")
+                .long("cert-dir")
+                .short("d")
+                .takes_value(true)
+                .long_help(
+                    "Path to the directory certificates are created in. \
+                             Defaults to /etc/splinter/certs/. This location can also be \
+                             changed with the SPLINTER_CERT_DIR environment variable. \
+                             This directory must exist.
+                        ",
+                ),
+        )
+        .arg(
+            Arg::with_name("force")
+                .long("force")
+                .conflicts_with("skip")
+                .long_help(
+                    "Overwrites files if they exist. If this flag is not \
+                            provided and the file exists, an error is returned.
+                        ",
+                ),
+        )
+        .arg(
+            Arg::with_name("skip")
+                .long("skip")
+                .conflicts_with("force")
+                .long_help(
+                    "Checks if the files exists and generates the files that \
+                             are missing. If this flag is not \
+                             provided and the file exists, an error is returned.",
+                ),
+        )
+        .after_help(
+            "DETAILS: \n\n\
+                    The files are generated in the location specified by --cert-dir, the \
+                    SPLINTER_CERT_DIR environment variable, or in the default location \
+                     /etc/splinter/certs/. \n\n\
+                    The following files are created: \n    \
+                        - client.crt \n    \
+                        - client.key \n    \
+                        - server.crt \n    \
+                        - server.key \n    \
+                        - generated_ca.pem \n    \
+                        - generated_ca.key
+                                    ",
+        );
+    #[cfg(feature = "https-certs")]
+    let cert_generate_subcommand = SubCommand::with_name("generate")
+        .long_about(
+            "Generates test certificates and keys for running splinterd with \
+                         TLS (in insecure mode)",
+        )
+        .arg(
+            Arg::with_name("server_common_name")
+                .long("server-common-name")
+                .alias("common-name")
+                .takes_value(true)
+                .long_help(
+                    "String that specifies a common name for the generated \
+                             server certificate (defaults to localhost). Use this option \
+                             if the splinterd URL uses a DNS address instead of a numerical \
+                             IP address.",
+                ),
+        )
+        .arg(
+            Arg::with_name("rest_api_common_name")
+                .long("rest-api-common-name")
+                .takes_value(true)
+                .long_help(
+                    "String that specifies a common name for the generated \
+                             REST API certificate (defaults to localhost). Use this option \
+                             if the splinterd URL uses a DNS address instead of a numerical \
+                             IP address.",
+                ),
+        )
+        .arg(
+            Arg::with_name("cert_dir")
+                .long("cert-dir")
+                .short("d")
+                .takes_value(true)
+                .long_help(
+                    "Path to the directory certificates are created in. \
+                             Defaults to /etc/splinter/certs/. This location can also be \
+                             changed with the SPLINTER_CERT_DIR environment variable. \
+                             This directory must exist.
+                        ",
+                ),
+        )
+        .arg(
+            Arg::with_name("force")
+                .long("force")
+                .conflicts_with("skip")
+                .long_help(
+                    "Overwrites files if they exist. If this flag is not \
+                            provided and the file exists, an error is returned.
+                        ",
+                ),
+        )
+        .arg(
+            Arg::with_name("skip")
+                .long("skip")
+                .conflicts_with("force")
+                .long_help(
+                    "Checks if the files exists and generates the files that \
+                             are missing. If this flag is not \
+                             provided and the file exists, an error is returned.",
+                ),
+        )
+        .after_help(
+            "DETAILS: \n\n\
+                    The files are generated in the location specified by --cert-dir, the \
+                    SPLINTER_CERT_DIR environment variable, or in the default location \
+                     /etc/splinter/certs/. \n\n\
+                    The following files are created: \n    \
+                        - client.crt \n    \
+                        - client.key \n    \
+                        - server.crt \n    \
+                        - server.key \n    \
+                        - rest_api.crt \n    \
+                        - rest_api.key \n    \
+                        - generated_ca.pem \n    \
+                        - generated_ca.key
+                                                ",
+        );
+
+    app = app.subcommand(
+        SubCommand::with_name("cert")
+            .about("Generates certificates that can be used for development")
+            .setting(AppSettings::SubcommandRequiredElseHelp)
+            .subcommand(cert_generate_subcommand),
+    );
 
     #[cfg(feature = "circuit-template")]
     let circuit_command = circuit_command.subcommand(

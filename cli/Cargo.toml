@@ -70,6 +70,7 @@ experimental = [
     # The following features are experimental:
     "circuit-auth-type",
     "health",
+    "https-certs",
     "splinter-cli-jwt",
 ]
 
@@ -79,6 +80,8 @@ circuit-template = ["splinter/circuit-template"]
 splinter-cli-jwt = ["cylinder/jwt", "cylinder/key-load"]
 
 health = []
+
+https-certs = []
 
 database = ["diesel"]
 postgres = [
