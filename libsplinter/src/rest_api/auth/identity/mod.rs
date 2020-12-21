@@ -32,7 +32,7 @@ use super::AuthorizationHeader;
 /// A service that fetches identities from a backing provider
 pub trait IdentityProvider: Send + Sync {
     /// Attempts to get the identity that corresponds to the given authorization header. This method
-    /// will  return `Ok(None)` if the identity provider was not able to resolve the authorization
+    /// will return `Ok(None)` if the identity provider was not able to resolve the authorization
     /// to an identity.
     fn get_identity(
         &self,
