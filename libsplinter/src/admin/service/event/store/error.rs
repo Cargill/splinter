@@ -15,6 +15,9 @@
 //! Types for errors that can be raised while using an admin service event store
 use std::fmt;
 
+use crate::admin::store::error::AdminServiceStoreError;
+#[cfg(feature = "admin-service-event-store-diesel")]
+use crate::error::ConstraintViolationType;
 use crate::error::{
     ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
 };
@@ -42,6 +45,66 @@ impl fmt::Display for AdminServiceEventStoreError {
                 write!(f, "{}", err)
             }
             AdminServiceEventStoreError::InvalidStateError(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl From<AdminServiceStoreError> for AdminServiceEventStoreError {
+    fn from(err: AdminServiceStoreError) -> Self {
+        match err {
+            AdminServiceStoreError::InternalError(err) => {
+                AdminServiceEventStoreError::InternalError(err)
+            }
+            AdminServiceStoreError::ConstraintViolationError(err) => {
+                AdminServiceEventStoreError::ConstraintViolationError(err)
+            }
+            AdminServiceStoreError::ResourceTemporarilyUnavailableError(err) => {
+                AdminServiceEventStoreError::ResourceTemporarilyUnavailableError(err)
+            }
+            AdminServiceStoreError::InvalidStateError(err) => {
+                AdminServiceEventStoreError::InvalidStateError(err)
+            }
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store-diesel")]
+impl From<diesel::r2d2::PoolError> for AdminServiceEventStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        AdminServiceEventStoreError::ResourceTemporarilyUnavailableError(
+            ResourceTemporarilyUnavailableError::from_source(Box::new(err)),
+        )
+    }
+}
+
+#[cfg(feature = "admin-service-event-store-diesel")]
+impl From<diesel::result::Error> for AdminServiceEventStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        match err {
+            diesel::result::Error::DatabaseError(db_err_kind, _) => match db_err_kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    AdminServiceEventStoreError::ConstraintViolationError(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    AdminServiceEventStoreError::ConstraintViolationError(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => AdminServiceEventStoreError::InternalError(InternalError::from_source(
+                    Box::new(err),
+                )),
+            },
+            _ => AdminServiceEventStoreError::InternalError(InternalError::from_source(Box::new(
+                err,
+            ))),
         }
     }
 }
