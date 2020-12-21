@@ -14,4 +14,4 @@
 
 PGPASSWORD=admin psql -h splinterd-db-node -U admin -d splinter -c \
     'TRUNCATE keys, notification_properties, notifications, refresh_tokens,
-    user_credentials, user_notifications, oauth_user';
+    user_credentials, user_notifications, oauth_users, oauth_user_sessions';
