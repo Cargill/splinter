@@ -43,9 +43,14 @@
 //!
 //! let index_resource = IndexResource { name: "Taco".to_string() };
 //!
+//! #[cfg(not(feature = "https-bind"))]
+//! let bind = "localhost:8080";
+//! #[cfg(feature = "https-bind")]
+//! let bind = splinter::rest_api::RestApiBind::Insecure("localhost:8080".into());
+//!
 //! RestApiBuilder::new()
 //!     .add_resources(index_resource.resources())
-//!     .with_bind("localhost:8080")
+//!     .with_bind(bind)
 //!     .build()
 //!     .unwrap()
 //!     .run();
@@ -516,10 +521,34 @@ impl ConfigureAuthorizationMapping {
     }
 }
 
+/// Bind configuration for the REST API.
+#[derive(Clone)]
+pub enum RestApiBind {
+    #[cfg(feature = "https-bind")]
+    /// A secure binding, including certificate and key paths.
+    Secure {
+        bind: String,
+        cert_path: String,
+        key_path: String,
+    },
+    /// A insecure binding.
+    Insecure(String),
+}
+
+impl std::fmt::Display for RestApiBind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            #[cfg(feature = "https-bind")]
+            RestApiBind::Secure { bind, .. } => write!(f, "https://{}", bind),
+            RestApiBind::Insecure(bind) => write!(f, "http://{}", bind),
+        }
+    }
+}
+
 /// `RestApi` is used to create an instance of a restful web server.
 pub struct RestApi {
     resources: Vec<Resource>,
-    bind: String,
+    bind: RestApiBind,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
@@ -534,8 +563,7 @@ impl RestApi {
     ) -> Result<(RestApiShutdownHandle, thread::JoinHandle<()>), RestApiServerError> {
         let (tx, rx) = mpsc::channel();
 
-        let bind_url_for_err = self.bind.to_owned();
-        let bind_url = self.bind.to_owned();
+        let bind_config_for_err = self.bind.clone();
         let resources = self.resources;
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist;
@@ -556,11 +584,32 @@ impl RestApi {
             None => cors::Cors::new_allow_any(),
         };
 
+        #[cfg(feature = "https-bind")]
+        let bind_info = match self.bind {
+            RestApiBind::Secure {
+                bind,
+                cert_path,
+                key_path,
+            } => {
+                let mut acceptor =
+                    openssl::ssl::SslAcceptor::mozilla_modern(openssl::ssl::SslMethod::tls())?;
+                acceptor.set_private_key_file(key_path, openssl::ssl::SslFiletype::PEM)?;
+                acceptor.set_certificate_chain_file(&cert_path)?;
+                acceptor.check_private_key()?;
+
+                (bind, Some(acceptor))
+            }
+            RestApiBind::Insecure(bind) => (bind, None),
+        };
+
+        #[cfg(not(feature = "https-bind"))]
+        let RestApiBind::Insecure(bind_info) = self.bind;
+
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
             .spawn(move || {
                 let sys = actix::System::new("SplinterD-Rest-API");
-                let mut server = HttpServer::new(move || {
+                let server = HttpServer::new(move || {
                     let app = App::new();
 
                     #[cfg(feature = "rest-api-cors")]
@@ -577,7 +626,22 @@ impl RestApi {
                     app
                 });
 
-                server = match server.bind(&bind_url) {
+                #[cfg(feature = "https-bind")]
+                let (bind_url, opt_acceptor) = bind_info;
+                #[cfg(not(feature = "https-bind"))]
+                let bind_url = bind_info;
+
+                #[cfg(feature = "https-bind")]
+                let server = if let Some(acceptor) = opt_acceptor {
+                    server.bind_ssl(&bind_url, acceptor)
+                } else {
+                    server.bind(&bind_url)
+                };
+
+                #[cfg(not(feature = "https-bind"))]
+                let server = server.bind(&bind_url);
+
+                let server = match server {
                     Ok(server) => server,
                     Err(err) => {
                         let error_msg = format!("Invalid REST API bind {}: {}", bind_url, err);
@@ -611,7 +675,7 @@ impl RestApi {
             .map_err(|err| {
                 RestApiServerError::BindError(format!(
                     "Failed to bind to URL {}: {}",
-                    bind_url_for_err, err
+                    bind_config_for_err, err
                 ))
             })?;
 
@@ -641,7 +705,16 @@ impl RestApi {
     ) -> Result<(RestApiShutdownHandle, thread::JoinHandle<()>), RestApiServerError> {
         let (tx, rx) = mpsc::channel();
 
-        let bind_url = self.bind.to_owned();
+        #[cfg(feature = "https-bind")]
+        let bind_url = match self.bind.clone() {
+            RestApiBind::Secure { bind, .. } => bind,
+
+            RestApiBind::Insecure(bind) => bind,
+        };
+
+        #[cfg(not(feature = "https-bind"))]
+        let RestApiBind::Insecure(bind_url) = self.bind.clone();
+
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist.to_owned();
@@ -731,7 +804,7 @@ impl RestApi {
 /// Builder `struct` for `RestApi`.
 pub struct RestApiBuilder {
     resources: Vec<Resource>,
-    bind: Option<String>,
+    bind: Option<RestApiBind>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
@@ -760,8 +833,15 @@ impl RestApiBuilder {
         Self::default()
     }
 
+    #[cfg(not(feature = "https-bind"))]
     pub fn with_bind(mut self, value: &str) -> Self {
-        self.bind = Some(value.to_string());
+        self.bind = Some(RestApiBind::Insecure(value.to_string()));
+        self
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn with_bind(mut self, value: RestApiBind) -> Self {
+        self.bind = Some(value);
         self
     }
 
@@ -968,6 +1048,12 @@ impl RestApiBuilder {
             .bind
             .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
 
+        let bind = match bind {
+            #[cfg(feature = "https-bind")]
+            RestApiBind::Secure { bind, .. } => RestApiBind::Insecure(bind),
+            insecure @ RestApiBind::Insecure(_) => insecure,
+        };
+
         Ok(RestApi {
             bind,
             resources: self.resources,
@@ -1146,9 +1232,16 @@ mod test {
     /// provided.
     #[test]
     fn rest_api_builder_successful() {
-        // Allowing unused_mut because builder must be mutable if feature auth is enabled
-        #[allow(unused_mut)]
-        let mut builder = RestApiBuilder::new().with_bind("test");
+        let mut builder = RestApiBuilder::new();
+
+        #[cfg(not(feature = "https-bind"))]
+        {
+            builder = builder.with_bind("test");
+        }
+        #[cfg(feature = "https-bind")]
+        {
+            builder = builder.with_bind(RestApiBind::Insecure("test".into()));
+        }
 
         #[cfg(feature = "auth")]
         {
@@ -1167,8 +1260,15 @@ mod test {
     #[test]
     #[cfg(feature = "auth")]
     fn rest_api_builder_no_auth() {
+        #[cfg(feature = "https-bind")]
+        let result = RestApiBuilder::new()
+            .with_bind(RestApiBind::Insecure("test".into()))
+            .build();
+        #[cfg(not(feature = "https-bind"))]
+        let result = RestApiBuilder::new().with_bind("test").build();
+
         assert!(matches!(
-            RestApiBuilder::new().with_bind("test").build(),
+            result,
             Err(RestApiServerError::InvalidStateError(_))
         ));
     }

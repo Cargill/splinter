@@ -17,7 +17,7 @@ use std::fmt;
 
 use actix_web::Error as ActixError;
 
-use crate::error::InvalidStateError;
+use crate::error::{InternalError, InvalidStateError};
 
 /// Error module for `rest_api`.
 #[derive(Debug)]
@@ -27,6 +27,7 @@ pub enum RestApiServerError {
     MissingField(String),
     StdError(std::io::Error),
     InvalidStateError(InvalidStateError),
+    InternalError(InternalError),
 }
 
 impl From<std::io::Error> for RestApiServerError {
@@ -43,6 +44,7 @@ impl Error for RestApiServerError {
             RestApiServerError::StdError(err) => Some(err),
             RestApiServerError::MissingField(_) => None,
             RestApiServerError::InvalidStateError(err) => Some(err),
+            RestApiServerError::InternalError(err) => Some(err),
         }
     }
 }
@@ -57,6 +59,7 @@ impl fmt::Display for RestApiServerError {
                 write!(f, "Missing required field: {}", field)
             }
             RestApiServerError::InvalidStateError(e) => write!(f, "{}", e),
+            RestApiServerError::InternalError(e) => write!(f, "{}", e),
         }
     }
 }
@@ -109,5 +112,12 @@ impl fmt::Display for RequestError {
             RequestError::MissingHeader(msg) => f.write_str(&msg),
             RequestError::InvalidHeaderValue(msg) => f.write_str(&msg),
         }
+    }
+}
+
+#[cfg(feature = "https-bind")]
+impl From<openssl::error::ErrorStack> for RestApiServerError {
+    fn from(err: openssl::error::ErrorStack) -> Self {
+        RestApiServerError::InternalError(InternalError::from_source(Box::new(err)))
     }
 }

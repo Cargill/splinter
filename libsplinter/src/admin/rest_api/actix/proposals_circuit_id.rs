@@ -125,7 +125,7 @@ mod tests {
         service::proposal_store::{ProposalIter, ProposalStoreError},
         store::CircuitPredicate,
     };
-    use crate::rest_api::{RestApiBuilder, RestApiServerError, RestApiShutdownHandle};
+    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /admin/proposals/{circuit_id} request returns the expected proposal.
@@ -272,23 +272,23 @@ mod tests {
     fn run_rest_api_on_open_port(
         resources: Vec<Resource>,
     ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
-        (10000..20000)
-            .find_map(|port| {
-                let bind_url = format!("127.0.0.1:{}", port);
-                let result = RestApiBuilder::new()
-                    .with_bind(&bind_url)
-                    .add_resources(resources.clone())
-                    .build_insecure()
-                    .expect("Failed to build REST API")
-                    .run_insecure();
-                match result {
-                    Ok((shutdown_handle, join_handle)) => {
-                        Some((shutdown_handle, join_handle, bind_url))
-                    }
-                    Err(RestApiServerError::BindError(_)) => None,
-                    Err(err) => panic!("Failed to run REST API: {}", err),
-                }
-            })
-            .expect("No port available")
+        #[cfg(not(feature = "https-bind"))]
+        let bind = "127.0.0.1:0";
+        #[cfg(feature = "https-bind")]
+        let bind = crate::rest_api::RestApiBind::Insecure("127.0.0.1:0".into());
+
+        let result = RestApiBuilder::new()
+            .with_bind(bind)
+            .add_resources(resources.clone())
+            .build_insecure()
+            .expect("Failed to build REST API")
+            .run_insecure();
+        match result {
+            Ok((shutdown_handle, join_handle)) => {
+                let port = shutdown_handle.port_numbers()[0];
+                (shutdown_handle, join_handle, format!("127.0.0.1:{}", port))
+            }
+            Err(err) => panic!("Failed to run REST API: {}", err),
+        }
     }
 }
