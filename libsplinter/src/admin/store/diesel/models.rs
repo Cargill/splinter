@@ -67,8 +67,8 @@ pub struct ProposedCircuitModel {
     pub durability: String,
     pub routes: String,
     pub circuit_management_type: String,
-    pub application_metadata: Vec<u8>,
-    pub comments: String,
+    pub application_metadata: Option<Vec<u8>>,
+    pub comments: Option<String>,
     pub display_name: Option<String>,
 }
 
@@ -81,8 +81,8 @@ impl From<&ProposedCircuit> for ProposedCircuitModel {
             durability: String::from(proposed_circuit.durability()),
             routes: String::from(proposed_circuit.routes()),
             circuit_management_type: proposed_circuit.circuit_management_type().into(),
-            application_metadata: proposed_circuit.application_metadata().into(),
-            comments: proposed_circuit.comments().into(),
+            application_metadata: proposed_circuit.application_metadata().clone(),
+            comments: proposed_circuit.comments().clone(),
             display_name: proposed_circuit.display_name().clone(),
         }
     }

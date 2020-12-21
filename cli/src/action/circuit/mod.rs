@@ -914,7 +914,7 @@ fn list_proposals(
             display_name,
             proposal.circuit.management_type.to_string(),
             members,
-            proposal.circuit.comments.to_string(),
+            proposal.circuit.comments.clone().unwrap_or_default(),
         ]);
     });
 

@@ -89,7 +89,7 @@ pub(crate) struct CircuitResponse<'a> {
     pub management_type: &'a str,
     #[serde(serialize_with = "as_hex")]
     pub application_metadata: &'a [u8],
-    pub comments: &'a str,
+    pub comments: String,
 }
 
 impl<'a> From<&'a CreateCircuit> for CircuitResponse<'a> {
@@ -100,7 +100,7 @@ impl<'a> From<&'a CreateCircuit> for CircuitResponse<'a> {
             roster: circuit.roster.iter().map(ServiceResponse::from).collect(),
             management_type: &circuit.circuit_management_type,
             application_metadata: &circuit.application_metadata,
-            comments: &circuit.comments,
+            comments: circuit.comments.clone().unwrap_or_default(),
         }
     }
 }

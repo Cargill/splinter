@@ -419,7 +419,7 @@ pub struct ProposalCircuitSlice {
     pub members: Vec<CircuitMembers>,
     pub roster: Vec<CircuitService>,
     pub management_type: String,
-    pub comments: String,
+    pub comments: Option<String>,
     pub display_name: Option<String>,
 }
 

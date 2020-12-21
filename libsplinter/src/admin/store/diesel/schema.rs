@@ -30,8 +30,8 @@ table! {
         durability -> Text,
         routes -> Text,
         circuit_management_type -> Text,
-        application_metadata -> Binary,
-        comments -> Text,
+        application_metadata -> Nullable<Binary>,
+        comments -> Nullable<Text>,
         display_name -> Nullable<Text>,
     }
 }

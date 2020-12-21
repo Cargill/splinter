@@ -86,7 +86,7 @@ pub(crate) struct CircuitResponse<'a> {
     pub management_type: &'a str,
     #[serde(serialize_with = "as_hex")]
     pub application_metadata: &'a [u8],
-    pub comments: &'a str,
+    pub comments: &'a Option<String>,
     pub display_name: &'a Option<String>,
 }
 

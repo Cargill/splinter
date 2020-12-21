@@ -64,8 +64,8 @@ where
             Text,
             Text,
             Text,
-            Binary,
-            Text,
+            Nullable<Binary>,
+            Nullable<Text>,
             Nullable<Text>,
         ),
         C::Backend,
@@ -176,9 +176,19 @@ where
                                 proposed_circuit.durability,
                             )?)
                             .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
-                            .with_circuit_management_type(&proposed_circuit.circuit_management_type)
-                            .with_application_metadata(&proposed_circuit.application_metadata)
-                            .with_comments(&proposed_circuit.comments);
+                            .with_circuit_management_type(
+                                &proposed_circuit.circuit_management_type,
+                            );
+
+                        if let Some(application_metadata) = &proposed_circuit.application_metadata {
+                            proposed_circuit_builder = proposed_circuit_builder
+                                .with_application_metadata(&application_metadata);
+                        }
+
+                        if let Some(comments) = &proposed_circuit.comments {
+                            proposed_circuit_builder =
+                                proposed_circuit_builder.with_comments(&comments);
+                        }
 
                         if let Some(display_name) = &proposed_circuit.display_name {
                             proposed_circuit_builder =
