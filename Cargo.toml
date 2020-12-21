@@ -1,6 +1,6 @@
 [package]
 name = "sabre-cli"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Cargill Incorporated"]
 edition = "2018"
 
