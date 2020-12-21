@@ -12,37 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An identity provider that looks up GitHub usernames
+//! A subject provider that looks up GitHub usernames
 
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
-use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::IdentityProvider;
+use super::SubjectProvider;
 
 /// Retrieves a GitHub username from the GitHub servers
-///
-/// This provider only accepts `AuthorizationHeader::Bearer(BearerToken::OAuth2(token))`
-/// authorizations, and the inner token must be a valid GitHub OAuth2 access token.
 #[derive(Clone)]
-pub struct GithubUserIdentityProvider;
+pub struct GithubSubjectProvider;
 
-impl IdentityProvider for GithubUserIdentityProvider {
-    fn get_identity(
-        &self,
-        authorization: &AuthorizationHeader,
-    ) -> Result<Option<String>, InternalError> {
-        let token = match authorization {
-            AuthorizationHeader::Bearer(BearerToken::OAuth2(token)) => token,
-            _ => return Ok(None),
-        };
-
+impl SubjectProvider for GithubSubjectProvider {
+    fn get_subject(&self, access_token: &str) -> Result<Option<String>, InternalError> {
         let response = Client::builder()
             .build()
             .map_err(|err| InternalError::from_source(err.into()))?
             .get("https://api.github.com/user")
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {}", access_token))
             .header("User-Agent", "splinter")
             .send()
             .map_err(|err| InternalError::from_source(err.into()))?;
@@ -67,7 +55,7 @@ impl IdentityProvider for GithubUserIdentityProvider {
         Ok(Some(username))
     }
 
-    fn clone_box(&self) -> Box<dyn IdentityProvider> {
+    fn clone_box(&self) -> Box<dyn SubjectProvider> {
         Box::new(self.clone())
     }
 }

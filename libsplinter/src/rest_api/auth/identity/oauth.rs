@@ -12,39 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A general OAuth identity provider implementation wraps another, OAuth server-backed identity
-//! provider
+//! An identity provider backed by an OAuth server
 
 use crate::biome::OAuthUserSessionStore;
 use crate::error::InternalError;
+use crate::oauth::SubjectProvider;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
 use super::IdentityProvider;
 
-/// A general OAuth identity provider implementation wraps another, OAuth server-backed identity
-/// provider
+/// An identity provider, backed by an OAuth server, that returns a user's Biome ID
 ///
 /// This provider uses an [OAuthUserSessionStore] as a cache of identities. The session store tracks
-/// all OAuth users' sessions with a "last authenticated" timestamp. If the user has been
-/// authenticated within the last hour, the identity from the session store will be returned; if the
-/// user has not been authenticated within the last hour, the user will be re-authenticated using
-/// the internal identity provider and the session will be updated in the session store.
+/// all OAuth users' sessions with a "last authenticated" timestamp. Sessions are initially added by
+/// the OAuth REST API endpoints when a user logs in.
+///
+/// If the session has not been authenticated within the re-authentication interval, the user will
+/// be re-authenticated using the internal OAuth [SubjectProvider] and the session will be updated
+/// in the session store. If re-authentication fails, the session will be removed from the store
+/// and the user will need to start a new session by logging in.
 ///
 /// This identity provider will also use a session's refresh token (if it has one) to get a new
 /// OAuth access token for the session as needed.
+///
+/// This provider only accepts `AuthorizationHeader::Bearer(BearerToken::OAuth2(token))`
+/// authorizations, and the inner token must be a valid Splinter access token for an OAuth user.
 #[derive(Clone)]
 pub struct OAuthUserIdentityProvider {
-    _internal_identity_provider: Box<dyn IdentityProvider>,
+    _subject_provider: Box<dyn SubjectProvider>,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 }
 
 impl OAuthUserIdentityProvider {
+    /// Creates a new OAuth user identity provider
+    ///
+    /// # Arguments
+    ///
+    /// * `subject_provider` - The OAuth subject provider that calls the OAuth server to check if a
+    ///   session is still valid
+    /// * `oauth_user_session_store` - The store that tracks users' sessions
     pub fn new(
-        internal_identity_provider: Box<dyn IdentityProvider>,
+        _subject_provider: Box<dyn SubjectProvider>,
         oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
     ) -> Self {
         Self {
-            _internal_identity_provider: internal_identity_provider,
+            _subject_provider: subject_provider,
             oauth_user_session_store,
         }
     }

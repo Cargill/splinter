@@ -17,9 +17,8 @@ use reqwest::blocking::Client;
 use crate::error::{InternalError, InvalidStateError};
 use crate::oauth::{
     builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
-    OAuthClient,
+    OAuthClient, OpenIdSubjectProvider, SubjectProvider,
 };
-use crate::rest_api::auth::identity::{openid::OpenIdUserIdentityProvider, IdentityProvider};
 
 /// Builds a new `OAuthClient` using an OpenID discovery document.
 pub struct OpenIdOAuthClientBuilder {
@@ -81,14 +80,14 @@ impl OpenIdOAuthClientBuilder {
         self
     }
 
-    /// Builds an OAuthClient and an [`IdentityProvider`] based on the OpenID provider's discovery
+    /// Builds an OAuthClient and a [`SubjectProvider`] based on the OpenID provider's discovery
     /// document.
     ///
     /// # Errors
     ///
     /// Returns an [`OAuthClientBuildError`] if there are required fields missing, if any URL's
     /// provided are invalid or it is unable to load the discovery document.
-    pub fn build(self) -> Result<(OAuthClient, Box<dyn IdentityProvider>), OAuthClientBuildError> {
+    pub fn build(self) -> Result<(OAuthClient, Box<dyn SubjectProvider>), OAuthClientBuildError> {
         let discovery_url = self.openid_discovery_url.ok_or_else(|| {
             InvalidStateError::with_message(
                 "An OpenID discovery URL is required to successfully build an OAuthClient".into(),
@@ -119,7 +118,7 @@ impl OpenIdOAuthClientBuilder {
             .with_auth_url(discovery_document_response.authorization_endpoint)
             .with_token_url(discovery_document_response.token_endpoint)
             .with_scopes(discovery_document_response.scopes_supported)
-            .with_identity_provider(Box::new(OpenIdUserIdentityProvider::new(userinfo_endpoint)))
+            .with_subject_provider(Box::new(OpenIdSubjectProvider::new(userinfo_endpoint)))
             .build()
     }
 }

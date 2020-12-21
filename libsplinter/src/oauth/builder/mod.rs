@@ -20,10 +20,9 @@ mod github;
 mod openid;
 
 use crate::error::InvalidStateError;
-use crate::rest_api::auth::identity::IdentityProvider;
 
 use super::error::OAuthClientBuildError;
-use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient};
+use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient, SubjectProvider};
 
 #[cfg(feature = "oauth-github")]
 pub use github::GithubOAuthClientBuilder;
@@ -44,7 +43,7 @@ pub struct OAuthClientBuilder {
     redirect_url: Option<String>,
     token_url: Option<String>,
     scopes: Vec<String>,
-    identity_provider: Option<Box<dyn IdentityProvider>>,
+    subject_provider: Option<Box<dyn SubjectProvider>>,
     inflight_request_store: Option<Box<dyn InflightOAuthRequestStore>>,
 }
 
@@ -54,13 +53,13 @@ impl OAuthClientBuilder {
         Self::default()
     }
 
-    /// Builds an `OAuthClient` and returns it along with the configured `IdentityProvider`.
+    /// Builds an `OAuthClient` and returns it along with the configured `SubjectProvider`.
     ///
     /// # Errors
     ///
     /// Returns an [`OAuthClientBuildError`] if any of the auth, redirect, or token URLs are
     /// invalid.
-    pub fn build(self) -> Result<(OAuthClient, Box<dyn IdentityProvider>), OAuthClientBuildError> {
+    pub fn build(self) -> Result<(OAuthClient, Box<dyn SubjectProvider>), OAuthClientBuildError> {
         let client_id = self.client_id.ok_or_else(|| {
             InvalidStateError::with_message(
                 "A client ID is required to successfully build an OAuthClient".into(),
@@ -86,9 +85,9 @@ impl OAuthClientBuilder {
                 "A token URL is required to successfully build an OAuthClient".into(),
             )
         })?;
-        let identity_provider = self.identity_provider.ok_or_else(|| {
+        let subject_provider = self.subject_provider.ok_or_else(|| {
             InvalidStateError::with_message(
-                "An identity provider is required to successfully build an OAuthClient".into(),
+                "A subject provider is required to successfully build an OAuthClient".into(),
             )
         })?;
         let inflight_request_store = self.inflight_request_store.ok_or_else(|| {
@@ -101,10 +100,10 @@ impl OAuthClientBuilder {
             OAuthClient::new(
                 new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
                 self.scopes,
-                identity_provider.clone(),
+                subject_provider.clone(),
                 inflight_request_store,
             )?,
-            identity_provider,
+            subject_provider,
         ))
     }
 
@@ -145,10 +144,9 @@ impl OAuthClientBuilder {
         self
     }
 
-    /// Sets the identity provider to use to request a reference to the user's identity, as defined
-    /// by the OAuth2 provider.
-    pub fn with_identity_provider(mut self, identity_provider: Box<dyn IdentityProvider>) -> Self {
-        self.identity_provider = Some(identity_provider);
+    /// Sets the subject provider to use to request the user's subject identifier.
+    pub fn with_subject_provider(mut self, subject_provider: Box<dyn SubjectProvider>) -> Self {
+        self.subject_provider = Some(subject_provider);
         self
     }
 

@@ -18,12 +18,8 @@
 pub mod biome;
 #[cfg(feature = "cylinder-jwt")]
 pub mod cylinder;
-#[cfg(feature = "oauth-github")]
-pub mod github;
 #[cfg(feature = "oauth")]
 pub mod oauth;
-#[cfg(feature = "oauth-openid")]
-pub mod openid;
 
 use crate::error::InternalError;
 

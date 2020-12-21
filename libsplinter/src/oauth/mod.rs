@@ -19,6 +19,7 @@ mod error;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
 pub mod store;
+mod subject;
 
 use std::time::Duration;
 
@@ -28,7 +29,6 @@ use oauth2::{
 };
 
 use crate::error::{InternalError, InvalidArgumentError};
-use crate::rest_api::auth::{identity::IdentityProvider, AuthorizationHeader, BearerToken};
 
 use store::InflightOAuthRequestStore;
 
@@ -38,6 +38,11 @@ pub use builder::OAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 pub use builder::OpenIdOAuthClientBuilder;
 pub use error::OAuthClientBuildError;
+#[cfg(feature = "oauth-github")]
+pub use subject::GithubSubjectProvider;
+#[cfg(feature = "oauth-openid")]
+pub use subject::OpenIdSubjectProvider;
+pub use subject::SubjectProvider;
 
 /// An OAuth2 client for Splinter
 ///
@@ -49,8 +54,8 @@ pub struct OAuthClient {
     client: BasicClient,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
-    /// OAuth2 identity provider used to retrieve users' identities
-    identity_provider: Box<dyn IdentityProvider>,
+    /// OAuth2 subject provider used to retrieve users' subject identifiers
+    subject_provider: Box<dyn SubjectProvider>,
 
     /// Store for pending authorization requests, including the CSRF token, PKCE verifier, and
     /// client's redirect URL
@@ -64,7 +69,8 @@ impl OAuthClient {
     ///
     /// * `client` - the [oauth2::basic::BasicClient], used for requests to the provider
     /// * `scopes` - The scopes that will be requested for each user
-    /// * `identity_provider` - The OAuth identity provider used to retrieve the users' identity
+    /// * `subject_provider` - The OAuth subject provider used to retrieve users' subject
+    ///   identifiers
     /// * `inflight_request_store` - The store for information about in-flight request to a
     /// provider.
     ///
@@ -74,13 +80,13 @@ impl OAuthClient {
     fn new(
         client: BasicClient,
         scopes: Vec<String>,
-        identity_provider: Box<dyn IdentityProvider>,
+        subject_provider: Box<dyn SubjectProvider>,
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     ) -> Result<Self, InvalidArgumentError> {
         Ok(Self {
             client,
             scopes,
-            identity_provider,
+            subject_provider,
             inflight_request_store,
         })
     }
@@ -154,18 +160,12 @@ impl OAuthClient {
                 ))
             })?;
 
-        // Create `AuthorizationHeader` necessary to fetch the user's identity from OAuth provider
-        let authorization = AuthorizationHeader::Bearer(BearerToken::OAuth2(
-            token_response.access_token().secret().to_string(),
-        ));
-        // Fetch user identity from OAuth provider
-        let identity = self
-            .identity_provider
-            .get_identity(&authorization)
-            .map_err(|err| {
-                InternalError::with_message(format!("failed to get identity: {}", err,))
-            })?
-            .ok_or_else(|| InternalError::with_message("identity not found".into()))?;
+        // Fetch the users subject identifier from OAuth provider
+        let subject = self
+            .subject_provider
+            .get_subject(token_response.access_token().secret())
+            .map_err(|err| InternalError::with_message(format!("failed to get subject: {}", err,)))?
+            .ok_or_else(|| InternalError::with_message("subject not found".into()))?;
 
         let user_info = UserInfo {
             access_token: token_response.access_token().secret().into(),
@@ -173,7 +173,7 @@ impl OAuthClient {
             refresh_token: token_response
                 .refresh_token()
                 .map(|token| token.secret().into()),
-            identity,
+            subject,
         };
 
         Ok(Some((user_info, pending_authorization.client_redirect_url)))
@@ -220,8 +220,8 @@ pub struct UserInfo {
     expires_in: Option<Duration>,
     /// The refresh token (if the provider gives one) for refreshing the access token
     refresh_token: Option<String>,
-    /// The identity of the user, from the OAuth provider
-    identity: String,
+    /// The user's subject identifier
+    subject: String,
 }
 
 impl UserInfo {
@@ -242,9 +242,9 @@ impl UserInfo {
         self.refresh_token.as_deref()
     }
 
-    /// Gets the user's identity.
-    pub fn identity(&self) -> &str {
-        &self.identity
+    /// Gets the user's subject identifier.
+    pub fn subject(&self) -> &str {
+        &self.subject
     }
 }
 
@@ -257,7 +257,7 @@ impl std::fmt::Debug for UserInfo {
                 "refresh_token",
                 &self.refresh_token.as_deref().map(|_| "<Redacted>"),
             )
-            .field("identity", &self.identity)
+            .field("subject", &self.subject)
             .finish()
     }
 }
@@ -272,7 +272,7 @@ mod tests {
     /// appropriate errors when invalid URLs are provided.
     #[test]
     fn client_construction() {
-        let identity_box: Box<TestIdentityProvider> = Box::new(TestIdentityProvider);
+        let subject_box: Box<dyn SubjectProvider> = Box::new(TestSubjectProvider);
         let inflight_request_store = Box::new(TestInflightOAuthRequestStore);
         OAuthClient::new(
             new_basic_client(
@@ -284,7 +284,7 @@ mod tests {
             )
             .expect("Failed to create basic client"),
             vec![],
-            identity_box.clone_box(),
+            subject_box.clone_box(),
             inflight_request_store.clone_box(),
         )
         .expect("Failed to create client from valid inputs");
@@ -324,14 +324,14 @@ mod tests {
     }
 
     #[derive(Clone)]
-    pub struct TestIdentityProvider;
+    pub struct TestSubjectProvider;
 
-    impl IdentityProvider for TestIdentityProvider {
-        fn get_identity(&self, _: &AuthorizationHeader) -> Result<Option<String>, InternalError> {
+    impl SubjectProvider for TestSubjectProvider {
+        fn get_subject(&self, _: &str) -> Result<Option<String>, InternalError> {
             Ok(Some("".to_string()))
         }
 
-        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+        fn clone_box(&self) -> Box<dyn SubjectProvider> {
             Box::new(self.clone())
         }
     }
