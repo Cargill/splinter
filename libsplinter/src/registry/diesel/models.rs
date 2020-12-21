@@ -14,8 +14,6 @@
 
 //! Provides database models for the `DieselRegistry`.
 
-use diesel::sql_types::BigInt;
-
 use crate::registry::Node;
 
 use super::schema::{
@@ -56,14 +54,6 @@ pub struct NodeMetadataModel {
     pub identity: String,
     pub key: String,
     pub value: String,
-}
-
-/// This is required to execute a `SELECT COUNT(_)` query using the `sql_query` function, like when
-/// metadata predicates are passed to `count_nodes`.
-#[derive(QueryableByName)]
-pub struct Count {
-    #[sql_type = "BigInt"]
-    pub count: i64,
 }
 
 impl From<&Node> for NodesModel {

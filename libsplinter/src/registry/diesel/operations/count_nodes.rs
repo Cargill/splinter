@@ -13,15 +13,13 @@
 // limitations under the License.
 
 //! Provides the "count nodes" operation for the `DieselRegistry`.
+use std::convert::TryFrom;
 
-use diesel::{dsl::sql_query, prelude::*};
+use diesel::{dsl::count_star, prelude::*};
 
-use crate::registry::{
-    diesel::{models::Count, schema::splinter_nodes},
-    MetadataPredicate, RegistryError,
-};
+use crate::registry::{diesel::schema::splinter_nodes, MetadataPredicate, RegistryError};
 
-use super::{exists_statements_from_metadata_predicates, RegistryOperations};
+use super::{apply_predicate_filters, RegistryOperations};
 
 pub(in crate::registry::diesel) trait RegistryCountNodesOperation {
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError>;
@@ -35,35 +33,38 @@ where
     fn count_nodes(&self, predicates: &[MetadataPredicate]) -> Result<u32, RegistryError> {
         if predicates.is_empty() {
             // No predicates were specified, just count all nodes
-            splinter_nodes::table
+            let count = splinter_nodes::table
                 .count()
                 // Parse as an i64 here because Diesel knows how to convert a `BigInt` into an i64
                 .get_result::<i64>(self.conn)
-                .map(|count| count as u32)
                 .map_err(|err| {
                     RegistryError::general_error_with_source(
                         "Failed to count all nodes",
                         Box::new(err),
                     )
-                })
+                })?;
+
+            Ok(u32::try_from(count).map_err(|_| {
+                RegistryError::general_error("The number of nodes is larger than the max u32")
+            })?)
         } else {
-            // With predicates, this query is too complicated for pure Diesel, so a raw SQL
-            // query is needed.
-            let filters = exists_statements_from_metadata_predicates(predicates);
-            sql_query(format!(
-                "SELECT COUNT(*) FROM splinter_nodes WHERE {}",
-                filters
-            ))
-            // The `Count` struct is required because the deserialized type for a `sql_query` must
-            // implement the `QueryableByName` trait, which a raw `i64` does not.
-            .get_result::<Count>(self.conn)
-            .map(|count| count.count as u32)
-            .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to count nodes matching metadata predicates",
-                    Box::new(err),
-                )
-            })
+            let mut query = splinter_nodes::table
+                .into_boxed()
+                .select(splinter_nodes::all_columns);
+            query = apply_predicate_filters(query, predicates);
+            let count = query
+                .select(count_star())
+                .first::<i64>(self.conn)
+                .map_err(|err| {
+                    RegistryError::general_error_with_source(
+                        "Failed to count nodes matching metadata predicates",
+                        Box::new(err),
+                    )
+                })?;
+
+            Ok(u32::try_from(count).map_err(|_| {
+                RegistryError::general_error("The number of nodes is larger than the max u32")
+            })?)
         }
     }
 }

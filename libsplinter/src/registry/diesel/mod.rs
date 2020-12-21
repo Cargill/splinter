@@ -157,3 +157,535 @@ where
         Box::new(self.clone())
     }
 }
+
+#[cfg(all(test, feature = "sqlite"))]
+pub mod tests {
+    use super::*;
+
+    use crate::migrations::run_sqlite_migrations;
+
+    use diesel::{
+        r2d2::{ConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
+
+    ///  Test that a new node can be inserted into the registry and fetched
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1
+    /// 3. Validate that the node can be fetched correctly from state
+    /// 4. Try to insert the node again with same endpoints, should fail
+    #[test]
+    fn test_insert_nodes() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        let node = registry
+            .fetch_node(&get_node_1().identity)
+            .expect("Failed to fetch node")
+            .expect("Node not found");
+
+        assert_eq!(node, get_node_1());
+
+        if registry.insert_node(get_node_1()).is_ok() {
+            panic!("Should have returned an error because of duplicate endpoint")
+        }
+    }
+
+    ///  Test that a new node can be inserted into the registry and fetched
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1 and 2
+    /// 3. Try to fetch that does not exist
+    #[test]
+    fn test_fetch_node_not_found() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        assert_eq!(
+            registry
+                .fetch_node("DoesNotExist")
+                .expect("Failed to fetch node"),
+            None
+        )
+    }
+
+    /// Verifies that `has_node` properly determines if a node exists in the registry.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1
+    /// 3. Validate that the registry has node 1 but not node 2
+    #[test]
+    fn test_has_node() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+
+        assert!(registry
+            .has_node(&get_node_1().identity)
+            .expect("Failed to check if node1 exists"));
+        assert!(!registry
+            .has_node(&get_node_2().identity)
+            .expect("Failed to check if node2 exists"));
+    }
+
+    /// Verifies that list_nodes returns a list of nodes.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1 and 2
+    /// 3. Validate that the registry returns both nodes in the list
+    #[test]
+    fn test_list_nodes_ok() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        let nodes = registry
+            .list_nodes(&[])
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes[0], get_node_1());
+        assert_eq!(nodes[1], get_node_2());
+    }
+
+    /// Verifies that list_nodes returns an empty list when there are no nodes in the registry.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Validate that the registry returns an empty list
+    #[test]
+    fn test_list_nodes_empty_ok() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        let nodes = registry
+            .list_nodes(&[])
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+        assert_eq!(nodes.len(), 0);
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by metadata.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1 and 2
+    /// 3. Validate that the registry returns only node 2 when filtered by company
+    #[test]
+    fn test_list_nodes_filter_metadata_ok() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Eq(
+            "company".into(),
+            get_node_2().metadata.get("company").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0], get_node_2());
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by multiple
+    /// metadata fields.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, 2 and 3
+    /// 3. Validate that the registry returns only node 3 when filtered by company and admin
+    #[test]
+    fn test_list_nodes_filter_metadata_mutliple() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_3())
+            .expect("Unable to insert node");
+
+        let filter = vec![
+            MetadataPredicate::Eq(
+                "company".to_string(),
+                get_node_3().metadata.get("company").unwrap().to_string(),
+            ),
+            MetadataPredicate::Eq(
+                "admin".to_string(),
+                get_node_3().metadata.get("admin").unwrap().to_string(),
+            ),
+        ];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0], get_node_3());
+    }
+
+    /// Verifies that list_nodes returns an empty list when no nodes fits the filtering criteria.
+    ///
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, and
+    /// 3. Validate that the registry returns an empty list
+    #[test]
+    fn test_list_nodes_filter_empty_ok() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Eq(
+            "admin".to_string(),
+            get_node_3().metadata.get("admin").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 0);
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by metadata.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1 and 2
+    /// 3. Validate that the registry returns only node 1 when filtered by company
+    #[test]
+    fn test_list_nodes_filter_metadata_not_equal() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Ne(
+            "company".into(),
+            get_node_2().metadata.get("company").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0], get_node_1());
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by metadata.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1 and 2
+    /// 3. Validate that the registry returns only node 2 when filtered by gt admin Bob
+    #[test]
+    fn test_list_nodes_filter_metadata_gt() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Gt(
+            "admin".into(),
+            get_node_1().metadata.get("admin").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0], get_node_2());
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by metadata.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, 2, and 3
+    /// 3. Validate that the registry returns node 2 and 3 when filtered by ge admin Carol
+    #[test]
+    fn test_list_nodes_filter_metadata_ge() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_3())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Ge(
+            "admin".into(),
+            get_node_2().metadata.get("admin").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes, [get_node_2(), get_node_3()]);
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by metadata.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1 and 2
+    /// 3. Validate that the registry returns only node 1 when filtered by lt admin Carol
+    #[test]
+    fn test_list_nodes_filter_metadata_lt() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Lt(
+            "admin".into(),
+            get_node_2().metadata.get("admin").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0], get_node_1());
+    }
+
+    /// Verifies that list_nodes returns the correct items when it is filtered by metadata.
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, 2, and 3
+    /// 3. Validate that the registry returns node 1 and 2 when filtered by le admin Carol
+    #[test]
+    fn test_list_nodes_filter_metadata_le() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_3())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Le(
+            "admin".into(),
+            get_node_2().metadata.get("admin").unwrap().to_string(),
+        )];
+
+        let nodes = registry
+            .list_nodes(&filter)
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes, [get_node_1(), get_node_2()]);
+    }
+
+    /// Verifies that delete_nodes removes the required node
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, 2, and 3
+    /// 3. Delete node 2
+    /// 4. Verify that only node 1 and 3 are returned from list
+    #[test]
+    fn test_delete_node() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_3())
+            .expect("Unable to insert node");
+
+        registry
+            .delete_node("Node-456")
+            .expect("Unable to delete node");
+
+        let nodes = registry
+            .list_nodes(&[])
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes, [get_node_1(), get_node_3()]);
+    }
+
+    /// Verifies that count_nodes returns the correct number of nodes
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, 2, and 3
+    /// 4. Verify that the registry count_nodes returns 3
+    #[test]
+    fn test_count_node() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_3())
+            .expect("Unable to insert node");
+
+        let count = registry.count_nodes(&[]).expect("Failed to retrieve nodes");
+
+        assert_eq!(count, 3);
+    }
+
+    /// Verifies that count_nodes returns the correct number of nodes when filtered with metadata
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1, 2, and 3
+    /// 4. Verify that the registry count_nodes returns 2 when filtered by company Cargill
+    #[test]
+    fn test_count_node_metadata() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .insert_node(get_node_1())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_2())
+            .expect("Unable to insert node");
+        registry
+            .insert_node(get_node_3())
+            .expect("Unable to insert node");
+
+        let filter = vec![MetadataPredicate::Eq(
+            "company".into(),
+            get_node_2().metadata.get("company").unwrap().to_string(),
+        )];
+
+        let count = registry
+            .count_nodes(&filter)
+            .expect("Failed to retrieve nodes");
+
+        assert_eq!(count, 2);
+    }
+
+    fn get_node_1() -> Node {
+        Node::builder("Node-123")
+            .with_endpoint("tcps://12.0.0.123:8431")
+            .with_display_name("Bitwise IO - Node 1")
+            .with_key("abcd")
+            .with_metadata("company", "Bitwise IO")
+            .with_metadata("admin", "Bob")
+            .build()
+            .expect("Failed to build node1")
+    }
+
+    fn get_node_2() -> Node {
+        Node::builder("Node-456")
+            .with_endpoint("tcps://12.0.0.123:8434")
+            .with_display_name("Cargill - Node 1")
+            .with_key("0123")
+            .with_metadata("company", "Cargill")
+            .with_metadata("admin", "Carol")
+            .build()
+            .expect("Failed to build node2")
+    }
+
+    fn get_node_3() -> Node {
+        Node::builder("Node-789")
+            .with_endpoint("tcps://12.0.0.123:8435")
+            .with_display_name("Cargill - Node 2")
+            .with_key("4567")
+            .with_metadata("company", "Cargill")
+            .with_metadata("admin", "Charlie")
+            .build()
+            .expect("Failed to build node3")
+    }
+
+    /// Creates a connection pool for an in-memory SQLite database with only a single connection
+    /// available. Each connection is backed by a different in-memory SQLite database, so limiting
+    /// the pool to a single connection ensures that the same DB is used for all operations.
+    fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        pool
+    }
+}
