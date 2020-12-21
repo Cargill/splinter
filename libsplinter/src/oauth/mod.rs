@@ -28,7 +28,7 @@ use oauth2::{
 };
 
 use crate::error::{InternalError, InvalidArgumentError};
-use crate::rest_api::auth::identity::{Authorization, BearerToken, IdentityProvider};
+use crate::rest_api::auth::{identity::IdentityProvider, AuthorizationHeader, BearerToken};
 
 use store::InflightOAuthRequestStore;
 
@@ -154,8 +154,8 @@ impl OAuthClient {
                 ))
             })?;
 
-        // Create `Authorization` necessary to fetch the user's identity from OAuth provider
-        let authorization = Authorization::Bearer(BearerToken::OAuth2(
+        // Create `AuthorizationHeader` necessary to fetch the user's identity from OAuth provider
+        let authorization = AuthorizationHeader::Bearer(BearerToken::OAuth2(
             token_response.access_token().secret().to_string(),
         ));
         // Fetch user identity from OAuth provider
@@ -327,7 +327,7 @@ mod tests {
     pub struct TestIdentityProvider;
 
     impl IdentityProvider for TestIdentityProvider {
-        fn get_identity(&self, _: &Authorization) -> Result<Option<String>, InternalError> {
+        fn get_identity(&self, _: &AuthorizationHeader) -> Result<Option<String>, InternalError> {
             Ok(Some("".to_string()))
         }
 

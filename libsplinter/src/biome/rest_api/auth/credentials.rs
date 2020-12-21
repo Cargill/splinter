@@ -21,7 +21,7 @@ use jsonwebtoken::decode;
 use crate::biome::rest_api::{resources::User, BiomeRestConfig};
 use crate::error::InternalError;
 use crate::rest_api::{
-    auth::identity::{Authorization, AuthorizationMapping, BearerToken},
+    auth::{AuthorizationHeader, AuthorizationMapping, BearerToken},
     secrets::SecretManager,
     sessions::{default_validation, Claims},
 };
@@ -46,9 +46,9 @@ impl GetUserByBiomeAuthorization {
 }
 
 impl AuthorizationMapping<User> for GetUserByBiomeAuthorization {
-    fn get(&self, authorization: &Authorization) -> Result<Option<User>, InternalError> {
+    fn get(&self, authorization: &AuthorizationHeader) -> Result<Option<User>, InternalError> {
         match authorization {
-            Authorization::Bearer(BearerToken::Biome(token)) => {
+            AuthorizationHeader::Bearer(BearerToken::Biome(token)) => {
                 let validation = default_validation(&self.rest_config.issuer());
                 let secret = match self.secret_manager.secret() {
                     Ok(secret) => secret,

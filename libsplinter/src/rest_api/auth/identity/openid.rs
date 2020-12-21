@@ -15,8 +15,9 @@
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
+use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::{Authorization, BearerToken, IdentityProvider};
+use super::IdentityProvider;
 
 #[derive(Clone)]
 pub struct OpenIdUserIdentityProvider {
@@ -30,9 +31,12 @@ impl OpenIdUserIdentityProvider {
 }
 
 impl IdentityProvider for OpenIdUserIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
+    fn get_identity(
+        &self,
+        authorization: &AuthorizationHeader,
+    ) -> Result<Option<String>, InternalError> {
         let token = match authorization {
-            Authorization::Bearer(BearerToken::OAuth2(token)) => token,
+            AuthorizationHeader::Bearer(BearerToken::OAuth2(token)) => token,
             _ => return Ok(None),
         };
 
