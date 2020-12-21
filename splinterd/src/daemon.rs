@@ -573,7 +573,24 @@ impl SplinterDaemon {
                     StartError::RestApiError("missing OAuth redirect URL configuration".into())
                 })?;
                 let oauth_config = match oauth_provider {
+                    "azure" => OAuthConfig::Azure {
+                        client_id,
+                        client_secret,
+                        redirect_url,
+                        oauth_openid_url: self.oauth_openid_url.clone().ok_or_else(|| {
+                            StartError::RestApiError(
+                                "missing OAuth OpenID discovery document URL configuration".into(),
+                            )
+                        })?,
+                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
+                    },
                     "github" => OAuthConfig::GitHub {
+                        client_id,
+                        client_secret,
+                        redirect_url,
+                        inflight_request_store: store_factory.get_oauth_inflight_request_store(),
+                    },
+                    "google" => OAuthConfig::Google {
                         client_id,
                         client_secret,
                         redirect_url,

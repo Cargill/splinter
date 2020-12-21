@@ -20,6 +20,9 @@ use crate::oauth::{
     OAuthClient, OpenIdSubjectProvider,
 };
 
+/// The URL fo the Google OpenID discovery document
+const GOOGLE_DISCOVERY_URL: &str = "https://accounts.google.com/.well-known/openid-configuration";
+
 /// Builds a new `OAuthClient` using an OpenID discovery document.
 pub struct OpenIdOAuthClientBuilder {
     openid_discovery_url: Option<String>,
@@ -31,6 +34,15 @@ impl OpenIdOAuthClientBuilder {
     pub fn new() -> Self {
         Self {
             openid_discovery_url: None,
+            inner: OAuthClientBuilder::default(),
+        }
+    }
+
+    /// Constructs a new [`OpenIdOAuthClientBuilder`] that's pre-configured with Google's discovery
+    /// URL.
+    pub fn new_google() -> Self {
+        Self {
+            openid_discovery_url: Some(GOOGLE_DISCOVERY_URL.into()),
             inner: OAuthClientBuilder::default(),
         }
     }
