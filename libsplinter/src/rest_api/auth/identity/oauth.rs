@@ -64,7 +64,7 @@ impl IdentityProvider for OAuthUserIdentityProvider {
             .oauth_user_session_store
             .get_session(token)
             .map_err(|err| InternalError::from_source(err.into()))?
-            .map(|session| session.user().subject().to_string()))
+            .map(|session| session.user().user_id().to_string()))
     }
 
     fn clone_box(&self) -> Box<dyn IdentityProvider> {
