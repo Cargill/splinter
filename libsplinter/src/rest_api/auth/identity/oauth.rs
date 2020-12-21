@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use crate::biome::OAuthUserSessionStore;
 use crate::error::InternalError;
-use crate::oauth::SubjectProvider;
+use crate::oauth::OAuthClient;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
 use super::IdentityProvider;
@@ -34,9 +34,9 @@ const DEFAULT_REAUTHENTICATION_INTERVAL: Duration = Duration::from_secs(3600); /
 /// the OAuth REST API endpoints when a user logs in.
 ///
 /// If the session has not been authenticated within the re-authentication interval, the user will
-/// be re-authenticated using the internal OAuth [SubjectProvider] and the session will be updated
-/// in the session store. If re-authentication fails, the session will be removed from the store
-/// and the user will need to start a new session by logging in.
+/// be re-authenticated using the internal [OAuthClient] and the session will be updated in the
+/// session store. If re-authentication fails, the session will be removed from the store and the
+/// user will need to start a new session by logging in.
 ///
 /// This identity provider will also use a session's refresh token (if it has one) to get a new
 /// OAuth access token for the session as needed.
@@ -45,7 +45,7 @@ const DEFAULT_REAUTHENTICATION_INTERVAL: Duration = Duration::from_secs(3600); /
 /// authorizations, and the inner token must be a valid Splinter access token for an OAuth user.
 #[derive(Clone)]
 pub struct OAuthUserIdentityProvider {
-    subject_provider: Box<dyn SubjectProvider>,
+    oauth_client: OAuthClient,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
     reauthentication_interval: Duration,
 }
@@ -55,20 +55,19 @@ impl OAuthUserIdentityProvider {
     ///
     /// # Arguments
     ///
-    /// * `subject_provider` - The OAuth subject provider that calls the OAuth server to check if a
-    ///   session is still valid
+    /// * `oauth_client` - The OAuth client that will be used to check if a session is still valid
     /// * `oauth_user_session_store` - The store that tracks users' sessions
     /// * `reauthentication_interval` - The amount of time since the last authentication for which
     ///   the identity provider can assume the session is still valid. If this amount of time has
     ///   elapsed since the last authentication of a session, the session will be re-authenticated
     ///   by the identity provider. If not provided, the default will be used (1 hour).
     pub fn new(
-        subject_provider: Box<dyn SubjectProvider>,
+        oauth_client: OAuthClient,
         oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
         reauthentication_interval: Option<Duration>,
     ) -> Self {
         Self {
-            subject_provider,
+            oauth_client,
             oauth_user_session_store,
             reauthentication_interval: reauthentication_interval
                 .unwrap_or(DEFAULT_REAUTHENTICATION_INTERVAL),
@@ -102,10 +101,7 @@ impl IdentityProvider for OAuthUserIdentityProvider {
             .elapsed()
             .map_err(|err| InternalError::from_source(err.into()))?;
         if time_since_authenticated >= self.reauthentication_interval {
-            match self
-                .subject_provider
-                .get_subject(session.oauth_access_token())
-            {
+            match self.oauth_client.get_subject(session.oauth_access_token()) {
                 Ok(Some(_)) => {
                     let updated_session = session.into_update_builder().build();
                     self.oauth_user_session_store
@@ -142,16 +138,19 @@ mod tests {
 
     use crate::biome::oauth::store::InsertableOAuthUserSessionBuilder;
     use crate::biome::MemoryOAuthUserSessionStore;
+    use crate::oauth::{
+        store::MemoryInflightOAuthRequestStore, OAuthClientBuilder, SubjectProvider,
+    };
 
     /// Verifies that the `OAuthUserIdentityProvider` returns a cached user identity when a session
     /// does not need to be re-authenticated.
     ///
     /// 1. Create a new `OAuthUserSessionStore`
     /// 2. Add a session to the store
-    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, a subject provider
-    ///    that always fails (this will verify that the cache is used and this isn't called), and
-    ///    the default re-authentication interval (an hour is long enough to ensure that the session
-    ///    does not expire while this test is running).
+    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, an OAuth client that
+    ///    always fails to get a subject (this will verify that the cache is used and this isn't
+    ///    called), and the default re-authentication interval (an hour is long enough to ensure
+    ///    that the session does not expire while this test is running).
     /// 4. Call the `get_identity` method with the session's access token and verify that the
     ///    correct identity (the user's Biome ID) is returned.
     #[test]
@@ -177,7 +176,7 @@ mod tests {
             .to_string();
 
         let identity_provider =
-            OAuthUserIdentityProvider::new(Box::new(AlwaysErrSubjectProvider), session_store, None);
+            OAuthUserIdentityProvider::new(always_err_client(), session_store, None);
 
         let authorization_header =
             AuthorizationHeader::Bearer(BearerToken::OAuth2(splinter_access_token.into()));
@@ -191,14 +190,14 @@ mod tests {
     /// Verifies that the `OAuthUserIdentityProvider` returns `None` when the sessions store does
     /// not have a session for the given token.
     ///
-    /// 1. Create a new `OAuthUserIdentityProvider` with an empty session store and a subject
-    ///    provider that always succeeds (this will verify that the subject provider isn't called
-    ///    when the session doesn't even exist).
+    /// 1. Create a new `OAuthUserIdentityProvider` with an empty session store and an OAuth client
+    ///    that always successfully gets a subject (this will verify that the subject provider isn't
+    ///    called when the session doesn't even exist).
     /// 2. Call the `get_identity` method and verify that `None` is returned
     #[test]
     fn get_identity_no_session() {
         let identity_provider = OAuthUserIdentityProvider::new(
-            Box::new(AlwaysSomeSubjectProvider),
+            always_some_client(),
             Box::new(MemoryOAuthUserSessionStore::new()),
             None,
         );
@@ -216,9 +215,9 @@ mod tests {
     ///
     /// 1. Create a new `OAuthUserSessionStore`
     /// 2. Add a session to the store
-    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, a subject provider
-    ///    that always succeeds, and a re-authentication interval of 0 (the session will expire
-    ///    immediately).
+    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, an OAuth client
+    ///    that always successfully gets a subject, and a re-authentication interval of 0 (the
+    ///    session will expire immediately).
     /// 4. Call the `get_identity` method with the session's access token and verify that the
     ///    identity is correct.
     /// 5. Verify that the "last authenticated" time for the session in the session store is more
@@ -243,7 +242,7 @@ mod tests {
             .expect("Inserted session not found");
 
         let identity_provider = OAuthUserIdentityProvider::new(
-            Box::new(AlwaysSomeSubjectProvider),
+            always_some_client(),
             session_store.clone(),
             Some(Duration::from_secs(0)),
         );
@@ -268,9 +267,9 @@ mod tests {
     ///
     /// 1. Create a new `OAuthUserSessionStore`
     /// 2. Add a session to the store
-    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, a subject provider
-    ///    that always returns `Ok(None)`, and a re-authentication interval of 0 (the session will
-    ///    expire immediately).
+    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, an OAuth client
+    ///    that always returns `Ok(None)` when getting a subject, and a re-authentication interval
+    ///    of 0 (the session will expire immediately).
     /// 4. Call the `get_identity` method with the session's access token and verify that `Ok(None)`
     ///    is returned.
     /// 5. Verify that the session has been removed from the store.
@@ -290,7 +289,7 @@ mod tests {
             .expect("Failed to add session");
 
         let identity_provider = OAuthUserIdentityProvider::new(
-            Box::new(AlwaysNoneSubjectProvider),
+            always_none_client(),
             session_store.clone(),
             Some(Duration::from_secs(0)),
         );
@@ -313,8 +312,8 @@ mod tests {
     ///
     /// 1. Create a new `OAuthUserSessionStore`
     /// 2. Add a session to the store
-    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, a subject provider
-    ///    that always returns an error, and a re-authentication interval of 0 (the session will
+    /// 3. Create a new `OAuthUserIdentityProvider` with the session store, an OAuth client that
+    ///    always fails to get a subject, and a re-authentication interval of 0 (the session will
     ///    expire immediately).
     /// 4. Call the `get_identity` method with the session's access token and verify that an error
     ///    is returned.
@@ -335,7 +334,7 @@ mod tests {
             .expect("Failed to add session");
 
         let identity_provider = OAuthUserIdentityProvider::new(
-            Box::new(AlwaysErrSubjectProvider),
+            always_err_client(),
             session_store.clone(),
             Some(Duration::from_secs(0)),
         );
@@ -352,6 +351,20 @@ mod tests {
             .is_none());
     }
 
+    /// Returns a mock OAuth client that wraps an `AlwaysSomeSubjectProvider`
+    fn always_some_client() -> OAuthClient {
+        OAuthClientBuilder::new()
+            .with_client_id("client_id".into())
+            .with_client_secret("client_secret".into())
+            .with_auth_url("http://test.com/auth".into())
+            .with_redirect_url("http://test.com/redirect".into())
+            .with_token_url("http://test.com/token".into())
+            .with_subject_provider(Box::new(AlwaysSomeSubjectProvider))
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .build()
+            .expect("Failed to build OAuth client")
+    }
+
     /// Subject provider that always returns a subject
     #[derive(Clone)]
     struct AlwaysSomeSubjectProvider;
@@ -366,6 +379,20 @@ mod tests {
         }
     }
 
+    /// Returns a mock OAuth client that wraps an `AlwaysNoneSubjectProvider`
+    fn always_none_client() -> OAuthClient {
+        OAuthClientBuilder::new()
+            .with_client_id("client_id".into())
+            .with_client_secret("client_secret".into())
+            .with_auth_url("http://test.com/auth".into())
+            .with_redirect_url("http://test.com/redirect".into())
+            .with_token_url("http://test.com/token".into())
+            .with_subject_provider(Box::new(AlwaysNoneSubjectProvider))
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .build()
+            .expect("Failed to build OAuth client")
+    }
+
     /// Subject provider that always returns `Ok(None)`
     #[derive(Clone)]
     struct AlwaysNoneSubjectProvider;
@@ -378,6 +405,20 @@ mod tests {
         fn clone_box(&self) -> Box<dyn SubjectProvider> {
             Box::new(self.clone())
         }
+    }
+
+    /// Returns a mock OAuth client that wraps an `AlwaysErrSubjectProvider`
+    fn always_err_client() -> OAuthClient {
+        OAuthClientBuilder::new()
+            .with_client_id("client_id".into())
+            .with_client_secret("client_secret".into())
+            .with_auth_url("http://test.com/auth".into())
+            .with_redirect_url("http://test.com/redirect".into())
+            .with_token_url("http://test.com/token".into())
+            .with_subject_provider(Box::new(AlwaysErrSubjectProvider))
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .build()
+            .expect("Failed to build OAuth client")
     }
 
     /// Subject provider that always returns `Err`

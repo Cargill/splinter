@@ -53,13 +53,13 @@ impl OAuthClientBuilder {
         Self::default()
     }
 
-    /// Builds an `OAuthClient` and returns it along with the configured `SubjectProvider`.
+    /// Builds an `OAuthClient`.
     ///
     /// # Errors
     ///
     /// Returns an [`OAuthClientBuildError`] if any of the auth, redirect, or token URLs are
     /// invalid.
-    pub fn build(self) -> Result<(OAuthClient, Box<dyn SubjectProvider>), OAuthClientBuildError> {
+    pub fn build(self) -> Result<OAuthClient, OAuthClientBuildError> {
         let client_id = self.client_id.ok_or_else(|| {
             InvalidStateError::with_message(
                 "A client ID is required to successfully build an OAuthClient".into(),
@@ -96,15 +96,13 @@ impl OAuthClientBuilder {
                     .into(),
             )
         })?;
-        Ok((
-            OAuthClient::new(
-                new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
-                self.scopes,
-                subject_provider.clone(),
-                inflight_request_store,
-            )?,
-            subject_provider,
-        ))
+        OAuthClient::new(
+            new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
+            self.scopes,
+            subject_provider.clone(),
+            inflight_request_store,
+        )
+        .map_err(OAuthClientBuildError::from)
     }
 
     /// Sets the client ID for the OAuth2 provider.

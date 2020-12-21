@@ -162,9 +162,7 @@ impl OAuthClient {
 
         // Fetch the users subject identifier from OAuth provider
         let subject = self
-            .subject_provider
-            .get_subject(token_response.access_token().secret())
-            .map_err(|err| InternalError::with_message(format!("failed to get subject: {}", err,)))?
+            .get_subject(token_response.access_token().secret())?
             .ok_or_else(|| InternalError::with_message("subject not found".into()))?;
 
         let user_info = UserInfo {
@@ -177,6 +175,12 @@ impl OAuthClient {
         };
 
         Ok(Some((user_info, pending_authorization.client_redirect_url)))
+    }
+
+    /// Attempts to get the subject that the given access token is for from the OAuth server. This
+    /// method will return `Ok(None)` if the access token could not be resolved to a subject.
+    pub fn get_subject(&self, access_token: &str) -> Result<Option<String>, InternalError> {
+        self.subject_provider.get_subject(access_token)
     }
 }
 
