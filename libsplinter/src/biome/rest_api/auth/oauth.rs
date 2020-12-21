@@ -23,7 +23,7 @@ use crate::biome::{
 };
 use crate::error::InternalError;
 use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
-use crate::rest_api::auth::identity::{AuthorizationHeader, AuthorizationMapping, BearerToken};
+use crate::rest_api::auth::{AuthorizationHeader, AuthorizationMapping, BearerToken};
 
 /// This is the UUID namespace for Biome user IDs generated for users that login with OAuth. This
 /// will prevent collisions with Biome user IDs generated for users that register with Biome

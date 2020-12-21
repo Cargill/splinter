@@ -19,7 +19,7 @@ use futures::{future::IntoFuture, Future};
 
 use crate::oauth::rest_api::OAuthUserInfoStore;
 use crate::protocol;
-use crate::rest_api::auth::identity::{AuthorizationHeader, BearerToken};
+use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 pub fn make_logout_route(user_info_store: Box<dyn OAuthUserInfoStore>) -> Resource {

@@ -33,8 +33,7 @@ use crate::error::InternalError;
 use crate::rest_api::ErrorResponse;
 
 use super::{
-    authorize,
-    identity::{AuthorizationHeader, AuthorizationMapping, IdentityProvider},
+    authorize, identity::IdentityProvider, AuthorizationHeader, AuthorizationMapping,
     AuthorizationResult,
 };
 

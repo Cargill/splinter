@@ -99,10 +99,7 @@ use crate::oauth::OpenIdOAuthClientBuilder;
 #[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
 use auth::identity::cylinder::CylinderKeyIdentityProvider;
 #[cfg(feature = "auth")]
-use auth::{
-    actix::Authorization,
-    identity::{AuthorizationMapping, IdentityProvider},
-};
+use auth::{actix::Authorization, identity::IdentityProvider, AuthorizationMapping};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -1122,7 +1119,7 @@ mod test {
     #[cfg(feature = "auth")]
     use crate::error::InternalError;
     #[cfg(feature = "auth")]
-    use crate::rest_api::auth::identity::AuthorizationHeader;
+    use crate::rest_api::auth::AuthorizationHeader;
 
     #[test]
     fn test_resource() {

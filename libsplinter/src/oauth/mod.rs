@@ -28,7 +28,7 @@ use oauth2::{
 };
 
 use crate::error::{InternalError, InvalidArgumentError};
-use crate::rest_api::auth::identity::{AuthorizationHeader, BearerToken, IdentityProvider};
+use crate::rest_api::auth::{identity::IdentityProvider, AuthorizationHeader, BearerToken};
 
 use store::InflightOAuthRequestStore;
 

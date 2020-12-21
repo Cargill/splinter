@@ -19,9 +19,13 @@ use std::sync::Arc;
 use jsonwebtoken::{decode, Validation};
 
 use crate::error::InternalError;
-use crate::rest_api::{secrets::SecretManager, sessions::Claims};
+use crate::rest_api::{
+    auth::{AuthorizationHeader, BearerToken},
+    secrets::SecretManager,
+    sessions::Claims,
+};
 
-use super::{AuthorizationHeader, BearerToken, IdentityProvider};
+use super::IdentityProvider;
 
 /// Extracts the user ID from a Biome JWT
 ///

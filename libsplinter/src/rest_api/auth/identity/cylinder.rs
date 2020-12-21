@@ -19,8 +19,9 @@ use std::sync::{Arc, Mutex};
 use cylinder::{jwt::JsonWebTokenParser, Verifier};
 
 use crate::error::InternalError;
+use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::{AuthorizationHeader, BearerToken, IdentityProvider};
+use super::IdentityProvider;
 
 /// Extracts the public key from a Cylinder JWT
 ///

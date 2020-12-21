@@ -21,7 +21,7 @@ use jsonwebtoken::decode;
 use crate::biome::rest_api::{resources::User, BiomeRestConfig};
 use crate::error::InternalError;
 use crate::rest_api::{
-    auth::identity::{AuthorizationHeader, AuthorizationMapping, BearerToken},
+    auth::{AuthorizationHeader, AuthorizationMapping, BearerToken},
     secrets::SecretManager,
     sessions::{default_validation, Claims},
 };

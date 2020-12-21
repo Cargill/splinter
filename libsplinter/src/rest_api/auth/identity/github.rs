@@ -17,8 +17,9 @@
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
+use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::{AuthorizationHeader, BearerToken, IdentityProvider};
+use super::IdentityProvider;
 
 /// Retrieves a GitHub username from the GitHub servers
 ///

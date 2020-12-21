@@ -18,7 +18,11 @@
 pub(crate) mod actix;
 pub mod identity;
 
-use identity::{AuthorizationHeader, IdentityProvider};
+use std::str::FromStr;
+
+use crate::error::{InternalError, InvalidArgumentError};
+
+use identity::IdentityProvider;
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
@@ -88,11 +92,134 @@ fn authorize(
     AuthorizationResult::Unauthorized
 }
 
+/// A trait that fetches a value based on an authorization header.
+pub trait AuthorizationMapping<T> {
+    /// Return a value based on the given authorization header.
+    fn get(&self, authorization: &AuthorizationHeader) -> Result<Option<T>, InternalError>;
+}
+
+/// A parsed authorization header
+#[derive(PartialEq)]
+pub enum AuthorizationHeader {
+    Bearer(BearerToken),
+    Custom(String),
+}
+
+/// Parses an authorization string. This implementation will attempt to parse the string in the
+/// format "<scheme> <value>" to a known scheme. If the string does not match this format or the
+/// scheme is unknown, the `AuthorizationHeader::Custom` variant will be returned with the whole
+/// authorization string.
+impl FromStr for AuthorizationHeader {
+    type Err = InvalidArgumentError;
+
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        let mut parts = str.splitn(2, ' ');
+        match (parts.next(), parts.next()) {
+            (Some(auth_scheme), Some(value)) => match auth_scheme {
+                "Bearer" => Ok(AuthorizationHeader::Bearer(value.parse()?)),
+                _ => Ok(AuthorizationHeader::Custom(str.to_string())),
+            },
+            (Some(_), None) => Ok(AuthorizationHeader::Custom(str.to_string())),
+            _ => unreachable!(), // splitn always returns at least one item
+        }
+    }
+}
+
+/// A bearer token of a specific type
+#[derive(PartialEq)]
+pub enum BearerToken {
+    #[cfg(feature = "biome-credentials")]
+    /// Contains a Biome JWT
+    Biome(String),
+    /// Contains a custom token, which is any bearer token that does not match one of the other
+    /// variants of this enum
+    Custom(String),
+    #[cfg(feature = "cylinder-jwt")]
+    /// Contains a Cylinder JWT
+    Cylinder(String),
+    #[cfg(feature = "oauth")]
+    /// Contains an OAuth2 token
+    OAuth2(String),
+}
+
+/// Parses a bearer token string. This implementation will attempt to parse the token in the format
+/// "<type>:<value>" to a know type. If the token does not match this format or the type is unknown,
+/// the `BearerToken::Custom` variant will be returned with the whole token value.
+impl FromStr for BearerToken {
+    type Err = InvalidArgumentError;
+
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        let mut parts = str.splitn(2, ':');
+        match (parts.next(), parts.next()) {
+            (Some(token_type), Some(token)) => match token_type {
+                #[cfg(feature = "biome-credentials")]
+                "Biome" => Ok(BearerToken::Biome(token.to_string())),
+                #[cfg(feature = "cylinder-jwt")]
+                "Cylinder" => Ok(BearerToken::Cylinder(token.to_string())),
+                #[cfg(feature = "oauth")]
+                "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
+                _ => Ok(BearerToken::Custom(str.to_string())),
+            },
+            (Some(_), None) => Ok(BearerToken::Custom(str.to_string())),
+            _ => unreachable!(), // splitn always returns at least one item
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::error::InternalError;
+    /// Verfifies that the `AuthorizationHeader` enum is correctly parsed from strings
+    #[test]
+    fn parse_authorization_header() {
+        assert!(matches!(
+            "Bearer token".parse(),
+            Ok(AuthorizationHeader::Bearer(token)) if token == "token".parse().unwrap()
+        ));
+
+        assert!(matches!(
+            "Unknown token".parse(),
+            Ok(AuthorizationHeader::Custom(auth_str)) if auth_str == "Unknown token"
+        ));
+
+        assert!(matches!(
+            "test".parse(),
+            Ok(AuthorizationHeader::Custom(auth_str)) if auth_str == "test"
+        ));
+    }
+
+    /// Verfifies that the `BearerToken` enum is correctly parsed from strings
+    #[test]
+    fn parse_bearer_token() {
+        #[cfg(feature = "biome-credentials")]
+        assert!(matches!(
+            "Biome:test".parse(),
+            Ok(BearerToken::Biome(token)) if token == "test"
+        ));
+
+        #[cfg(feature = "cylinder-jwt")]
+        assert!(matches!(
+            "Cylinder:test".parse(),
+            Ok(BearerToken::Cylinder(token)) if token == "test"
+        ));
+
+        #[cfg(feature = "oauth")]
+        assert!(matches!(
+            "OAuth2:test".parse(),
+            Ok(BearerToken::OAuth2(token)) if token == "test"
+        ));
+
+        assert!(matches!(
+            "Unknown:test".parse(),
+            Ok(BearerToken::Custom(token)) if token == "Unknown:test"
+        ));
+
+        assert!(matches!(
+            "test".parse(),
+            Ok(BearerToken::Custom(token)) if token == "test"
+        ));
+    }
 
     /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when no
     /// identity providers are specified. Without any identity providers, there's no way to properly
