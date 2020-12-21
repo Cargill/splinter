@@ -987,6 +987,7 @@ impl RestApiBuilder {
                         identity_providers.push(Box::new(OAuthUserIdentityProvider::new(
                             subject_provider,
                             oauth_user_session_store.clone(),
+                            None,
                         )));
                         self.resources.append(
                             &mut OAuthResourceProvider::new(oauth_client, oauth_user_session_store)
