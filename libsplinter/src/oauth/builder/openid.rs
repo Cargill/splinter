@@ -20,6 +20,8 @@ use crate::oauth::{
     OAuthClient, OpenIdSubjectProvider,
 };
 
+/// The scopes required to get OpenID user information.
+const DEFAULT_SCOPES: &[&str] = &["openid", "profile", "email"];
 /// The URL fo the Google OpenID discovery document
 const GOOGLE_DISCOVERY_URL: &str = "https://accounts.google.com/.well-known/openid-configuration";
 
@@ -128,7 +130,7 @@ impl OpenIdOAuthClientBuilder {
         self.inner
             .with_auth_url(discovery_document_response.authorization_endpoint)
             .with_token_url(discovery_document_response.token_endpoint)
-            .with_scopes(discovery_document_response.scopes_supported)
+            .with_scopes(DEFAULT_SCOPES.iter().map(ToString::to_string).collect())
             .with_subject_provider(Box::new(OpenIdSubjectProvider::new(userinfo_endpoint)))
             .build()
     }
@@ -146,5 +148,4 @@ struct DiscoveryDocumentResponse {
     authorization_endpoint: String,
     token_endpoint: String,
     userinfo_endpoint: String,
-    scopes_supported: Vec<String>,
 }
