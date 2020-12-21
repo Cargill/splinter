@@ -110,10 +110,56 @@ impl IdentityProvider for OAuthUserIdentityProvider {
                     Ok(Some(user_id))
                 }
                 Ok(None) => {
-                    self.oauth_user_session_store
-                        .remove_session(token)
-                        .map_err(|err| InternalError::from_source(err.into()))?;
-                    Ok(None)
+                    // The access token didn't work; see if there's a refresh token that can be used
+                    // to get a new one.
+                    match session.oauth_refresh_token() {
+                        Some(refresh_token) => {
+                            // Try using the session's OAuth refresh token to get a new OAuth
+                            // access token
+                            match self
+                                .oauth_client
+                                .exchange_refresh_token(refresh_token.to_string())
+                            {
+                                Ok(access_token) => {
+                                    // Update the access token in the store
+                                    let updated_session = session
+                                        .into_update_builder()
+                                        .with_oauth_access_token(access_token.clone())
+                                        .build();
+                                    self.oauth_user_session_store
+                                        .update_session(updated_session)
+                                        .map_err(|err| InternalError::from_source(err.into()))?;
+                                    // Authenticate with the new access token; if this fails (we
+                                    // get Ok(None) or Err(_)), something's wrong that can't be
+                                    // handled here.
+                                    match self.oauth_client.get_subject(&access_token)? {
+                                        Some(_) => Ok(Some(user_id)),
+                                        None => Err(InternalError::with_message(
+                                            "failed to authenticate user with new access token"
+                                                .into(),
+                                        )),
+                                    }
+                                }
+                                Err(err) => {
+                                    // The refresh token didn't work; delete the session since it's
+                                    // no longer valid
+                                    debug!("Failed to exchange refresh token: {}", err);
+                                    self.oauth_user_session_store
+                                        .remove_session(token)
+                                        .map_err(|err| InternalError::from_source(err.into()))?;
+                                    Ok(None)
+                                }
+                            }
+                        }
+                        None => {
+                            // The access token didn't work and there's no refresh token for this
+                            // session; delete the session since it's no longer valid.
+                            self.oauth_user_session_store
+                                .remove_session(token)
+                                .map_err(|err| InternalError::from_source(err.into()))?;
+                            Ok(None)
+                        }
+                    }
                 }
                 Err(err) => {
                     self.oauth_user_session_store

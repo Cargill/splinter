@@ -25,7 +25,8 @@ use std::time::Duration;
 
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, ClientSecret,
-    CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
+    TokenResponse, TokenUrl,
 };
 
 use crate::error::{InternalError, InvalidArgumentError};
@@ -175,6 +176,20 @@ impl OAuthClient {
         };
 
         Ok(Some((user_info, pending_authorization.client_redirect_url)))
+    }
+
+    /// Exchanges the given refresh token for an access token.
+    pub fn exchange_refresh_token(&self, refresh_token: String) -> Result<String, InternalError> {
+        self.client
+            .exchange_refresh_token(&RefreshToken::new(refresh_token))
+            .request(http_client)
+            .map(|response| response.access_token().secret().into())
+            .map_err(|err| {
+                InternalError::with_message(format!(
+                    "failed to make refresh token exchange request: {}",
+                    err,
+                ))
+            })
     }
 
     /// Attempts to get the subject that the given access token is for from the OAuth server. This
