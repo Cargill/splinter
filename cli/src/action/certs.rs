@@ -209,12 +209,12 @@ impl Action for CertGenAction {
             } else {
                 // if all files need to be generated log what will be written and generate all
                 log_writing(&cert_path, &private_cert_path)?;
-                create_all_certs(cert_path, private_cert_path, common_name)?;
+                create_all_certs(&cert_path, &private_cert_path, common_name)?;
             }
         } else {
             // if force is true, overwrite all existing files
             log_overwriting(&cert_path, &private_cert_path)?;
-            create_all_certs(cert_dir.to_path_buf(), private_cert_path, common_name)?;
+            create_all_certs(&cert_dir.to_path_buf(), &private_cert_path, common_name)?;
         }
 
         Ok(())
@@ -345,8 +345,7 @@ fn handle_skip(
             absolute_path(&private_cert_path)?,
             CA_KEY
         );
-        let (genearte_ca_key, generate_ca_cert) =
-            write_ca(cert_path.clone(), private_cert_path.clone())?;
+        let (genearte_ca_key, generate_ca_cert) = write_ca(&cert_path, &private_cert_path)?;
         ca = Some((genearte_ca_key, generate_ca_cert));
     }
 
@@ -373,11 +372,13 @@ fn handle_skip(
             CLIENT_KEY
         );
         if let Some((ca_key, ca_cert)) = ca {
-            write_client(
-                cert_path.clone(),
-                private_cert_path.clone(),
+            write_cert_and_key(
+                &cert_path.clone(),
+                &private_cert_path.clone(),
                 &ca_key,
                 &ca_cert,
+                CLIENT_CERT,
+                CLIENT_KEY,
                 &common_name,
             )?;
             ca = Some((ca_key, ca_cert));
@@ -408,12 +409,14 @@ fn handle_skip(
             absolute_path(&private_cert_path)?,
             SERVER_KEY
         );
-        if let Some((ca_key, ca_cert)) = ca {
-            write_server(
-                cert_path,
-                private_cert_path,
-                &ca_key,
-                &ca_cert,
+        if let Some((ca_key, ca_cert)) = ca.as_ref() {
+            write_cert_and_key(
+                &cert_path,
+                &private_cert_path,
+                ca_key,
+                ca_cert,
+                SERVER_CERT,
+                SERVER_KEY,
                 &common_name,
             )?;
         } else {
@@ -426,28 +429,32 @@ fn handle_skip(
 
 // create all certificates and keys from scratch
 fn create_all_certs(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
+    cert_path: &PathBuf,
+    private_cert_path: &PathBuf,
     common_name: String,
 ) -> Result<(), CliError> {
     // Generate Certificate Authority keys and certificate.
     // These files are not saved
-    let (ca_key, ca_cert) = write_ca(cert_path.clone(), private_cert_path.clone())?;
+    let (ca_key, ca_cert) = write_ca(cert_path, private_cert_path)?;
     // Generate client and server keys and certificates
 
-    write_client(
-        cert_path.clone(),
-        private_cert_path.clone(),
-        &ca_key,
-        &ca_cert,
-        &common_name,
-    )?;
-
-    write_server(
+    write_cert_and_key(
         cert_path,
         private_cert_path,
         &ca_key,
         &ca_cert,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        &common_name,
+    )?;
+
+    write_cert_and_key(
+        cert_path,
+        private_cert_path,
+        &ca_key,
+        &ca_cert,
+        SERVER_CERT,
+        SERVER_KEY,
         &common_name,
     )?;
 
@@ -456,8 +463,8 @@ fn create_all_certs(
 
 // Generate Certificate Authority keys and certificate.
 fn write_ca(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
+    cert_path: &PathBuf,
+    private_cert_path: &PathBuf,
 ) -> Result<(PKey<Private>, X509), CliError> {
     let (ca_key, ca_cert) = make_ca_cert()?;
 
@@ -473,40 +480,22 @@ fn write_ca(
 }
 
 // Generate server keys and certificate.
-fn write_server(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
+fn write_cert_and_key(
+    cert_path: &PathBuf,
+    private_cert_path: &PathBuf,
     ca_key: &PKey<Private>,
     ca_cert: &X509,
+    cert_name: &str,
+    key_name: &str,
     common_name: &str,
 ) -> Result<(), CliError> {
     let (server_key, server_cert) = make_ca_signed_cert(ca_cert, ca_key, common_name)?;
 
-    write_file(cert_path, SERVER_CERT, &server_cert.to_pem()?)?;
+    write_file(cert_path, cert_name, &server_cert.to_pem()?)?;
 
     write_file(
         private_cert_path,
-        SERVER_KEY,
-        &server_key.private_key_to_pem_pkcs8()?,
-    )?;
-    Ok(())
-}
-
-// Generate client keys and certificate.
-fn write_client(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
-    ca_key: &PKey<Private>,
-    ca_cert: &X509,
-    common_name: &str,
-) -> Result<(), CliError> {
-    let (server_key, server_cert) = make_ca_signed_cert(ca_cert, ca_key, common_name)?;
-
-    write_file(cert_path, CLIENT_CERT, &server_cert.to_pem()?)?;
-
-    write_file(
-        private_cert_path,
-        CLIENT_KEY,
+        key_name,
         &server_key.private_key_to_pem_pkcs8()?,
     )?;
     Ok(())
@@ -596,7 +585,7 @@ fn make_ca_signed_cert(
 
 /// write the a file to a temp file name and then rename to final filename
 /// this will guarantee that the final file will ony ever contain valid data
-fn write_file(path_buf: PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
+fn write_file(path_buf: &PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
     let temp_path_buf = path_buf.join(format!(".{}.new", file_name));
     let temp_path = {
         if let Some(path) = temp_path_buf.to_str() {
