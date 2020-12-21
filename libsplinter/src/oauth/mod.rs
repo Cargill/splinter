@@ -53,6 +53,8 @@ pub use subject::SubjectProvider;
 pub struct OAuthClient {
     /// The inner OAuth2 client
     client: BasicClient,
+    /// Extra parameters that will be added to an authorization request
+    extra_auth_params: Vec<(String, String)>,
     /// The scopes that will be requested for each user that's authenticated
     scopes: Vec<String>,
     /// OAuth2 subject provider used to retrieve users' subject identifiers
@@ -69,6 +71,7 @@ impl OAuthClient {
     /// # Arguments
     ///
     /// * `client` - the [oauth2::basic::BasicClient], used for requests to the provider
+    /// * `extra_auth_params` - Extra parameters that will be added to an authorization request
     /// * `scopes` - The scopes that will be requested for each user
     /// * `subject_provider` - The OAuth subject provider used to retrieve users' subject
     ///   identifiers
@@ -80,12 +83,14 @@ impl OAuthClient {
     /// Returns an error if any of the auth, redirect, or token URLs are invalid
     fn new(
         client: BasicClient,
+        extra_auth_params: Vec<(String, String)>,
         scopes: Vec<String>,
         subject_provider: Box<dyn SubjectProvider>,
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     ) -> Result<Self, InvalidArgumentError> {
         Ok(Self {
             client,
+            extra_auth_params,
             scopes,
             subject_provider,
             inflight_request_store,
@@ -108,6 +113,9 @@ impl OAuthClient {
             .client
             .authorize_url(CsrfToken::new_random)
             .set_pkce_challenge(pkce_challenge);
+        for (key, value) in self.extra_auth_params.iter() {
+            request = request.add_extra_param(key, value);
+        }
         for scope in &self.scopes {
             request = request.add_scope(Scope::new(scope.into()));
         }
@@ -302,6 +310,7 @@ mod tests {
                 "https://provider.com/token".into(),
             )
             .expect("Failed to create basic client"),
+            vec![],
             vec![],
             subject_box.clone_box(),
             inflight_request_store.clone_box(),
