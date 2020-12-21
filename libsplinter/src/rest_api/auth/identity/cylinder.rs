@@ -20,12 +20,12 @@ use cylinder::{jwt::JsonWebTokenParser, Verifier};
 
 use crate::error::InternalError;
 
-use super::{Authorization, BearerToken, IdentityProvider};
+use super::{AuthorizationHeader, BearerToken, IdentityProvider};
 
 /// Extracts the public key from a Cylinder JWT
 ///
-/// This provider only accepts `Authorization::Bearer(BearerToken::Cylinder(token))` authorizations,
-/// and the inner token must be a valid Cylinder JWT.
+/// This provider only accepts `AuthorizationHeader::Bearer(BearerToken::Cylinder(token))`
+/// authorizations, and the inner token must be a valid Cylinder JWT.
 #[derive(Clone)]
 pub struct CylinderKeyIdentityProvider {
     /// The verifier is wrapped in an `Arc<Mutex<_>>` to ensure this struct is `Sync`
@@ -40,9 +40,12 @@ impl CylinderKeyIdentityProvider {
 }
 
 impl IdentityProvider for CylinderKeyIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
+    fn get_identity(
+        &self,
+        authorization: &AuthorizationHeader,
+    ) -> Result<Option<String>, InternalError> {
         let token = match authorization {
-            Authorization::Bearer(BearerToken::Cylinder(token)) => token,
+            AuthorizationHeader::Bearer(BearerToken::Cylinder(token)) => token,
             _ => return Ok(None),
         };
 

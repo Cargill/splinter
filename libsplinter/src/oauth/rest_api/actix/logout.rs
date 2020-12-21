@@ -19,7 +19,7 @@ use futures::{future::IntoFuture, Future};
 
 use crate::oauth::rest_api::OAuthUserInfoStore;
 use crate::protocol;
-use crate::rest_api::auth::identity::{Authorization, BearerToken};
+use crate::rest_api::auth::identity::{AuthorizationHeader, BearerToken};
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
 pub fn make_logout_route(user_info_store: Box<dyn OAuthUserInfoStore>) -> Resource {
@@ -79,7 +79,7 @@ fn get_access_token(
     };
 
     match auth_header.parse() {
-        Ok(Authorization::Bearer(BearerToken::OAuth2(access_token))) => Ok(access_token),
+        Ok(AuthorizationHeader::Bearer(BearerToken::OAuth2(access_token))) => Ok(access_token),
         Ok(_) | Err(_) => Err(Box::new(
             HttpResponse::Unauthorized()
                 .json(ErrorResponse::unauthorized())

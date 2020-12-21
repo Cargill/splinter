@@ -18,19 +18,22 @@ use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
 
-use super::{Authorization, BearerToken, IdentityProvider};
+use super::{AuthorizationHeader, BearerToken, IdentityProvider};
 
 /// Retrieves a GitHub username from the GitHub servers
 ///
-/// This provider only accepts `Authorization::Bearer(BearerToken::OAuth2(token))` authorizations,
-/// and the inner token must be a valid GitHub OAuth2 access token.
+/// This provider only accepts `AuthorizationHeader::Bearer(BearerToken::OAuth2(token))`
+/// authorizations, and the inner token must be a valid GitHub OAuth2 access token.
 #[derive(Clone)]
 pub struct GithubUserIdentityProvider;
 
 impl IdentityProvider for GithubUserIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
+    fn get_identity(
+        &self,
+        authorization: &AuthorizationHeader,
+    ) -> Result<Option<String>, InternalError> {
         let token = match authorization {
-            Authorization::Bearer(BearerToken::OAuth2(token)) => token,
+            AuthorizationHeader::Bearer(BearerToken::OAuth2(token)) => token,
             _ => return Ok(None),
         };
 

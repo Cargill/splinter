@@ -29,10 +29,13 @@ use crate::error::{InternalError, InvalidArgumentError};
 
 /// A service that fetches identities from a backing provider
 pub trait IdentityProvider: Send + Sync {
-    /// Attempts to get the identity that corresponds to the given authorization. This method will
-    /// return `Ok(None)` if the identity provider was not able to resolve the authorization to an
-    /// identity.
-    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError>;
+    /// Attempts to get the identity that corresponds to the given authorization header. This method
+    /// will  return `Ok(None)` if the identity provider was not able to resolve the authorization
+    /// to an identity.
+    fn get_identity(
+        &self,
+        authorization: &AuthorizationHeader,
+    ) -> Result<Option<String>, InternalError>;
 
     /// Clone implementation for `IdentityProvider`. The implementation of the `Clone` trait for
     /// `Box<dyn IdentityProvider>` calls this method.
@@ -53,34 +56,34 @@ impl Clone for Box<dyn IdentityProvider> {
     }
 }
 
-/// A trait that fetches a value based on an Authorization.
+/// A trait that fetches a value based on an authorization header.
 pub trait AuthorizationMapping<T> {
-    /// Return a value based on the given authorization value.
-    fn get(&self, authorization: &Authorization) -> Result<Option<T>, InternalError>;
+    /// Return a value based on the given authorization header.
+    fn get(&self, authorization: &AuthorizationHeader) -> Result<Option<T>, InternalError>;
 }
 
-/// The authorization that is passed to an `IdentityProvider`
+/// A parsed authorization header
 #[derive(PartialEq)]
-pub enum Authorization {
+pub enum AuthorizationHeader {
     Bearer(BearerToken),
     Custom(String),
 }
 
 /// Parses an authorization string. This implementation will attempt to parse the string in the
 /// format "<scheme> <value>" to a known scheme. If the string does not match this format or the
-/// scheme is unknown, the `Authorization::Custom` variant will be returned with the whole
+/// scheme is unknown, the `AuthorizationHeader::Custom` variant will be returned with the whole
 /// authorization string.
-impl FromStr for Authorization {
+impl FromStr for AuthorizationHeader {
     type Err = InvalidArgumentError;
 
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         let mut parts = str.splitn(2, ' ');
         match (parts.next(), parts.next()) {
             (Some(auth_scheme), Some(value)) => match auth_scheme {
-                "Bearer" => Ok(Authorization::Bearer(value.parse()?)),
-                _ => Ok(Authorization::Custom(str.to_string())),
+                "Bearer" => Ok(AuthorizationHeader::Bearer(value.parse()?)),
+                _ => Ok(AuthorizationHeader::Custom(str.to_string())),
             },
-            (Some(_), None) => Ok(Authorization::Custom(str.to_string())),
+            (Some(_), None) => Ok(AuthorizationHeader::Custom(str.to_string())),
             _ => unreachable!(), // splitn always returns at least one item
         }
     }
@@ -131,22 +134,22 @@ impl FromStr for BearerToken {
 mod tests {
     use super::*;
 
-    /// Verfifies that the `Authorization` enum is correctly parsed from strings
+    /// Verfifies that the `AuthorizationHeader` enum is correctly parsed from strings
     #[test]
-    fn parse_authorization() {
+    fn parse_authorization_header() {
         assert!(matches!(
             "Bearer token".parse(),
-            Ok(Authorization::Bearer(token)) if token == "token".parse().unwrap()
+            Ok(AuthorizationHeader::Bearer(token)) if token == "token".parse().unwrap()
         ));
 
         assert!(matches!(
             "Unknown token".parse(),
-            Ok(Authorization::Custom(auth_str)) if auth_str == "Unknown token"
+            Ok(AuthorizationHeader::Custom(auth_str)) if auth_str == "Unknown token"
         ));
 
         assert!(matches!(
             "test".parse(),
-            Ok(Authorization::Custom(auth_str)) if auth_str == "test"
+            Ok(AuthorizationHeader::Custom(auth_str)) if auth_str == "test"
         ));
     }
 

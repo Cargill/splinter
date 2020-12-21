@@ -23,7 +23,7 @@ use crate::biome::{
 };
 use crate::error::InternalError;
 use crate::oauth::{rest_api::OAuthUserInfoStore, UserInfo};
-use crate::rest_api::auth::identity::{Authorization, AuthorizationMapping, BearerToken};
+use crate::rest_api::auth::identity::{AuthorizationHeader, AuthorizationMapping, BearerToken};
 
 /// This is the UUID namespace for Biome user IDs generated for users that login with OAuth. This
 /// will prevent collisions with Biome user IDs generated for users that register with Biome
@@ -44,9 +44,9 @@ impl GetUserByOAuthAuthorization {
 }
 
 impl AuthorizationMapping<User> for GetUserByOAuthAuthorization {
-    fn get(&self, authorization: &Authorization) -> Result<Option<User>, InternalError> {
+    fn get(&self, authorization: &AuthorizationHeader) -> Result<Option<User>, InternalError> {
         match authorization {
-            Authorization::Bearer(BearerToken::OAuth2(access_token)) => {
+            AuthorizationHeader::Bearer(BearerToken::OAuth2(access_token)) => {
                 debug!("Getting user for access token {}", access_token);
                 self.oauth_user_store
                     .get_by_access_token(&access_token)

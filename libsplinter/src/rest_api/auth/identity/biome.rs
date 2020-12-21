@@ -21,12 +21,12 @@ use jsonwebtoken::{decode, Validation};
 use crate::error::InternalError;
 use crate::rest_api::{secrets::SecretManager, sessions::Claims};
 
-use super::{Authorization, BearerToken, IdentityProvider};
+use super::{AuthorizationHeader, BearerToken, IdentityProvider};
 
 /// Extracts the user ID from a Biome JWT
 ///
-/// This provider only accepts `Authorization::Bearer(BearerToken::Biome(token))` authorizations,
-/// and the inner token must be a valid Biome JWT.
+/// This provider only accepts `AuthorizationHeader::Bearer(BearerToken::Biome(token))`
+/// authorizations, and the inner token must be a valid Biome JWT.
 #[derive(Clone)]
 pub struct BiomeUserIdentityProvider {
     token_secret_manager: Arc<dyn SecretManager>,
@@ -44,9 +44,12 @@ impl BiomeUserIdentityProvider {
 }
 
 impl IdentityProvider for BiomeUserIdentityProvider {
-    fn get_identity(&self, authorization: &Authorization) -> Result<Option<String>, InternalError> {
+    fn get_identity(
+        &self,
+        authorization: &AuthorizationHeader,
+    ) -> Result<Option<String>, InternalError> {
         let token = match authorization {
-            Authorization::Bearer(BearerToken::Biome(token)) => token,
+            AuthorizationHeader::Bearer(BearerToken::Biome(token)) => token,
             _ => return Ok(None),
         };
 

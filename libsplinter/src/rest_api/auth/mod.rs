@@ -18,14 +18,14 @@
 pub(crate) mod actix;
 pub mod identity;
 
-use identity::{Authorization, IdentityProvider};
+use identity::{AuthorizationHeader, IdentityProvider};
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
-    /// The client was authorized to the given identity
+    /// The client was authorized to the given identity based on the authorization header
     Authorized {
         identity: String,
-        authorization: Authorization,
+        authorization: AuthorizationHeader,
     },
     /// The requested endpoint does not require authorization
     NoAuthorizationNecessary,
@@ -320,7 +320,7 @@ mod tests {
     impl IdentityProvider for AlwaysAcceptIdentityProvider {
         fn get_identity(
             &self,
-            _authorization: &Authorization,
+            _authorization: &AuthorizationHeader,
         ) -> Result<Option<String>, InternalError> {
             Ok(Some("identity".into()))
         }
@@ -337,7 +337,7 @@ mod tests {
     impl IdentityProvider for AlwaysRejectIdentityProvider {
         fn get_identity(
             &self,
-            _authorization: &Authorization,
+            _authorization: &AuthorizationHeader,
         ) -> Result<Option<String>, InternalError> {
             Ok(None)
         }
@@ -354,7 +354,7 @@ mod tests {
     impl IdentityProvider for AlwaysErrIdentityProvider {
         fn get_identity(
             &self,
-            _authorization: &Authorization,
+            _authorization: &AuthorizationHeader,
         ) -> Result<Option<String>, InternalError> {
             Err(InternalError::with_message("failed".into()))
         }

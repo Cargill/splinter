@@ -1122,7 +1122,7 @@ mod test {
     #[cfg(feature = "auth")]
     use crate::error::InternalError;
     #[cfg(feature = "auth")]
-    use crate::rest_api::auth::identity::Authorization;
+    use crate::rest_api::auth::identity::AuthorizationHeader;
 
     #[test]
     fn test_resource() {
@@ -1184,7 +1184,7 @@ mod test {
     impl IdentityProvider for MockIdentityProvider {
         fn get_identity(
             &self,
-            _authorization: &Authorization,
+            _authorization: &AuthorizationHeader,
         ) -> Result<Option<String>, InternalError> {
             Ok(Some("".into()))
         }

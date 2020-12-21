@@ -34,7 +34,7 @@ use crate::rest_api::ErrorResponse;
 
 use super::{
     authorize,
-    identity::{Authorization as IdentityAuthorization, AuthorizationMapping, IdentityProvider},
+    identity::{AuthorizationHeader, AuthorizationMapping, IdentityProvider},
     AuthorizationResult,
 };
 
@@ -48,7 +48,7 @@ pub struct Authorization {
 /// This is a wrapper to avoid multiple generic types.
 struct IdentityExtension {
     inner: Box<
-        dyn Fn(&mut Extensions, &IdentityAuthorization) -> Result<(), InternalError> + Send + Sync,
+        dyn Fn(&mut Extensions, &AuthorizationHeader) -> Result<(), InternalError> + Send + Sync,
     >,
 }
 
@@ -76,7 +76,7 @@ impl IdentityExtension {
     fn extend(
         &self,
         extensions: &mut Extensions,
-        authorization: &IdentityAuthorization,
+        authorization: &AuthorizationHeader,
     ) -> Result<(), InternalError> {
         (*self.inner)(extensions, authorization)
     }
@@ -312,7 +312,7 @@ mod tests {
     impl IdentityProvider for AlwaysAcceptIdentityProvider {
         fn get_identity(
             &self,
-            _authorization: &IdentityAuthorization,
+            _authorization: &AuthorizationHeader,
         ) -> Result<Option<String>, InternalError> {
             Ok(Some("identity".into()))
         }
@@ -328,7 +328,7 @@ mod tests {
     impl AuthorizationMapping<String> for MockAuthorizationMapping {
         fn get(
             &self,
-            _authorization: &IdentityAuthorization,
+            _authorization: &AuthorizationHeader,
         ) -> Result<Option<String>, InternalError> {
             Ok(Some("test".to_string()))
         }
