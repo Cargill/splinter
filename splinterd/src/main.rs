@@ -317,7 +317,7 @@ fn main() {
             .takes_value(true),
     );
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     let app = app.arg(
         Arg::with_name("enable_biome")
             .long("enable-biome")
@@ -474,7 +474,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         daemon_builder = daemon_builder.with_db_url(Some(String::from(db_url)));
     }
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     {
         daemon_builder = daemon_builder.enable_biome(config.enable_biome());
     }

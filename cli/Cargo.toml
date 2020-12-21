@@ -46,11 +46,7 @@ whoami = "0.7.0"
 
 [dependencies.splinter]
 path = "../libsplinter"
-features = [
-  "biome",
-  "registry",
-  "admin-service"
-]
+features = ["admin-service", "registry"]
 
 [dev-dependencies]
 gag = "0.1"

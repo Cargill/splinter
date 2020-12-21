@@ -31,7 +31,7 @@ use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService};
 use splinter::admin::store::yaml::YamlAdminServiceStore;
-#[cfg(feature = "biome")]
+#[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
@@ -103,7 +103,7 @@ pub struct SplinterDaemon {
     rest_api_endpoint: String,
     #[cfg(feature = "database")]
     db_url: Option<String>,
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     enable_biome: bool,
     registries: Vec<String>,
     registry_auto_refresh: u64,
@@ -143,10 +143,22 @@ impl SplinterDaemon {
 
         // Default to memory, as stores are still in use, but there is no compiled code to persist
         // the information.
-        #[cfg(all(not(feature = "database"), any(feature = "auth", feature = "biome")))]
+        #[cfg(all(
+            not(feature = "database"),
+            any(
+                feature = "auth",
+                feature = "biome-credentials",
+                feature = "biome-key-management"
+            )
+        ))]
         let db_url = "memory".to_string();
 
-        #[cfg(any(feature = "database", feature = "auth", feature = "biome"))]
+        #[cfg(any(
+            feature = "database",
+            feature = "auth",
+            feature = "biome-credentials",
+            feature = "biome-key-management"
+        ))]
         let store_factory = create_store_factory(&db_url)?;
 
         let admin_service_store = {
@@ -610,7 +622,7 @@ impl SplinterDaemon {
 
         // If Biome is enabled but wasn't already added as an auth provider, add it now
         #[cfg(all(
-            feature = "biome",
+            any(feature = "biome-credentials", feature = "biome-key-management"),
             not(all(feature = "auth", feature = "biome-credentials"))
         ))]
         if self.enable_biome {
@@ -851,7 +863,7 @@ fn create_store_factory(
     })
 }
 
-#[cfg(feature = "biome")]
+#[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
 fn build_biome_routes(
     store_factory: &dyn splinter::store::StoreFactory,
 ) -> Result<BiomeRestResourceManager, StartError> {
@@ -890,7 +902,7 @@ pub struct SplinterDaemonBuilder {
     rest_api_endpoint: Option<String>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     enable_biome: bool,
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
@@ -965,7 +977,7 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    #[cfg(feature = "biome")]
+    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
     pub fn enable_biome(mut self, enabled: bool) -> Self {
         self.enable_biome = enabled;
         self
@@ -1085,7 +1097,7 @@ impl SplinterDaemonBuilder {
         #[cfg(feature = "database")]
         let db_url = self.db_url;
 
-        #[cfg(feature = "biome")]
+        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
         {
             if self.enable_biome && db_url.is_none() {
                 return Err(CreateError::MissingRequiredField(
@@ -1121,7 +1133,7 @@ impl SplinterDaemonBuilder {
             rest_api_endpoint,
             #[cfg(feature = "database")]
             db_url,
-            #[cfg(feature = "biome")]
+            #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
             enable_biome: self.enable_biome,
             registries: self.registries,
             registry_auto_refresh,
