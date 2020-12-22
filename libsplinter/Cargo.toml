@@ -96,7 +96,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "admin-service-event-store",
-    "auth",
     "biome-notifications",
     "biome-oauth",
     "biome-oauth-user-store-postgres",
@@ -118,7 +117,6 @@ benchmark = []
 
 admin-service = []
 admin-service-event-store = ["admin-service"]
-auth = []
 biome-credentials = ["bcrypt"]
 biome-key-management = []
 biome-notifications = []
@@ -128,7 +126,7 @@ circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
-oauth = ["auth", "biome-oauth", "oauth2"]
+oauth = ["biome-oauth", "oauth2"]
 oauth-github = ["oauth"]
 oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 oauth-openid = ["oauth", "reqwest"]

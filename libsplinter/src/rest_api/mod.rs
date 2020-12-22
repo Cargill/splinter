@@ -56,7 +56,6 @@
 //!     .run();
 //! ```
 
-#[cfg(feature = "auth")]
 pub mod auth;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
@@ -71,23 +70,22 @@ use actix_web::{
     error::ErrorBadRequest, http::header, middleware, web, App, Error as ActixError, HttpRequest,
     HttpResponse, HttpServer,
 };
-#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+#[cfg(feature = "cylinder-jwt")]
 use cylinder::Verifier;
 use futures::{future::FutureResult, stream::Stream, Future, IntoFuture};
 use percent_encoding::{AsciiSet, CONTROLS};
 use protobuf::{self, Message};
 
 use std::boxed::Box;
-#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+#[cfg(feature = "cylinder-jwt")]
 use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+#[cfg(feature = "biome-credentials")]
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "oauth")]
 use crate::biome::{rest_api::auth::GetUserByOAuthAuthorization, OAuthUserSessionStore};
-#[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
 #[cfg(feature = "oauth")]
 use crate::oauth::rest_api::OAuthResourceProvider;
@@ -97,11 +95,10 @@ use crate::oauth::store::InflightOAuthRequestStore;
 use crate::oauth::GithubOAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 use crate::oauth::OpenIdOAuthClientBuilder;
-#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+#[cfg(feature = "cylinder-jwt")]
 use auth::identity::cylinder::CylinderKeyIdentityProvider;
 #[cfg(feature = "oauth")]
 use auth::identity::oauth::OAuthUserIdentityProvider;
-#[cfg(feature = "auth")]
 use auth::{actix::Authorization, identity::IdentityProvider, AuthorizationMapping};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
@@ -490,12 +487,10 @@ impl RequestGuard for ProtocolVersionRangeGuard {
     }
 }
 
-#[cfg(feature = "auth")]
 struct ConfigureAuthorizationMapping {
     config_fn: Box<dyn FnMut(Authorization) -> Authorization>,
 }
 
-#[cfg(feature = "auth")]
 impl ConfigureAuthorizationMapping {
     fn new<M, T>(auth_mapping: M) -> Self
     where
@@ -549,9 +544,7 @@ pub struct RestApi {
     bind: RestApiBind,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
     identity_providers: Vec<Box<dyn IdentityProvider>>,
-    #[cfg(feature = "auth")]
     authorization_mappings: Vec<ConfigureAuthorizationMapping>,
 }
 
@@ -565,15 +558,12 @@ impl RestApi {
         let resources = self.resources;
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist;
-        #[cfg(feature = "auth")]
+
         let mut authorization = Authorization::new(self.identity_providers.to_owned());
 
-        #[cfg(feature = "auth")]
-        {
-            let mut auth_mappings = self.authorization_mappings;
-            for auth_mapping in auth_mappings.iter_mut() {
-                authorization = auth_mapping.configure(authorization);
-            }
+        let mut auth_mappings = self.authorization_mappings;
+        for auth_mapping in auth_mappings.iter_mut() {
+            authorization = auth_mapping.configure(authorization);
         }
 
         #[cfg(feature = "rest-api-cors")]
@@ -613,7 +603,6 @@ impl RestApi {
                     #[cfg(feature = "rest-api-cors")]
                     let app = app.wrap(cors.clone());
 
-                    #[cfg(feature = "auth")]
                     let app = app.wrap(authorization.clone());
 
                     let mut app = app.wrap(middleware::Logger::default());
@@ -805,9 +794,7 @@ pub struct RestApiBuilder {
     bind: Option<RestApiBind>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
     auth_configs: Vec<AuthConfig>,
-    #[cfg(feature = "auth")]
     authorization_mappings: Vec<ConfigureAuthorizationMapping>,
 }
 
@@ -818,9 +805,7 @@ impl Default for RestApiBuilder {
             bind: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
-            #[cfg(feature = "auth")]
             auth_configs: Vec::new(),
-            #[cfg(feature = "auth")]
             authorization_mappings: vec![],
         }
     }
@@ -859,13 +844,11 @@ impl RestApiBuilder {
         self
     }
 
-    #[cfg(feature = "auth")]
     pub fn with_auth_configs(mut self, auth_configs: Vec<AuthConfig>) -> Self {
         self.auth_configs = auth_configs;
         self
     }
 
-    #[cfg(feature = "auth")]
     pub fn with_authorization_mapping<M, T>(mut self, authorization_mapping: M) -> Self
     where
         T: 'static,
@@ -884,7 +867,6 @@ impl RestApiBuilder {
             .bind
             .ok_or_else(|| RestApiServerError::MissingField("bind".to_string()))?;
 
-        #[cfg(feature = "auth")]
         let identity_providers = {
             if self.auth_configs.is_empty() {
                 return Err(RestApiServerError::InvalidStateError(
@@ -1014,9 +996,7 @@ impl RestApiBuilder {
             resources: self.resources,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
-            #[cfg(feature = "auth")]
             identity_providers,
-            #[cfg(feature = "auth")]
             authorization_mappings: self.authorization_mappings,
         })
     }
@@ -1039,16 +1019,13 @@ impl RestApiBuilder {
             resources: self.resources,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
-            #[cfg(feature = "auth")]
             identity_providers: vec![],
-            #[cfg(feature = "auth")]
             authorization_mappings: self.authorization_mappings,
         })
     }
 }
 
 /// Configurations for the various authentication methods supported by the Splinter REST API.
-#[cfg(feature = "auth")]
 pub enum AuthConfig {
     /// Biome credentials authentication
     #[cfg(feature = "biome-credentials")]
@@ -1170,9 +1147,7 @@ mod test {
     use actix_http::Response;
     use futures::IntoFuture;
 
-    #[cfg(feature = "auth")]
     use crate::error::InternalError;
-    #[cfg(feature = "auth")]
     use crate::rest_api::auth::AuthorizationHeader;
 
     #[test]
@@ -1211,14 +1186,11 @@ mod test {
             builder = builder.with_bind(RestApiBind::Insecure("test".into()));
         }
 
-        #[cfg(feature = "auth")]
-        {
-            let auth_config = AuthConfig::Custom {
-                resources: vec![],
-                identity_provider: Box::new(MockIdentityProvider),
-            };
-            builder = builder.with_auth_configs(vec![auth_config]);
-        }
+        let auth_config = AuthConfig::Custom {
+            resources: vec![],
+            identity_provider: Box::new(MockIdentityProvider),
+        };
+        builder = builder.with_auth_configs(vec![auth_config]);
 
         assert!(builder.build().is_ok())
     }
@@ -1226,7 +1198,6 @@ mod test {
     /// Verifies that the `RestApiBuilder` fails to build when auth is enabled but no auth is
     /// configured.
     #[test]
-    #[cfg(feature = "auth")]
     fn rest_api_builder_no_auth() {
         #[cfg(feature = "https-bind")]
         let result = RestApiBuilder::new()
@@ -1241,11 +1212,9 @@ mod test {
         ));
     }
 
-    #[cfg(feature = "auth")]
     #[derive(Clone)]
     struct MockIdentityProvider;
 
-    #[cfg(feature = "auth")]
     impl IdentityProvider for MockIdentityProvider {
         fn get_identity(
             &self,

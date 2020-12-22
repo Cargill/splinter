@@ -32,6 +32,7 @@ enum AuthorizationResult {
         authorization: AuthorizationHeader,
     },
     /// The requested endpoint does not require authorization
+    #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
     NoAuthorizationNecessary,
     /// The authorization header is empty or invalid
     Unauthorized,
@@ -46,22 +47,27 @@ enum AuthorizationResult {
 /// * `auth_header` - The value of the Authorization HTTP header for the request
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
 fn authorize(
-    endpoint: &str,
+    #[cfg(any(feature = "biome-credentials", feature = "oauth"))] endpoint: &str,
+    #[cfg(all(not(feature = "biome-credentials"), not(feature = "oauth")))] _endpoint: &str,
     auth_header: Option<&str>,
     identity_providers: &[Box<dyn IdentityProvider>],
 ) -> AuthorizationResult {
-    // Authorization isn't necessary when using one of the authorization endpoints
-    let mut is_auth_endpoint = false;
-    #[cfg(feature = "biome-credentials")]
-    if endpoint == "/biome/register" || endpoint == "/biome/login" || endpoint == "/biome/token" {
-        is_auth_endpoint = true;
-    }
-    #[cfg(feature = "oauth")]
-    if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
-        is_auth_endpoint = true;
-    }
-    if is_auth_endpoint {
-        return AuthorizationResult::NoAuthorizationNecessary;
+    #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
+    {
+        // Authorization isn't necessary when using one of the authorization endpoints
+        let mut is_auth_endpoint = false;
+        #[cfg(feature = "biome-credentials")]
+        if endpoint == "/biome/register" || endpoint == "/biome/login" || endpoint == "/biome/token"
+        {
+            is_auth_endpoint = true;
+        }
+        #[cfg(feature = "oauth")]
+        if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
+            is_auth_endpoint = true;
+        }
+        if is_auth_endpoint {
+            return AuthorizationResult::NoAuthorizationNecessary;
+        }
     }
 
     // Parse the auth header
@@ -151,15 +157,12 @@ impl FromStr for BearerToken {
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         let mut parts = str.splitn(2, ':');
         match (parts.next(), parts.next()) {
-            (Some(token_type), Some(token)) => match token_type {
-                #[cfg(feature = "biome-credentials")]
-                "Biome" => Ok(BearerToken::Biome(token.to_string())),
-                #[cfg(feature = "cylinder-jwt")]
-                "Cylinder" => Ok(BearerToken::Cylinder(token.to_string())),
-                #[cfg(feature = "oauth")]
-                "OAuth2" => Ok(BearerToken::OAuth2(token.to_string())),
-                _ => Ok(BearerToken::Custom(str.to_string())),
-            },
+            #[cfg(feature = "biome-credentials")]
+            (Some("Biome"), Some(token)) => Ok(BearerToken::Biome(token.to_string())),
+            #[cfg(feature = "cylinder-jwt")]
+            (Some("Cylinder"), Some(token)) => Ok(BearerToken::Cylinder(token.to_string())),
+            #[cfg(feature = "oauth")]
+            (Some("OAuth2"), Some(token)) => Ok(BearerToken::OAuth2(token.to_string())),
             (Some(_), None) => Ok(BearerToken::Custom(str.to_string())),
             _ => unreachable!(), // splitn always returns at least one item
         }

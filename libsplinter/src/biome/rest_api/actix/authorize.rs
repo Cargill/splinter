@@ -23,8 +23,6 @@ use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::{resources::User, BiomeRestConfig};
 use crate::futures::{Future, IntoFuture};
 use crate::rest_api::secrets::SecretManager;
-#[cfg(not(feature = "auth"))]
-use crate::rest_api::sessions::default_validation;
 use crate::rest_api::ErrorResponse;
 #[cfg(feature = "biome-credentials")]
 use crate::rest_api::{get_authorization_token, sessions::Claims};
@@ -78,44 +76,6 @@ pub(crate) fn validate_claims(
 
 type ErrorHttpResponse = Box<dyn Future<Item = HttpResponse, Error = ActixError>>;
 
-#[cfg(all(not(feature = "auth"), not(feature = "biome-credentials")))]
-pub(crate) fn get_authorized_user(
-    request: &HttpRequest,
-    secret_manager: &Arc<dyn SecretManager>,
-    rest_config: &BiomeRestConfig,
-) -> Result<User, ErrorHttpResponse> {
-    /// Nothing is configured at compile-time, any route making use of this can't be authorized.
-    Err(Box::new(
-        HttpResponse::Unauthorized()
-            .json(ErrorResponse::unauthorized())
-            .into_future(),
-    ))
-}
-
-#[cfg(all(not(feature = "auth"), feature = "biome-credentials"))]
-pub(crate) fn get_authorized_user(
-    request: &HttpRequest,
-    secret_manager: &Arc<dyn SecretManager>,
-    rest_config: &BiomeRestConfig,
-) -> Result<User, ErrorHttpResponse> {
-    let validation = default_validation(&rest_config.issuer());
-
-    match authorize_user(&request, &*secret_manager, &validation) {
-        AuthorizationResult::Authorized(claims) => Ok(User::new(&claims.user_id())),
-        AuthorizationResult::Unauthorized => Err(Box::new(
-            HttpResponse::Unauthorized()
-                .json(ErrorResponse::unauthorized())
-                .into_future(),
-        )),
-        AuthorizationResult::Failed => Err(Box::new(
-            HttpResponse::InternalServerError()
-                .json(ErrorResponse::internal_error())
-                .into_future(),
-        )),
-    }
-}
-
-#[cfg(feature = "auth")]
 pub(crate) fn get_authorized_user(
     request: &HttpRequest,
     _secret_manager: &Arc<dyn SecretManager>,

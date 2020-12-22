@@ -202,6 +202,7 @@ where
                 }
                 debug!("Authenticated user {}", identity);
             }
+            #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
             AuthorizationResult::NoAuthorizationNecessary => {}
             AuthorizationResult::Unauthorized => {
                 return Box::new(
