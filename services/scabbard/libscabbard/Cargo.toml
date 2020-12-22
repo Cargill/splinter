@@ -33,7 +33,7 @@ openssl = "0.10"
 protobuf = "2"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
 sawtooth = { version = "0.6", default-features = false, features = ["lmdb-store", "receipt-store"] }
-sawtooth-sabre = "0.6"
+sawtooth-sabre = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

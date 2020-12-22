@@ -34,7 +34,7 @@ cylinder = "0.2"
 dirs = "2.0"
 flexi_logger = "0.14"
 log = "0.4"
-sabre-sdk = "0.6"
+sabre-sdk = "0.7"
 transact = { version = "0.3", features = ["contract-archive"] }
 scabbard = { path = "../libscabbard", features = ["client", "client-auth"] }
 
