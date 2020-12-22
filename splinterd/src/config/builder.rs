@@ -161,6 +161,24 @@ impl ConfigBuilder {
                 None => None,
             })
             .ok_or_else(|| ConfigError::MissingValue("server key".to_string()))?;
+        #[cfg(feature = "https-bind")]
+        let tls_rest_api_cert = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.tls_rest_api_cert() {
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("rest_api certificate".to_string()))?;
+        #[cfg(feature = "https-bind")]
+        let tls_rest_api_key = self
+            .partial_configs
+            .iter()
+            .find_map(|p| match p.tls_rest_api_key() {
+                Some(v) => Some((get_tls_file_path(&tls_cert_dir.0, &v), p.source())),
+                None => None,
+            })
+            .ok_or_else(|| ConfigError::MissingValue("rest_api key".to_string()))?;
         let network_endpoints = self
             .partial_configs
             .iter()
@@ -203,6 +221,10 @@ impl ConfigBuilder {
             tls_client_key,
             tls_server_cert,
             tls_server_key,
+            #[cfg(feature = "https-bind")]
+            tls_rest_api_cert,
+            #[cfg(feature = "https-bind")]
+            tls_rest_api_key,
             #[cfg(feature = "service-endpoint")]
             service_endpoint: self
                 .partial_configs
@@ -391,6 +413,10 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "/etc/splinter/certs/client.key";
     static EXAMPLE_SERVER_CERT: &str = "/etc/splinter/certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "/etc/splinter/certs/server.key";
+    #[cfg(feature = "https-bind")]
+    static EXAMPLE_REST_API_CERT: &str = "/etc/splinter/certs/rest_api.crt";
+    #[cfg(feature = "https-bind")]
+    static EXAMPLE_REST_API_KEY: &str = "/etc/splinter/certs/rest_api.key";
     #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
@@ -419,6 +445,17 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "https-bind")]
+        {
+            assert_eq!(
+                config.tls_rest_api_cert(),
+                Some(EXAMPLE_REST_API_CERT.to_string())
+            );
+            assert_eq!(
+                config.tls_rest_api_key(),
+                Some(EXAMPLE_REST_API_KEY.to_string())
+            );
+        }
         #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),
@@ -477,6 +514,13 @@ mod tests {
             .with_heartbeat(None)
             .with_admin_timeout(None);
 
+        #[cfg(feature = "https-bind")]
+        {
+            partial_config = partial_config
+                .with_tls_rest_api_cert(Some(String::from(EXAMPLE_REST_API_CERT)))
+                .with_tls_rest_api_key(Some(String::from(EXAMPLE_REST_API_KEY)));
+        }
+
         #[cfg(feature = "service-endpoint")]
         {
             partial_config =
@@ -506,6 +550,14 @@ mod tests {
         partial_config = partial_config.with_tls_client_key(Some(EXAMPLE_CLIENT_KEY.to_string()));
         partial_config = partial_config.with_tls_server_cert(Some(EXAMPLE_SERVER_CERT.to_string()));
         partial_config = partial_config.with_tls_server_key(Some(EXAMPLE_SERVER_KEY.to_string()));
+
+        #[cfg(feature = "https-bind")]
+        {
+            partial_config =
+                partial_config.with_tls_rest_api_cert(Some(EXAMPLE_REST_API_CERT.to_string()));
+            partial_config =
+                partial_config.with_tls_rest_api_key(Some(EXAMPLE_REST_API_KEY.to_string()));
+        }
 
         #[cfg(feature = "service-endpoint")]
         {

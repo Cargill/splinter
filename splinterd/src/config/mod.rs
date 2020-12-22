@@ -48,6 +48,10 @@ pub struct Config {
     tls_client_key: (String, ConfigSource),
     tls_server_cert: (String, ConfigSource),
     tls_server_key: (String, ConfigSource),
+    #[cfg(feature = "https-bind")]
+    tls_rest_api_cert: (String, ConfigSource),
+    #[cfg(feature = "https-bind")]
+    tls_rest_api_key: (String, ConfigSource),
     #[cfg(feature = "service-endpoint")]
     service_endpoint: (String, ConfigSource),
     network_endpoints: (Vec<String>, ConfigSource),
@@ -118,6 +122,16 @@ impl Config {
 
     pub fn tls_server_key(&self) -> &str {
         &self.tls_server_key.0
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn tls_rest_api_cert(&self) -> &str {
+        &self.tls_rest_api_cert.0
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn tls_rest_api_key(&self) -> &str {
+        &self.tls_rest_api_key.0
     }
 
     #[cfg(feature = "service-endpoint")]
@@ -291,6 +305,16 @@ impl Config {
 
     fn tls_server_key_source(&self) -> &ConfigSource {
         &self.tls_server_key.1
+    }
+
+    #[cfg(feature = "https-bind")]
+    fn tls_rest_api_cert_source(&self) -> &ConfigSource {
+        &self.tls_rest_api_cert.1
+    }
+
+    #[cfg(feature = "https-bind")]
+    fn tls_rest_api_key_source(&self) -> &ConfigSource {
+        &self.tls_rest_api_key.1
     }
 
     #[cfg(feature = "service-endpoint")]
@@ -471,6 +495,19 @@ impl Config {
             self.tls_server_key(),
             self.tls_server_key_source()
         );
+        #[cfg(feature = "https-bind")]
+        {
+            debug!(
+                "Config: tls_rest_api_cert: {} (source: {:?})",
+                self.tls_rest_api_cert(),
+                self.tls_rest_api_cert_source()
+            );
+            debug!(
+                "Config: tls_rest_api_key: {} (source: {:?})",
+                self.tls_rest_api_key(),
+                self.tls_rest_api_key_source()
+            );
+        }
         #[cfg(feature = "service-endpoint")]
         debug!(
             "Config: service_endpoint: {} (source: {:?})",
