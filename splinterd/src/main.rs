@@ -324,6 +324,24 @@ fn main() {
             .long_help("Enable the biome subsystem"),
     );
 
+    #[cfg(feature = "https-bind")]
+    let app = app.arg(
+        Arg::with_name("tls_rest_api_cert")
+            .long("tls-rest-api-cert")
+            .help("File path to the certificate for the node's REST API.")
+            .takes_value(true)
+            .alias("rest-api-cert"),
+    );
+
+    #[cfg(feature = "https-bind")]
+    let app = app.arg(
+        Arg::with_name("tls_rest_api_key")
+            .long("tls-rest-api-key")
+            .help("File path to the key for the node's REST API.")
+            .takes_value(true)
+            .alias("rest-api-key"),
+    );
+
     #[cfg(feature = "rest-api-cors")]
     let app = app.arg(
         Arg::with_name("whitelist")
