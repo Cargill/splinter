@@ -20,8 +20,12 @@ use crate::oauth::{
     OAuthClient, OpenIdSubjectProvider,
 };
 
+/// The scope required to get a refresh token from an Azure provider.
+const AZURE_SCOPE: &str = "offline_access";
 /// The scopes required to get OpenID user information.
 const DEFAULT_SCOPES: &[&str] = &["openid", "profile", "email"];
+/// The authorization request parameters required to get a refresh token from a Google provider.
+const GOOGLE_AUTH_PARAMS: &[(&str, &str)] = &[("access_type", "offline"), ("prompt", "consent")];
 /// The URL fo the Google OpenID discovery document
 const GOOGLE_DISCOVERY_URL: &str = "https://accounts.google.com/.well-known/openid-configuration";
 
@@ -40,12 +44,26 @@ impl OpenIdOAuthClientBuilder {
         }
     }
 
+    /// Constructs a new [`OpenIdOAuthClientBuilder`] that's pre-configured with the scope for
+    /// getting refresh tokens.
+    pub fn new_azure() -> Self {
+        Self {
+            openid_discovery_url: None,
+            inner: OAuthClientBuilder::default().with_scopes(vec![AZURE_SCOPE.into()]),
+        }
+    }
+
     /// Constructs a new [`OpenIdOAuthClientBuilder`] that's pre-configured with Google's discovery
-    /// URL.
+    /// URL and the extra authorization code request parameter for getting refresh tokens.
     pub fn new_google() -> Self {
         Self {
             openid_discovery_url: Some(GOOGLE_DISCOVERY_URL.into()),
-            inner: OAuthClientBuilder::default(),
+            inner: OAuthClientBuilder::default().with_extra_auth_params(
+                GOOGLE_AUTH_PARAMS
+                    .iter()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect(),
+            ),
         }
     }
 

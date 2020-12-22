@@ -940,7 +940,7 @@ impl RestApiBuilder {
                                 redirect_url,
                                 oauth_openid_url,
                                 inflight_request_store,
-                            } => OpenIdOAuthClientBuilder::new()
+                            } => OpenIdOAuthClientBuilder::new_azure()
                                 .with_discovery_url(oauth_openid_url)
                                 .with_client_id(client_id)
                                 .with_client_secret(client_secret)
