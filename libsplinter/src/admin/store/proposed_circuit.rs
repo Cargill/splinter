@@ -14,7 +14,9 @@
 
 //! Structs for building proposed circuits
 
-use crate::admin::messages::is_valid_circuit_id;
+use std::convert::TryFrom;
+
+use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
 use crate::protos::admin;
 
@@ -489,5 +491,45 @@ impl ProposedCircuitBuilder {
         };
 
         Ok(create_circuit_message)
+    }
+}
+
+impl TryFrom<&messages::CreateCircuit> for ProposedCircuit {
+    type Error = InvalidStateError;
+
+    fn try_from(create_circuit: &messages::CreateCircuit) -> Result<ProposedCircuit, Self::Error> {
+        let services = create_circuit
+            .roster
+            .iter()
+            .map(ProposedService::try_from)
+            .collect::<Result<Vec<ProposedService>, InvalidStateError>>()?;
+        let nodes = create_circuit
+            .members
+            .iter()
+            .map(ProposedNode::from)
+            .collect::<Vec<ProposedNode>>();
+        let mut circuit_builder = ProposedCircuitBuilder::new()
+            .with_circuit_id(&create_circuit.circuit_id)
+            .with_roster(&services)
+            .with_members(&nodes)
+            .with_authorization_type(&AuthorizationType::from(&create_circuit.authorization_type))
+            .with_persistence(&PersistenceType::from(&create_circuit.persistence))
+            .with_durability(&DurabilityType::from(&create_circuit.durability))
+            .with_routes(&RouteType::from(&create_circuit.routes))
+            .with_circuit_management_type(&create_circuit.circuit_management_type);
+        // Add the `application_metadata` if not empty
+        if !create_circuit.application_metadata.is_empty() {
+            circuit_builder =
+                circuit_builder.with_application_metadata(&create_circuit.application_metadata);
+        }
+        // Add the `comments` if present
+        if let Some(comments) = &create_circuit.comments {
+            circuit_builder = circuit_builder.with_comments(&comments);
+        }
+        // Add the `display_name` if present
+        if let Some(display_name) = &create_circuit.display_name {
+            circuit_builder = circuit_builder.with_display_name(&display_name);
+        }
+        circuit_builder.build()
     }
 }

@@ -14,7 +14,7 @@
 
 //! Structs for building circuits
 
-use crate::admin::messages::is_valid_circuit_id;
+use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
 
 use super::{ProposedCircuit, Service};
@@ -86,6 +86,14 @@ pub enum AuthorizationType {
     Trust,
 }
 
+impl From<&messages::AuthorizationType> for AuthorizationType {
+    fn from(message_enum: &messages::AuthorizationType) -> Self {
+        match *message_enum {
+            messages::AuthorizationType::Trust => AuthorizationType::Trust,
+        }
+    }
+}
+
 /// A circuits message persistence strategy
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PersistenceType {
@@ -98,10 +106,26 @@ impl Default for PersistenceType {
     }
 }
 
+impl From<&messages::PersistenceType> for PersistenceType {
+    fn from(message_enum: &messages::PersistenceType) -> Self {
+        match *message_enum {
+            messages::PersistenceType::Any => PersistenceType::Any,
+        }
+    }
+}
+
 /// A circuits durability requirement
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DurabilityType {
     NoDurability,
+}
+
+impl From<&messages::DurabilityType> for DurabilityType {
+    fn from(message_enum: &messages::DurabilityType) -> Self {
+        match *message_enum {
+            messages::DurabilityType::NoDurability => DurabilityType::NoDurability,
+        }
+    }
 }
 
 /// How messages are expected to be routed across a circuit
@@ -113,6 +137,14 @@ pub enum RouteType {
 impl Default for RouteType {
     fn default() -> Self {
         RouteType::Any
+    }
+}
+
+impl From<&messages::RouteType> for RouteType {
+    fn from(message_enum: &messages::RouteType) -> Self {
+        match *message_enum {
+            messages::RouteType::Any => RouteType::Any,
+        }
     }
 }
 

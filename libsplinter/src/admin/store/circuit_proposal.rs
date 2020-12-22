@@ -14,7 +14,9 @@
 
 //! Structs for building circuit proposals
 
-use crate::admin::messages::is_valid_circuit_id;
+use std::convert::TryFrom;
+
+use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
 use crate::protos::admin;
 
@@ -330,6 +332,28 @@ impl CircuitProposalBuilder {
     }
 }
 
+impl TryFrom<&messages::CircuitProposal> for CircuitProposal {
+    type Error = InvalidStateError;
+
+    fn try_from(admin_proposal: &messages::CircuitProposal) -> Result<Self, Self::Error> {
+        CircuitProposalBuilder::new()
+            .with_proposal_type(&ProposalType::from(&admin_proposal.proposal_type))
+            .with_circuit_id(&admin_proposal.circuit_id)
+            .with_circuit_hash(&admin_proposal.circuit_hash)
+            .with_circuit(&ProposedCircuit::try_from(&admin_proposal.circuit)?)
+            .with_votes(
+                &admin_proposal
+                    .votes
+                    .iter()
+                    .map(VoteRecord::from)
+                    .collect::<Vec<VoteRecord>>(),
+            )
+            .with_requester(&admin_proposal.requester)
+            .with_requester_node_id(&admin_proposal.requester_node_id)
+            .build()
+    }
+}
+
 // Native representation of a vote record for a proposal
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VoteRecord {
@@ -459,6 +483,15 @@ pub enum Vote {
     Reject,
 }
 
+impl From<&messages::Vote> for Vote {
+    fn from(admin_vote: &messages::Vote) -> Self {
+        match *admin_vote {
+            messages::Vote::Accept => Vote::Accept,
+            messages::Vote::Reject => Vote::Reject,
+        }
+    }
+}
+
 /// Represents the of  type change the circuit proposal is for
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProposalType {
@@ -467,4 +500,26 @@ pub enum ProposalType {
     AddNode,
     RemoveNode,
     Destroy,
+}
+
+impl From<&messages::ProposalType> for ProposalType {
+    fn from(admin_proposal_type: &messages::ProposalType) -> Self {
+        match *admin_proposal_type {
+            messages::ProposalType::Create => ProposalType::Create,
+            messages::ProposalType::UpdateRoster => ProposalType::UpdateRoster,
+            messages::ProposalType::AddNode => ProposalType::AddNode,
+            messages::ProposalType::RemoveNode => ProposalType::RemoveNode,
+            messages::ProposalType::Destroy => ProposalType::Destroy,
+        }
+    }
+}
+
+impl From<&messages::VoteRecord> for VoteRecord {
+    fn from(admin_vote_record: &messages::VoteRecord) -> Self {
+        VoteRecord {
+            public_key: admin_vote_record.public_key.to_vec(),
+            vote: Vote::from(&admin_vote_record.vote),
+            voter_node_id: admin_vote_record.voter_node_id.to_string(),
+        }
+    }
 }
