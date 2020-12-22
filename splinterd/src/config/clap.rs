@@ -92,6 +92,15 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             })
             .with_state_dir(self.matches.value_of("state_dir").map(String::from));
 
+        #[cfg(feature = "https-bind")]
+        {
+            partial_config = partial_config
+                .with_tls_rest_api_cert(
+                    self.matches.value_of("tls_rest_api_cert").map(String::from),
+                )
+                .with_tls_rest_api_key(self.matches.value_of("tls_rest_api_key").map(String::from));
+        }
+
         #[cfg(feature = "service-endpoint")]
         {
             partial_config = partial_config
@@ -157,6 +166,10 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
     static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    #[cfg(feature = "https-bind")]
+    static EXAMPLE_REST_API_CERT: &str = "certs/rest_api.crt";
+    #[cfg(feature = "https-bind")]
+    static EXAMPLE_REST_API_KEY: &str = "certs/rest_api.key";
     #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NETWORK_ENDPOINT: &str = "127.0.0.1:8044";
@@ -186,6 +199,17 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "https-bind")]
+        {
+            assert_eq!(
+                config.tls_rest_api_cert(),
+                Some(EXAMPLE_REST_API_CERT.to_string())
+            );
+            assert_eq!(
+                config.tls_rest_api_key(),
+                Some(EXAMPLE_REST_API_KEY.to_string())
+            );
+        }
         #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),
@@ -220,28 +244,59 @@ mod tests {
 
     /// Creates an `ArgMatches` object to be used to construct a `ClapPartialConfigBuilder` object.
     fn create_arg_matches(args: Vec<&str>) -> ArgMatches<'static> {
-        clap_app!(configtest =>
-            (version: crate_version!())
-            (about: "Config-Test")
-            (@arg config: -c --config +takes_value)
-            (@arg node_id: --("node-id") +takes_value)
-            (@arg display_name: --("display-name") +takes_value)
-            (@arg storage: --("storage") +takes_value)
-            (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
-            (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
-            (@arg service_endpoint: --("service-endpoint") +takes_value)
-            (@arg peers: --peers +takes_value +multiple)
-            (@arg tls_ca_file: --("tls-ca-file") +takes_value)
-            (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
-            (@arg tls_client_cert: --("tls-client-cert") +takes_value)
-            (@arg tls_server_cert: --("tls-server-cert") +takes_value)
-            (@arg tls_server_key:  --("tls-server-key") +takes_value)
-            (@arg tls_client_key:  --("tls-client-key") +takes_value)
-            (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
-            (@arg tls_insecure: --("tls-insecure"))
-            (@arg no_tls: --("no-tls"))
-            (@arg state_dir: --("state-dir") + takes_value))
-        .get_matches_from(args)
+        #[cfg(not(feature = "https-bind"))]
+        {
+            clap_app!(configtest =>
+                (version: crate_version!())
+                (about: "Config-Test")
+                (@arg config: -c --config +takes_value)
+                (@arg node_id: --("node-id") +takes_value)
+                (@arg display_name: --("display-name") +takes_value)
+                (@arg storage: --("storage") +takes_value)
+                (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
+                (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
+                (@arg service_endpoint: --("service-endpoint") +takes_value)
+                (@arg peers: --peers +takes_value +multiple)
+                (@arg tls_ca_file: --("tls-ca-file") +takes_value)
+                (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
+                (@arg tls_client_cert: --("tls-client-cert") +takes_value)
+                (@arg tls_server_cert: --("tls-server-cert") +takes_value)
+                (@arg tls_server_key:  --("tls-server-key") +takes_value)
+                (@arg tls_client_key:  --("tls-client-key") +takes_value)
+                (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
+                (@arg tls_insecure: --("tls-insecure"))
+                (@arg no_tls: --("no-tls"))
+                (@arg state_dir: --("state-dir") + takes_value))
+            .get_matches_from(args)
+        }
+
+        #[cfg(feature = "https-bind")]
+        {
+            clap_app!(configtest =>
+                (version: crate_version!())
+                (about: "Config-Test")
+                (@arg config: -c --config +takes_value)
+                (@arg node_id: --("node-id") +takes_value)
+                (@arg display_name: --("display-name") +takes_value)
+                (@arg storage: --("storage") +takes_value)
+                (@arg network_endpoints: -n --("network-endpoints") +takes_value +multiple)
+                (@arg advertised_endpoints: -a --("advertised-endpoints") +takes_value +multiple)
+                (@arg service_endpoint: --("service-endpoint") +takes_value)
+                (@arg peers: --peers +takes_value +multiple)
+                (@arg tls_ca_file: --("tls-ca-file") +takes_value)
+                (@arg tls_cert_dir: --("tls-cert-dir") +takes_value)
+                (@arg tls_client_cert: --("tls-client-cert") +takes_value)
+                (@arg tls_client_key:  --("tls-client-key") +takes_value)
+                (@arg tls_server_cert: --("tls-server-cert") +takes_value)
+                (@arg tls_server_key:  --("tls-server-key") +takes_value)
+                (@arg tls_rest_api_cert: --("tls-rest-api-cert") +takes_value)
+                (@arg tls_rest_api_key:  --("tls-rest-api-key") +takes_value)
+                (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
+                (@arg tls_insecure: --("tls-insecure"))
+                (@arg no_tls: --("no-tls"))
+                (@arg state_dir: --("state-dir") + takes_value))
+            .get_matches_from(args)
+        }
     }
 
     #[test]
@@ -283,6 +338,14 @@ mod tests {
             EXAMPLE_SERVER_CERT,
             "--tls-server-key",
             EXAMPLE_SERVER_KEY,
+            #[cfg(feature = "https-bind")]
+            "--tls-rest-api-cert",
+            #[cfg(feature = "https-bind")]
+            EXAMPLE_REST_API_CERT,
+            #[cfg(feature = "https-bind")]
+            "--tls-rest-api-key",
+            #[cfg(feature = "https-bind")]
+            EXAMPLE_REST_API_KEY,
             "--tls-insecure",
             "--no-tls",
             "--state-dir",
