@@ -18,54 +18,10 @@
 mod actix;
 mod resources;
 
-use crate::error::InternalError;
+use crate::biome::OAuthUserSessionStore;
 use crate::rest_api::{Resource, RestResourceProvider};
 
-use super::{OAuthClient, UserInfo};
-
-/// Operations that handle an OAuth user.
-pub trait OAuthUserInfoStore: Sync + Send {
-    /// Executes a save operation on the given user info.
-    fn save_user_info(&self, user_info: &UserInfo) -> Result<(), InternalError>;
-
-    /// Executes an update operation to remove the user's tokens.
-    fn remove_user_tokens(&self, access_token: &str) -> Result<(), InternalError>;
-
-    /// Clone implementation for `OAuthUserInfoStore`. The implementation of the `Clone` trait
-    /// for `Box<dyn OAuthUserInfoStore>` calls this method.
-    ///
-    /// # Example
-    ///
-    ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn OAuthUserInfoStore> {
-    ///     Box::new(self.clone())
-    ///  }
-    ///```
-    fn clone_box(&self) -> Box<dyn OAuthUserInfoStore>;
-}
-
-impl Clone for Box<dyn OAuthUserInfoStore> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
-/// A no-op implementation of `OAuthUserInfoStore`.
-pub struct OAuthUserInfoStoreNoOp;
-
-impl OAuthUserInfoStore for OAuthUserInfoStoreNoOp {
-    fn save_user_info(&self, _user_info: &UserInfo) -> Result<(), InternalError> {
-        Ok(())
-    }
-
-    fn remove_user_tokens(&self, _access_token: &str) -> Result<(), InternalError> {
-        Ok(())
-    }
-
-    fn clone_box(&self) -> Box<dyn OAuthUserInfoStore> {
-        Box::new(OAuthUserInfoStoreNoOp)
-    }
-}
+use super::OAuthClient;
 
 /// Provides the REST API [Resource](../../../rest_api/struct.Resource.html) definitions for OAuth
 /// endpoints. The following endpoints are provided:
@@ -80,15 +36,18 @@ impl OAuthUserInfoStore for OAuthUserInfoStoreNoOp {
 #[derive(Clone)]
 pub(crate) struct OAuthResourceProvider {
     client: OAuthClient,
-    user_info_store: Box<dyn OAuthUserInfoStore>,
+    oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 }
 
 impl OAuthResourceProvider {
     /// Creates a new `OAuthResourceProvider`
-    pub fn new(client: OAuthClient, user_info_store: Box<dyn OAuthUserInfoStore>) -> Self {
+    pub fn new(
+        client: OAuthClient,
+        oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
+    ) -> Self {
         Self {
             client,
-            user_info_store,
+            oauth_user_session_store,
         }
     }
 }
@@ -115,9 +74,9 @@ impl RestResourceProvider for OAuthResourceProvider {
                 actix::login::make_login_route(self.client.clone()),
                 actix::callback::make_callback_route(
                     self.client.clone(),
-                    self.user_info_store.clone(),
+                    self.oauth_user_session_store.clone(),
                 ),
-                actix::logout::make_logout_route(self.user_info_store.clone()),
+                actix::logout::make_logout_route(self.oauth_user_session_store.clone()),
             ]);
         }
 

@@ -20,6 +20,8 @@ pub mod biome;
 pub mod cylinder;
 #[cfg(feature = "oauth-github")]
 pub mod github;
+#[cfg(feature = "oauth")]
+pub mod oauth;
 #[cfg(feature = "oauth-openid")]
 pub mod openid;
 

@@ -21,7 +21,7 @@ use diesel::{
 };
 
 #[cfg(feature = "biome-oauth")]
-use crate::biome::MemoryOAuthUserStore;
+use crate::biome::MemoryOAuthUserSessionStore;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::{
     CredentialsStore, MemoryCredentialsStore, MemoryRefreshTokenStore, RefreshTokenStore,
@@ -43,7 +43,7 @@ pub struct MemoryStoreFactory {
     #[cfg(feature = "biome-credentials")]
     biome_refresh_token_store: MemoryRefreshTokenStore,
     #[cfg(feature = "biome-oauth")]
-    biome_oauth_user_store: MemoryOAuthUserStore,
+    biome_oauth_user_session_store: MemoryOAuthUserSessionStore,
     #[cfg(feature = "oauth")]
     inflight_request_store: MemoryInflightOAuthRequestStore,
 }
@@ -59,7 +59,7 @@ impl MemoryStoreFactory {
         let biome_key_store = MemoryKeyStore::new();
 
         #[cfg(feature = "biome-oauth")]
-        let biome_oauth_user_store = MemoryOAuthUserStore::new();
+        let biome_oauth_user_session_store = MemoryOAuthUserSessionStore::new();
 
         #[cfg(feature = "oauth")]
         let inflight_request_store = MemoryInflightOAuthRequestStore::new();
@@ -72,7 +72,7 @@ impl MemoryStoreFactory {
             #[cfg(feature = "biome-credentials")]
             biome_refresh_token_store: MemoryRefreshTokenStore::new(),
             #[cfg(feature = "biome-oauth")]
-            biome_oauth_user_store,
+            biome_oauth_user_session_store,
             #[cfg(feature = "oauth")]
             inflight_request_store,
         }
@@ -96,8 +96,8 @@ impl StoreFactory for MemoryStoreFactory {
     }
 
     #[cfg(feature = "biome-oauth")]
-    fn get_biome_oauth_user_store(&self) -> Box<dyn crate::biome::OAuthUserStore> {
-        Box::new(self.biome_oauth_user_store.clone())
+    fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore> {
+        Box::new(self.biome_oauth_user_session_store.clone())
     }
 
     #[cfg(all(feature = "admin-service", feature = "sqlite"))]

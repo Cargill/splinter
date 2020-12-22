@@ -12,312 +12,389 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines a representation of OAuth users and provides an API to manage them.
+//! Defines a representation of OAuth users and their sessions with an API to manage them.
 //!
-//! The OAuth user can be considered an extension of the base Biome user.
+//! This store serves two purposes:
+//!
+//! * It provides a correlation between an OAuth subject identifier and a Biome user ID
+//! * It stores tokens and other data for an OAuth user's sessions
 
 #[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
 pub(in crate::biome) mod diesel;
 mod error;
 pub(in crate::biome) mod memory;
 
+use std::time::SystemTime;
+
+use uuid::Uuid;
+
 use crate::error::InvalidStateError;
 
-pub use error::OAuthUserStoreError;
+pub use error::OAuthUserSessionStoreError;
 
-/// The set of supported OAuth providers.
-#[derive(Clone, Debug, PartialEq)]
-pub enum OAuthProvider {
-    Github,
-    OpenId,
+/// This is the UUID namespace for Biome user IDs generated for users that login with OAuth. This
+/// will prevent collisions with Biome user IDs generated for users that register with Biome
+/// credentials. The `u128` was calculated by creating a v5 UUID with the nil namespace and the
+/// name `b"biome oauth"`.
+const UUID_NAMESPACE: Uuid = Uuid::from_u128(187643141867173602676740887132833008173);
+
+/// Correlation between an OAuth user (subject) and a Biome user ID
+#[derive(Clone)]
+pub struct OAuthUser {
+    subject: String,
+    user_id: String,
 }
 
-/// Access token assigned to a user when they have been successfully authorized.
-#[derive(Clone, Debug, PartialEq)]
-pub enum AccessToken {
-    Authorized(String),
-    Unauthorized,
-}
+impl OAuthUser {
+    /// Creates a new subject/user pair with a new generated Biome user ID
+    ///
+    /// This constructor should only be used by implementations of the [OAuthUserSessionStore] for
+    /// creating a new user.
+    pub fn new(subject: String) -> Self {
+        Self {
+            subject,
+            user_id: Uuid::new_v5(&UUID_NAMESPACE, Uuid::new_v4().as_bytes()).to_string(),
+        }
+    }
 
-impl Default for AccessToken {
-    fn default() -> Self {
-        AccessToken::Unauthorized
+    /// Creates a new subject/user pair with an existing Biome user ID
+    ///
+    /// This constructor should only be used by implementations of the [OAuthUserSessionStore] for
+    /// returning an existing user.
+    pub fn new_with_id(subject: String, user_id: String) -> Self {
+        Self { subject, user_id }
+    }
+
+    /// Returns the user's subject identifier
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    /// Returns the Biome user ID
+    pub fn user_id(&self) -> &str {
+        &self.user_id
     }
 }
 
-impl AccessToken {
-    /// Returns if this token is an unauthorized token placeholder.
-    pub fn is_unauthorized(&self) -> bool {
-        match self {
-            AccessToken::Unauthorized => true,
-            AccessToken::Authorized(_) => false,
+/// Data for an OAuth user's session that's in an [OAuthUserSessionStore]
+#[derive(Clone)]
+pub struct OAuthUserSession {
+    splinter_access_token: String,
+    user: OAuthUser,
+    oauth_access_token: String,
+    oauth_refresh_token: Option<String>,
+    last_authenticated: SystemTime,
+}
+
+impl OAuthUserSession {
+    /// Returns the Splinter access token for this session. This token is sent by the client and
+    /// verified by the Splinter REST API.
+    pub fn splinter_access_token(&self) -> &str {
+        &self.splinter_access_token
+    }
+
+    /// Returns the user this session is for
+    pub fn user(&self) -> &OAuthUser {
+        &self.user
+    }
+
+    /// Returns the OAuth access token associated with this session. This token may be used to
+    /// reauthenticate the user with the OAuth provider.
+    pub fn oauth_access_token(&self) -> &str {
+        &self.oauth_access_token
+    }
+
+    /// Returns the OAuth refresh token associated with this session if it exists. This token may be
+    /// used to get a new access token from the OAuth provider.
+    pub fn oauth_refresh_token(&self) -> Option<&str> {
+        self.oauth_refresh_token.as_deref()
+    }
+
+    /// Returns the time at which the user was last authenticated with the OAuth provider for this
+    /// session. This may be used to determine when the user needs to be reauthenticated for the
+    /// session. This field is only set by the store; when the session data is returned by the
+    /// store, this field will always be set.
+    pub fn last_authenticated(&self) -> SystemTime {
+        self.last_authenticated
+    }
+
+    /// Converts the session data into an update builder
+    pub fn into_update_builder(self) -> InsertableOAuthUserSessionUpdateBuilder {
+        InsertableOAuthUserSessionUpdateBuilder {
+            splinter_access_token: self.splinter_access_token,
+            subject: self.user.subject,
+            oauth_access_token: self.oauth_access_token,
+            oauth_refresh_token: self.oauth_refresh_token,
         }
     }
 }
 
-/// A new OAuth User access.
+/// Builds a new [OAuthUserSession]
 ///
-/// This user is connected to a Biome User, via a user ID.
-pub struct NewOAuthUserAccess {
-    user_id: String,
-    provider_user_ref: String,
-
-    access_token: AccessToken,
-    refresh_token: Option<String>,
-    provider: OAuthProvider,
-}
-
-/// Builder for OAuthUserAccess structs
+/// This builder should only be used by implementations of the [OAuthUserSessionStore] for creating
+/// session data to return.
 #[derive(Default)]
-pub struct NewOAuthUserAccessBuilder {
-    user_id: Option<String>,
-    provider_user_ref: Option<String>,
-
-    access_token: Option<AccessToken>,
-    refresh_token: Option<String>,
-    provider: Option<OAuthProvider>,
+pub struct OAuthUserSessionBuilder {
+    splinter_access_token: Option<String>,
+    user: Option<OAuthUser>,
+    oauth_access_token: Option<String>,
+    oauth_refresh_token: Option<String>,
+    last_authenticated: Option<SystemTime>,
 }
 
-impl NewOAuthUserAccessBuilder {
+impl OAuthUserSessionBuilder {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the Biome ID for this OAuth user.
-    pub fn with_user_id(mut self, user_id: String) -> Self {
-        self.user_id = Some(user_id);
-
+    /// Sets the Splinter access token for this session
+    pub fn with_splinter_access_token(mut self, splinter_access_token: String) -> Self {
+        self.splinter_access_token = Some(splinter_access_token);
         self
     }
 
-    /// Set the user identity, as defined by the OAuth provider.
-    pub fn with_provider_user_ref(mut self, provider_user_ref: String) -> Self {
-        self.provider_user_ref = Some(provider_user_ref);
-
+    /// Sets the user this session is for
+    pub fn with_user(mut self, user: OAuthUser) -> Self {
+        self.user = Some(user);
         self
     }
 
-    /// Set the OAuth access token.
-    pub fn with_access_token(mut self, access_token: AccessToken) -> Self {
-        self.access_token = Some(access_token);
-
+    /// Sets the OAuth access token for this session
+    pub fn with_oauth_access_token(mut self, oauth_access_token: String) -> Self {
+        self.oauth_access_token = Some(oauth_access_token);
         self
     }
 
-    /// Set the OAuth refresh token.
-    ///
-    /// This field is optional when constructing the final struct.
-    pub fn with_refresh_token(mut self, refresh_token: Option<String>) -> Self {
-        self.refresh_token = refresh_token;
-
+    /// Sets the OAuth refresh token for this session
+    pub fn with_oauth_refresh_token(mut self, oauth_refresh_token: Option<String>) -> Self {
+        self.oauth_refresh_token = oauth_refresh_token;
         self
     }
 
-    /// Set the OAuth provider used to create this user.
-    pub fn with_provider(mut self, provider: OAuthProvider) -> Self {
-        self.provider = Some(provider);
-
+    /// Sets the time at which the user was last authenticated for this session
+    pub fn with_last_authenticated(mut self, last_authenticated: SystemTime) -> Self {
+        self.last_authenticated = Some(last_authenticated);
         self
     }
 
-    /// Build an OAuthUserAccess
-    ///
-    /// # Errors
-    ///
-    /// Returns an `InvalidStateError` if there are required fields missing.
-    pub fn build(self) -> Result<NewOAuthUserAccess, InvalidStateError> {
-        Ok(NewOAuthUserAccess {
-            user_id: self.user_id.ok_or_else(|| {
+    /// Builds the session
+    pub fn build(self) -> Result<OAuthUserSession, InvalidStateError> {
+        Ok(OAuthUserSession {
+            splinter_access_token: self.splinter_access_token.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A user ID is required to successfully build an NewOAuthUserAccess".into(),
+                    "A Splinter access token is required to build an OAuthUserSession".into(),
                 )
             })?,
-            provider_user_ref: self.provider_user_ref.ok_or_else(|| {
+            user: self.user.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A provider user identity is required to successfully build an NewOAuthUserAccess"
-                        .into(),
+                    "A user is required to build an OAuthUserSession".into(),
                 )
             })?,
-            access_token: self.access_token.ok_or_else(|| {
+            oauth_access_token: self.oauth_access_token.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A access token is required to successfully build an NewOAuthUserAccess"
-                        .into(),
+                    "An OAuth access token is required to build an OAuthUserSession".into(),
                 )
             })?,
-            refresh_token: self.refresh_token,
-            provider: self.provider.ok_or_else(|| {
+            oauth_refresh_token: self.oauth_refresh_token,
+            last_authenticated: self.last_authenticated.ok_or_else(|| {
                 InvalidStateError::with_message(
-                    "A provider is required to successfully build an NewOAuthUserAccess".into(),
+                    "A 'last authenticated' time is required to build an OAuthUserSession".into(),
                 )
             })?,
         })
     }
 }
 
-/// A user defined by an OAuth Provider.
+/// Data for an OAuth user's session that can be inserted into an [OAuthUserSessionStore]
 ///
-/// This user is connected to a Biome User, via a user ID.
-#[derive(Clone)]
-pub struct OAuthUserAccess {
-    id: i64,
-    user_id: String,
-    provider_user_ref: String,
-
-    access_token: AccessToken,
-    refresh_token: Option<String>,
-    provider: OAuthProvider,
+/// Unlike [OAuthUserSession], this struct does not contain a `last_authenticated` timestamp or the
+/// user's Biome user ID; this is because the timestamp and Biome user ID are always determined by
+/// the store itself.
+pub struct InsertableOAuthUserSession {
+    splinter_access_token: String,
+    subject: String,
+    oauth_access_token: String,
+    oauth_refresh_token: Option<String>,
 }
 
-impl OAuthUserAccess {
-    /// Return the access id (this id is assigned by a store implementation).
-    pub fn id(&self) -> i64 {
-        self.id
+impl InsertableOAuthUserSession {
+    /// Returns the Splinter access token for this session
+    pub fn splinter_access_token(&self) -> &str {
+        &self.splinter_access_token
     }
 
-    /// Return the user ID associated with this OAuth user
-    pub fn user_id(&self) -> &str {
-        &self.user_id
+    /// Returns the subject identifier of the user this session is for
+    pub fn subject(&self) -> &str {
+        &self.subject
     }
 
-    /// Return the user's provider user reference.
-    ///
-    /// This references the identity value of the user in the provider's system.
-    pub fn provider_user_ref(&self) -> &str {
-        &self.provider_user_ref
+    /// Returns the OAuth access token associated with this session
+    pub fn oauth_access_token(&self) -> &str {
+        &self.oauth_access_token
     }
 
-    /// Return the user's current access token.
-    pub fn access_token(&self) -> &AccessToken {
-        &self.access_token
+    /// Returns the OAuth refresh token associated with this session if it exists
+    pub fn oauth_refresh_token(&self) -> Option<&str> {
+        self.oauth_refresh_token.as_deref()
+    }
+}
+
+/// Builds a new [InsertableOAuthUserSession]
+#[derive(Default)]
+pub struct InsertableOAuthUserSessionBuilder {
+    splinter_access_token: Option<String>,
+    subject: Option<String>,
+    oauth_access_token: Option<String>,
+    oauth_refresh_token: Option<String>,
+}
+
+impl InsertableOAuthUserSessionBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Return the user's current refresh token, if one is available.
-    pub fn refresh_token(&self) -> Option<&str> {
-        self.refresh_token.as_deref()
+    /// Sets the Splinter access token for this session
+    pub fn with_splinter_access_token(mut self, splinter_access_token: String) -> Self {
+        self.splinter_access_token = Some(splinter_access_token);
+        self
     }
 
-    /// Return the OAuth provider used
-    pub fn provider(&self) -> &OAuthProvider {
-        &self.provider
+    /// Sets the subject identifier of the user this session is for
+    pub fn with_subject(mut self, subject: String) -> Self {
+        self.subject = Some(subject);
+        self
     }
 
-    /// Convert this OAuthUserAccess into an update builder.
-    pub fn into_update_builder(self) -> OAuthUserAccessUpdateBuilder {
-        let Self {
-            id,
-            user_id,
-            provider_user_ref,
-            access_token,
-            refresh_token,
-            provider,
-        } = self;
-        OAuthUserAccessUpdateBuilder {
-            id,
-            user_id,
-            provider_user_ref,
-            access_token,
-            refresh_token,
-            provider,
+    /// Sets the OAuth access token for this session
+    pub fn with_oauth_access_token(mut self, oauth_access_token: String) -> Self {
+        self.oauth_access_token = Some(oauth_access_token);
+        self
+    }
+
+    /// Sets the OAuth refresh token for this session
+    pub fn with_oauth_refresh_token(mut self, oauth_refresh_token: Option<String>) -> Self {
+        self.oauth_refresh_token = oauth_refresh_token;
+        self
+    }
+
+    /// Builds the insertable session
+    pub fn build(self) -> Result<InsertableOAuthUserSession, InvalidStateError> {
+        Ok(InsertableOAuthUserSession {
+            splinter_access_token: self.splinter_access_token.ok_or_else(|| {
+                InvalidStateError::with_message(
+                    "A Splinter access token is required to build an InsertableOAuthUserSession"
+                        .into(),
+                )
+            })?,
+            subject: self.subject.ok_or_else(|| {
+                InvalidStateError::with_message(
+                    "A subject identifier is required to build an InsertableOAuthUserSession"
+                        .into(),
+                )
+            })?,
+            oauth_access_token: self.oauth_access_token.ok_or_else(|| {
+                InvalidStateError::with_message(
+                    "An OAuth access token is required to build an InsertableOAuthUserSession"
+                        .into(),
+                )
+            })?,
+            oauth_refresh_token: self.oauth_refresh_token,
+        })
+    }
+}
+
+/// Builds an updated [InsertableOAuthUserSession]
+///
+/// This builder only allows changes to the fields of a session that may be updated.
+pub struct InsertableOAuthUserSessionUpdateBuilder {
+    // Immutable items
+    splinter_access_token: String,
+    subject: String,
+    // Mutable items
+    oauth_access_token: String,
+    oauth_refresh_token: Option<String>,
+}
+
+impl InsertableOAuthUserSessionUpdateBuilder {
+    /// Sets the OAuth access token for this session
+    pub fn with_oauth_access_token(mut self, oauth_access_token: String) -> Self {
+        self.oauth_access_token = oauth_access_token;
+        self
+    }
+
+    /// Sets the OAuth refresh token for this session
+    pub fn with_oauth_refresh_token(mut self, oauth_refresh_token: Option<String>) -> Self {
+        self.oauth_refresh_token = oauth_refresh_token;
+        self
+    }
+
+    /// Builds the insertable session
+    pub fn build(self) -> InsertableOAuthUserSession {
+        InsertableOAuthUserSession {
+            splinter_access_token: self.splinter_access_token,
+            subject: self.subject,
+            oauth_access_token: self.oauth_access_token,
+            oauth_refresh_token: self.oauth_refresh_token,
         }
     }
 }
 
-/// Builds an updated `OAuthUserAccess` struct.
-///
-/// This builder only allows changes to the fields on an OAuthUserAccess that may be
-/// updated.
-pub struct OAuthUserAccessUpdateBuilder {
-    // "immutable" items
-    id: i64,
-    user_id: String,
-    provider_user_ref: String,
-    provider: OAuthProvider,
-
-    // "mutable" items
-    access_token: AccessToken,
-    refresh_token: Option<String>,
-}
-
-impl OAuthUserAccessUpdateBuilder {
-    /// Set the OAuth access token.
-    pub fn with_access_token(mut self, access_token: AccessToken) -> Self {
-        self.access_token = access_token;
-
-        self
-    }
-
-    /// Set the OAuth refresh token.
+/// Defines methods for CRUD operations on OAuth session data
+pub trait OAuthUserSessionStore: Send + Sync {
+    /// Adds an OAuth session
     ///
-    /// This field is optional when constructing the final struct.
-    pub fn with_refresh_token(mut self, refresh_token: Option<String>) -> Self {
-        self.refresh_token = refresh_token;
-
-        self
-    }
-
-    /// Builds the updated OAuthUserAccess.
-    pub fn build(self) -> Result<OAuthUserAccess, InvalidStateError> {
-        let Self {
-            id,
-            user_id,
-            provider_user_ref,
-            access_token,
-            refresh_token,
-            provider,
-        } = self;
-        Ok(OAuthUserAccess {
-            id,
-            user_id,
-            provider_user_ref,
-            access_token,
-            refresh_token,
-            provider,
-        })
-    }
-}
-
-/// Defines methods for CRUD operations and fetching OAuth user information.
-pub trait OAuthUserStore: Send + Sync {
-    /// Add an OAuthUserAccess to the store.
+    /// The store will set the "last authenticated" value of the session to the current time. The
+    /// store will also generate a new OAuth user entry if one does not already exist for the
+    /// session's subject.
     ///
     /// # Errors
     ///
-    /// Returns a ConstraintViolation if either there already is a user ID associated
-    /// with another provider identity, or the provider identity has already been
-    /// associated with a user ID.
-    fn add_oauth_user(&self, oauth_user: NewOAuthUserAccess) -> Result<(), OAuthUserStoreError>;
+    /// Returns a `ConstraintViolation` error if a session with the given `splinter_access_token`
+    /// already exists.
+    fn add_session(
+        &self,
+        session: InsertableOAuthUserSession,
+    ) -> Result<(), OAuthUserSessionStoreError>;
 
-    /// Updates an OAuthUserAccess to the store.
+    /// Updates the OAuth access token and/or refresh token for a session
+    ///
+    /// The store will set the "last authenticated" value of the session to the current time.
     ///
     /// # Errors
     ///
-    /// Returns a ConstraintViolation if the OAuthUser associated with the user ID provided doesn't
-    /// exist.
-    fn update_oauth_user(&self, oauth_user: OAuthUserAccess) -> Result<(), OAuthUserStoreError>;
-
-    /// Returns the stored OAuth user based on the provider_user_ref from the OAuth provider.
-    fn list_by_provider_user_ref(
+    /// * Returns an `InvalidState` error if there is no session with the given
+    ///   `splinter_access_token`
+    /// * Returns a `InvalidArgument` error if any field other than `oauth_access_token` or
+    ///   `oauth_refresh_token` have been changed.
+    fn update_session(
         &self,
-        provider_user_ref: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError>;
+        session: InsertableOAuthUserSession,
+    ) -> Result<(), OAuthUserSessionStoreError>;
 
-    /// Returns the stored OAuth user based on the access token from the OAuth provider.
-    fn get_by_access_token(
+    /// Removes an OAuth session based on the provided Splinter access token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `InvalidState` error if there is no session with the given
+    /// `splinter_access_token`
+    fn remove_session(&self, splinter_access_token: &str)
+        -> Result<(), OAuthUserSessionStoreError>;
+
+    /// Returns the OAuth session for the provided Splinter access token if it exists
+    fn get_session(
         &self,
-        access_token: &str,
-    ) -> Result<Option<OAuthUserAccess>, OAuthUserStoreError>;
+        splinter_access_token: &str,
+    ) -> Result<Option<OAuthUserSession>, OAuthUserSessionStoreError>;
 
-    /// Returns the stored OAuth user based on the biome user ID.
-    fn list_by_user_id(
-        &self,
-        user_id: &str,
-    ) -> Result<Box<dyn Iterator<Item = OAuthUserAccess>>, OAuthUserStoreError>;
+    /// Returns the correlation between the given OAuth subject identifier and a Biome user ID if it
+    /// exists
+    fn get_user(&self, subject: &str) -> Result<Option<OAuthUser>, OAuthUserSessionStoreError>;
 
-    /// Clone into a boxed, dynamic dispatched OAuthUserStore.
-    fn clone_box(&self) -> Box<dyn OAuthUserStore>;
+    /// Clone into a boxed, dynamically dispatched store
+    fn clone_box(&self) -> Box<dyn OAuthUserSessionStore>;
 }
 
-impl Clone for Box<dyn OAuthUserStore> {
+impl Clone for Box<dyn OAuthUserSessionStore> {
     fn clone(&self) -> Self {
         self.clone_box()
     }

@@ -58,11 +58,11 @@ pub use key_management::store::memory::MemoryKeyStore;
 pub use key_management::store::KeyStore;
 
 #[cfg(all(feature = "biome-oauth", feature = "diesel"))]
-pub use oauth::store::diesel::DieselOAuthUserStore;
+pub use oauth::store::diesel::DieselOAuthUserSessionStore;
 #[cfg(feature = "biome-oauth")]
-pub use oauth::store::memory::MemoryOAuthUserStore;
+pub use oauth::store::memory::MemoryOAuthUserSessionStore;
 #[cfg(feature = "biome-oauth")]
-pub use oauth::store::OAuthUserStore;
+pub use oauth::store::OAuthUserSessionStore;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;

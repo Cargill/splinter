@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::oauth::UserInfo;
-
 #[derive(Deserialize)]
 pub struct CallbackQuery {
     pub code: String,
     pub state: String,
 }
 
-/// Serializes the given user information as a query string to pass to the client
-pub fn user_info_to_query_string(user_info: &UserInfo) -> String {
-    let mut query_string = format!("access_token=OAuth2:{}", user_info.access_token());
-    query_string.push_str(&format!("&display_name={}", user_info.identity()));
-    if let Some(duration) = user_info.expires_in() {
-        query_string.push_str(&format!("&expires_in={}", duration.as_secs()))
-    };
-    if let Some(refresh) = user_info.refresh_token() {
-        query_string.push_str(&format!("&refresh_token={}", refresh))
-    };
-    query_string
+pub fn generate_redirect_query(splinter_access_token: &str, display_name: &str) -> String {
+    format!(
+        "access_token=OAuth2:{}&display_name={}",
+        splinter_access_token, display_name
+    )
 }

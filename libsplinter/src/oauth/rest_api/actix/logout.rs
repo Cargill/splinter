@@ -17,12 +17,12 @@
 use actix_web::{HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 
-use crate::oauth::rest_api::OAuthUserInfoStore;
+use crate::biome::oauth::store::OAuthUserSessionStore;
 use crate::protocol;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
 
-pub fn make_logout_route(user_info_store: Box<dyn OAuthUserInfoStore>) -> Resource {
+pub fn make_logout_route(oauth_user_session_store: Box<dyn OAuthUserSessionStore>) -> Resource {
     Resource::build("/oauth/logout")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::OAUTH_LOGOUT_MIN,
@@ -34,19 +34,21 @@ pub fn make_logout_route(user_info_store: Box<dyn OAuthUserInfoStore>) -> Resour
                 Err(err_response) => return err_response,
             };
 
-            Box::new(match user_info_store.remove_user_tokens(&access_token) {
-                Ok(()) => HttpResponse::Ok()
-                    .json(json!({
-                        "message": "User successfully logged out"
-                    }))
-                    .into_future(),
-                Err(err) => {
-                    error!("Unable to remove user tokens: {}", err);
-                    HttpResponse::InternalServerError()
-                        .json(ErrorResponse::internal_error())
-                        .into_future()
-                }
-            })
+            Box::new(
+                match oauth_user_session_store.remove_session(&access_token) {
+                    Ok(()) => HttpResponse::Ok()
+                        .json(json!({
+                            "message": "User successfully logged out"
+                        }))
+                        .into_future(),
+                    Err(err) => {
+                        error!("Unable to remove user session: {}", err);
+                        HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())
+                            .into_future()
+                    }
+                },
+            )
         })
 }
 
