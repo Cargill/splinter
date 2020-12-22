@@ -73,6 +73,15 @@ tls_server_cert = "/etc/splinter/node_012/certs/server.crt"
 # (default "/etc/splinter/certs/private/server.key")
 tls_server_key = "/etc/splinter/node_012/certs/server.key"
 
+# A certificate signed by a certificate authority.
+# Used by the daemon when it is providing a REST API.
+# (default "/etc/splinter/certs/rest_api.crt")
+tls_rest_api_cert = "/etc/splinter/node_012/certs/rest_api.crt"
+
+# Private key used by daemon when it is providing a REST API.
+# (default "/etc/splinter/certs/private/rest_api.key")
+tls_rest_api_key = "/etc/splinter/node_012/certs/rest_api.key"
+
 # Public network endpoint for daemon-to-daemon communication
 # Use a protocol prefix to enforce the connection type, using the format
 # `protocol_prefix://ip:port`
