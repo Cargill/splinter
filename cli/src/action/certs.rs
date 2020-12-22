@@ -293,61 +293,6 @@ fn handle_skip(
     let cert_path = cert_dir;
     let mut ca;
 
-    #[cfg(not(feature = "https-certs"))]
-    let all_exist = client_cert_path.exists()
-        && client_key_path.exists()
-        && server_cert_path.exists()
-        && server_key_path.exists()
-        && ca_cert_path.exists()
-        && ca_key_path.exists();
-
-    #[cfg(feature = "https-certs")]
-    let all_exist = client_cert_path.exists()
-        && client_key_path.exists()
-        && server_cert_path.exists()
-        && server_key_path.exists()
-        && ca_cert_path.exists()
-        && ca_key_path.exists()
-        && rest_api_cert_path.exists()
-        && rest_api_key_path.exists();
-
-    // if all exists, log existence and return
-    if all_exist {
-        info!(
-            "Client certificate exists, skipping: {}",
-            absolute_path(&client_cert_path)?,
-        );
-        info!(
-            "Client key exists, skipping: {}",
-            absolute_path(&client_key_path)?,
-        );
-        info!(
-            "Server certificate exists, skipping: {}",
-            absolute_path(&server_cert_path)?,
-        );
-        info!(
-            "Server key exists, skipping: {}",
-            absolute_path(&server_key_path)?,
-        );
-        #[cfg(feature = "https-certs")]
-        {
-            info!(
-                "REST API certificate exists, skipping: {}",
-                absolute_path(&rest_api_cert_path)?,
-            );
-            info!(
-                "REST API key exists, skipping: {}",
-                absolute_path(&rest_api_key_path)?,
-            );
-        }
-        info!(
-            "CA certificate exists, skipping: {}",
-            absolute_path(&ca_cert_path)?,
-        );
-        info!("CA key exists, skipping: {}", absolute_path(&ca_key_path)?);
-        return Ok(());
-    }
-
     if (ca_cert_path.exists() || ca_key_path.exists())
         && !(ca_cert_path.exists() && ca_key_path.exists())
     {
