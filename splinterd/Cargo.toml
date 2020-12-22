@@ -84,6 +84,7 @@ experimental = [
     "admin-service-event-store",
     "biome-oauth",
     "health",
+    "https-bind",
     "registry-database",
     "service-arg-validation",
     "service-endpoint",
@@ -108,6 +109,7 @@ biome-oauth = [
     "splinter/biome-oauth-user-store-postgres"
 ]
 database = ["splinter/postgres", "splinter/sqlite"]
+https-bind = ["splinter/https-bind"]
 registry-database = ["database", "splinter/registry-database"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
