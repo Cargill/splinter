@@ -101,6 +101,8 @@ pub struct SplinterDaemon {
     node_id: String,
     display_name: String,
     rest_api_endpoint: String,
+    #[cfg(feature = "https-bind")]
+    rest_api_ssl_settings: Option<(String, String)>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
     #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
@@ -504,10 +506,16 @@ impl SplinterDaemon {
         let circuit_resource_provider =
             CircuitResourceProvider::new(self.node_id.to_string(), admin_service_store);
 
+        #[cfg(not(feature = "https-bind"))]
+        let bind = &self.rest_api_endpoint;
+
+        #[cfg(feature = "https-bind")]
+        let bind = self.build_rest_api_bind()?;
+
         // Allowing unused_mut because rest_api_builder must be mutable if feature biome is enabled
         #[allow(unused_mut)]
         let mut rest_api_builder = RestApiBuilder::new()
-            .with_bind(&self.rest_api_endpoint)
+            .with_bind(bind)
             .add_resource(
                 Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
             )
@@ -691,6 +699,37 @@ impl SplinterDaemon {
         connection_manager.await_shutdown();
         self.mesh.shutdown_signaler().shutdown();
         Ok(())
+    }
+
+    #[cfg(feature = "https-bind")]
+    fn build_rest_api_bind(&self) -> Result<splinter::rest_api::RestApiBind, StartError> {
+        match self.rest_api_endpoint.strip_prefix("http://") {
+            Some(insecure_endpoint) => Ok(splinter::rest_api::RestApiBind::Insecure(
+                insecure_endpoint.into(),
+            )),
+            None => {
+                if let Some((rest_api_server_cert, rest_api_server_key)) =
+                    self.rest_api_ssl_settings.as_ref()
+                {
+                    Ok(splinter::rest_api::RestApiBind::Secure {
+                        bind: self
+                            .rest_api_endpoint
+                            .strip_prefix("https://")
+                            .or(Some(&self.rest_api_endpoint))
+                            .map(String::from)
+                            .expect("There should be a value, due to the above or"),
+                        cert_path: rest_api_server_cert.clone(),
+                        key_path: rest_api_server_key.clone(),
+                    })
+                } else {
+                    Err(StartError::RestApiError(
+                        "The REST API has been configured for HTTPS, \
+                        but no certificate and key was provided."
+                            .into(),
+                    ))
+                }
+            }
+        }
     }
 
     fn listen_for_services(
@@ -889,6 +928,10 @@ pub struct SplinterDaemonBuilder {
     node_id: Option<String>,
     display_name: Option<String>,
     rest_api_endpoint: Option<String>,
+    #[cfg(feature = "https-bind")]
+    rest_api_server_cert: Option<String>,
+    #[cfg(feature = "https-bind")]
+    rest_api_server_key: Option<String>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
     #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
@@ -957,6 +1000,18 @@ impl SplinterDaemonBuilder {
 
     pub fn with_rest_api_endpoint(mut self, value: String) -> Self {
         self.rest_api_endpoint = Some(value);
+        self
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn with_rest_api_server_cert(mut self, value: String) -> Self {
+        self.rest_api_server_cert = Some(value);
+        self
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn with_rest_api_server_key(mut self, value: String) -> Self {
+        self.rest_api_server_key = Some(value);
         self
     }
 
@@ -1083,6 +1138,17 @@ impl SplinterDaemonBuilder {
             CreateError::MissingRequiredField("Missing field: rest_api_endpoint".to_string())
         })?;
 
+        #[cfg(feature = "https-bind")]
+        let rest_api_ssl_settings = match (self.rest_api_server_cert, self.rest_api_server_key) {
+            (Some(cert), Some(key)) => Some((cert, key)),
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(CreateError::MissingRequiredField(
+                    "Both rest_api_server_cert and rest_api_server_key must be set".into(),
+                ))
+            }
+            (None, None) => None,
+        };
+
         #[cfg(feature = "database")]
         let db_url = self.db_url;
 
@@ -1120,6 +1186,8 @@ impl SplinterDaemonBuilder {
             node_id,
             display_name,
             rest_api_endpoint,
+            #[cfg(feature = "https-bind")]
+            rest_api_ssl_settings,
             #[cfg(feature = "database")]
             db_url,
             #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]

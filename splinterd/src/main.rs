@@ -399,6 +399,8 @@ fn main() {
     log_spec_builder.default(log_level);
     log_spec_builder.module("hyper", log::LevelFilter::Warn);
     log_spec_builder.module("tokio", log::LevelFilter::Warn);
+    #[cfg(feature = "https-bind")]
+    log_spec_builder.module("h2", log::LevelFilter::Warn);
 
     Logger::with(log_spec_builder.build())
         .format(log_format)
@@ -471,6 +473,13 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_heartbeat(config.heartbeat())
         .with_admin_timeout(admin_timeout)
         .with_strict_ref_counts(config.strict_ref_counts());
+
+    #[cfg(feature = "https-bind")]
+    {
+        daemon_builder = daemon_builder
+            .with_rest_api_server_cert(config.tls_rest_api_cert().to_string())
+            .with_rest_api_server_key(config.tls_rest_api_key().to_string());
+    }
 
     #[cfg(feature = "service-endpoint")]
     {
