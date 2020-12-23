@@ -25,10 +25,10 @@ mod error;
 pub mod memory;
 
 pub use self::error::AdminServiceEventStoreError;
-use crate::admin::service::messages::AdminServiceEvent;
+use crate::admin::service::{event::AdminServiceEvent, messages};
 
 /// Return type of the `AdminServiceEventStore` `list_events_*` methods.
-pub type EventIter = Box<dyn ExactSizeIterator<Item = (i64, AdminServiceEvent)> + Send>;
+pub type EventIter = Box<dyn ExactSizeIterator<Item = AdminServiceEvent> + Send>;
 
 /// Interface for performing CRUD operations on `AdminServiceEvent`s.
 pub trait AdminServiceEventStore: Send + Sync {
@@ -40,8 +40,8 @@ pub trait AdminServiceEventStore: Send + Sync {
     /// * `event` - the `AdminServiceEvent` to be added to the store
     fn add_event(
         &self,
-        event: AdminServiceEvent,
-    ) -> Result<(i64, AdminServiceEvent), AdminServiceEventStoreError>;
+        event: messages::AdminServiceEvent,
+    ) -> Result<AdminServiceEvent, AdminServiceEventStoreError>;
 
     /// List `AdminServiceEvent`s that have been added to the store since the provided index.
     ///

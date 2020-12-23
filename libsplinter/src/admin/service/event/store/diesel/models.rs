@@ -21,10 +21,8 @@ use crate::admin::service::event::store::diesel::schema::{
     admin_event_proposed_node_endpoint, admin_event_proposed_service,
     admin_event_proposed_service_argument, admin_event_vote_record, admin_service_event,
 };
-use crate::admin::service::messages::{
-    AdminServiceEvent, AuthorizationType, CircuitProposal, CreateCircuit, DurabilityType,
-    PersistenceType, ProposalType, RouteType, Vote, VoteRecord,
-};
+use crate::admin::service::messages::{self, CreateCircuit};
+use crate::admin::store::{Vote, VoteRecord, VoteRecordBuilder};
 use crate::error::InvalidStateError;
 
 /// Database model representation of an `AdminServiceEvent`
@@ -58,8 +56,8 @@ pub struct AdminEventCircuitProposalModel {
     pub requester_node_id: String,
 }
 
-impl From<(i64, &CircuitProposal)> for AdminEventCircuitProposalModel {
-    fn from((event_id, proposal): (i64, &CircuitProposal)) -> Self {
+impl From<(i64, &messages::CircuitProposal)> for AdminEventCircuitProposalModel {
+    fn from((event_id, proposal): (i64, &messages::CircuitProposal)) -> Self {
         AdminEventCircuitProposalModel {
             event_id,
             proposal_type: String::from(&proposal.proposal_type),
@@ -126,12 +124,18 @@ pub struct AdminEventVoteRecordModel {
 
 impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
     type Error = InvalidStateError;
-    fn try_from(vote: &AdminEventVoteRecordModel) -> Result<Self, Self::Error> {
-        Ok(VoteRecord {
-            public_key: vote.public_key.to_vec(),
-            vote: Vote::try_from(vote.vote.clone())?,
-            voter_node_id: vote.voter_node_id.to_string(),
-        })
+    fn try_from(
+        admin_event_vote_record_model: &AdminEventVoteRecordModel,
+    ) -> Result<Self, Self::Error> {
+        VoteRecordBuilder::new()
+            .with_public_key(&admin_event_vote_record_model.public_key)
+            .with_vote(
+                &Vote::try_from(admin_event_vote_record_model.vote.clone()).map_err(|_| {
+                    InvalidStateError::with_message("Unable to convert string to Vote".into())
+                })?,
+            )
+            .with_voter_node_id(&admin_event_vote_record_model.voter_node_id)
+            .build()
     }
 }
 
@@ -185,156 +189,79 @@ pub struct AdminEventProposedServiceArgumentModel {
 // All enums associated with the above structs have TryFrom and From implemented in order to
 // translate the enums to a `Text` representation to be stored in the database.
 
-impl TryFrom<String> for Vote {
-    type Error = InvalidStateError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "Accept" => Ok(Vote::Accept),
-            "Reject" => Ok(Vote::Reject),
-            _ => Err(InvalidStateError::with_message(
-                "Unable to convert string to Vote".into(),
-            )),
-        }
-    }
-}
-
-impl From<&Vote> for String {
-    fn from(variant: &Vote) -> Self {
+impl From<&messages::Vote> for String {
+    fn from(variant: &messages::Vote) -> Self {
         match variant {
-            Vote::Accept => String::from("Accept"),
-            Vote::Reject => String::from("Reject"),
+            messages::Vote::Accept => String::from("Accept"),
+            messages::Vote::Reject => String::from("Reject"),
         }
     }
 }
 
-impl TryFrom<String> for ProposalType {
-    type Error = InvalidStateError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "Create" => Ok(ProposalType::Create),
-            "UpdateRoster" => Ok(ProposalType::UpdateRoster),
-            "AddNode" => Ok(ProposalType::AddNode),
-            "RemoveNode" => Ok(ProposalType::RemoveNode),
-            "Destroy" => Ok(ProposalType::Destroy),
-            _ => Err(InvalidStateError::with_message(
-                "Unable to convert string to ProposalType".into(),
-            )),
-        }
-    }
-}
-
-impl From<&ProposalType> for String {
-    fn from(variant: &ProposalType) -> Self {
+impl From<&messages::ProposalType> for String {
+    fn from(variant: &messages::ProposalType) -> Self {
         match variant {
-            ProposalType::Create => String::from("Create"),
-            ProposalType::UpdateRoster => String::from("UpdateRoster"),
-            ProposalType::AddNode => String::from("AddNode"),
-            ProposalType::RemoveNode => String::from("RemoveNode"),
-            ProposalType::Destroy => String::from("Destroy"),
+            messages::ProposalType::Create => String::from("Create"),
+            messages::ProposalType::UpdateRoster => String::from("UpdateRoster"),
+            messages::ProposalType::AddNode => String::from("AddNode"),
+            messages::ProposalType::RemoveNode => String::from("RemoveNode"),
+            messages::ProposalType::Destroy => String::from("Destroy"),
         }
     }
 }
 
-impl TryFrom<String> for AuthorizationType {
-    type Error = InvalidStateError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "Trust" => Ok(AuthorizationType::Trust),
-            _ => Err(InvalidStateError::with_message(
-                "Unable to convert string to AuthorizationType".into(),
-            )),
-        }
-    }
-}
-
-impl From<&AuthorizationType> for String {
-    fn from(variant: &AuthorizationType) -> Self {
+impl From<&messages::AuthorizationType> for String {
+    fn from(variant: &messages::AuthorizationType) -> Self {
         match variant {
-            AuthorizationType::Trust => String::from("Trust"),
+            messages::AuthorizationType::Trust => String::from("Trust"),
         }
     }
 }
 
-impl TryFrom<String> for PersistenceType {
-    type Error = InvalidStateError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "Any" => Ok(PersistenceType::Any),
-            _ => Err(InvalidStateError::with_message(
-                "Unable to convert string to PersistenceType".into(),
-            )),
-        }
-    }
-}
-
-impl From<&PersistenceType> for String {
-    fn from(variant: &PersistenceType) -> Self {
+impl From<&messages::PersistenceType> for String {
+    fn from(variant: &messages::PersistenceType) -> Self {
         match variant {
-            PersistenceType::Any => String::from("Any"),
+            messages::PersistenceType::Any => String::from("Any"),
         }
     }
 }
 
-impl TryFrom<String> for DurabilityType {
-    type Error = InvalidStateError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "NoDurability" => Ok(DurabilityType::NoDurability),
-            _ => Err(InvalidStateError::with_message(
-                "Unable to convert string to DurabilityType".into(),
-            )),
-        }
-    }
-}
-
-impl From<&DurabilityType> for String {
-    fn from(variant: &DurabilityType) -> Self {
+impl From<&messages::DurabilityType> for String {
+    fn from(variant: &messages::DurabilityType) -> Self {
         match variant {
-            DurabilityType::NoDurability => String::from("NoDurability"),
+            messages::DurabilityType::NoDurability => String::from("NoDurability"),
         }
     }
 }
 
-impl TryFrom<String> for RouteType {
-    type Error = InvalidStateError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "Any" => Ok(RouteType::Any),
-            _ => Err(InvalidStateError::with_message(
-                "Unable to convert string to RouteType".into(),
-            )),
-        }
-    }
-}
-
-impl From<&RouteType> for String {
-    fn from(variant: &RouteType) -> Self {
+impl From<&messages::RouteType> for String {
+    fn from(variant: &messages::RouteType) -> Self {
         match variant {
-            RouteType::Any => String::from("Any"),
+            messages::RouteType::Any => String::from("Any"),
         }
     }
 }
 
-impl<'a> From<&'a AdminServiceEvent> for NewAdminServiceEventModel<'a> {
-    fn from(event: &'a AdminServiceEvent) -> Self {
+impl<'a> From<&'a messages::AdminServiceEvent> for NewAdminServiceEventModel<'a> {
+    fn from(event: &'a messages::AdminServiceEvent) -> Self {
         match event {
-            AdminServiceEvent::ProposalSubmitted(_) => NewAdminServiceEventModel {
+            messages::AdminServiceEvent::ProposalSubmitted(_) => NewAdminServiceEventModel {
                 event_type: "ProposalSubmitted",
                 data: None,
             },
-            AdminServiceEvent::ProposalVote((_, data)) => NewAdminServiceEventModel {
+            messages::AdminServiceEvent::ProposalVote((_, data)) => NewAdminServiceEventModel {
                 event_type: "ProposalVote",
                 data: Some(data),
             },
-            AdminServiceEvent::ProposalAccepted((_, data)) => NewAdminServiceEventModel {
+            messages::AdminServiceEvent::ProposalAccepted((_, data)) => NewAdminServiceEventModel {
                 event_type: "ProposalAccepted",
                 data: Some(data),
             },
-            AdminServiceEvent::ProposalRejected((_, data)) => NewAdminServiceEventModel {
+            messages::AdminServiceEvent::ProposalRejected((_, data)) => NewAdminServiceEventModel {
                 event_type: "ProposalRejected",
                 data: Some(data),
             },
-            AdminServiceEvent::CircuitReady(_) => NewAdminServiceEventModel {
+            messages::AdminServiceEvent::CircuitReady(_) => NewAdminServiceEventModel {
                 event_type: "CircuitReady",
                 data: None,
             },
