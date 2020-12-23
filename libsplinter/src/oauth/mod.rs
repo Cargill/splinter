@@ -293,7 +293,23 @@ impl std::fmt::Debug for UserInfo {
 mod tests {
     use super::*;
 
-    use super::store::InflightOAuthRequestStoreError;
+    use std::collections::HashMap;
+
+    use url::Url;
+
+    use super::store::{InflightOAuthRequestStoreError, MemoryInflightOAuthRequestStore};
+
+    const CLIENT_ID: &str = "client_id";
+    const CLIENT_SECRET: &str = "client_secret";
+    const AUTH_URL: &str = "http://oauth/auth";
+    const REDIRECT_URL: &str = "http://oauth/callback";
+    const TOKEN_ENDPOINT: &str = "/token";
+    const EXTRA_AUTH_PARAM_KEY: &str = "key";
+    const EXTRA_AUTH_PARAM_VAL: &str = "val";
+    const SCOPE1: &str = "scope1";
+    const SCOPE2: &str = "scope2";
+    const CLIENT_REDIRECT_URL: &str = "http://client/redirect";
+    const SUBJECT: &str = "subject";
 
     /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
@@ -351,12 +367,104 @@ mod tests {
         ));
     }
 
+    /// Verifies that the OAuth client generates a correct authorization URL based on its
+    /// configuration and inputs.
+    ///
+    /// 1. Create a new OAuthClient
+    /// 2. Get a new authorization URL from the client
+    /// 3. Verify that the base URL (origin) is correct
+    /// 4. Verify that all the expected query parameters are set to the correct values
+    /// 5. Verify that the correct CSRF state, PKCE verifier, and client redirect URL were saved in
+    ///    the in-flight request store.
+    #[test]
+    fn get_authorization_url() {
+        let auth_url = Url::parse(AUTH_URL).expect("Failed to parse auth url");
+        let request_store = Box::new(MemoryInflightOAuthRequestStore::new());
+        let client = OAuthClient::new(
+            new_basic_client(
+                CLIENT_ID.into(),
+                CLIENT_SECRET.into(),
+                auth_url.as_str().into(),
+                REDIRECT_URL.into(),
+                format!("http://oauth{}", TOKEN_ENDPOINT),
+            )
+            .expect("Failed to create basic client"),
+            vec![(EXTRA_AUTH_PARAM_KEY.into(), EXTRA_AUTH_PARAM_VAL.into())],
+            vec![SCOPE1.into(), SCOPE2.into()],
+            Box::new(TestSubjectProvider),
+            request_store.clone(),
+        )
+        .expect("Failed to create client");
+
+        let generated_auth_url = Url::parse(
+            &client
+                .get_authorization_url(CLIENT_REDIRECT_URL.into())
+                .expect("Failed to generate auth URL"),
+        )
+        .expect("Failed to parse generated auth URL");
+
+        assert_eq!(auth_url.origin(), generated_auth_url.origin());
+
+        let query_map: HashMap<String, String> =
+            generated_auth_url.query_pairs().into_owned().collect();
+        assert_eq!(
+            query_map.get("client_id").expect("Missing client_id"),
+            CLIENT_ID,
+        );
+        assert_eq!(
+            query_map.get("redirect_uri").expect("Missing redirect_uri"),
+            REDIRECT_URL,
+        );
+        assert_eq!(
+            query_map
+                .get(EXTRA_AUTH_PARAM_KEY)
+                .expect("Missing extra auth param"),
+            EXTRA_AUTH_PARAM_VAL,
+        );
+        assert_eq!(
+            query_map.get("scope").expect("Missing scope"),
+            &format!("{} {}", SCOPE1, SCOPE2),
+        );
+        assert_eq!(
+            query_map
+                .get("response_type")
+                .expect("Missing response_type"),
+            "code",
+        );
+        assert_eq!(
+            query_map
+                .get("code_challenge_method")
+                .expect("Missing code_challenge_method"),
+            "S256",
+        );
+        let code_challenge = query_map
+            .get("code_challenge")
+            .expect("Missing code_challenge");
+        let state = query_map.get("state").expect("Missing state");
+
+        let pending_authorization = request_store
+            .remove_request(state)
+            .expect("Failed to get pending authorization")
+            .expect("Pending authorization not saved");
+        assert_eq!(
+            &pending_authorization.client_redirect_url,
+            CLIENT_REDIRECT_URL
+        );
+        assert_eq!(
+            PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(
+                pending_authorization.pkce_verifier
+            ))
+            .as_str(),
+            code_challenge.as_str(),
+        );
+    }
+
     #[derive(Clone)]
     pub struct TestSubjectProvider;
 
     impl SubjectProvider for TestSubjectProvider {
         fn get_subject(&self, _: &str) -> Result<Option<String>, InternalError> {
-            Ok(Some("".to_string()))
+            Ok(Some(SUBJECT.to_string()))
         }
 
         fn clone_box(&self) -> Box<dyn SubjectProvider> {
@@ -385,6 +493,230 @@ mod tests {
 
         fn clone_box(&self) -> Box<dyn InflightOAuthRequestStore> {
             Box::new(self.clone())
+        }
+    }
+}
+
+/// These tests require actix to be enabled
+#[cfg(test)]
+#[cfg(all(feature = "actix", feature = "actix-web", feature = "futures"))]
+mod actix_tests {
+    use super::*;
+
+    use std::sync::mpsc::channel;
+    use std::thread::JoinHandle;
+
+    use actix::System;
+    use actix_web::{dev::Server, web, App, HttpResponse, HttpServer};
+    use futures::Future;
+
+    use crate::oauth::store::MemoryInflightOAuthRequestStore;
+
+    use super::tests::TestSubjectProvider;
+
+    const CLIENT_ID: &str = "client_id";
+    const CLIENT_SECRET: &str = "client_secret";
+    const AUTH_URL: &str = "http://oauth/auth";
+    const REDIRECT_URL: &str = "http://oauth/callback";
+    const TOKEN_ENDPOINT: &str = "/token";
+    const CLIENT_REDIRECT_URL: &str = "http://client/redirect";
+    const AUTH_CODE: &str = "auth_code";
+    const MOCK_PKCE_VERIFIER: &str = "F9ZfayKQHV5exVsgM3WyzRt15UQvYxVZBm41iO-h20A";
+    const ACCESS_TOKEN: &str = "access_token";
+    const REFRESH_TOKEN: &str = "refresh_token";
+    const EXPIRES_IN: Duration = Duration::from_secs(3600);
+    const SUBJECT: &str = "subject";
+
+    /// Verifies that the OAuth client correctly handles exchanging an authorization code for the
+    /// user's tokens and returns the correct user values in the `exchange_authorization_code`
+    /// method.
+    ///
+    /// 1. Start the mock OAuth server
+    /// 2. Create a new InflightOAuthRequestStore and add a pending authorization
+    /// 3. Create a new OAuthClient with the pre-populated in-flight request store
+    /// 4. Call `exchange_authorization_code` with the CSRF token of the pending authorization; the
+    ///    mock server will verify that the correct data was sent.
+    /// 5. Verify that the returned user info and client redirect URL are correct
+    /// 6. Verify that the pending authorization has been removed from the store and calling
+    ///    `exchange_authorization_code` again returns `Ok(None)`
+    /// 7. Stop the mock OAuth server
+    #[test]
+    fn exchange_authorization_code() {
+        let (shutdown_handle, address) = run_mock_oauth_server("exchange_authorization_code");
+
+        let request_store = Box::new(MemoryInflightOAuthRequestStore::new());
+        let csrf_token = "csrf_token";
+        request_store
+            .insert_request(
+                csrf_token.into(),
+                PendingAuthorization {
+                    pkce_verifier: MOCK_PKCE_VERIFIER.into(),
+                    client_redirect_url: CLIENT_REDIRECT_URL.into(),
+                },
+            )
+            .expect("Failed to insert in-flight request");
+
+        let client = OAuthClient::new(
+            new_basic_client(
+                CLIENT_ID.into(),
+                CLIENT_SECRET.into(),
+                AUTH_URL.into(),
+                REDIRECT_URL.into(),
+                format!("{}{}", address, TOKEN_ENDPOINT),
+            )
+            .expect("Failed to create basic client"),
+            vec![],
+            vec![],
+            Box::new(TestSubjectProvider),
+            request_store.clone(),
+        )
+        .expect("Failed to create client");
+
+        let (user_info, client_redirect_url) = client
+            .exchange_authorization_code(AUTH_CODE.into(), csrf_token)
+            .expect("Failed to exchange authorization code")
+            .expect("Pending request not found");
+
+        assert_eq!(&user_info.access_token, ACCESS_TOKEN);
+        assert_eq!(
+            user_info.expires_in.expect("expires_in missing"),
+            EXPIRES_IN
+        );
+        assert_eq!(
+            &user_info.refresh_token.expect("refresh_token missing"),
+            REFRESH_TOKEN
+        );
+        assert_eq!(&user_info.subject, SUBJECT);
+        assert_eq!(&client_redirect_url, CLIENT_REDIRECT_URL);
+
+        assert!(request_store
+            .remove_request(csrf_token)
+            .expect("Failed to check in-flight request store")
+            .is_none());
+        assert!(client
+            .exchange_authorization_code(AUTH_CODE.into(), csrf_token)
+            .expect("Failed to exchange authorization code")
+            .is_none());
+
+        shutdown_handle.shutdown();
+    }
+
+    /// Verifies that the OAuth client correctly handles exchanging a refresh token for a new access
+    /// access token with the `exchange_refresh_token` method.
+    ///
+    /// 1. Start the mock OAuth server
+    /// 2. Create a new OAuthClient
+    /// 3. Call `exchange_refresh_token`; the mock server will verify that the correct data was sent.
+    /// 4. Verify that the returned access token is correct
+    /// 5. Stop the mock OAuth server
+    #[test]
+    fn exchange_refresh_token() {
+        let (shutdown_handle, address) = run_mock_oauth_server("exchange_refresh_token");
+
+        let client = OAuthClient::new(
+            new_basic_client(
+                CLIENT_ID.into(),
+                CLIENT_SECRET.into(),
+                AUTH_URL.into(),
+                REDIRECT_URL.into(),
+                format!("{}{}", address, TOKEN_ENDPOINT),
+            )
+            .expect("Failed to create basic client"),
+            vec![],
+            vec![],
+            Box::new(TestSubjectProvider),
+            Box::new(MemoryInflightOAuthRequestStore::new()),
+        )
+        .expect("Failed to create client");
+
+        let access_token = client
+            .exchange_refresh_token(REFRESH_TOKEN.into())
+            .expect("Failed to exchange refresh token");
+
+        assert_eq!(&access_token, ACCESS_TOKEN);
+
+        shutdown_handle.shutdown();
+    }
+
+    /// Runs a mock OAuth server and returns its shutdown handle along with the address the server
+    /// is running on.
+    fn run_mock_oauth_server(test_name: &str) -> (OAuthServerShutdownHandle, String) {
+        let (tx, rx) = channel();
+
+        let instance_name = format!("OAuth-Server-{}", test_name);
+        let join_handle = std::thread::Builder::new()
+            .name(instance_name.clone())
+            .spawn(move || {
+                let sys = System::new(instance_name);
+                let server = HttpServer::new(|| {
+                    App::new().service(web::resource(TOKEN_ENDPOINT).to(token_endpoint))
+                })
+                .bind("127.0.0.1:0")
+                .expect("Failed to bind OAuth server");
+                let address = format!("http://127.0.0.1:{}", server.addrs()[0].port());
+                let server = server.disable_signals().system_exit().start();
+                tx.send((server, address)).expect("Failed to send server");
+                sys.run().expect("OAuth server runtime failed");
+            })
+            .expect("Failed to spawn OAuth server thread");
+
+        let (server, address) = rx.recv().expect("Failed to receive server");
+
+        (OAuthServerShutdownHandle(server, join_handle), address)
+    }
+
+    /// The handler for the OAuth server's token endpoint. This endpoint receives the request
+    /// parameters as a form, since that's how the OAuth2 crate sends the request.
+    fn token_endpoint(form: web::Form<TokenRequestForm>) -> HttpResponse {
+        match form.grant_type.as_str() {
+            "authorization_code" => {
+                assert_eq!(form.code.as_deref(), Some(AUTH_CODE));
+                assert_eq!(form.code_verifier.as_deref(), Some(MOCK_PKCE_VERIFIER));
+                assert_eq!(form.redirect_uri.as_deref(), Some(REDIRECT_URL));
+
+                HttpResponse::Ok()
+                    .content_type("application/json")
+                    .json(json!({
+                        "token_type": "bearer",
+                        "access_token": ACCESS_TOKEN,
+                        "refresh_token": REFRESH_TOKEN,
+                        "expires_in": EXPIRES_IN.as_secs(),
+                    }))
+            }
+            "refresh_token" => {
+                assert_eq!(form.refresh_token.as_deref(), Some(REFRESH_TOKEN));
+
+                HttpResponse::Ok()
+                    .content_type("application/json")
+                    .json(json!({
+                        "token_type": "bearer",
+                        "access_token": ACCESS_TOKEN,
+                    }))
+            }
+            _ => panic!("Invalid grant_type"),
+        }
+    }
+
+    #[derive(Deserialize)]
+    struct TokenRequestForm {
+        grant_type: String,
+        // Authorization code requests
+        code: Option<String>,
+        code_verifier: Option<String>,
+        redirect_uri: Option<String>,
+        // Refresh token requests
+        refresh_token: Option<String>,
+    }
+
+    struct OAuthServerShutdownHandle(Server, JoinHandle<()>);
+
+    impl OAuthServerShutdownHandle {
+        pub fn shutdown(self) {
+            self.0
+                .stop(false)
+                .wait()
+                .expect("Failed to stop OAuth server");
+            self.1.join().expect("OAuth server thread failed");
         }
     }
 }
