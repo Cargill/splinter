@@ -208,7 +208,7 @@ impl CreateCircuitBuilder {
 
         let application_metadata = self.application_metadata.unwrap_or_default();
 
-        let comments = self.comments.unwrap_or_default();
+        let comments = self.comments;
 
         let display_name = self.display_name;
 
@@ -435,7 +435,7 @@ mod tests {
         assert_eq!(circuit.routes, RouteType::Any);
         assert_eq!(&circuit.circuit_management_type, "mgmt_type");
         assert_eq!(&circuit.application_metadata, b"abcd");
-        assert_eq!(&circuit.comments, "new circuit");
+        assert_eq!(circuit.comments, Some("new circuit".into()));
     }
 
     /// Verify that the `CreateCircuitBuilder` builds a correct `CreateCircuit` when `circuit_id`,
@@ -476,7 +476,7 @@ mod tests {
         assert_eq!(circuit.routes, RouteType::Any);
         assert_eq!(&circuit.circuit_management_type, "mgmt_type");
         assert!(circuit.application_metadata.is_empty());
-        assert!(circuit.comments.is_empty());
+        assert_eq!(circuit.comments, None);
     }
 
     /// Verify that the `CreateCircuitBuilder` fails to build when an invalid `circuit_id` is

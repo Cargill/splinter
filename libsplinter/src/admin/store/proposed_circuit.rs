@@ -33,8 +33,8 @@ pub struct ProposedCircuit {
     durability: DurabilityType,
     routes: RouteType,
     circuit_management_type: String,
-    application_metadata: Vec<u8>,
-    comments: String,
+    application_metadata: Option<Vec<u8>>,
+    comments: Option<String>,
     display_name: Option<String>,
 }
 
@@ -79,12 +79,12 @@ impl ProposedCircuit {
         &self.circuit_management_type
     }
 
-    pub fn application_metadata(&self) -> &[u8] {
+    pub fn application_metadata(&self) -> &Option<Vec<u8>> {
         &self.application_metadata
     }
 
     /// Returns the mangement type of the circuit
-    pub fn comments(&self) -> &str {
+    pub fn comments(&self) -> &Option<String> {
         &self.comments
     }
 
@@ -136,6 +136,18 @@ impl ProposedCircuit {
             Some(proto.take_display_name())
         };
 
+        let comments = if proto.get_comments().is_empty() {
+            None
+        } else {
+            Some(proto.take_comments())
+        };
+
+        let application_metadata = if proto.get_application_metadata().is_empty() {
+            None
+        } else {
+            Some(proto.take_application_metadata())
+        };
+
         Ok(Self {
             circuit_id: proto.take_circuit_id(),
             roster: proto
@@ -153,8 +165,8 @@ impl ProposedCircuit {
             durability,
             routes,
             circuit_management_type: proto.take_circuit_management_type(),
-            application_metadata: proto.take_application_metadata(),
-            comments: proto.take_comments(),
+            application_metadata,
+            comments,
             display_name,
         })
     }
@@ -177,8 +189,14 @@ impl ProposedCircuit {
         ));
 
         circuit.set_circuit_management_type(self.circuit_management_type);
-        circuit.set_application_metadata(self.application_metadata);
-        circuit.set_comments(self.comments);
+
+        if let Some(application_metadata) = self.application_metadata {
+            circuit.set_application_metadata(application_metadata);
+        }
+
+        if let Some(comments) = self.comments {
+            circuit.set_comments(comments);
+        }
 
         if let Some(display_name) = self.display_name {
             circuit.set_display_name(display_name);
@@ -450,9 +468,9 @@ impl ProposedCircuitBuilder {
             )
         })?;
 
-        let application_metadata = self.application_metadata.unwrap_or_default();
+        let application_metadata = self.application_metadata;
 
-        let comments = self.comments.unwrap_or_default();
+        let comments = self.comments;
 
         let display_name = self.display_name;
 

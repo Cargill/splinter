@@ -39,7 +39,7 @@ pub struct CreateCircuit {
     #[serde(default)]
     pub application_metadata: Vec<u8>,
     #[serde(default)]
-    pub comments: String,
+    pub comments: Option<String>,
     pub display_name: Option<String>,
 }
 
@@ -85,6 +85,12 @@ impl CreateCircuit {
             Some(proto.get_display_name().into())
         };
 
+        let comments = if proto.get_comments().is_empty() {
+            None
+        } else {
+            Some(proto.get_comments().into())
+        };
+
         Ok(Self {
             circuit_id: proto.take_circuit_id(),
             roster: proto
@@ -103,7 +109,7 @@ impl CreateCircuit {
             routes,
             circuit_management_type: proto.take_circuit_management_type(),
             application_metadata: proto.take_application_metadata(),
-            comments: proto.take_comments(),
+            comments,
             display_name,
         })
     }
@@ -127,7 +133,10 @@ impl CreateCircuit {
 
         circuit.set_circuit_management_type(self.circuit_management_type);
         circuit.set_application_metadata(self.application_metadata);
-        circuit.set_comments(self.comments);
+
+        if let Some(comments) = self.comments {
+            circuit.set_comments(comments);
+        }
 
         if let Some(display_name) = self.display_name {
             circuit.set_display_name(display_name);
@@ -402,8 +411,11 @@ impl From<store::CircuitProposal> for CircuitProposal {
             durability: DurabilityType::NoDurability,
             routes: RouteType::Any,
             circuit_management_type: store_circuit.circuit_management_type().into(),
-            application_metadata: store_circuit.application_metadata().into(),
-            comments: store_circuit.comments().into(),
+            application_metadata: store_circuit
+                .application_metadata()
+                .clone()
+                .unwrap_or_default(),
+            comments: store_circuit.comments().clone(),
             display_name: store_circuit.display_name().clone(),
         };
 

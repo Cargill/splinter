@@ -902,6 +902,18 @@ fn list_proposals(
             }
         };
 
+        let comments = {
+            if format == "csv" {
+                proposal.circuit.comments.clone().unwrap_or_default()
+            } else {
+                proposal
+                    .circuit
+                    .comments
+                    .clone()
+                    .unwrap_or_else(|| "-".to_string())
+            }
+        };
+
         let members = proposal
             .circuit
             .members
@@ -914,7 +926,7 @@ fn list_proposals(
             display_name,
             proposal.circuit.management_type.to_string(),
             members,
-            proposal.circuit.comments.to_string(),
+            comments,
         ]);
     });
 

@@ -1339,8 +1339,8 @@ struct YamlProposedCircuit {
     durability: YamlDurabilityType,
     routes: YamlRouteType,
     circuit_management_type: String,
-    application_metadata: String,
-    comments: String,
+    application_metadata: Option<String>,
+    comments: Option<String>,
     display_name: Option<String>,
 }
 
@@ -1368,11 +1368,21 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
             .with_persistence(&PersistenceType::from(circuit.persistence))
             .with_durability(&DurabilityType::from(circuit.durability))
             .with_routes(&RouteType::from(circuit.routes))
-            .with_circuit_management_type(&circuit.circuit_management_type)
-            .with_application_metadata(&parse_hex(&circuit.application_metadata).map_err(|_| {
-                InvalidStateError::with_message("Requester public key is not valid hex".to_string())
-            })?)
-            .with_comments(&circuit.comments);
+            .with_circuit_management_type(&circuit.circuit_management_type);
+
+        if let Some(application_metadata) = circuit.application_metadata {
+            builder = builder.with_application_metadata(&parse_hex(&application_metadata).map_err(
+                |_| {
+                    InvalidStateError::with_message(
+                        "Requester application metadataca is not valid hex".to_string(),
+                    )
+                },
+            )?)
+        }
+
+        if let Some(comments) = &circuit.comments {
+            builder = builder.with_comments(comments);
+        }
 
         if let Some(display_name) = &circuit.display_name {
             builder = builder.with_display_name(display_name);
@@ -1384,6 +1394,14 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
 
 impl From<ProposedCircuit> for YamlProposedCircuit {
     fn from(circuit: ProposedCircuit) -> Self {
+        let application_metadata = {
+            if let Some(application_metadata) = circuit.application_metadata() {
+                Some(to_hex(application_metadata))
+            } else {
+                None
+            }
+        };
+
         YamlProposedCircuit {
             circuit_id: circuit.circuit_id().into(),
             roster: circuit
@@ -1403,8 +1421,8 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
             durability: circuit.durability().clone().into(),
             routes: circuit.routes().clone().into(),
             circuit_management_type: circuit.circuit_management_type().into(),
-            application_metadata: to_hex(circuit.application_metadata()),
-            comments: circuit.comments().into(),
+            application_metadata,
+            comments: circuit.comments().clone(),
             display_name: circuit.display_name().clone(),
         }
     }
@@ -1732,8 +1750,6 @@ proposals:
             durability: NoDurability
             routes: Any
             circuit_management_type: gameroom
-            application_metadata: ''
-            comments: \"\"
             display_name: \"test_display\"
         votes: []
         requester: 0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482
