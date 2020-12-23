@@ -51,14 +51,22 @@ const SERVER_KEY: &str = "server.key";
 const CA_CERT: &str = "generated_ca.pem";
 const CA_KEY: &str = "generated_ca.key";
 
+#[cfg(feature = "https-certs")]
+const REST_API_CERT: &str = "rest_api.crt";
+#[cfg(feature = "https-certs")]
+const REST_API_KEY: &str = "rest_api.key";
+
 impl Action for CertGenAction {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
         let args = arg_matches.ok_or(CliError::RequiresArgs)?;
 
-        let common_name = args
-            .value_of("common_name")
-            .unwrap_or("localhost")
-            .to_string();
+        #[cfg(not(feature = "https-certs"))]
+        let server_common_name = args.value_of("common_name").unwrap_or("localhost");
+        #[cfg(feature = "https-certs")]
+        let server_common_name = args.value_of("server_common_name").unwrap_or("localhost");
+
+        #[cfg(feature = "https-certs")]
+        let rest_api_common_name = args.value_of("rest_api_common_name").unwrap_or("localhost");
 
         let cert_dir_string = args
             .value_of("cert_dir")
@@ -144,17 +152,27 @@ impl Action for CertGenAction {
         // if skip, check each pair of certificate/key to see if it exists. If not generate the
         // the missing files. If only one of the two files exists, this is an error.
         if args.is_present("skip") {
-            return handle_skip(cert_path, private_cert_path, common_name);
+            return handle_skip(
+                cert_path,
+                private_cert_path,
+                server_common_name,
+                #[cfg(feature = "https-certs")]
+                rest_api_common_name,
+            );
         }
 
         // if force is not present, all files must not exist.
         if !args.is_present("force") {
             let client_cert_path = cert_dir.join(CLIENT_CERT);
             let server_cert_path = cert_dir.join(SERVER_CERT);
+            #[cfg(feature = "https-certs")]
+            let rest_api_cert_path = cert_dir.join(REST_API_CERT);
             let ca_cert_path = cert_dir.join(CA_CERT);
 
             let client_key_path = private_cert_path.join(CLIENT_KEY);
             let server_key_path = private_cert_path.join(SERVER_KEY);
+            #[cfg(feature = "https-certs")]
+            let rest_api_key_path = private_cert_path.join(REST_API_KEY);
             let ca_key_path = private_cert_path.join(CA_KEY);
             let mut errored = false;
             if client_cert_path.exists() {
@@ -189,6 +207,25 @@ impl Action for CertGenAction {
                 errored = true;
             }
 
+            #[cfg(feature = "https-certs")]
+            {
+                if rest_api_cert_path.exists() {
+                    error!(
+                        "REST API certificate already exists: {}",
+                        absolute_path(&rest_api_cert_path)?,
+                    );
+                    errored = true;
+                }
+
+                if rest_api_key_path.exists() {
+                    error!(
+                        "REST API key already exists: {}",
+                        absolute_path(&rest_api_key_path)?,
+                    );
+                    errored = true;
+                }
+            }
+
             if ca_cert_path.exists() {
                 error!(
                     "CA certificate already exists: {}",
@@ -209,12 +246,24 @@ impl Action for CertGenAction {
             } else {
                 // if all files need to be generated log what will be written and generate all
                 log_writing(&cert_path, &private_cert_path)?;
-                create_all_certs(cert_path, private_cert_path, common_name)?;
+                create_all_certs(
+                    &cert_path,
+                    &private_cert_path,
+                    server_common_name,
+                    #[cfg(feature = "https-certs")]
+                    rest_api_common_name,
+                )?;
             }
         } else {
             // if force is true, overwrite all existing files
             log_overwriting(&cert_path, &private_cert_path)?;
-            create_all_certs(cert_dir.to_path_buf(), private_cert_path, common_name)?;
+            create_all_certs(
+                &cert_dir.to_path_buf(),
+                &private_cert_path,
+                server_common_name,
+                #[cfg(feature = "https-certs")]
+                rest_api_common_name,
+            )?;
         }
 
         Ok(())
@@ -226,49 +275,23 @@ impl Action for CertGenAction {
 fn handle_skip(
     cert_dir: PathBuf,
     private_cert_path: PathBuf,
-    common_name: String,
+    server_common_name: &str,
+    #[cfg(feature = "https-certs")] rest_api_common_name: &str,
 ) -> Result<(), CliError> {
     let client_cert_path = cert_dir.join(CLIENT_CERT);
     let server_cert_path = cert_dir.join(SERVER_CERT);
     let ca_cert_path = cert_dir.join(CA_CERT);
+    #[cfg(feature = "https-certs")]
+    let rest_api_cert_path = cert_dir.join(REST_API_CERT);
 
     let client_key_path = private_cert_path.join(CLIENT_KEY);
     let server_key_path = private_cert_path.join(SERVER_KEY);
     let ca_key_path = private_cert_path.join(CA_KEY);
+    #[cfg(feature = "https-certs")]
+    let rest_api_key_path = private_cert_path.join(REST_API_KEY);
+
     let cert_path = cert_dir;
     let mut ca;
-
-    // if all exists, log existence and return
-    if client_cert_path.exists()
-        && client_key_path.exists()
-        && server_cert_path.exists()
-        && server_key_path.exists()
-        && ca_cert_path.exists()
-        && ca_key_path.exists()
-    {
-        info!(
-            "Client certificate exists, skipping: {}",
-            absolute_path(&client_cert_path)?,
-        );
-        info!(
-            "Client key exists, skipping: {}",
-            absolute_path(&client_key_path)?,
-        );
-        info!(
-            "Server certificate exists, skipping: {}",
-            absolute_path(&server_cert_path)?,
-        );
-        info!(
-            "Server key exists, skipping: {}",
-            absolute_path(&server_key_path)?,
-        );
-        info!(
-            "CA certificate exists, skipping: {}",
-            absolute_path(&ca_cert_path)?,
-        );
-        info!("CA key exists, skipping: {}", absolute_path(&ca_key_path)?);
-        return Ok(());
-    }
 
     if (ca_cert_path.exists() || ca_key_path.exists())
         && !(ca_cert_path.exists() && ca_key_path.exists())
@@ -327,6 +350,26 @@ fn handle_skip(
         }
     }
 
+    #[cfg(feature = "https-certs")]
+    if (rest_api_cert_path.exists() || rest_api_key_path.exists())
+        && !(rest_api_cert_path.exists() && rest_api_key_path.exists())
+    {
+        // if one exists without the other return an error
+        if rest_api_cert_path.exists() {
+            return Err(CliError::ActionError(format!(
+                "Matching key for the certificate is missing: {}/{} ",
+                absolute_path(&cert_path)?,
+                REST_API_KEY
+            )));
+        } else {
+            return Err(CliError::ActionError(format!(
+                "Matching certificate for the key is missing: {}/{} ",
+                absolute_path(&private_cert_path)?,
+                REST_API_CERT
+            )));
+        }
+    }
+
     // if ca files exists, log and read the cert and key from the file
     if ca_cert_path.exists() && ca_key_path.exists() {
         info!(
@@ -345,8 +388,7 @@ fn handle_skip(
             absolute_path(&private_cert_path)?,
             CA_KEY
         );
-        let (genearte_ca_key, generate_ca_cert) =
-            write_ca(cert_path.clone(), private_cert_path.clone())?;
+        let (genearte_ca_key, generate_ca_cert) = write_ca(&cert_path, &private_cert_path)?;
         ca = Some((genearte_ca_key, generate_ca_cert));
     }
 
@@ -373,12 +415,14 @@ fn handle_skip(
             CLIENT_KEY
         );
         if let Some((ca_key, ca_cert)) = ca {
-            write_client(
-                cert_path.clone(),
-                private_cert_path.clone(),
+            write_cert_and_key(
+                &cert_path,
+                &private_cert_path,
                 &ca_key,
                 &ca_cert,
-                &common_name,
+                CLIENT_CERT,
+                CLIENT_KEY,
+                server_common_name,
             )?;
             ca = Some((ca_key, ca_cert));
         } else {
@@ -408,47 +452,104 @@ fn handle_skip(
             absolute_path(&private_cert_path)?,
             SERVER_KEY
         );
-        if let Some((ca_key, ca_cert)) = ca {
-            write_server(
-                cert_path,
-                private_cert_path,
-                &ca_key,
-                &ca_cert,
-                &common_name,
+        if let Some((ca_key, ca_cert)) = ca.as_ref() {
+            write_cert_and_key(
+                &cert_path,
+                &private_cert_path,
+                ca_key,
+                ca_cert,
+                SERVER_CERT,
+                SERVER_KEY,
+                server_common_name,
             )?;
         } else {
             // this should never happen
             return Err(CliError::ActionError("CA does not exist".into()));
         }
     }
+
+    #[cfg(feature = "https-certs")]
+    if rest_api_cert_path.exists() && rest_api_key_path.exists() {
+        info!(
+            "REST API certificate exists, skipping: {}",
+            absolute_path(&rest_api_cert_path)?,
+        );
+        info!(
+            "REST API key exists, skipping: {}",
+            absolute_path(&rest_api_key_path)?,
+        );
+    } else {
+        // if the rest_api files do not exist, generate them using the ca
+        info!(
+            "Writing file: {}/{}",
+            absolute_path(&cert_path)?,
+            REST_API_CERT
+        );
+        info!(
+            "Writing file: {}/{}",
+            absolute_path(&private_cert_path)?,
+            REST_API_KEY
+        );
+        if let Some((ca_key, ca_cert)) = ca.as_ref() {
+            write_cert_and_key(
+                &cert_path,
+                &private_cert_path,
+                ca_key,
+                ca_cert,
+                REST_API_CERT,
+                REST_API_KEY,
+                rest_api_common_name,
+            )?;
+        } else {
+            // this should never happen
+            return Err(CliError::ActionError("CA does not exist".into()));
+        }
+    }
+
     Ok(())
 }
 
 // create all certificates and keys from scratch
 fn create_all_certs(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
-    common_name: String,
+    cert_path: &PathBuf,
+    private_cert_path: &PathBuf,
+    server_common_name: &str,
+    #[cfg(feature = "https-certs")] rest_api_common_name: &str,
 ) -> Result<(), CliError> {
     // Generate Certificate Authority keys and certificate.
     // These files are not saved
-    let (ca_key, ca_cert) = write_ca(cert_path.clone(), private_cert_path.clone())?;
+    let (ca_key, ca_cert) = write_ca(cert_path, private_cert_path)?;
     // Generate client and server keys and certificates
 
-    write_client(
-        cert_path.clone(),
-        private_cert_path.clone(),
-        &ca_key,
-        &ca_cert,
-        &common_name,
-    )?;
-
-    write_server(
+    write_cert_and_key(
         cert_path,
         private_cert_path,
         &ca_key,
         &ca_cert,
-        &common_name,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        server_common_name,
+    )?;
+
+    write_cert_and_key(
+        cert_path,
+        private_cert_path,
+        &ca_key,
+        &ca_cert,
+        SERVER_CERT,
+        SERVER_KEY,
+        server_common_name,
+    )?;
+
+    #[cfg(feature = "https-certs")]
+    write_cert_and_key(
+        cert_path,
+        private_cert_path,
+        &ca_key,
+        &ca_cert,
+        REST_API_CERT,
+        REST_API_KEY,
+        rest_api_common_name,
     )?;
 
     Ok(())
@@ -456,8 +557,8 @@ fn create_all_certs(
 
 // Generate Certificate Authority keys and certificate.
 fn write_ca(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
+    cert_path: &PathBuf,
+    private_cert_path: &PathBuf,
 ) -> Result<(PKey<Private>, X509), CliError> {
     let (ca_key, ca_cert) = make_ca_cert()?;
 
@@ -473,40 +574,22 @@ fn write_ca(
 }
 
 // Generate server keys and certificate.
-fn write_server(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
+fn write_cert_and_key(
+    cert_path: &PathBuf,
+    private_cert_path: &PathBuf,
     ca_key: &PKey<Private>,
     ca_cert: &X509,
+    cert_name: &str,
+    key_name: &str,
     common_name: &str,
 ) -> Result<(), CliError> {
     let (server_key, server_cert) = make_ca_signed_cert(ca_cert, ca_key, common_name)?;
 
-    write_file(cert_path, SERVER_CERT, &server_cert.to_pem()?)?;
+    write_file(cert_path, cert_name, &server_cert.to_pem()?)?;
 
     write_file(
         private_cert_path,
-        SERVER_KEY,
-        &server_key.private_key_to_pem_pkcs8()?,
-    )?;
-    Ok(())
-}
-
-// Generate client keys and certificate.
-fn write_client(
-    cert_path: PathBuf,
-    private_cert_path: PathBuf,
-    ca_key: &PKey<Private>,
-    ca_cert: &X509,
-    common_name: &str,
-) -> Result<(), CliError> {
-    let (server_key, server_cert) = make_ca_signed_cert(ca_cert, ca_key, common_name)?;
-
-    write_file(cert_path, CLIENT_CERT, &server_cert.to_pem()?)?;
-
-    write_file(
-        private_cert_path,
-        CLIENT_KEY,
+        key_name,
         &server_key.private_key_to_pem_pkcs8()?,
     )?;
     Ok(())
@@ -596,7 +679,7 @@ fn make_ca_signed_cert(
 
 /// write the a file to a temp file name and then rename to final filename
 /// this will guarantee that the final file will ony ever contain valid data
-fn write_file(path_buf: PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
+fn write_file(path_buf: &PathBuf, file_name: &str, bytes: &[u8]) -> Result<(), CliError> {
     let temp_path_buf = path_buf.join(format!(".{}.new", file_name));
     let temp_path = {
         if let Some(path) = temp_path_buf.to_str() {
@@ -699,6 +782,20 @@ fn log_writing(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(), C
         absolute_path(private_cert_path)?,
         SERVER_KEY
     );
+
+    #[cfg(feature = "https-certs")]
+    {
+        info!(
+            "Writing file: {}/{}",
+            absolute_path(cert_path)?,
+            REST_API_CERT
+        );
+        info!(
+            "Writing file: {}/{}",
+            absolute_path(private_cert_path)?,
+            REST_API_KEY
+        );
+    }
     Ok(())
 }
 
@@ -736,6 +833,20 @@ fn log_overwriting(cert_path: &PathBuf, private_cert_path: &PathBuf) -> Result<(
         absolute_path(private_cert_path)?,
         SERVER_KEY
     );
+
+    #[cfg(feature = "https-certs")]
+    {
+        info!(
+            "Overwriting file: {}/{}",
+            absolute_path(cert_path)?,
+            REST_API_CERT
+        );
+        info!(
+            "Overwriting file: {}/{}",
+            absolute_path(private_cert_path)?,
+            REST_API_KEY
+        );
+    }
     Ok(())
 }
 
