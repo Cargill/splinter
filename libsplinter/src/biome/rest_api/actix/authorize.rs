@@ -20,7 +20,7 @@ use jsonwebtoken::{decode, Validation};
 use crate::actix_web::{Error as ActixError, HttpRequest, HttpResponse};
 #[cfg(feature = "biome-credentials")]
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
-use crate::biome::rest_api::{resources::User, BiomeRestConfig};
+use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 #[cfg(feature = "auth")]
 use crate::rest_api::auth::identity::Identity;
@@ -85,7 +85,7 @@ pub(crate) fn get_authorized_user(
     request: &HttpRequest,
     secret_manager: &Arc<dyn SecretManager>,
     rest_config: &BiomeRestConfig,
-) -> Result<User, ErrorHttpResponse> {
+) -> Result<String, ErrorHttpResponse> {
     /// Nothing is configured at compile-time, any route making use of this can't be authorized.
     Err(Box::new(
         HttpResponse::Unauthorized()
@@ -99,11 +99,11 @@ pub(crate) fn get_authorized_user(
     request: &HttpRequest,
     secret_manager: &Arc<dyn SecretManager>,
     rest_config: &BiomeRestConfig,
-) -> Result<User, ErrorHttpResponse> {
+) -> Result<String, ErrorHttpResponse> {
     let validation = default_validation(&rest_config.issuer());
 
     match authorize_user(&request, &*secret_manager, &validation) {
-        AuthorizationResult::Authorized(claims) => Ok(User::new(&claims.user_id())),
+        AuthorizationResult::Authorized(claims) => Ok(claims.user_id()),
         AuthorizationResult::Unauthorized => Err(Box::new(
             HttpResponse::Unauthorized()
                 .json(ErrorResponse::unauthorized())
@@ -122,9 +122,9 @@ pub(crate) fn get_authorized_user(
     request: &HttpRequest,
     _secret_manager: &Arc<dyn SecretManager>,
     _rest_config: &BiomeRestConfig,
-) -> Result<User, ErrorHttpResponse> {
+) -> Result<String, ErrorHttpResponse> {
     match request.extensions().get::<Identity>() {
-        Some(Identity::User(id)) => Ok(User::new(&id)),
+        Some(Identity::User(id)) => Ok(id.into()),
         _ => Err(Box::new(
             HttpResponse::Unauthorized()
                 .json(ErrorResponse::unauthorized())
