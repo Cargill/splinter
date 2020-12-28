@@ -20,17 +20,14 @@ pub mod identity;
 
 use std::str::FromStr;
 
-use crate::error::{InternalError, InvalidArgumentError};
+use crate::error::InvalidArgumentError;
 
 use identity::{Identity, IdentityProvider};
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
     /// The client was authorized to the given identity based on the authorization header
-    Authorized {
-        identity: Identity,
-        authorization: AuthorizationHeader,
-    },
+    Authorized(Identity),
     /// The requested endpoint does not require authorization
     NoAuthorizationNecessary,
     /// The authorization header is empty or invalid
@@ -77,12 +74,7 @@ fn authorize(
     // Attempt to get the client's identity
     for provider in identity_providers {
         match provider.get_identity(&authorization) {
-            Ok(Some(identity)) => {
-                return AuthorizationResult::Authorized {
-                    identity,
-                    authorization,
-                }
-            }
+            Ok(Some(identity)) => return AuthorizationResult::Authorized(identity),
             Ok(None) => {}
             Err(err) => error!("{}", err),
         }
@@ -90,12 +82,6 @@ fn authorize(
 
     // No identity provider could resolve the authorization to an identity
     AuthorizationResult::Unauthorized
-}
-
-/// A trait that fetches a value based on an authorization header.
-pub trait AuthorizationMapping<T> {
-    /// Return a value based on the given authorization header.
-    fn get(&self, authorization: &AuthorizationHeader) -> Result<Option<T>, InternalError>;
 }
 
 /// A parsed authorization header
@@ -169,6 +155,8 @@ impl FromStr for BearerToken {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::error::InternalError;
 
     /// Verfifies that the `AuthorizationHeader` enum is correctly parsed from strings
     #[test]
@@ -380,10 +368,7 @@ mod tests {
                 Some("auth"),
                 &[Box::new(AlwaysAcceptIdentityProvider)]
             ),
-            AuthorizationResult::Authorized {
-                identity,
-                authorization,
-            } if identity == expected_identity && authorization == expected_auth
+            AuthorizationResult::Authorized(identity) if identity == expected_identity
         ));
     }
 
@@ -407,10 +392,7 @@ mod tests {
                     Box::new(AlwaysRejectIdentityProvider),
                 ]
             ),
-            AuthorizationResult::Authorized {
-                identity,
-                authorization,
-            } if identity == expected_identity && authorization == expected_auth
+            AuthorizationResult::Authorized(identity) if identity == expected_identity
         ));
     }
 
@@ -433,10 +415,7 @@ mod tests {
                     Box::new(AlwaysAcceptIdentityProvider),
                 ]
             ),
-            AuthorizationResult::Authorized {
-                identity,
-                authorization,
-            } if identity == expected_identity && authorization == expected_auth
+            AuthorizationResult::Authorized(identity) if identity == expected_identity
         ));
     }
 

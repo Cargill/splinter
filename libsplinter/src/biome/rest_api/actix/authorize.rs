@@ -22,6 +22,8 @@ use crate::actix_web::{Error as ActixError, HttpRequest, HttpResponse};
 use crate::biome::rest_api::resources::authorize::AuthorizationResult;
 use crate::biome::rest_api::{resources::User, BiomeRestConfig};
 use crate::futures::{Future, IntoFuture};
+#[cfg(feature = "auth")]
+use crate::rest_api::auth::identity::Identity;
 use crate::rest_api::secrets::SecretManager;
 #[cfg(not(feature = "auth"))]
 use crate::rest_api::sessions::default_validation;
@@ -121,9 +123,9 @@ pub(crate) fn get_authorized_user(
     _secret_manager: &Arc<dyn SecretManager>,
     _rest_config: &BiomeRestConfig,
 ) -> Result<User, ErrorHttpResponse> {
-    match request.extensions().get::<User>().cloned() {
-        Some(user) => Ok(user),
-        None => Err(Box::new(
+    match request.extensions().get::<Identity>() {
+        Some(Identity::User(id)) => Ok(User::new(&id)),
+        _ => Err(Box::new(
             HttpResponse::Unauthorized()
                 .json(ErrorResponse::unauthorized())
                 .into_future(),
