@@ -24,6 +24,10 @@ const TLS_CLIENT_CERT: &str = "client.crt";
 const TLS_CLIENT_KEY: &str = "private/client.key";
 const TLS_SERVER_CERT: &str = "server.crt";
 const TLS_SERVER_KEY: &str = "private/server.key";
+#[cfg(feature = "https-bind")]
+const TLS_REST_API_CERT: &str = "rest_api.crt";
+#[cfg(feature = "https-bind")]
+const TLS_REST_API_KEY: &str = "private/rest_api.key";
 const TLS_CA_FILE: &str = "ca.pem";
 
 const REST_API_ENDPOINT: &str = "127.0.0.1:8080";
@@ -72,6 +76,13 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_no_tls(Some(false))
             .with_strict_ref_counts(Some(false));
 
+        #[cfg(feature = "https-bind")]
+        {
+            partial_config = partial_config
+                .with_tls_rest_api_cert(Some(String::from(TLS_REST_API_CERT)))
+                .with_tls_rest_api_key(Some(String::from(TLS_REST_API_KEY)));
+        }
+
         #[cfg(feature = "service-endpoint")]
         {
             partial_config =
@@ -112,6 +123,17 @@ mod tests {
             Some(String::from(TLS_SERVER_CERT))
         );
         assert_eq!(config.tls_server_key(), Some(String::from(TLS_SERVER_KEY)));
+        #[cfg(feature = "https-bind")]
+        {
+            assert_eq!(
+                config.tls_rest_api_cert(),
+                Some(String::from(TLS_REST_API_CERT))
+            );
+            assert_eq!(
+                config.tls_rest_api_key(),
+                Some(String::from(TLS_REST_API_KEY))
+            );
+        }
         #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),

@@ -231,6 +231,15 @@ OPTIONS
 : Specifies the path and file name for the server key.
   (Default: `/etc/splinter/certs/server.key`.)
 
+`--tls-rest-api-cert REST-API-CERT`
+: Specifies the path and file name for the REST API certificate, which is used by
+  `splinterd` when it is hosting the REST API over HTTPS.
+  (Default: `/etc/splinter/certs/rest_api.crt`.)
+
+`--tls-rest-api-key REST-API-KEY`
+: Specifies the path and file name for the REST API key.
+  (Default: `/etc/splinter/certs/rest_api.key`.)
+
 `--whitelist WHITELIST` `[,...]`
 : Lists one or more trusted domains for cross-origin resource sharing (CORS).
   This option allows the specified domains to access restricted web resources

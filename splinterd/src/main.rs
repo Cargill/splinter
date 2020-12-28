@@ -324,6 +324,24 @@ fn main() {
             .long_help("Enable the biome subsystem"),
     );
 
+    #[cfg(feature = "https-bind")]
+    let app = app.arg(
+        Arg::with_name("tls_rest_api_cert")
+            .long("tls-rest-api-cert")
+            .help("File path to the certificate for the node's REST API.")
+            .takes_value(true)
+            .alias("rest-api-cert"),
+    );
+
+    #[cfg(feature = "https-bind")]
+    let app = app.arg(
+        Arg::with_name("tls_rest_api_key")
+            .long("tls-rest-api-key")
+            .help("File path to the key for the node's REST API.")
+            .takes_value(true)
+            .alias("rest-api-key"),
+    );
+
     #[cfg(feature = "rest-api-cors")]
     let app = app.arg(
         Arg::with_name("whitelist")
@@ -381,6 +399,8 @@ fn main() {
     log_spec_builder.default(log_level);
     log_spec_builder.module("hyper", log::LevelFilter::Warn);
     log_spec_builder.module("tokio", log::LevelFilter::Warn);
+    #[cfg(feature = "https-bind")]
+    log_spec_builder.module("h2", log::LevelFilter::Warn);
 
     Logger::with(log_spec_builder.build())
         .format(log_format)
@@ -453,6 +473,13 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_heartbeat(config.heartbeat())
         .with_admin_timeout(admin_timeout)
         .with_strict_ref_counts(config.strict_ref_counts());
+
+    #[cfg(feature = "https-bind")]
+    {
+        daemon_builder = daemon_builder
+            .with_rest_api_server_cert(config.tls_rest_api_cert().to_string())
+            .with_rest_api_server_key(config.tls_rest_api_key().to_string());
+    }
 
     #[cfg(feature = "service-endpoint")]
     {

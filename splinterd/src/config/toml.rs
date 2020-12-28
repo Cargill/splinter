@@ -35,6 +35,10 @@ struct TomlConfig {
     tls_client_key: Option<String>,
     tls_server_cert: Option<String>,
     tls_server_key: Option<String>,
+    #[cfg(feature = "https-bind")]
+    tls_rest_api_cert: Option<String>,
+    #[cfg(feature = "https-bind")]
+    tls_rest_api_key: Option<String>,
     #[cfg(feature = "service-endpoint")]
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
@@ -144,6 +148,13 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_heartbeat(self.toml_config.heartbeat)
             .with_admin_timeout(self.toml_config.admin_timeout);
 
+        #[cfg(feature = "https-bind")]
+        {
+            partial_config = partial_config
+                .with_tls_rest_api_cert(self.toml_config.tls_rest_api_cert)
+                .with_tls_rest_api_key(self.toml_config.tls_rest_api_key);
+        }
+
         #[cfg(feature = "service-endpoint")]
         {
             partial_config = partial_config.with_service_endpoint(self.toml_config.service_endpoint)
@@ -230,6 +241,10 @@ mod tests {
     static EXAMPLE_CLIENT_KEY: &str = "certs/client.key";
     static EXAMPLE_SERVER_CERT: &str = "certs/server.crt";
     static EXAMPLE_SERVER_KEY: &str = "certs/server.key";
+    #[cfg(feature = "https-bind")]
+    static EXAMPLE_REST_API_CERT: &str = "certs/rest_api.crt";
+    #[cfg(feature = "https-bind")]
+    static EXAMPLE_REST_API_KEY: &str = "certs/rest_api.key";
     #[cfg(feature = "service-endpoint")]
     static EXAMPLE_SERVICE_ENDPOINT: &str = "127.0.0.1:8043";
     static EXAMPLE_NODE_ID: &str = "012";
@@ -254,6 +269,16 @@ mod tests {
                 EXAMPLE_SERVER_CERT.to_string(),
             ),
             ("tls_server_key".to_string(), EXAMPLE_SERVER_KEY.to_string()),
+            #[cfg(feature = "https-bind")]
+            (
+                "tls_rest_api_cert".to_string(),
+                EXAMPLE_REST_API_CERT.to_string(),
+            ),
+            #[cfg(feature = "https-bind")]
+            (
+                "tls_rest_api_key".to_string(),
+                EXAMPLE_REST_API_KEY.to_string(),
+            ),
             #[cfg(feature = "service-endpoint")]
             (
                 "service_endpoint".to_string(),
@@ -331,6 +356,17 @@ mod tests {
             config.tls_server_key(),
             Some(EXAMPLE_SERVER_KEY.to_string())
         );
+        #[cfg(feature = "https-bind")]
+        {
+            assert_eq!(
+                config.tls_rest_api_cert(),
+                Some(EXAMPLE_REST_API_CERT.to_string())
+            );
+            assert_eq!(
+                config.tls_rest_api_key(),
+                Some(EXAMPLE_REST_API_KEY.to_string())
+            );
+        }
         #[cfg(feature = "service-endpoint")]
         assert_eq!(
             config.service_endpoint(),

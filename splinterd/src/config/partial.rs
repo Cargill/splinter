@@ -41,6 +41,10 @@ pub struct PartialConfig {
     tls_client_key: Option<String>,
     tls_server_cert: Option<String>,
     tls_server_key: Option<String>,
+    #[cfg(feature = "https-bind")]
+    tls_rest_api_cert: Option<String>,
+    #[cfg(feature = "https-bind")]
+    tls_rest_api_key: Option<String>,
     #[cfg(feature = "service-endpoint")]
     service_endpoint: Option<String>,
     network_endpoints: Option<Vec<String>>,
@@ -89,6 +93,10 @@ impl PartialConfig {
             tls_client_key: None,
             tls_server_cert: None,
             tls_server_key: None,
+            #[cfg(feature = "https-bind")]
+            tls_rest_api_cert: None,
+            #[cfg(feature = "https-bind")]
+            tls_rest_api_key: None,
             #[cfg(feature = "service-endpoint")]
             service_endpoint: None,
             network_endpoints: None,
@@ -159,6 +167,16 @@ impl PartialConfig {
 
     pub fn tls_server_key(&self) -> Option<String> {
         self.tls_server_key.clone()
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn tls_rest_api_cert(&self) -> Option<String> {
+        self.tls_rest_api_cert.clone()
+    }
+
+    #[cfg(feature = "https-bind")]
+    pub fn tls_rest_api_key(&self) -> Option<String> {
+        self.tls_rest_api_key.clone()
     }
 
     #[cfg(feature = "service-endpoint")]
@@ -353,6 +371,31 @@ impl PartialConfig {
     ///
     pub fn with_tls_server_key(mut self, tls_server_key: Option<String>) -> Self {
         self.tls_server_key = tls_server_key;
+        self
+    }
+
+    /// Adds a `tls_rest_api_cert` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `tls_rest_api_cert` - A certificate signed by a certificate authority. Used by the daemon
+    ///                   when it is acting as a rest_api, receiving messages.
+    ///
+    #[cfg(feature = "https-bind")]
+    pub fn with_tls_rest_api_cert(mut self, tls_rest_api_cert: Option<String>) -> Self {
+        self.tls_rest_api_cert = tls_rest_api_cert;
+        self
+    }
+
+    /// Adds a `tls_rest_api_key` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `tls_rest_api_key` - Private key used by daemon when it is acting as a rest_api.
+    ///
+    #[cfg(feature = "https-bind")]
+    pub fn with_tls_rest_api_key(mut self, tls_rest_api_key: Option<String>) -> Self {
+        self.tls_rest_api_key = tls_rest_api_key;
         self
     }
 
