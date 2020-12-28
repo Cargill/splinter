@@ -182,11 +182,22 @@ impl IdentityProvider for OAuthUserIdentityProvider {
 mod tests {
     use super::*;
 
+    use std::sync::mpsc::channel;
+    use std::thread::JoinHandle;
+
+    use actix::System;
+    use actix_web::{dev::Server, web, App, HttpResponse, HttpServer};
+    use futures::Future;
+
     use crate::biome::oauth::store::InsertableOAuthUserSessionBuilder;
     use crate::biome::MemoryOAuthUserSessionStore;
     use crate::oauth::{
         store::MemoryInflightOAuthRequestStore, OAuthClientBuilder, SubjectProvider,
     };
+
+    const TOKEN_ENDPOINT: &str = "/token";
+    const REFRESH_TOKEN: &str = "refresh_token";
+    const NEW_OAUTH_ACCESS_TOKEN: &str = "new_oauth_access_token";
 
     /// Verifies that the `OAuthUserIdentityProvider` returns a cached user identity when a session
     /// does not need to be re-authenticated.
@@ -309,10 +320,10 @@ mod tests {
     }
 
     /// Verifies that the `OAuthUserIdentityProvider` correctly handles the case where the internal
-    /// subect provider returns `Ok(None)` when re-authenticating a session.
+    /// subect provider returns `Ok(None)` when re-authenticating a session without a refresh token.
     ///
     /// 1. Create a new `OAuthUserSessionStore`
-    /// 2. Add a session to the store
+    /// 2. Add a session without a refresh token to the store
     /// 3. Create a new `OAuthUserIdentityProvider` with the session store, an OAuth client
     ///    that always returns `Ok(None)` when getting a subject, and a re-authentication interval
     ///    of 0 (the session will expire immediately).
@@ -397,6 +408,147 @@ mod tests {
             .is_none());
     }
 
+    /// Verifies that the `OAuthUserIdentityProvider` correctly handles the case where
+    /// re-authentication is required and a session's refresh token must be used to get a new access
+    /// token.
+    ///
+    /// 1. Start the mock OAuth server
+    /// 2. Create a new `OAuthUserSessionStore`
+    /// 3. Add a session with a refresh token to the store
+    /// 4. Create a new OAuthClient with a subject provider that only returns an identity for the
+    ///    refreshed OAuth access token.
+    /// 5. Create a new `OAuthUserIdentityProvider` with the session store, the OAuth client, and a
+    ///    re-authentication interval of 0 (the session will expire immediately).
+    /// 6. Call the `get_identity` method with the session's access token and verify that the
+    ///    identity is correct.
+    /// 7. Verify that the "last authenticated" time for the session in the session store is more
+    ///    recent than the session's original "last authenticated" time.
+    /// 8. Verify that the session's OAuth access token has been updated to the correct value.
+    /// 9. Stop the mock OAuth server
+    #[test]
+    fn get_identity_refresh_successful() {
+        let (shutdown_handle, address) = run_mock_oauth_server("get_identity_refresh_successful");
+
+        let session_store = Box::new(MemoryOAuthUserSessionStore::new());
+
+        let splinter_access_token = "splinter_access_token";
+        let session = InsertableOAuthUserSessionBuilder::new()
+            .with_splinter_access_token(splinter_access_token.into())
+            .with_subject("subject".into())
+            .with_oauth_access_token("oauth_access_token".into())
+            .with_oauth_refresh_token(Some(REFRESH_TOKEN.into()))
+            .build()
+            .expect("Failed to build session");
+        session_store
+            .add_session(session)
+            .expect("Failed to add session");
+        let original_session = session_store
+            .get_session(splinter_access_token)
+            .expect("Failed to get inserted session")
+            .expect("Inserted session not found");
+
+        let client = OAuthClientBuilder::new()
+            .with_client_id("client_id".into())
+            .with_client_secret("client_secret".into())
+            .with_auth_url("http://test.com/auth".into())
+            .with_redirect_url("http://test.com/redirect".into())
+            .with_token_url(format!("{}{}", address, TOKEN_ENDPOINT))
+            .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .build()
+            .expect("Failed to build OAuth client");
+
+        let identity_provider = OAuthUserIdentityProvider::new(
+            client,
+            session_store.clone(),
+            Some(Duration::from_secs(0)),
+        );
+
+        let authorization_header =
+            AuthorizationHeader::Bearer(BearerToken::OAuth2(splinter_access_token.into()));
+        let identity = identity_provider
+            .get_identity(&authorization_header)
+            .expect("Failed to get identity")
+            .expect("Identity not found");
+        assert_eq!(&identity, original_session.user().user_id());
+
+        let new_session = session_store
+            .get_session(splinter_access_token)
+            .expect("Failed to get updated session")
+            .expect("Updated session not found");
+        assert!(new_session.last_authenticated() > original_session.last_authenticated());
+
+        assert_eq!(new_session.oauth_access_token(), NEW_OAUTH_ACCESS_TOKEN);
+
+        shutdown_handle.shutdown();
+    }
+
+    /// Verifies that the `OAuthUserIdentityProvider` correctly handles the case where
+    /// re-authentication is required and the OAuth client fails to exchange the session's refresh
+    /// token for a new access token.
+    ///
+    /// 1. Start the mock OAuth server
+    /// 2. Create a new `OAuthUserSessionStore`
+    /// 3. Add a session with an unknown refresh token to the store (the mock OAuth server checks
+    ///    the refresh token, so an unknown token will cause the refresh to fail)
+    /// 4. Create a new OAuthClient with a subject provider that only returns an identity for the
+    ///    refreshed OAuth access token.
+    /// 5. Create a new `OAuthUserIdentityProvider` with the session store, the OAuth client, and a
+    ///    re-authentication interval of 0 (the session will expire immediately).
+    /// 6. Call the `get_identity` method with the session's access token and verify that `Ok(None)`
+    ///    is returned.
+    /// 7. Verify that the session has been removed from the store.
+    /// 8. Stop the mock OAuth server
+    #[test]
+    fn get_identity_refresh_failed() {
+        let (shutdown_handle, address) = run_mock_oauth_server("get_identity_refresh_successful");
+
+        let session_store = Box::new(MemoryOAuthUserSessionStore::new());
+
+        let splinter_access_token = "splinter_access_token";
+        let session = InsertableOAuthUserSessionBuilder::new()
+            .with_splinter_access_token(splinter_access_token.into())
+            .with_subject("subject".into())
+            .with_oauth_access_token("oauth_access_token".into())
+            .with_oauth_refresh_token(Some("unknown_refresh_token".into()))
+            .build()
+            .expect("Failed to build session");
+        session_store
+            .add_session(session)
+            .expect("Failed to add session");
+
+        let client = OAuthClientBuilder::new()
+            .with_client_id("client_id".into())
+            .with_client_secret("client_secret".into())
+            .with_auth_url("http://test.com/auth".into())
+            .with_redirect_url("http://test.com/redirect".into())
+            .with_token_url(format!("{}{}", address, TOKEN_ENDPOINT))
+            .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
+            .build()
+            .expect("Failed to build OAuth client");
+
+        let identity_provider = OAuthUserIdentityProvider::new(
+            client,
+            session_store.clone(),
+            Some(Duration::from_secs(0)),
+        );
+
+        let authorization_header =
+            AuthorizationHeader::Bearer(BearerToken::OAuth2(splinter_access_token.into()));
+        assert!(identity_provider
+            .get_identity(&authorization_header)
+            .expect("Failed to get identity")
+            .is_none());
+
+        assert!(session_store
+            .get_session(splinter_access_token)
+            .expect("Failed to get session")
+            .is_none());
+
+        shutdown_handle.shutdown();
+    }
+
     /// Returns a mock OAuth client that wraps an `AlwaysSomeSubjectProvider`
     fn always_some_client() -> OAuthClient {
         OAuthClientBuilder::new()
@@ -478,6 +630,86 @@ mod tests {
 
         fn clone_box(&self) -> Box<dyn SubjectProvider> {
             Box::new(self.clone())
+        }
+    }
+
+    /// Subject provider that returns a subject when the new `NEW_OAUTH_ACCESS_TOKEN` is provided;
+    /// returns `Ok(None)` otherwise.
+    #[derive(Clone)]
+    struct RefreshedTokenSubjectProvider;
+
+    impl SubjectProvider for RefreshedTokenSubjectProvider {
+        fn get_subject(&self, access_token: &str) -> Result<Option<String>, InternalError> {
+            if access_token == NEW_OAUTH_ACCESS_TOKEN {
+                Ok(Some("subject".into()))
+            } else {
+                Ok(None)
+            }
+        }
+
+        fn clone_box(&self) -> Box<dyn SubjectProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// Runs a mock OAuth server and returns its shutdown handle along with the address the server
+    /// is running on.
+    fn run_mock_oauth_server(test_name: &str) -> (OAuthServerShutdownHandle, String) {
+        let (tx, rx) = channel();
+
+        let instance_name = format!("OAuth-Server-{}", test_name);
+        let join_handle = std::thread::Builder::new()
+            .name(instance_name.clone())
+            .spawn(move || {
+                let sys = System::new(instance_name);
+                let server = HttpServer::new(|| {
+                    App::new().service(web::resource(TOKEN_ENDPOINT).to(token_endpoint))
+                })
+                .bind("127.0.0.1:0")
+                .expect("Failed to bind OAuth server");
+                let address = format!("http://127.0.0.1:{}", server.addrs()[0].port());
+                let server = server.disable_signals().system_exit().start();
+                tx.send((server, address)).expect("Failed to send server");
+                sys.run().expect("OAuth server runtime failed");
+            })
+            .expect("Failed to spawn OAuth server thread");
+
+        let (server, address) = rx.recv().expect("Failed to receive server");
+
+        (OAuthServerShutdownHandle(server, join_handle), address)
+    }
+
+    /// The handler for the OAuth server's token endpoint. This endpoint receives the request
+    /// parameters as a form, since that's how the OAuth2 crate sends the request.
+    fn token_endpoint(form: web::Form<TokenRequestForm>) -> HttpResponse {
+        assert_eq!(&form.grant_type, "refresh_token");
+        if &form.refresh_token == REFRESH_TOKEN {
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .json(json!({
+                    "token_type": "bearer",
+                    "access_token": NEW_OAUTH_ACCESS_TOKEN,
+                }))
+        } else {
+            HttpResponse::Unauthorized().finish()
+        }
+    }
+
+    #[derive(Deserialize)]
+    struct TokenRequestForm {
+        grant_type: String,
+        refresh_token: String,
+    }
+
+    struct OAuthServerShutdownHandle(Server, JoinHandle<()>);
+
+    impl OAuthServerShutdownHandle {
+        pub fn shutdown(self) {
+            self.0
+                .stop(false)
+                .wait()
+                .expect("Failed to stop OAuth server");
+            self.1.join().expect("OAuth server thread failed");
         }
     }
 }
