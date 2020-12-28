@@ -17,7 +17,7 @@
 use actix_web::{HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 
-use crate::biome::oauth::store::OAuthUserSessionStore;
+use crate::biome::oauth::store::{OAuthUserSessionStore, OAuthUserSessionStoreError};
 use crate::protocol;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
@@ -36,7 +36,9 @@ pub fn make_logout_route(oauth_user_session_store: Box<dyn OAuthUserSessionStore
 
             Box::new(
                 match oauth_user_session_store.remove_session(&access_token) {
-                    Ok(()) => HttpResponse::Ok()
+                    // `InvalidState` means there's no session for this token; we return `200 Ok`
+                    // here because session removal is idempotent.
+                    Ok(()) | Err(OAuthUserSessionStoreError::InvalidState(_)) => HttpResponse::Ok()
                         .json(json!({
                             "message": "User successfully logged out"
                         }))
