@@ -14,9 +14,8 @@
 
 use crate::oauth::{
     builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
-    OAuthClient,
+    GithubSubjectProvider, OAuthClient, SubjectProvider,
 };
-use crate::rest_api::auth::identity::{github::GithubUserIdentityProvider, IdentityProvider};
 
 /// Builds a new `OAuthClient` with GitHub's authorization and token URLs.
 pub struct GithubOAuthClientBuilder {
@@ -30,7 +29,7 @@ impl GithubOAuthClientBuilder {
             inner: OAuthClientBuilder::new()
                 .with_auth_url("https://github.com/login/oauth/authorize".into())
                 .with_token_url("https://github.com/login/oauth/access_token".into())
-                .with_identity_provider(Box::new(GithubUserIdentityProvider)),
+                .with_subject_provider(Box::new(GithubSubjectProvider)),
         }
     }
 
@@ -74,7 +73,7 @@ impl GithubOAuthClientBuilder {
     ///
     /// Returns an [`OAuthClientBuildError`] if there are required fields missing, or any URL's
     /// provided are invalid.
-    pub fn build(self) -> Result<(OAuthClient, Box<dyn IdentityProvider>), OAuthClientBuildError> {
+    pub fn build(self) -> Result<(OAuthClient, Box<dyn SubjectProvider>), OAuthClientBuildError> {
         self.inner.build()
     }
 }

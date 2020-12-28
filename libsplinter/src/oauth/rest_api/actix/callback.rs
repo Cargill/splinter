@@ -46,21 +46,21 @@ pub fn make_callback_route(
                                 // Generate a Splinter access token for the new session
                                 let splinter_access_token = new_splinter_access_token();
 
-                                // Adding the token and identity to the redirect URL so the client
+                                // Adding the token and subject to the redirect URL so the client
                                 // may access these values after a redirect
                                 let redirect_url = format!(
                                     "{}?{}",
                                     redirect_url,
                                     generate_redirect_query(
                                         &splinter_access_token,
-                                        user_info.identity()
+                                        user_info.subject()
                                     )
                                 );
 
                                 // Save the new session
                                 match InsertableOAuthUserSessionBuilder::new()
                                     .with_splinter_access_token(splinter_access_token)
-                                    .with_subject(user_info.identity().to_string())
+                                    .with_subject(user_info.subject().to_string())
                                     .with_oauth_access_token(user_info.access_token().to_string())
                                     .with_oauth_refresh_token(
                                         user_info.refresh_token().map(ToOwned::to_owned),

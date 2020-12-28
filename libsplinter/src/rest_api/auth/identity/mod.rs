@@ -18,12 +18,8 @@
 pub mod biome;
 #[cfg(feature = "cylinder-jwt")]
 pub mod cylinder;
-#[cfg(feature = "oauth-github")]
-pub mod github;
 #[cfg(feature = "oauth")]
 pub mod oauth;
-#[cfg(feature = "oauth-openid")]
-pub mod openid;
 
 use crate::error::InternalError;
 
@@ -32,7 +28,7 @@ use super::AuthorizationHeader;
 /// A service that fetches identities from a backing provider
 pub trait IdentityProvider: Send + Sync {
     /// Attempts to get the identity that corresponds to the given authorization header. This method
-    /// will  return `Ok(None)` if the identity provider was not able to resolve the authorization
+    /// will return `Ok(None)` if the identity provider was not able to resolve the authorization
     /// to an identity.
     fn get_identity(
         &self,

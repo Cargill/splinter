@@ -233,13 +233,19 @@ pub mod tests {
         oauth_user_session_store
             .add_session(session)
             .expect("Unable to add session");
+        let session = oauth_user_session_store
+            .get_session(splinter_access_token)
+            .expect("Unable to get session")
+            .expect("Session not found");
+        let originally_authenticated = session.last_authenticated();
+
+        // Wait for a few seconds so we can check that the timestamp changes (graunularity of the
+        // timestamp is seconds)
+        std::thread::sleep(std::time::Duration::from_secs(5));
 
         let updated_oauth_access_token = "updated_oauth_access_token";
         let updated_oauth_refresh_token = "updated_oauth_refresh_token";
-        let updated_session = oauth_user_session_store
-            .get_session(splinter_access_token)
-            .expect("Unable to get session")
-            .expect("Session not found")
+        let updated_session = session
             .into_update_builder()
             .with_oauth_access_token(updated_oauth_access_token.into())
             .with_oauth_refresh_token(Some(updated_oauth_refresh_token.into()))
@@ -260,6 +266,7 @@ pub mod tests {
             updated_session.oauth_refresh_token(),
             Some(updated_oauth_refresh_token)
         );
+        assert!(updated_session.last_authenticated() > originally_authenticated);
 
         let non_existent_session = InsertableOAuthUserSessionBuilder::new()
             .with_splinter_access_token("NonExistentToken".into())

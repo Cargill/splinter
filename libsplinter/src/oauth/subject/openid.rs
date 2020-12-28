@@ -15,36 +15,27 @@
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
-use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::IdentityProvider;
+use super::SubjectProvider;
 
 #[derive(Clone)]
-pub struct OpenIdUserIdentityProvider {
+pub struct OpenIdSubjectProvider {
     userinfo_endpoint: String,
 }
 
-impl OpenIdUserIdentityProvider {
-    pub fn new(userinfo_endpoint: String) -> OpenIdUserIdentityProvider {
-        OpenIdUserIdentityProvider { userinfo_endpoint }
+impl OpenIdSubjectProvider {
+    pub fn new(userinfo_endpoint: String) -> OpenIdSubjectProvider {
+        OpenIdSubjectProvider { userinfo_endpoint }
     }
 }
 
-impl IdentityProvider for OpenIdUserIdentityProvider {
-    fn get_identity(
-        &self,
-        authorization: &AuthorizationHeader,
-    ) -> Result<Option<String>, InternalError> {
-        let token = match authorization {
-            AuthorizationHeader::Bearer(BearerToken::OAuth2(token)) => token,
-            _ => return Ok(None),
-        };
-
+impl SubjectProvider for OpenIdSubjectProvider {
+    fn get_subject(&self, access_token: &str) -> Result<Option<String>, InternalError> {
         let response = Client::builder()
             .build()
             .map_err(|err| InternalError::from_source(err.into()))?
             .get(&self.userinfo_endpoint)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {}", access_token))
             .send()
             .map_err(|err| InternalError::from_source(err.into()))?;
 
@@ -60,15 +51,15 @@ impl IdentityProvider for OpenIdUserIdentityProvider {
             }
         }
 
-        let user_identity = response
+        let subject = response
             .json::<UserResponse>()
             .map_err(|_| InternalError::with_message("Received unexpected response body".into()))?
             .sub;
 
-        Ok(Some(user_identity))
+        Ok(Some(subject))
     }
 
-    fn clone_box(&self) -> Box<dyn IdentityProvider> {
+    fn clone_box(&self) -> Box<dyn SubjectProvider> {
         Box::new(self.clone())
     }
 }
