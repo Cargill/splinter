@@ -1205,7 +1205,7 @@ mod test {
     #[cfg(feature = "auth")]
     use crate::error::InternalError;
     #[cfg(feature = "auth")]
-    use crate::rest_api::auth::AuthorizationHeader;
+    use crate::rest_api::auth::{identity::Identity, AuthorizationHeader};
 
     #[test]
     fn test_resource() {
@@ -1282,8 +1282,8 @@ mod test {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
-            Ok(Some("".into()))
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("".into())))
         }
 
         /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for

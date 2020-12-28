@@ -22,13 +22,13 @@ use std::str::FromStr;
 
 use crate::error::{InternalError, InvalidArgumentError};
 
-use identity::IdentityProvider;
+use identity::{Identity, IdentityProvider};
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
     /// The client was authorized to the given identity based on the authorization header
     Authorized {
-        identity: String,
+        identity: Identity,
         authorization: AuthorizationHeader,
     },
     /// The requested endpoint does not require authorization
@@ -440,7 +440,7 @@ mod tests {
         ));
     }
 
-    /// An identity provider that always returns `Ok(Some("identity"))`
+    /// An identity provider that always returns `Ok(Some(_))`
     #[derive(Clone)]
     struct AlwaysAcceptIdentityProvider;
 
@@ -448,8 +448,8 @@ mod tests {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
-            Ok(Some("identity".into()))
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("identity".into())))
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
@@ -465,7 +465,7 @@ mod tests {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
+        ) -> Result<Option<Identity>, InternalError> {
             Ok(None)
         }
 
@@ -482,7 +482,7 @@ mod tests {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
+        ) -> Result<Option<Identity>, InternalError> {
             Err(InternalError::with_message("failed".into()))
         }
 

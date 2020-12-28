@@ -200,7 +200,7 @@ where
                         );
                     }
                 }
-                debug!("Authenticated user {}", identity);
+                debug!("Authenticated user {:?}", identity);
             }
             AuthorizationResult::NoAuthorizationNecessary => {}
             AuthorizationResult::Unauthorized => {
@@ -231,6 +231,8 @@ mod tests {
     use super::*;
 
     use actix_web::{http::StatusCode, test, web, App, HttpRequest};
+
+    use crate::rest_api::auth::identity::Identity;
 
     /// Verifies that the authorization middleware sets the `Access-Control-Allow-Credentials: true`
     /// header for `OPTIONS` requests.
@@ -304,7 +306,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
-    /// An identity provider that always returns `Ok(Some("identity"))`
+    /// An identity provider that always returns `Ok(Some(_))`
     #[derive(Clone)]
     struct AlwaysAcceptIdentityProvider;
 
@@ -312,8 +314,8 @@ mod tests {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
-            Ok(Some("identity".into()))
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("identity".into())))
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {

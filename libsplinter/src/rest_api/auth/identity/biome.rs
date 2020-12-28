@@ -25,7 +25,7 @@ use crate::rest_api::{
     sessions::Claims,
 };
 
-use super::IdentityProvider;
+use super::{Identity, IdentityProvider};
 
 /// Extracts the user ID from a Biome JWT
 ///
@@ -51,7 +51,7 @@ impl IdentityProvider for BiomeUserIdentityProvider {
     fn get_identity(
         &self,
         authorization: &AuthorizationHeader,
-    ) -> Result<Option<String>, InternalError> {
+    ) -> Result<Option<Identity>, InternalError> {
         let token = match authorization {
             AuthorizationHeader::Bearer(BearerToken::Biome(token)) => token,
             _ => return Ok(None),
@@ -63,7 +63,7 @@ impl IdentityProvider for BiomeUserIdentityProvider {
             .map_err(|err| InternalError::from_source(err.into()))?;
 
         Ok(decode::<Claims>(&token, secret.as_ref(), &self.validation)
-            .map(|token_data| token_data.claims.user_id())
+            .map(|token_data| Identity::User(token_data.claims.user_id()))
             .ok())
     }
 
