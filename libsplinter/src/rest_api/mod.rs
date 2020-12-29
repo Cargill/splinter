@@ -946,15 +946,7 @@ impl RestApiBuilder {
                                 .with_client_secret(client_secret)
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
-                                .build()
-                                .map_err(|err| {
-                                    RestApiServerError::InvalidStateError(
-                                        InvalidStateError::with_message(format!(
-                                            "Invalid OpenID OAuth config provided: {}",
-                                            err
-                                        )),
-                                    )
-                                })?,
+                                .build()?,
                             #[cfg(feature = "oauth-github")]
                             OAuthConfig::GitHub {
                                 client_id,
@@ -966,15 +958,7 @@ impl RestApiBuilder {
                                 .with_client_secret(client_secret)
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
-                                .build()
-                                .map_err(|err| {
-                                    RestApiServerError::InvalidStateError(
-                                        InvalidStateError::with_message(format!(
-                                            "Invalid GitHub OAuth config provided: {}",
-                                            err
-                                        )),
-                                    )
-                                })?,
+                                .build()?,
                             #[cfg(feature = "oauth-openid")]
                             OAuthConfig::Google {
                                 client_id,
@@ -986,15 +970,7 @@ impl RestApiBuilder {
                                 .with_client_secret(client_secret)
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
-                                .build()
-                                .map_err(|err| {
-                                    RestApiServerError::InvalidStateError(
-                                        InvalidStateError::with_message(format!(
-                                            "Invalid OpenID OAuth config provided: {}",
-                                            err
-                                        )),
-                                    )
-                                })?,
+                                .build()?,
                             #[cfg(feature = "oauth-openid")]
                             OAuthConfig::OpenId {
                                 client_id,
@@ -1008,15 +984,7 @@ impl RestApiBuilder {
                                 .with_client_secret(client_secret)
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
-                                .build()
-                                .map_err(|err| {
-                                    RestApiServerError::InvalidStateError(
-                                        InvalidStateError::with_message(format!(
-                                            "Invalid OpenID OAuth config provided: {}",
-                                            err
-                                        )),
-                                    )
-                                })?,
+                                .build()?,
                         };
 
                         // Add the configuration mapping for the Biome User value.
