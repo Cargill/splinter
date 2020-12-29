@@ -324,6 +324,12 @@ Cylinder JWT, and OAuth.
 
 Cylinder JWT authorization is enabled by default.
 
+A Cylinder JWT is a custom JSON Web Token implementation which supports the
+signing algorithms provided by the Cylinder library. This includes secp256k1
+which is currently used for signing transactions and Splinter administrative
+payloads. This allows the same signing key to be used as an authorization
+identity.
+
 Biome credentials for the splinter REST API can be enabled using the
 `--enable-biome` flag.
 
