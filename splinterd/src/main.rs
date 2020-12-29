@@ -359,7 +359,7 @@ fn main() {
                 .long("oauth-provider")
                 .long_help("The OAuth provider used by the REST API")
                 .takes_value(true)
-                .possible_values(&["github", "openid"]),
+                .possible_values(&["azure", "github", "google", "openid"]),
         )
         .arg(
             Arg::with_name("oauth_client_id")
@@ -382,7 +382,7 @@ fn main() {
         .arg(
             Arg::with_name("oauth_openid_url")
                 .long("oauth-openid-url")
-                .long_help("URL for the OAuth provider's discovery document used by the REST API")
+                .long_help("URL for an OpenID discovery document used by the REST API")
                 .takes_value(true),
         );
 

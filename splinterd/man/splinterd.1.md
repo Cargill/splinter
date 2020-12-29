@@ -164,11 +164,12 @@ OPTIONS
 
 `--oauth-openid-url OAUTH-OPENID-URL`
 : OpenID discovery document URL for the OAuth provider used by the REST API.
-  This option is required when `--oauth-provider openid` is used.
+  This option is required when `--oauth-provider azure` or
+  `--oauth-provider openid` is used.
 
 `--oauth-provider OAUTH-PROVIDER`
-: Specifies the OAuth provider used by the REST API. Accepted values: `github`,
-  `openid`.
+: Specifies the OAuth provider used by the REST API. Accepted values: `azure`,
+  `github`, `google`, `openid`.
 
 `--oauth-redirect-url OAUTH-REDIRECT-URL`
 : Redirect URL for the OAuth provider used by the REST API.
@@ -330,7 +331,8 @@ Biome credentials for the splinter REST API can be enabled using the
 The Splinter daemon provides 5 options for configuring OAuth for the REST API:
 
 * `oauth-provider` for specifying the OAuth provider that splinterd will use to
-  get the client's identity. Currently, `github` and `openid` are supported.
+  get the client's identity. Currently, `azure`, `github`, `google`, and
+  `openid` are supported.
 
 * `oauth-client-id` for specifying the client ID, which is a public identifier
   for an app that's registered with the chosen OAuth provider.
@@ -343,8 +345,8 @@ The Splinter daemon provides 5 options for configuring OAuth for the REST API:
 
 * `oauth-openid-url` for specifying the OpenID discovery document URL that will
   be used to find the OAuth and OpenID endpoints for authentication. This option
-  is required if the `oauth-provider` option is set to `openid`; if a different
-  provider is configured, this option will have no effect.
+  is required if the `oauth-provider` option is set to `azure` or `openid`; if a
+  different provider is configured, this option will have no effect.
 
 The first 4 of the above arguments (provider, client ID, client secret, and
 redirect URL) must be provided when using OAuth authorization. If some but not
@@ -479,16 +481,22 @@ provider for REST API authentication:
 
 ```
 $ splinterd --node-id mynode \
-  --oauth-provider openid \
+  --oauth-provider google \
+  --oauth-client-id <my-client-id> \
+  --oauth-client-secret <my-client-secret> \
+  --oauth-redirect http://localhost:8080/oauth/callback
+```
+
+Here is how you could configure an Azure OAuth provider:
+
+```
+$ splinterd --node-id mynode \
+  --oauth-provider azure \
   --oauth-client-id <my-client-id> \
   --oauth-client-secret <my-client-secret> \
   --oauth-redirect http://localhost:8080/oauth/callback \
-  --oauth-openid-url https://accounts.google.com/.well-known/openid-configuration
+  --oauth-openid-url https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration
 ```
-
-To configure a different OAuth provider that conforms to the OpenID
-specification, you would start splinterd just like the Google example, but with
-the appropriate OpenID discovery document URL for the desired OAuth provider.
 
 SEE ALSO
 ========

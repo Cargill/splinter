@@ -42,6 +42,7 @@ pub struct OAuthClientBuilder {
     auth_url: Option<String>,
     redirect_url: Option<String>,
     token_url: Option<String>,
+    extra_auth_params: Vec<(String, String)>,
     scopes: Vec<String>,
     subject_provider: Option<Box<dyn SubjectProvider>>,
     inflight_request_store: Option<Box<dyn InflightOAuthRequestStore>>,
@@ -53,13 +54,13 @@ impl OAuthClientBuilder {
         Self::default()
     }
 
-    /// Builds an `OAuthClient` and returns it along with the configured `SubjectProvider`.
+    /// Builds an `OAuthClient`.
     ///
     /// # Errors
     ///
     /// Returns an [`OAuthClientBuildError`] if any of the auth, redirect, or token URLs are
     /// invalid.
-    pub fn build(self) -> Result<(OAuthClient, Box<dyn SubjectProvider>), OAuthClientBuildError> {
+    pub fn build(self) -> Result<OAuthClient, OAuthClientBuildError> {
         let client_id = self.client_id.ok_or_else(|| {
             InvalidStateError::with_message(
                 "A client ID is required to successfully build an OAuthClient".into(),
@@ -96,15 +97,14 @@ impl OAuthClientBuilder {
                     .into(),
             )
         })?;
-        Ok((
-            OAuthClient::new(
-                new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
-                self.scopes,
-                subject_provider.clone(),
-                inflight_request_store,
-            )?,
-            subject_provider,
-        ))
+        OAuthClient::new(
+            new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
+            self.extra_auth_params,
+            self.scopes,
+            subject_provider.clone(),
+            inflight_request_store,
+        )
+        .map_err(OAuthClientBuildError::from)
     }
 
     /// Sets the client ID for the OAuth2 provider.
@@ -134,6 +134,13 @@ impl OAuthClientBuilder {
     /// Sets the token URL for the OAuth2 provider.
     pub fn with_token_url(mut self, token_url: String) -> Self {
         self.token_url = Some(token_url);
+        self
+    }
+
+    /// Sets extra parameters that will be added to an authorization request
+    pub fn with_extra_auth_params(mut self, extra_auth_params: Vec<(String, String)>) -> Self {
+        let mut extra_auth_params = extra_auth_params;
+        self.extra_auth_params.append(&mut extra_auth_params);
         self
     }
 

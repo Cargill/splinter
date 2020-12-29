@@ -89,14 +89,14 @@ use crate::biome::rest_api::BiomeRestResourceManager;
 use crate::biome::{rest_api::auth::GetUserByOAuthAuthorization, OAuthUserSessionStore};
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
+#[cfg(feature = "oauth")]
+use crate::oauth::rest_api::OAuthResourceProvider;
 #[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
 use crate::oauth::store::InflightOAuthRequestStore;
 #[cfg(feature = "oauth-github")]
 use crate::oauth::GithubOAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 use crate::oauth::OpenIdOAuthClientBuilder;
-#[cfg(feature = "oauth")]
-use crate::oauth::{rest_api::OAuthResourceProvider, SubjectProvider};
 #[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
 use auth::identity::cylinder::CylinderKeyIdentityProvider;
 #[cfg(feature = "oauth")]
@@ -932,51 +932,60 @@ impl RestApiBuilder {
                             ));
                         }
 
-                        let (oauth_client, subject_provider): (_, Box<dyn SubjectProvider>) =
-                            match oauth_config {
-                                #[cfg(feature = "oauth-github")]
-                                OAuthConfig::GitHub {
-                                    client_id,
-                                    client_secret,
-                                    redirect_url,
-                                    inflight_request_store,
-                                } => GithubOAuthClientBuilder::new()
-                                    .with_client_id(client_id)
-                                    .with_client_secret(client_secret)
-                                    .with_redirect_url(redirect_url)
-                                    .with_inflight_request_store(inflight_request_store)
-                                    .build()
-                                    .map_err(|err| {
-                                        RestApiServerError::InvalidStateError(
-                                            InvalidStateError::with_message(format!(
-                                                "Invalid GitHub OAuth config provided: {}",
-                                                err
-                                            )),
-                                        )
-                                    })?,
-                                #[cfg(feature = "oauth-openid")]
-                                OAuthConfig::OpenId {
-                                    client_id,
-                                    client_secret,
-                                    redirect_url,
-                                    oauth_openid_url,
-                                    inflight_request_store,
-                                } => OpenIdOAuthClientBuilder::new()
-                                    .with_discovery_url(oauth_openid_url)
-                                    .with_client_id(client_id)
-                                    .with_client_secret(client_secret)
-                                    .with_redirect_url(redirect_url)
-                                    .with_inflight_request_store(inflight_request_store)
-                                    .build()
-                                    .map_err(|err| {
-                                        RestApiServerError::InvalidStateError(
-                                            InvalidStateError::with_message(format!(
-                                                "Invalid OpenID OAuth config provided: {}",
-                                                err
-                                            )),
-                                        )
-                                    })?,
-                            };
+                        let oauth_client = match oauth_config {
+                            #[cfg(feature = "oauth-openid")]
+                            OAuthConfig::Azure {
+                                client_id,
+                                client_secret,
+                                redirect_url,
+                                oauth_openid_url,
+                                inflight_request_store,
+                            } => OpenIdOAuthClientBuilder::new_azure()
+                                .with_discovery_url(oauth_openid_url)
+                                .with_client_id(client_id)
+                                .with_client_secret(client_secret)
+                                .with_redirect_url(redirect_url)
+                                .with_inflight_request_store(inflight_request_store)
+                                .build()?,
+                            #[cfg(feature = "oauth-github")]
+                            OAuthConfig::GitHub {
+                                client_id,
+                                client_secret,
+                                redirect_url,
+                                inflight_request_store,
+                            } => GithubOAuthClientBuilder::new()
+                                .with_client_id(client_id)
+                                .with_client_secret(client_secret)
+                                .with_redirect_url(redirect_url)
+                                .with_inflight_request_store(inflight_request_store)
+                                .build()?,
+                            #[cfg(feature = "oauth-openid")]
+                            OAuthConfig::Google {
+                                client_id,
+                                client_secret,
+                                redirect_url,
+                                inflight_request_store,
+                            } => OpenIdOAuthClientBuilder::new_google()
+                                .with_client_id(client_id)
+                                .with_client_secret(client_secret)
+                                .with_redirect_url(redirect_url)
+                                .with_inflight_request_store(inflight_request_store)
+                                .build()?,
+                            #[cfg(feature = "oauth-openid")]
+                            OAuthConfig::OpenId {
+                                client_id,
+                                client_secret,
+                                redirect_url,
+                                oauth_openid_url,
+                                inflight_request_store,
+                            } => OpenIdOAuthClientBuilder::new()
+                                .with_discovery_url(oauth_openid_url)
+                                .with_client_id(client_id)
+                                .with_client_secret(client_secret)
+                                .with_redirect_url(redirect_url)
+                                .with_inflight_request_store(inflight_request_store)
+                                .build()?,
+                        };
 
                         // Add the configuration mapping for the Biome User value.
                         self.authorization_mappings
@@ -985,7 +994,7 @@ impl RestApiBuilder {
                             ));
 
                         identity_providers.push(Box::new(OAuthUserIdentityProvider::new(
-                            subject_provider,
+                            oauth_client.clone(),
                             oauth_user_session_store.clone(),
                             None,
                         )));
@@ -1082,6 +1091,19 @@ pub enum AuthConfig {
 /// OAuth configurations that are supported out-of-the-box by the Splinter REST API.
 #[cfg(feature = "oauth")]
 pub enum OAuthConfig {
+    #[cfg(feature = "oauth-openid")]
+    Azure {
+        /// The client ID of the Azure OAuth app
+        client_id: String,
+        /// The client secret of the Azure OAuth app
+        client_secret: String,
+        /// The redirect URL that is configured for the Azure OAuth app
+        redirect_url: String,
+        /// The URL of the OpenID discovery document for the Azure OAuth app
+        oauth_openid_url: String,
+        /// The store for in-flight requests
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+    },
     /// OAuth provided by GitHub
     #[cfg(feature = "oauth-github")]
     GitHub {
@@ -1095,14 +1117,25 @@ pub enum OAuthConfig {
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
     #[cfg(feature = "oauth-openid")]
-    OpenId {
-        /// The client ID of the OpenID OAuth app
+    Google {
+        /// The client ID of the Google OAuth app
         client_id: String,
-        /// The client secret of the OpenID OAuth app
+        /// The client secret of the Google OAuth app
         client_secret: String,
-        /// The redirect URL that is configured for the OpenID OAuth app
+        /// The redirect URL that is configured for the Google OAuth app
         redirect_url: String,
-        /// The URL of the OpenID discovery document
+        /// The store for in-flight requests
+        inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+    },
+    #[cfg(feature = "oauth-openid")]
+    OpenId {
+        /// The client ID of the OpenId OAuth app
+        client_id: String,
+        /// The client secret of the OpenId OAuth app
+        client_secret: String,
+        /// The redirect URL that is configured for the OpenId OAuth app
+        redirect_url: String,
+        /// The URL of the OpenID discovery document for the OpenId OAuth app
         oauth_openid_url: String,
         /// The store for in-flight requests
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,

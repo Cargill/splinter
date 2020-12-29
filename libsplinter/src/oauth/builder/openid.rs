@@ -17,8 +17,17 @@ use reqwest::blocking::Client;
 use crate::error::{InternalError, InvalidStateError};
 use crate::oauth::{
     builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
-    OAuthClient, OpenIdSubjectProvider, SubjectProvider,
+    OAuthClient, OpenIdSubjectProvider,
 };
+
+/// The scope required to get a refresh token from an Azure provider.
+const AZURE_SCOPE: &str = "offline_access";
+/// The scopes required to get OpenID user information.
+const DEFAULT_SCOPES: &[&str] = &["openid", "profile", "email"];
+/// The authorization request parameters required to get a refresh token from a Google provider.
+const GOOGLE_AUTH_PARAMS: &[(&str, &str)] = &[("access_type", "offline"), ("prompt", "consent")];
+/// The URL fo the Google OpenID discovery document
+const GOOGLE_DISCOVERY_URL: &str = "https://accounts.google.com/.well-known/openid-configuration";
 
 /// Builds a new `OAuthClient` using an OpenID discovery document.
 pub struct OpenIdOAuthClientBuilder {
@@ -32,6 +41,29 @@ impl OpenIdOAuthClientBuilder {
         Self {
             openid_discovery_url: None,
             inner: OAuthClientBuilder::default(),
+        }
+    }
+
+    /// Constructs a new [`OpenIdOAuthClientBuilder`] that's pre-configured with the scope for
+    /// getting refresh tokens.
+    pub fn new_azure() -> Self {
+        Self {
+            openid_discovery_url: None,
+            inner: OAuthClientBuilder::default().with_scopes(vec![AZURE_SCOPE.into()]),
+        }
+    }
+
+    /// Constructs a new [`OpenIdOAuthClientBuilder`] that's pre-configured with Google's discovery
+    /// URL and the extra authorization code request parameter for getting refresh tokens.
+    pub fn new_google() -> Self {
+        Self {
+            openid_discovery_url: Some(GOOGLE_DISCOVERY_URL.into()),
+            inner: OAuthClientBuilder::default().with_extra_auth_params(
+                GOOGLE_AUTH_PARAMS
+                    .iter()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect(),
+            ),
         }
     }
 
@@ -80,14 +112,13 @@ impl OpenIdOAuthClientBuilder {
         self
     }
 
-    /// Builds an OAuthClient and a [`SubjectProvider`] based on the OpenID provider's discovery
-    /// document.
+    /// Builds an OAuthClient based on the OpenID provider's discovery document.
     ///
     /// # Errors
     ///
     /// Returns an [`OAuthClientBuildError`] if there are required fields missing, if any URL's
     /// provided are invalid or it is unable to load the discovery document.
-    pub fn build(self) -> Result<(OAuthClient, Box<dyn SubjectProvider>), OAuthClientBuildError> {
+    pub fn build(self) -> Result<OAuthClient, OAuthClientBuildError> {
         let discovery_url = self.openid_discovery_url.ok_or_else(|| {
             InvalidStateError::with_message(
                 "An OpenID discovery URL is required to successfully build an OAuthClient".into(),
@@ -117,7 +148,7 @@ impl OpenIdOAuthClientBuilder {
         self.inner
             .with_auth_url(discovery_document_response.authorization_endpoint)
             .with_token_url(discovery_document_response.token_endpoint)
-            .with_scopes(discovery_document_response.scopes_supported)
+            .with_scopes(DEFAULT_SCOPES.iter().map(ToString::to_string).collect())
             .with_subject_provider(Box::new(OpenIdSubjectProvider::new(userinfo_endpoint)))
             .build()
     }
@@ -135,5 +166,4 @@ struct DiscoveryDocumentResponse {
     authorization_endpoint: String,
     token_endpoint: String,
     userinfo_endpoint: String,
-    scopes_supported: Vec<String>,
 }

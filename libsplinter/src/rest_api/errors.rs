@@ -18,6 +18,8 @@ use std::fmt;
 use actix_web::Error as ActixError;
 
 use crate::error::{InternalError, InvalidStateError};
+#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+use crate::oauth::OAuthClientBuildError;
 
 /// Error module for `rest_api`.
 #[derive(Debug)]
@@ -33,6 +35,17 @@ pub enum RestApiServerError {
 impl From<std::io::Error> for RestApiServerError {
     fn from(err: std::io::Error) -> RestApiServerError {
         RestApiServerError::StdError(err)
+    }
+}
+
+#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+impl From<OAuthClientBuildError> for RestApiServerError {
+    fn from(err: OAuthClientBuildError) -> Self {
+        match err {
+            OAuthClientBuildError::InvalidStateError(err) => Self::InvalidStateError(err),
+            OAuthClientBuildError::InternalError(err) => Self::InternalError(err),
+            _ => Self::InternalError(InternalError::from_source(err.into())),
+        }
     }
 }
 
