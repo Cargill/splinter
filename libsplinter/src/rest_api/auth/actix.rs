@@ -18,7 +18,7 @@ use actix_web::dev::*;
 use actix_web::{
     http::{
         header::{self, HeaderValue},
-        Method,
+        Method as ActixMethod,
     },
     Error as ActixError, HttpMessage, HttpResponse,
 };
@@ -28,6 +28,8 @@ use futures::{
 };
 
 use crate::rest_api::ErrorResponse;
+#[cfg(feature = "authorization")]
+use crate::rest_api::Method;
 
 use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 
@@ -86,7 +88,7 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        if req.method() == Method::OPTIONS {
+        if req.method() == ActixMethod::OPTIONS {
             return Box::new(self.service.call(req).and_then(|mut res| {
                 res.headers_mut().insert(
                     header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
@@ -96,6 +98,28 @@ where
                 res
             }));
         }
+
+        #[cfg(feature = "authorization")]
+        let method = match *req.method() {
+            ActixMethod::GET => Method::Get,
+            ActixMethod::POST => Method::Post,
+            ActixMethod::PUT => Method::Put,
+            ActixMethod::PATCH => Method::Patch,
+            ActixMethod::DELETE => Method::Delete,
+            ActixMethod::HEAD => Method::Head,
+            _ => {
+                return Box::new(
+                    req.into_response(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request(
+                                "HTTP method not supported by Splinter REST API",
+                            ))
+                            .into_body(),
+                    )
+                    .into_future(),
+                )
+            }
+        };
 
         let auth_header =
             match req
@@ -118,7 +142,13 @@ where
                 ),
             };
 
-        match authorize(req.path(), auth_header, &self.identity_providers) {
+        match authorize(
+            #[cfg(feature = "authorization")]
+            &method,
+            req.path(),
+            auth_header,
+            &self.identity_providers,
+        ) {
             AuthorizationResult::Authorized(identity) => {
                 debug!("Authenticated user {:?}", identity);
                 req.extensions_mut().insert(identity);
@@ -164,13 +194,13 @@ mod tests {
             App::new().wrap(Authorization::new(vec![])).route(
                 "/",
                 web::route()
-                    .method(Method::OPTIONS)
+                    .method(ActixMethod::OPTIONS)
                     .to(|| HttpResponse::Ok()),
             ),
         );
 
         let req = test::TestRequest::with_uri("/")
-            .method(Method::OPTIONS)
+            .method(ActixMethod::OPTIONS)
             .to_request();
         let resp = test::block_on(app.call(req)).unwrap();
 

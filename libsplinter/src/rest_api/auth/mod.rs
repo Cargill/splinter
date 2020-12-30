@@ -24,6 +24,9 @@ use std::str::FromStr;
 
 use crate::error::InvalidArgumentError;
 
+#[cfg(feature = "authorization")]
+use super::Method;
+
 use identity::{Identity, IdentityProvider};
 
 #[cfg(feature = "authorization")]
@@ -55,10 +58,12 @@ enum AuthorizationResult {
 ///
 /// # Arguments
 ///
+/// * `method` - The HTTP method used for the request
 /// * `endpoint` - The endpoint that is being requested. Example: "/endpoint/path"
 /// * `auth_header` - The value of the Authorization HTTP header for the request
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
 fn authorize(
+    #[cfg(feature = "authorization")] _method: &Method,
     endpoint: &str,
     auth_header: Option<&str>,
     identity_providers: &[Box<dyn IdentityProvider>],
@@ -231,7 +236,13 @@ mod tests {
     #[test]
     fn authorize_no_identity_providers() {
         assert!(matches!(
-            authorize("/test/endpoint", Some("auth"), &[]),
+            authorize(
+                #[cfg(feature = "authorization")]
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &[]
+            ),
             AuthorizationResult::Unauthorized
         ));
     }
@@ -242,6 +253,8 @@ mod tests {
     fn authorize_no_matching_identity_provider() {
         assert!(matches!(
             authorize(
+                #[cfg(feature = "authorization")]
+                &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
                 &[Box::new(AlwaysRejectIdentityProvider)]
@@ -257,6 +270,8 @@ mod tests {
     fn authorize_no_header_provided() {
         assert!(matches!(
             authorize(
+                #[cfg(feature = "authorization")]
+                &Method::Get,
                 "/test/endpoint",
                 None,
                 &[Box::new(AlwaysAcceptIdentityProvider)]
@@ -276,6 +291,8 @@ mod tests {
         {
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/biome/register",
                     None,
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -284,6 +301,8 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/biome/login",
                     None,
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -292,6 +311,8 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/biome/token",
                     None,
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -303,6 +324,8 @@ mod tests {
         {
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/oauth/login",
                     None,
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -311,6 +334,8 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/oauth/callback",
                     None,
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -324,6 +349,8 @@ mod tests {
         {
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/biome/register",
                     Some("auth"),
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -332,6 +359,8 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/biome/login",
                     Some("auth"),
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -340,6 +369,8 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/biome/token",
                     Some("auth"),
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -351,6 +382,8 @@ mod tests {
         {
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/oauth/login",
                     Some("auth"),
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -359,6 +392,8 @@ mod tests {
             ));
             assert!(matches!(
                 authorize(
+                    #[cfg(feature = "authorization")]
+                    &Method::Get,
                     "/oauth/callback",
                     Some("auth"),
                     &[Box::new(AlwaysRejectIdentityProvider)]
@@ -380,6 +415,8 @@ mod tests {
 
         assert!(matches!(
             authorize(
+                #[cfg(feature = "authorization")]
+                &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
                 &[Box::new(AlwaysAcceptIdentityProvider)]
@@ -400,6 +437,8 @@ mod tests {
 
         assert!(matches!(
             authorize(
+                #[cfg(feature = "authorization")]
+                &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
                 &[
@@ -424,6 +463,8 @@ mod tests {
 
         assert!(matches!(
             authorize(
+                #[cfg(feature = "authorization")]
+                &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
                 &[
