@@ -130,7 +130,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
         {
             resources.push(make_user_routes(
                 self.rest_config.clone(),
-                self.token_secret_manager.clone(),
                 self.credentials_store.clone(),
                 self.key_store.clone(),
             ));
