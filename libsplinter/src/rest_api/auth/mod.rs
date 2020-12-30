@@ -70,6 +70,7 @@ fn authorize(
     #[cfg(feature = "authorization")] _method: &Method,
     endpoint: &str,
     auth_header: Option<&str>,
+    #[cfg(feature = "authorization")] _permission_map: &PermissionMap,
     identity_providers: &[Box<dyn IdentityProvider>],
 ) -> AuthorizationResult {
     // Authorization isn't necessary when using one of the authorization endpoints
@@ -245,6 +246,8 @@ mod tests {
                 &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
+                #[cfg(feature = "authorization")]
+                &Default::default(),
                 &[]
             ),
             AuthorizationResult::Unauthorized
@@ -261,6 +264,8 @@ mod tests {
                 &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
+                #[cfg(feature = "authorization")]
+                &Default::default(),
                 &[Box::new(AlwaysRejectIdentityProvider)]
             ),
             AuthorizationResult::Unauthorized
@@ -278,6 +283,8 @@ mod tests {
                 &Method::Get,
                 "/test/endpoint",
                 None,
+                #[cfg(feature = "authorization")]
+                &Default::default(),
                 &[Box::new(AlwaysAcceptIdentityProvider)]
             ),
             AuthorizationResult::Unauthorized
@@ -299,6 +306,8 @@ mod tests {
                     &Method::Get,
                     "/biome/register",
                     None,
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -309,6 +318,8 @@ mod tests {
                     &Method::Get,
                     "/biome/login",
                     None,
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -319,6 +330,8 @@ mod tests {
                     &Method::Get,
                     "/biome/token",
                     None,
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -332,6 +345,8 @@ mod tests {
                     &Method::Get,
                     "/oauth/login",
                     None,
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -342,6 +357,8 @@ mod tests {
                     &Method::Get,
                     "/oauth/callback",
                     None,
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -357,6 +374,8 @@ mod tests {
                     &Method::Get,
                     "/biome/register",
                     Some("auth"),
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -367,6 +386,8 @@ mod tests {
                     &Method::Get,
                     "/biome/login",
                     Some("auth"),
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -377,6 +398,8 @@ mod tests {
                     &Method::Get,
                     "/biome/token",
                     Some("auth"),
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -390,6 +413,8 @@ mod tests {
                     &Method::Get,
                     "/oauth/login",
                     Some("auth"),
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -400,6 +425,8 @@ mod tests {
                     &Method::Get,
                     "/oauth/callback",
                     Some("auth"),
+                    #[cfg(feature = "authorization")]
+                    &Default::default(),
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
@@ -423,6 +450,8 @@ mod tests {
                 &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
+                #[cfg(feature = "authorization")]
+                &Default::default(),
                 &[Box::new(AlwaysAcceptIdentityProvider)]
             ),
             AuthorizationResult::Authorized(identity) if identity == expected_identity
@@ -445,6 +474,8 @@ mod tests {
                 &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
+                #[cfg(feature = "authorization")]
+                &Default::default(),
                 &[
                     Box::new(AlwaysRejectIdentityProvider),
                     Box::new(AlwaysAcceptIdentityProvider),
@@ -471,6 +502,8 @@ mod tests {
                 &Method::Get,
                 "/test/endpoint",
                 Some("auth"),
+                #[cfg(feature = "authorization")]
+                &Default::default(),
                 &[
                     Box::new(AlwaysErrIdentityProvider),
                     Box::new(AlwaysAcceptIdentityProvider),

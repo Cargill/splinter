@@ -31,6 +31,8 @@ use crate::rest_api::ErrorResponse;
 #[cfg(feature = "authorization")]
 use crate::rest_api::Method;
 
+#[cfg(feature = "authorization")]
+use super::PermissionMap;
 use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 
 /// Wrapper for the authorization middleware
@@ -142,11 +144,29 @@ where
                 ),
             };
 
+        #[cfg(feature = "authorization")]
+        let permission_map = match req.app_data::<PermissionMap>() {
+            Some(map) => map,
+            None => {
+                error!("Missing REST API permission map");
+                return Box::new(
+                    req.into_response(
+                        HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())
+                            .into_body(),
+                    )
+                    .into_future(),
+                );
+            }
+        };
+
         match authorize(
             #[cfg(feature = "authorization")]
             &method,
             req.path(),
             auth_header,
+            #[cfg(feature = "authorization")]
+            permission_map.get_ref(),
             &self.identity_providers,
         ) {
             AuthorizationResult::Authorized(identity) => {
@@ -216,14 +236,17 @@ mod tests {
     /// and identity providers.
     #[test]
     fn auth_middleware_unauthorized() {
-        let mut app = test::init_service(
-            App::new()
-                .wrap(Authorization::new(vec![]))
-                .route("/", web::get().to(|| HttpResponse::Ok())),
-        );
+        let app = App::new()
+            .wrap(Authorization::new(vec![]))
+            .route("/", web::get().to(|| HttpResponse::Ok()));
+
+        #[cfg(feature = "authorization")]
+        let app = app.data(PermissionMap::default());
+
+        let mut service = test::init_service(app);
 
         let req = test::TestRequest::with_uri("/").to_request();
-        let resp = test::block_on(app.call(req)).unwrap();
+        let resp = test::block_on(service.call(req)).unwrap();
 
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
@@ -235,7 +258,7 @@ mod tests {
     fn auth_middleware_authorized() {
         let auth_middleware = Authorization::new(vec![Box::new(AlwaysAcceptIdentityProvider)]);
 
-        let mut app = test::init_service(App::new().wrap(auth_middleware).route(
+        let app = App::new().wrap(auth_middleware).route(
             "/",
             web::get().to(|req: HttpRequest| {
                 // Verify that the client's identity was added to the request extensions
@@ -245,13 +268,18 @@ mod tests {
                     HttpResponse::InternalServerError()
                 }
             }),
-        ));
+        );
+
+        #[cfg(feature = "authorization")]
+        let app = app.data(PermissionMap::default());
+
+        let mut service = test::init_service(app);
 
         // Need to provide some value for the `Authorization` header
         let req = test::TestRequest::with_uri("/")
             .header("Authorization", "test")
             .to_request();
-        let resp = test::block_on(app.call(req)).unwrap();
+        let resp = test::block_on(service.call(req)).unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
     }
