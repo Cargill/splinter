@@ -20,18 +20,78 @@ use std::collections::HashMap;
 
 use crate::oauth::OAuthClient;
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     ErrorResponse,
 };
 
 pub fn make_login_route(client: OAuthClient) -> Resource {
-    Resource::build("/oauth/login")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
-            protocol::OAUTH_LOGIN_MIN,
-            protocol::OAUTH_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |req, _| {
+    let resource = Resource::build("/oauth/login").add_request_guard(
+        ProtocolVersionRangeGuard::new(protocol::OAUTH_LOGIN_MIN, protocol::OAUTH_PROTOCOL_VERSION),
+    );
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(
+            Method::Get,
+            Permission::AllowUnauthenticated,
+            move |req, _| {
+                let query: web::Query<HashMap<String, String>> =
+                    if let Ok(q) = web::Query::from_query(req.query_string()) {
+                        q
+                    } else {
+                        return Box::new(
+                            HttpResponse::BadRequest()
+                                .json(ErrorResponse::bad_request("Invalid query"))
+                                .into_future(),
+                        );
+                    };
+                let client_redirect_url = if let Some(header_value) = query.get("redirect_url") {
+                    header_value
+                } else {
+                    match req.headers().get("referer") {
+                        Some(url) => match url.to_str() {
+                            Ok(url) => url,
+                            Err(_) => {
+                                return Box::new(
+                                    HttpResponse::BadRequest()
+                                        .json(ErrorResponse::bad_request(
+                                            "No valid redirect URL supplied",
+                                        ))
+                                        .into_future(),
+                                )
+                            }
+                        },
+                        None => {
+                            return Box::new(
+                                HttpResponse::BadRequest()
+                                    .json(ErrorResponse::bad_request(
+                                        "No valid redirect URL supplied",
+                                    ))
+                                    .into_future(),
+                            )
+                        }
+                    }
+                };
+
+                Box::new(
+                    match client.get_authorization_url(client_redirect_url.to_string()) {
+                        Ok(auth_url) => HttpResponse::Found().header(LOCATION, auth_url).finish(),
+                        Err(err) => {
+                            error!("{}", err);
+                            HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                        }
+                    }
+                    .into_future(),
+                )
+            },
+        )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |req, _| {
             let query: web::Query<HashMap<String, String>> =
                 if let Ok(q) = web::Query::from_query(req.query_string()) {
                     q
@@ -79,6 +139,7 @@ pub fn make_login_route(client: OAuthClient) -> Resource {
                 .into_future(),
             )
         })
+    }
 }
 
 #[cfg(test)]

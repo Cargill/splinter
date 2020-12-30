@@ -26,6 +26,20 @@ use crate::error::InvalidArgumentError;
 
 use identity::{Identity, IdentityProvider};
 
+#[cfg(feature = "authorization")]
+#[derive(Clone, Debug, PartialEq)]
+pub enum Permission {
+    /// Check that the authenticated client has the specified permission.
+    Check(&'static str),
+    /// Allow any request that has been authenticated (the client's identity has been determined).
+    /// This may be used by endpoints that need to know the client's identity but do not require a
+    /// special permission to be checked (the Biome key management and OAuth logout routes are an
+    /// example of this).
+    AllowAuthenticated,
+    /// Allow any request without checking for authorization.
+    AllowUnauthenticated,
+}
+
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {
     /// The client was authorized to the given identity based on the authorization header

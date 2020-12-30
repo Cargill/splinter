@@ -21,6 +21,8 @@
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
     rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, RegistryError,
     RegistryReader, RegistryWriter, RwRegistry,
@@ -33,20 +35,38 @@ use crate::rest_api::{
 pub fn make_nodes_identity_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
     let registry2 = registry.clone();
-    Resource::build("/registry/nodes/{identity}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource = Resource::build("/registry/nodes/{identity}").add_request_guard(
+        ProtocolVersionRangeGuard::new(
             protocol::REGISTRY_FETCH_NODE_MIN,
             protocol::REGISTRY_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
-            fetch_node(r, web::Data::new(registry.clone_box_as_reader()))
-        })
-        .add_method(Method::Put, move |r, p| {
-            put_node(r, p, web::Data::new(registry1.clone_box_as_writer()))
-        })
-        .add_method(Method::Delete, move |r, _| {
-            delete_node(r, web::Data::new(registry2.clone_box_as_writer()))
-        })
+        ),
+    );
+    #[cfg(feature = "authorization")]
+    {
+        resource
+            .add_method(Method::Get, REGISTRY_READ_PERMISSION, move |r, _| {
+                fetch_node(r, web::Data::new(registry.clone_box_as_reader()))
+            })
+            .add_method(Method::Put, REGISTRY_WRITE_PERMISSION, move |r, p| {
+                put_node(r, p, web::Data::new(registry1.clone_box_as_writer()))
+            })
+            .add_method(Method::Delete, REGISTRY_WRITE_PERMISSION, move |r, _| {
+                delete_node(r, web::Data::new(registry2.clone_box_as_writer()))
+            })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource
+            .add_method(Method::Get, move |r, _| {
+                fetch_node(r, web::Data::new(registry.clone_box_as_reader()))
+            })
+            .add_method(Method::Put, move |r, p| {
+                put_node(r, p, web::Data::new(registry1.clone_box_as_writer()))
+            })
+            .add_method(Method::Delete, move |r, _| {
+                delete_node(r, web::Data::new(registry2.clone_box_as_writer()))
+            })
+    }
 }
 
 fn fetch_node(

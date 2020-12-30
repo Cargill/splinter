@@ -20,6 +20,9 @@ use actix_web::{
 use futures::{future::IntoFuture, stream::Stream, Future};
 use protobuf::{self, Message};
 
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
+
 use super::{Continuation, RequestGuard};
 
 /// Rest methods compatible with `RestApi`.
@@ -80,9 +83,17 @@ pub type HandlerFunction = Box<
         + 'static,
 >;
 
+#[cfg(feature = "authorization")]
+#[derive(Clone)]
+struct ResourceMethod {
+    method: Method,
+    permission: Permission,
+    handler: Arc<HandlerFunction>,
+}
+
 /// `Resource` represents a RESTful endpoint.
 ///
-/// ```
+/// ```ignore
 /// use splinter::rest_api::{Resource, Method};
 /// use actix_web::HttpResponse;
 /// use futures::IntoFuture;
@@ -100,10 +111,14 @@ pub type HandlerFunction = Box<
 pub struct Resource {
     route: String,
     request_guards: Vec<Arc<dyn RequestGuard>>,
+    #[cfg(feature = "authorization")]
+    methods: Vec<ResourceMethod>,
+    #[cfg(not(feature = "authorization"))]
     methods: Vec<(Method, Arc<HandlerFunction>)>,
 }
 
 impl Resource {
+    #[cfg(not(feature = "authorization"))]
     #[deprecated(note = "Please use the `build` and `add_method` methods instead")]
     pub fn new<F>(method: Method, route: &str, handle: F) -> Self
     where
@@ -126,6 +141,26 @@ impl Resource {
         }
     }
 
+    #[cfg(feature = "authorization")]
+    pub fn add_method<F>(mut self, method: Method, permission: Permission, handle: F) -> Self
+    where
+        F: Fn(
+                HttpRequest,
+                web::Payload,
+            ) -> Box<dyn Future<Item = HttpResponse, Error = ActixError>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.methods.push(ResourceMethod {
+            method,
+            permission,
+            handler: Arc::new(Box::new(handle)),
+        });
+        self
+    }
+
+    #[cfg(not(feature = "authorization"))]
     pub fn add_method<F>(mut self, method: Method, handle: F) -> Self
     where
         F: Fn(
@@ -146,7 +181,7 @@ impl Resource {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use splinter::rest_api::{Resource, Method, Continuation};
     /// use actix_web::{HttpRequest, HttpResponse};
     /// use futures::IntoFuture;
@@ -177,6 +212,60 @@ impl Resource {
         self
     }
 
+    #[cfg(feature = "authorization")]
+    pub(super) fn into_route(self) -> actix_web::Resource {
+        let mut resource = web::resource(&self.route);
+
+        let mut allowed_methods = self
+            .methods
+            .iter()
+            .map(|resource_method| resource_method.method.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        allowed_methods += ", OPTIONS";
+
+        resource = resource.route(web::route().guard(actix_web::guard::Options()).to(
+            move |_: HttpRequest| {
+                HttpResponse::Ok()
+                    .header(header::ALLOW, allowed_methods.clone())
+                    .finish()
+            },
+        ));
+
+        let request_guards = self.request_guards;
+        self.methods.into_iter().fold(
+            resource,
+            |resource,
+             ResourceMethod {
+                 method, handler, ..
+             }| {
+                let guards = request_guards.clone();
+                let func = move |r: HttpRequest, p: web::Payload| {
+                    // This clone satisfies a requirement that this be FnOnce
+                    if !guards.is_empty() {
+                        for guard in guards.clone() {
+                            match guard.evaluate(&r) {
+                                Continuation::Terminate(result) => return result,
+                                Continuation::Continue => (),
+                            }
+                        }
+                    }
+                    (handler)(r, p)
+                };
+                resource.route(match method {
+                    Method::Get => web::get().to_async(func),
+                    Method::Post => web::post().to_async(func),
+                    Method::Put => web::put().to_async(func),
+                    Method::Patch => web::patch().to_async(func),
+                    Method::Delete => web::delete().to_async(func),
+                    Method::Head => web::head().to_async(func),
+                })
+            },
+        )
+    }
+
+    #[cfg(not(feature = "authorization"))]
     pub(super) fn into_route(self) -> actix_web::Resource {
         let mut resource = web::resource(&self.route);
 
@@ -239,22 +328,43 @@ mod test {
 
     #[test]
     fn test_resource() {
-        Resource::build("/test")
-            .add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
+        let mut resource = Resource::build("/test");
+        #[cfg(feature = "authorization")]
+        {
+            resource = resource.add_method(
+                Method::Get,
+                Permission::AllowUnauthenticated,
+                |_: HttpRequest, _: web::Payload| Box::new(Response::Ok().finish().into_future()),
+            );
+        }
+        #[cfg(not(feature = "authorization"))]
+        {
+            resource = resource.add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
                 Box::new(Response::Ok().finish().into_future())
-            })
-            .into_route();
+            });
+        }
+        resource.into_route();
     }
 
     #[test]
     fn test_resource_with_guard() {
-        Resource::build("/test-guarded")
-            .add_request_guard(|_: &HttpRequest| {
-                Continuation::terminate(Response::BadRequest().finish().into_future())
-            })
-            .add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
+        let mut resource = Resource::build("/test-guarded").add_request_guard(|_: &HttpRequest| {
+            Continuation::terminate(Response::BadRequest().finish().into_future())
+        });
+        #[cfg(feature = "authorization")]
+        {
+            resource = resource.add_method(
+                Method::Get,
+                Permission::AllowUnauthenticated,
+                |_: HttpRequest, _: web::Payload| Box::new(Response::Ok().finish().into_future()),
+            );
+        }
+        #[cfg(not(feature = "authorization"))]
+        {
+            resource = resource.add_method(Method::Get, |_: HttpRequest, _: web::Payload| {
                 Box::new(Response::Ok().finish().into_future())
-            })
-            .into_route();
+            });
+        }
+        resource.into_route();
     }
 }

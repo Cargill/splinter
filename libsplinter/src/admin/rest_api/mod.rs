@@ -23,6 +23,13 @@ mod resources;
 use crate::admin::service::AdminService;
 use crate::admin::store::AdminServiceStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+use crate::rest_api::auth::Permission;
+
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const CIRCUIT_READ_PERMISSION: Permission = Permission::Check("circuit.read");
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const CIRCUIT_WRITE_PERMISSION: Permission = Permission::Check("circuit.write");
 
 /// The admin service provides the following endpoints as REST API resources:
 ///

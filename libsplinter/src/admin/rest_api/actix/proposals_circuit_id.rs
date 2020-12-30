@@ -21,6 +21,8 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::Future;
 
 use crate::admin::rest_api::error::ProposalFetchError;
+#[cfg(feature = "authorization")]
+use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::protocol;
 use crate::rest_api::{
@@ -31,14 +33,25 @@ use crate::rest_api::{
 use super::super::resources;
 
 pub fn make_fetch_proposal_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
-    Resource::build("admin/proposals/{circuit_id}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource = Resource::build("admin/proposals/{circuit_id}").add_request_guard(
+        ProtocolVersionRangeGuard::new(
             protocol::ADMIN_FETCH_PROPOSALS_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
+        ),
+    );
+
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
             fetch_proposal(r, web::Data::new(proposal_store.clone()))
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |r, _| {
+            fetch_proposal(r, web::Data::new(proposal_store.clone()))
+        })
+    }
 }
 
 fn fetch_proposal<PS: ProposalStore + 'static>(

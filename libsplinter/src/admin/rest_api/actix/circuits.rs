@@ -19,6 +19,8 @@ use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 use std::collections::HashMap;
 
+#[cfg(feature = "authorization")]
+use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::store::{AdminServiceStore, CircuitPredicate};
 use crate::protocol;
 use crate::rest_api::{
@@ -31,14 +33,23 @@ use super::super::error::CircuitListError;
 use super::super::resources;
 
 pub fn make_list_circuits_resource(store: Box<dyn AdminServiceStore>) -> Resource {
-    Resource::build("/admin/circuits")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/admin/circuits").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::ADMIN_LIST_CIRCUITS_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
             list_circuits(r, web::Data::new(store.clone()))
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |r, _| {
+            list_circuits(r, web::Data::new(store.clone()))
+        })
+    }
 }
 
 fn list_circuits(

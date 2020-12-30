@@ -63,9 +63,11 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
+  "authorization",
   "client-auth"
 ]
 
+authorization = ["splinter/authorization"]
 client = ["reqwest"]
 events = ["splinter/events"]
 rest-api = ["futures", "splinter/rest-api"]

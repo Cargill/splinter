@@ -15,3 +15,11 @@
 #[cfg(feature = "rest-api-actix")]
 pub mod actix;
 pub mod resources;
+
+#[cfg(feature = "authorization")]
+use splinter::rest_api::auth::Permission;
+
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const SCABBARD_READ_PERMISSION: Permission = Permission::Check("scabbard.read");
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check("scabbard.write");

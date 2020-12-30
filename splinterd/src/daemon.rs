@@ -58,6 +58,8 @@ use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
 };
+#[cfg(feature = "authorization")]
+use splinter::rest_api::auth::Permission;
 #[cfg(feature = "auth")]
 use splinter::rest_api::{AuthConfig, OAuthConfig};
 use splinter::rest_api::{
@@ -516,25 +518,53 @@ impl SplinterDaemon {
         #[allow(unused_mut)]
         let mut rest_api_builder = RestApiBuilder::new()
             .with_bind(bind)
-            .add_resource(
-                Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
-            )
-            .add_resource(
-                Resource::build("/status").add_method(Method::Get, move |_, _| {
-                    routes::get_status(
-                        node_id.clone(),
-                        display_name.clone(),
-                        #[cfg(feature = "service-endpoint")]
-                        service_endpoint.clone(),
-                        network_endpoints.clone(),
-                        advertised_endpoints.clone(),
-                    )
-                }),
-            )
             .add_resources(registry.resources())
             .add_resources(admin_service.resources())
             .add_resources(orchestrator_resources)
             .add_resources(circuit_resource_provider.resources());
+
+        #[cfg(feature = "authorization")]
+        {
+            rest_api_builder = rest_api_builder
+                .add_resource(Resource::build("/openapi.yaml").add_method(
+                    Method::Get,
+                    Permission::AllowAuthenticated,
+                    routes::get_openapi,
+                ))
+                .add_resource(Resource::build("/status").add_method(
+                    Method::Get,
+                    routes::STATUS_READ_PERMISSION,
+                    move |_, _| {
+                        routes::get_status(
+                            node_id.clone(),
+                            display_name.clone(),
+                            #[cfg(feature = "service-endpoint")]
+                            service_endpoint.clone(),
+                            network_endpoints.clone(),
+                            advertised_endpoints.clone(),
+                        )
+                    },
+                ));
+        }
+        #[cfg(not(feature = "authorization"))]
+        {
+            rest_api_builder = rest_api_builder
+                .add_resource(
+                    Resource::build("/openapi.yaml").add_method(Method::Get, routes::get_openapi),
+                )
+                .add_resource(
+                    Resource::build("/status").add_method(Method::Get, move |_, _| {
+                        routes::get_status(
+                            node_id.clone(),
+                            display_name.clone(),
+                            #[cfg(feature = "service-endpoint")]
+                            service_endpoint.clone(),
+                            network_endpoints.clone(),
+                            advertised_endpoints.clone(),
+                        )
+                    }),
+                );
+        }
 
         #[cfg(feature = "rest-api-cors")]
         {

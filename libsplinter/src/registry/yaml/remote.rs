@@ -401,6 +401,8 @@ mod tests {
     use tempdir::TempDir;
 
     use crate::rest_api::actix_web_1::{Method, Resource, RestApiBuilder, RestApiShutdownHandle};
+    #[cfg(feature = "authorization")]
+    use crate::rest_api::auth::Permission;
 
     /// Verifies that a remote file that contains two nodes with the same identity is rejected (not
     /// loaded).
@@ -1071,17 +1073,40 @@ mod tests {
     fn serve_registry(
         registry: Arc<Mutex<Option<Vec<Node>>>>,
     ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
-        let (shutdown, join, url) = run_rest_api_on_open_port(vec![Resource::build(
-            "/registry.yaml",
-        )
-        .add_method(Method::Get, move |_, _| {
-            Box::new(match &*registry.lock().expect("Registry lock poisoned") {
-                Some(registry) => HttpResponse::Ok()
-                    .body(serde_yaml::to_vec(&registry).expect("Failed to serialize registry file"))
-                    .into_future(),
-                None => HttpResponse::NotFound().finish().into_future(),
+        let mut resource = Resource::build("/registry.yaml");
+        #[cfg(feature = "authorization")]
+        {
+            resource = resource.add_method(
+                Method::Get,
+                Permission::AllowUnauthenticated,
+                move |_, _| {
+                    Box::new(match &*registry.lock().expect("Registry lock poisoned") {
+                        Some(registry) => HttpResponse::Ok()
+                            .body(
+                                serde_yaml::to_vec(&registry)
+                                    .expect("Failed to serialize registry file"),
+                            )
+                            .into_future(),
+                        None => HttpResponse::NotFound().finish().into_future(),
+                    })
+                },
+            )
+        }
+        #[cfg(not(feature = "authorization"))]
+        {
+            resource = resource.add_method(Method::Get, move |_, _| {
+                Box::new(match &*registry.lock().expect("Registry lock poisoned") {
+                    Some(registry) => HttpResponse::Ok()
+                        .body(
+                            serde_yaml::to_vec(&registry)
+                                .expect("Failed to serialize registry file"),
+                        )
+                        .into_future(),
+                    None => HttpResponse::NotFound().finish().into_future(),
+                })
             })
-        })]);
+        }
+        let (shutdown, join, url) = run_rest_api_on_open_port(vec![resource]);
 
         (shutdown, join, format!("http://{}/registry.yaml", url))
     }

@@ -26,6 +26,8 @@ use crate::oauth::{
     OAuthClient,
 };
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     ErrorResponse,
@@ -35,12 +37,101 @@ pub fn make_callback_route(
     client: OAuthClient,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 ) -> Resource {
-    Resource::build("/oauth/callback")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/oauth/callback").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::OAUTH_CALLBACK_MIN,
             protocol::OAUTH_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |req, _| {
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(
+            Method::Get,
+            Permission::AllowUnauthenticated,
+            move |req, _| {
+                Box::new(
+                    match Query::<CallbackQuery>::from_query(req.query_string()) {
+                        Ok(query) => {
+                            match client
+                                .exchange_authorization_code(query.code.clone(), &query.state)
+                            {
+                                Ok(Some((user_info, redirect_url))) => {
+                                    // Generate a Splinter access token for the new session
+                                    let splinter_access_token = new_splinter_access_token();
+
+                                    // Adding the token and subject to the redirect URL so the client
+                                    // may access these values after a redirect
+                                    let redirect_url = format!(
+                                        "{}?{}",
+                                        redirect_url,
+                                        generate_redirect_query(
+                                            &splinter_access_token,
+                                            user_info.subject()
+                                        )
+                                    );
+
+                                    // Save the new session
+                                    match InsertableOAuthUserSessionBuilder::new()
+                                        .with_splinter_access_token(splinter_access_token)
+                                        .with_subject(user_info.subject().to_string())
+                                        .with_oauth_access_token(
+                                            user_info.access_token().to_string(),
+                                        )
+                                        .with_oauth_refresh_token(
+                                            user_info.refresh_token().map(ToOwned::to_owned),
+                                        )
+                                        .build()
+                                    {
+                                        Ok(session) => {
+                                            match oauth_user_session_store.add_session(session) {
+                                                Ok(_) => HttpResponse::Found()
+                                                    .header(LOCATION, redirect_url)
+                                                    .finish(),
+                                                Err(err) => {
+                                                    error!("Unable to store user session: {}", err);
+                                                    HttpResponse::InternalServerError()
+                                                        .json(ErrorResponse::internal_error())
+                                                }
+                                            }
+                                        }
+                                        Err(err) => {
+                                            error!("Unable to build user session: {}", err);
+                                            HttpResponse::InternalServerError()
+                                                .json(ErrorResponse::internal_error())
+                                        }
+                                    }
+                                }
+                                Ok(None) => {
+                                    error!(
+                                    "Received OAuth callback request that does not correlate to an \
+                                     open authorization request"
+                                );
+                                    HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                }
+                                Err(err) => {
+                                    error!("{}", err);
+                                    HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            error!(
+                                "Failed to parse query string in OAuth callback request: {}",
+                                err
+                            );
+                            HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                        }
+                    }
+                    .into_future(),
+                )
+            },
+        )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |req, _| {
             Box::new(
                 match Query::<CallbackQuery>::from_query(req.query_string()) {
                     Ok(query) => {
@@ -115,6 +206,7 @@ pub fn make_callback_route(
                 .into_future(),
             )
         })
+    }
 }
 
 /// Generates a new Splinter access token, which is a string of 32 random alphanumeric characters

@@ -32,15 +32,19 @@ use crate::biome::key_management::{
 
 #[cfg(feature = "biome-key-management")]
 use crate::biome::rest_api::resources::{key_management::ResponseKey, user::ModifyUser};
+#[cfg(feature = "authorization")]
+use crate::biome::rest_api::{BIOME_USER_READ_PERMISSION, BIOME_USER_WRITE_PERMISSION};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource {
-    Resource::build("/biome/users")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/biome/users").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_LIST_USERS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |_, _| {
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, BIOME_USER_READ_PERMISSION, move |_, _| {
             let credentials_store = credentials_store.clone();
             Box::new(match credentials_store.list_usernames() {
                 Ok(users) => HttpResponse::Ok().json(users).into_future(),
@@ -52,6 +56,22 @@ pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource
                 }
             })
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |_, _| {
+            let credentials_store = credentials_store.clone();
+            Box::new(match credentials_store.list_usernames() {
+                Ok(users) => HttpResponse::Ok().json(users).into_future(),
+                Err(err) => {
+                    debug!("Failed to get users from the database {}", err);
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future()
+                }
+            })
+        })
+    }
 }
 
 #[cfg(feature = "biome-key-management")]
@@ -61,20 +81,43 @@ pub fn make_user_routes(
     credentials_store: Arc<dyn CredentialsStore>,
     key_store: Arc<dyn KeyStore>,
 ) -> Resource {
-    Resource::build("/biome/users/{id}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/biome/users/{id}").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_USER_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(
-            Method::Put,
-            add_modify_user_method(credentials_store.clone(), rest_config, key_store),
-        )
-        .add_method(
-            Method::Get,
-            add_fetch_user_method(credentials_store.clone()),
-        )
-        .add_method(Method::Delete, add_delete_user_method(credentials_store))
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource
+            .add_method(
+                Method::Put,
+                BIOME_USER_WRITE_PERMISSION,
+                add_modify_user_method(credentials_store.clone(), rest_config, key_store),
+            )
+            .add_method(
+                Method::Get,
+                BIOME_USER_READ_PERMISSION,
+                add_fetch_user_method(credentials_store.clone()),
+            )
+            .add_method(
+                Method::Delete,
+                BIOME_USER_WRITE_PERMISSION,
+                add_delete_user_method(credentials_store),
+            )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource
+            .add_method(
+                Method::Put,
+                add_modify_user_method(credentials_store.clone(), rest_config, key_store),
+            )
+            .add_method(
+                Method::Get,
+                add_fetch_user_method(credentials_store.clone()),
+            )
+            .add_method(Method::Delete, add_delete_user_method(credentials_store))
+    }
 }
 
 /// Defines a REST endpoint to fetch a user from the database

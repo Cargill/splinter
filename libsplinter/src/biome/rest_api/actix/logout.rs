@@ -22,6 +22,8 @@ use crate::biome::rest_api::{
 };
 use crate::futures::IntoFuture;
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
 use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     secrets::SecretManager,
@@ -36,15 +38,26 @@ pub fn make_logout_route(
     secret_manager: Arc<dyn SecretManager>,
     rest_config: Arc<BiomeRestConfig>,
 ) -> Resource {
-    Resource::build("/biome/logout")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/biome/logout").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_LOGIN_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(
+            Method::Patch,
+            Permission::AllowAuthenticated,
+            add_logout_route(refresh_token_store, secret_manager, rest_config),
+        )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(
             Method::Patch,
             add_logout_route(refresh_token_store, secret_manager, rest_config),
         )
+    }
 }
 
 pub fn add_logout_route(

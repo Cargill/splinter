@@ -50,63 +50,135 @@ impl RestResourceProvider for ServiceOrchestrator {
 
                         let service_type = endpoint.service_type;
                         let handler = endpoint.handler;
-                        resource_builder.add_method(endpoint.method, move |request, payload| {
-                            let circuit = request
-                                .match_info()
-                                .get("circuit")
-                                .unwrap_or("")
-                                .to_string();
-                            let service_id = request
-                                .match_info()
-                                .get("service_id")
-                                .unwrap_or("")
-                                .to_string();
+                        #[cfg(feature = "authorization")]
+                        {
+                            resource_builder.add_method(
+                                endpoint.method,
+                                endpoint.permission,
+                                move |request, payload| {
+                                    let circuit = request
+                                        .match_info()
+                                        .get("circuit")
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let service_id = request
+                                        .match_info()
+                                        .get("service_id")
+                                        .unwrap_or("")
+                                        .to_string();
 
-                            let services = match services.lock() {
-                                Ok(s) => s,
-                                Err(err) => {
-                                    error!("Orchestrator's service lock is poisoned: {}", err);
-                                    return Box::new(
-                                        HttpResponse::InternalServerError()
-                                            .json(json!({
-                                                "message": "An internal error occurred"
-                                            }))
-                                            .into_future(),
-                                    )
-                                    .into_future();
-                                }
-                            };
+                                    let services = match services.lock() {
+                                        Ok(s) => s,
+                                        Err(err) => {
+                                            error!("Orchestrator's service lock is poisoned: {}", err);
+                                            return Box::new(
+                                                HttpResponse::InternalServerError()
+                                                    .json(json!({
+                                                        "message": "An internal error occurred"
+                                                    }))
+                                                    .into_future(),
+                                            )
+                                            .into_future();
+                                        }
+                                    };
 
-                            let service =
-                                match services.iter().find_map(|(service_def, managed_service)| {
-                                    if service_def.service_type == service_type
-                                        && service_def.circuit == circuit
-                                        && service_def.service_id == service_id
-                                    {
-                                        Some(&*managed_service.service)
-                                    } else {
-                                        None
-                                    }
-                                }) {
-                                    Some(s) => s,
-                                    None => {
-                                        return Box::new(
-                                            HttpResponse::NotFound()
-                                                .json(json!({
-                                                    "message":
-                                                        format!(
-                                                            "{} service {} on circuit {} not found",
-                                                            service_type, service_id, circuit
-                                                        )
-                                                }))
-                                                .into_future(),
-                                        )
-                                        .into_future();
-                                    }
-                                };
+                                    let service = match services.iter().find_map(
+                                        |(service_def, managed_service)| {
+                                            if service_def.service_type == service_type
+                                                && service_def.circuit == circuit
+                                                && service_def.service_id == service_id
+                                            {
+                                                Some(&*managed_service.service)
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                    ) {
+                                        Some(s) => s,
+                                        None => {
+                                            return Box::new(
+                                                HttpResponse::NotFound()
+                                                    .json(json!({
+                                                        "message":
+                                                            format!(
+                                                                "{} service {} on circuit {} not found",
+                                                                service_type, service_id, circuit
+                                                            )
+                                                    }))
+                                                    .into_future(),
+                                            )
+                                            .into_future();
+                                        }
+                                    };
 
-                            handler(request, payload, service)
-                        })
+                                    handler(request, payload, service)
+                                },
+                            )
+                        }
+                        #[cfg(not(feature = "authorization"))]
+                        {
+                            resource_builder.add_method(
+                                endpoint.method,
+                                move |request, payload| {
+                                    let circuit = request
+                                        .match_info()
+                                        .get("circuit")
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let service_id = request
+                                        .match_info()
+                                        .get("service_id")
+                                        .unwrap_or("")
+                                        .to_string();
+
+                                    let services = match services.lock() {
+                                        Ok(s) => s,
+                                        Err(err) => {
+                                            error!("Orchestrator's service lock is poisoned: {}", err);
+                                            return Box::new(
+                                                HttpResponse::InternalServerError()
+                                                    .json(json!({
+                                                        "message": "An internal error occurred"
+                                                    }))
+                                                    .into_future(),
+                                            )
+                                            .into_future();
+                                        }
+                                    };
+
+                                    let service = match services.iter().find_map(
+                                        |(service_def, managed_service)| {
+                                            if service_def.service_type == service_type
+                                                && service_def.circuit == circuit
+                                                && service_def.service_id == service_id
+                                            {
+                                                Some(&*managed_service.service)
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                    ) {
+                                        Some(s) => s,
+                                        None => {
+                                            return Box::new(
+                                                HttpResponse::NotFound()
+                                                    .json(json!({
+                                                        "message":
+                                                            format!(
+                                                                "{} service {} on circuit {} not found",
+                                                                service_type, service_id, circuit
+                                                            )
+                                                    }))
+                                                    .into_future(),
+                                            )
+                                            .into_future();
+                                        }
+                                    };
+
+                                    handler(request, payload, service)
+                                },
+                            )
+                        }
                     })
                     .collect::<Vec<_>>();
 

@@ -19,6 +19,8 @@ use std::convert::TryFrom;
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::{future::IntoFuture, Future};
 
+#[cfg(feature = "authorization")]
+use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::admin::store::CircuitPredicate;
 use crate::protocol;
@@ -32,14 +34,24 @@ use super::super::error::ProposalListError;
 use super::super::resources;
 
 pub fn make_list_proposals_resource<PS: ProposalStore + 'static>(proposal_store: PS) -> Resource {
-    Resource::build("admin/proposals")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("admin/proposals").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::ADMIN_LIST_PROPOSALS_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
+        ));
+
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
             list_proposals(r, web::Data::new(proposal_store.clone()))
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |r, _| {
+            list_proposals(r, web::Data::new(proposal_store.clone()))
+        })
+    }
 }
 
 fn list_proposals<PS: ProposalStore + 'static>(

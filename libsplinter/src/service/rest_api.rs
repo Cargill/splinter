@@ -19,6 +19,8 @@ use std::sync::Arc;
 use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
 use crate::futures::Future;
 use crate::rest_api::actix_web_1::{Continuation, Method, RequestGuard};
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
 
 use super::Service;
 
@@ -46,6 +48,9 @@ pub struct ServiceEndpoint {
     pub handler: Handler,
     /// Guards for this endpoint
     pub request_guards: Vec<Box<dyn ServiceRequestGuard>>,
+    #[cfg(feature = "authorization")]
+    /// The permission that a client needs to use this endpoint
+    pub permission: Permission,
 }
 
 /// This trait enforces that the Request guard is Clone.
