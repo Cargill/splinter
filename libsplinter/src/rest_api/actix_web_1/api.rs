@@ -18,6 +18,8 @@ use std::thread;
 use actix_web::{middleware, App, HttpServer};
 use futures::Future;
 
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::PermissionMap;
 #[cfg(feature = "auth")]
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "rest-api-cors")]
@@ -108,9 +110,25 @@ impl RestApi {
 
                     let mut app = app.wrap(middleware::Logger::default());
 
+                    #[cfg(feature = "authorization")]
+                    let mut permission_map = PermissionMap::new();
+
                     for resource in resources.clone() {
-                        app = app.service(resource.into_route());
+                        #[cfg(feature = "authorization")]
+                        {
+                            let (route, mut permissions) = resource.into_route();
+                            permission_map.append(&mut permissions);
+                            app = app.service(route);
+                        }
+                        #[cfg(not(feature = "authorization"))]
+                        {
+                            app = app.service(resource.into_route());
+                        }
                     }
+
+                    #[cfg(feature = "authorization")]
+                    let app = app.data(permission_map);
+
                     app
                 });
 
@@ -226,7 +244,14 @@ impl RestApi {
                     let mut app = app.wrap(middleware::Logger::default());
 
                     for resource in resources.clone() {
-                        app = app.service(resource.into_route());
+                        #[cfg(feature = "authorization")]
+                        {
+                            app = app.service(resource.into_route().0);
+                        }
+                        #[cfg(not(feature = "authorization"))]
+                        {
+                            app = app.service(resource.into_route());
+                        }
                     }
                     app
                 });

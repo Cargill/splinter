@@ -21,12 +21,12 @@ use futures::{future::IntoFuture, stream::Stream, Future};
 use protobuf::{self, Message};
 
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::{Permission, PermissionMap};
 
 use super::{Continuation, RequestGuard};
 
 /// Rest methods compatible with `RestApi`.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Method {
     Get,
     Post,
@@ -213,7 +213,7 @@ impl Resource {
     }
 
     #[cfg(feature = "authorization")]
-    pub(super) fn into_route(self) -> actix_web::Resource {
+    pub(super) fn into_route(self) -> (actix_web::Resource, PermissionMap) {
         let mut resource = web::resource(&self.route);
 
         let mut allowed_methods = self
@@ -234,11 +234,15 @@ impl Resource {
         ));
 
         let request_guards = self.request_guards;
-        self.methods.into_iter().fold(
+        let mut permission_map = PermissionMap::new();
+        let route = self.route.clone();
+        let resource = self.methods.into_iter().fold(
             resource,
             |resource,
              ResourceMethod {
-                 method, handler, ..
+                 method,
+                 permission,
+                 handler,
              }| {
                 let guards = request_guards.clone();
                 let func = move |r: HttpRequest, p: web::Payload| {
@@ -253,6 +257,7 @@ impl Resource {
                     }
                     (handler)(r, p)
                 };
+                permission_map.add_permission(method.clone(), &route, permission);
                 resource.route(match method {
                     Method::Get => web::get().to_async(func),
                     Method::Post => web::post().to_async(func),
@@ -262,7 +267,8 @@ impl Resource {
                     Method::Head => web::head().to_async(func),
                 })
             },
-        )
+        );
+        (resource, permission_map)
     }
 
     #[cfg(not(feature = "authorization"))]
@@ -366,5 +372,24 @@ mod test {
             });
         }
         resource.into_route();
+    }
+
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn test_resource_permission() {
+        let (_, permission_map) = Resource::build("/test")
+            .add_method(
+                Method::Get,
+                Permission::Check("test"),
+                |_: HttpRequest, _: web::Payload| Box::new(Response::Ok().finish().into_future()),
+            )
+            .into_route();
+
+        assert_eq!(
+            permission_map
+                .get_permission(&Method::Get, "/test")
+                .expect("Missing permission"),
+            &Permission::Check("test"),
+        );
     }
 }

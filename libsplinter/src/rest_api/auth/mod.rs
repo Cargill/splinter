@@ -30,6 +30,8 @@ use crate::error::InvalidArgumentError;
 use super::Method;
 
 use identity::{Identity, IdentityProvider};
+#[cfg(feature = "authorization")]
+pub(in crate::rest_api) use permission_map::PermissionMap;
 
 #[cfg(feature = "authorization")]
 #[derive(Clone, Debug, PartialEq)]
