@@ -55,6 +55,8 @@ enum AuthorizationResult {
     NoAuthorizationNecessary,
     /// The authorization header is empty or invalid
     Unauthorized,
+    /// The request endpoint is not defined
+    UnknownEndpoint,
 }
 
 /// Uses the given identity providers to check authorization for the request. This function is
@@ -67,24 +69,40 @@ enum AuthorizationResult {
 /// * `auth_header` - The value of the Authorization HTTP header for the request
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
 fn authorize(
-    #[cfg(feature = "authorization")] _method: &Method,
+    #[cfg(feature = "authorization")] method: &Method,
     endpoint: &str,
     auth_header: Option<&str>,
-    #[cfg(feature = "authorization")] _permission_map: &PermissionMap,
+    #[cfg(feature = "authorization")] permission_map: &PermissionMap,
     identity_providers: &[Box<dyn IdentityProvider>],
 ) -> AuthorizationResult {
-    // Authorization isn't necessary when using one of the authorization endpoints
-    let mut is_auth_endpoint = false;
-    #[cfg(feature = "biome-credentials")]
-    if endpoint == "/biome/register" || endpoint == "/biome/login" || endpoint == "/biome/token" {
-        is_auth_endpoint = true;
-    }
-    #[cfg(feature = "oauth")]
-    if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
-        is_auth_endpoint = true;
-    }
-    if is_auth_endpoint {
+    // Get the permission that applies to this request
+    #[cfg(feature = "authorization")]
+    let permission = match permission_map.get_permission(&method, endpoint) {
+        Some(perm) => perm,
+        None => return AuthorizationResult::UnknownEndpoint,
+    };
+
+    // Determine if authorization is required
+    #[cfg(feature = "authorization")]
+    if permission == &Permission::AllowUnauthenticated {
         return AuthorizationResult::NoAuthorizationNecessary;
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        // Authorization isn't necessary when using one of the authorization endpoints
+        let mut is_auth_endpoint = false;
+        #[cfg(feature = "biome-credentials")]
+        if endpoint == "/biome/register" || endpoint == "/biome/login" || endpoint == "/biome/token"
+        {
+            is_auth_endpoint = true;
+        }
+        #[cfg(feature = "oauth")]
+        if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
+            is_auth_endpoint = true;
+        }
+        if is_auth_endpoint {
+            return AuthorizationResult::NoAuthorizationNecessary;
+        }
     }
 
     // Parse the auth header
@@ -240,6 +258,17 @@ mod tests {
     /// authorize.
     #[test]
     fn authorize_no_identity_providers() {
+        #[cfg(feature = "authorization")]
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowAuthenticated,
+            );
+            map
+        };
+
         assert!(matches!(
             authorize(
                 #[cfg(feature = "authorization")]
@@ -247,7 +276,7 @@ mod tests {
                 "/test/endpoint",
                 Some("auth"),
                 #[cfg(feature = "authorization")]
-                &Default::default(),
+                &permission_map,
                 &[]
             ),
             AuthorizationResult::Unauthorized
@@ -258,6 +287,17 @@ mod tests {
     /// identity provider returns an identity for the auth header.
     #[test]
     fn authorize_no_matching_identity_provider() {
+        #[cfg(feature = "authorization")]
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowAuthenticated,
+            );
+            map
+        };
+
         assert!(matches!(
             authorize(
                 #[cfg(feature = "authorization")]
@@ -265,7 +305,7 @@ mod tests {
                 "/test/endpoint",
                 Some("auth"),
                 #[cfg(feature = "authorization")]
-                &Default::default(),
+                &permission_map,
                 &[Box::new(AlwaysRejectIdentityProvider)]
             ),
             AuthorizationResult::Unauthorized
@@ -277,6 +317,17 @@ mod tests {
     /// identity, we verify that the failure is because of the missing header value.
     #[test]
     fn authorize_no_header_provided() {
+        #[cfg(feature = "authorization")]
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowAuthenticated,
+            );
+            map
+        };
+
         assert!(matches!(
             authorize(
                 #[cfg(feature = "authorization")]
@@ -284,153 +335,168 @@ mod tests {
                 "/test/endpoint",
                 None,
                 #[cfg(feature = "authorization")]
-                &Default::default(),
+                &permission_map,
                 &[Box::new(AlwaysAcceptIdentityProvider)]
             ),
             AuthorizationResult::Unauthorized
         ));
     }
 
+    /// Verifies that the `authorize` function returns `AuthorizationResult::UnknownEndpoint` when
+    /// a permission cannot be found for the request. This is accomplished by passing in an empty
+    /// permission map.
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_unknown_endpoint() {
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                None,
+                &Default::default(),
+                &[Box::new(AlwaysAcceptIdentityProvider)]
+            ),
+            AuthorizationResult::UnknownEndpoint
+        ));
+    }
+
     /// Verifies that the `authorization` function returns
-    /// `AuthorizationResult::NoAuthorizationNecessary`when the requested endpoint does not require
+    /// `AuthorizationResult::NoAuthorizationNecessary` when the requested endpoint does not require
     /// authorization, whether the header is set or not. By using an identity provider that always
     /// returns `None`, we verify that authorization is being ignored.
     #[test]
     fn authorize_no_authorization_necessary() {
-        // Verify with header not set
-        #[cfg(feature = "biome-credentials")]
+        #[cfg(feature = "authorization")]
         {
+            let mut permission_map = PermissionMap::new();
+            permission_map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowUnauthenticated,
+            );
+
+            // Verify with header not set
             assert!(matches!(
                 authorize(
-                    #[cfg(feature = "authorization")]
                     &Method::Get,
-                    "/biome/register",
+                    "/test/endpoint",
                     None,
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
+                    &permission_map,
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
             ));
+
+            // Verify with header set
             assert!(matches!(
                 authorize(
-                    #[cfg(feature = "authorization")]
                     &Method::Get,
-                    "/biome/login",
-                    None,
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/biome/token",
-                    None,
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-        }
-        #[cfg(feature = "oauth")]
-        {
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/oauth/login",
-                    None,
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/oauth/callback",
-                    None,
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
+                    "/test/endpoint",
+                    Some("auth"),
+                    &permission_map,
                     &[Box::new(AlwaysRejectIdentityProvider)]
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
             ));
         }
 
-        // Verify with header set
-        #[cfg(feature = "biome-credentials")]
+        #[cfg(not(feature = "authorization"))]
         {
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/biome/register",
-                    Some("auth"),
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/biome/login",
-                    Some("auth"),
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/biome/token",
-                    Some("auth"),
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-        }
-        #[cfg(feature = "oauth")]
-        {
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/oauth/login",
-                    Some("auth"),
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
-            assert!(matches!(
-                authorize(
-                    #[cfg(feature = "authorization")]
-                    &Method::Get,
-                    "/oauth/callback",
-                    Some("auth"),
-                    #[cfg(feature = "authorization")]
-                    &Default::default(),
-                    &[Box::new(AlwaysRejectIdentityProvider)]
-                ),
-                AuthorizationResult::NoAuthorizationNecessary
-            ));
+            // Verify with header not set
+            #[cfg(feature = "biome-credentials")]
+            {
+                assert!(matches!(
+                    authorize(
+                        "/biome/register",
+                        None,
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+                assert!(matches!(
+                    authorize(
+                        "/biome/login",
+                        None,
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+                assert!(matches!(
+                    authorize(
+                        "/biome/token",
+                        None,
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+            }
+            #[cfg(feature = "oauth")]
+            {
+                assert!(matches!(
+                    authorize(
+                        "/oauth/login",
+                        None,
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+                assert!(matches!(
+                    authorize(
+                        "/oauth/callback",
+                        None,
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+            }
+
+            // Verify with header set
+            #[cfg(feature = "biome-credentials")]
+            {
+                assert!(matches!(
+                    authorize(
+                        "/biome/register",
+                        Some("auth"),
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+                assert!(matches!(
+                    authorize(
+                        "/biome/login",
+                        Some("auth"),
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+                assert!(matches!(
+                    authorize(
+                        "/biome/token",
+                        Some("auth"),
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+            }
+            #[cfg(feature = "oauth")]
+            {
+                assert!(matches!(
+                    authorize(
+                        "/oauth/login",
+                        Some("auth"),
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+                assert!(matches!(
+                    authorize(
+                        "/oauth/callback",
+                        Some("auth"),
+                        &[Box::new(AlwaysRejectIdentityProvider)]
+                    ),
+                    AuthorizationResult::NoAuthorizationNecessary
+                ));
+            }
         }
     }
 
@@ -444,6 +510,17 @@ mod tests {
             .unwrap()
             .unwrap();
 
+        #[cfg(feature = "authorization")]
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowAuthenticated,
+            );
+            map
+        };
+
         assert!(matches!(
             authorize(
                 #[cfg(feature = "authorization")]
@@ -451,7 +528,7 @@ mod tests {
                 "/test/endpoint",
                 Some("auth"),
                 #[cfg(feature = "authorization")]
-                &Default::default(),
+                &permission_map,
                 &[Box::new(AlwaysAcceptIdentityProvider)]
             ),
             AuthorizationResult::Authorized(identity) if identity == expected_identity
@@ -468,6 +545,17 @@ mod tests {
             .unwrap()
             .unwrap();
 
+        #[cfg(feature = "authorization")]
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowAuthenticated,
+            );
+            map
+        };
+
         assert!(matches!(
             authorize(
                 #[cfg(feature = "authorization")]
@@ -475,7 +563,7 @@ mod tests {
                 "/test/endpoint",
                 Some("auth"),
                 #[cfg(feature = "authorization")]
-                &Default::default(),
+                &permission_map,
                 &[
                     Box::new(AlwaysRejectIdentityProvider),
                     Box::new(AlwaysAcceptIdentityProvider),
@@ -496,6 +584,17 @@ mod tests {
             .unwrap()
             .unwrap();
 
+        #[cfg(feature = "authorization")]
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::AllowAuthenticated,
+            );
+            map
+        };
+
         assert!(matches!(
             authorize(
                 #[cfg(feature = "authorization")]
@@ -503,7 +602,7 @@ mod tests {
                 "/test/endpoint",
                 Some("auth"),
                 #[cfg(feature = "authorization")]
-                &Default::default(),
+                &permission_map,
                 &[
                     Box::new(AlwaysErrIdentityProvider),
                     Box::new(AlwaysAcceptIdentityProvider),

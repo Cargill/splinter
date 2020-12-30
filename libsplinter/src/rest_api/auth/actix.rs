@@ -184,6 +184,16 @@ where
                     .into_future(),
                 )
             }
+            AuthorizationResult::UnknownEndpoint => {
+                return Box::new(
+                    req.into_response(
+                        HttpResponse::NotFound()
+                            .json(ErrorResponse::not_found("endpoint not found"))
+                            .into_body(),
+                    )
+                    .into_future(),
+                )
+            }
         }
 
         Box::new(self.service.call(req).and_then(|mut res| {
@@ -204,6 +214,8 @@ mod tests {
     use actix_web::{http::StatusCode, test, web, App, HttpRequest};
 
     use crate::error::InternalError;
+    #[cfg(feature = "authorization")]
+    use crate::rest_api::auth::Permission;
     use crate::rest_api::auth::{identity::Identity, AuthorizationHeader};
 
     /// Verifies that the authorization middleware sets the `Access-Control-Allow-Credentials: true`
@@ -233,7 +245,7 @@ mod tests {
 
     /// Verifies that the authorization middleware returns a `403 Unauthorized` response when the
     /// `authorize` function returns an "unauthorized" result. This is simulated by not configuring
-    /// and identity providers.
+    /// any identity providers.
     #[test]
     fn auth_middleware_unauthorized() {
         let app = App::new()
@@ -241,7 +253,11 @@ mod tests {
             .route("/", web::get().to(|| HttpResponse::Ok()));
 
         #[cfg(feature = "authorization")]
-        let app = app.data(PermissionMap::default());
+        let app = {
+            let mut permission_map = PermissionMap::default();
+            permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
+            app.data(permission_map)
+        };
 
         let mut service = test::init_service(app);
 
@@ -249,6 +265,29 @@ mod tests {
         let resp = test::block_on(service.call(req)).unwrap();
 
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// Verifies that the authorization middleware returns a `404 Not Found` response when the
+    /// `authorize` function returns an "unkonwn endpoint" result.
+    #[test]
+    fn auth_middleware_not_found() {
+        let app = App::new()
+            .wrap(Authorization::new(vec![]))
+            .route("/", web::get().to(|| HttpResponse::Ok()));
+
+        #[cfg(feature = "authorization")]
+        let app = {
+            let mut permission_map = PermissionMap::default();
+            permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
+            app.data(permission_map)
+        };
+
+        let mut service = test::init_service(app);
+
+        let req = test::TestRequest::with_uri("/test").to_request();
+        let resp = test::block_on(service.call(req)).unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     /// Verifies that the authorization middleware allows requests that are properly authorized (the
@@ -271,7 +310,11 @@ mod tests {
         );
 
         #[cfg(feature = "authorization")]
-        let app = app.data(PermissionMap::default());
+        let app = {
+            let mut permission_map = PermissionMap::default();
+            permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
+            app.data(permission_map)
+        };
 
         let mut service = test::init_service(app);
 
