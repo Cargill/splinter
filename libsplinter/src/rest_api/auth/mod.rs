@@ -17,6 +17,8 @@
 #[cfg(feature = "rest-api-actix")]
 pub(crate) mod actix;
 pub mod identity;
+#[cfg(feature = "authorization")]
+pub mod roles;
 
 use std::str::FromStr;
 
