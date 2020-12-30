@@ -92,7 +92,7 @@ fn handle_post(
             let key = Key::new(
                 &new_key.public_key,
                 &new_key.encrypted_private_key,
-                user.id(),
+                &user,
                 &new_key.display_name,
             );
             let response_key = ResponseKey::from(&key);
@@ -134,7 +134,7 @@ fn handle_get(
             Err(response) => return response,
         };
 
-        match key_store.list_keys(Some(user.id())) {
+        match key_store.list_keys(Some(&user)) {
             Ok(keys) => Box::new(
                 HttpResponse::Ok()
                     .json(json!(
@@ -187,7 +187,7 @@ fn handle_patch(
 
             match key_store.update_key(
                 &updated_key.public_key,
-                user.id(),
+                &user,
                 &updated_key.new_display_name,
             ) {
                 Ok(()) => HttpResponse::Ok()
@@ -262,7 +262,7 @@ fn handle_fetch(
             Err(response) => return response,
         };
 
-        match key_store.fetch_key(&public_key, user.id()) {
+        match key_store.fetch_key(&public_key, &user) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
                     .json(json!({ "data": ResponseKey::from(&key) }))
@@ -318,7 +318,7 @@ fn handle_delete(
             Err(response) => return response,
         };
 
-        match key_store.remove_key(&public_key, user.id()) {
+        match key_store.remove_key(&public_key, &user) {
             Ok(key) => Box::new(
                 HttpResponse::Ok()
                     .json(json!(

@@ -176,7 +176,7 @@ fn add_modify_user_method(
                     Key::new(
                         &new_key.public_key,
                         &new_key.encrypted_private_key,
-                        user.id(),
+                        &user,
                         &new_key.display_name,
                     )
                 })
@@ -218,7 +218,7 @@ fn add_modify_user_method(
                         .collect::<Vec<ResponseKey>>();
 
                     match key_store.update_keys_and_password(
-                        user.id(),
+                        &user,
                         &new_password,
                         encryption_cost,
                         &new_key_pairs,
@@ -269,7 +269,7 @@ fn add_delete_user_method(
             Err(response) => return response,
         };
 
-        Box::new(match credentials_store.remove_credentials(user.id()) {
+        Box::new(match credentials_store.remove_credentials(&user) {
             Ok(()) => HttpResponse::Ok()
                 .json(json!({ "message": "User deleted sucessfully" }))
                 .into_future(),
@@ -279,7 +279,7 @@ fn add_delete_user_method(
                     HttpResponse::NotFound()
                         .json(ErrorResponse::not_found(&format!(
                             "User ID not found: {}",
-                            user.id()
+                            user
                         )))
                         .into_future()
                 }

@@ -14,8 +14,6 @@
 
 //! Authorization middleware for the Actix REST API
 
-use std::sync::Arc;
-
 use actix_web::dev::*;
 use actix_web::{
     http::{
@@ -29,76 +27,19 @@ use futures::{
     Future, IntoFuture, Poll,
 };
 
-use crate::error::InternalError;
 use crate::rest_api::ErrorResponse;
 
-use super::{
-    authorize, identity::IdentityProvider, AuthorizationHeader, AuthorizationMapping,
-    AuthorizationResult,
-};
+use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 
 /// Wrapper for the authorization middleware
 #[derive(Clone)]
 pub struct Authorization {
     identity_providers: Vec<Box<dyn IdentityProvider>>,
-    identity_extensions: Vec<Arc<IdentityExtension>>,
-}
-
-/// This is a wrapper to avoid multiple generic types.
-struct IdentityExtension {
-    inner: Box<
-        dyn Fn(&mut Extensions, &AuthorizationHeader) -> Result<(), InternalError> + Send + Sync,
-    >,
-}
-
-impl IdentityExtension {
-    /// Wrap a AuthorizationMapping implementation in an IdentityExtension, to provide the ability to
-    /// add a value from the AuthorizationMapping trait to the HttpRequest.
-    fn new<G, T>(get_by_auth: G) -> Self
-    where
-        T: 'static,
-        G: AuthorizationMapping<T> + Send + Sync + 'static,
-    {
-        Self {
-            inner: Box::new(move |extensions, identity_auth| {
-                debug!("executing auth mapping {}", std::any::type_name::<G>());
-                if let Some(xformed) = get_by_auth.get(identity_auth)? {
-                    extensions.insert(xformed);
-                }
-
-                Ok(())
-            }),
-        }
-    }
-
-    /// Extend the given HttpRequest::Extensions.
-    fn extend(
-        &self,
-        extensions: &mut Extensions,
-        authorization: &AuthorizationHeader,
-    ) -> Result<(), InternalError> {
-        (*self.inner)(extensions, authorization)
-    }
 }
 
 impl Authorization {
     pub fn new(identity_providers: Vec<Box<dyn IdentityProvider>>) -> Self {
-        Self {
-            identity_providers,
-            identity_extensions: Vec::new(),
-        }
-    }
-
-    /// Add an authorization mapping, provided by a AuthorizationMapping implementation.
-    pub fn with_authorization_mapping<M, T>(mut self, auth_mapping: M) -> Self
-    where
-        T: 'static,
-        M: AuthorizationMapping<T> + Send + Sync + 'static,
-    {
-        self.identity_extensions
-            .push(Arc::new(IdentityExtension::new(auth_mapping)));
-
-        self
+        Self { identity_providers }
     }
 }
 
@@ -118,7 +59,6 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ok(AuthorizationMiddleware {
             identity_providers: self.identity_providers.clone(),
-            identity_extensions: self.identity_extensions.clone(),
             service,
         })
     }
@@ -127,7 +67,6 @@ where
 /// Authorization middleware for the Actix REST API
 pub struct AuthorizationMiddleware<S> {
     identity_providers: Vec<Box<dyn IdentityProvider>>,
-    identity_extensions: Vec<Arc<IdentityExtension>>,
     service: S,
 }
 
@@ -180,27 +119,9 @@ where
             };
 
         match authorize(req.path(), auth_header, &self.identity_providers) {
-            AuthorizationResult::Authorized {
-                authorization,
-                identity,
-            } => {
-                for identity_extension in self.identity_extensions.iter() {
-                    let res =
-                        { identity_extension.extend(&mut req.extensions_mut(), &authorization) };
-
-                    if let Err(err) = res {
-                        error!("Unable to transform extension: {}", err);
-                        return Box::new(
-                            req.into_response(
-                                HttpResponse::InternalServerError()
-                                    .json(ErrorResponse::internal_error())
-                                    .into_body(),
-                            )
-                            .into_future(),
-                        );
-                    }
-                }
-                debug!("Authenticated user {}", identity);
+            AuthorizationResult::Authorized(identity) => {
+                debug!("Authenticated user {:?}", identity);
+                req.extensions_mut().insert(identity);
             }
             AuthorizationResult::NoAuthorizationNecessary => {}
             AuthorizationResult::Unauthorized => {
@@ -231,6 +152,9 @@ mod tests {
     use super::*;
 
     use actix_web::{http::StatusCode, test, web, App, HttpRequest};
+
+    use crate::error::InternalError;
+    use crate::rest_api::auth::{identity::Identity, AuthorizationHeader};
 
     /// Verifies that the authorization middleware sets the `Access-Control-Allow-Credentials: true`
     /// header for `OPTIONS` requests.
@@ -275,19 +199,17 @@ mod tests {
     }
 
     /// Verifies that the authorization middleware allows requests that are properly authorized (the
-    /// `authorize` function returns an "authorized" result), and that
-    /// `AuthorizationMapping`s/`IdentityExtension`s are properly applied.
+    /// `authorize` function returns an "authorized" result), and that the client's identity is
+    /// added to the request's extensions.
     #[test]
     fn auth_middleware_authorized() {
-        let auth_middleware = Authorization::new(vec![Box::new(AlwaysAcceptIdentityProvider)])
-            .with_authorization_mapping(MockAuthorizationMapping);
+        let auth_middleware = Authorization::new(vec![Box::new(AlwaysAcceptIdentityProvider)]);
 
         let mut app = test::init_service(App::new().wrap(auth_middleware).route(
             "/",
             web::get().to(|req: HttpRequest| {
-                // Verify that the expected string was added to the request extensions by the
-                // `MockAuthorizationMapping`
-                if req.extensions().get() == Some(&"test".to_string()) {
+                // Verify that the client's identity was added to the request extensions
+                if req.extensions().get() == Some(&Identity::Custom("identity".into())) {
                     HttpResponse::Ok()
                 } else {
                     HttpResponse::InternalServerError()
@@ -304,7 +226,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
-    /// An identity provider that always returns `Ok(Some("identity"))`
+    /// An identity provider that always returns `Ok(Some(_))`
     #[derive(Clone)]
     struct AlwaysAcceptIdentityProvider;
 
@@ -312,24 +234,12 @@ mod tests {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
-            Ok(Some("identity".into()))
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("identity".into())))
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
             Box::new(self.clone())
-        }
-    }
-
-    /// An `AuthorizationMapping` that just returns a string
-    struct MockAuthorizationMapping;
-
-    impl AuthorizationMapping<String> for MockAuthorizationMapping {
-        fn get(
-            &self,
-            _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
-            Ok(Some("test".to_string()))
         }
     }
 }

@@ -21,7 +21,7 @@ use cylinder::{jwt::JsonWebTokenParser, Verifier};
 use crate::error::InternalError;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::IdentityProvider;
+use super::{Identity, IdentityProvider};
 
 /// Extracts the public key from a Cylinder JWT
 ///
@@ -44,7 +44,7 @@ impl IdentityProvider for CylinderKeyIdentityProvider {
     fn get_identity(
         &self,
         authorization: &AuthorizationHeader,
-    ) -> Result<Option<String>, InternalError> {
+    ) -> Result<Option<Identity>, InternalError> {
         let token = match authorization {
             AuthorizationHeader::Bearer(BearerToken::Cylinder(token)) => token,
             _ => return Ok(None),
@@ -58,7 +58,7 @@ impl IdentityProvider for CylinderKeyIdentityProvider {
             })?)
             .parse(token)
             .ok()
-            .map(|parsed_token| parsed_token.issuer().as_hex()),
+            .map(|parsed_token| Identity::Key(parsed_token.issuer().as_hex())),
         )
     }
 

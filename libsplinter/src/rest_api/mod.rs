@@ -86,7 +86,7 @@ use std::thread;
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "oauth")]
-use crate::biome::{rest_api::auth::GetUserByOAuthAuthorization, OAuthUserSessionStore};
+use crate::biome::OAuthUserSessionStore;
 #[cfg(feature = "auth")]
 use crate::error::InvalidStateError;
 #[cfg(feature = "oauth")]
@@ -102,7 +102,7 @@ use auth::identity::cylinder::CylinderKeyIdentityProvider;
 #[cfg(feature = "oauth")]
 use auth::identity::oauth::OAuthUserIdentityProvider;
 #[cfg(feature = "auth")]
-use auth::{actix::Authorization, identity::IdentityProvider, AuthorizationMapping};
+use auth::{actix::Authorization, identity::IdentityProvider};
 
 pub use errors::{RequestError, ResponseError, RestApiServerError};
 
@@ -490,35 +490,6 @@ impl RequestGuard for ProtocolVersionRangeGuard {
     }
 }
 
-#[cfg(feature = "auth")]
-struct ConfigureAuthorizationMapping {
-    config_fn: Box<dyn FnMut(Authorization) -> Authorization>,
-}
-
-#[cfg(feature = "auth")]
-impl ConfigureAuthorizationMapping {
-    fn new<M, T>(auth_mapping: M) -> Self
-    where
-        T: 'static,
-        M: AuthorizationMapping<T> + Send + Sync + 'static,
-    {
-        let mut auth_mapping = Some(auth_mapping);
-        Self {
-            config_fn: Box::new(move |authorization| {
-                if let Some(auth_mapping) = auth_mapping.take() {
-                    authorization.with_authorization_mapping(auth_mapping)
-                } else {
-                    authorization
-                }
-            }),
-        }
-    }
-
-    fn configure(&mut self, authorization: Authorization) -> Authorization {
-        (*self.config_fn)(authorization)
-    }
-}
-
 /// Bind configuration for the REST API.
 #[derive(Clone)]
 pub enum RestApiBind {
@@ -551,8 +522,6 @@ pub struct RestApi {
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     identity_providers: Vec<Box<dyn IdentityProvider>>,
-    #[cfg(feature = "auth")]
-    authorization_mappings: Vec<ConfigureAuthorizationMapping>,
 }
 
 impl RestApi {
@@ -566,15 +535,7 @@ impl RestApi {
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist;
         #[cfg(feature = "auth")]
-        let mut authorization = Authorization::new(self.identity_providers.to_owned());
-
-        #[cfg(feature = "auth")]
-        {
-            let mut auth_mappings = self.authorization_mappings;
-            for auth_mapping in auth_mappings.iter_mut() {
-                authorization = auth_mapping.configure(authorization);
-            }
-        }
+        let authorization = Authorization::new(self.identity_providers.to_owned());
 
         #[cfg(feature = "rest-api-cors")]
         let cors = match &whitelist {
@@ -807,8 +768,6 @@ pub struct RestApiBuilder {
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     auth_configs: Vec<AuthConfig>,
-    #[cfg(feature = "auth")]
-    authorization_mappings: Vec<ConfigureAuthorizationMapping>,
 }
 
 impl Default for RestApiBuilder {
@@ -820,8 +779,6 @@ impl Default for RestApiBuilder {
             whitelist: None,
             #[cfg(feature = "auth")]
             auth_configs: Vec::new(),
-            #[cfg(feature = "auth")]
-            authorization_mappings: vec![],
         }
     }
 }
@@ -865,18 +822,6 @@ impl RestApiBuilder {
         self
     }
 
-    #[cfg(feature = "auth")]
-    pub fn with_authorization_mapping<M, T>(mut self, authorization_mapping: M) -> Self
-    where
-        T: 'static,
-        M: AuthorizationMapping<T> + Send + Sync + 'static,
-    {
-        self.authorization_mappings
-            .push(ConfigureAuthorizationMapping::new(authorization_mapping));
-
-        self
-    }
-
     // Allowing unused_mut because self must be mutable if feature `auth` is enabled
     #[allow(unused_mut)]
     pub fn build(mut self) -> Result<RestApi, RestApiServerError> {
@@ -906,10 +851,6 @@ impl RestApiBuilder {
                     } => {
                         identity_providers
                             .push(Box::new(biome_resource_manager.get_identity_provider()));
-                        self.authorization_mappings
-                            .push(ConfigureAuthorizationMapping::new(
-                                biome_resource_manager.get_authorization_mapping(),
-                            ));
                         self.resources
                             .append(&mut biome_resource_manager.resources());
                     }
@@ -987,12 +928,6 @@ impl RestApiBuilder {
                                 .build()?,
                         };
 
-                        // Add the configuration mapping for the Biome User value.
-                        self.authorization_mappings
-                            .push(ConfigureAuthorizationMapping::new(
-                                GetUserByOAuthAuthorization::new(oauth_user_session_store.clone()),
-                            ));
-
                         identity_providers.push(Box::new(OAuthUserIdentityProvider::new(
                             oauth_client.clone(),
                             oauth_user_session_store.clone(),
@@ -1024,8 +959,6 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers,
-            #[cfg(feature = "auth")]
-            authorization_mappings: self.authorization_mappings,
         })
     }
 
@@ -1049,8 +982,6 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers: vec![],
-            #[cfg(feature = "auth")]
-            authorization_mappings: self.authorization_mappings,
         })
     }
 }
@@ -1205,7 +1136,7 @@ mod test {
     #[cfg(feature = "auth")]
     use crate::error::InternalError;
     #[cfg(feature = "auth")]
-    use crate::rest_api::auth::AuthorizationHeader;
+    use crate::rest_api::auth::{identity::Identity, AuthorizationHeader};
 
     #[test]
     fn test_resource() {
@@ -1282,8 +1213,8 @@ mod test {
         fn get_identity(
             &self,
             _authorization: &AuthorizationHeader,
-        ) -> Result<Option<String>, InternalError> {
-            Ok(Some("".into()))
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("".into())))
         }
 
         /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for

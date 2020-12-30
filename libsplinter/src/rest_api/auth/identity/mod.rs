@@ -25,6 +25,19 @@ use crate::error::InternalError;
 
 use super::AuthorizationHeader;
 
+/// A REST API client's identity as determined by an [IdentityProvider]
+#[derive(Debug, PartialEq)]
+pub enum Identity {
+    /// A custom identity
+    Custom(String),
+    #[cfg(feature = "cylinder-jwt")]
+    /// A Cylinder public key
+    Key(String),
+    #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
+    /// A Biome user ID
+    User(String),
+}
+
 /// A service that fetches identities from a backing provider
 pub trait IdentityProvider: Send + Sync {
     /// Attempts to get the identity that corresponds to the given authorization header. This method
@@ -33,7 +46,7 @@ pub trait IdentityProvider: Send + Sync {
     fn get_identity(
         &self,
         authorization: &AuthorizationHeader,
-    ) -> Result<Option<String>, InternalError>;
+    ) -> Result<Option<Identity>, InternalError>;
 
     /// Clone implementation for `IdentityProvider`. The implementation of the `Clone` trait for
     /// `Box<dyn IdentityProvider>` calls this method.

@@ -19,8 +19,6 @@
 
 #[cfg(feature = "rest-api-actix")]
 mod actix;
-#[cfg(feature = "auth")]
-pub(crate) mod auth;
 mod config;
 mod error;
 mod resources;
@@ -64,8 +62,6 @@ use self::actix::token::make_token_route;
 use self::actix::user::make_user_routes;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix",))]
 use self::actix::{login::make_login_route, user::make_list_route, verify::make_verify_route};
-#[cfg(all(feature = "auth", feature = "biome-credentials"))]
-use self::auth::GetUserByBiomeAuthorization;
 #[cfg(feature = "biome-credentials")]
 use super::credentials::store::CredentialsStore;
 
@@ -116,15 +112,6 @@ impl BiomeRestResourceManager {
         BiomeUserIdentityProvider::new(
             self.token_secret_manager.clone(),
             default_validation(&self.rest_config.issuer()),
-        )
-    }
-
-    /// Creates a new Biome authorization mapping for Users
-    #[cfg(all(feature = "auth", feature = "biome-credentials"))]
-    pub fn get_authorization_mapping(&self) -> GetUserByBiomeAuthorization {
-        GetUserByBiomeAuthorization::new(
-            self.rest_config.clone(),
-            self.token_secret_manager.clone(),
         )
     }
 }
@@ -503,9 +490,6 @@ mod tests {
 
         #[cfg(feature = "auth")]
         {
-            rest_api_builder = rest_api_builder
-                .with_authorization_mapping(resource_manager.get_authorization_mapping());
-
             rest_api_builder = rest_api_builder.with_auth_configs(vec![AuthConfig::Biome {
                 biome_resource_manager: resource_manager,
             }]);

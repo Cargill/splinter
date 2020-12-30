@@ -21,7 +21,7 @@ use crate::error::InternalError;
 use crate::oauth::OAuthClient;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
 
-use super::IdentityProvider;
+use super::{Identity, IdentityProvider};
 
 /// The default amount of time since the last authentication for which the identity provider can
 /// assume the session is still valid
@@ -79,7 +79,7 @@ impl IdentityProvider for OAuthUserIdentityProvider {
     fn get_identity(
         &self,
         authorization: &AuthorizationHeader,
-    ) -> Result<Option<String>, InternalError> {
+    ) -> Result<Option<Identity>, InternalError> {
         let token = match authorization {
             AuthorizationHeader::Bearer(BearerToken::OAuth2(token)) => token,
             _ => return Ok(None),
@@ -107,7 +107,7 @@ impl IdentityProvider for OAuthUserIdentityProvider {
                     self.oauth_user_session_store
                         .update_session(updated_session)
                         .map_err(|err| InternalError::from_source(err.into()))?;
-                    Ok(Some(user_id))
+                    Ok(Some(Identity::User(user_id)))
                 }
                 Ok(None) => {
                     // The access token didn't work; see if there's a refresh token that can be used
@@ -133,7 +133,7 @@ impl IdentityProvider for OAuthUserIdentityProvider {
                                     // get Ok(None) or Err(_)), something's wrong that can't be
                                     // handled here.
                                     match self.oauth_client.get_subject(&access_token)? {
-                                        Some(_) => Ok(Some(user_id)),
+                                        Some(_) => Ok(Some(Identity::User(user_id))),
                                         None => Err(InternalError::with_message(
                                             "failed to authenticate user with new access token"
                                                 .into(),
@@ -169,7 +169,7 @@ impl IdentityProvider for OAuthUserIdentityProvider {
                 }
             }
         } else {
-            Ok(Some(user_id))
+            Ok(Some(Identity::User(user_id)))
         }
     }
 
@@ -241,7 +241,7 @@ mod tests {
             .get_identity(&authorization_header)
             .expect("Failed to get identity")
             .expect("Identity not found");
-        assert_eq!(identity, user_id);
+        assert_eq!(identity, Identity::User(user_id));
     }
 
     /// Verifies that the `OAuthUserIdentityProvider` returns `None` when the sessions store does
@@ -310,7 +310,10 @@ mod tests {
             .get_identity(&authorization_header)
             .expect("Failed to get identity")
             .expect("Identity not found");
-        assert_eq!(&identity, original_session.user().user_id());
+        assert_eq!(
+            identity,
+            Identity::User(original_session.user().user_id().into())
+        );
 
         let new_session = session_store
             .get_session(splinter_access_token)
@@ -470,7 +473,10 @@ mod tests {
             .get_identity(&authorization_header)
             .expect("Failed to get identity")
             .expect("Identity not found");
-        assert_eq!(&identity, original_session.user().user_id());
+        assert_eq!(
+            identity,
+            Identity::User(original_session.user().user_id().into())
+        );
 
         let new_session = session_store
             .get_session(splinter_access_token)
