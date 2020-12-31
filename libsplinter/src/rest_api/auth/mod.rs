@@ -18,6 +18,8 @@
 pub(crate) mod actix;
 pub mod identity;
 #[cfg(feature = "authorization")]
+mod permission_map;
+#[cfg(feature = "authorization")]
 pub mod roles;
 
 use std::str::FromStr;
