@@ -123,7 +123,7 @@ fn put_node(
                                 ),
                             ))
                         } else {
-                            registry.insert_node(node)
+                            registry.update_node(node)
                         }
                     })
                     .then(|res| {
@@ -485,6 +485,30 @@ mod tests {
                 .expect("mem registry lock was poisoned")
                 .insert(node.identity.clone(), node);
             Ok(())
+        }
+
+        fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+            self.nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .insert(node.identity.clone(), node);
+            Ok(())
+        }
+
+        fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+            let mut inner = self.nodes.lock().expect("mem registry lock was poisoned");
+
+            if inner.contains_key(&node.identity) {
+                inner.insert(node.identity.clone(), node);
+                Ok(())
+            } else {
+                Err(RegistryError::InvalidNode(
+                    InvalidNodeError::InvalidIdentity(
+                        node.identity,
+                        "Node does not exist in the registry".to_string(),
+                    ),
+                ))
+            }
         }
 
         fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
