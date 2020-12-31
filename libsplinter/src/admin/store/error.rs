@@ -31,7 +31,7 @@ pub enum AdminServiceStoreError {
     ConstraintViolationError(ConstraintViolationError),
     /// Represents when the underlying resource is unavailable
     ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
-    /// Represents when cab operation cannot be completed because the state of the underlying
+    /// Represents when an operation cannot be completed because the state of the underlying
     /// struct is inconsistent.
     InvalidStateError(InvalidStateError),
 }
