@@ -23,7 +23,7 @@ use crate::error::{InternalError, InvalidStateError};
 pub enum RoutingTableReaderError {
     /// Represents errors internal to the function.
     InternalError(InternalError),
-    /// Represents when cab operation cannot be completed because the state of the underlying
+    /// Represents when an operation cannot be completed because the state of the underlying
     /// struct is inconsistent.
     InvalidStateError(InvalidStateError),
 }
