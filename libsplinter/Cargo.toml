@@ -97,6 +97,7 @@ experimental = [
     # The following features are experimental:
     "admin-service-event-store",
     "auth",
+    "authorization",
     "biome-notifications",
     "biome-oauth",
     "biome-oauth-user-store-postgres",
@@ -119,6 +120,7 @@ benchmark = []
 admin-service = []
 admin-service-event-store = ["admin-service"]
 auth = []
+authorization = []
 biome-credentials = ["bcrypt"]
 biome-key-management = []
 biome-notifications = []
