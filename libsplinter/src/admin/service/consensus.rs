@@ -171,12 +171,14 @@ impl ProposalManager for AdminProposalManager {
             // consensus. The ID is the hash of the circuit management playload. This example will
             // not work with forking consensus, because it does not track previously accepted
             // proposals.
-            let mut proposal = Proposal::default();
-            proposal.id = sha256(&circuit_payload)
-                .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?
-                .as_bytes()
-                .into();
-            proposal.summary = expected_hash.as_bytes().into();
+            let mut proposal = Proposal {
+                id: sha256(&circuit_payload)
+                    .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?
+                    .as_bytes()
+                    .into(),
+                summary: expected_hash.as_bytes().into(),
+                ..Default::default()
+            };
 
             let mut required_verifiers = RequiredVerifiers::new();
             let mut verifiers = vec![];

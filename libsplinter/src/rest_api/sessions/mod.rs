@@ -40,18 +40,20 @@ pub trait TokenIssuer<T: Serialize> {
 
 #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
 pub(crate) fn default_validation(issuer: &str) -> Validation {
-    let mut validation = Validation::default();
-    validation.leeway = DEFAULT_LEEWAY;
-    validation.iss = Some(issuer.to_string());
-    validation
+    Validation {
+        leeway: DEFAULT_LEEWAY,
+        iss: Some(issuer.to_string()),
+        ..Default::default()
+    }
 }
 
 /// Validates authorization token but ignores the expiration date
 #[cfg(feature = "biome-credentials")]
 pub(crate) fn ignore_exp_validation(issuer: &str) -> Validation {
-    let mut validation = Validation::default();
-    validation.leeway = DEFAULT_LEEWAY;
-    validation.iss = Some(issuer.to_string());
-    validation.validate_exp = false;
-    validation
+    Validation {
+        leeway: DEFAULT_LEEWAY,
+        iss: Some(issuer.to_string()),
+        validate_exp: false,
+        ..Default::default()
+    }
 }
