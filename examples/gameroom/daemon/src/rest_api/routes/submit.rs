@@ -334,11 +334,8 @@ async fn check_batch_status(
                 // send request again to re-check the batch status
                 if batches_info
                     .iter()
-                    .any(|batch_info| match batch_info.status {
-                        BatchStatus::Pending => true,
-                        BatchStatus::Valid(_) => true,
-                        _ => false,
-                    })
+                    .any(|batch_info|
+                         matches!(batch_info.status, BatchStatus::Pending | BatchStatus::Valid(_)))
                     && Instant::now().duration_since(start_time) < Duration::from_secs(wait)
                 {
                     // wait one second before sending request again
