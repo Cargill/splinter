@@ -13,7 +13,14 @@
 // limitations under the License.
 
 mod models;
+mod operations;
 mod schema;
+
+use std::convert::TryFrom;
+
+use crate::error::{
+    ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
+};
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
@@ -21,6 +28,10 @@ use super::{
     Assignment, Identity, Role, RoleBasedAuthorizationStore, RoleBasedAuthorizationStoreError,
     RoleBuilder,
 };
+
+use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
+use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
+use operations::RoleBasedAuthorizationStoreOperations;
 
 /// A database-backed [RoleBasedAuthorizationStore], powered by [diesel].
 pub struct DieselRoleBasedAuthorizationStore<C: diesel::Connection + 'static> {
@@ -39,7 +50,8 @@ impl RoleBasedAuthorizationStore
 {
     /// Returns the role for the given ID, if one exists.
     fn get_role(&self, id: &str) -> Result<Option<Role>, RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).get_role(id)
     }
 
     /// Lists all roles.
@@ -55,7 +67,8 @@ impl RoleBasedAuthorizationStore
     ///
     /// Returns a `ConstraintViolation` error if a duplicate role ID is added.
     fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).add_role(role)
     }
 
     /// Updates a role.
@@ -134,5 +147,136 @@ impl RoleBasedAuthorizationStore
         Box::new(DieselRoleBasedAuthorizationStore {
             connection_pool: self.connection_pool.clone(),
         })
+    }
+}
+
+impl From<Role> for (models::RoleModel, Vec<models::RolePermissionModel>) {
+    fn from(role: Role) -> Self {
+        let (id, display_name, permissions) = role.into_parts();
+
+        let perm_models = permissions
+            .into_iter()
+            .map(|permission| models::RolePermissionModel {
+                role_id: id.clone(),
+                permission,
+            })
+            .collect::<Vec<_>>();
+        (models::RoleModel { id, display_name }, perm_models)
+    }
+}
+
+impl TryFrom<(models::RoleModel, Vec<models::RolePermissionModel>)> for Role {
+    type Error = InvalidStateError;
+
+    fn try_from(
+        (role_model, perm_models): (models::RoleModel, Vec<models::RolePermissionModel>),
+    ) -> Result<Self, Self::Error> {
+        RoleBuilder::new()
+            .with_id(role_model.id)
+            .with_display_name(role_model.display_name)
+            .with_permissions(
+                perm_models
+                    .into_iter()
+                    .map(|perm| perm.permission)
+                    .collect(),
+            )
+            .build()
+    }
+}
+
+impl From<diesel::result::Error> for RoleBasedAuthorizationStoreError {
+    fn from(err: diesel::result::Error) -> Self {
+        match err {
+            diesel::result::Error::DatabaseError(ref kind, _) => match kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    RoleBasedAuthorizationStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
+                    Box::new(err),
+                )),
+            },
+            _ => RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
+                Box::new(err),
+            )),
+        }
+    }
+}
+
+impl From<diesel::r2d2::PoolError> for RoleBasedAuthorizationStoreError {
+    fn from(err: diesel::r2d2::PoolError) -> Self {
+        RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(Box::new(err)))
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+mod tests {
+    use super::*;
+
+    use crate::rest_api::auth::roles::store::RoleBuilder;
+
+    use crate::migrations::run_sqlite_migrations;
+
+    use diesel::{
+        r2d2::{ConnectionManager, Pool},
+        sqlite::SqliteConnection,
+    };
+
+    /// This tests verifies the following:
+    /// 1. Adds a role via the store API
+    /// 2. Verifies it has been added by getting the role via the store API
+    #[test]
+    fn sqlite_add_and_get_role() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool);
+
+        let stored_role = role_based_auth_store
+            .get_role("test-role")
+            .expect("Unable to lookup role by id");
+        assert!(stored_role.is_none());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let stored_role = role_based_auth_store
+            .get_role("test-role")
+            .expect("Unable to lookup role by id")
+            .expect("Did not find the added role");
+
+        assert_eq!("test-role", stored_role.id());
+        assert_eq!("Test Role", stored_role.display_name());
+        assert_eq!(
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            stored_role.permissions()
+        );
+    }
+
+    /// Creates a connection pool for an in-memory SQLite database with only a single connection
+    /// available. Each connection is backed by a different in-memory SQLite database, so limiting
+    /// the pool to a single connection insures that the same DB is used for all operations.
+    fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        run_sqlite_migrations(&*pool.get().expect("Failed to get connection for migrations"))
+            .expect("Failed to run migrations");
+
+        pool
     }
 }
