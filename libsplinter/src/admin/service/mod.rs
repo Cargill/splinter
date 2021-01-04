@@ -661,8 +661,8 @@ impl Service for AdminService {
                     ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
                 })?;
 
-                if protocol > ADMIN_SERVICE_PROTOCOL_VERSION
-                    || protocol < ADMIN_SERVICE_PROTOCOL_MIN
+                if !(ADMIN_SERVICE_PROTOCOL_MIN..=ADMIN_SERVICE_PROTOCOL_VERSION)
+                    .contains(&protocol)
                 {
                     warn!(
                         "Received service protocol version is not supported: {}",
