@@ -14,6 +14,8 @@
 
 //! This module defines the store trait for roles and their assignments to identities.
 
+#[cfg(feature = "diesel")]
+mod diesel;
 mod error;
 
 use crate::error::InvalidStateError;
