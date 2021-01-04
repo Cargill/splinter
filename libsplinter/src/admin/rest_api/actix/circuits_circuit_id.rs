@@ -20,7 +20,10 @@ use futures::Future;
 
 use crate::admin::store::AdminServiceStore;
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 use super::super::error::CircuitFetchError;
 use super::super::resources;
@@ -118,7 +121,7 @@ mod tests {
         DurabilityType, PersistenceType, RouteType, ServiceBuilder,
     };
     use crate::migrations::run_sqlite_migrations;
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /admin/circuit/{circuit_id} request returns the expected circuit.

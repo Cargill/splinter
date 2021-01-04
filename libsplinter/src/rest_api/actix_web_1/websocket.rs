@@ -16,18 +16,58 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use actix::prelude::*;
+use actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
 use actix_web_actors::ws::{self, CloseCode, CloseReason};
 use futures::{
+    future::FutureResult,
     stream::{iter_ok, Stream},
     sync::mpsc::{unbounded, UnboundedSender},
+    IntoFuture,
 };
 use serde::ser::Serialize;
 
-use crate::rest_api::{errors::ResponseError, Request, Response};
+use super::ResponseError;
 
 /// Wait time in seconds between ping messages being sent by the ws server to the ws client
 const PING_INTERVAL: u64 = 30;
 
+pub struct Request(HttpRequest, web::Payload);
+
+impl From<(HttpRequest, web::Payload)> for Request {
+    fn from((http_request, payload): (HttpRequest, web::Payload)) -> Self {
+        Self(http_request, payload)
+    }
+}
+
+impl Into<(HttpRequest, web::Payload)> for Request {
+    fn into(self) -> (HttpRequest, web::Payload) {
+        (self.0, self.1)
+    }
+}
+
+pub struct Response(HttpResponse);
+
+impl From<HttpResponse> for Response {
+    fn from(res: HttpResponse) -> Self {
+        Self(res)
+    }
+}
+
+impl IntoFuture for Response {
+    type Item = HttpResponse;
+    type Error = ActixError;
+    type Future = FutureResult<HttpResponse, ActixError>;
+
+    fn into_future(self) -> Self::Future {
+        self.0.into_future()
+    }
+}
+
+impl std::fmt::Debug for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
 pub fn new_websocket_event_sender<T: Serialize + Debug>(
     req: Request,
     initial_events: Box<dyn Iterator<Item = T> + Send>,

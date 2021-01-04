@@ -20,7 +20,8 @@ use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
-    into_bytes, ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
+    actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
 };
 
 #[cfg(feature = "biome-key-management")]

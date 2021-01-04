@@ -18,7 +18,10 @@ use crate::actix_web::HttpResponse;
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
 use crate::biome::rest_api::resources::credentials::UsernamePassword;

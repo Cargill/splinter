@@ -23,8 +23,10 @@ use crate::biome::rest_api::{
 use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{
-    secrets::SecretManager, sessions::default_validation, ErrorResponse, HandlerFunction, Method,
-    ProtocolVersionRangeGuard, Resource,
+    actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
+    secrets::SecretManager,
+    sessions::default_validation,
+    ErrorResponse,
 };
 
 /// Defines a REST endpoint to remove any refresh tokens belonging to the user.

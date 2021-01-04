@@ -23,7 +23,10 @@ use futures::Future;
 use crate::admin::rest_api::error::ProposalFetchError;
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 use super::super::resources;
 
@@ -125,7 +128,7 @@ mod tests {
         service::proposal_store::{ProposalIter, ProposalStoreError},
         store::CircuitPredicate,
     };
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /admin/proposals/{circuit_id} request returns the expected proposal.

@@ -400,7 +400,7 @@ mod tests {
     use futures::future::IntoFuture;
     use tempdir::TempDir;
 
-    use crate::rest_api::{Method, Resource, RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{Method, Resource, RestApiBuilder, RestApiShutdownHandle};
 
     /// Verifies that a remote file that contains two nodes with the same identity is rejected (not
     /// loaded).

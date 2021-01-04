@@ -18,7 +18,7 @@ use futures::{Future, IntoFuture};
 use crate::admin::service::{AdminCommands, AdminServiceError};
 use crate::protocol;
 use crate::protos::admin::CircuitManagementPayload;
-use crate::rest_api::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGuard, Resource};
 use crate::service::ServiceError;
 
 pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) -> Resource {

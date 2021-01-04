@@ -22,7 +22,7 @@ mod resources;
 
 use crate::admin::service::AdminService;
 use crate::admin::store::AdminServiceStore;
-use crate::rest_api::{Resource, RestResourceProvider};
+use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 
 /// The admin service provides the following endpoints as REST API resources:
 ///

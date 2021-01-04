@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
 use crate::futures::Future;
-use crate::rest_api::{Continuation, Method, RequestGuard};
+use crate::rest_api::actix_web_1::{Continuation, Method, RequestGuard};
 
 use super::Service;
 

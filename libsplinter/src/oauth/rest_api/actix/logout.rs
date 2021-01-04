@@ -19,8 +19,11 @@ use futures::{future::IntoFuture, Future};
 
 use crate::biome::oauth::store::{OAuthUserSessionStore, OAuthUserSessionStoreError};
 use crate::protocol;
-use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    auth::{AuthorizationHeader, BearerToken},
+    ErrorResponse,
+};
 
 pub fn make_logout_route(oauth_user_session_store: Box<dyn OAuthUserSessionStore>) -> Resource {
     Resource::build("/oauth/logout")
@@ -100,7 +103,7 @@ mod tests {
 
     use crate::biome::oauth::store::InsertableOAuthUserSessionBuilder;
     use crate::biome::MemoryOAuthUserSessionStore;
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     const SPLINTER_ACCESS_TOKEN: &str = "splinter_access_token";
 

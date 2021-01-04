@@ -22,8 +22,11 @@ use futures::{future::IntoFuture, Future};
 use crate::admin::service::proposal_store::ProposalStore;
 use crate::admin::store::CircuitPredicate;
 use crate::protocol;
-use crate::rest_api::paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET};
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    ErrorResponse,
+};
 
 use super::super::error::ProposalListError;
 use super::super::resources;
@@ -227,7 +230,10 @@ mod tests {
             ProposedCircuitBuilder, ProposedNodeBuilder,
         },
     };
-    use crate::rest_api::{paging::Paging, RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::{
+        actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
+        paging::Paging,
+    };
 
     #[test]
     /// Tests a GET /admin/proposals request with no filters returns the expected proposals.

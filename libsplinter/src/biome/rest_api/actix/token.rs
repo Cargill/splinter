@@ -27,11 +27,11 @@ use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
-    into_bytes,
+    actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
     sessions::{
         default_validation, ignore_exp_validation, AccessTokenIssuer, ClaimsBuilder, TokenIssuer,
     },
-    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
+    ErrorResponse,
 };
 
 /// Defines a REST endpoint for requesting a new authorization token

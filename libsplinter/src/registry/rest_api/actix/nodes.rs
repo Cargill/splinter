@@ -28,8 +28,9 @@ use crate::registry::{
     RwRegistry,
 };
 use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    percent_encode_filter_query, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
+    percent_encode_filter_query, ErrorResponse,
 };
 
 type Filter = HashMap<String, (String, String)>;
@@ -257,7 +258,10 @@ mod tests {
     use serde_json::{to_value, Value as JsonValue};
 
     use crate::registry::NodeIter;
-    use crate::rest_api::{paging::Paging, RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::{
+        actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
+        paging::Paging,
+    };
 
     #[test]
     /// Tests a GET /registry/nodes request with no filters returns the expected nodes.

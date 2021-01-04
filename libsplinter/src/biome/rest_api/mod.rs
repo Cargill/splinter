@@ -27,11 +27,11 @@ use std::sync::Arc;
 
 #[cfg(feature = "biome-credentials")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
+use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::rest_api::{
     auth::identity::biome::BiomeUserIdentityProvider, sessions::default_validation,
 };
-use crate::rest_api::{Resource, RestResourceProvider};
 
 #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
 use self::actix::key_management::{
@@ -363,8 +363,8 @@ mod tests {
 
     use crate::biome::{MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore};
     #[cfg(feature = "auth")]
-    use crate::rest_api::AuthConfig;
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::AuthConfig;
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     #[derive(Serialize)]
     struct UsernamePassword {
