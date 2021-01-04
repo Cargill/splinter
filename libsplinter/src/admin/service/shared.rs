@@ -15,7 +15,6 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::iter::ExactSizeIterator;
-use std::iter::FromIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 #[cfg(not(feature = "admin-service-event-store"))]
@@ -1445,13 +1444,12 @@ impl AdminServiceShared {
         let ready = {
             if let Some(uninitialized_circuit) = self.uninitialized_circuits.get(circuit_id) {
                 if let Some(ref circuit_proposal) = uninitialized_circuit.circuit {
-                    let all_members = HashSet::from_iter(
-                        circuit_proposal
-                            .get_circuit_proposal()
-                            .members
-                            .iter()
-                            .map(|node| node.node_id.clone()),
-                    );
+                    let all_members = circuit_proposal
+                        .get_circuit_proposal()
+                        .members
+                        .iter()
+                        .map(|node| node.node_id.clone())
+                        .collect::<HashSet<String>>();
                     all_members.is_subset(&uninitialized_circuit.ready_members)
                 } else {
                     false
