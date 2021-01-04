@@ -96,6 +96,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "admin-service-event-store",
+    "admin-service-event-store-diesel",
     "auth",
     "authorization",
     "biome-notifications",
@@ -119,6 +120,7 @@ benchmark = []
 
 admin-service = []
 admin-service-event-store = ["admin-service"]
+admin-service-event-store-diesel = ["diesel", "admin-service-event-store"]
 auth = []
 authorization = []
 biome-credentials = ["bcrypt"]
