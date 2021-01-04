@@ -42,7 +42,6 @@
 mod timing;
 
 use std::collections::{HashSet, VecDeque};
-use std::iter::FromIterator;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
@@ -474,7 +473,11 @@ impl TwoPhaseEngine {
         let verifiers = if !proposal.consensus_data.is_empty() {
             let required_verifiers: RequiredVerifiers =
                 protobuf::parse_from_bytes(&proposal.consensus_data)?;
-            HashSet::from_iter(required_verifiers.verifiers.into_iter().map(PeerId::from))
+            required_verifiers
+                .verifiers
+                .into_iter()
+                .map(PeerId::from)
+                .collect::<HashSet<PeerId>>()
         } else {
             let mut verifiers = self.peers.clone();
             verifiers.insert(self.id.clone());
