@@ -25,7 +25,6 @@ pub use self::diesel::DieselRoleBasedAuthorizationStore;
 
 pub use error::RoleBasedAuthorizationStoreError;
 
-
 /// A Role is a named set of permissions.
 pub struct Role {
     id: String,
@@ -56,6 +55,12 @@ impl Role {
             display_name: Some(self.display_name),
             permissions: self.permissions,
         }
+    }
+
+    /// Converts this role into it's constituent parts.  These parts are in the tuple:
+    /// `(id, display_name, permissions)`.
+    pub fn into_parts(self) -> (String, String, Vec<String>) {
+        (self.id, self.display_name, self.permissions)
     }
 }
 
@@ -216,6 +221,12 @@ impl Assignment {
     pub fn into_update_builder(self) -> AssignmentUpdateBuilder {
         let Assignment { identity, roles } = self;
         AssignmentUpdateBuilder { identity, roles }
+    }
+
+    /// Converts this assignment into it's constituent parts.  These parts are in the tuple:
+    /// `(identity, roles)`.
+    pub fn into_parts(self) -> (Identity, Vec<String>) {
+        (self.identity, self.roles)
     }
 }
 
