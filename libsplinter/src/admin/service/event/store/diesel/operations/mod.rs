@@ -14,6 +14,11 @@
 
 //! Provides database operations for the `DieselAdminServiceEventStore`.
 
+pub(super) mod add_event;
+pub(super) mod list_events;
+pub(super) mod list_events_by_management_type_since;
+pub(super) mod list_events_since;
+
 pub struct AdminServiceEventStoreOperations<'a, C> {
     conn: &'a C,
 }
