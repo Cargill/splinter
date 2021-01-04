@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
 use std::path::Path;
 use std::time::Duration;
 
@@ -126,16 +125,15 @@ impl ServiceFactory for ScabbardFactory {
         let peer_services_str = args.get("peer_services").ok_or_else(|| {
             FactoryCreateError::InvalidArguments("peer_services argument not provided".into())
         })?;
-        let peer_services = HashSet::from_iter(
-            serde_json::from_str::<Vec<_>>(peer_services_str)
-                .map_err(|err| {
-                    FactoryCreateError::InvalidArguments(format!(
-                        "failed to parse peer_services list: {}",
-                        err,
-                    ))
-                })?
-                .into_iter(),
-        );
+        let peer_services = serde_json::from_str::<Vec<_>>(peer_services_str)
+            .map_err(|err| {
+                FactoryCreateError::InvalidArguments(format!(
+                    "failed to parse peer_services list: {}",
+                    err,
+                ))
+            })?
+            .into_iter()
+            .collect::<HashSet<String>>();
         let state_db_dir = Path::new(&self.state_db_dir);
         let receipt_db_dir = Path::new(&self.receipt_db_dir);
         let admin_keys_str = args.get("admin_keys").ok_or_else(|| {
