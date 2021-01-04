@@ -43,3 +43,21 @@ impl Error for RoleBasedAuthorizationStoreError {
         }
     }
 }
+
+impl From<InternalError> for RoleBasedAuthorizationStoreError {
+    fn from(err: InternalError) -> Self {
+        RoleBasedAuthorizationStoreError::InternalError(err)
+    }
+}
+
+impl From<InvalidStateError> for RoleBasedAuthorizationStoreError {
+    fn from(err: InvalidStateError) -> Self {
+        RoleBasedAuthorizationStoreError::InvalidState(err)
+    }
+}
+
+impl From<ConstraintViolationError> for RoleBasedAuthorizationStoreError {
+    fn from(err: ConstraintViolationError) -> Self {
+        RoleBasedAuthorizationStoreError::ConstraintViolation(err)
+    }
+}
