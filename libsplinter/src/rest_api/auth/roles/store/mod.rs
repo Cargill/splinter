@@ -20,7 +20,11 @@ mod error;
 
 use crate::error::InvalidStateError;
 
+#[cfg(feature = "diesel")]
+pub use self::diesel::DieselRoleBasedAuthorizationStore;
+
 pub use error::RoleBasedAuthorizationStoreError;
+
 
 /// A Role is a named set of permissions.
 pub struct Role {
