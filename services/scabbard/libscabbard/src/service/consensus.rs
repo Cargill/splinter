@@ -177,9 +177,11 @@ impl ProposalManager for ScabbardProposalManager {
             // Intentionally leaving out the previous_id and proposal_height fields, since this
             // service and two phase consensus don't use them. This means the proposal ID can just
             // be the summary.
-            let mut proposal = Proposal::default();
-            proposal.id = expected_hash.as_bytes().into();
-            proposal.summary = expected_hash.as_bytes().into();
+            let proposal = Proposal {
+                id: expected_hash.as_bytes().into(),
+                summary: expected_hash.as_bytes().into(),
+                ..Default::default()
+            };
 
             shared.add_proposed_batch(proposal.id.clone(), batch.clone());
 
