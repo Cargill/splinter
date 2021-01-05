@@ -574,7 +574,7 @@ impl Service for AdminService {
         message_bytes: &[u8],
         message_context: &ServiceMessageContext,
     ) -> Result<(), ServiceError> {
-        let admin_message: AdminMessage = protobuf::parse_from_bytes(message_bytes)
+        let admin_message: AdminMessage = Message::parse_from_bytes(message_bytes)
             .map_err(|err| ServiceError::InvalidMessageFormat(Box::new(err)))?;
 
         debug!("received admin message {:?}", admin_message);
@@ -1014,7 +1014,7 @@ mod tests {
         }
 
         let admin_envelope: admin::AdminMessage =
-            protobuf::parse_from_bytes(&message).expect("The message could not be parsed");
+            Message::parse_from_bytes(&message).expect("The message could not be parsed");
 
         assert_eq!(
             admin::AdminMessage_Type::SERVICE_PROTOCOL_VERSION_REQUEST,
@@ -1048,7 +1048,7 @@ mod tests {
         assert_eq!("admin::other-node".to_string(), recipient);
 
         let mut admin_envelope: admin::AdminMessage =
-            protobuf::parse_from_bytes(&message).expect("The message could not be parsed");
+            Message::parse_from_bytes(&message).expect("The message could not be parsed");
 
         assert_eq!(
             admin::AdminMessage_Type::PROPOSED_CIRCUIT,
@@ -1060,7 +1060,7 @@ mod tests {
             .take_circuit_payload();
 
         let header: admin::CircuitManagementPayload_Header =
-            protobuf::parse_from_bytes(envelope.get_header()).unwrap();
+            Message::parse_from_bytes(envelope.get_header()).unwrap();
         assert_eq!(
             admin::CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST,
             header.get_action()

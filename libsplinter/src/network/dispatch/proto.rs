@@ -23,7 +23,7 @@ where
     M: Message + Sized,
 {
     fn from_message_bytes(message_bytes: &[u8]) -> Result<Self, DispatchError> {
-        protobuf::parse_from_bytes(message_bytes)
+        Message::parse_from_bytes(message_bytes)
             .map_err(|err| DispatchError::DeserializationError(err.to_string()))
     }
 }

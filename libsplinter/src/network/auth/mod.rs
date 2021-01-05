@@ -214,7 +214,7 @@ impl AuthorizationConnector {
             let authed_identity = 'main: loop {
                 match connection.recv() {
                     Ok(bytes) => {
-                        let mut msg: NetworkMessage = match protobuf::parse_from_bytes(&bytes) {
+                        let mut msg: NetworkMessage = match Message::parse_from_bytes(&bytes) {
                             Ok(msg) => msg,
                             Err(err) => {
                                 warn!("Received invalid network message: {}", err);
@@ -563,7 +563,7 @@ pub(in crate::network) mod tests {
 
     fn read_auth_message(bytes: &[u8]) -> AuthorizationMessage {
         let msg: NetworkMessage =
-            protobuf::parse_from_bytes(bytes).expect("Cannot parse network message");
+            Message::parse_from_bytes(bytes).expect("Cannot parse network message");
 
         assert_eq!(NetworkMessageType::AUTHORIZATION, msg.get_message_type());
 

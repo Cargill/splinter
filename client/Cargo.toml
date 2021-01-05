@@ -27,7 +27,7 @@ description = """\
 [dependencies]
 log = "0.3.8"
 openssl = "0.10"
-protobuf = "2"
+protobuf = "2.19"
 splinter = { path = "../libsplinter" }
 url = "1.7.1"
 

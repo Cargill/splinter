@@ -176,11 +176,11 @@ pub mod tests {
             .name("test_admin_connect".to_string())
             .spawn(move || {
                 let msg_bytes = outgoing_receiver.recv().unwrap();
-                let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+                let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
                 let circuit_msg: CircuitMessage =
-                    protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+                    Message::parse_from_bytes(network_msg.get_payload()).unwrap();
                 let mut connect_request: ServiceConnectRequest =
-                    protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+                    Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
                 assert_eq!(connect_request.get_service_id(), "service_a");
                 assert_eq!(connect_request.get_circuit(), ADMIN_CIRCUIT_NAME);
@@ -224,11 +224,11 @@ pub mod tests {
             .name("test_standard_connect".to_string())
             .spawn(move || {
                 let msg_bytes = outgoing_receiver.recv().unwrap();
-                let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+                let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
                 let circuit_msg: CircuitMessage =
-                    protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+                    Message::parse_from_bytes(network_msg.get_payload()).unwrap();
                 let mut connect_request: ServiceConnectRequest =
-                    protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+                    Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
                 assert_eq!(connect_request.get_service_id(), "service_a");
                 assert_eq!(connect_request.get_circuit(), "test");
@@ -272,11 +272,11 @@ pub mod tests {
             .name("test_disconnect".to_string())
             .spawn(move || {
                 let msg_bytes = outgoing_receiver.recv().unwrap();
-                let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+                let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
                 let circuit_msg: CircuitMessage =
-                    protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+                    Message::parse_from_bytes(network_msg.get_payload()).unwrap();
                 let mut disconnect_request: ServiceDisconnectRequest =
-                    protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+                    Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
                 assert_eq!(disconnect_request.get_service_id(), "service_a");
                 assert_eq!(disconnect_request.get_circuit(), "test");

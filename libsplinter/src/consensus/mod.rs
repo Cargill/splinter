@@ -126,7 +126,7 @@ impl Into<ProposalProto> for Proposal {
 impl TryFrom<&[u8]> for Proposal {
     type Error = ProtobufError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        let proto: ProposalProto = protobuf::parse_from_bytes(bytes)?;
+        let proto: ProposalProto = Message::parse_from_bytes(bytes)?;
         Ok(Proposal::from(proto))
     }
 }
@@ -235,7 +235,7 @@ impl Into<ConsensusMessageProto> for ConsensusMessage {
 impl TryFrom<&[u8]> for ConsensusMessage {
     type Error = ProtobufError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        let proto: ConsensusMessageProto = protobuf::parse_from_bytes(bytes)?;
+        let proto: ConsensusMessageProto = Message::parse_from_bytes(bytes)?;
         Ok(ConsensusMessage::from(proto))
     }
 }

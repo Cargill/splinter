@@ -22,6 +22,8 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
+use protobuf::Message;
+
 use crate::network::dispatch::{ConnectionId, DispatchMessageSender, MessageSender};
 use crate::protos::component::{ComponentMessage, ComponentMessageType};
 use crate::transport::matrix::{
@@ -298,7 +300,7 @@ where
         // If we have the service, pass message to dispatcher, else print error
         if let Some(service_id) = service_id {
             let mut component_msg: ComponentMessage =
-                match protobuf::parse_from_bytes(&envelope.payload()) {
+                match Message::parse_from_bytes(&envelope.payload()) {
                     Ok(msg) => msg,
                     Err(err) => {
                         error!("Unable to dispatch message: {}", err);
@@ -522,13 +524,13 @@ pub mod tests {
 
             // Verify mesh received the same network echo back
             let envelope = mesh2.recv().expect("Cannot receive message");
-            let mut network_msg: ComponentMessage = protobuf::parse_from_bytes(&envelope.payload())
+            let mut network_msg: ComponentMessage = Message::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse ComponentMessage");
 
             if network_msg.get_message_type() == ComponentMessageType::COMPONENT_HEARTBEAT {
                 // try to get the service message
                 let envelope = mesh2.recv().expect("Cannot receive message");
-                network_msg = protobuf::parse_from_bytes(&envelope.payload())
+                network_msg = Message::parse_from_bytes(&envelope.payload())
                     .expect("Cannot parse ComponentMessage");
             }
 
@@ -538,7 +540,7 @@ pub mod tests {
             );
 
             let echo: service::ServiceProcessorMessage =
-                protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+                Message::parse_from_bytes(network_msg.get_payload()).unwrap();
 
             assert_eq!(echo.get_payload().to_vec(), b"test_retrieve".to_vec());
 
@@ -673,7 +675,7 @@ pub mod tests {
             );
 
             let service_processor_msg: service::ServiceProcessorMessage =
-                protobuf::parse_from_bytes(message.get_payload()).unwrap();
+                Message::parse_from_bytes(message.get_payload()).unwrap();
 
             let expected_msg = self
                 .expected_messages

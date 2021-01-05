@@ -534,11 +534,11 @@ mod tests {
     ) {
         assert_eq!(expected_recipient, &recipient);
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&message).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&message).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         assert_eq!(expected_circuit_msg_type, circuit_msg.get_message_type(),);
-        let circuit_msg: M = protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+        let circuit_msg: M = Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         detail_assertions(circuit_msg);
     }

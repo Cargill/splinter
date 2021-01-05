@@ -139,7 +139,7 @@ impl TwoPhaseEngine {
         network_sender: &dyn ConsensusNetworkSender,
         proposal_manager: &dyn ProposalManager,
     ) -> Result<(), ConsensusEngineError> {
-        let two_phase_msg: TwoPhaseMessage = protobuf::parse_from_bytes(&consensus_msg.message)?;
+        let two_phase_msg: TwoPhaseMessage = Message::parse_from_bytes(&consensus_msg.message)?;
         let proposal_id = ProposalId::from(two_phase_msg.get_proposal_id());
 
         match two_phase_msg.get_message_type() {
@@ -472,7 +472,7 @@ impl TwoPhaseEngine {
         // the list will be all peers.
         let verifiers = if !proposal.consensus_data.is_empty() {
             let required_verifiers: RequiredVerifiers =
-                protobuf::parse_from_bytes(&proposal.consensus_data)?;
+                Message::parse_from_bytes(&proposal.consensus_data)?;
             required_verifiers
                 .verifiers
                 .into_iter()
@@ -793,7 +793,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(0) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
@@ -825,7 +825,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(1) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_RESULT
@@ -851,7 +851,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(2) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
@@ -894,7 +894,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(3) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_RESULT
@@ -968,7 +968,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(0) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
@@ -1000,7 +1000,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(1) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_RESULT
@@ -1026,7 +1026,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(2) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
@@ -1069,7 +1069,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(3) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_RESULT
@@ -1150,7 +1150,7 @@ pub mod tests {
         loop {
             if let Some((msg, peer_id)) = network.sent_messages().get(0) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(peer_id, &vec![0].into());
                 assert_eq!(
                     msg.get_message_type(),
@@ -1211,7 +1211,7 @@ pub mod tests {
         loop {
             if let Some((msg, peer_id)) = network.sent_messages().get(1) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(peer_id, &vec![0].into());
                 assert_eq!(
                     msg.get_message_type(),
@@ -1288,7 +1288,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(0) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
@@ -1302,7 +1302,7 @@ pub mod tests {
         loop {
             if let Some(msg) = network.broadcast_messages().get(1) {
                 let msg: TwoPhaseMessage =
-                    protobuf::parse_from_bytes(msg).expect("failed to parse message");
+                    Message::parse_from_bytes(msg).expect("failed to parse message");
                 assert_eq!(
                     msg.get_message_type(),
                     TwoPhaseMessage_Type::PROPOSAL_RESULT

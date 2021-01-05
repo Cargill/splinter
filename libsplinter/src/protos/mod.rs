@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use protobuf::Message;
+
 #[derive(Debug)]
 pub enum ProtoConversionError {
     DeserializationError(String),
@@ -59,7 +61,7 @@ where
     N: FromProto<P>,
 {
     fn from_bytes(bytes: &[u8]) -> Result<Self, ProtoConversionError> {
-        let p: P = protobuf::parse_from_bytes(bytes)
+        let p: P = Message::parse_from_bytes(bytes)
             .map_err(|err| ProtoConversionError::DeserializationError(err.to_string()))?;
         N::from_proto(p)
     }
