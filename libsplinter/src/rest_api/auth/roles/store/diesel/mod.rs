@@ -33,6 +33,7 @@ use operations::add_assignment::RoleBasedAuthorizationStoreAddAssignment as _;
 use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
 use operations::get_assignment::RoleBasedAuthorizationStoreGetAssignment as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
+use operations::list_assignments::RoleBasedAuthorizationStoreListAssignments as _;
 use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
 use operations::remove_role::RoleBasedAuthorizationStoreRemoveRole as _;
 use operations::update_role::RoleBasedAuthorizationStoreUpdateRole as _;
@@ -111,7 +112,8 @@ impl RoleBasedAuthorizationStore
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>
     {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).list_assignments()
     }
 
     /// Adds an assignment.
@@ -538,6 +540,72 @@ mod tests {
 
         assert_eq!(
             &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
+    }
+
+    /// This test verifies the following:
+    /// 1. Adds a role.
+    /// 2. Add two assignments for that role
+    /// 3. Verifies the assignments were added via the store's list API
+    #[test]
+    fn sqlite_list_assignments() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-user-id-1".into()))
+            .with_roles(vec!["test-role".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::Key("some-key-1".into()))
+            .with_roles(vec!["test-role".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let mut stored_assignment_iter = role_based_auth_store
+            .list_assignments()
+            .expect("Unable to get assignment");
+
+        assert_eq!(2, stored_assignment_iter.len());
+
+        let stored_assignment = stored_assignment_iter
+            .next()
+            .expect("has 2 items, but returned None");
+        assert_eq!(
+            &Identity::User("some-user-id-1".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
+
+        let stored_assignment = stored_assignment_iter
+            .next()
+            .expect("has 2 items, but returned None");
+        assert_eq!(
+            &Identity::Key("some-key-1".into()),
             stored_assignment.identity()
         );
         assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
