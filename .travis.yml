@@ -74,7 +74,7 @@ jobs:
     - stage: Publish artifacts
       language: generic
       before_deploy:
-        - docker login -u splintercommunity -p $DOCKER_TOKEN
+        - echo "$DOCKERHUB_PASSWORD" | docker login -u splintercommunity --password-stdin
       deploy:
         - provider: script
           script: bash ci/publish-docker master
