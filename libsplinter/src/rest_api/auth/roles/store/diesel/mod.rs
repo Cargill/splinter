@@ -35,6 +35,7 @@ use operations::get_assignment::RoleBasedAuthorizationStoreGetAssignment as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
 use operations::list_assignments::RoleBasedAuthorizationStoreListAssignments as _;
 use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
+use operations::remove_assignment::RoleBasedAuthorizationStoreRemoveAssignment as _;
 use operations::remove_role::RoleBasedAuthorizationStoreRemoveRole as _;
 use operations::update_assignment::RoleBasedAuthorizationStoreUpdateAssignment as _;
 use operations::update_role::RoleBasedAuthorizationStoreUpdateRole as _;
@@ -153,7 +154,8 @@ impl RoleBasedAuthorizationStore
         &self,
         identity: &Identity,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_assignment(identity)
     }
 
     /// Clone into a boxed, dynamically dispatched store
@@ -711,6 +713,76 @@ mod tests {
             stored_assignment.identity()
         );
         assert_eq!(&vec!["test-role-2".to_string()], stored_assignment.roles());
+    }
+
+    /// This test verifies the following:
+    /// 1. Add a role
+    /// 2. Add an assignment for the role and verify with the store API
+    /// 3. Remove the assignment and verify its removal with the API
+    /// 4. Verify that the assignment records have been removed.
+    /// 5. Verify that the removal is idempotent
+    #[test]
+    fn sqlite_remove_assignment() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-user-id".into()))
+            .with_roles(vec!["test-role".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
+
+        role_based_auth_store
+            .remove_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to remove assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment");
+
+        assert!(stored_assignment.is_none());
+
+        // verify that the assignments have been removed (in a block, so the connection is dropped)
+        {
+            let connection = pool.get().expect("Unable to get connection");
+            let perms = schema::assignments::table
+                .filter(schema::assignments::identity.eq("some-user-id"))
+                .load::<models::RolePermissionModel>(&*connection)
+                .expect("Unable to load permissions");
+            assert!(perms.is_empty());
+        }
+
+        // verify that the removal is idempotent
+        role_based_auth_store
+            .remove_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to remove assignment");
     }
 
     /// Creates a connection pool for an in-memory SQLite database with only a single connection
