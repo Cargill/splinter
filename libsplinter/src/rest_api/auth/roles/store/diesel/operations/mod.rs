@@ -15,6 +15,7 @@
 pub(super) mod add_role;
 pub(super) mod get_role;
 pub(super) mod list_roles;
+pub(super) mod update_role;
 
 pub(super) struct RoleBasedAuthorizationStoreOperations<'a, C> {
     conn: &'a C,

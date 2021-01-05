@@ -32,6 +32,7 @@ use super::{
 use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
 use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
+use operations::update_role::RoleBasedAuthorizationStoreUpdateRole as _;
 use operations::RoleBasedAuthorizationStoreOperations;
 
 /// A database-backed [RoleBasedAuthorizationStore], powered by [diesel].
@@ -79,7 +80,8 @@ impl RoleBasedAuthorizationStore
     ///
     /// Returns a `InvalidState` error if the role does not exist.
     fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).update_role(role)
     }
 
     /// Removes a role.
@@ -320,6 +322,62 @@ mod tests {
         assert_eq!("Test Role 2", stored_role.display_name());
         assert_eq!(
             &["x".to_string(), "y".to_string(), "z".to_string()],
+            stored_role.permissions()
+        );
+    }
+
+    /// This tests verifies the following:
+    /// 1. Adds a role and verifies that it has been inserted
+    /// 2. Update the role and verifies that it has been changed, via the store API
+    #[test]
+    fn sqlite_update_role() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool);
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let stored_role = role_based_auth_store
+            .get_role("test-role")
+            .expect("Unable to lookup role by id")
+            .expect("Did not find the added role");
+
+        assert_eq!("test-role", stored_role.id());
+        assert_eq!("Test Role", stored_role.display_name());
+        assert_eq!(
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            stored_role.permissions()
+        );
+
+        let updated_role = stored_role
+            .into_update_builder()
+            .with_display_name("Updated Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string()])
+            .build()
+            .expect("Unable to build updated role");
+
+        role_based_auth_store
+            .update_role(updated_role)
+            .expect("Unable to update role");
+
+        let stored_role = role_based_auth_store
+            .get_role("test-role")
+            .expect("Unable to lookup role by id")
+            .expect("Did not find the added role");
+
+        assert_eq!("test-role", stored_role.id());
+        assert_eq!("Updated Test Role", stored_role.display_name());
+        assert_eq!(
+            &["a".to_string(), "b".to_string()],
             stored_role.permissions()
         );
     }
