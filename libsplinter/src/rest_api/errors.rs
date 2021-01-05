@@ -15,8 +15,6 @@
 use std::error::Error;
 use std::fmt;
 
-use actix_web::Error as ActixError;
-
 use crate::error::{InternalError, InvalidStateError};
 #[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
 use crate::oauth::OAuthClientBuildError;
@@ -74,40 +72,6 @@ impl fmt::Display for RestApiServerError {
             RestApiServerError::InvalidStateError(e) => write!(f, "{}", e),
             RestApiServerError::InternalError(e) => write!(f, "{}", e),
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum ResponseError {
-    ActixError(ActixError),
-    InternalError(String),
-}
-
-impl Error for ResponseError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            ResponseError::ActixError(err) => Some(err),
-            ResponseError::InternalError(_) => None,
-        }
-    }
-}
-
-impl fmt::Display for ResponseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ResponseError::ActixError(err) => write!(
-                f,
-                "Failed to get response when setting up websocket: {}",
-                err
-            ),
-            ResponseError::InternalError(msg) => f.write_str(&msg),
-        }
-    }
-}
-
-impl From<ActixError> for ResponseError {
-    fn from(err: ActixError) -> Self {
-        ResponseError::ActixError(err)
     }
 }
 

@@ -24,7 +24,7 @@ use crate::admin::service::{
     AdminCommands, AdminServiceEventSubscriber, AdminServiceStatus, AdminSubscriberError,
 };
 use crate::protocol;
-use crate::rest_api::{
+use crate::rest_api::actix_web_1::{
     new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request, Resource,
 };
 

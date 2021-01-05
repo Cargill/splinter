@@ -25,7 +25,10 @@ use crate::registry::{
     rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, RegistryError,
     RegistryReader, RegistryWriter, RwRegistry,
 };
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 pub fn make_nodes_identity_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
@@ -167,7 +170,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
 
     use crate::registry::{MetadataPredicate, NodeIter};
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
     /// Tests a GET /registry/nodes/{identity} request returns the expected node.

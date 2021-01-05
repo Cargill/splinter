@@ -29,7 +29,7 @@ use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::sessions::default_validation;
 use crate::rest_api::ErrorResponse;
 #[cfg(feature = "biome-credentials")]
-use crate::rest_api::{get_authorization_token, sessions::Claims};
+use crate::rest_api::{actix_web_1::get_authorization_token, sessions::Claims};
 
 /// Verifies the user has the correct permissions
 #[cfg(feature = "biome-credentials")]

@@ -20,7 +20,10 @@ use std::collections::HashMap;
 
 use crate::oauth::OAuthClient;
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 pub fn make_login_route(client: OAuthClient) -> Resource {
     Resource::build("/oauth/login")
@@ -93,7 +96,7 @@ mod tests {
         tests::TestSubjectProvider,
         PendingAuthorization,
     };
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     const CLIENT_ID: &str = "client_id";
     const CLIENT_SECRET: &str = "client_secret";

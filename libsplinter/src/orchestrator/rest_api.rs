@@ -14,7 +14,7 @@
 
 use crate::actix_web::HttpResponse;
 use crate::futures::IntoFuture;
-use crate::rest_api::{Resource, RestResourceProvider};
+use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 
 use super::ServiceOrchestrator;
 

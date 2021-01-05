@@ -18,7 +18,7 @@
 mod actix;
 mod resources;
 
-use crate::rest_api::{Resource, RestResourceProvider};
+use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 
 use super::RwRegistry;
 

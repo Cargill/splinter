@@ -26,7 +26,10 @@ use crate::oauth::{
     OAuthClient,
 };
 use crate::protocol;
-use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 pub fn make_callback_route(
     client: OAuthClient,
@@ -134,7 +137,7 @@ mod tests {
     use url::Url;
 
     use crate::biome::MemoryOAuthUserSessionStore;
-    use crate::rest_api::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     use crate::oauth::{
         new_basic_client,

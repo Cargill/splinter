@@ -18,8 +18,10 @@ use crate::actix_web::HttpResponse;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
-    into_bytes, secrets::SecretManager, sessions::default_validation, ErrorResponse, Method,
-    ProtocolVersionRangeGuard, Resource,
+    actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
+    secrets::SecretManager,
+    sessions::default_validation,
+    ErrorResponse,
 };
 
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};

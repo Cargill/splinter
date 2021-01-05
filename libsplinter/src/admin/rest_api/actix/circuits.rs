@@ -22,8 +22,9 @@ use std::collections::HashMap;
 use crate::admin::store::{AdminServiceStore, CircuitPredicate};
 use crate::protocol;
 use crate::rest_api::{
+    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
-    ErrorResponse, Method, ProtocolVersionRangeGuard, Resource,
+    ErrorResponse,
 };
 
 use super::super::error::CircuitListError;
@@ -221,7 +222,10 @@ mod tests {
         DurabilityType, PersistenceType, RouteType, ServiceBuilder,
     };
     use crate::migrations::run_sqlite_migrations;
-    use crate::rest_api::{paging::Paging, RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::{
+        actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
+        paging::Paging,
+    };
 
     #[test]
     /// Tests a GET /admin/circuits request with no filters returns the expected circuits.

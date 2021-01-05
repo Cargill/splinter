@@ -26,7 +26,8 @@ use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
-    into_bytes, ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
+    actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
 };
 
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys

@@ -23,7 +23,10 @@ use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
-use crate::rest_api::{into_bytes, ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
+use crate::rest_api::{
+    actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},
+    ErrorResponse,
+};
 
 /// This is the UUID namespace for Biome user IDs generated for users that register with Biome
 /// credentials. This will prevent collisions with Biome user IDs generated for users that login
