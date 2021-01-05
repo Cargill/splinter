@@ -35,6 +35,9 @@ addons:
     packages:
       - docker-ce
 
+before_script:
+  - echo "$DOCKERHUB_PASSWORD" | docker login -u splintercommunity --password-stdin
+
 jobs:
   include:
     - stage: Lint Gameroom Client
