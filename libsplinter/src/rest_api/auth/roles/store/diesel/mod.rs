@@ -25,11 +25,13 @@ use crate::error::{
 use diesel::r2d2::{ConnectionManager, Pool};
 
 use super::{
-    Assignment, Identity, Role, RoleBasedAuthorizationStore, RoleBasedAuthorizationStoreError,
-    RoleBuilder,
+    Assignment, AssignmentBuilder, Identity, Role, RoleBasedAuthorizationStore,
+    RoleBasedAuthorizationStoreError, RoleBuilder,
 };
 
+use operations::add_assignment::RoleBasedAuthorizationStoreAddAssignment as _;
 use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
+use operations::get_assignment::RoleBasedAuthorizationStoreGetAssignment as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
 use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
 use operations::remove_role::RoleBasedAuthorizationStoreRemoveRole as _;
@@ -100,7 +102,8 @@ impl RoleBasedAuthorizationStore
         &self,
         identity: &Identity,
     ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assignment(identity)
     }
 
     /// Lists all assignments.
@@ -121,7 +124,8 @@ impl RoleBasedAuthorizationStore
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).add_assignment(assignment)
     }
 
     /// Updates an assignment.
@@ -184,6 +188,59 @@ impl TryFrom<(models::RoleModel, Vec<models::RolePermissionModel>)> for Role {
                 perm_models
                     .into_iter()
                     .map(|perm| perm.permission)
+                    .collect(),
+            )
+            .build()
+    }
+}
+
+impl From<Assignment> for (models::IdentityModel, Vec<models::AssignmentModel>) {
+    fn from(assignment: Assignment) -> Self {
+        let (identity, roles) = assignment.into_parts();
+
+        let identity_model = match identity {
+            Identity::Key(identity) => models::IdentityModel {
+                identity,
+                identity_type: models::IdentityModelType::Key,
+            },
+            Identity::User(identity) => models::IdentityModel {
+                identity,
+                identity_type: models::IdentityModelType::User,
+            },
+        };
+
+        let role_models = roles
+            .into_iter()
+            .map(|role_id| models::AssignmentModel {
+                identity: identity_model.identity.clone(),
+                role_id,
+            })
+            .collect::<Vec<_>>();
+
+        (identity_model, role_models)
+    }
+}
+
+impl TryFrom<(models::IdentityModel, Vec<models::AssignmentModel>)> for Assignment {
+    type Error = InvalidStateError;
+
+    fn try_from(
+        (identity_model, assignments): (models::IdentityModel, Vec<models::AssignmentModel>),
+    ) -> Result<Self, Self::Error> {
+        let models::IdentityModel {
+            identity,
+            identity_type,
+        } = identity_model;
+        let identity = match identity_type {
+            models::IdentityModelType::Key => Identity::Key(identity),
+            models::IdentityModelType::User => Identity::User(identity),
+        };
+        AssignmentBuilder::new()
+            .with_identity(identity)
+            .with_roles(
+                assignments
+                    .into_iter()
+                    .map(|assignment| assignment.role_id)
                     .collect(),
             )
             .build()
@@ -441,6 +498,49 @@ mod tests {
         role_based_auth_store
             .remove_role("test-role")
             .expect("Unable to remove role");
+    }
+
+    /// This test verifies the following:
+    /// 1. Adds a role.
+    /// 2. Adds an assignment for that role
+    /// 3. Verifies the assignment was added via the store API
+    #[test]
+    fn sqlite_add_and_get_assignment() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-user-id".into()))
+            .with_roles(vec!["test-role".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
     }
 
     /// Creates a connection pool for an in-memory SQLite database with only a single connection

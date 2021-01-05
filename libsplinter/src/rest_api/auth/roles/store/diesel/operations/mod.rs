@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub(super) mod add_assignment;
 pub(super) mod add_role;
+pub(super) mod get_assignment;
 pub(super) mod get_role;
 pub(super) mod list_roles;
 pub(super) mod remove_role;
