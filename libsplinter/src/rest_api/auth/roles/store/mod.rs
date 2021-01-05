@@ -181,6 +181,7 @@ impl RoleUpdateBuilder {
 }
 
 /// An identity that may be assigned roles.
+#[derive(Debug, PartialEq)]
 pub enum Identity {
     /// A public key-based identity.
     Key(String),
