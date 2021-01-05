@@ -32,6 +32,7 @@ use super::{
 use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
 use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
+use operations::remove_role::RoleBasedAuthorizationStoreRemoveRole as _;
 use operations::update_role::RoleBasedAuthorizationStoreUpdateRole as _;
 use operations::RoleBasedAuthorizationStoreOperations;
 
@@ -90,7 +91,8 @@ impl RoleBasedAuthorizationStore
     ///
     /// Returns a `InvalidState` error if the role does not exist.
     fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_role(role_id)
     }
 
     /// Returns the role for the given Identity, if one exists.
@@ -226,6 +228,7 @@ mod tests {
     use crate::migrations::run_sqlite_migrations;
 
     use diesel::{
+        prelude::*,
         r2d2::{ConnectionManager, Pool},
         sqlite::SqliteConnection,
     };
@@ -380,6 +383,64 @@ mod tests {
             &["a".to_string(), "b".to_string()],
             stored_role.permissions()
         );
+    }
+
+    /// This tests verifies the following:
+    /// 1. Adds a role and verifies that it has been inserted
+    /// 2. Removes a role and verifies that it has been removed, via the store API
+    /// 3. Verify that the role permissions have been removed
+    #[test]
+    fn sqlite_remove_role() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let stored_role = role_based_auth_store
+            .get_role("test-role")
+            .expect("Unable to lookup role by id")
+            .expect("Did not find the added role");
+
+        assert_eq!("test-role", stored_role.id());
+        assert_eq!("Test Role", stored_role.display_name());
+        assert_eq!(
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            stored_role.permissions()
+        );
+
+        role_based_auth_store
+            .remove_role(stored_role.id())
+            .expect("Unable to remove role");
+
+        let stored_role = role_based_auth_store
+            .get_role("test-role")
+            .expect("Unable to lookup role by id");
+        assert!(stored_role.is_none());
+
+        // verify that the permissions have been removed (in a block, so the connection is dropped)
+        {
+            let connection = pool.get().expect("Unable to get connection");
+            let perms = schema::role_permissions::table
+                .filter(schema::role_permissions::role_id.eq("test-role"))
+                .load::<models::RolePermissionModel>(&*connection)
+                .expect("Unable to load permissions");
+            assert!(perms.is_empty());
+        }
+
+        // verify that the remove is idempotent
+        role_based_auth_store
+            .remove_role("test-role")
+            .expect("Unable to remove role");
     }
 
     /// Creates a connection pool for an in-memory SQLite database with only a single connection
