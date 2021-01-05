@@ -79,6 +79,17 @@ impl StoreFactory for SqliteStoreFactory {
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
         Box::new(crate::registry::DieselRegistry::new(self.pool.clone()))
     }
+
+    #[cfg(feature = "authorization")]
+    fn get_role_based_authorization_store(
+        &self,
+    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+        Box::new(
+            crate::rest_api::auth::roles::store::DieselRoleBasedAuthorizationStore::new(
+                self.pool.clone(),
+            ),
+        )
+    }
 }
 
 #[derive(Default, Debug)]

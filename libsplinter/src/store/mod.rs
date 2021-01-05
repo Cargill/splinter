@@ -58,6 +58,11 @@ pub trait StoreFactory {
 
     #[cfg(feature = "registry-database")]
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry>;
+
+    #[cfg(feature = "authorization")]
+    fn get_role_based_authorization_store(
+        &self,
+    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection
