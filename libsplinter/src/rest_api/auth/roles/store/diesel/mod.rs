@@ -36,6 +36,7 @@ use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
 use operations::list_assignments::RoleBasedAuthorizationStoreListAssignments as _;
 use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
 use operations::remove_role::RoleBasedAuthorizationStoreRemoveRole as _;
+use operations::update_assignment::RoleBasedAuthorizationStoreUpdateAssignment as _;
 use operations::update_role::RoleBasedAuthorizationStoreUpdateRole as _;
 use operations::RoleBasedAuthorizationStoreOperations;
 
@@ -139,7 +140,8 @@ impl RoleBasedAuthorizationStore
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).update_assignment(assignment)
     }
 
     /// Removes an assignment.
@@ -609,6 +611,106 @@ mod tests {
             stored_assignment.identity()
         );
         assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
+    }
+
+    /// This test verifies the following:
+    /// 1. Add two roles
+    /// 2. Add an assignment to one of the roles
+    /// 3. Update the assignment to have both roles and verify via the store API
+    /// 4. Update the assignment to only have the other role, and verify via the store API
+    #[test]
+    fn sqlite_update_assignment() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-user-id".into()))
+            .with_roles(vec!["test-role-1".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role-1".to_string()], stored_assignment.roles());
+
+        let updated_assignment = stored_assignment
+            .into_update_builder()
+            .with_roles(vec!["test-role-1".to_string(), "test-role-2".to_string()])
+            .build()
+            .expect("Unable to build updated assignment");
+
+        role_based_auth_store
+            .update_assignment(updated_assignment)
+            .expect("Unable to update assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(
+            &vec!["test-role-1".to_string(), "test-role-2".to_string()],
+            stored_assignment.roles()
+        );
+
+        let updated_assignment = stored_assignment
+            .into_update_builder()
+            .with_roles(vec!["test-role-2".to_string()])
+            .build()
+            .expect("Unable to build updated assignment");
+
+        role_based_auth_store
+            .update_assignment(updated_assignment)
+            .expect("Unable to update assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role-2".to_string()], stored_assignment.roles());
     }
 
     /// Creates a connection pool for an in-memory SQLite database with only a single connection

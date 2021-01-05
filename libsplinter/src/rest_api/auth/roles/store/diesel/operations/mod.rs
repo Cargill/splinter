@@ -19,6 +19,7 @@ pub(super) mod get_role;
 pub(super) mod list_assignments;
 pub(super) mod list_roles;
 pub(super) mod remove_role;
+pub(super) mod update_assignment;
 pub(super) mod update_role;
 
 pub(super) struct RoleBasedAuthorizationStoreOperations<'a, C> {
