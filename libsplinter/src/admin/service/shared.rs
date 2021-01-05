@@ -559,10 +559,8 @@ impl AdminServiceShared {
         &mut self,
         mut circuit_payload: CircuitManagementPayload,
     ) -> Result<(String, CircuitProposal), AdminSharedError> {
-        let header = protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(
-            circuit_payload.get_header(),
-        )
-        .map_err(MarshallingError::from)?;
+        let header = Message::parse_from_bytes(circuit_payload.get_header())
+            .map_err(MarshallingError::from)?;
         self.validate_circuit_management_payload(&circuit_payload, &header)?;
         self.verify_signature(&circuit_payload).map_err(|_| {
             AdminSharedError::ValidationFailed(String::from("Unable to verify signature"))
@@ -922,8 +920,7 @@ impl AdminServiceShared {
     pub fn submit(&mut self, payload: CircuitManagementPayload) -> Result<(), ServiceError> {
         debug!("Payload submitted: {:?}", payload);
 
-        let header =
-            protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.get_header())?;
+        let header = Message::parse_from_bytes(payload.get_header())?;
         self.validate_circuit_management_payload(&payload, &header)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
         self.verify_signature(&payload)?;
@@ -1942,8 +1939,8 @@ impl AdminServiceShared {
     }
 
     fn verify_signature(&self, payload: &CircuitManagementPayload) -> Result<bool, ServiceError> {
-        let header =
-            protobuf::parse_from_bytes::<CircuitManagementPayload_Header>(payload.get_header())?;
+        let header: CircuitManagementPayload_Header =
+            Message::parse_from_bytes(payload.get_header())?;
 
         let signature = payload.get_signature().to_vec();
         let public_key = header.get_requester().to_vec();

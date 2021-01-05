@@ -66,7 +66,7 @@ pub fn into_protobuf<M: Message>(
             body.extend_from_slice(&chunk);
             Ok::<_, ActixError>(body)
         })
-        .and_then(|body| match protobuf::parse_from_bytes::<M>(&body) {
+        .and_then(|body| match Message::parse_from_bytes(&body) {
             Ok(proto) => Ok(proto),
             Err(err) => Err(ErrorBadRequest(json!({ "message": format!("{}", err) }))),
         })

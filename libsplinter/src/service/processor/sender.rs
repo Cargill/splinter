@@ -312,11 +312,11 @@ pub mod tests {
             Err(err) => panic!("Received error: {}", err),
         };
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let direct_message: CircuitDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         assert_eq!(direct_message.get_recipient(), "service_b");
         assert_eq!(direct_message.get_sender(), "service_a");
@@ -357,11 +357,11 @@ pub mod tests {
             Err(err) => panic!("Received error: {}", err),
         };
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let mut direct_message: CircuitDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         assert_eq!(direct_message.get_recipient(), "service_b");
         assert_eq!(direct_message.get_sender(), "service_a");
@@ -424,11 +424,11 @@ pub mod tests {
             Err(err) => panic!("Received error: {}", err),
         };
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let direct_message: CircuitDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         assert_eq!(direct_message.get_recipient(), "service_b");
         assert_eq!(direct_message.get_sender(), "service_a");
@@ -462,11 +462,11 @@ pub mod tests {
             Err(err) => panic!("Received error: {}", err),
         };
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let direct_message: AdminDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         assert_eq!(direct_message.get_recipient(), "service_a");
         assert_eq!(direct_message.get_sender(), "service_b");
@@ -506,11 +506,11 @@ pub mod tests {
             Err(err) => panic!("Received error: {}", err),
         };
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let mut direct_message: AdminDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         assert_eq!(direct_message.get_recipient(), "service_a");
         assert_eq!(direct_message.get_sender(), "service_b");
@@ -572,11 +572,11 @@ pub mod tests {
             Err(err) => panic!("Received error: {}", err),
         };
 
-        let network_msg: NetworkMessage = protobuf::parse_from_bytes(&msg_bytes).unwrap();
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
-            protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let direct_message: AdminDirectMessage =
-            protobuf::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
 
         assert_eq!(direct_message.get_recipient(), "service_b");
         assert_eq!(direct_message.get_sender(), "service_a");

@@ -415,7 +415,7 @@ mod tests {
         assert_eq!(recipient, "1".to_string());
 
         let scabbard_message: ScabbardMessage =
-            protobuf::parse_from_bytes(&message).expect("failed to parse 1st scabbard message");
+            Message::parse_from_bytes(&message).expect("failed to parse 1st scabbard message");
         assert_eq!(
             scabbard_message.get_message_type(),
             ScabbardMessage_Type::CONSENSUS_MESSAGE
@@ -441,7 +441,7 @@ mod tests {
         assert!(peer_services.remove(&recipient));
 
         let scabbard_message: ScabbardMessage =
-            protobuf::parse_from_bytes(&message).expect("failed to parse 2nd scabbard message");
+            Message::parse_from_bytes(&message).expect("failed to parse 2nd scabbard message");
         assert_eq!(
             scabbard_message.get_message_type(),
             ScabbardMessage_Type::CONSENSUS_MESSAGE
@@ -464,7 +464,7 @@ mod tests {
         assert!(peer_services.remove(&recipient));
 
         let scabbard_message: ScabbardMessage =
-            protobuf::parse_from_bytes(&message).expect("failed to parse 3rd scabbard message");
+            Message::parse_from_bytes(&message).expect("failed to parse 3rd scabbard message");
         assert_eq!(
             scabbard_message.get_message_type(),
             ScabbardMessage_Type::CONSENSUS_MESSAGE

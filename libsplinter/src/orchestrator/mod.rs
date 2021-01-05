@@ -23,6 +23,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender};
+use protobuf::Message;
 use uuid::Uuid;
 
 use crate::channel;
@@ -353,7 +354,7 @@ pub fn run_incoming_loop(
             }
         };
 
-        let msg: NetworkMessage = protobuf::parse_from_bytes(&message_bytes)
+        let msg: NetworkMessage = Message::parse_from_bytes(&message_bytes)
             .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
         // if a service is waiting on a reply the inbound router will
@@ -361,14 +362,13 @@ pub fn run_incoming_loop(
         // the message, otherwise it will be sent to the inbound thread
         match msg.get_message_type() {
             NetworkMessageType::CIRCUIT => {
-                let mut circuit_msg: CircuitMessage =
-                    protobuf::parse_from_bytes(&msg.get_payload())
-                        .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
+                let mut circuit_msg: CircuitMessage = Message::parse_from_bytes(&msg.get_payload())
+                    .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
                 match circuit_msg.get_message_type() {
                     CircuitMessageType::ADMIN_DIRECT_MESSAGE => {
                         let admin_direct_message: AdminDirectMessage =
-                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                            Message::parse_from_bytes(circuit_msg.get_payload())
                                 .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
                         inbound_router
                             .route(
@@ -382,7 +382,7 @@ pub fn run_incoming_loop(
                     }
                     CircuitMessageType::CIRCUIT_DIRECT_MESSAGE => {
                         let direct_message: CircuitDirectMessage =
-                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                            Message::parse_from_bytes(circuit_msg.get_payload())
                                 .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
                         inbound_router
                             .route(
@@ -396,7 +396,7 @@ pub fn run_incoming_loop(
                     }
                     CircuitMessageType::SERVICE_CONNECT_RESPONSE => {
                         let response: ServiceConnectResponse =
-                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                            Message::parse_from_bytes(circuit_msg.get_payload())
                                 .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
                         inbound_router
                             .route(
@@ -410,7 +410,7 @@ pub fn run_incoming_loop(
                     }
                     CircuitMessageType::SERVICE_DISCONNECT_RESPONSE => {
                         let response: ServiceDisconnectResponse =
-                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                            Message::parse_from_bytes(circuit_msg.get_payload())
                                 .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
                         inbound_router
                             .route(
@@ -424,7 +424,7 @@ pub fn run_incoming_loop(
                     }
                     CircuitMessageType::CIRCUIT_ERROR_MESSAGE => {
                         let response: CircuitError =
-                            protobuf::parse_from_bytes(circuit_msg.get_payload())
+                            Message::parse_from_bytes(circuit_msg.get_payload())
                                 .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
                         warn!("Received circuit error message {:?}", response);
                     }
@@ -458,7 +458,7 @@ fn run_inbound_loop(
 
         match service_message {
             (CircuitMessageType::ADMIN_DIRECT_MESSAGE, msg) => {
-                let mut admin_direct_message: AdminDirectMessage = protobuf::parse_from_bytes(&msg)
+                let mut admin_direct_message: AdminDirectMessage = Message::parse_from_bytes(&msg)
                     .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
                 let services = services
@@ -496,7 +496,7 @@ fn run_inbound_loop(
             }
             (CircuitMessageType::CIRCUIT_DIRECT_MESSAGE, msg) => {
                 let mut circuit_direct_message: CircuitDirectMessage =
-                    protobuf::parse_from_bytes(&msg)
+                    Message::parse_from_bytes(&msg)
                         .map_err(|err| OrchestratorError::Internal(Box::new(err)))?;
 
                 let services = services

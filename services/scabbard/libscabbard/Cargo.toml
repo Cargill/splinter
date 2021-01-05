@@ -30,7 +30,7 @@ cylinder = "0.2"
 futures = { version = "0.1", optional = true }
 log = "0.3.0"
 openssl = "0.10"
-protobuf = "2"
+protobuf = "2.19"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
 sawtooth = { version = "0.6", default-features = false, features = ["lmdb-store", "receipt-store"] }
 sawtooth-sabre = "0.7"

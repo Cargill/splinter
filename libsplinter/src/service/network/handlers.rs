@@ -991,11 +991,11 @@ mod tests {
         detail_assertions: F,
     ) {
         let component_message: component::ComponentMessage =
-            protobuf::parse_from_bytes(msg_bytes).unwrap();
+            Message::parse_from_bytes(msg_bytes).unwrap();
         let service_msg: service::ServiceMessage =
-            protobuf::parse_from_bytes(component_message.get_payload()).unwrap();
+            Message::parse_from_bytes(component_message.get_payload()).unwrap();
         assert_eq!(expected_service_msg_type, service_msg.get_message_type(),);
-        let service_msg_paylaod: M = protobuf::parse_from_bytes(service_msg.get_payload()).unwrap();
+        let service_msg_paylaod: M = Message::parse_from_bytes(service_msg.get_payload()).unwrap();
 
         detail_assertions(service_msg_paylaod);
     }

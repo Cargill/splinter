@@ -26,6 +26,8 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
+use protobuf::Message;
+
 use crate::network::dispatch::DispatchMessageSender;
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::transport::matrix::{
@@ -335,7 +337,7 @@ where
         // If we have the peer, pass message to dispatcher, else print error
         if let Some(peer_id) = peer_id {
             let mut network_msg: NetworkMessage =
-                match protobuf::parse_from_bytes(&envelope.payload()) {
+                match Message::parse_from_bytes(&envelope.payload()) {
                     Ok(msg) => msg,
                     Err(err) => {
                         error!("Unable to dispatch message: {}", err);
@@ -559,14 +561,14 @@ pub mod tests {
             mesh2.send(envelope).expect("Unable to send message");
             // Verify mesh received the same network echo back
             let envelope = mesh2.recv().expect("Cannot receive message");
-            let network_msg: NetworkMessage = protobuf::parse_from_bytes(&envelope.payload())
+            let network_msg: NetworkMessage = Message::parse_from_bytes(&envelope.payload())
                 .expect("Cannot parse NetworkMessage");
             assert_eq!(
                 network_msg.get_message_type(),
                 NetworkMessageType::NETWORK_ECHO
             );
 
-            let echo: NetworkEcho = protobuf::parse_from_bytes(network_msg.get_payload()).unwrap();
+            let echo: NetworkEcho = Message::parse_from_bytes(network_msg.get_payload()).unwrap();
             assert_eq!(echo.get_payload().to_vec(), b"test_retrieve".to_vec());
 
             // Send a message back to PeerInterconnect that will shutdown the test
