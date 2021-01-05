@@ -31,6 +31,7 @@ use super::{
 
 use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
+use operations::list_roles::RoleBasedAuthorizationStoreListRoles as _;
 use operations::RoleBasedAuthorizationStoreOperations;
 
 /// A database-backed [RoleBasedAuthorizationStore], powered by [diesel].
@@ -58,7 +59,8 @@ impl RoleBasedAuthorizationStore
     fn list_roles(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
-        todo!()
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).list_roles()
     }
 
     /// Adds a role.
@@ -260,6 +262,64 @@ mod tests {
         assert_eq!("Test Role", stored_role.display_name());
         assert_eq!(
             &["a".to_string(), "b".to_string(), "c".to_string()],
+            stored_role.permissions()
+        );
+    }
+
+    /// This tests verifies the following:
+    /// 1. Adds two roles via the store API
+    /// 2. Verifies they have been added by listing the roles via the store API
+    #[test]
+    fn sqlite_list_roles() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool);
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let mut stored_role_iter = role_based_auth_store
+            .list_roles()
+            .expect("Unable to lookup role by id");
+
+        assert_eq!(2, stored_role_iter.len());
+
+        let stored_role = stored_role_iter
+            .next()
+            .expect("has 2 items, but returned None");
+        assert_eq!("test-role-1", stored_role.id());
+        assert_eq!("Test Role 1", stored_role.display_name());
+        assert_eq!(
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            stored_role.permissions()
+        );
+
+        let stored_role = stored_role_iter
+            .next()
+            .expect("has 2 items, but returned None");
+        assert_eq!("test-role-2", stored_role.id());
+        assert_eq!("Test Role 2", stored_role.display_name());
+        assert_eq!(
+            &["x".to_string(), "y".to_string(), "z".to_string()],
             stored_role.permissions()
         );
     }
