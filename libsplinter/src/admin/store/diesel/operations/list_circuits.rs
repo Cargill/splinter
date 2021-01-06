@@ -43,6 +43,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
 {
     fn list_circuits(
         &self,
@@ -99,25 +100,22 @@ where
 
                 // Collect the `Circuit` members and put them in a HashMap to associate the list
                 // of `node_ids` to the `circuit_id`
-                let mut circuit_members: HashMap<String, Vec<String>> = HashMap::new();
+                let mut circuit_members: HashMap<String, Vec<CircuitMemberModel>> = HashMap::new();
                 for member in circuit_member::table
                     .filter(circuit_member::circuit_id.eq_any(&circuit_ids))
                     .load::<CircuitMemberModel>(self.conn)?
                 {
                     if let Some(members) = circuit_members.get_mut(&member.circuit_id) {
-                        members.push(member.node_id.to_string());
+                        members.push(member);
                     } else {
-                        circuit_members.insert(
-                            member.circuit_id.to_string(),
-                            vec![member.node_id.to_string()],
-                        );
+                        circuit_members.insert(member.circuit_id.to_string(), vec![member]);
                     }
                 }
 
-                // Create HashMap of (`circuit_id`, ` service_id`) to a `ServiceBuilder`
-                let mut services: HashMap<(String, String), ServiceBuilder> = HashMap::new();
+                // Create HashMap of (`circuit_id`, ` service_id`) to a `ServiceModel`
+                let mut services: HashMap<(String, String), ServiceModel> = HashMap::new();
                 // Create HashMap of (`circuit_id`, `service_id`) to the associated argument values
-                let mut arguments_map: HashMap<(String, String), Vec<(String, String)>> =
+                let mut arguments_map: HashMap<(String, String), Vec<ServiceArgumentModel>> =
                     HashMap::new();
                 // Collects all `service` and `service_argument` entries using an inner_join on the
                 // `service_id`, since the relationship between `service` and `service_argument` is
@@ -149,14 +147,14 @@ where
                             service.circuit_id.to_string(),
                             service.service_id.to_string(),
                         )) {
-                            args.push((arg_model.key.to_string(), arg_model.value.to_string()));
+                            args.push(arg_model);
                         } else {
                             arguments_map.insert(
                                 (
                                     service.circuit_id.to_string(),
                                     service.service_id.to_string(),
                                 ),
-                                vec![(arg_model.key.to_string(), arg_model.value.to_string())],
+                                vec![arg_model],
                             );
                         }
                     }
@@ -166,21 +164,34 @@ where
                             service.circuit_id.to_string(),
                             service.service_id.to_string(),
                         ))
-                        .or_insert_with(|| {
-                            ServiceBuilder::new()
-                                .with_service_id(&service.service_id)
-                                .with_service_type(&service.service_type)
-                                .with_node_id(&service.node_id)
-                        });
+                        .or_insert_with(|| service);
                 }
                 // Collect the `Services` mapped to `circuit_ids` after adding any
                 // `service_arguments` to the `ServiceBuilder`.
                 let mut built_services: HashMap<String, Vec<Service>> = HashMap::new();
-                for ((circuit_id, service_id), mut builder) in services.into_iter() {
+
+                let mut service_vec: Vec<((String, String), ServiceModel)> = services
+                    .into_iter()
+                    .map(|((circuit_id, service_id), service)| ((circuit_id, service_id), service))
+                    .collect();
+                service_vec.sort_by_key(|(_, service)| service.position);
+
+                for ((circuit_id, service_id), service) in service_vec.into_iter() {
+                    let mut builder = ServiceBuilder::new()
+                        .with_service_id(&service.service_id)
+                        .with_service_type(&service.service_type)
+                        .with_node_id(&service.node_id);
+
                     if let Some(args) =
-                        arguments_map.get(&(circuit_id.to_string(), service_id.to_string()))
+                        arguments_map.get_mut(&(circuit_id.to_string(), service_id.to_string()))
                     {
-                        builder = builder.with_arguments(&args);
+                        args.sort_by_key(|arg| arg.position);
+                        builder = builder.with_arguments(
+                            &args
+                                .iter()
+                                .map(|args| (args.key.to_string(), args.value.to_string()))
+                                .collect::<Vec<(String, String)>>(),
+                        );
                     }
                     let service = builder
                         .build()
@@ -208,8 +219,14 @@ where
                     if let Some(display_name) = &model.display_name {
                         circuit_builder = circuit_builder.with_display_name(&display_name);
                     }
-                    if let Some(members) = circuit_members.get(&model.circuit_id) {
-                        circuit_builder = circuit_builder.with_members(&members);
+                    if let Some(members) = circuit_members.get_mut(&model.circuit_id) {
+                        members.sort_by_key(|member| member.position);
+                        circuit_builder = circuit_builder.with_members(
+                            &members
+                                .iter()
+                                .map(|member| member.node_id.to_string())
+                                .collect::<Vec<String>>(),
+                        );
                     }
                     if let Some(services) = built_services.get(&model.circuit_id) {
                         circuit_builder = circuit_builder.with_roster(&services);

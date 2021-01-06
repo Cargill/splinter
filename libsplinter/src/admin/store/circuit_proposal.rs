@@ -304,9 +304,7 @@ impl CircuitProposalBuilder {
             InvalidStateError::with_message("unable to build, missing field: `circuit`".to_string())
         })?;
 
-        let mut votes = self.votes.unwrap_or_default();
-
-        votes.sort_by_key(|vote| vote.voter_node_id().to_string());
+        let votes = self.votes.unwrap_or_default();
 
         let requester = self.requester.ok_or_else(|| {
             InvalidStateError::with_message(

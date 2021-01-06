@@ -15,8 +15,11 @@
 //! Provides the "add circuit" operation for the `DieselAdminServiceStore`.
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 use diesel::{dsl::insert_into, prelude::*};
+
+use crate::error::InternalError;
 
 use super::AdminServiceStoreOperations;
 
@@ -71,11 +74,19 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             // Create a list of circuit members from `nodes`
             let circuit_members: Vec<CircuitMemberModel> = nodes
                 .iter()
-                .map(|node| CircuitMemberModel {
-                    circuit_id: circuit.circuit_id().into(),
-                    node_id: node.node_id().into(),
+                .enumerate()
+                .map(|(idx, node)| {
+                    Ok(CircuitMemberModel {
+                        circuit_id: circuit.circuit_id().into(),
+                        node_id: node.node_id().into(),
+                        position: i32::try_from(idx).map_err(|_| {
+                            AdminServiceStoreError::InternalError(InternalError::with_message(
+                                "Unable to convert index into i32".to_string(),
+                            ))
+                        })?,
+                    })
                 })
-                .collect();
+                .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()?;
             insert_into(circuit_member::table)
                 .values(circuit_members)
                 .execute(self.conn)?;
@@ -113,11 +124,11 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             }
 
             // Build `Services` and all associated data from `circuit`
-            let circuit_services: Vec<ServiceModel> = Vec::from(&circuit);
+            let circuit_services: Vec<ServiceModel> = Vec::try_from(&circuit)?;
             insert_into(service::table)
                 .values(&circuit_services)
                 .execute(self.conn)?;
-            let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
+            let service_argument: Vec<ServiceArgumentModel> = Vec::try_from(&circuit)?;
             insert_into(service_argument::table)
                 .values(&service_argument)
                 .execute(self.conn)?;
@@ -158,11 +169,19 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             // Create a list of circuit members from `nodes`
             let circuit_members: Vec<CircuitMemberModel> = nodes
                 .iter()
-                .map(|node| CircuitMemberModel {
-                    circuit_id: circuit.circuit_id().into(),
-                    node_id: node.node_id().into(),
+                .enumerate()
+                .map(|(idx, node)| {
+                    Ok(CircuitMemberModel {
+                        circuit_id: circuit.circuit_id().into(),
+                        node_id: node.node_id().into(),
+                        position: i32::try_from(idx).map_err(|_| {
+                            AdminServiceStoreError::InternalError(InternalError::with_message(
+                                "Unable to convert index into i32".to_string(),
+                            ))
+                        })?,
+                    })
                 })
-                .collect();
+                .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()?;
             insert_into(circuit_member::table)
                 .values(circuit_members)
                 .execute(self.conn)?;
@@ -200,11 +219,11 @@ impl<'a> AdminServiceStoreAddCircuitOperation
             }
 
             // Build `Services` and all associated data from `circuit`
-            let circuit_services: Vec<ServiceModel> = Vec::from(&circuit);
+            let circuit_services: Vec<ServiceModel> = Vec::try_from(&circuit)?;
             insert_into(service::table)
                 .values(&circuit_services)
                 .execute(self.conn)?;
-            let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
+            let service_argument: Vec<ServiceArgumentModel> = Vec::try_from(&circuit)?;
             insert_into(service_argument::table)
                 .values(&service_argument)
                 .execute(self.conn)?;

@@ -37,6 +37,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
 {
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
         self.conn.transaction::<Option<Circuit>, _, _>(|| {
@@ -55,6 +56,7 @@ where
             // Collecting the members of the `Circuit`
             let members: Vec<CircuitMemberModel> = circuit_member::table
                 .filter(circuit_member::circuit_id.eq(circuit_id.to_string()))
+                .order(circuit_member::position)
                 .load(self.conn)?;
 
             // Collecting services associated with the `Circuit` using the `list_services` method,

@@ -41,6 +41,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
     NodeEndpointModel: diesel::Queryable<(Text, Text), C::Backend>,
 {
     fn list_nodes(
@@ -51,28 +52,39 @@ where
         let nodes_info: Vec<(CircuitMemberModel, NodeEndpointModel)> = circuit_member::table
             // As `circuit_member` and `node_endpoint` have a one-to-many relationship, this join
             // will return all matching entries as there are `node_endpoint` entries.
+            .order(circuit_member::position)
             .inner_join(node_endpoint::table.on(circuit_member::node_id.eq(node_endpoint::node_id)))
             .load(self.conn)?;
         let mut node_map: HashMap<String, Vec<String>> = HashMap::new();
+        let mut nodes: HashMap<String, CircuitMemberModel> = HashMap::new();
         // Iterate over the list of node data retrieved from the database, in order to collect all
         // endpoints associated with the `node_ids` in a HashMap.
-        nodes_info.iter().for_each(|(node, node_endpoint)| {
+        nodes_info.into_iter().for_each(|(node, node_endpoint)| {
             if let Some(endpoint_list) = node_map.get_mut(&node.node_id) {
-                endpoint_list.push(node_endpoint.endpoint.to_string());
+                endpoint_list.push(node_endpoint.endpoint);
             } else {
-                node_map.insert(
-                    node.node_id.to_string(),
-                    vec![node_endpoint.endpoint.to_string()],
-                );
+                node_map.insert(node.node_id.to_string(), vec![node_endpoint.endpoint]);
+            }
+
+            if !nodes.contains_key(&node.node_id) {
+                nodes.insert(node.node_id.to_string(), node);
             }
         });
-        let nodes: Vec<CircuitNode> = node_map
+
+        let mut nodes_vec: Vec<CircuitMemberModel> =
+            nodes.into_iter().map(|(_, node)| node).collect();
+        nodes_vec.sort_by_key(|node| node.position);
+
+        let nodes: Vec<CircuitNode> = nodes_vec
             .iter()
-            .map(|(node_id, endpoints)| {
-                CircuitNodeBuilder::new()
-                    .with_node_id(&node_id)
-                    .with_endpoints(&endpoints)
-                    .build()
+            .map(|node| {
+                let mut builder = CircuitNodeBuilder::new().with_node_id(&node.node_id);
+
+                if let Some(endpoints) = node_map.get(&node.node_id) {
+                    builder = builder.with_endpoints(&endpoints);
+                }
+
+                builder.build()
             })
             .collect::<Result<Vec<CircuitNode>, InvalidStateError>>()
             .map_err(AdminServiceStoreError::InvalidStateError)?;

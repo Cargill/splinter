@@ -29,7 +29,7 @@ use crate::admin::store::{
     VoteRecordBuilder,
 };
 use crate::admin::store::{Circuit, CircuitProposal, ProposedCircuit};
-use crate::error::InvalidStateError;
+use crate::error::{InternalError, InvalidStateError};
 
 /// Database model representation of a `CircuitProposal`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -98,20 +98,31 @@ pub struct VoteRecordModel {
     pub public_key: Vec<u8>,
     pub vote: String,
     pub voter_node_id: String,
+    pub position: i32,
 }
 
-impl From<&CircuitProposal> for Vec<VoteRecordModel> {
-    fn from(proposal: &CircuitProposal) -> Self {
+impl TryFrom<&CircuitProposal> for Vec<VoteRecordModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(proposal: &CircuitProposal) -> Result<Self, Self::Error> {
         proposal
             .votes()
             .iter()
-            .map(|vote| VoteRecordModel {
-                circuit_id: proposal.circuit_id().into(),
-                public_key: vote.public_key().into(),
-                vote: String::from(vote.vote()),
-                voter_node_id: vote.voter_node_id().into(),
+            .enumerate()
+            .map(|(idx, vote)| {
+                Ok(VoteRecordModel {
+                    circuit_id: proposal.circuit_id().into(),
+                    public_key: vote.public_key().into(),
+                    vote: String::from(vote.vote()),
+                    voter_node_id: vote.voter_node_id().into(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
-            .collect()
+            .collect::<Result<Vec<VoteRecordModel>, AdminServiceStoreError>>()
     }
 }
 
@@ -135,18 +146,29 @@ impl TryFrom<&VoteRecordModel> for VoteRecord {
 pub struct ProposedNodeModel {
     pub circuit_id: String,
     pub node_id: String,
+    pub position: i32,
 }
 
-impl From<&ProposedCircuit> for Vec<ProposedNodeModel> {
-    fn from(proposed_circuit: &ProposedCircuit) -> Self {
+impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(proposed_circuit: &ProposedCircuit) -> Result<Self, Self::Error> {
         proposed_circuit
             .members()
             .iter()
-            .map(|node| ProposedNodeModel {
-                circuit_id: proposed_circuit.circuit_id().into(),
-                node_id: node.node_id().into(),
+            .enumerate()
+            .map(|(idx, node)| {
+                Ok(ProposedNodeModel {
+                    circuit_id: proposed_circuit.circuit_id().into(),
+                    node_id: node.node_id().into(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
-            .collect()
+            .collect::<Result<Vec<ProposedNodeModel>, AdminServiceStoreError>>()
     }
 }
 
@@ -159,24 +181,35 @@ pub struct ProposedNodeEndpointModel {
     pub node_id: String,
     pub circuit_id: String,
     pub endpoint: String,
+    pub position: i32,
 }
 
-impl From<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
-    fn from(proposed_circuit: &ProposedCircuit) -> Self {
+impl TryFrom<&ProposedCircuit> for Vec<ProposedNodeEndpointModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(proposed_circuit: &ProposedCircuit) -> Result<Self, Self::Error> {
         let mut endpoint_models = Vec::new();
         for node in proposed_circuit.members() {
             endpoint_models.extend(
                 node.endpoints()
                     .iter()
-                    .map(|endpoint| ProposedNodeEndpointModel {
-                        node_id: node.node_id().into(),
-                        circuit_id: proposed_circuit.circuit_id().into(),
-                        endpoint: endpoint.clone(),
+                    .enumerate()
+                    .map(|(idx, endpoint)| {
+                        Ok(ProposedNodeEndpointModel {
+                            node_id: node.node_id().into(),
+                            circuit_id: proposed_circuit.circuit_id().into(),
+                            endpoint: endpoint.clone(),
+                            position: i32::try_from(idx).map_err(|_| {
+                                AdminServiceStoreError::InternalError(InternalError::with_message(
+                                    "Unable to convert index into i32".to_string(),
+                                ))
+                            })?,
+                        })
                     })
-                    .collect::<Vec<ProposedNodeEndpointModel>>(),
+                    .collect::<Result<Vec<ProposedNodeEndpointModel>, AdminServiceStoreError>>()?,
             );
         }
-        endpoint_models
+        Ok(endpoint_models)
     }
 }
 
@@ -190,20 +223,31 @@ pub struct ProposedServiceModel {
     pub service_id: String,
     pub service_type: String,
     pub node_id: String,
+    pub position: i32,
 }
 
-impl From<&ProposedCircuit> for Vec<ProposedServiceModel> {
-    fn from(proposed_circuit: &ProposedCircuit) -> Self {
-        proposed_circuit
+impl TryFrom<&ProposedCircuit> for Vec<ProposedServiceModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(proposed_circuit: &ProposedCircuit) -> Result<Self, Self::Error> {
+        Ok(proposed_circuit
             .roster()
             .iter()
-            .map(|service| ProposedServiceModel {
-                circuit_id: proposed_circuit.circuit_id().into(),
-                service_id: service.service_id().into(),
-                service_type: service.service_type().into(),
-                node_id: service.node_id().into(),
+            .enumerate()
+            .map(|(idx, service)| {
+                Ok(ProposedServiceModel {
+                    circuit_id: proposed_circuit.circuit_id().into(),
+                    service_id: service.service_id().into(),
+                    service_type: service.service_type().into(),
+                    node_id: service.node_id().into(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
-            .collect()
+            .collect::<Result<Vec<ProposedServiceModel>, AdminServiceStoreError>>()?)
     }
 }
 
@@ -217,26 +261,38 @@ pub struct ProposedServiceArgumentModel {
     pub service_id: String,
     pub key: String,
     pub value: String,
+    pub position: i32,
 }
 
-impl From<&ProposedCircuit> for Vec<ProposedServiceArgumentModel> {
-    fn from(proposed_circuit: &ProposedCircuit) -> Self {
+impl TryFrom<&ProposedCircuit> for Vec<ProposedServiceArgumentModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(proposed_circuit: &ProposedCircuit) -> Result<Self, Self::Error> {
         let mut service_arguments = Vec::new();
         for service in proposed_circuit.roster() {
             service_arguments.extend(
                 service
                     .arguments()
                     .iter()
-                    .map(|(key, value)| ProposedServiceArgumentModel {
-                        circuit_id: proposed_circuit.circuit_id().into(),
-                        service_id: service.service_id().into(),
-                        key: key.into(),
-                        value: value.into(),
+                    .enumerate()
+                    .map(|(idx, (key, value))| {
+                        Ok(ProposedServiceArgumentModel {
+                            circuit_id: proposed_circuit.circuit_id().into(),
+                            service_id: service.service_id().into(),
+                            key: key.into(),
+                            value: value.into(),
+                            position: i32::try_from(idx).map_err(|_| {
+                                AdminServiceStoreError::InternalError(InternalError::with_message(
+                                    "Unable to convert index into i32".to_string(),
+                                ))
+                            })?,
+                        })
                     })
-                    .collect::<Vec<ProposedServiceArgumentModel>>(),
+                    .collect::<Result<Vec<ProposedServiceArgumentModel>, AdminServiceStoreError>>(
+                    )?,
             );
         }
-        service_arguments
+        Ok(service_arguments)
     }
 }
 
@@ -250,20 +306,31 @@ pub struct ServiceModel {
     pub service_id: String,
     pub service_type: String,
     pub node_id: String,
+    pub position: i32,
 }
 
-impl From<&Circuit> for Vec<ServiceModel> {
-    fn from(circuit: &Circuit) -> Self {
+impl TryFrom<&Circuit> for Vec<ServiceModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(circuit: &Circuit) -> Result<Self, Self::Error> {
         circuit
             .roster()
             .iter()
-            .map(|service| ServiceModel {
-                circuit_id: circuit.circuit_id().into(),
-                service_id: service.service_id().into(),
-                service_type: service.service_type().into(),
-                node_id: service.node_id().into(),
+            .enumerate()
+            .map(|(idx, service)| {
+                Ok(ServiceModel {
+                    circuit_id: circuit.circuit_id().into(),
+                    service_id: service.service_id().into(),
+                    service_type: service.service_type().into(),
+                    node_id: service.node_id().into(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
-            .collect()
+            .collect::<Result<Vec<ServiceModel>, AdminServiceStoreError>>()
     }
 }
 
@@ -277,26 +344,37 @@ pub struct ServiceArgumentModel {
     pub service_id: String,
     pub key: String,
     pub value: String,
+    pub position: i32,
 }
 
-impl From<&Circuit> for Vec<ServiceArgumentModel> {
-    fn from(circuit: &Circuit) -> Self {
+impl TryFrom<&Circuit> for Vec<ServiceArgumentModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(circuit: &Circuit) -> Result<Self, Self::Error> {
         let mut service_arguments = Vec::new();
         for service in circuit.roster() {
             service_arguments.extend(
                 service
                     .arguments()
                     .iter()
-                    .map(|(key, value)| ServiceArgumentModel {
-                        circuit_id: circuit.circuit_id().into(),
-                        service_id: service.service_id().into(),
-                        key: key.clone(),
-                        value: value.clone(),
+                    .enumerate()
+                    .map(|(idx, (key, value))| {
+                        Ok(ServiceArgumentModel {
+                            circuit_id: circuit.circuit_id().into(),
+                            service_id: service.service_id().into(),
+                            key: key.clone(),
+                            value: value.clone(),
+                            position: i32::try_from(idx).map_err(|_| {
+                                AdminServiceStoreError::InternalError(InternalError::with_message(
+                                    "Unable to convert index into i32".to_string(),
+                                ))
+                            })?,
+                        })
                     })
-                    .collect::<Vec<ServiceArgumentModel>>(),
+                    .collect::<Result<Vec<ServiceArgumentModel>, AdminServiceStoreError>>()?,
             );
         }
-        service_arguments
+        Ok(service_arguments)
     }
 }
 
@@ -336,18 +414,29 @@ impl From<&Circuit> for CircuitModel {
 pub struct CircuitMemberModel {
     pub circuit_id: String,
     pub node_id: String,
+    pub position: i32,
 }
 
-impl From<&Circuit> for Vec<CircuitMemberModel> {
-    fn from(circuit: &Circuit) -> Self {
+impl TryFrom<&Circuit> for Vec<CircuitMemberModel> {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(circuit: &Circuit) -> Result<Self, Self::Error> {
         circuit
             .members()
             .iter()
-            .map(|node_id| CircuitMemberModel {
-                circuit_id: circuit.circuit_id().into(),
-                node_id: node_id.clone(),
+            .enumerate()
+            .map(|(idx, node_id)| {
+                Ok(CircuitMemberModel {
+                    circuit_id: circuit.circuit_id().into(),
+                    node_id: node_id.clone(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
-            .collect()
+            .collect::<Result<Vec<CircuitMemberModel>, AdminServiceStoreError>>()
     }
 }
 

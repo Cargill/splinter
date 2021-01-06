@@ -32,6 +32,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
 {
     fn remove_circuit(&self, circuit_id: &str) -> Result<(), AdminServiceStoreError> {
         self.conn.transaction::<(), _, _>(|| {

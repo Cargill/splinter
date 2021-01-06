@@ -16,7 +16,7 @@
 
 use diesel::{
     prelude::*,
-    sql_types::{Binary, Nullable, Text},
+    sql_types::{Binary, Integer, Nullable, Text},
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -25,8 +25,8 @@ use super::AdminServiceStoreOperations;
 use crate::admin::store::{
     diesel::{
         models::{
-            CircuitProposalModel, ProposedCircuitModel, ProposedNodeModel,
-            ProposedServiceArgumentModel, ProposedServiceModel, VoteRecordModel,
+            CircuitProposalModel, ProposedCircuitModel, ProposedNodeEndpointModel,
+            ProposedNodeModel, ProposedServiceArgumentModel, ProposedServiceModel, VoteRecordModel,
         },
         schema::{
             circuit_proposal, proposed_circuit, proposed_node, proposed_node_endpoint,
@@ -51,6 +51,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
     CircuitProposalModel: diesel::Queryable<(Text, Text, Text, Binary, Text), C::Backend>,
     ProposedCircuitModel: diesel::Queryable<
         (
@@ -66,7 +67,7 @@ where
         ),
         C::Backend,
     >,
-    VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text), C::Backend>,
+    VoteRecordModel: diesel::Queryable<(Text, Binary, Text, Text, Integer), C::Backend>,
 {
     fn get_proposal(
         &self,
@@ -91,8 +92,9 @@ where
                     None => return Ok(None),
                 };
             // If the proposal exists, we must fetch all associated data
-            let mut proposed_node_endpoints: HashMap<String, Vec<String>> = HashMap::new();
-            let mut nodes: HashMap<String, ProposedNodeBuilder> = HashMap::new();
+            let mut proposed_node_endpoints: HashMap<String, Vec<ProposedNodeEndpointModel>> =
+                HashMap::new();
+            let mut nodes: HashMap<String, ProposedNodeModel> = HashMap::new();
             for (node, endpoint) in proposed_node::table
                 // As `proposed_node` and `proposed_node_endpoint` have a one-to-many relationship,
                 // this join will return all matching entries as there are `proposed_node_endpoint`
@@ -104,29 +106,37 @@ where
                 )
                 // Filters the entries based on the provided `proposal_id`.
                 .filter(proposed_node::circuit_id.eq(&proposal.circuit_id))
-                // Selects only the necessary columns from the data being retrieved, used to
-                // populate the list of `ProposedNodes`.
-                .select((proposed_node::all_columns, proposed_node_endpoint::endpoint))
-                .load::<(ProposedNodeModel, String)>(self.conn)?
+                .select((
+                    proposed_node::all_columns,
+                    proposed_node_endpoint::all_columns,
+                ))
+                .load::<(ProposedNodeModel, ProposedNodeEndpointModel)>(self.conn)?
             {
                 if let Some(endpoint_list) = proposed_node_endpoints.get_mut(&node.node_id) {
-                    endpoint_list.push(endpoint.to_string());
+                    endpoint_list.push(endpoint);
                 } else {
-                    proposed_node_endpoints
-                        .insert(node.node_id.to_string(), vec![endpoint.to_string()]);
+                    proposed_node_endpoints.insert(node.node_id.to_string(), vec![endpoint]);
                 }
                 if !nodes.contains_key(&node.node_id) {
-                    nodes.insert(
-                        node.node_id.to_string(),
-                        ProposedNodeBuilder::new().with_node_id(&node.node_id),
-                    );
+                    nodes.insert(node.node_id.to_string(), node);
                 }
             }
-            let built_proposed_nodes: Vec<ProposedNode> = nodes
+
+            let mut nodes_vec: Vec<ProposedNodeModel> =
+                nodes.into_iter().map(|(_, node)| node).collect();
+            nodes_vec.sort_by_key(|node| node.position);
+
+            let built_proposed_nodes: Vec<ProposedNode> = nodes_vec
                 .into_iter()
-                .map(|(id, mut builder)| {
-                    if let Some(endpoints) = proposed_node_endpoints.get(&id) {
-                        builder = builder.with_endpoints(endpoints);
+                .map(|node| {
+                    let mut builder = ProposedNodeBuilder::new().with_node_id(&node.node_id);
+                    if let Some(endpoint_mods) = proposed_node_endpoints.get_mut(&node.node_id) {
+                        endpoint_mods.sort_by_key(|endpoint| endpoint.position);
+                        let endpoints = endpoint_mods
+                            .iter()
+                            .map(|endpoint_mod| endpoint_mod.endpoint.to_string())
+                            .collect::<Vec<String>>();
+                        builder = builder.with_endpoints(&endpoints);
                     }
                     builder
                         .build()
@@ -134,11 +144,12 @@ where
                 })
                 .collect::<Result<Vec<ProposedNode>, AdminServiceStoreError>>()?;
 
-            // Create HashMap of `service_id` to a `ProposedServiceBuilder` to collect
+            // Create HashMap of `service_id` to a `ProposedServiceModel` to collect
             // `ProposedService` information
-            let mut proposed_services: HashMap<String, ProposedServiceBuilder> = HashMap::new();
+            let mut proposed_services: HashMap<String, ProposedServiceModel> = HashMap::new();
             // Create HashMap of `service_id` to the associated argument values
-            let mut arguments_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+            let mut arguments_map: HashMap<String, Vec<ProposedServiceArgumentModel>> =
+                HashMap::new();
             // Collect all 'proposed_service' entries and associated data using `inner_join`, as
             // `proposed_service` has a one-to-many relationship to `proposed_service_argument`.
             for (proposed_service, opt_arg) in proposed_service::table
@@ -165,30 +176,40 @@ where
             {
                 if let Some(arg_model) = opt_arg {
                     if let Some(args) = arguments_map.get_mut(&proposed_service.service_id) {
-                        args.push((arg_model.key.to_string(), arg_model.value.to_string()));
+                        args.push(arg_model);
                     } else {
-                        arguments_map.insert(
-                            proposed_service.service_id.to_string(),
-                            vec![(arg_model.key.to_string(), arg_model.value.to_string())],
-                        );
+                        arguments_map
+                            .insert(proposed_service.service_id.to_string(), vec![arg_model]);
                     }
                 }
                 // Insert new `ProposedServiceBuilder` if it does not already exist
                 if !proposed_services.contains_key(&proposed_service.service_id) {
-                    proposed_services.insert(
-                        proposed_service.service_id.to_string(),
-                        ProposedServiceBuilder::new()
-                            .with_service_id(&proposed_service.service_id)
-                            .with_service_type(&proposed_service.service_type)
-                            .with_node_id(&proposed_service.node_id),
-                    );
+                    proposed_services
+                        .insert(proposed_service.service_id.to_string(), proposed_service);
                 }
             }
-            let built_proposed_services: Vec<ProposedService> = proposed_services
+
+            let mut service_vec: Vec<ProposedServiceModel> = proposed_services
                 .into_iter()
-                .map(|(id, mut builder)| {
-                    if let Some(args) = arguments_map.get(&id) {
-                        builder = builder.with_arguments(&args);
+                .map(|(_, service)| service)
+                .collect();
+            service_vec.sort_by_key(|service| service.position);
+            let built_proposed_services: Vec<ProposedService> = service_vec
+                .into_iter()
+                .map(|service| {
+                    let mut builder = ProposedServiceBuilder::new()
+                        .with_service_id(&service.service_id)
+                        .with_service_type(&service.service_type)
+                        .with_node_id(&service.node_id);
+
+                    if let Some(args) = arguments_map.get_mut(&service.service_id) {
+                        args.sort_by_key(|arg| arg.position);
+                        builder = builder.with_arguments(
+                            &args
+                                .iter()
+                                .map(|arg| (arg.key.to_string(), arg.value.to_string()))
+                                .collect::<Vec<(String, String)>>(),
+                        );
                     }
                     builder
                         .build()
@@ -199,6 +220,7 @@ where
             // Retrieve all associated `VoteRecord` entries
             let vote_record: Vec<VoteRecord> = vote_record::table
                 .filter(vote_record::circuit_id.eq(&proposal.circuit_id))
+                .order(vote_record::position)
                 .load::<VoteRecordModel>(self.conn)?
                 .into_iter()
                 .filter_map(|vote| VoteRecord::try_from(&vote).ok())
