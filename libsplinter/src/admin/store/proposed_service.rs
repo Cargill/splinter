@@ -13,7 +13,10 @@
 // limitations under the License.
 
 //! Structs for building proposed services
-use crate::admin::messages::is_valid_service_id;
+
+use std::convert::TryFrom;
+
+use crate::admin::messages::{self, is_valid_service_id};
 use crate::error::InvalidStateError;
 use crate::protos::admin;
 
@@ -205,5 +208,22 @@ impl ProposedServiceBuilder {
         };
 
         Ok(service)
+    }
+}
+
+impl TryFrom<&messages::SplinterService> for ProposedService {
+    type Error = InvalidStateError;
+
+    fn try_from(
+        splinter_service: &messages::SplinterService,
+    ) -> Result<ProposedService, Self::Error> {
+        ProposedServiceBuilder::new()
+            .with_service_id(&splinter_service.service_id)
+            .with_service_type(&splinter_service.service_type)
+            .with_node_id(splinter_service.allowed_nodes.get(0).ok_or_else(|| {
+                InvalidStateError::with_message("Must contain 1 node ID".to_string())
+            })?)
+            .with_arguments(&splinter_service.arguments)
+            .build()
     }
 }

@@ -20,22 +20,23 @@
 
 use std::cmp;
 use std::collections::BTreeSet;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::admin::service::event::store::{
-    AdminServiceEventStore, AdminServiceEventStoreError, EventIter,
+use crate::admin::service::event::{
+    store::{AdminServiceEventStore, AdminServiceEventStoreError, EventIter},
+    AdminServiceEvent,
 };
-use crate::admin::service::messages::AdminServiceEvent;
+use crate::admin::service::messages;
 use crate::error::InternalError;
 
 /// A simple entry for `AdminServiceEvent` values, to be ordered by the `id`
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct EventEntry {
     id: i64,
-    event: AdminServiceEvent,
+    event: messages::AdminServiceEvent,
 }
 
 impl cmp::Ord for EventEntry {
@@ -94,8 +95,8 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
     /// copy of the event.
     fn add_event(
         &self,
-        event: AdminServiceEvent,
-    ) -> Result<(i64, AdminServiceEvent), AdminServiceEventStoreError> {
+        event: messages::AdminServiceEvent,
+    ) -> Result<AdminServiceEvent, AdminServiceEventStoreError> {
         let mut inner = self.inner.lock().map_err(|_| {
             AdminServiceEventStoreError::InternalError(InternalError::with_message(String::from(
                 "Cannot access admin events: mutex lock poisoned",
@@ -129,7 +130,8 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
             event: event.clone(),
         });
 
-        Ok((self.last_event_id.load(Ordering::Relaxed), event))
+        AdminServiceEvent::try_from((self.last_event_id.load(Ordering::Relaxed), &event))
+            .map_err(AdminServiceEventStoreError::InvalidStateError)
     }
 
     /// List `AdminServiceEvent`s that have been added to the store since the provided index.
@@ -142,10 +144,11 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
         // Increment the `start` index to exclude that ID
         let exclusive_start = start + 1;
         // Construct a list of tuples of the event ID and the corresponding event to be returned.
-        let inner_iter: Vec<(i64, AdminServiceEvent)> = inner
+        let inner_iter: Vec<AdminServiceEvent> = inner
             .range(exclusive_start..)
-            .map(|entry| (entry.id, entry.event.clone()))
-            .collect();
+            .map(|entry| AdminServiceEvent::try_from((entry.id, &entry.event)))
+            .collect::<Result<Vec<AdminServiceEvent>, _>>()
+            .map_err(AdminServiceEventStoreError::InvalidStateError)?;
         Ok(Box::new(inner_iter.into_iter()))
     }
 
@@ -164,7 +167,7 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
         // Increment the `start` index to exclude that ID
         let exclusive_start = start + 1;
         // Construct a list of tuples of the event ID and the corresponding event to be returned.
-        let inner_iter: Vec<(i64, AdminServiceEvent)> = inner
+        let inner_iter: Vec<AdminServiceEvent> = inner
             .range(exclusive_start..)
             .filter_map(|entry| {
                 if entry.event.proposal().circuit.circuit_management_type == management_type {
@@ -172,14 +175,16 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
                 }
                 None
             })
-            .collect();
+            .map(|(id, event)| AdminServiceEvent::try_from((id, &event)))
+            .collect::<Result<Vec<AdminServiceEvent>, _>>()
+            .map_err(AdminServiceEventStoreError::InvalidStateError)?;
         Ok(Box::new(inner_iter.into_iter()))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::admin::messages::{self, AdminServiceEvent, CircuitProposal, ProposalType};
+    use crate::admin::messages::{self, CircuitProposal, ProposalType};
 
     use super::*;
 
@@ -195,25 +200,25 @@ mod tests {
         let event_store = MemoryAdminServiceEventStore::new_boxed();
 
         event_store
-            .add_event(make_event("circuit_one", "default"))
+            .add_event(make_event("abcde-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_one", "gameroom"))
+            .add_event(make_event("fghij-01234", "gameroom"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("circuit_two", "default"))
+            .add_event(make_event("klmno-01234", "default"))
             .expect("Unable to add event");
 
         assert_eq!(
             vec![
-                (1, make_event("circuit_one", "default")),
-                (2, make_event("gameroom_one", "gameroom")),
-                (3, make_event("circuit_two", "default")),
+                convert_event(1, &make_event("abcde-01234", "default")),
+                convert_event(2, &make_event("fghij-01234", "gameroom")),
+                convert_event(3, &make_event("klmno-01234", "default")),
             ],
             event_store
                 .list_events_since(0)
                 .expect("Unable to create an admin events list")
-                .collect::<Vec<(i64, AdminServiceEvent)>>()
+                .collect::<Vec<AdminServiceEvent>>()
         )
     }
 
@@ -227,7 +232,7 @@ mod tests {
         assert!(&event_store
             .list_events_since(0)
             .expect("Unable to create an admin events list")
-            .collect::<Vec<(i64, AdminServiceEvent)>>()
+            .collect::<Vec<AdminServiceEvent>>()
             .is_empty());
     }
 
@@ -245,25 +250,25 @@ mod tests {
         let event_store = MemoryAdminServiceEventStore::new_boxed();
 
         event_store
-            .add_event(make_event("circuit_one", "default"))
+            .add_event(make_event("abcde-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_one", "gameroom"))
+            .add_event(make_event("fghij-01234", "gameroom"))
             .expect("Unable to add event");
 
         let event_list = event_store
             .list_events_since(0)
             .expect("Unable to create an admin events list")
-            .collect::<Vec<(i64, AdminServiceEvent)>>();
+            .collect::<Vec<AdminServiceEvent>>();
 
         event_store
-            .add_event(make_event("circuit_two", "default"))
+            .add_event(make_event("klmno-01234", "default"))
             .expect("Unable to add event");
 
         assert_eq!(
             vec![
-                (1, make_event("circuit_one", "default")),
-                (2, make_event("gameroom_one", "gameroom")),
+                convert_event(1, &make_event("abcde-01234", "default")),
+                convert_event(2, &make_event("fghij-01234", "gameroom")),
             ],
             event_list,
         );
@@ -281,24 +286,24 @@ mod tests {
         let event_store = MemoryAdminServiceEventStore::new_boxed();
 
         event_store
-            .add_event(make_event("circuit_one", "default"))
+            .add_event(make_event("abcde-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_one", "gameroom"))
+            .add_event(make_event("fghij-01234", "gameroom"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("circuit_two", "default"))
+            .add_event(make_event("klmno-01234", "default"))
             .expect("Unable to add event");
 
         assert_eq!(
             vec![
-                (2, make_event("gameroom_one", "gameroom")),
-                (3, make_event("circuit_two", "default")),
+                convert_event(2, &make_event("fghij-01234", "gameroom")),
+                convert_event(3, &make_event("klmno-01234", "default")),
             ],
             event_store
                 .list_events_since(1)
                 .expect("Unable to create an admin events list")
-                .collect::<Vec<(i64, AdminServiceEvent)>>()
+                .collect::<Vec<AdminServiceEvent>>()
         )
     }
 
@@ -317,27 +322,27 @@ mod tests {
         let event_store = MemoryAdminServiceEventStore::new_boxed();
 
         event_store
-            .add_event(make_event("circuit_one", "default"))
+            .add_event(make_event("abcde-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_one", "gameroom"))
+            .add_event(make_event("fghij-01234", "gameroom"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("circuit_two", "default"))
+            .add_event(make_event("klmno-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_two", "gameroom"))
+            .add_event(make_event("pqrst-01234", "gameroom"))
             .expect("Unable to add event");
 
         // Validate only the second "gameroom" circuit appears in the results, as the
         // `list_events_by_management_type_since` is filtering on the "gameroom" mangaement type
         // and should only select events since the second event.
         assert_eq!(
-            vec![(4, make_event("gameroom_two", "gameroom"))],
+            vec![convert_event(4, &make_event("pqrst-01234", "gameroom"))],
             event_store
                 .list_events_by_management_type_since("gameroom".to_string(), 2)
                 .expect("Unable to create an admin events list")
-                .collect::<Vec<(i64, AdminServiceEvent)>>()
+                .collect::<Vec<AdminServiceEvent>>()
         )
     }
 
@@ -360,16 +365,16 @@ mod tests {
         );
 
         event_store
-            .add_event(make_event("circuit_one", "default"))
+            .add_event(make_event("abcde-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_one", "gameroom"))
+            .add_event(make_event("fghij-01234", "gameroom"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("circuit_two", "default"))
+            .add_event(make_event("klmno-01234", "default"))
             .expect("Unable to add event");
         event_store
-            .add_event(make_event("gameroom_two", "gameroom"))
+            .add_event(make_event("pqrst-01234", "gameroom"))
             .expect("Unable to add event");
 
         // Validate only the second "gameroom" circuit appears in the results, as the
@@ -377,27 +382,28 @@ mod tests {
         // and should only select events since the second event.
         assert_eq!(
             vec![
-                (2, make_event("gameroom_one", "gameroom")),
-                (3, make_event("circuit_two", "default")),
-                (4, make_event("gameroom_two", "gameroom")),
+                convert_event(2, &make_event("fghij-01234", "gameroom")),
+                convert_event(3, &make_event("klmno-01234", "default")),
+                convert_event(4, &make_event("pqrst-01234", "gameroom")),
             ],
             event_store
                 .list_events_since(1)
                 .expect("Unable to create an admin events list")
-                .collect::<Vec<(i64, AdminServiceEvent)>>()
+                .collect::<Vec<AdminServiceEvent>>()
         );
 
-        assert_eq!(
-            vec![(4, make_event("gameroom_two", "gameroom")),],
-            event_store
-                .list_events_by_management_type_since("gameroom".to_string(), 2)
-                .expect("Unable to create an admin events list")
-                .collect::<Vec<(i64, AdminServiceEvent)>>()
-        );
+        let expected_results: Vec<AdminServiceEvent> =
+            vec![convert_event(4, &make_event("pqrst-01234", "gameroom"))];
+        let actual_results: Vec<AdminServiceEvent> = event_store
+            .list_events_by_management_type_since("gameroom".to_string(), 2)
+            .expect("Unable to create an admin events list")
+            .collect();
+
+        assert_eq!(expected_results, actual_results);
     }
 
-    fn make_event(circuit_id: &str, event_type: &str) -> AdminServiceEvent {
-        AdminServiceEvent::ProposalSubmitted(CircuitProposal {
+    fn make_event(circuit_id: &str, event_type: &str) -> messages::AdminServiceEvent {
+        messages::AdminServiceEvent::ProposalSubmitted(CircuitProposal {
             proposal_type: ProposalType::Create,
             circuit_id: circuit_id.into(),
             circuit_hash: "not real hash for tests".into(),
@@ -418,5 +424,15 @@ mod tests {
             requester: vec![],
             requester_node_id: "another-node".into(),
         })
+    }
+
+    // Converts an event from the messages::AdminServiceEvent representation to the native
+    // `AdminServiceEventStore` `AdminServiceEvent` struct.
+    fn convert_event(
+        event_id: i64,
+        messages_event: &messages::AdminServiceEvent,
+    ) -> AdminServiceEvent {
+        AdminServiceEvent::try_from((event_id, messages_event))
+            .expect("Unable to convert event to AdminServiceEventStore AdminServiceEvent")
     }
 }

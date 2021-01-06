@@ -60,8 +60,9 @@ use super::{
     Events,
 };
 #[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event::store::{
-    memory::MemoryAdminServiceEventStore, AdminServiceEventStore,
+use crate::admin::service::event::{
+    self,
+    store::{memory::MemoryAdminServiceEventStore, AdminServiceEventStore},
 };
 
 static VOTER_ROLE: &str = "voter";
@@ -141,24 +142,19 @@ impl SubscriberMap {
     }
 
     #[cfg(feature = "admin-service-event-store")]
-    fn broadcast_by_type(
-        &self,
-        event_type: &str,
-        admin_service_event: &messages::AdminServiceEvent,
-        event_id: &i64,
-    ) {
+    fn broadcast_by_type(&self, event_type: &str, admin_service_event: &event::AdminServiceEvent) {
         let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
         if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
-            subscribers.retain(|subscriber| {
-                match subscriber.handle_event(admin_service_event, event_id) {
+            subscribers.retain(
+                |subscriber| match subscriber.handle_event(admin_service_event) {
                     Ok(()) => true,
                     Err(AdminSubscriberError::Unsubscribe) => false,
                     Err(AdminSubscriberError::UnableToHandleEvent(msg)) => {
                         error!("Unable to send event: {}", msg);
                         true
                     }
-                }
-            });
+                },
+            );
         }
     }
 
@@ -1099,7 +1095,9 @@ impl AdminServiceShared {
                 *since_event_id,
             )
             .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?;
-        Ok(Events { inner: events })
+        Ok(Events {
+            inner: Box::new(events),
+        })
     }
 
     pub fn add_subscriber(
@@ -1137,8 +1135,8 @@ impl AdminServiceShared {
         circuit_management_type: &str,
         event: messages::AdminServiceEvent,
     ) {
-        let (event_id, event) = match self.admin_event_store.add_event(event) {
-            Ok((id, event)) => (id, event),
+        let admin_event = match self.admin_event_store.add_event(event) {
+            Ok(admin_event) => admin_event,
             Err(err) => {
                 error!("Unable to store admin event: {}", err);
                 return;
@@ -1146,7 +1144,7 @@ impl AdminServiceShared {
         };
 
         self.event_subscribers
-            .broadcast_by_type(&circuit_management_type, &event, &event_id);
+            .broadcast_by_type(&circuit_management_type, &admin_event);
     }
 
     pub fn remove_all_event_subscribers(&mut self) {

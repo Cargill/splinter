@@ -20,6 +20,8 @@ use std::convert::TryInto;
 use std::time;
 
 use crate::admin::messages::AdminServiceEvent;
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::service::event;
 use crate::admin::service::{
     AdminCommands, AdminServiceEventSubscriber, AdminServiceStatus, AdminSubscriberError,
 };
@@ -110,7 +112,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
 
                 match admin_commands.get_events_since(&last_seen_event_id, &circuit_management_type)
                 {
-                    Ok(events) => events.map(JsonAdminEvent::from).skip(skip),
+                    Ok(events) => events.map(|event| JsonAdminEvent::from(&event)).skip(skip),
                     Err(err) => {
                         error!(
                             "Unable to load initial set of admin events for {}: {}",
@@ -169,16 +171,8 @@ impl AdminServiceEventSubscriber for WsAdminServiceEventSubscriber {
     }
 
     #[cfg(feature = "admin-service-event-store")]
-    fn handle_event(
-        &self,
-        event: &AdminServiceEvent,
-        event_id: &i64,
-    ) -> Result<(), AdminSubscriberError> {
-        let json_event = JsonAdminEvent {
-            timestamp: time::SystemTime::now(),
-            event: event.clone(),
-            event_id: Some(*event_id),
-        };
+    fn handle_event(&self, event: &event::AdminServiceEvent) -> Result<(), AdminSubscriberError> {
+        let json_event = JsonAdminEvent::from(event);
         self.sender.send(json_event).map_err(|_| {
             debug!("Dropping admin service event and unsubscribing due to websocket being closed");
             AdminSubscriberError::Unsubscribe
@@ -216,12 +210,12 @@ impl From<(time::SystemTime, AdminServiceEvent)> for JsonAdminEvent {
 // `timestamp` is set to the `UNIX_EPOCH` value to allow for backward-compatibility, as the
 // `timestamp` is not used by the `AdminServiceEventStore`.
 #[cfg(feature = "admin-service-event-store")]
-impl From<(i64, AdminServiceEvent)> for JsonAdminEvent {
-    fn from(raw_evt: (i64, AdminServiceEvent)) -> Self {
+impl From<&event::AdminServiceEvent> for JsonAdminEvent {
+    fn from(event: &event::AdminServiceEvent) -> Self {
         Self {
             timestamp: time::SystemTime::now(),
-            event: raw_evt.1,
-            event_id: Some(raw_evt.0),
+            event: AdminServiceEvent::from(event),
+            event_id: Some(event.event_id),
         }
     }
 }

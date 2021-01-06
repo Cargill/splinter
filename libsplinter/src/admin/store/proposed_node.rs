@@ -14,6 +14,7 @@
 
 //! Structs for building proposed nodes
 
+use crate::admin::messages;
 use crate::error::InvalidStateError;
 use crate::protos::admin;
 
@@ -114,5 +115,14 @@ impl ProposedNodeBuilder {
         let node = ProposedNode { node_id, endpoints };
 
         Ok(node)
+    }
+}
+
+impl From<&messages::SplinterNode> for ProposedNode {
+    fn from(admin_node: &messages::SplinterNode) -> ProposedNode {
+        ProposedNode {
+            node_id: admin_node.node_id.to_string(),
+            endpoints: admin_node.endpoints.to_vec(),
+        }
     }
 }

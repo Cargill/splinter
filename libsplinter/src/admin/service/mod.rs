@@ -78,8 +78,7 @@ pub trait AdminServiceEventSubscriber: Send {
     #[cfg(feature = "admin-service-event-store")]
     fn handle_event(
         &self,
-        admin_service_event: &messages::AdminServiceEvent,
-        event_id: &i64,
+        admin_service_event: &event::AdminServiceEvent,
     ) -> Result<(), AdminSubscriberError>;
 }
 
@@ -168,12 +167,12 @@ impl Iterator for Events {
 
 #[cfg(feature = "admin-service-event-store")]
 pub struct Events {
-    inner: Box<dyn ExactSizeIterator<Item = (i64, messages::AdminServiceEvent)> + Send>,
+    inner: Box<dyn ExactSizeIterator<Item = event::AdminServiceEvent> + Send>,
 }
 
 #[cfg(feature = "admin-service-event-store")]
 impl Iterator for Events {
-    type Item = (i64, messages::AdminServiceEvent);
+    type Item = event::AdminServiceEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
