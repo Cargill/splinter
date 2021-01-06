@@ -25,9 +25,10 @@ pub trait RoleBasedAuthorizationStoreRemoveRole {
     fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError>;
 }
 
-#[cfg(feature = "sqlite")]
-impl<'a> RoleBasedAuthorizationStoreRemoveRole
-    for RoleBasedAuthorizationStoreOperations<'a, diesel::sqlite::SqliteConnection>
+impl<'a, C> RoleBasedAuthorizationStoreRemoveRole for RoleBasedAuthorizationStoreOperations<'a, C>
+where
+    C: diesel::Connection,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
         self.conn.transaction::<_, _, _>(|| {

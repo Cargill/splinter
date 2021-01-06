@@ -95,7 +95,21 @@ impl StoreFactory for PgStoreFactory {
         Box::new(crate::registry::DieselRegistry::new(self.pool.clone()))
     }
 
-    #[cfg(feature = "authorization")]
+    #[cfg(feature = "role-based-authorization-store-postgres")]
+    fn get_role_based_authorization_store(
+        &self,
+    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+        Box::new(
+            crate::rest_api::auth::roles::store::DieselRoleBasedAuthorizationStore::new(
+                self.pool.clone(),
+            ),
+        )
+    }
+
+    #[cfg(all(
+        feature = "authorization",
+        not(feature = "role-based-authorization-store-postgres")
+    ))]
     fn get_role_based_authorization_store(
         &self,
     ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {

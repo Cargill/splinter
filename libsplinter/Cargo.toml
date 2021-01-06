@@ -109,6 +109,7 @@ experimental = [
     "oauth-openid",
     "oauth-inflight-request-store-postgres",
     "registry-database",
+    "role-based-authorization-store-postgres",
     "service-arg-validation",
     "service-network",
     "ws-transport",
@@ -151,6 +152,7 @@ rest-api = [
 ]
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
+role-based-authorization-store-postgres = ["authorization", "postgres"]
 service-arg-validation = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]

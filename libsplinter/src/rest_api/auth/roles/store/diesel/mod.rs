@@ -166,6 +166,118 @@ impl RoleBasedAuthorizationStore
     }
 }
 
+#[cfg(feature = "role-based-authorization-store-postgres")]
+impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::pg::PgConnection> {
+    /// Returns the role for the given ID, if one exists.
+    fn get_role(&self, id: &str) -> Result<Option<Role>, RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).get_role(id)
+    }
+
+    /// Lists all roles.
+    fn list_roles(
+        &self,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).list_roles()
+    }
+
+    /// Adds a role.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ConstraintViolation` error if a duplicate role ID is added.
+    fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).add_role(role)
+    }
+
+    /// Updates a role.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `InvalidState` error if the role does not exist.
+    fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).update_role(role)
+    }
+
+    /// Removes a role.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `InvalidState` error if the role does not exist.
+    fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_role(role_id)
+    }
+
+    /// Returns the role for the given Identity, if one exists.
+    fn get_assignment(
+        &self,
+        identity: &Identity,
+    ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assignment(identity)
+    }
+
+    /// Lists all assignments.
+    fn list_assignments(
+        &self,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>
+    {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).list_assignments()
+    }
+
+    /// Adds an assignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ConstraintViolation` error if there is a duplicate assignment of a role to an
+    /// identity.
+    fn add_assignment(
+        &self,
+        assignment: Assignment,
+    ) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).add_assignment(assignment)
+    }
+
+    /// Updates an assignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `InvalidState` error if the assignment does not exist.
+    fn update_assignment(
+        &self,
+        assignment: Assignment,
+    ) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).update_assignment(assignment)
+    }
+
+    /// Removes an assignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `InvalidState` error if the assignment does not exist.
+    fn remove_assignment(
+        &self,
+        identity: &Identity,
+    ) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).remove_assignment(identity)
+    }
+
+    /// Clone into a boxed, dynamically dispatched store
+    fn clone_box(&self) -> Box<dyn RoleBasedAuthorizationStore> {
+        Box::new(DieselRoleBasedAuthorizationStore {
+            connection_pool: self.connection_pool.clone(),
+        })
+    }
+}
+
 impl From<Role> for (models::RoleModel, Vec<models::RolePermissionModel>) {
     fn from(role: Role) -> Self {
         let (id, display_name, permissions) = role.into_parts();

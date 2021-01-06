@@ -53,3 +53,26 @@ impl<'a> RoleBasedAuthorizationStoreAddAssignment
         })
     }
 }
+
+#[cfg(feature = "role-based-authorization-store-postgres")]
+impl<'a> RoleBasedAuthorizationStoreAddAssignment
+    for RoleBasedAuthorizationStoreOperations<'a, diesel::pg::PgConnection>
+{
+    fn add_assignment(
+        &self,
+        assignment: Assignment,
+    ) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let (identity, assignments): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
+        self.conn.transaction::<_, _, _>(|| {
+            insert_into(identities::table)
+                .values(identity)
+                .execute(self.conn)?;
+
+            insert_into(assignments::table)
+                .values(assignments)
+                .execute(self.conn)?;
+
+            Ok(())
+        })
+    }
+}
