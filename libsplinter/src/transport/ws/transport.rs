@@ -120,8 +120,8 @@ impl Transport for WsTransport {
             )));
         }
 
-        let address = if bind.starts_with(PROTOCOL_PREFIX) {
-            &bind[PROTOCOL_PREFIX.len()..]
+        let address = if let Some(address) = bind.strip_prefix(PROTOCOL_PREFIX) {
+            address
         } else {
             bind
         };

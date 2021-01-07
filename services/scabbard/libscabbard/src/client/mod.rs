@@ -293,13 +293,9 @@ fn wait_for_batches(
             )
         })?;
 
-        let any_pending_batches = batch_infos.iter().any(|info| {
-            match info.status {
-                // `Valid` is still technically pending until it's `Committed`
-                BatchStatus::Pending | BatchStatus::Valid(_) => true,
-                _ => false,
-            }
-        });
+        let any_pending_batches = batch_infos
+            .iter()
+            .any(|info| matches!(info.status, BatchStatus::Pending | BatchStatus::Valid(_)));
 
         if any_pending_batches {
             if Instant::now() < end_time {
@@ -311,13 +307,9 @@ fn wait_for_batches(
                 )));
             }
         } else {
-            let any_invalid_batches = batch_infos.iter().any(|info| {
-                if let BatchStatus::Invalid(_) = info.status {
-                    true
-                } else {
-                    false
-                }
-            });
+            let any_invalid_batches = batch_infos
+                .iter()
+                .any(|info| matches!(info.status, BatchStatus::Invalid(_)));
 
             if any_invalid_batches {
                 return Err(ScabbardClientError::new(&format!(

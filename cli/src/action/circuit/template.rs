@@ -37,7 +37,7 @@ pub struct ShowCircuitTemplate;
 
 impl Action for ShowCircuitTemplate {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
         let template_name = match args.value_of("name") {
             Some(name) => name,
             None => return Err(CliError::ActionError("Name is required".into())),
@@ -55,7 +55,7 @@ pub struct ListCircuitTemplateArguments;
 
 impl Action for ListCircuitTemplateArguments {
     fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
-        let args = arg_matches.ok_or_else(|| CliError::RequiresArgs)?;
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
         let template_name = match args.value_of("name") {
             Some(name) => name,
             None => return Err(CliError::ActionError("Name is required".into())),

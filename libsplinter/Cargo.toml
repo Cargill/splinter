@@ -36,6 +36,7 @@ awc = { version = "0.2", optional = true }
 bcrypt = {version = "0.6", optional = true}
 byteorder = "1"
 crossbeam-channel = "0.3"
+cylinder = "0.2"
 diesel = { version = "1.0", features = ["r2d2", "serde_json"], optional = true }
 diesel_migrations = { version = "1.4", optional = true }
 futures = { version = "0.1", optional = true }
@@ -49,14 +50,12 @@ percent-encoding = { version = "2.0", optional = true }
 protobuf = "2"
 rand = "0.7"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
-sawtooth-sdk = { version = "0.4", optional = true }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
 tokio = { version = "0.1.22", optional = true }
 url = "1.7.1"
-ursa = { version = "0.1", optional = true }
 uuid = { version = "0.7", features = ["v4"]}
 websocket = { version = "0.24", optional = true }
 zmq = { version = "0.9", optional = true }
@@ -85,7 +84,6 @@ stable = [
     "rest-api",
     "rest-api-actix",
     "rest-api-cors",
-    "sawtooth-signing-compat",
 ]
 
 experimental = [
@@ -122,17 +120,10 @@ rest-api = [
 ]
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-cors = []
-sawtooth-signing-compat = ["sawtooth-sdk"]
 service-arg-validation = []
 service-network = []
 ws-transport = ["websocket"]
 zmq-transport = ["zmq"]
-
-# The following features are broken and should not be used.
-
-# The `ursa` dependency is currently broken, and will need to be fixed before
-# the `ursa-compat` feature can be added back to `experimental`.
-ursa-compat = ["ursa"]
 
 [package.metadata.docs.rs]
 features = [

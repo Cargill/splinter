@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {
+  Secp256k1Signer,
+  SabreTransactionBuilder,
+  BatchBuilder,
+  Secp256k1PrivateKey,
+} from 'transact-sdk-javascript';
+
 import protos from '@/protobuf';
 import { User } from '@/store/models';
-import { signXOPayload } from '@/utils/crypto';
 import { XO_FAMILY_NAME, XO_FAMILY_VERSION, XO_FAMILY_PREFIX } from '@/utils/addressing';
 import {
   calculateNamespaceRegistryAddress,
@@ -23,7 +29,6 @@ import {
 } from '@/utils/addressing';
 
 const crypto = require('crypto');
-const { Transaction, TransactionHeader, Batch, BatchHeader, BatchList } = require('sawtooth-sdk/protobuf');
 
 // The Sawtooth Sabre transaction family name (sabre)
 const SABRE_FAMILY_NAME = 'sabre';
@@ -37,58 +42,31 @@ export function createTransaction(
   outputs: string[],
   user: User,
 ) {
-  const excuteTransactionAction = protos.ExecuteContractAction.create({
+  const privateKey = Secp256k1PrivateKey.fromHex(user.privateKey);
+  const signer = new Secp256k1Signer(privateKey);
+
+  return new SabreTransactionBuilder({
     name: 'xo',
     version: XO_FAMILY_VERSION,
-    inputs,
-    outputs,
-    payload: payloadBytes,
-  });
-
-  const sabrePayload = protos.SabrePayload.encode({
-    action: protos.SabrePayload.Action.EXECUTE_CONTRACT,
-    executeContract: excuteTransactionAction,
-  }).finish();
-
-  const transactionHeaderBytes = TransactionHeader.encode({
-    familyName: SABRE_FAMILY_NAME,
-    familyVersion: SABRE_FAMILY_VERSION,
-    inputs: prepare_inputs(inputs),
-    outputs,
-    signerPublicKey: user.publicKey,
-    batcherPublicKey: user.publicKey,
-    dependencies: [],
-    payloadSha512: crypto.createHash('sha512').update(sabrePayload).digest('hex'),
-  }).finish();
-
-  const signature = signXOPayload(transactionHeaderBytes, user.privateKey);
-
-  return Transaction.create({
-    header: transactionHeaderBytes,
-    headerSignature: signature,
-    payload: sabrePayload,
-  });
+    prefix: XO_FAMILY_PREFIX,
+  })
+    .withBatcherPublicKey(signer.getPublicKey())
+    .withFamilyName('xo')
+    .withFamilyVersion(XO_FAMILY_PREFIX)
+    .withInputs(inputs)
+    .withOutputs(outputs)
+    .withPayload(payloadBytes)
+    .build(signer);
 }
 
 
 export function createBatch(transactions: any, user: User) {
-  const transactionIds = transactions.map((txn: any) => txn.headerSignature);
-  const batchHeaderBytes = BatchHeader.encode({
-    signerPublicKey: user.publicKey,
-    transactionIds,
-  }).finish();
+  const privateKey = Secp256k1PrivateKey.fromHex(user.privateKey);
+  const signer = new Secp256k1Signer(privateKey);
 
-  const signature = signXOPayload(batchHeaderBytes, user.privateKey);
-
-  const batch = Batch.create({
-    header: batchHeaderBytes,
-    headerSignature: signature,
-    transactions,
-  });
-
-  const batchListBytes = BatchList.encode({
-    batches: [batch],
-  }).finish();
+  const batchListBytes = new BatchBuilder()
+    .withTransactions(transactions)
+    .build(signer);
 
   return batchListBytes;
 }

@@ -243,8 +243,6 @@ impl ScabbardState {
         // Get the results and shutdown the scheduler
         let recv_result = result_rx.recv_timeout(Duration::from_secs(EXECUTION_TIMEOUT));
 
-        scheduler.shutdown();
-
         let batch_result = recv_result
             .map_err(|_| ScabbardStateError("failed to receive result in reasonable time".into()))?
             .ok_or_else(|| ScabbardStateError("no result returned from executor".into()))?;
@@ -844,6 +842,7 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use cylinder::{secp256k1::Secp256k1Context, Context};
     use tempdir::TempDir;
     use transact::{
         families::command::make_command_transaction,
@@ -851,7 +850,6 @@ mod tests {
             batch::BatchBuilder,
             command::{BytesEntry, Command, SetState},
         },
-        signing::hash::HashSigner,
     };
 
     const TEMP_DB_SIZE: usize = 1 << 30; // 1024 ** 3
@@ -946,16 +944,21 @@ mod tests {
         let address = "abcdef".to_string();
         let value = b"value".to_vec();
 
-        let signer = HashSigner::default();
+        let signing_context = Secp256k1Context::new();
+        let signer = signing_context.new_signer(signing_context.new_random_private_key());
         let batch = BatchBuilder::new()
             .with_transactions(vec![
-                make_command_transaction(&[Command::SetState(SetState::new(vec![
-                    BytesEntry::new(address.clone(), value.clone()),
-                ]))])
+                make_command_transaction(
+                    &[Command::SetState(SetState::new(vec![BytesEntry::new(
+                        address.clone(),
+                        value.clone(),
+                    )]))],
+                    &*signer,
+                )
                 .take()
                 .0,
             ])
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("Failed to build batch");
         state
             .prepare_change(batch)
@@ -1013,18 +1016,22 @@ mod tests {
         let address3 = "0123456789".to_string();
         let value3 = b"value3".to_vec();
 
-        let signer = HashSigner::default();
+        let signing_context = Secp256k1Context::new();
+        let signer = signing_context.new_signer(signing_context.new_random_private_key());
         let batch = BatchBuilder::new()
             .with_transactions(vec![
-                make_command_transaction(&[Command::SetState(SetState::new(vec![
-                    BytesEntry::new(address1.clone(), value1.clone()),
-                    BytesEntry::new(address2.clone(), value2.clone()),
-                    BytesEntry::new(address3.clone(), value3.clone()),
-                ]))])
+                make_command_transaction(
+                    &[Command::SetState(SetState::new(vec![
+                        BytesEntry::new(address1.clone(), value1.clone()),
+                        BytesEntry::new(address2.clone(), value2.clone()),
+                        BytesEntry::new(address3.clone(), value3.clone()),
+                    ]))],
+                    &*signer,
+                )
                 .take()
                 .0,
             ])
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("Failed to build batch");
         state
             .prepare_change(batch)

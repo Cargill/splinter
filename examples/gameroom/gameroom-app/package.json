@@ -17,14 +17,14 @@
     "generate-proto-files": "node scripts/compile_protobuf.js > src/compiled_protos.json"
   },
   "dependencies": {
-    "@types/node": "^12.12.6",
+    "@types/node": "12.12.6",
     "@types/request-promise": "^4.1.44",
     "@types/sjcl": "^1.0.28",
     "axios": "^0.19.0",
     "moment": "2.24.0",
     "protobufjs": "^6.8.8",
-    "sawtooth-sdk": "^1.0.5",
     "sjcl": "^1.0.8",
+    "transact-sdk-javascript": "github:hyperledger/transact-sdk-javascript",
     "vue": "^2.6.10",
     "vue-class-component": "^7.0.2",
     "vue-clickaway": "^2.2.2",

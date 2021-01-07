@@ -18,11 +18,11 @@
 use std::error::Error;
 use std::fmt;
 
+use cylinder::{KeyParseError, SigningError};
 use sabre_sdk::protocol::{
     payload::{ActionBuildError, SabrePayloadBuildError},
     AddressingError,
 };
-use sawtooth_sdk::signing::Error as SigningError;
 use splinter::events;
 use transact::{
     protocol::{batch::BatchBuildError, transaction::TransactionBuildError},
@@ -155,6 +155,12 @@ macro_rules! impl_from_sabre_errors {
 }
 
 impl_from_sabre_errors!(AddressingError, ActionBuildError, SabrePayloadBuildError);
+
+impl From<KeyParseError> for AppAuthHandlerError {
+    fn from(err: KeyParseError) -> Self {
+        AppAuthHandlerError::SigningError(err.to_string())
+    }
+}
 
 impl From<SigningError> for AppAuthHandlerError {
     fn from(err: SigningError) -> Self {

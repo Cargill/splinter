@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use splinter::{
     consensus::{Proposal, ProposalUpdate},
@@ -38,7 +39,6 @@ use splinter::{
         Service, ServiceDestroyError, ServiceError, ServiceMessageContext, ServiceNetworkRegistry,
         ServiceStartError, ServiceStopError,
     },
-    signing::SignatureVerifier,
 };
 use transact::{protocol::batch::BatchPair, protos::FromBytes};
 
@@ -277,7 +277,7 @@ impl Service for Scabbard {
             .lock()
             .map_err(|_| ServiceStopError::PoisonedLock("consensus lock poisoned".into()))?
             .take()
-            .ok_or_else(|| ServiceStopError::NotStarted)?
+            .ok_or(ServiceStopError::NotStarted)?
             .shutdown()
             .map_err(|err| ServiceStopError::Internal(Box::new(ScabbardError::from(err))))?;
 
@@ -323,7 +323,7 @@ impl Service for Scabbard {
                 .lock()
                 .map_err(|_| ServiceError::PoisonedLock("consensus lock poisoned".into()))?
                 .as_ref()
-                .ok_or_else(|| ServiceError::NotStarted)?
+                .ok_or(ServiceError::NotStarted)?
                 .handle_message(message.get_consensus_message())
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err))),
             ScabbardMessage_Type::PROPOSED_BATCH => {
@@ -342,7 +342,7 @@ impl Service for Scabbard {
                     .lock()
                     .map_err(|_| ServiceError::PoisonedLock("consensus lock poisoned".into()))?
                     .as_ref()
-                    .ok_or_else(|| ServiceError::NotStarted)?
+                    .ok_or(ServiceError::NotStarted)?
                     .send_update(ProposalUpdate::ProposalReceived(
                         proposal,
                         proposed_batch.get_service_id().as_bytes().into(),
@@ -383,12 +383,10 @@ pub mod tests {
 
     use std::error::Error;
 
-    use splinter::{
-        service::{
-            ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
-            ServiceNetworkSender, ServiceSendError,
-        },
-        signing::hash::HashVerifier,
+    use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
+    use splinter::service::{
+        ServiceConnectionError, ServiceDisconnectionError, ServiceMessageContext,
+        ServiceNetworkSender, ServiceSendError,
     };
 
     /// Tests that a new scabbard service is properly instantiated.
@@ -402,7 +400,7 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
-            Box::new(HashVerifier),
+            Secp256k1Context::new().new_verifier(),
             vec![],
             None,
         )
@@ -423,7 +421,7 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
-            Box::new(HashVerifier),
+            Secp256k1Context::new().new_verifier(),
             vec![],
             None,
         )
@@ -444,7 +442,7 @@ pub mod tests {
             1024 * 1024,
             Path::new("/tmp"),
             1024 * 1024,
-            Box::new(HashVerifier),
+            Secp256k1Context::new().new_verifier(),
             vec![],
             None,
         )

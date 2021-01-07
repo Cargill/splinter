@@ -23,7 +23,6 @@ use sabre_sdk::{
     },
     protos::ProtoConversionError,
 };
-use sawtooth_sdk::signing::Error as SigningError;
 use scabbard::client::ScabbardClientError;
 use transact::{
     contract::archive::Error as ContractArchiveError,
@@ -105,12 +104,6 @@ impl From<SabrePayloadBuildError> for CliError {
 impl From<ProtoConversionError> for CliError {
     fn from(err: ProtoConversionError) -> Self {
         Self::action_error_with_source("failed to convert Sabre protobuf", err.into())
-    }
-}
-
-impl From<SigningError> for CliError {
-    fn from(err: SigningError) -> Self {
-        Self::action_error_with_source("signer failed", err.into())
     }
 }
 

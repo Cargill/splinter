@@ -17,11 +17,11 @@
 
 //! This module is based on the Sawtooth Sabre CLI.
 
-use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
+use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey, Signer};
 use futures::future::{self, Future};
 use futures::stream::Stream;
 use hyper::{Body, Client, Request, StatusCode};
@@ -32,15 +32,10 @@ use sabre_sdk::protocol::{
         CreateNamespaceRegistryActionBuilder, CreateNamespaceRegistryPermissionActionBuilder,
     },
 };
-use sawtooth_sdk::signing::{
-    create_context, secp256k1::Secp256k1PrivateKey, transact::TransactSigner,
-    Signer as SawtoothSigner,
-};
 use scabbard::protocol;
 use transact::{
     protocol::{batch::BatchBuilder, transaction::Transaction},
     protos::IntoBytes,
-    signing::Signer,
 };
 
 use super::AppAuthHandlerError;
@@ -62,7 +57,7 @@ pub fn setup_xo(
     let signer = new_signer(private_key)?;
 
     // The node with the first key in the list of scabbard admins is responsible for setting up xo
-    let public_key = bytes_to_hex_str(signer.public_key());
+    let public_key = signer.public_key()?.as_hex();
     let is_submitter = match scabbard_admin_keys.get(0) {
         Some(submitting_key) => &public_key == submitting_key,
         None => false,
@@ -73,12 +68,14 @@ pub fn setup_xo(
 
     // Create the transactions and batch them
     let txns = vec![
-        create_contract_registry_txn(scabbard_admin_keys.clone(), &signer)?,
-        upload_contract_txn(&signer)?,
-        create_xo_namespace_registry_txn(scabbard_admin_keys, &signer)?,
-        xo_namespace_permissions_txn(&signer)?,
+        create_contract_registry_txn(scabbard_admin_keys.clone(), &*signer)?,
+        upload_contract_txn(&*signer)?,
+        create_xo_namespace_registry_txn(scabbard_admin_keys, &*signer)?,
+        xo_namespace_permissions_txn(&*signer)?,
     ];
-    let batch = BatchBuilder::new().with_transactions(txns).build(&signer)?;
+    let batch = BatchBuilder::new()
+        .with_transactions(txns)
+        .build(&*signer)?;
     let payload = vec![batch].into_bytes()?;
 
     // Submit the batch to the scabbard service
@@ -134,10 +131,10 @@ pub fn setup_xo(
     ))
 }
 
-fn new_signer(private_key: &str) -> Result<TransactSigner, AppAuthHandlerError> {
-    let context = create_context("secp256k1")?;
-    let private_key = Box::new(Secp256k1PrivateKey::from_hex(private_key)?);
-    Ok(SawtoothSigner::new_boxed(context, private_key).try_into()?)
+fn new_signer(private_key: &str) -> Result<Box<dyn Signer>, AppAuthHandlerError> {
+    let context = Secp256k1Context::new();
+    let private_key = PrivateKey::new_from_hex(private_key)?;
+    Ok(context.new_signer(private_key))
 }
 
 fn create_contract_registry_txn(
