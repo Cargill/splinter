@@ -195,7 +195,7 @@ OPTIONS
   read. (Default: 10 seconds.) Use 0 to turn off forced refreshes.
 
 `--rest-api-endpoint REST-API-ENDPOINT`
-: Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8080.)
+: Specifies the connection endpoint for the REST API. (Default: 127.0.0.1:8443.)
 
 `--state-dir STATE-DIR`
 : Specifies the storage directory.
