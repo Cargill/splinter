@@ -38,7 +38,7 @@ flexi_logger = "0.14"
 health = { path = "../services/health", optional = true }
 log = "0.4"
 openssl = { version = "0.10", optional = true }
-protobuf = "2"
+protobuf = "~2.18"
 rand = "0.7"
 serde = "1.0.80"
 serde_derive = "1.0.80"
