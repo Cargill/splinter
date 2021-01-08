@@ -150,4 +150,29 @@ impl StoreFactory for MemoryStoreFactory {
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
         unimplemented!()
     }
+
+    #[cfg(all(feature = "authorization", feature = "sqlite"))]
+    fn get_role_based_authorization_store(
+        &self,
+    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .expect("Failed to build connection pool");
+
+        crate::migrations::run_sqlite_migrations(
+            &*pool.get().expect("Failed to get connection for migrations"),
+        )
+        .expect("Failed to run migrations");
+
+        Box::new(crate::rest_api::auth::roles::store::DieselRoleBasedAuthorizationStore::new(pool))
+    }
+
+    #[cfg(all(feature = "authorization", not(feature = "sqlite")))]
+    fn get_role_based_authorization_store(
+        &self,
+    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+        unimplemented!()
+    }
 }
