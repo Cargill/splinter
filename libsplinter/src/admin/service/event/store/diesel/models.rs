@@ -16,13 +16,19 @@
 
 use std::convert::TryFrom;
 
-use crate::admin::service::event::store::diesel::schema::{
-    admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
-    admin_event_proposed_node_endpoint, admin_event_proposed_service,
-    admin_event_proposed_service_argument, admin_event_vote_record, admin_service_event,
+use crate::admin::service::event::{
+    store::{
+        diesel::schema::{
+            admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
+            admin_event_proposed_node_endpoint, admin_event_proposed_service,
+            admin_event_proposed_service_argument, admin_event_vote_record, admin_service_event,
+        },
+        AdminServiceEventStoreError,
+    },
+    AdminServiceEvent, EventType,
 };
 use crate::admin::service::messages::{self, CreateCircuit};
-use crate::admin::store::{Vote, VoteRecord, VoteRecordBuilder};
+use crate::admin::store::{CircuitProposal, Vote, VoteRecord, VoteRecordBuilder};
 use crate::error::InvalidStateError;
 
 /// Database model representation of an `AdminServiceEvent`
@@ -122,6 +128,26 @@ pub struct AdminEventVoteRecordModel {
     pub voter_node_id: String,
 }
 
+impl AdminEventVoteRecordModel {
+    // Creates a list of `AdminEventVoteRecordModel` from a `CircuitProposal` associated with
+    // an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Vec<AdminEventVoteRecordModel> {
+        proposal
+            .votes
+            .iter()
+            .map(|vote| AdminEventVoteRecordModel {
+                event_id,
+                public_key: vote.public_key.to_vec(),
+                vote: String::from(&vote.vote),
+                voter_node_id: vote.voter_node_id.to_string(),
+            })
+            .collect()
+    }
+}
+
 impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
     type Error = InvalidStateError;
     fn try_from(
@@ -149,6 +175,25 @@ pub struct AdminEventProposedNodeModel {
     pub node_id: String,
 }
 
+impl AdminEventProposedNodeModel {
+    // Creates a list of `AdminEventProposedNodeModel` from a `CircuitProposal` associated with
+    // an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Vec<AdminEventProposedNodeModel> {
+        proposal
+            .circuit
+            .members
+            .iter()
+            .map(|node| AdminEventProposedNodeModel {
+                event_id,
+                node_id: node.node_id.to_string(),
+            })
+            .collect()
+    }
+}
+
 /// Database model representation of the endpoint values associated with a `ProposedNode` from an
 /// `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -159,6 +204,30 @@ pub struct AdminEventProposedNodeEndpointModel {
     pub event_id: i64,
     pub node_id: String,
     pub endpoint: String,
+}
+
+impl AdminEventProposedNodeEndpointModel {
+    // Creates a list of `AdminEventProposedNodeEndpointModel` from a `CircuitProposal` associated
+    // with an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Vec<AdminEventProposedNodeEndpointModel> {
+        let mut endpoint_models = Vec::new();
+        for node in &proposal.circuit.members {
+            endpoint_models.extend(
+                node.endpoints
+                    .iter()
+                    .map(|endpoint| AdminEventProposedNodeEndpointModel {
+                        event_id,
+                        node_id: node.node_id.to_string(),
+                        endpoint: endpoint.to_string(),
+                    })
+                    .collect::<Vec<AdminEventProposedNodeEndpointModel>>(),
+            );
+        }
+        endpoint_models
+    }
 }
 
 /// Database model representation of a `ProposedService` from an `AdminServiceEvent`
@@ -173,6 +242,39 @@ pub struct AdminEventProposedServiceModel {
     pub node_id: String,
 }
 
+impl AdminEventProposedServiceModel {
+    // Creates a list of `AdminEventProposedServiceModel` from a `CircuitProposal` associated
+    // with an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Result<Vec<AdminEventProposedServiceModel>, AdminServiceEventStoreError> {
+        proposal
+            .circuit
+            .roster
+            .iter()
+            .map(|service| {
+                Ok(AdminEventProposedServiceModel {
+                    event_id,
+                    service_id: service.service_id.to_string(),
+                    service_type: service.service_type.to_string(),
+                    node_id: service
+                        .allowed_nodes
+                        .get(0)
+                        .ok_or_else(|| {
+                            AdminServiceEventStoreError::InvalidStateError(
+                                InvalidStateError::with_message(
+                                    "Must contain 1 node ID".to_string(),
+                                ),
+                            )
+                        })?
+                        .to_string(),
+                })
+            })
+            .collect::<Result<Vec<AdminEventProposedServiceModel>, AdminServiceEventStoreError>>()
+    }
+}
+
 /// Database model representation of the arguments associated with a `ProposedService` from an
 /// `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -184,6 +286,32 @@ pub struct AdminEventProposedServiceArgumentModel {
     pub service_id: String,
     pub key: String,
     pub value: String,
+}
+
+impl AdminEventProposedServiceArgumentModel {
+    // Creates a list of `AdminEventProposedServiceArgumentModel` from a `CircuitProposal` associated
+    // with an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Vec<AdminEventProposedServiceArgumentModel> {
+        let mut service_arguments = Vec::new();
+        for service in &proposal.circuit.roster {
+            service_arguments.extend(
+                service
+                    .arguments
+                    .iter()
+                    .map(|(key, value)| AdminEventProposedServiceArgumentModel {
+                        event_id,
+                        service_id: service.service_id.to_string(),
+                        key: key.into(),
+                        value: value.into(),
+                    })
+                    .collect::<Vec<AdminEventProposedServiceArgumentModel>>(),
+            );
+        }
+        service_arguments
+    }
 }
 
 // All enums associated with the above structs have TryFrom and From implemented in order to
@@ -265,6 +393,47 @@ impl<'a> From<&'a messages::AdminServiceEvent> for NewAdminServiceEventModel<'a>
                 event_type: "CircuitReady",
                 data: None,
             },
+        }
+    }
+}
+
+impl TryFrom<(AdminServiceEventModel, CircuitProposal)> for AdminServiceEvent {
+    type Error = AdminServiceEventStoreError;
+
+    fn try_from(
+        (event_model, proposal): (AdminServiceEventModel, CircuitProposal),
+    ) -> Result<Self, Self::Error> {
+        match (event_model.event_type.as_ref(), event_model.data) {
+            ("ProposalSubmitted", None) => Ok(AdminServiceEvent {
+                event_id: event_model.id,
+                event_type: EventType::ProposalSubmitted,
+                proposal,
+            }),
+            ("ProposalVote", Some(requester)) => Ok(AdminServiceEvent {
+                event_id: event_model.id,
+                event_type: EventType::ProposalVote { requester },
+                proposal,
+            }),
+            ("ProposalAccepted", Some(requester)) => Ok(AdminServiceEvent {
+                event_id: event_model.id,
+                event_type: EventType::ProposalAccepted { requester },
+                proposal,
+            }),
+            ("ProposalRejected", Some(requester)) => Ok(AdminServiceEvent {
+                event_id: event_model.id,
+                event_type: EventType::ProposalRejected { requester },
+                proposal,
+            }),
+            ("CircuitReady", None) => Ok(AdminServiceEvent {
+                event_id: event_model.id,
+                event_type: EventType::CircuitReady,
+                proposal,
+            }),
+            _ => Err(AdminServiceEventStoreError::InvalidStateError(
+                InvalidStateError::with_message(
+                    "Unable to convert AdminServiceEventModel to AdminServiceEvent".into(),
+                ),
+            )),
         }
     }
 }
