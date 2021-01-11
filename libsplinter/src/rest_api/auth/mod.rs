@@ -181,6 +181,9 @@ impl FromStr for BearerToken {
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         let mut parts = str.splitn(2, ':');
         match (parts.next(), parts.next()) {
+            // Allowing lint in case none of `biome-credentials`, `cylinder-jwt`, or `oauth` are
+            // used
+            #[allow(unused_variables, clippy::match_single_binding)]
             (Some(token_type), Some(token)) => match token_type {
                 #[cfg(feature = "biome-credentials")]
                 "Biome" => Ok(BearerToken::Biome(token.to_string())),
