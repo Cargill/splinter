@@ -24,6 +24,8 @@ pub mod roles;
 
 use std::str::FromStr;
 
+#[cfg(feature = "authorization")]
+use crate::error::InternalError;
 use crate::error::InvalidArgumentError;
 
 #[cfg(feature = "authorization")]
@@ -45,6 +47,43 @@ pub enum Permission {
     AllowAuthenticated,
     /// Allow any request without checking for authorization.
     AllowUnauthenticated,
+}
+
+/// An authorization handler's decision about whether to allow, deny, or pass on the request
+#[cfg(feature = "authorization")]
+pub enum AuthorizationHandlerResult {
+    Allow,
+    Deny,
+    Continue,
+}
+
+/// Determines if a client (identity) has the requested permissions (represented by the permission
+/// ID)
+#[cfg(feature = "authorization")]
+pub trait AuthorizationHandler: Send + Sync {
+    fn has_permission(
+        &self,
+        identity: &Identity,
+        permission_id: &str,
+    ) -> Result<AuthorizationHandlerResult, InternalError>;
+
+    /// Clone implementation for `AuthorizationHandler`. The implementation of the `Clone` trait for
+    /// `Box<dyn AuthorizationHandler>` calls this method.
+    ///
+    /// # Example
+    ///
+    ///```ignore
+    ///  fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+    ///     Box::new(self.clone())
+    ///  }
+    ///```
+    fn clone_box(&self) -> Box<dyn AuthorizationHandler>;
+}
+
+impl Clone for Box<dyn AuthorizationHandler> {
+    fn clone(&self) -> Box<dyn AuthorizationHandler> {
+        self.clone_box()
+    }
 }
 
 /// The possible outcomes of attempting to authorize a client
@@ -74,18 +113,42 @@ fn authorize(
     auth_header: Option<&str>,
     #[cfg(feature = "authorization")] permission_map: &PermissionMap,
     identity_providers: &[Box<dyn IdentityProvider>],
+    #[cfg(feature = "authorization")] authorization_handlers: &[Box<dyn AuthorizationHandler>],
 ) -> AuthorizationResult {
-    // Get the permission that applies to this request
     #[cfg(feature = "authorization")]
-    let permission = match permission_map.get_permission(&method, endpoint) {
-        Some(perm) => perm,
-        None => return AuthorizationResult::UnknownEndpoint,
-    };
+    {
+        // Get the permission that applies to this request
+        let permission = match permission_map.get_permission(&method, endpoint) {
+            Some(perm) => perm,
+            None => return AuthorizationResult::UnknownEndpoint,
+        };
 
-    // Determine if authorization is required
-    #[cfg(feature = "authorization")]
-    if permission == &Permission::AllowUnauthenticated {
-        return AuthorizationResult::NoAuthorizationNecessary;
+        match *permission {
+            Permission::AllowUnauthenticated => AuthorizationResult::NoAuthorizationNecessary,
+            Permission::AllowAuthenticated => match get_identity(auth_header, identity_providers) {
+                Some(identity) => AuthorizationResult::Authorized(identity),
+                None => AuthorizationResult::Unauthorized,
+            },
+            Permission::Check(perm) => match get_identity(auth_header, identity_providers) {
+                Some(identity) => {
+                    for handler in authorization_handlers {
+                        match handler.has_permission(&identity, perm) {
+                            Ok(AuthorizationHandlerResult::Allow) => {
+                                return AuthorizationResult::Authorized(identity)
+                            }
+                            Ok(AuthorizationHandlerResult::Deny) => {
+                                return AuthorizationResult::Unauthorized
+                            }
+                            Ok(AuthorizationHandlerResult::Continue) => {}
+                            Err(err) => error!("{}", err),
+                        }
+                    }
+                    // No handler allowed the request, so deny by default
+                    AuthorizationResult::Unauthorized
+                }
+                None => AuthorizationResult::Unauthorized,
+            },
+        }
     }
     #[cfg(not(feature = "authorization"))]
     {
@@ -103,29 +166,25 @@ fn authorize(
         if is_auth_endpoint {
             return AuthorizationResult::NoAuthorizationNecessary;
         }
-    }
 
-    // Parse the auth header
-    let auth_str = match auth_header {
-        Some(auth_str) => auth_str,
-        None => return AuthorizationResult::Unauthorized,
-    };
-    let authorization = match auth_str.parse() {
-        Ok(auth) => auth,
-        Err(_) => return AuthorizationResult::Unauthorized,
-    };
-
-    // Attempt to get the client's identity
-    for provider in identity_providers {
-        match provider.get_identity(&authorization) {
-            Ok(Some(identity)) => return AuthorizationResult::Authorized(identity),
-            Ok(None) => {}
-            Err(err) => error!("{}", err),
+        match get_identity(auth_header, identity_providers) {
+            Some(identity) => AuthorizationResult::Authorized(identity),
+            None => AuthorizationResult::Unauthorized,
         }
     }
+}
 
-    // No identity provider could resolve the authorization to an identity
-    AuthorizationResult::Unauthorized
+fn get_identity(
+    auth_header: Option<&str>,
+    identity_providers: &[Box<dyn IdentityProvider>],
+) -> Option<Identity> {
+    let authorization = auth_header?.parse().ok()?;
+    identity_providers.iter().find_map(|provider| {
+        provider.get_identity(&authorization).unwrap_or_else(|err| {
+            error!("{}", err);
+            None
+        })
+    })
 }
 
 /// A parsed authorization header
@@ -280,7 +339,9 @@ mod tests {
                 Some("auth"),
                 #[cfg(feature = "authorization")]
                 &permission_map,
-                &[]
+                &[],
+                #[cfg(feature = "authorization")]
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
             ),
             AuthorizationResult::Unauthorized
         ));
@@ -309,7 +370,9 @@ mod tests {
                 Some("auth"),
                 #[cfg(feature = "authorization")]
                 &permission_map,
-                &[Box::new(AlwaysRejectIdentityProvider)]
+                &[Box::new(AlwaysRejectIdentityProvider)],
+                #[cfg(feature = "authorization")]
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
             ),
             AuthorizationResult::Unauthorized
         ));
@@ -339,7 +402,9 @@ mod tests {
                 None,
                 #[cfg(feature = "authorization")]
                 &permission_map,
-                &[Box::new(AlwaysAcceptIdentityProvider)]
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                #[cfg(feature = "authorization")]
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
             ),
             AuthorizationResult::Unauthorized
         ));
@@ -357,7 +422,8 @@ mod tests {
                 "/test/endpoint",
                 None,
                 &Default::default(),
-                &[Box::new(AlwaysAcceptIdentityProvider)]
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
             ),
             AuthorizationResult::UnknownEndpoint
         ));
@@ -385,7 +451,8 @@ mod tests {
                     "/test/endpoint",
                     None,
                     &permission_map,
-                    &[Box::new(AlwaysRejectIdentityProvider)]
+                    &[Box::new(AlwaysRejectIdentityProvider)],
+                    &[Box::new(AlwaysAllowAuthorizationHandler)],
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
             ));
@@ -397,7 +464,8 @@ mod tests {
                     "/test/endpoint",
                     Some("auth"),
                     &permission_map,
-                    &[Box::new(AlwaysRejectIdentityProvider)]
+                    &[Box::new(AlwaysRejectIdentityProvider)],
+                    &[Box::new(AlwaysAllowAuthorizationHandler)],
                 ),
                 AuthorizationResult::NoAuthorizationNecessary
             ));
@@ -504,9 +572,11 @@ mod tests {
     }
 
     /// Verifies the simple case where `authorize` is called with a single identity provider that
-    /// successfully gets the client's identity.
+    /// successfully gets the client's identity. This test uses an endpoint with
+    /// `Permission::AllowAuthenticated` to ignore authorization handlers which are covered by other
+    /// tests.
     #[test]
-    fn authorize_successful_one_provider() {
+    fn authorize_successful_one_identity_provider() {
         let expected_auth = "auth".parse().unwrap();
         let expected_identity = AlwaysAcceptIdentityProvider
             .get_identity(&expected_auth)
@@ -532,16 +602,20 @@ mod tests {
                 Some("auth"),
                 #[cfg(feature = "authorization")]
                 &permission_map,
-                &[Box::new(AlwaysAcceptIdentityProvider)]
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                #[cfg(feature = "authorization")]
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
             ),
             AuthorizationResult::Authorized(identity) if identity == expected_identity
         ));
     }
 
     /// Verifies the case where `authorize` is called with multile identity providers and only one
-    /// successfully gets the client's identity.
+    /// successfully gets the client's identity. This test uses an endpoint with
+    /// `Permission::AllowAuthenticated` to ignore authorization handlers which are covered by other
+    /// tests.
     #[test]
-    fn authorize_successful_multiple_providers() {
+    fn authorize_successful_multiple_identity_providers() {
         let expected_auth = "auth".parse().unwrap();
         let expected_identity = AlwaysAcceptIdentityProvider
             .get_identity(&expected_auth)
@@ -571,16 +645,20 @@ mod tests {
                     Box::new(AlwaysRejectIdentityProvider),
                     Box::new(AlwaysAcceptIdentityProvider),
                     Box::new(AlwaysRejectIdentityProvider),
-                ]
+                ],
+                #[cfg(feature = "authorization")]
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
             ),
             AuthorizationResult::Authorized(identity) if identity == expected_identity
         ));
     }
 
     /// Verifies the case where `authorize` is called with multiple identity provider and one errors
-    /// before another successfully gets the client's identity.
+    /// before another successfully gets the client's identity. This test uses an endpoint with
+    /// `Permission::AllowAuthenticated` to ignore authorization handlers which are covered by other
+    /// tests.
     #[test]
-    fn authorize_successful_after_error() {
+    fn authorize_successful_after_identity_provider_error() {
         let expected_auth = "auth".parse().unwrap();
         let expected_identity = AlwaysAcceptIdentityProvider
             .get_identity(&expected_auth)
@@ -609,7 +687,211 @@ mod tests {
                 &[
                     Box::new(AlwaysErrIdentityProvider),
                     Box::new(AlwaysAcceptIdentityProvider),
-                ]
+                ],
+                #[cfg(feature = "authorization")]
+                &[Box::new(AlwaysAllowAuthorizationHandler)],
+            ),
+            AuthorizationResult::Authorized(identity) if identity == expected_identity
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when no
+    /// authorization handlers are specified, since this function should deny by default.
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_no_authorization_handlers() {
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::Check("permission"),
+            );
+            map
+        };
+
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &permission_map,
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[],
+            ),
+            AuthorizationResult::Unauthorized
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when no
+    /// authorization handlers returns `Allow` or `Deny`. since this function should deny by
+    /// default (must get an explicit `Allow` from an authorization handler).
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_no_allowing_authorization_handler() {
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::Check("permission"),
+            );
+            map
+        };
+
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &permission_map,
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[Box::new(AlwaysContinueAuthorizationHandler)],
+            ),
+            AuthorizationResult::Unauthorized
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Unauthorized` when an
+    /// authorization handler returns `Deny`, even if an auth handler after it returns `Allow`.
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_deny_before_allowing_authorization_handler() {
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::Check("permission"),
+            );
+            map
+        };
+
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &permission_map,
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[
+                    Box::new(AlwaysDenyAuthorizationHandler),
+                    Box::new(AlwaysAllowAuthorizationHandler),
+                ],
+            ),
+            AuthorizationResult::Unauthorized
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Authorized(identity)`
+    /// when an authorization handler returns `Allow`, even if an auth handler after it returns
+    /// `Deny`.
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_allow_before_denying_authorization_handler() {
+        let expected_auth = "auth".parse().unwrap();
+        let expected_identity = AlwaysAcceptIdentityProvider
+            .get_identity(&expected_auth)
+            .unwrap()
+            .unwrap();
+
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::Check("permission"),
+            );
+            map
+        };
+
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &permission_map,
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[
+                    Box::new(AlwaysAllowAuthorizationHandler),
+                    Box::new(AlwaysDenyAuthorizationHandler),
+                ],
+            ),
+            AuthorizationResult::Authorized(identity) if identity == expected_identity
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Authorized(identity)`
+    /// when an authorization handler returns `Allow` after another authorization handler returns
+    /// `Continue`.
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_allow_after_continuing_authorization_handler() {
+        let expected_auth = "auth".parse().unwrap();
+        let expected_identity = AlwaysAcceptIdentityProvider
+            .get_identity(&expected_auth)
+            .unwrap()
+            .unwrap();
+
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::Check("permission"),
+            );
+            map
+        };
+
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &permission_map,
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[
+                    Box::new(AlwaysContinueAuthorizationHandler),
+                    Box::new(AlwaysAllowAuthorizationHandler),
+                ],
+            ),
+            AuthorizationResult::Authorized(identity) if identity == expected_identity
+        ));
+    }
+
+    /// Verifies that the `authorize` function returns `AuthorizationResult::Authorized(identity)`
+    /// when an authorization handler returns `Allow` after another authorization handler returns
+    /// `Err(_)`.
+    #[cfg(feature = "authorization")]
+    #[test]
+    fn authorize_allow_after_err_authorization_handler() {
+        let expected_auth = "auth".parse().unwrap();
+        let expected_identity = AlwaysAcceptIdentityProvider
+            .get_identity(&expected_auth)
+            .unwrap()
+            .unwrap();
+
+        let permission_map = {
+            let mut map = PermissionMap::new();
+            map.add_permission(
+                Method::Get,
+                "/test/endpoint",
+                Permission::Check("permission"),
+            );
+            map
+        };
+
+        assert!(matches!(
+            authorize(
+                &Method::Get,
+                "/test/endpoint",
+                Some("auth"),
+                &permission_map,
+                &[Box::new(AlwaysAcceptIdentityProvider)],
+                &[
+                    Box::new(AlwaysErrAuthorizationHandler),
+                    Box::new(AlwaysAllowAuthorizationHandler),
+                ],
             ),
             AuthorizationResult::Authorized(identity) if identity == expected_identity
         ));
@@ -662,6 +944,86 @@ mod tests {
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An authorization handler that always returns `Ok(AuthorizationHandlerResult::Allow)`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysAllowAuthorizationHandler;
+
+    #[cfg(feature = "authorization")]
+    impl AuthorizationHandler for AlwaysAllowAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Allow)
+        }
+
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An authorization handler that always returns `Ok(AuthorizationHandlerResult::Deny)`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysDenyAuthorizationHandler;
+
+    #[cfg(feature = "authorization")]
+    impl AuthorizationHandler for AlwaysDenyAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Deny)
+        }
+
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An authorization handler that always returns `Ok(AuthorizationHandlerResult::Continue)`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysContinueAuthorizationHandler;
+
+    #[cfg(feature = "authorization")]
+    impl AuthorizationHandler for AlwaysContinueAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Continue)
+        }
+
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An authorization handler that always returns `Err(_)`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysErrAuthorizationHandler;
+
+    #[cfg(feature = "authorization")]
+    impl AuthorizationHandler for AlwaysErrAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Err(InternalError::with_message("failed".into()))
+        }
+
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
             Box::new(self.clone())
         }
     }

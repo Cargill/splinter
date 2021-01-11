@@ -368,9 +368,15 @@ mod tests {
     use reqwest::blocking::Client;
 
     use crate::biome::{MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore};
+    #[cfg(feature = "authorization")]
+    use crate::error::InternalError;
     #[cfg(feature = "auth")]
     use crate::rest_api::actix_web_1::AuthConfig;
     use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
+    #[cfg(feature = "authorization")]
+    use crate::rest_api::auth::{
+        identity::Identity, AuthorizationHandler, AuthorizationHandlerResult,
+    };
 
     #[derive(Serialize)]
     struct UsernamePassword {
@@ -501,7 +507,33 @@ mod tests {
             }]);
         }
 
+        #[cfg(feature = "authorization")]
+        {
+            rest_api_builder = rest_api_builder
+                .with_authorization_handlers(vec![Box::new(AlwaysAllowAuthorizationHandler)]);
+        }
+
         rest_api_builder.build().unwrap().run().unwrap()
+    }
+
+    /// An authorization handler that always returns `Ok(AuthorizationHandlerResult::Allow)`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysAllowAuthorizationHandler;
+
+    #[cfg(feature = "authorization")]
+    impl AuthorizationHandler for AlwaysAllowAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Allow)
+        }
+
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+            Box::new(self.clone())
+        }
     }
 
     fn create_and_authorize_user(

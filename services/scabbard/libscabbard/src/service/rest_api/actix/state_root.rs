@@ -87,7 +87,7 @@ mod tests {
     use splinter::rest_api::{
         auth::{
             identity::{Identity, IdentityProvider},
-            AuthorizationHeader,
+            AuthorizationHandler, AuthorizationHandlerResult, AuthorizationHeader,
         },
         AuthConfig,
     };
@@ -265,11 +265,12 @@ mod tests {
                     .with_bind(&bind_url)
                     .add_resources(resources.clone());
                 #[cfg(feature = "authorization")]
-                let rest_api_builder =
-                    rest_api_builder.with_auth_configs(vec![AuthConfig::Custom {
+                let rest_api_builder = rest_api_builder
+                    .with_auth_configs(vec![AuthConfig::Custom {
                         resources: vec![],
                         identity_provider: Box::new(AlwaysAcceptIdentityProvider),
-                    }]);
+                    }])
+                    .with_authorization_handlers(vec![Box::new(AlwaysAllowAuthorizationHandler)]);
                 let result = rest_api_builder
                     .build()
                     .expect("Failed to build REST API")
@@ -300,6 +301,26 @@ mod tests {
         }
 
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// An authorization handler that always returns `Ok(AuthorizationHandlerResult::Allow)`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysAllowAuthorizationHandler;
+
+    #[cfg(feature = "authorization")]
+    impl AuthorizationHandler for AlwaysAllowAuthorizationHandler {
+        fn has_permission(
+            &self,
+            _identity: &Identity,
+            _permission_id: &str,
+        ) -> Result<AuthorizationHandlerResult, InternalError> {
+            Ok(AuthorizationHandlerResult::Allow)
+        }
+
+        fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
             Box::new(self.clone())
         }
     }
