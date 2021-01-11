@@ -27,8 +27,9 @@ use crate::admin::service::event::{
         diesel::{
             models::{
                 AdminEventCircuitProposalModel, AdminEventProposedCircuitModel,
-                AdminEventProposedNodeModel, AdminEventProposedServiceArgumentModel,
-                AdminEventProposedServiceModel, AdminEventVoteRecordModel, AdminServiceEventModel,
+                AdminEventProposedNodeEndpointModel, AdminEventProposedNodeModel,
+                AdminEventProposedServiceArgumentModel, AdminEventProposedServiceModel,
+                AdminEventVoteRecordModel, AdminServiceEventModel,
             },
             schema::{
                 admin_event_circuit_proposal, admin_event_proposed_circuit,
@@ -58,6 +59,7 @@ where
     C::Backend: HasSqlType<diesel::sql_types::BigInt>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
 {
     fn list_events(&self, event_ids: Vec<i64>) -> Result<EventIter, AdminServiceEventStoreError> {
@@ -143,11 +145,10 @@ where
                 .collect::<Result<HashMap<i64, (_, _, _)>, AdminServiceEventStoreError>>()?;
 
             // Collect `ProposedServices` to apply to the `ProposedCircuit`
-            // Create HashMap of (`event_id`, `service_id`) to a `ProposedServiceBuilder`
-            let mut proposed_services: HashMap<(i64, String), ProposedServiceBuilder> =
+            // Create HashMap of (`event_id`, `service_id`) to a `IndexedServiceBuilder`
+            let mut proposed_services: HashMap<(i64, String), IndexedServiceBuilder> =
                 HashMap::new();
-            // Create HashMap of (`event_id`, `service_id`) to the associated argument values
-            let mut arguments_map: HashMap<(i64, String), Vec<(String, String)>> = HashMap::new();
+
             for (proposed_service, opt_arg) in admin_event_proposed_service::table
                 .filter(admin_event_proposed_service::event_id.eq_any(&event_ids))
                 .left_join(
@@ -170,41 +171,48 @@ where
                 )>(self.conn)?
             {
                 if let Some(arg_model) = opt_arg {
-                    if let Some(args) = arguments_map.get_mut(&(
+                    if let Some(indexed_service) = proposed_services.get_mut(&(
                         proposed_service.event_id,
                         proposed_service.service_id.to_string(),
                     )) {
-                        args.push((arg_model.key.to_string(), arg_model.value.to_string()));
+                        indexed_service.arguments.push(arg_model);
                     } else {
-                        arguments_map.insert(
-                            (
+                        // Insert new `ProposedServiceBuilder` if it does not already exist
+                        proposed_services
+                            .entry((
                                 proposed_service.event_id,
                                 proposed_service.service_id.to_string(),
-                            ),
-                            vec![(arg_model.key.to_string(), arg_model.value.to_string())],
-                        );
+                            ))
+                            .or_insert_with(|| IndexedServiceBuilder {
+                                position: proposed_service.position,
+                                arguments: vec![arg_model],
+                                builder: ProposedServiceBuilder::new()
+                                    .with_service_id(&proposed_service.service_id)
+                                    .with_service_type(&proposed_service.service_type)
+                                    .with_node_id(&proposed_service.node_id),
+                            });
                     }
                 }
-                // Insert new `ProposedServiceBuilder` if it does not already exist
-                proposed_services
-                    .entry((
-                        proposed_service.event_id,
-                        proposed_service.service_id.to_string(),
-                    ))
-                    .or_insert_with(|| {
-                        ProposedServiceBuilder::new()
-                            .with_service_id(&proposed_service.service_id)
-                            .with_service_type(&proposed_service.service_type)
-                            .with_node_id(&proposed_service.node_id)
-                    });
             }
             // Need to collect the `ProposedServices` mapped to `event_ids`
             let mut built_proposed_services: HashMap<i64, Vec<ProposedService>> = HashMap::new();
-            for ((event_id, service_id), mut builder) in proposed_services.into_iter() {
-                if let Some(args) = arguments_map.get(&(event_id, service_id.to_string())) {
-                    builder = builder.with_arguments(&args);
-                }
-                let proposed_service = builder
+
+            let mut ordered_proposed_services: Vec<((i64, String), IndexedServiceBuilder)> =
+                proposed_services.into_iter().collect();
+            ordered_proposed_services
+                .sort_by_key(|((_, _), indexed_service)| indexed_service.position);
+            for ((event_id, _), mut indexed_service) in ordered_proposed_services.into_iter() {
+                indexed_service.arguments.sort_by_key(|arg| arg.position);
+                indexed_service.builder = indexed_service.builder.with_arguments(
+                    &indexed_service
+                        .arguments
+                        .iter()
+                        .map(|arg_mod| (arg_mod.key.to_string(), arg_mod.value.to_string()))
+                        .collect::<Vec<(String, String)>>(),
+                );
+
+                let proposed_service = indexed_service
+                    .builder
                     .build()
                     .map_err(AdminServiceEventStoreError::InvalidStateError)?;
 
@@ -214,8 +222,8 @@ where
                     built_proposed_services.insert(event_id, vec![proposed_service]);
                 }
             }
-            // Collect `ProposedNodes` and proposed node endpoints
-            let mut proposed_nodes: HashMap<(i64, String), ProposedNodeBuilder> = HashMap::new();
+            // Collect `Nodes` and proposed node endpoints
+            let mut proposed_nodes: HashMap<(i64, String), IndexedNodeBuilder> = HashMap::new();
             for (node, endpoint) in admin_event_proposed_node::table
                 .filter(admin_event_proposed_node::event_id.eq_any(&event_ids))
                 .inner_join(
@@ -230,40 +238,69 @@ where
                 )
                 .select((
                     admin_event_proposed_node::all_columns,
-                    admin_event_proposed_node_endpoint::endpoint,
+                    admin_event_proposed_node_endpoint::all_columns,
                 ))
-                .load::<(AdminEventProposedNodeModel, String)>(self.conn)?
+                .load::<(
+                    AdminEventProposedNodeModel,
+                    AdminEventProposedNodeEndpointModel,
+                )>(self.conn)?
             {
                 if let Some(proposed_node) =
-                    proposed_nodes.remove(&(node.event_id, node.node_id.to_string()))
+                    proposed_nodes.get_mut(&(node.event_id, node.node_id.to_string()))
                 {
-                    if let Some(mut endpoints) = proposed_node.endpoints() {
-                        endpoints.push(endpoint);
-                        let proposed_node = proposed_node.with_endpoints(&endpoints);
-                        proposed_nodes.insert((node.event_id, node.node_id), proposed_node);
-                    } else {
-                        let proposed_node = proposed_node.with_endpoints(&[endpoint]);
-                        proposed_nodes.insert((node.event_id, node.node_id), proposed_node);
-                    }
+                    proposed_node.endpoints.push(endpoint);
                 } else {
-                    let proposed_node = ProposedNodeBuilder::new()
-                        .with_node_id(&node.node_id)
-                        .with_endpoints(&[endpoint]);
-                    proposed_nodes.insert((node.event_id, node.node_id), proposed_node);
+                    let proposed_node = ProposedNodeBuilder::new().with_node_id(&node.node_id);
+
+                    proposed_nodes.insert(
+                        (node.event_id, node.node_id),
+                        IndexedNodeBuilder {
+                            position: node.position,
+                            endpoints: vec![endpoint],
+                            builder: proposed_node,
+                        },
+                    );
                 }
             }
+
+            let mut ordered_proposed_nodes: Vec<((i64, String), IndexedNodeBuilder)> =
+                proposed_nodes.into_iter().collect();
+            ordered_proposed_nodes.sort_by_key(|((_, _), indexed_node)| indexed_node.position);
+
             let mut built_proposed_nodes: HashMap<i64, Vec<ProposedNode>> = HashMap::new();
-            for ((event_id, _), builder) in proposed_nodes.into_iter() {
+            for ((event_id, _), mut proposed_node) in ordered_proposed_nodes.into_iter() {
                 if let Some(nodes) = built_proposed_nodes.get_mut(&event_id) {
+                    proposed_node
+                        .endpoints
+                        .sort_by_key(|endpoint_mods| endpoint_mods.position);
+
+                    let endpoints = proposed_node
+                        .endpoints
+                        .iter()
+                        .map(|endpoint_mod| endpoint_mod.endpoint.to_string())
+                        .collect::<Vec<String>>();
                     nodes.push(
-                        builder
+                        proposed_node
+                            .builder
+                            .with_endpoints(&endpoints)
                             .build()
                             .map_err(AdminServiceEventStoreError::InvalidStateError)?,
                     )
                 } else {
+                    proposed_node
+                        .endpoints
+                        .sort_by_key(|endpoint_mods| endpoint_mods.position);
+
+                    let endpoints = proposed_node
+                        .endpoints
+                        .iter()
+                        .map(|endpoint_mod| endpoint_mod.endpoint.to_string())
+                        .collect::<Vec<String>>();
                     built_proposed_nodes.insert(
                         event_id,
-                        vec![builder
+                        vec![proposed_node
+                            .builder
+                            .with_endpoints(&endpoints)
                             .build()
                             .map_err(AdminServiceEventStoreError::InvalidStateError)?],
                     );
@@ -274,6 +311,7 @@ where
             let mut vote_records: HashMap<i64, Vec<VoteRecord>> = HashMap::new();
             for vote in admin_event_vote_record::table
                 .filter(admin_event_vote_record::event_id.eq_any(&event_ids))
+                .order(admin_event_vote_record::position)
                 .load::<AdminEventVoteRecordModel>(self.conn)?
                 .into_iter()
             {
@@ -320,4 +358,16 @@ where
             Ok(Box::new(events.into_iter()))
         })
     }
+}
+
+struct IndexedNodeBuilder {
+    position: i32,
+    endpoints: Vec<AdminEventProposedNodeEndpointModel>,
+    builder: ProposedNodeBuilder,
+}
+
+struct IndexedServiceBuilder {
+    position: i32,
+    arguments: Vec<AdminEventProposedServiceArgumentModel>,
+    builder: ProposedServiceBuilder,
 }

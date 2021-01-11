@@ -52,6 +52,7 @@ table! {
         public_key -> Binary,
         vote -> Text,
         voter_node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -59,6 +60,7 @@ table! {
     admin_event_proposed_node (event_id, node_id) {
         event_id -> Int8,
         node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -67,6 +69,7 @@ table! {
         event_id -> Int8,
         node_id -> Text,
         endpoint -> Text,
+        position -> Integer,
     }
 }
 
@@ -76,6 +79,7 @@ table! {
         service_id -> Text,
         service_type -> Text,
         node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -85,6 +89,7 @@ table! {
         service_id -> Text,
         key -> Text,
         value -> Text,
+        position -> Integer,
     }
 }
 
