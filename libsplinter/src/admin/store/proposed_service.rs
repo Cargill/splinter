@@ -196,9 +196,7 @@ impl ProposedServiceBuilder {
             InvalidStateError::with_message("unable to build, missing field: `node_id`".to_string())
         })?;
 
-        let mut arguments = self.arguments.unwrap_or_default();
-
-        arguments.sort();
+        let arguments = self.arguments.unwrap_or_default();
 
         let service = ProposedService {
             service_id,

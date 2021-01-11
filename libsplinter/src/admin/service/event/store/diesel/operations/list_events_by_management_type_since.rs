@@ -40,6 +40,7 @@ where
     C::Backend: HasSqlType<diesel::sql_types::BigInt>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
 {
     fn list_events_by_management_type_since(

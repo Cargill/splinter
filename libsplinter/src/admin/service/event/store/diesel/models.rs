@@ -29,7 +29,7 @@ use crate::admin::service::event::{
 };
 use crate::admin::service::messages::{self, CreateCircuit};
 use crate::admin::store::{CircuitProposal, Vote, VoteRecord, VoteRecordBuilder};
-use crate::error::InvalidStateError;
+use crate::error::{InternalError, InvalidStateError};
 
 /// Database model representation of an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -126,6 +126,7 @@ pub struct AdminEventVoteRecordModel {
     pub public_key: Vec<u8>,
     pub vote: String,
     pub voter_node_id: String,
+    pub position: i32,
 }
 
 impl AdminEventVoteRecordModel {
@@ -134,15 +135,23 @@ impl AdminEventVoteRecordModel {
     pub(super) fn list_from_proposal_with_id(
         event_id: i64,
         proposal: &messages::CircuitProposal,
-    ) -> Vec<AdminEventVoteRecordModel> {
+    ) -> Result<Vec<AdminEventVoteRecordModel>, AdminServiceEventStoreError> {
         proposal
             .votes
             .iter()
-            .map(|vote| AdminEventVoteRecordModel {
-                event_id,
-                public_key: vote.public_key.to_vec(),
-                vote: String::from(&vote.vote),
-                voter_node_id: vote.voter_node_id.to_string(),
+            .enumerate()
+            .map(|(idx, vote)| {
+                Ok(AdminEventVoteRecordModel {
+                    event_id,
+                    public_key: vote.public_key.to_vec(),
+                    vote: String::from(&vote.vote),
+                    voter_node_id: vote.voter_node_id.to_string(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceEventStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
             .collect()
     }
@@ -173,6 +182,7 @@ impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
 pub struct AdminEventProposedNodeModel {
     pub event_id: i64,
     pub node_id: String,
+    pub position: i32,
 }
 
 impl AdminEventProposedNodeModel {
@@ -181,14 +191,22 @@ impl AdminEventProposedNodeModel {
     pub(super) fn list_from_proposal_with_id(
         event_id: i64,
         proposal: &messages::CircuitProposal,
-    ) -> Vec<AdminEventProposedNodeModel> {
+    ) -> Result<Vec<AdminEventProposedNodeModel>, AdminServiceEventStoreError> {
         proposal
             .circuit
             .members
             .iter()
-            .map(|node| AdminEventProposedNodeModel {
-                event_id,
-                node_id: node.node_id.to_string(),
+            .enumerate()
+            .map(|(idx, node)| {
+                Ok(AdminEventProposedNodeModel {
+                    event_id,
+                    node_id: node.node_id.to_string(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceEventStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
             })
             .collect()
     }
@@ -204,6 +222,7 @@ pub struct AdminEventProposedNodeEndpointModel {
     pub event_id: i64,
     pub node_id: String,
     pub endpoint: String,
+    pub position: i32,
 }
 
 impl AdminEventProposedNodeEndpointModel {
@@ -212,21 +231,29 @@ impl AdminEventProposedNodeEndpointModel {
     pub(super) fn list_from_proposal_with_id(
         event_id: i64,
         proposal: &messages::CircuitProposal,
-    ) -> Vec<AdminEventProposedNodeEndpointModel> {
+    ) -> Result<Vec<AdminEventProposedNodeEndpointModel>, AdminServiceEventStoreError> {
         let mut endpoint_models = Vec::new();
         for node in &proposal.circuit.members {
             endpoint_models.extend(
                 node.endpoints
                     .iter()
-                    .map(|endpoint| AdminEventProposedNodeEndpointModel {
+                    .enumerate()
+                    .map(|(idx, endpoint)| Ok(AdminEventProposedNodeEndpointModel {
                         event_id,
                         node_id: node.node_id.to_string(),
                         endpoint: endpoint.to_string(),
-                    })
-                    .collect::<Vec<AdminEventProposedNodeEndpointModel>>(),
+                        position: i32::try_from(idx).map_err(|_| {
+                            AdminServiceEventStoreError::InternalError(InternalError::with_message(
+                                "Unable to convert index into i32".to_string(),
+                            ))
+                        })?,
+                    }))
+                    .collect::<Result<
+                        Vec<AdminEventProposedNodeEndpointModel>,AdminServiceEventStoreError>
+                    >()?,
             );
         }
-        endpoint_models
+        Ok(endpoint_models)
     }
 }
 
@@ -240,6 +267,7 @@ pub struct AdminEventProposedServiceModel {
     pub service_id: String,
     pub service_type: String,
     pub node_id: String,
+    pub position: i32,
 }
 
 impl AdminEventProposedServiceModel {
@@ -253,7 +281,8 @@ impl AdminEventProposedServiceModel {
             .circuit
             .roster
             .iter()
-            .map(|service| {
+            .enumerate()
+            .map(|(idx, service)| {
                 Ok(AdminEventProposedServiceModel {
                     event_id,
                     service_id: service.service_id.to_string(),
@@ -269,6 +298,11 @@ impl AdminEventProposedServiceModel {
                             )
                         })?
                         .to_string(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceEventStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
                 })
             })
             .collect::<Result<Vec<AdminEventProposedServiceModel>, AdminServiceEventStoreError>>()
@@ -286,6 +320,7 @@ pub struct AdminEventProposedServiceArgumentModel {
     pub service_id: String,
     pub key: String,
     pub value: String,
+    pub position: i32,
 }
 
 impl AdminEventProposedServiceArgumentModel {
@@ -294,23 +329,36 @@ impl AdminEventProposedServiceArgumentModel {
     pub(super) fn list_from_proposal_with_id(
         event_id: i64,
         proposal: &messages::CircuitProposal,
-    ) -> Vec<AdminEventProposedServiceArgumentModel> {
+    ) -> Result<Vec<AdminEventProposedServiceArgumentModel>, AdminServiceEventStoreError> {
         let mut service_arguments = Vec::new();
         for service in &proposal.circuit.roster {
             service_arguments.extend(
                 service
                     .arguments
                     .iter()
-                    .map(|(key, value)| AdminEventProposedServiceArgumentModel {
-                        event_id,
-                        service_id: service.service_id.to_string(),
-                        key: key.into(),
-                        value: value.into(),
+                    .enumerate()
+                    .map(|(idx, (key, value))| {
+                        Ok(AdminEventProposedServiceArgumentModel {
+                            event_id,
+                            service_id: service.service_id.to_string(),
+                            key: key.into(),
+                            value: value.into(),
+                            position: i32::try_from(idx).map_err(|_| {
+                                AdminServiceEventStoreError::InternalError(
+                                    InternalError::with_message(
+                                        "Unable to convert index into i32".to_string(),
+                                    ),
+                                )
+                            })?,
+                        })
                     })
-                    .collect::<Vec<AdminEventProposedServiceArgumentModel>>(),
+                    .collect::<Result<
+                        Vec<AdminEventProposedServiceArgumentModel>,
+                        AdminServiceEventStoreError,
+                    >>()?,
             );
         }
-        service_arguments
+        Ok(service_arguments)
     }
 }
 

@@ -327,17 +327,13 @@ impl CircuitBuilder {
             }
         };
 
-        let mut roster = self.roster.ok_or_else(|| {
+        let roster = self.roster.ok_or_else(|| {
             InvalidStateError::with_message("unable to build, missing field: `roster`".to_string())
         })?;
 
-        roster.sort_by_key(|service| service.service_id().to_string());
-
-        let mut members = self.members.ok_or_else(|| {
+        let members = self.members.ok_or_else(|| {
             InvalidStateError::with_message("unable to build, missing field: `members`".to_string())
         })?;
-
-        members.sort();
 
         let authorization_type = self.authorization_type.unwrap_or(AuthorizationType::Trust);
 

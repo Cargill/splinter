@@ -41,15 +41,16 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
 {
     fn list_services(
         &self,
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
-        // Create HashMap of `service_id` to a `ServiceBuilder` to collect `Service` information
-        let mut services: HashMap<String, ServiceBuilder> = HashMap::new();
+        // Create HashMap of `service_id` to a `ServiceModel`
+        let mut services: HashMap<String, ServiceModel> = HashMap::new();
         // Create HashMap of `service_id` to the associated argument values
-        let mut arguments_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        let mut arguments_map: HashMap<String, Vec<ServiceArgumentModel>> = HashMap::new();
         // Collect all 'service' entries and associated data using `inner_join`, as each `service`
         // entry has a one-to-many relationship to `service_argument`.
         for (service, opt_arg) in service::table
@@ -74,32 +75,39 @@ where
         {
             if let Some(arg_model) = opt_arg {
                 if let Some(args) = arguments_map.get_mut(&service.service_id) {
-                    args.push((arg_model.key.to_string(), arg_model.value.to_string()));
+                    args.push(arg_model);
                 } else {
-                    arguments_map.insert(
-                        service.service_id.to_string(),
-                        vec![(arg_model.key.to_string(), arg_model.value.to_string())],
-                    );
+                    arguments_map.insert(service.service_id.to_string(), vec![arg_model]);
                 }
             }
-            // Insert new `ServiceBuilder` if it does not already exist
+            // Insert `ServiceModel`
             if !services.contains_key(&service.service_id) {
-                services.insert(
-                    service.service_id.to_string(),
-                    ServiceBuilder::new()
-                        .with_service_id(&service.service_id)
-                        .with_service_type(&service.service_type)
-                        .with_node_id(&service.node_id),
-                );
+                services.insert(service.service_id.to_string(), service);
             }
         }
 
-        let ret_services: Vec<Service> = services
+        let mut service_vec: Vec<ServiceModel> =
+            services.into_iter().map(|(_, service)| service).collect();
+        service_vec.sort_by_key(|service| service.position);
+
+        let ret_services: Vec<Service> = service_vec
             .into_iter()
-            .map(|(id, mut builder)| {
-                if let Some(args) = arguments_map.get(&id) {
-                    builder = builder.with_arguments(&args);
+            .map(|service| {
+                let mut builder = ServiceBuilder::new()
+                    .with_service_id(&service.service_id)
+                    .with_service_type(&service.service_type)
+                    .with_node_id(&service.node_id);
+
+                if let Some(args) = arguments_map.get_mut(&service.service_id) {
+                    args.sort_by_key(|arg| arg.position);
+                    builder = builder.with_arguments(
+                        &args
+                            .iter()
+                            .map(|args| (args.key.to_string(), args.value.to_string()))
+                            .collect::<Vec<(String, String)>>(),
+                    );
                 }
+
                 builder
                     .build()
                     .map_err(AdminServiceStoreError::InvalidStateError)

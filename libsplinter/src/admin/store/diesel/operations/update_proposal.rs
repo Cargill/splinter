@@ -14,6 +14,8 @@
 
 //! Provides the "update proposal" operation for the `DieselAdminServiceStore`.
 
+use std::convert::TryFrom;
+
 use diesel::{
     dsl::{delete, insert_into, update},
     prelude::*,
@@ -114,29 +116,29 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             // Insert the updated info for all of the `CircuitProposal` and `ProposedCircuit`
             // associated data
             // Insert `members` of a `ProposedCircuit`
-            let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
+            let proposed_members: Vec<ProposedNodeModel> = Vec::try_from(proposal.circuit())?;
             insert_into(proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
-                Vec::from(proposal.circuit());
+                Vec::try_from(proposal.circuit())?;
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
-            let proposed_service: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
+            let proposed_service: Vec<ProposedServiceModel> = Vec::try_from(proposal.circuit())?;
             insert_into(proposed_service::table)
                 .values(proposed_service)
                 .execute(self.conn)?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
-                Vec::from(proposal.circuit());
+                Vec::try_from(proposal.circuit())?;
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
                 .execute(self.conn)?;
             // Insert `votes` from the `CircuitProposal`
-            let vote_record: Vec<VoteRecordModel> = Vec::from(&proposal);
+            let vote_record: Vec<VoteRecordModel> = Vec::try_from(&proposal)?;
             insert_into(vote_record::table)
                 .values(vote_record)
                 .execute(self.conn)?;
@@ -221,29 +223,29 @@ impl<'a> AdminServiceStoreUpdateProposalOperation
             // Insert the updated info for all of the `CircuitProposal` and `ProposedCircuit`
             // associated data
             // Insert `members` of a `ProposedCircuit`
-            let proposed_members: Vec<ProposedNodeModel> = Vec::from(proposal.circuit());
+            let proposed_members: Vec<ProposedNodeModel> = Vec::try_from(proposal.circuit())?;
             insert_into(proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)?;
             // Insert the node `endpoints` the proposed `members` of a `ProposedCircuit`
             let proposed_member_endpoints: Vec<ProposedNodeEndpointModel> =
-                Vec::from(proposal.circuit());
+                Vec::try_from(proposal.circuit())?;
             insert_into(proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)?;
             // Insert `roster`, list of `Services` of a `ProposedCircuit`
-            let proposed_service: Vec<ProposedServiceModel> = Vec::from(proposal.circuit());
+            let proposed_service: Vec<ProposedServiceModel> = Vec::try_from(proposal.circuit())?;
             insert_into(proposed_service::table)
                 .values(proposed_service)
                 .execute(self.conn)?;
             // Insert `service_arguments` from the `Services` inserted above
             let proposed_service_argument: Vec<ProposedServiceArgumentModel> =
-                Vec::from(proposal.circuit());
+                Vec::try_from(proposal.circuit())?;
             insert_into(proposed_service_argument::table)
                 .values(proposed_service_argument)
                 .execute(self.conn)?;
             // Insert `votes` from the `CircuitProposal`
-            let vote_record: Vec<VoteRecordModel> = Vec::from(&proposal);
+            let vote_record: Vec<VoteRecordModel> = Vec::try_from(&proposal)?;
             insert_into(vote_record::table)
                 .values(vote_record)
                 .execute(self.conn)?;

@@ -97,7 +97,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
             // Insert `members` of an admin event's `CreateCircuit`, represented by the
             // `AdminEventProposedCircuitModel`
             let proposed_members: Vec<AdminEventProposedNodeModel> =
-                AdminEventProposedNodeModel::list_from_proposal_with_id(event_id, &proposal);
+                AdminEventProposedNodeModel::list_from_proposal_with_id(event_id, &proposal)?;
             insert_into(admin_event_proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)?;
@@ -106,7 +106,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
             let proposed_member_endpoints: Vec<AdminEventProposedNodeEndpointModel> =
                 AdminEventProposedNodeEndpointModel::list_from_proposal_with_id(
                     event_id, &proposal,
-                );
+                )?;
             insert_into(admin_event_proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)?;
@@ -121,13 +121,13 @@ impl<'a> AdminServiceEventStoreAddEventOperation
             let proposed_service_arguments: Vec<AdminEventProposedServiceArgumentModel> =
                 AdminEventProposedServiceArgumentModel::list_from_proposal_with_id(
                     event_id, &proposal,
-                );
+                )?;
             insert_into(admin_event_proposed_service_argument::table)
                 .values(proposed_service_arguments)
                 .execute(self.conn)?;
             // Insert `votes` from the `CircuitProposal`
             let vote_records: Vec<AdminEventVoteRecordModel> =
-                AdminEventVoteRecordModel::list_from_proposal_with_id(event_id, &proposal);
+                AdminEventVoteRecordModel::list_from_proposal_with_id(event_id, &proposal)?;
             insert_into(admin_event_vote_record::table)
                 .values(vote_records)
                 .execute(self.conn)?;
@@ -190,7 +190,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
             // Insert `members` of an admin event's `CreateCircuit`, represented by the
             // `AdminEventProposedCircuitModel`
             let proposed_members: Vec<AdminEventProposedNodeModel> =
-                AdminEventProposedNodeModel::list_from_proposal_with_id(event_id, &proposal);
+                AdminEventProposedNodeModel::list_from_proposal_with_id(event_id, &proposal)?;
             insert_into(admin_event_proposed_node::table)
                 .values(proposed_members)
                 .execute(self.conn)?;
@@ -199,7 +199,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
             let proposed_member_endpoints: Vec<AdminEventProposedNodeEndpointModel> =
                 AdminEventProposedNodeEndpointModel::list_from_proposal_with_id(
                     event_id, &proposal,
-                );
+                )?;
             insert_into(admin_event_proposed_node_endpoint::table)
                 .values(proposed_member_endpoints)
                 .execute(self.conn)?;
@@ -214,13 +214,13 @@ impl<'a> AdminServiceEventStoreAddEventOperation
             let proposed_service_arguments: Vec<AdminEventProposedServiceArgumentModel> =
                 AdminEventProposedServiceArgumentModel::list_from_proposal_with_id(
                     event_id, &proposal,
-                );
+                )?;
             insert_into(admin_event_proposed_service_argument::table)
                 .values(proposed_service_arguments)
                 .execute(self.conn)?;
             // Insert `votes` from the `CircuitProposal`
             let vote_records: Vec<AdminEventVoteRecordModel> =
-                AdminEventVoteRecordModel::list_from_proposal_with_id(event_id, &proposal);
+                AdminEventVoteRecordModel::list_from_proposal_with_id(event_id, &proposal)?;
             insert_into(admin_event_vote_record::table)
                 .values(vote_records)
                 .execute(self.conn)?;

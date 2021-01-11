@@ -38,6 +38,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
 {
     fn get_service(
         &self,
@@ -61,6 +62,7 @@ where
             let arguments: Vec<(String, String)> = service_argument::table
                 .filter(service_argument::circuit_id.eq(&service_id.circuit_id))
                 .filter(service_argument::service_id.eq(&service_id.service_id))
+                .order(service_argument::position)
                 .load::<ServiceArgumentModel>(self.conn)?
                 .iter()
                 .map(|arg| (arg.key.to_string(), arg.value.to_string()))

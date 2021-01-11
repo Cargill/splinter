@@ -42,6 +42,7 @@ table! {
         public_key -> Binary,
         vote -> Text,
         voter_node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -49,6 +50,7 @@ table! {
     proposed_node (circuit_id, node_id) {
         circuit_id -> Text,
         node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -57,6 +59,7 @@ table! {
         circuit_id -> Text,
         node_id -> Text,
         endpoint -> Text,
+        position -> Integer,
     }
 }
 
@@ -66,6 +69,7 @@ table! {
         service_id -> Text,
         service_type -> Text,
         node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -75,6 +79,7 @@ table! {
         service_id -> Text,
         key -> Text,
         value -> Text,
+        position -> Integer,
     }
 }
 
@@ -84,6 +89,7 @@ table! {
         service_id -> Text,
         service_type -> Text,
         node_id -> Text,
+        position -> Integer,
     }
 }
 
@@ -93,6 +99,7 @@ table! {
         service_id -> Text,
         key -> Text,
         value -> Text,
+        position -> Integer,
     }
 }
 
@@ -112,6 +119,7 @@ table! {
     circuit_member (circuit_id, node_id) {
         circuit_id -> Text,
         node_id -> Text,
+        position -> Integer,
     }
 }
 

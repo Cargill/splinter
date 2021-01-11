@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! Provides the "update circuit" operation for the `DieselAdminServiceStore`.
+use std::convert::TryFrom;
 
 use diesel::{
     dsl::{delete, insert_into, update},
@@ -71,15 +72,15 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
             )
             .execute(self.conn)?;
             // Insert new data associate with the `Circuit`
-            let services: Vec<ServiceModel> = Vec::from(&circuit);
+            let services: Vec<ServiceModel> = Vec::try_from(&circuit)?;
             insert_into(service::table)
                 .values(&services)
                 .execute(self.conn)?;
-            let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
+            let service_argument: Vec<ServiceArgumentModel> = Vec::try_from(&circuit)?;
             insert_into(service_argument::table)
                 .values(&service_argument)
                 .execute(self.conn)?;
-            let circuit_member: Vec<CircuitMemberModel> = Vec::from(&circuit);
+            let circuit_member: Vec<CircuitMemberModel> = Vec::try_from(&circuit)?;
             insert_into(circuit_member::table)
                 .values(circuit_member)
                 .execute(self.conn)?;
@@ -125,15 +126,15 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
             )
             .execute(self.conn)?;
             // Insert new data associate with the `Circuit`
-            let services: Vec<ServiceModel> = Vec::from(&circuit);
+            let services: Vec<ServiceModel> = Vec::try_from(&circuit)?;
             insert_into(service::table)
                 .values(&services)
                 .execute(self.conn)?;
-            let service_argument: Vec<ServiceArgumentModel> = Vec::from(&circuit);
+            let service_argument: Vec<ServiceArgumentModel> = Vec::try_from(&circuit)?;
             insert_into(service_argument::table)
                 .values(&service_argument)
                 .execute(self.conn)?;
-            let circuit_member: Vec<CircuitMemberModel> = Vec::from(&circuit);
+            let circuit_member: Vec<CircuitMemberModel> = Vec::try_from(&circuit)?;
             insert_into(circuit_member::table)
                 .values(circuit_member)
                 .execute(self.conn)?;
