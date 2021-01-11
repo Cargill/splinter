@@ -229,6 +229,8 @@ mod tests {
     use url::Url;
 
     use crate::biome::MemoryOAuthUserSessionStore;
+    #[cfg(feature = "biome-profile")]
+    use crate::biome::MemoryUserProfileStore;
     use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     use crate::oauth::{
@@ -237,6 +239,9 @@ mod tests {
         tests::TestSubjectProvider,
         PendingAuthorization,
     };
+
+    #[cfg(feature = "biome-profile")]
+    use crate::oauth::tests::TestProfileProvider;
 
     const TOKEN_ENDPOINT: &str = "/token";
     const AUTH_CODE: &str = "auth_code";
@@ -291,6 +296,8 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let session_store = MemoryOAuthUserSessionStore::new();
@@ -390,6 +397,8 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let session_store = MemoryOAuthUserSessionStore::new();
@@ -461,6 +470,8 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let session_store = MemoryOAuthUserSessionStore::new();
@@ -534,6 +545,8 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let session_store = MemoryOAuthUserSessionStore::new();

@@ -22,6 +22,8 @@ mod openid;
 use crate::error::InvalidStateError;
 
 use super::error::OAuthClientBuildError;
+#[cfg(feature = "biome-profile")]
+use super::ProfileProvider;
 use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient, SubjectProvider};
 
 #[cfg(feature = "oauth-github")]
@@ -46,6 +48,8 @@ pub struct OAuthClientBuilder {
     scopes: Vec<String>,
     subject_provider: Option<Box<dyn SubjectProvider>>,
     inflight_request_store: Option<Box<dyn InflightOAuthRequestStore>>,
+    #[cfg(feature = "biome-profile")]
+    profile_provider: Option<Box<dyn ProfileProvider>>,
 }
 
 impl OAuthClientBuilder {
@@ -97,12 +101,20 @@ impl OAuthClientBuilder {
                     .into(),
             )
         })?;
+        #[cfg(feature = "biome-profile")]
+        let profile_provider = self.profile_provider.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "A profile provider is required to successfully build an OAuthClient".into(),
+            )
+        })?;
         Ok(OAuthClient::new(
             new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
             self.extra_auth_params,
             self.scopes,
             subject_provider.clone(),
             inflight_request_store,
+            #[cfg(feature = "biome-profile")]
+            profile_provider,
         ))
     }
 
@@ -163,6 +175,13 @@ impl OAuthClientBuilder {
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     ) -> Self {
         self.inflight_request_store = Some(inflight_request_store);
+        self
+    }
+
+    #[cfg(feature = "biome-profile")]
+    /// Sets the profile provider to use to request the user's profile details.
+    pub fn with_profile_provider(mut self, profile_provider: Box<dyn ProfileProvider>) -> Self {
+        self.profile_provider = Some(profile_provider);
         self
     }
 }
