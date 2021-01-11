@@ -63,6 +63,9 @@ pub trait StoreFactory {
     fn get_role_based_authorization_store(
         &self,
     ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore>;
+
+    #[cfg(feature = "biome-profile")]
+    fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection

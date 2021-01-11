@@ -28,6 +28,8 @@ use crate::biome::{
 };
 #[cfg(feature = "biome-key-management")]
 use crate::biome::{KeyStore, MemoryKeyStore};
+#[cfg(feature = "biome-profile")]
+use crate::biome::{MemoryUserProfileStore, UserProfileStore};
 #[cfg(feature = "oauth")]
 use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
@@ -46,6 +48,8 @@ pub struct MemoryStoreFactory {
     biome_oauth_user_session_store: MemoryOAuthUserSessionStore,
     #[cfg(feature = "oauth")]
     inflight_request_store: MemoryInflightOAuthRequestStore,
+    #[cfg(feature = "biome-profile")]
+    biome_profile_store: MemoryUserProfileStore,
 }
 
 impl MemoryStoreFactory {
@@ -64,6 +68,9 @@ impl MemoryStoreFactory {
         #[cfg(feature = "oauth")]
         let inflight_request_store = MemoryInflightOAuthRequestStore::new();
 
+        #[cfg(feature = "biome-profile")]
+        let biome_profile_store = MemoryUserProfileStore::new();
+
         Self {
             #[cfg(feature = "biome-credentials")]
             biome_credentials_store,
@@ -75,6 +82,8 @@ impl MemoryStoreFactory {
             biome_oauth_user_session_store,
             #[cfg(feature = "oauth")]
             inflight_request_store,
+            #[cfg(feature = "biome-profile")]
+            biome_profile_store,
         }
     }
 }
@@ -174,5 +183,10 @@ impl StoreFactory for MemoryStoreFactory {
         &self,
     ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
         unimplemented!()
+    }
+
+    #[cfg(feature = "biome-profile")]
+    fn get_biome_user_profile_store(&self) -> Box<dyn UserProfileStore> {
+        Box::new(self.biome_profile_store.clone())
     }
 }
