@@ -29,13 +29,13 @@ use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
 use crate::rest_api::auth::identity::oauth::OAuthUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::rest_api::auth::identity::IdentityProvider;
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 use crate::rest_api::{OAuthConfig, OAuthResourceProvider};
 use crate::rest_api::{RestApiBind, RestApiServerError};
 
 #[cfg(feature = "auth")]
 use super::AuthConfig;
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 use super::RestResourceProvider;
 use super::{Resource, RestApi};
 
