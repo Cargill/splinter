@@ -15,6 +15,8 @@
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "authorization")]
+use splinter::rest_api::auth::Permission;
 use splinter::{
     actix_web::HttpResponse,
     futures::IntoFuture,
@@ -25,6 +27,9 @@ use splinter::{
     },
 };
 use std::any::Any;
+
+#[cfg(feature = "authorization")]
+pub const HEALTH_READ_PERMISSION: Permission = Permission::Check("health.read");
 
 pub struct HealthService {
     service_id: String,
@@ -89,7 +94,18 @@ impl RestResourceProvider for HealthService {
 }
 
 fn make_status_resource() -> Resource {
-    Resource::build("/health/status").add_method(Method::Get, move |_, _| {
-        Box::new(HttpResponse::Ok().finish().into_future())
-    })
+    let resource = Resource::build("/health/status");
+
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, HEALTH_READ_PERMISSION, move |_, _| {
+            Box::new(HttpResponse::Ok().finish().into_future())
+        })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |_, _| {
+            Box::new(HttpResponse::Ok().finish().into_future())
+        })
+    }
 }

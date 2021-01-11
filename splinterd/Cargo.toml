@@ -81,6 +81,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "auth",
+    "authorization",
     "admin-service-event-store",
     "biome-oauth",
     "health",
@@ -100,6 +101,12 @@ auth = [
     "splinter/oauth-github",
     "splinter/oauth-inflight-request-store-postgres",
     "splinter/oauth-openid"
+]
+authorization = [
+    "auth",
+    "health/authorization",
+    "scabbard/authorization",
+    "splinter/authorization",
 ]
 biome-credentials = ["database", "splinter/biome-credentials"]
 biome-key-management = ["database", "splinter/biome-key-management"]

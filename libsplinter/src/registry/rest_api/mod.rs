@@ -19,8 +19,15 @@ mod actix;
 mod resources;
 
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+use crate::rest_api::auth::Permission;
 
 use super::RwRegistry;
+
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const REGISTRY_READ_PERMISSION: Permission = Permission::Check("registry.read");
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const REGISTRY_WRITE_PERMISSION: Permission = Permission::Check("registry.write");
 
 /// The `RwRegistry` trait service provides the following endpoints as REST API resources:
 ///

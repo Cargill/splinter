@@ -24,6 +24,8 @@ use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey, Upd
 use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
 use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
@@ -36,31 +38,62 @@ pub fn make_key_management_route(
     key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    Resource::build("/biome/keys")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/biome/keys").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(
-            Method::Post,
-            handle_post(
-                rest_config.clone(),
-                key_store.clone(),
-                secret_manager.clone(),
-            ),
-        )
-        .add_method(
-            Method::Get,
-            handle_get(
-                rest_config.clone(),
-                key_store.clone(),
-                secret_manager.clone(),
-            ),
-        )
-        .add_method(
-            Method::Patch,
-            handle_patch(rest_config, key_store, secret_manager),
-        )
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource
+            .add_method(
+                Method::Post,
+                Permission::AllowAuthenticated,
+                handle_post(
+                    rest_config.clone(),
+                    key_store.clone(),
+                    secret_manager.clone(),
+                ),
+            )
+            .add_method(
+                Method::Get,
+                Permission::AllowAuthenticated,
+                handle_get(
+                    rest_config.clone(),
+                    key_store.clone(),
+                    secret_manager.clone(),
+                ),
+            )
+            .add_method(
+                Method::Patch,
+                Permission::AllowAuthenticated,
+                handle_patch(rest_config, key_store, secret_manager),
+            )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource
+            .add_method(
+                Method::Post,
+                handle_post(
+                    rest_config.clone(),
+                    key_store.clone(),
+                    secret_manager.clone(),
+                ),
+            )
+            .add_method(
+                Method::Get,
+                handle_get(
+                    rest_config.clone(),
+                    key_store.clone(),
+                    secret_manager.clone(),
+                ),
+            )
+            .add_method(
+                Method::Patch,
+                handle_patch(rest_config, key_store, secret_manager),
+            )
+    }
 }
 
 /// Defines a REST endpoint for adding a key to the underlying storage
@@ -216,23 +249,46 @@ pub fn make_key_management_route_with_public_key(
     key_store: Arc<dyn KeyStore>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
-    Resource::build("/biome/keys/{public_key}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource = Resource::build("/biome/keys/{public_key}").add_request_guard(
+        ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(
-            Method::Get,
-            handle_fetch(
-                rest_config.clone(),
-                key_store.clone(),
-                secret_manager.clone(),
-            ),
-        )
-        .add_method(
-            Method::Delete,
-            handle_delete(rest_config, key_store, secret_manager),
-        )
+        ),
+    );
+    #[cfg(feature = "authorization")]
+    {
+        resource
+            .add_method(
+                Method::Get,
+                Permission::AllowAuthenticated,
+                handle_fetch(
+                    rest_config.clone(),
+                    key_store.clone(),
+                    secret_manager.clone(),
+                ),
+            )
+            .add_method(
+                Method::Delete,
+                Permission::AllowAuthenticated,
+                handle_delete(rest_config, key_store, secret_manager),
+            )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource
+            .add_method(
+                Method::Get,
+                handle_fetch(
+                    rest_config.clone(),
+                    key_store.clone(),
+                    secret_manager.clone(),
+                ),
+            )
+            .add_method(
+                Method::Delete,
+                handle_delete(rest_config, key_store, secret_manager),
+            )
+    }
 }
 
 /// Defines a REST endpoint method to fetch a key from the underlying storage

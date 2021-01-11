@@ -19,7 +19,7 @@
 //! Below is an example of a `struct` that implements `ResouceProvider` and then passes its resources
 //! to a running instance of `RestApi`.
 //!
-//! ```no_run
+//! ```ignore
 //! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
 //! use actix_web::HttpResponse;
 //! use futures::IntoFuture;

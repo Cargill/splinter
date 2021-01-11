@@ -22,6 +22,8 @@ use splinter::{
 };
 
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::service::rest_api::SCABBARD_READ_PERMISSION;
 use crate::service::{Scabbard, SERVICE_TYPE};
 
 pub fn make_get_state_root_endpoint() -> ServiceEndpoint {
@@ -56,6 +58,8 @@ pub fn make_get_state_root_endpoint() -> ServiceEndpoint {
             protocol::SCABBARD_STATE_ROOT_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
+        #[cfg(feature = "authorization")]
+        permission: SCABBARD_READ_PERMISSION,
     }
 }
 
@@ -77,6 +81,16 @@ mod tests {
         },
     };
 
+    #[cfg(feature = "authorization")]
+    use splinter::error::InternalError;
+    #[cfg(feature = "authorization")]
+    use splinter::rest_api::{
+        auth::{
+            identity::{Identity, IdentityProvider},
+            AuthorizationHeader,
+        },
+        AuthConfig,
+    };
     use splinter::{
         rest_api::{Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle},
         service::Service,
@@ -167,6 +181,7 @@ mod tests {
                 "SplinterProtocolVersion",
                 protocol::SCABBARD_PROTOCOL_VERSION,
             )
+            .header("Authorization", "test")
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::OK);
@@ -214,13 +229,30 @@ mod tests {
             resource = resource.add_request_guard(request_guard);
         }
         let handler = service_endpoint.handler;
-        resource.add_method(service_endpoint.method, move |request, payload| {
-            (handler)(
-                request,
-                payload,
-                &*service.lock().expect("Service lock poisoned"),
+        #[cfg(feature = "authorization")]
+        {
+            resource.add_method(
+                service_endpoint.method,
+                service_endpoint.permission,
+                move |request, payload| {
+                    (handler)(
+                        request,
+                        payload,
+                        &*service.lock().expect("Service lock poisoned"),
+                    )
+                },
             )
-        })
+        }
+        #[cfg(not(feature = "authorization"))]
+        {
+            resource.add_method(service_endpoint.method, move |request, payload| {
+                (handler)(
+                    request,
+                    payload,
+                    &*service.lock().expect("Service lock poisoned"),
+                )
+            })
+        }
     }
 
     fn run_rest_api_on_open_port(
@@ -229,9 +261,16 @@ mod tests {
         (10000..20000)
             .find_map(|port| {
                 let bind_url = format!("127.0.0.1:{}", port);
-                let result = RestApiBuilder::new()
+                let rest_api_builder = RestApiBuilder::new()
                     .with_bind(&bind_url)
-                    .add_resources(resources.clone())
+                    .add_resources(resources.clone());
+                #[cfg(feature = "authorization")]
+                let rest_api_builder =
+                    rest_api_builder.with_auth_configs(vec![AuthConfig::Custom {
+                        resources: vec![],
+                        identity_provider: Box::new(AlwaysAcceptIdentityProvider),
+                    }]);
+                let result = rest_api_builder
                     .build()
                     .expect("Failed to build REST API")
                     .run();
@@ -244,5 +283,24 @@ mod tests {
                 }
             })
             .expect("No port available")
+    }
+
+    /// An identity provider that always returns `Ok(Some(_))`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysAcceptIdentityProvider;
+
+    #[cfg(feature = "authorization")]
+    impl IdentityProvider for AlwaysAcceptIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &AuthorizationHeader,
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("identity".into())))
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
     }
 }

@@ -20,6 +20,8 @@ use std::convert::TryInto;
 use std::time;
 
 use crate::admin::messages::AdminServiceEvent;
+#[cfg(feature = "authorization")]
+use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 #[cfg(feature = "admin-service-event-store")]
 use crate::admin::service::event;
 use crate::admin::service::{
@@ -33,12 +35,134 @@ use crate::rest_api::actix_web_1::{
 pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 'static>(
     admin_commands: A,
 ) -> Resource {
-    Resource::build("/ws/admin/register/{type}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource = Resource::build("/ws/admin/register/{type}").add_request_guard(
+        ProtocolVersionRangeGuard::new(
             protocol::ADMIN_APPLICATION_REGISTRATION_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |request, payload| {
+        ),
+    );
+
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(
+            Method::Get,
+            CIRCUIT_READ_PERMISSION,
+            move |request, payload| {
+                let status = if let Ok(status) = admin_commands.admin_service_status() {
+                    status
+                } else {
+                    return Box::new(HttpResponse::InternalServerError().finish().into_future());
+                };
+
+                if status != AdminServiceStatus::Running {
+                    warn!("Admin service is not running");
+                    return Box::new(HttpResponse::ServiceUnavailable().finish().into_future());
+                }
+                let circuit_management_type = if let Some(t) = request.match_info().get("type") {
+                    t.to_string()
+                } else {
+                    return Box::new(HttpResponse::BadRequest().finish().into_future());
+                };
+                debug!(
+                    "Beginning application authorization handler registration for \"{}\"",
+                    circuit_management_type
+                );
+
+                let mut query =
+                    match web::Query::<HashMap<String, u64>>::from_query(request.query_string()) {
+                        Ok(query) => query,
+                        Err(_) => {
+                            return Box::new(HttpResponse::BadRequest().finish().into_future())
+                        }
+                    };
+
+                #[cfg(not(feature = "admin-service-event-store"))]
+                let initial_events = {
+                    let (skip, last_seen_timestamp) = query
+                        .remove("last")
+                        .map(|since_millis| {
+                            // Since this is the last seen event, we will skip it in our since
+                            // query
+                            debug!("Catching up on events since {}", since_millis);
+                            (
+                                1usize,
+                                time::SystemTime::UNIX_EPOCH
+                                    + time::Duration::from_millis(since_millis),
+                            )
+                        })
+                        .unwrap_or((0, time::SystemTime::UNIX_EPOCH));
+
+                    match admin_commands
+                        .get_events_since(&last_seen_timestamp, &circuit_management_type)
+                    {
+                        Ok(events) => events.map(JsonAdminEvent::from).skip(skip),
+                        Err(err) => {
+                            error!(
+                                "Unable to load initial set of admin events for {}: {}",
+                                &circuit_management_type, err
+                            );
+                            return Box::new(
+                                HttpResponse::InternalServerError().finish().into_future(),
+                            );
+                        }
+                    }
+                };
+
+                #[cfg(feature = "admin-service-event-store")]
+                let initial_events = {
+                    let (skip, last_seen_event_id) = query
+                        .remove("last")
+                        .map(|since_evt_id| {
+                            // Since this is the last seen event, we will skip it in our since
+                            // query
+                            let id: i64 = since_evt_id.try_into().unwrap_or(0);
+                            debug!("Catching up on events since {}", id);
+                            (1usize, id)
+                        })
+                        .unwrap_or((0, 0));
+
+                    match admin_commands
+                        .get_events_since(&last_seen_event_id, &circuit_management_type)
+                    {
+                        Ok(events) => events.map(|event| JsonAdminEvent::from(&event)).skip(skip),
+                        Err(err) => {
+                            error!(
+                                "Unable to load initial set of admin events for {}: {}",
+                                &circuit_management_type, err
+                            );
+                            return Box::new(
+                                HttpResponse::InternalServerError().finish().into_future(),
+                            );
+                        }
+                    }
+                };
+
+                let request = Request::from((request, payload));
+                match new_websocket_event_sender(request, Box::new(initial_events)) {
+                    Ok((sender, res)) => {
+                        if let Err(err) = admin_commands.add_event_subscriber(
+                            &circuit_management_type,
+                            Box::new(WsAdminServiceEventSubscriber { sender }),
+                        ) {
+                            error!("Unable to add admin event subscriber: {}", err);
+                            return Box::new(
+                                HttpResponse::InternalServerError().finish().into_future(),
+                            );
+                        }
+                        debug!("Websocket response: {:?}", res);
+                        Box::new(res.into_future())
+                    }
+                    Err(err) => {
+                        debug!("Failed to create websocket: {:?}", err);
+                        Box::new(HttpResponse::InternalServerError().finish().into_future())
+                    }
+                }
+            },
+        )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |request, payload| {
             let status = if let Ok(status) = admin_commands.admin_service_status() {
                 status
             } else {
@@ -146,6 +270,7 @@ pub fn make_application_handler_registration_route<A: AdminCommands + Clone + 's
                 }
             }
         })
+    }
 }
 
 struct WsAdminServiceEventSubscriber {

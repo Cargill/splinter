@@ -542,6 +542,16 @@ mod tests {
     use actix_web::web;
     use actix_web::HttpResponse;
     use futures::future::IntoFuture;
+    #[cfg(feature = "authorization")]
+    use splinter::error::InternalError;
+    #[cfg(feature = "authorization")]
+    use splinter::rest_api::{
+        auth::{
+            identity::{Identity, IdentityProvider},
+            AuthorizationHeader, Permission,
+        },
+        AuthConfig,
+    };
     use splinter::rest_api::{
         Method, ProtocolVersionRangeGuard, Resource, RestApiBuilder, RestApiServerError,
         RestApiShutdownHandle,
@@ -561,6 +571,13 @@ mod tests {
     const MOCK_AUTH: &str = "Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmRlcitqd3QifQ==.\
     eyJpc3MiOiIwMjA5MWEwNmNjNDZjNWUwZDg4ZTg5Mjg0OTM2ZWRiMTY4MDBiMDNiNTZhOGYxYjdlYzI5MmYyMzJiN2M4Mzg1YTIifQ==.\
     tOMakxmebss0WGWcvKCQhYo2AAo3aaMDPS28y9nfVnMXiYq98Be08CdxB0gXCY5qYHZSw53+kjuIG+8gPhXLBA==";
+
+    // These have to be redefined here because the `scabbard::service::rest_api` module where these
+    // are originally defined is private
+    #[cfg(feature = "authorization")]
+    const SCABBARD_READ_PERMISSION: Permission = Permission::Check("scabbard.read");
+    #[cfg(feature = "authorization")]
+    const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check("scabbard.write");
 
     /// Verify that a `ServiceId` can be correctly parsed from a fully-qualified service ID string.
     #[test]
@@ -813,12 +830,38 @@ mod tests {
 
             let scabbard_base_clone = scabbard_base.clone();
             let internal_server_error_clone = internal_server_error.clone();
-            let batches = Resource::build(&format!("{}/batches", scabbard_base))
+            let mut batches = Resource::build(&format!("{}/batches", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
                     SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
                     SCABBARD_PROTOCOL_VERSION,
-                ))
-                .add_method(Method::Post, move |_, _| {
+                ));
+            #[cfg(feature = "authorization")]
+            {
+                batches =
+                    batches.add_method(Method::Post, SCABBARD_WRITE_PERMISSION, move |_, _| {
+                        if internal_server_error_clone.load(Ordering::SeqCst) {
+                            let response = ErrorResponse {
+                                message: "Request failed".into(),
+                            };
+                            Box::new(
+                                HttpResponse::InternalServerError()
+                                    .json(response)
+                                    .into_future(),
+                            )
+                        } else {
+                            let link = Link {
+                                link: format!(
+                                    "{}/batch_statuses?ids={}",
+                                    scabbard_base_clone, MOCK_BATCH_ID
+                                ),
+                            };
+                            Box::new(HttpResponse::Accepted().json(link).into_future())
+                        }
+                    });
+            }
+            #[cfg(not(feature = "authorization"))]
+            {
+                batches = batches.add_method(Method::Post, move |_, _| {
                     if internal_server_error_clone.load(Ordering::SeqCst) {
                         let response = ErrorResponse {
                             message: "Request failed".into(),
@@ -838,17 +881,69 @@ mod tests {
                         Box::new(HttpResponse::Accepted().json(link).into_future())
                     }
                 });
+            }
             resources.push(batches);
 
             let internal_server_error_clone = internal_server_error.clone();
             let invalid_batch_clone = invalid_batch.clone();
             let dont_commit_clone = dont_commit.clone();
-            let batch_statuses = Resource::build(&format!("{}/batch_statuses", scabbard_base))
+            let mut batch_statuses = Resource::build(&format!("{}/batch_statuses", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
                     SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
                     SCABBARD_PROTOCOL_VERSION,
-                ))
-                .add_method(Method::Get, move |_, _| {
+                ));
+            #[cfg(feature = "authorization")]
+            {
+                batch_statuses = batch_statuses.add_method(
+                    Method::Get,
+                    SCABBARD_READ_PERMISSION,
+                    move |_, _| {
+                        if internal_server_error_clone.load(Ordering::SeqCst) {
+                            let response = ErrorResponse {
+                                message: "Request failed".into(),
+                            };
+                            Box::new(
+                                HttpResponse::InternalServerError()
+                                    .json(response)
+                                    .into_future(),
+                            )
+                        } else if invalid_batch_clone.load(Ordering::SeqCst) {
+                            Box::new(
+                                HttpResponse::Ok()
+                                    .json(vec![BatchInfo {
+                                        id: MOCK_BATCH_ID.into(),
+                                        status: BatchStatus::Invalid(vec![]),
+                                        timestamp: SystemTime::now(),
+                                    }])
+                                    .into_future(),
+                            )
+                        } else if dont_commit_clone.load(Ordering::SeqCst) {
+                            Box::new(
+                                HttpResponse::Ok()
+                                    .json(vec![BatchInfo {
+                                        id: MOCK_BATCH_ID.into(),
+                                        status: BatchStatus::Pending,
+                                        timestamp: SystemTime::now(),
+                                    }])
+                                    .into_future(),
+                            )
+                        } else {
+                            Box::new(
+                                HttpResponse::Ok()
+                                    .json(vec![BatchInfo {
+                                        id: MOCK_BATCH_ID.into(),
+                                        status: BatchStatus::Committed(vec![]),
+                                        timestamp: SystemTime::now(),
+                                    }])
+                                    .into_future(),
+                            )
+                        }
+                    },
+                );
+            }
+            #[cfg(not(feature = "authorization"))]
+            {
+                batch_statuses = batch_statuses.add_method(Method::Get, move |_, _| {
                     if internal_server_error_clone.load(Ordering::SeqCst) {
                         let response = ErrorResponse {
                             message: "Request failed".into(),
@@ -890,15 +985,55 @@ mod tests {
                         )
                     }
                 });
+            }
             resources.push(batch_statuses);
 
             let internal_server_error_clone = internal_server_error.clone();
-            let state_address = Resource::build(&format!("{}/state/{{address}}", scabbard_base))
-                .add_request_guard(ProtocolVersionRangeGuard::new(
-                    SCABBARD_GET_STATE_PROTOCOL_MIN,
-                    SCABBARD_PROTOCOL_VERSION,
-                ))
-                .add_method(Method::Get, move |request, _| {
+            let mut state_address =
+                Resource::build(&format!("{}/state/{{address}}", scabbard_base)).add_request_guard(
+                    ProtocolVersionRangeGuard::new(
+                        SCABBARD_GET_STATE_PROTOCOL_MIN,
+                        SCABBARD_PROTOCOL_VERSION,
+                    ),
+                );
+            #[cfg(feature = "authorization")]
+            {
+                state_address = state_address.add_method(
+                    Method::Get,
+                    SCABBARD_READ_PERMISSION,
+                    move |request, _| {
+                        let address = request
+                            .match_info()
+                            .get("address")
+                            .expect("address should not be none");
+
+                        if internal_server_error_clone.load(Ordering::SeqCst) {
+                            let response = ErrorResponse {
+                                message: "Request failed".into(),
+                            };
+                            Box::new(
+                                HttpResponse::InternalServerError()
+                                    .json(response)
+                                    .into_future(),
+                            )
+                        } else if address == mock_state_entry().address {
+                            Box::new(
+                                HttpResponse::Ok()
+                                    .json(mock_state_entry().value)
+                                    .into_future(),
+                            )
+                        } else {
+                            let response = ErrorResponse {
+                                message: "Not found".into(),
+                            };
+                            Box::new(HttpResponse::NotFound().json(response).into_future())
+                        }
+                    },
+                );
+            }
+            #[cfg(not(feature = "authorization"))]
+            {
+                state_address = state_address.add_method(Method::Get, move |request, _| {
                     let address = request
                         .match_info()
                         .get("address")
@@ -926,15 +1061,51 @@ mod tests {
                         Box::new(HttpResponse::NotFound().json(response).into_future())
                     }
                 });
+            }
             resources.push(state_address);
 
             let internal_server_error_clone = internal_server_error.clone();
-            let state = Resource::build(&format!("{}/state", scabbard_base))
-                .add_request_guard(ProtocolVersionRangeGuard::new(
+            let mut state = Resource::build(&format!("{}/state", scabbard_base)).add_request_guard(
+                ProtocolVersionRangeGuard::new(
                     SCABBARD_LIST_STATE_PROTOCOL_MIN,
                     SCABBARD_PROTOCOL_VERSION,
-                ))
-                .add_method(Method::Get, move |request, _| {
+                ),
+            );
+            #[cfg(feature = "authorization")]
+            {
+                state =
+                    state.add_method(Method::Get, SCABBARD_READ_PERMISSION, move |request, _| {
+                        let query: web::Query<HashMap<String, String>> =
+                            web::Query::from_query(request.query_string())
+                                .expect("Failed to get query string");
+                        let prefix = query.get("prefix").map(String::as_str);
+
+                        if internal_server_error_clone.load(Ordering::SeqCst) {
+                            let response = ErrorResponse {
+                                message: "Request failed".into(),
+                            };
+                            Box::new(
+                                HttpResponse::InternalServerError()
+                                    .json(response)
+                                    .into_future(),
+                            )
+                        } else {
+                            let return_entry = match prefix {
+                                Some(prefix) => mock_state_entry().address.starts_with(prefix),
+                                None => true,
+                            };
+                            let entries = if return_entry {
+                                vec![mock_state_entry()]
+                            } else {
+                                vec![]
+                            };
+                            Box::new(HttpResponse::Ok().json(entries).into_future())
+                        }
+                    });
+            }
+            #[cfg(not(feature = "authorization"))]
+            {
+                state = state.add_method(Method::Get, move |request, _| {
                     let query: web::Query<HashMap<String, String>> =
                         web::Query::from_query(request.query_string())
                             .expect("Failed to get query string");
@@ -962,15 +1133,36 @@ mod tests {
                         Box::new(HttpResponse::Ok().json(entries).into_future())
                     }
                 });
+            }
             resources.push(state);
 
             let internal_server_error_clone = internal_server_error.clone();
-            let state_root = Resource::build(&format!("{}/state_root", scabbard_base))
+            let mut state_root = Resource::build(&format!("{}/state_root", scabbard_base))
                 .add_request_guard(ProtocolVersionRangeGuard::new(
                     SCABBARD_STATE_ROOT_PROTOCOL_MIN,
                     SCABBARD_PROTOCOL_VERSION,
-                ))
-                .add_method(Method::Get, move |_, _| {
+                ));
+            #[cfg(feature = "authorization")]
+            {
+                state_root =
+                    state_root.add_method(Method::Get, SCABBARD_READ_PERMISSION, move |_, _| {
+                        if internal_server_error_clone.load(Ordering::SeqCst) {
+                            let response = ErrorResponse {
+                                message: "Request failed".into(),
+                            };
+                            Box::new(
+                                HttpResponse::InternalServerError()
+                                    .json(response)
+                                    .into_future(),
+                            )
+                        } else {
+                            Box::new(HttpResponse::Ok().json(MOCK_STATE_ROOT_HASH).into_future())
+                        }
+                    });
+            }
+            #[cfg(not(feature = "authorization"))]
+            {
+                state_root = state_root.add_method(Method::Get, move |_, _| {
                     if internal_server_error_clone.load(Ordering::SeqCst) {
                         let response = ErrorResponse {
                             message: "Request failed".into(),
@@ -984,6 +1176,7 @@ mod tests {
                         Box::new(HttpResponse::Ok().json(MOCK_STATE_ROOT_HASH).into_future())
                     }
                 });
+            }
             resources.push(state_root);
 
             Self {
@@ -1024,9 +1217,16 @@ mod tests {
         (10000..20000)
             .find_map(|port| {
                 let bind_url = format!("127.0.0.1:{}", port);
-                let result = RestApiBuilder::new()
+                let rest_api_builder = RestApiBuilder::new()
                     .with_bind(&bind_url)
-                    .add_resources(resources.clone())
+                    .add_resources(resources.clone());
+                #[cfg(feature = "authorization")]
+                let rest_api_builder =
+                    rest_api_builder.with_auth_configs(vec![AuthConfig::Custom {
+                        resources: vec![],
+                        identity_provider: Box::new(AlwaysAcceptIdentityProvider),
+                    }]);
+                let result = rest_api_builder
                     .build()
                     .expect("Failed to build REST API")
                     .run();
@@ -1039,5 +1239,24 @@ mod tests {
                 }
             })
             .expect("No port available")
+    }
+
+    /// An identity provider that always returns `Ok(Some(_))`
+    #[cfg(feature = "authorization")]
+    #[derive(Clone)]
+    struct AlwaysAcceptIdentityProvider;
+
+    #[cfg(feature = "authorization")]
+    impl IdentityProvider for AlwaysAcceptIdentityProvider {
+        fn get_identity(
+            &self,
+            _authorization: &AuthorizationHeader,
+        ) -> Result<Option<Identity>, InternalError> {
+            Ok(Some(Identity::Custom("identity".into())))
+        }
+
+        fn clone_box(&self) -> Box<dyn IdentityProvider> {
+            Box::new(self.clone())
+        }
     }
 }

@@ -18,7 +18,7 @@ use actix_web::dev::*;
 use actix_web::{
     http::{
         header::{self, HeaderValue},
-        Method,
+        Method as ActixMethod,
     },
     Error as ActixError, HttpMessage, HttpResponse,
 };
@@ -28,7 +28,11 @@ use futures::{
 };
 
 use crate::rest_api::ErrorResponse;
+#[cfg(feature = "authorization")]
+use crate::rest_api::Method;
 
+#[cfg(feature = "authorization")]
+use super::PermissionMap;
 use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 
 /// Wrapper for the authorization middleware
@@ -86,7 +90,7 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        if req.method() == Method::OPTIONS {
+        if req.method() == ActixMethod::OPTIONS {
             return Box::new(self.service.call(req).and_then(|mut res| {
                 res.headers_mut().insert(
                     header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
@@ -96,6 +100,28 @@ where
                 res
             }));
         }
+
+        #[cfg(feature = "authorization")]
+        let method = match *req.method() {
+            ActixMethod::GET => Method::Get,
+            ActixMethod::POST => Method::Post,
+            ActixMethod::PUT => Method::Put,
+            ActixMethod::PATCH => Method::Patch,
+            ActixMethod::DELETE => Method::Delete,
+            ActixMethod::HEAD => Method::Head,
+            _ => {
+                return Box::new(
+                    req.into_response(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request(
+                                "HTTP method not supported by Splinter REST API",
+                            ))
+                            .into_body(),
+                    )
+                    .into_future(),
+                )
+            }
+        };
 
         let auth_header =
             match req
@@ -118,7 +144,31 @@ where
                 ),
             };
 
-        match authorize(req.path(), auth_header, &self.identity_providers) {
+        #[cfg(feature = "authorization")]
+        let permission_map = match req.app_data::<PermissionMap>() {
+            Some(map) => map,
+            None => {
+                error!("Missing REST API permission map");
+                return Box::new(
+                    req.into_response(
+                        HttpResponse::InternalServerError()
+                            .json(ErrorResponse::internal_error())
+                            .into_body(),
+                    )
+                    .into_future(),
+                );
+            }
+        };
+
+        match authorize(
+            #[cfg(feature = "authorization")]
+            &method,
+            req.path(),
+            auth_header,
+            #[cfg(feature = "authorization")]
+            permission_map.get_ref(),
+            &self.identity_providers,
+        ) {
             AuthorizationResult::Authorized(identity) => {
                 debug!("Authenticated user {:?}", identity);
                 req.extensions_mut().insert(identity);
@@ -129,6 +179,16 @@ where
                     req.into_response(
                         HttpResponse::Unauthorized()
                             .json(ErrorResponse::unauthorized())
+                            .into_body(),
+                    )
+                    .into_future(),
+                )
+            }
+            AuthorizationResult::UnknownEndpoint => {
+                return Box::new(
+                    req.into_response(
+                        HttpResponse::NotFound()
+                            .json(ErrorResponse::not_found("endpoint not found"))
                             .into_body(),
                     )
                     .into_future(),
@@ -154,6 +214,8 @@ mod tests {
     use actix_web::{http::StatusCode, test, web, App, HttpRequest};
 
     use crate::error::InternalError;
+    #[cfg(feature = "authorization")]
+    use crate::rest_api::auth::Permission;
     use crate::rest_api::auth::{identity::Identity, AuthorizationHeader};
 
     /// Verifies that the authorization middleware sets the `Access-Control-Allow-Credentials: true`
@@ -164,13 +226,13 @@ mod tests {
             App::new().wrap(Authorization::new(vec![])).route(
                 "/",
                 web::route()
-                    .method(Method::OPTIONS)
+                    .method(ActixMethod::OPTIONS)
                     .to(|| HttpResponse::Ok()),
             ),
         );
 
         let req = test::TestRequest::with_uri("/")
-            .method(Method::OPTIONS)
+            .method(ActixMethod::OPTIONS)
             .to_request();
         let resp = test::block_on(app.call(req)).unwrap();
 
@@ -183,19 +245,49 @@ mod tests {
 
     /// Verifies that the authorization middleware returns a `403 Unauthorized` response when the
     /// `authorize` function returns an "unauthorized" result. This is simulated by not configuring
-    /// and identity providers.
+    /// any identity providers.
     #[test]
     fn auth_middleware_unauthorized() {
-        let mut app = test::init_service(
-            App::new()
-                .wrap(Authorization::new(vec![]))
-                .route("/", web::get().to(|| HttpResponse::Ok())),
-        );
+        let app = App::new()
+            .wrap(Authorization::new(vec![]))
+            .route("/", web::get().to(|| HttpResponse::Ok()));
+
+        #[cfg(feature = "authorization")]
+        let app = {
+            let mut permission_map = PermissionMap::default();
+            permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
+            app.data(permission_map)
+        };
+
+        let mut service = test::init_service(app);
 
         let req = test::TestRequest::with_uri("/").to_request();
-        let resp = test::block_on(app.call(req)).unwrap();
+        let resp = test::block_on(service.call(req)).unwrap();
 
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// Verifies that the authorization middleware returns a `404 Not Found` response when the
+    /// `authorize` function returns an "unkonwn endpoint" result.
+    #[test]
+    fn auth_middleware_not_found() {
+        let app = App::new()
+            .wrap(Authorization::new(vec![]))
+            .route("/", web::get().to(|| HttpResponse::Ok()));
+
+        #[cfg(feature = "authorization")]
+        let app = {
+            let mut permission_map = PermissionMap::default();
+            permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
+            app.data(permission_map)
+        };
+
+        let mut service = test::init_service(app);
+
+        let req = test::TestRequest::with_uri("/test").to_request();
+        let resp = test::block_on(service.call(req)).unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     /// Verifies that the authorization middleware allows requests that are properly authorized (the
@@ -205,7 +297,7 @@ mod tests {
     fn auth_middleware_authorized() {
         let auth_middleware = Authorization::new(vec![Box::new(AlwaysAcceptIdentityProvider)]);
 
-        let mut app = test::init_service(App::new().wrap(auth_middleware).route(
+        let app = App::new().wrap(auth_middleware).route(
             "/",
             web::get().to(|req: HttpRequest| {
                 // Verify that the client's identity was added to the request extensions
@@ -215,13 +307,22 @@ mod tests {
                     HttpResponse::InternalServerError()
                 }
             }),
-        ));
+        );
+
+        #[cfg(feature = "authorization")]
+        let app = {
+            let mut permission_map = PermissionMap::default();
+            permission_map.add_permission(Method::Get, "/", Permission::AllowAuthenticated);
+            app.data(permission_map)
+        };
+
+        let mut service = test::init_service(app);
 
         // Need to provide some value for the `Authorization` header
         let req = test::TestRequest::with_uri("/")
             .header("Authorization", "test")
             .to_request();
-        let resp = test::block_on(app.call(req)).unwrap();
+        let resp = test::block_on(service.call(req)).unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
     }

@@ -28,6 +28,8 @@ use std::sync::Arc;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+use crate::rest_api::auth::Permission;
 #[cfg(all(feature = "auth", feature = "biome-credentials"))]
 use crate::rest_api::{
     auth::identity::biome::BiomeUserIdentityProvider, sessions::default_validation,
@@ -67,6 +69,11 @@ use super::credentials::store::CredentialsStore;
 
 #[allow(unused_imports)]
 use crate::rest_api::sessions::AccessTokenIssuer;
+
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const BIOME_USER_READ_PERMISSION: Permission = Permission::Check("biome.user.read");
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check("biome.user.write");
 
 /// Provides the REST API endpoints for biome
 ///
@@ -130,7 +137,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
         {
             resources.push(make_user_routes(
                 self.rest_config.clone(),
-                self.token_secret_manager.clone(),
                 self.credentials_store.clone(),
                 self.key_store.clone(),
             ));

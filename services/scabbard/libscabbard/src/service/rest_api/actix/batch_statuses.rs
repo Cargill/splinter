@@ -24,6 +24,8 @@ use splinter::{
 };
 
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::service::rest_api::SCABBARD_READ_PERMISSION;
 use crate::service::{
     rest_api::resources::batch_statuses::BatchInfoResponse, Scabbard, SERVICE_TYPE,
 };
@@ -120,5 +122,7 @@ pub fn make_get_batch_status_endpoint() -> ServiceEndpoint {
             protocol::SCABBARD_BATCH_STATUSES_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
+        #[cfg(feature = "authorization")]
+        permission: SCABBARD_READ_PERMISSION,
     }
 }

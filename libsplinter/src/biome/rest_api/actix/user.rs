@@ -29,20 +29,22 @@ use crate::biome::key_management::{
     store::{KeyStore, KeyStoreError},
     Key,
 };
-use crate::rest_api::secrets::SecretManager;
 
-use crate::biome::rest_api::actix::authorize::get_authorized_user;
 #[cfg(feature = "biome-key-management")]
 use crate::biome::rest_api::resources::{key_management::ResponseKey, user::ModifyUser};
+#[cfg(feature = "authorization")]
+use crate::biome::rest_api::{BIOME_USER_READ_PERMISSION, BIOME_USER_WRITE_PERMISSION};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource {
-    Resource::build("/biome/users")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/biome/users").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_LIST_USERS_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |_, _| {
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, BIOME_USER_READ_PERMISSION, move |_, _| {
             let credentials_store = credentials_store.clone();
             Box::new(match credentials_store.list_usernames() {
                 Ok(users) => HttpResponse::Ok().json(users).into_future(),
@@ -54,38 +56,68 @@ pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource
                 }
             })
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |_, _| {
+            let credentials_store = credentials_store.clone();
+            Box::new(match credentials_store.list_usernames() {
+                Ok(users) => HttpResponse::Ok().json(users).into_future(),
+                Err(err) => {
+                    debug!("Failed to get users from the database {}", err);
+                    HttpResponse::InternalServerError()
+                        .json(ErrorResponse::internal_error())
+                        .into_future()
+                }
+            })
+        })
+    }
 }
 
 #[cfg(feature = "biome-key-management")]
 /// Defines the `/biome/users/{id}` REST resource for managing users
 pub fn make_user_routes(
     rest_config: Arc<BiomeRestConfig>,
-    secret_manager: Arc<dyn SecretManager>,
     credentials_store: Arc<dyn CredentialsStore>,
     key_store: Arc<dyn KeyStore>,
 ) -> Resource {
-    Resource::build("/biome/users/{id}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/biome/users/{id}").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_USER_PROTOCOL_MIN,
             protocol::BIOME_PROTOCOL_VERSION,
-        ))
-        .add_method(
-            Method::Put,
-            add_modify_user_method(
-                credentials_store.clone(),
-                rest_config.clone(),
-                secret_manager.clone(),
-                key_store,
-            ),
-        )
-        .add_method(
-            Method::Get,
-            add_fetch_user_method(credentials_store.clone()),
-        )
-        .add_method(
-            Method::Delete,
-            add_delete_user_method(credentials_store, rest_config, secret_manager),
-        )
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource
+            .add_method(
+                Method::Put,
+                BIOME_USER_WRITE_PERMISSION,
+                add_modify_user_method(credentials_store.clone(), rest_config, key_store),
+            )
+            .add_method(
+                Method::Get,
+                BIOME_USER_READ_PERMISSION,
+                add_fetch_user_method(credentials_store.clone()),
+            )
+            .add_method(
+                Method::Delete,
+                BIOME_USER_WRITE_PERMISSION,
+                add_delete_user_method(credentials_store),
+            )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource
+            .add_method(
+                Method::Put,
+                add_modify_user_method(credentials_store.clone(), rest_config, key_store),
+            )
+            .add_method(
+                Method::Get,
+                add_fetch_user_method(credentials_store.clone()),
+            )
+            .add_method(Method::Delete, add_delete_user_method(credentials_store))
+    }
 }
 
 /// Defines a REST endpoint to fetch a user from the database
@@ -145,16 +177,23 @@ fn add_fetch_user_method(credentials_store: Arc<dyn CredentialsStore>) -> Handle
 fn add_modify_user_method(
     credentials_store: Arc<dyn CredentialsStore>,
     rest_config: Arc<BiomeRestConfig>,
-    secret_manager: Arc<dyn SecretManager>,
     key_store: Arc<dyn KeyStore>,
 ) -> HandlerFunction {
     let encryption_cost = rest_config.password_encryption_cost();
     Box::new(move |request, payload| {
         let credentials_store = credentials_store.clone();
         let key_store = key_store.clone();
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.match_info().get("id") {
+            Some(t) => t.to_string(),
+            None => {
+                return Box::new(
+                    HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(
+                            "Failed to process request: no user id",
+                        ))
+                        .into_future(),
+                )
+            }
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -258,16 +297,20 @@ fn add_modify_user_method(
 }
 
 /// Defines a REST endpoint to delete a user from the database
-fn add_delete_user_method(
-    credentials_store: Arc<dyn CredentialsStore>,
-    rest_config: Arc<BiomeRestConfig>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> HandlerFunction {
+fn add_delete_user_method(credentials_store: Arc<dyn CredentialsStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let credentials_store = credentials_store.clone();
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.match_info().get("id") {
+            Some(t) => t.to_string(),
+            None => {
+                return Box::new(
+                    HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(
+                            "Failed to process request: no user id",
+                        ))
+                        .into_future(),
+                )
+            }
         };
 
         Box::new(match credentials_store.remove_credentials(&user) {

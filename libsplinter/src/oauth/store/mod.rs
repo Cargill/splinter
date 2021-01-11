@@ -26,7 +26,7 @@ pub use self::diesel::DieselInflightOAuthRequestStore;
 pub use error::InflightOAuthRequestStoreError;
 pub use memory::MemoryInflightOAuthRequestStore;
 
-/// A Store for the in-flight information pertaining to an OAauth2 request.
+/// A Store for the in-flight information pertaining to an OAuth2 request.
 ///
 /// An OAuth2 request consists of a request to the provider, and then a callback request back to
 /// the library user's REST API.  There is information created for the first request that must be

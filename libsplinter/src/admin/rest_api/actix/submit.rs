@@ -15,6 +15,8 @@
 use actix_web::HttpResponse;
 use futures::{Future, IntoFuture};
 
+#[cfg(feature = "authorization")]
+use crate::admin::rest_api::CIRCUIT_WRITE_PERMISSION;
 use crate::admin::service::{AdminCommands, AdminServiceError};
 use crate::protocol;
 use crate::protos::admin::CircuitManagementPayload;
@@ -22,12 +24,15 @@ use crate::rest_api::actix_web_1::{into_protobuf, Method, ProtocolVersionRangeGu
 use crate::service::ServiceError;
 
 pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) -> Resource {
-    Resource::build("/admin/submit")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/admin/submit").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::ADMIN_SUBMIT_PROTOCOL_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Post, move |_, payload| {
+        ));
+
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Post, CIRCUIT_WRITE_PERMISSION, move |_, payload| {
             let admin_commands = admin_commands.clone();
             Box::new(
                 into_protobuf::<CircuitManagementPayload>(payload).and_then(move |payload| {
@@ -58,4 +63,39 @@ pub fn make_submit_route<A: AdminCommands + Clone + 'static>(admin_commands: A) 
                 }),
             )
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Post, move |_, payload| {
+            let admin_commands = admin_commands.clone();
+            Box::new(
+                into_protobuf::<CircuitManagementPayload>(payload).and_then(move |payload| {
+                    match admin_commands.submit_circuit_change(payload) {
+                        Ok(()) => HttpResponse::Accepted().finish().into_future(),
+                        Err(AdminServiceError::ServiceError(
+                            ServiceError::UnableToHandleMessage(err),
+                        )) => {
+                            debug!("{}", err);
+                            HttpResponse::BadRequest()
+                                .json(json!({
+                                    "message": format!("Unable to handle message: {}", err)
+                                }))
+                                .into_future()
+                        }
+                        Err(AdminServiceError::ServiceError(
+                            ServiceError::InvalidMessageFormat(err),
+                        )) => HttpResponse::BadRequest()
+                            .json(json!({
+                                "message": format!("Failed to parse payload: {}", err)
+                            }))
+                            .into_future(),
+                        Err(err) => {
+                            error!("{}", err);
+                            HttpResponse::InternalServerError().finish().into_future()
+                        }
+                    }
+                }),
+            )
+        })
+    }
 }

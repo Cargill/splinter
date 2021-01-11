@@ -14,6 +14,11 @@
 
 use splinter::actix_web::{web, Error, HttpRequest, HttpResponse};
 use splinter::futures::{Future, IntoFuture};
+#[cfg(feature = "auth")]
+use splinter::rest_api::auth::Permission;
+
+#[cfg(feature = "auth")]
+pub const STATUS_READ_PERMISSION: Permission = Permission::Check("status.read");
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Status {

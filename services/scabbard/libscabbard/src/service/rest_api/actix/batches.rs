@@ -25,6 +25,8 @@ use splinter::{
 };
 
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::service::rest_api::SCABBARD_WRITE_PERMISSION;
 use crate::service::{rest_api::resources::batches::BatchLinkResponse, Scabbard, SERVICE_TYPE};
 
 pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
@@ -87,5 +89,7 @@ pub fn make_add_batches_to_queue_endpoint() -> ServiceEndpoint {
             protocol::SCABBARD_ADD_BATCHES_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
+        #[cfg(feature = "authorization")]
+        permission: SCABBARD_WRITE_PERMISSION,
     }
 }

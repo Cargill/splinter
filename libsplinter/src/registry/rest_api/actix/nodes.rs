@@ -22,6 +22,8 @@ use std::collections::HashMap;
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
     rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
     InvalidNodeError, MetadataPredicate, Node, RegistryError, RegistryReader, RegistryWriter,
@@ -37,17 +39,31 @@ type Filter = HashMap<String, (String, String)>;
 
 pub fn make_nodes_resource(registry: Box<dyn RwRegistry>) -> Resource {
     let registry1 = registry.clone();
-    Resource::build("/registry/nodes")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/registry/nodes").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::REGISTRY_LIST_NODES_MIN,
             protocol::REGISTRY_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
-            list_nodes(r, web::Data::new(registry.clone_box_as_reader()))
-        })
-        .add_method(Method::Post, move |_, p| {
-            add_node(p, web::Data::new(registry1.clone()))
-        })
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource
+            .add_method(Method::Get, REGISTRY_READ_PERMISSION, move |r, _| {
+                list_nodes(r, web::Data::new(registry.clone_box_as_reader()))
+            })
+            .add_method(Method::Post, REGISTRY_WRITE_PERMISSION, move |_, p| {
+                add_node(p, web::Data::new(registry1.clone()))
+            })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource
+            .add_method(Method::Get, move |r, _| {
+                list_nodes(r, web::Data::new(registry.clone_box_as_reader()))
+            })
+            .add_method(Method::Post, move |_, p| {
+                add_node(p, web::Data::new(registry1.clone()))
+            })
+    }
 }
 
 fn list_nodes(

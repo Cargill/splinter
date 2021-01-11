@@ -26,6 +26,8 @@ use splinter::{
 };
 
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::service::rest_api::SCABBARD_READ_PERMISSION;
 use crate::service::{
     error::StateSubscriberError,
     state::{StateChangeEvent, StateSubscriber},
@@ -135,5 +137,7 @@ pub fn make_subscribe_endpoint() -> ServiceEndpoint {
             protocol::SCABBARD_SUBSCRIBE_PROTOCOL_MIN,
             protocol::SCABBARD_PROTOCOL_VERSION,
         ))],
+        #[cfg(feature = "authorization")]
+        permission: SCABBARD_READ_PERMISSION,
     }
 }

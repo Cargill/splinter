@@ -19,6 +19,8 @@ use futures::{future::IntoFuture, Future};
 
 use crate::biome::oauth::store::{OAuthUserSessionStore, OAuthUserSessionStoreError};
 use crate::protocol;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::{AuthorizationHeader, BearerToken},
@@ -26,12 +28,47 @@ use crate::rest_api::{
 };
 
 pub fn make_logout_route(oauth_user_session_store: Box<dyn OAuthUserSessionStore>) -> Resource {
-    Resource::build("/oauth/logout")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource =
+        Resource::build("/oauth/logout").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::OAUTH_LOGOUT_MIN,
             protocol::OAUTH_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |req, _| {
+        ));
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(
+            Method::Get,
+            Permission::AllowAuthenticated,
+            move |req, _| {
+                let access_token = match get_access_token(req) {
+                    Ok(access_token) => access_token,
+                    Err(err_response) => return err_response,
+                };
+
+                Box::new(
+                    match oauth_user_session_store.remove_session(&access_token) {
+                        // `InvalidState` means there's no session for this token; we return `200 Ok`
+                        // here because session removal is idempotent.
+                        Ok(()) | Err(OAuthUserSessionStoreError::InvalidState(_)) => {
+                            HttpResponse::Ok()
+                                .json(json!({
+                                    "message": "User successfully logged out"
+                                }))
+                                .into_future()
+                        }
+                        Err(err) => {
+                            error!("Unable to remove user session: {}", err);
+                            HttpResponse::InternalServerError()
+                                .json(ErrorResponse::internal_error())
+                                .into_future()
+                        }
+                    },
+                )
+            },
+        )
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |req, _| {
             let access_token = match get_access_token(req) {
                 Ok(access_token) => access_token,
                 Err(err_response) => return err_response,
@@ -55,6 +92,7 @@ pub fn make_logout_route(oauth_user_session_store: Box<dyn OAuthUserSessionStore
                 },
             )
         })
+    }
 }
 
 fn get_access_token(

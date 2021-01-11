@@ -18,6 +18,8 @@
 use actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use futures::Future;
 
+#[cfg(feature = "authorization")]
+use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::store::AdminServiceStore;
 use crate::protocol;
 use crate::rest_api::{
@@ -29,14 +31,24 @@ use super::super::error::CircuitFetchError;
 use super::super::resources;
 
 pub fn make_fetch_circuit_resource(store: Box<dyn AdminServiceStore>) -> Resource {
-    Resource::build("/admin/circuits/{circuit_id}")
-        .add_request_guard(ProtocolVersionRangeGuard::new(
+    let resource = Resource::build("/admin/circuits/{circuit_id}").add_request_guard(
+        ProtocolVersionRangeGuard::new(
             protocol::ADMIN_FETCH_CIRCUIT_MIN,
             protocol::ADMIN_PROTOCOL_VERSION,
-        ))
-        .add_method(Method::Get, move |r, _| {
+        ),
+    );
+    #[cfg(feature = "authorization")]
+    {
+        resource.add_method(Method::Get, CIRCUIT_READ_PERMISSION, move |r, _| {
             fetch_circuit(r, web::Data::new(store.clone()))
         })
+    }
+    #[cfg(not(feature = "authorization"))]
+    {
+        resource.add_method(Method::Get, move |r, _| {
+            fetch_circuit(r, web::Data::new(store.clone()))
+        })
+    }
 }
 
 fn fetch_circuit(
