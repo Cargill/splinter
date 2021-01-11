@@ -47,7 +47,7 @@ hyper = "0.12"
 log = "0.4"
 openssl = "0.10"
 percent-encoding = "2.0"
-protobuf = "2"
+protobuf = "~2.18"
 sabre-sdk = "0.7"
 scabbard = { path = "../../../services/scabbard/libscabbard", features = ["events"] }
 serde = "1.0"

@@ -516,14 +516,16 @@ impl Service for AdminService {
                 let expected_hash = proposed_circuit.get_expected_hash().to_vec();
                 let circuit_payload = proposed_circuit.get_circuit_payload();
                 let required_verifiers = proposed_circuit.get_required_verifiers();
-                let mut proposal = Proposal::default();
+                let proposal = Proposal {
+                    id: sha256(circuit_payload)
+                        .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
+                        .as_bytes()
+                        .into(),
+                    summary: expected_hash,
+                    consensus_data: required_verifiers.to_vec(),
+                    ..Default::default()
+                };
 
-                proposal.id = sha256(circuit_payload)
-                    .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
-                    .as_bytes()
-                    .into();
-                proposal.summary = expected_hash;
-                proposal.consensus_data = required_verifiers.to_vec();
                 let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
                     ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
                 })?;
