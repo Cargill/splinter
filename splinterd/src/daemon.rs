@@ -1001,6 +1001,11 @@ fn build_biome_routes(
         biome_rest_provider_builder =
             biome_rest_provider_builder.with_key_store(store_factory.get_biome_key_store())
     }
+    #[cfg(feature = "biome-profile")]
+    {
+        biome_rest_provider_builder = biome_rest_provider_builder
+            .with_profile_store(store_factory.get_biome_user_profile_store());
+    }
     let biome_rest_provider = biome_rest_provider_builder.build().map_err(|err| {
         StartError::RestApiError(format!("Unable to build Biome REST routes: {}", err))
     })?;
