@@ -702,6 +702,8 @@ impl SplinterDaemon {
                 auth_configs.push(AuthConfig::OAuth {
                     oauth_config,
                     oauth_user_session_store: store_factory.get_biome_oauth_user_session_store(),
+                    #[cfg(feature = "biome-profile")]
+                    user_profile_store: store_factory.get_biome_user_profile_store(),
                 });
             }
         }

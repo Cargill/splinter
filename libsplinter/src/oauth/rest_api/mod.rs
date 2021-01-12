@@ -21,6 +21,9 @@ mod resources;
 use crate::biome::OAuthUserSessionStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 
+#[cfg(feature = "biome-profile")]
+use crate::biome::UserProfileStore;
+
 use super::OAuthClient;
 
 /// Provides the REST API [Resource](../../../rest_api/struct.Resource.html) definitions for OAuth
@@ -37,6 +40,8 @@ use super::OAuthClient;
 pub struct OAuthResourceProvider {
     client: OAuthClient,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
+    #[cfg(feature = "biome-profile")]
+    user_profile_store: Box<dyn UserProfileStore>,
 }
 
 impl OAuthResourceProvider {
@@ -44,10 +49,13 @@ impl OAuthResourceProvider {
     pub fn new(
         client: OAuthClient,
         oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
+        #[cfg(feature = "biome-profile")] user_profile_store: Box<dyn UserProfileStore>,
     ) -> Self {
         Self {
             client,
             oauth_user_session_store,
+            #[cfg(feature = "biome-profile")]
+            user_profile_store,
         }
     }
 }
@@ -75,6 +83,8 @@ impl RestResourceProvider for OAuthResourceProvider {
                 actix::callback::make_callback_route(
                     self.client.clone(),
                     self.oauth_user_session_store.clone(),
+                    #[cfg(feature = "biome-profile")]
+                    self.user_profile_store.clone(),
                 ),
                 actix::logout::make_logout_route(self.oauth_user_session_store.clone()),
             ]);
