@@ -115,4 +115,9 @@ impl StoreFactory for PgStoreFactory {
     ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
         unimplemented!()
     }
+
+    #[cfg(feature = "biome-profile")]
+    fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore> {
+        Box::new(crate::biome::DieselUserProfileStore::new(self.pool.clone()))
+    }
 }

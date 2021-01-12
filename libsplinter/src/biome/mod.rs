@@ -37,6 +37,9 @@ pub mod notifications;
 #[cfg(feature = "biome-oauth")]
 pub mod oauth;
 
+#[cfg(feature = "biome-profile")]
+pub mod profile;
+
 #[cfg(feature = "biome-credentials")]
 pub mod refresh_tokens;
 
@@ -63,6 +66,13 @@ pub use oauth::store::diesel::DieselOAuthUserSessionStore;
 pub use oauth::store::memory::MemoryOAuthUserSessionStore;
 #[cfg(feature = "biome-oauth")]
 pub use oauth::store::OAuthUserSessionStore;
+
+#[cfg(all(feature = "biome-profile", feature = "diesel"))]
+pub use profile::store::diesel::DieselUserProfileStore;
+#[cfg(feature = "biome-profile")]
+pub use profile::store::memory::MemoryUserProfileStore;
+#[cfg(feature = "biome-profile")]
+pub use profile::store::UserProfileStore;
 
 #[cfg(all(feature = "biome-credentials", feature = "diesel"))]
 pub use refresh_tokens::store::diesel::DieselRefreshTokenStore;

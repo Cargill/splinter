@@ -52,7 +52,7 @@ percent-encoding = { version = "2.0", optional = true }
 protobuf = "2.19"
 rand = "0.7"
 reqwest = { version = "0.10", optional = true, features = ["blocking", "json"] }
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
@@ -102,6 +102,7 @@ experimental = [
     "biome-notifications",
     "biome-oauth",
     "biome-oauth-user-store-postgres",
+    "biome-profile",
     "cylinder-jwt",
     "https-bind",
     "oauth",
@@ -129,6 +130,7 @@ biome-key-management = []
 biome-notifications = []
 biome-oauth = []
 biome-oauth-user-store-postgres = ["biome-oauth", "postgres"]
+biome-profile = []
 circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]

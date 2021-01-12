@@ -90,6 +90,11 @@ impl StoreFactory for SqliteStoreFactory {
             ),
         )
     }
+
+    #[cfg(feature = "biome-profile")]
+    fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore> {
+        Box::new(crate::biome::DieselUserProfileStore::new(self.pool.clone()))
+    }
 }
 
 #[derive(Default, Debug)]
