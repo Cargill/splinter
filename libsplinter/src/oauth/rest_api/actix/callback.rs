@@ -21,6 +21,13 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
 use crate::biome::oauth::store::{InsertableOAuthUserSessionBuilder, OAuthUserSessionStore};
+
+#[cfg(feature = "biome-profile")]
+use crate::biome::{
+    profile::store::ProfileBuilder, profile::store::UserProfileStoreError, UserProfileStore,
+};
+use crate::error::InternalError;
+use crate::oauth::Profile as OauthProfile;
 use crate::oauth::{
     rest_api::resources::callback::{generate_redirect_query, CallbackQuery},
     OAuthClient,
@@ -36,6 +43,7 @@ use crate::rest_api::{
 pub fn make_callback_route(
     client: OAuthClient,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
+    #[cfg(feature = "biome-profile")] user_profile_store: Box<dyn UserProfileStore>,
 ) -> Resource {
     let resource =
         Resource::build("/oauth/callback").add_request_guard(ProtocolVersionRangeGuard::new(
@@ -83,22 +91,48 @@ pub fn make_callback_route(
                                     {
                                         Ok(session) => {
                                             match oauth_user_session_store.add_session(session) {
-                                                Ok(_) => HttpResponse::Found()
-                                                    .header(LOCATION, redirect_url)
-                                                    .finish(),
+                                                Ok(_) => {}
                                                 Err(err) => {
                                                     error!("Unable to store user session: {}", err);
-                                                    HttpResponse::InternalServerError()
-                                                        .json(ErrorResponse::internal_error())
+                                                    return Box::new(
+                                                        HttpResponse::InternalServerError()
+                                                            .json(ErrorResponse::internal_error())
+                                                            .into_future(),
+                                                    );
                                                 }
                                             }
                                         }
                                         Err(err) => {
                                             error!("Unable to build user session: {}", err);
-                                            HttpResponse::InternalServerError()
-                                                .json(ErrorResponse::internal_error())
+                                            return Box::new(
+                                                HttpResponse::InternalServerError()
+                                                    .json(ErrorResponse::internal_error())
+                                                    .into_future(),
+                                            );
+                                        }
+                                    };
+                                    #[cfg(feature = "biome-profile")]
+                                    {
+                                        match save_user_profile(
+                                            user_profile_store.clone_box(),
+                                            oauth_user_session_store.clone_box(),
+                                            &user_info.profile().clone(),
+                                            user_info.subject.clone(),
+                                        ) {
+                                            Ok(_) => debug!("User profile saved"),
+                                            Err(err) => {
+                                                error!("Failed to save profile: {}", err);
+                                                return Box::new(
+                                                    HttpResponse::InternalServerError()
+                                                        .json(ErrorResponse::internal_error())
+                                                        .into_future(),
+                                                );
+                                            }
                                         }
                                     }
+                                    HttpResponse::Found()
+                                        .header(LOCATION, redirect_url)
+                                        .finish()
                                 }
                                 Ok(None) => {
                                     error!(
@@ -163,22 +197,48 @@ pub fn make_callback_route(
                                 {
                                     Ok(session) => {
                                         match oauth_user_session_store.add_session(session) {
-                                            Ok(_) => HttpResponse::Found()
-                                                .header(LOCATION, redirect_url)
-                                                .finish(),
+                                            Ok(_) => {}
                                             Err(err) => {
                                                 error!("Unable to store user session: {}", err);
-                                                HttpResponse::InternalServerError()
-                                                    .json(ErrorResponse::internal_error())
+                                                return Box::new(
+                                                    HttpResponse::InternalServerError()
+                                                        .json(ErrorResponse::internal_error())
+                                                        .into_future(),
+                                                );
                                             }
                                         }
                                     }
                                     Err(err) => {
                                         error!("Unable to build user session: {}", err);
-                                        HttpResponse::InternalServerError()
-                                            .json(ErrorResponse::internal_error())
+                                        return Box::new(
+                                            HttpResponse::InternalServerError()
+                                                .json(ErrorResponse::internal_error())
+                                                .into_future(),
+                                        );
+                                    }
+                                };
+                                #[cfg(feature = "biome-profile")]
+                                {
+                                    match save_user_profile(
+                                        user_profile_store.clone_box(),
+                                        oauth_user_session_store.clone_box(),
+                                        &user_info.profile().clone(),
+                                        user_info.subject.clone(),
+                                    ) {
+                                        Ok(_) => debug!("User profile saved"),
+                                        Err(err) => {
+                                            error!("Failed to save profile: {}", err);
+                                            return Box::new(
+                                                HttpResponse::InternalServerError()
+                                                    .json(ErrorResponse::internal_error())
+                                                    .into_future(),
+                                            );
+                                        }
                                     }
                                 }
+                                HttpResponse::Found()
+                                    .header(LOCATION, redirect_url)
+                                    .finish()
                             }
                             Ok(None) => {
                                 error!(
@@ -212,6 +272,46 @@ pub fn make_callback_route(
 /// Generates a new Splinter access token, which is a string of 32 random alphanumeric characters
 fn new_splinter_access_token() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(32).collect()
+}
+
+/// Gets the user's Biome ID from the session store and saves the user profile information to
+/// the user profile store
+#[cfg(feature = "biome-profile")]
+fn save_user_profile(
+    user_profile_store: Box<dyn UserProfileStore>,
+    oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
+    profile: &OauthProfile,
+    subject: String,
+) -> Result<(), InternalError> {
+    if let Some(user) = oauth_user_session_store
+        .get_user(&subject)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+    {
+        let profile = ProfileBuilder::new()
+            .with_user_id(user.user_id().into())
+            .with_subject(profile.subject.clone())
+            .with_name(profile.name.clone())
+            .with_given_name(profile.given_name.clone())
+            .with_family_name(profile.family_name.clone())
+            .with_email(profile.email.clone())
+            .with_picture(profile.picture.clone())
+            .build()
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        match user_profile_store.get_profile(&user.user_id()) {
+            Ok(_) => user_profile_store
+                .update_profile(profile)
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            Err(UserProfileStoreError::InvalidArgument(_)) => user_profile_store
+                .add_profile(profile)
+                .map_err(|err| InternalError::from_source(Box::new(err))),
+            Err(err) => Err(InternalError::from_source(Box::new(err))),
+        }
+    } else {
+        Err(InternalError::with_message(
+            "Unable to retrieve user".to_string(),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -302,8 +402,16 @@ mod tests {
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
+        #[cfg(feature = "biome-profile")]
+        let profile_store = MemoryUserProfileStore::new();
+
         let (splinter_shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_callback_route(client, session_store.clone_box())]);
+            run_rest_api_on_open_port(vec![make_callback_route(
+                client,
+                session_store.clone_box(),
+                #[cfg(feature = "biome-profile")]
+                profile_store.clone_box(),
+            )]);
 
         let url = ReqwestUrl::parse_with_params(
             &format!("http://{}/oauth/callback", bind_url),
@@ -403,8 +511,16 @@ mod tests {
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
+        #[cfg(feature = "biome-profile")]
+        let profile_store = MemoryUserProfileStore::new();
+
         let (splinter_shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_callback_route(client, session_store.clone_box())]);
+            run_rest_api_on_open_port(vec![make_callback_route(
+                client,
+                session_store.clone_box(),
+                #[cfg(feature = "biome-profile")]
+                profile_store.clone_box(),
+            )]);
 
         let url = ReqwestUrl::parse_with_params(
             &format!("http://{}/oauth/callback", bind_url),
@@ -476,8 +592,16 @@ mod tests {
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
+        #[cfg(feature = "biome-profile")]
+        let profile_store = MemoryUserProfileStore::new();
+
         let (splinter_shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_callback_route(client, session_store.clone_box())]);
+            run_rest_api_on_open_port(vec![make_callback_route(
+                client,
+                session_store.clone_box(),
+                #[cfg(feature = "biome-profile")]
+                profile_store.clone_box(),
+            )]);
 
         let url = ReqwestUrl::parse_with_params(
             &format!("http://{}/oauth/callback", bind_url),
@@ -551,8 +675,16 @@ mod tests {
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
+        #[cfg(feature = "biome-profile")]
+        let profile_store = MemoryUserProfileStore::new();
+
         let (splinter_shutdown_handle, join_handle, bind_url) =
-            run_rest_api_on_open_port(vec![make_callback_route(client, session_store.clone_box())]);
+            run_rest_api_on_open_port(vec![make_callback_route(
+                client,
+                session_store.clone_box(),
+                #[cfg(feature = "biome-profile")]
+                profile_store.clone_box(),
+            )]);
 
         let url = ReqwestUrl::parse_with_params(
             &format!("http://{}/oauth/callback", bind_url),

@@ -180,6 +180,15 @@ impl OAuthClient {
                 ))
             })?;
 
+        #[cfg(feature = "biome-profile")]
+        let profile = self
+            .profile_provider
+            .get_profile(token_response.access_token().secret())
+            .map_err(|err| {
+                InternalError::with_message(format!("failed to get profile details: {}", err,))
+            })?
+            .ok_or_else(|| InternalError::with_message("profile details not found".into()))?;
+
         // Fetch the users subject identifier from OAuth provider
         let subject = self
             .get_subject(token_response.access_token().secret())?
@@ -192,6 +201,8 @@ impl OAuthClient {
                 .refresh_token()
                 .map(|token| token.secret().into()),
             subject,
+            #[cfg(feature = "biome-profile")]
+            profile,
         };
 
         Ok(Some((user_info, pending_authorization.client_redirect_url)))
@@ -260,6 +271,9 @@ pub struct UserInfo {
     refresh_token: Option<String>,
     /// The user's subject identifier
     subject: String,
+    /// The user's profile details
+    #[cfg(feature = "biome-profile")]
+    profile: Profile,
 }
 
 impl UserInfo {
@@ -284,20 +298,43 @@ impl UserInfo {
     pub fn subject(&self) -> &str {
         &self.subject
     }
+
+    /// Gets the user's profile details
+    #[cfg(feature = "biome-profile")]
+    pub fn profile(&self) -> &Profile {
+        &self.profile
+    }
 }
 
 impl std::fmt::Debug for UserInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("UserInfo")
+        let mut debug_struct = f.debug_struct("UserInfo");
+
+        debug_struct
             .field("access_token", &"<Redacted>".to_string())
             .field("expires_in", &self.expires_in)
             .field(
                 "refresh_token",
                 &self.refresh_token.as_deref().map(|_| "<Redacted>"),
             )
-            .field("subject", &self.subject)
-            .finish()
+            .field("subject", &self.subject);
+
+        #[cfg(feature = "biome-profile")]
+        debug_struct.field("profile", &self.profile);
+
+        debug_struct.finish()
     }
+}
+
+#[cfg(feature = "biome-profile")]
+#[derive(Clone, Debug)]
+pub struct Profile {
+    pub subject: String,
+    pub name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+    pub email: Option<String>,
+    pub picture: Option<String>,
 }
 
 #[cfg(test)]
