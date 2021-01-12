@@ -31,19 +31,29 @@ use crate::rest_api::ErrorResponse;
 #[cfg(feature = "authorization")]
 use crate::rest_api::Method;
 
-#[cfg(feature = "authorization")]
-use super::PermissionMap;
 use super::{authorize, identity::IdentityProvider, AuthorizationResult};
+#[cfg(feature = "authorization")]
+use super::{AuthorizationHandler, PermissionMap};
 
 /// Wrapper for the authorization middleware
 #[derive(Clone)]
 pub struct Authorization {
     identity_providers: Vec<Box<dyn IdentityProvider>>,
+    #[cfg(feature = "authorization")]
+    authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
 }
 
 impl Authorization {
-    pub fn new(identity_providers: Vec<Box<dyn IdentityProvider>>) -> Self {
-        Self { identity_providers }
+    pub fn new(
+        identity_providers: Vec<Box<dyn IdentityProvider>>,
+        #[cfg(feature = "authorization")] authorization_handlers: Vec<
+            Box<dyn AuthorizationHandler>,
+        >,
+    ) -> Self {
+        Self {
+            identity_providers,
+            authorization_handlers,
+        }
     }
 }
 
@@ -63,6 +73,7 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ok(AuthorizationMiddleware {
             identity_providers: self.identity_providers.clone(),
+            authorization_handlers: self.authorization_handlers.clone(),
             service,
         })
     }
@@ -71,6 +82,8 @@ where
 /// Authorization middleware for the Actix REST API
 pub struct AuthorizationMiddleware<S> {
     identity_providers: Vec<Box<dyn IdentityProvider>>,
+    #[cfg(feature = "authorization")]
+    authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
     service: S,
 }
 
@@ -168,6 +181,8 @@ where
             #[cfg(feature = "authorization")]
             permission_map.get_ref(),
             &self.identity_providers,
+            #[cfg(feature = "authorization")]
+            &self.authorization_handlers,
         ) {
             AuthorizationResult::Authorized(identity) => {
                 debug!("Authenticated user {:?}", identity);
@@ -223,12 +238,18 @@ mod tests {
     #[test]
     fn auth_middleware_options_request_header() {
         let mut app = test::init_service(
-            App::new().wrap(Authorization::new(vec![])).route(
-                "/",
-                web::route()
-                    .method(ActixMethod::OPTIONS)
-                    .to(|| HttpResponse::Ok()),
-            ),
+            App::new()
+                .wrap(Authorization::new(
+                    vec![],
+                    #[cfg(feature = "authorization")]
+                    vec![],
+                ))
+                .route(
+                    "/",
+                    web::route()
+                        .method(ActixMethod::OPTIONS)
+                        .to(|| HttpResponse::Ok()),
+                ),
         );
 
         let req = test::TestRequest::with_uri("/")
@@ -249,7 +270,11 @@ mod tests {
     #[test]
     fn auth_middleware_unauthorized() {
         let app = App::new()
-            .wrap(Authorization::new(vec![]))
+            .wrap(Authorization::new(
+                vec![],
+                #[cfg(feature = "authorization")]
+                vec![],
+            ))
             .route("/", web::get().to(|| HttpResponse::Ok()));
 
         #[cfg(feature = "authorization")]
@@ -272,7 +297,11 @@ mod tests {
     #[test]
     fn auth_middleware_not_found() {
         let app = App::new()
-            .wrap(Authorization::new(vec![]))
+            .wrap(Authorization::new(
+                vec![Box::new(AlwaysAcceptIdentityProvider)],
+                #[cfg(feature = "authorization")]
+                vec![],
+            ))
             .route("/", web::get().to(|| HttpResponse::Ok()));
 
         #[cfg(feature = "authorization")]
@@ -284,7 +313,9 @@ mod tests {
 
         let mut service = test::init_service(app);
 
-        let req = test::TestRequest::with_uri("/test").to_request();
+        let req = test::TestRequest::with_uri("/test")
+            .header("Authorization", "test")
+            .to_request();
         let resp = test::block_on(service.call(req)).unwrap();
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -295,7 +326,11 @@ mod tests {
     /// added to the request's extensions.
     #[test]
     fn auth_middleware_authorized() {
-        let auth_middleware = Authorization::new(vec![Box::new(AlwaysAcceptIdentityProvider)]);
+        let auth_middleware = Authorization::new(
+            vec![Box::new(AlwaysAcceptIdentityProvider)],
+            #[cfg(feature = "authorization")]
+            vec![],
+        );
 
         let app = App::new().wrap(auth_middleware).route(
             "/",

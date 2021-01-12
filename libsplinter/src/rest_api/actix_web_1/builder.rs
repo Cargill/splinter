@@ -29,6 +29,8 @@ use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
 use crate::rest_api::auth::identity::oauth::OAuthUserIdentityProvider;
 #[cfg(feature = "auth")]
 use crate::rest_api::auth::identity::IdentityProvider;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::AuthorizationHandler;
 #[cfg(feature = "oauth")]
 use crate::rest_api::{OAuthConfig, OAuthResourceProvider};
 use crate::rest_api::{RestApiBind, RestApiServerError};
@@ -47,6 +49,8 @@ pub struct RestApiBuilder {
     whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     auth_configs: Vec<AuthConfig>,
+    #[cfg(feature = "authorization")]
+    authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
 }
 
 impl Default for RestApiBuilder {
@@ -58,6 +62,8 @@ impl Default for RestApiBuilder {
             whitelist: None,
             #[cfg(feature = "auth")]
             auth_configs: Vec::new(),
+            #[cfg(feature = "authorization")]
+            authorization_handlers: Vec::new(),
         }
     }
 }
@@ -98,6 +104,15 @@ impl RestApiBuilder {
     #[cfg(feature = "auth")]
     pub fn with_auth_configs(mut self, auth_configs: Vec<AuthConfig>) -> Self {
         self.auth_configs = auth_configs;
+        self
+    }
+
+    #[cfg(feature = "authorization")]
+    pub fn with_authorization_handlers(
+        mut self,
+        authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
+    ) -> Self {
+        self.authorization_handlers = authorization_handlers;
         self
     }
 
@@ -238,6 +253,8 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers,
+            #[cfg(feature = "authorization")]
+            authorization_handlers: self.authorization_handlers,
         })
     }
 
@@ -261,6 +278,8 @@ impl RestApiBuilder {
             whitelist: self.whitelist,
             #[cfg(feature = "auth")]
             identity_providers: vec![],
+            #[cfg(feature = "authorization")]
+            authorization_handlers: vec![],
         })
     }
 }

@@ -18,10 +18,10 @@ use std::thread;
 use actix_web::{middleware, App, HttpServer};
 use futures::Future;
 
-#[cfg(feature = "authorization")]
-use crate::rest_api::auth::PermissionMap;
 #[cfg(feature = "auth")]
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::{AuthorizationHandler, PermissionMap};
 #[cfg(feature = "rest-api-cors")]
 use crate::rest_api::cors::Cors;
 use crate::rest_api::{RestApiBind, RestApiServerError};
@@ -53,6 +53,8 @@ pub struct RestApi {
     pub(super) whitelist: Option<Vec<String>>,
     #[cfg(feature = "auth")]
     pub(super) identity_providers: Vec<Box<dyn IdentityProvider>>,
+    #[cfg(feature = "authorization")]
+    pub(super) authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
 }
 
 impl RestApi {
@@ -66,7 +68,11 @@ impl RestApi {
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist;
         #[cfg(feature = "auth")]
-        let authorization = Authorization::new(self.identity_providers.to_owned());
+        let authorization = Authorization::new(
+            self.identity_providers.to_owned(),
+            #[cfg(feature = "authorization")]
+            self.authorization_handlers.to_owned(),
+        );
 
         #[cfg(feature = "rest-api-cors")]
         let cors = match &whitelist {
