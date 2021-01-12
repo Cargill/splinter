@@ -20,6 +20,8 @@ use diesel::{
     sqlite::SqliteConnection,
 };
 
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
 #[cfg(feature = "biome-oauth")]
 use crate::biome::MemoryOAuthUserSessionStore;
 #[cfg(feature = "biome-credentials")]
@@ -34,6 +36,9 @@ use crate::biome::{MemoryUserProfileStore, UserProfileStore};
 use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
 use super::StoreFactory;
+
+#[cfg(feature = "admin-service-event-store")]
+pub(in crate::store) const DEFAULT_IN_MEMORY_EVENT_LIMIT: usize = 100;
 
 /// A `StoryFactory` backed by memory.
 #[derive(Default)]
@@ -188,5 +193,14 @@ impl StoreFactory for MemoryStoreFactory {
     #[cfg(feature = "biome-profile")]
     fn get_biome_user_profile_store(&self) -> Box<dyn UserProfileStore> {
         Box::new(self.biome_profile_store.clone())
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn get_admin_service_event_store(
+        &self,
+    ) -> Box<dyn crate::admin::service::event::store::AdminServiceEventStore> {
+        MemoryAdminServiceEventStore::new_boxed_with_bound(
+            std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
+        )
     }
 }

@@ -152,7 +152,8 @@ impl SplinterDaemon {
             any(
                 feature = "auth",
                 feature = "biome-credentials",
-                feature = "biome-key-management"
+                feature = "biome-key-management",
+                feature = "admin-service-event-store"
             )
         ))]
         let db_url = "memory".to_string();
@@ -161,9 +162,13 @@ impl SplinterDaemon {
             feature = "database",
             feature = "auth",
             feature = "biome-credentials",
-            feature = "biome-key-management"
+            feature = "biome-key-management",
+            feature = "admin-service-event-store",
         ))]
         let store_factory = create_store_factory(&db_url)?;
+
+        #[cfg(feature = "admin-service-event-store")]
+        let admin_event_store = store_factory.get_admin_service_event_store();
 
         let admin_service_store = {
             if let Some(storage) = &self.storage_type {
@@ -493,6 +498,8 @@ impl SplinterDaemon {
             Box::new(AllowAllKeyPermissionManager),
             Some(self.admin_timeout),
             routing_writer.clone(),
+            #[cfg(feature = "admin-service-event-store")]
+            admin_event_store,
         )
         .map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
