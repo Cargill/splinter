@@ -35,6 +35,8 @@ use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::service::event::store::AdminServiceEventStore;
 use crate::admin::store::AdminServiceStore;
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
@@ -208,6 +210,9 @@ impl AdminService {
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
+        #[cfg(feature = "admin-service-event-store")] admin_event_store: Box<
+            dyn AdminServiceEventStore,
+        >,
     ) -> Result<(Self, thread::JoinHandle<()>), ServiceError> {
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
@@ -231,6 +236,8 @@ impl AdminService {
                 key_verifier,
                 key_permission_manager,
                 routing_table_writer,
+                #[cfg(feature = "admin-service-event-store")]
+                admin_event_store,
             )?)),
             orchestrator,
             coordinator_timeout,
@@ -846,6 +853,8 @@ mod tests {
         sqlite::SqliteConnection,
     };
 
+    #[cfg(feature = "admin-service-event-store")]
+    use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
     use crate::admin::store::diesel::DieselAdminServiceStore;
     use crate::circuit::routing::memory::RoutingTable;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
@@ -931,6 +940,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let (mut admin_service, _) = AdminService::new(
             "test-node".into(),
@@ -944,6 +955,8 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             None,
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .expect("Service should have been created correctly");
 

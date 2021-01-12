@@ -60,14 +60,12 @@ use super::{
     Events,
 };
 #[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event::{
-    self,
-    store::{memory::MemoryAdminServiceEventStore, AdminServiceEventStore},
-};
+use crate::admin::service::event::{self, store::AdminServiceEventStore};
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
 
+#[cfg(not(feature = "admin-service-event-store"))]
 const DEFAULT_IN_MEMORY_EVENT_LIMIT: usize = 100;
 
 pub enum PayloadType {
@@ -243,15 +241,14 @@ impl AdminServiceShared {
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
+        #[cfg(feature = "admin-service-event-store")] admin_event_store: Box<
+            dyn AdminServiceEventStore,
+        >,
     ) -> Result<Self, ServiceError> {
         #[cfg(not(feature = "admin-service-event-store"))]
         let event_mailbox = Mailbox::new(DurableBTreeSet::new_boxed_with_bound(
             std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
         ));
-        #[cfg(feature = "admin-service-event-store")]
-        let admin_event_store = MemoryAdminServiceEventStore::new_boxed_with_bound(
-            std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
-        );
 
         Ok(AdminServiceShared {
             node_id,
@@ -1967,6 +1964,9 @@ mod tests {
         sqlite::SqliteConnection,
     };
 
+    #[cfg(feature = "admin-service-event-store")]
+    use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
+
     use crate::admin::service::AdminKeyVerifierError;
     use crate::admin::store::diesel::DieselAdminServiceStore;
     use crate::circuit::routing::memory::RoutingTable;
@@ -2029,6 +2029,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2040,6 +2043,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
 
@@ -2158,6 +2163,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let mut shared = AdminServiceShared::new(
             "test-node".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2169,6 +2177,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
 
@@ -2253,6 +2263,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2264,6 +2277,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2294,6 +2309,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2305,6 +2323,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2329,6 +2349,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2340,6 +2363,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2368,6 +2393,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2379,6 +2407,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -2417,6 +2447,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2429,6 +2461,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2462,6 +2496,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2474,6 +2510,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2510,6 +2548,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2522,6 +2562,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2556,6 +2598,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2567,6 +2612,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2600,6 +2647,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2612,6 +2661,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2651,6 +2702,9 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
 
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
             Arc::new(Mutex::new(orchestrator)),
@@ -2662,6 +2716,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2689,6 +2745,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2701,6 +2759,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2730,6 +2790,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2742,6 +2804,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2775,6 +2839,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2787,6 +2853,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2827,6 +2895,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2839,6 +2909,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2879,6 +2951,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2891,6 +2965,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2919,6 +2995,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2931,6 +3009,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -2959,6 +3039,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -2971,6 +3053,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3007,6 +3091,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3019,6 +3105,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3055,6 +3143,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3067,6 +3157,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3103,6 +3195,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3115,6 +3209,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3143,6 +3239,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3155,6 +3253,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3183,6 +3283,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3195,6 +3297,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3223,6 +3327,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3235,6 +3341,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3263,6 +3371,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3275,6 +3385,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3303,6 +3415,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3315,6 +3429,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3344,6 +3460,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3356,6 +3474,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3384,6 +3504,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3396,6 +3518,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3424,6 +3548,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3436,6 +3562,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3472,6 +3600,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3484,6 +3614,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3518,6 +3650,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3530,6 +3664,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
 
@@ -3575,6 +3711,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3587,6 +3725,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
 
@@ -3633,6 +3773,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3645,6 +3787,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
 
@@ -3693,6 +3837,8 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3705,6 +3851,8 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
         )
         .unwrap();
 
