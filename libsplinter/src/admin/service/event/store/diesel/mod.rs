@@ -48,7 +48,7 @@ impl<C: diesel::Connection> DieselAdminServiceEventStore<C> {
     /// # Arguments
     ///
     ///  * `connection_pool`: connection pool for the database
-    pub fn _new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
+    pub fn new(connection_pool: Pool<ConnectionManager<C>>) -> Self {
         DieselAdminServiceEventStore { connection_pool }
     }
 }
@@ -149,7 +149,7 @@ pub mod tests {
     fn test_add_list_one_event() {
         let pool = create_connection_pool_and_migrate();
 
-        let store = DieselAdminServiceEventStore::_new(pool);
+        let store = DieselAdminServiceEventStore::new(pool);
         let event = create_proposal_submitted_messages_event("test");
         store.add_event(event).expect("Unable to add event");
 
@@ -176,7 +176,7 @@ pub mod tests {
     fn test_list_since_multiple_events() {
         let pool = create_connection_pool_and_migrate();
 
-        let store = DieselAdminServiceEventStore::_new(pool);
+        let store = DieselAdminServiceEventStore::new(pool);
         let event_1 = create_proposal_submitted_messages_event("test");
         store.add_event(event_1).expect("Unable to add event");
 
@@ -212,7 +212,7 @@ pub mod tests {
     fn test_list_since() {
         let pool = create_connection_pool_and_migrate();
 
-        let store = DieselAdminServiceEventStore::_new(pool);
+        let store = DieselAdminServiceEventStore::new(pool);
         let event_1 = create_proposal_submitted_messages_event("test");
         store.add_event(event_1).expect("Unable to add event");
         let event_2 = create_circuit_ready_messages_event("test");
@@ -251,7 +251,7 @@ pub mod tests {
     fn test_list_one_event_by_management_type() {
         let pool = create_connection_pool_and_migrate();
 
-        let store = DieselAdminServiceEventStore::_new(pool);
+        let store = DieselAdminServiceEventStore::new(pool);
         let event = create_proposal_submitted_messages_event("test");
         store.add_event(event).expect("Unable to add event");
 
@@ -286,7 +286,7 @@ pub mod tests {
     fn test_list_event_by_management_type_since() {
         let pool = create_connection_pool_and_migrate();
 
-        let store = DieselAdminServiceEventStore::_new(pool);
+        let store = DieselAdminServiceEventStore::new(pool);
         let event = create_proposal_submitted_messages_event("test");
         store.add_event(event).expect("Unable to add event");
         let event_2 = create_circuit_ready_messages_event("not-test");
@@ -319,7 +319,7 @@ pub mod tests {
     fn test_list_multiple_events_by_management_type() {
         let pool = create_connection_pool_and_migrate();
 
-        let store = DieselAdminServiceEventStore::_new(pool);
+        let store = DieselAdminServiceEventStore::new(pool);
         let event = create_proposal_submitted_messages_event("test");
         store.add_event(event).expect("Unable to add event");
         let event_2 = create_circuit_ready_messages_event("not-test");
