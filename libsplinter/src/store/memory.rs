@@ -168,7 +168,7 @@ impl StoreFactory for MemoryStoreFactory {
     #[cfg(all(feature = "authorization", feature = "sqlite"))]
     fn get_role_based_authorization_store(
         &self,
-    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+    ) -> Box<dyn crate::rest_api::auth::rbac::store::RoleBasedAuthorizationStore> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
             .max_size(1)
@@ -180,7 +180,7 @@ impl StoreFactory for MemoryStoreFactory {
         )
         .expect("Failed to run migrations");
 
-        Box::new(crate::rest_api::auth::roles::store::DieselRoleBasedAuthorizationStore::new(pool))
+        Box::new(crate::rest_api::auth::rbac::store::DieselRoleBasedAuthorizationStore::new(pool))
     }
 
     #[cfg(all(feature = "authorization", not(feature = "sqlite")))]

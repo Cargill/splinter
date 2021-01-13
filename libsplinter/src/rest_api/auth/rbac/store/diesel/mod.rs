@@ -398,7 +398,7 @@ impl From<diesel::r2d2::PoolError> for RoleBasedAuthorizationStoreError {
 mod tests {
     use super::*;
 
-    use crate::rest_api::auth::roles::store::RoleBuilder;
+    use crate::rest_api::auth::rbac::store::RoleBuilder;
 
     use crate::migrations::run_sqlite_migrations;
 
