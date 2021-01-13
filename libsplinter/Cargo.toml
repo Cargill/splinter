@@ -105,6 +105,7 @@ experimental = [
     "biome-profile",
     "cylinder-jwt",
     "https-bind",
+    "maintenance-mode",
     "oauth",
     "oauth-github",
     "oauth-openid",
@@ -135,6 +136,7 @@ circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
+maintenance-mode = ["authorization"]
 oauth = ["auth", "biome-oauth", "oauth2"]
 oauth-github = ["oauth"]
 oauth-inflight-request-store-postgres = ["oauth", "postgres"]
