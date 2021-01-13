@@ -350,6 +350,12 @@ pub trait RoleBasedAuthorizationStore: Send + Sync {
         identity: &Identity,
     ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError>;
 
+    /// Returns the assigned roles for the given Identity.
+    fn get_assigned_roles(
+        &self,
+        identity: &Identity,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError>;
+
     /// Lists all assignments.
     fn list_assignments(
         &self,

@@ -31,6 +31,7 @@ use super::{
 
 use operations::add_assignment::RoleBasedAuthorizationStoreAddAssignment as _;
 use operations::add_role::RoleBasedAuthorizationStoreAddRole as _;
+use operations::get_assigned_roles::RoleBasedAuthorizationStoreGetAssignedRoles as _;
 use operations::get_assignment::RoleBasedAuthorizationStoreGetAssignment as _;
 use operations::get_role::RoleBasedAuthorizationStoreGetRole as _;
 use operations::list_assignments::RoleBasedAuthorizationStoreListAssignments as _;
@@ -107,6 +108,15 @@ impl RoleBasedAuthorizationStore
     ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
         let connection = self.connection_pool.get()?;
         RoleBasedAuthorizationStoreOperations::new(&*connection).get_assignment(identity)
+    }
+
+    /// Returns the assigned roles for the given Identity.
+    fn get_assigned_roles(
+        &self,
+        identity: &Identity,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assigned_roles(identity)
     }
 
     /// Lists all assignments.
@@ -219,6 +229,15 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
     ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
         let connection = self.connection_pool.get()?;
         RoleBasedAuthorizationStoreOperations::new(&*connection).get_assignment(identity)
+    }
+
+    /// Returns the assigned roles for the given Identity.
+    fn get_assigned_roles(
+        &self,
+        identity: &Identity,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError> {
+        let connection = self.connection_pool.get()?;
+        RoleBasedAuthorizationStoreOperations::new(&*connection).get_assigned_roles(identity)
     }
 
     /// Lists all assignments.
@@ -659,6 +678,75 @@ mod tests {
             stored_assignment.identity()
         );
         assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
+    }
+
+    /// This test verifies the following:
+    /// 1. Adds two roles
+    /// 2. Adds an assignment for those roles
+    /// 3. Verifies the roles are returned via the get_assigned_roles API
+    #[test]
+    fn sqlite_get_assigned_roles() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-user-id".into()))
+            .with_roles(vec!["test-role-1".to_string(), "test-role-2".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let mut assigned_roles = role_based_auth_store
+            .get_assigned_roles(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assigned roles");
+
+        assert_eq!(2, assigned_roles.len());
+
+        let stored_role = assigned_roles
+            .next()
+            .expect("has 2 items, but returned None");
+        assert_eq!("test-role-1", stored_role.id());
+        assert_eq!("Test Role 1", stored_role.display_name());
+        assert_eq!(
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            stored_role.permissions()
+        );
+
+        let stored_role = assigned_roles
+            .next()
+            .expect("has 2 items, but returned None");
+        assert_eq!("test-role-2", stored_role.id());
+        assert_eq!("Test Role 2", stored_role.display_name());
+        assert_eq!(
+            &["x".to_string(), "y".to_string(), "z".to_string()],
+            stored_role.permissions()
+        );
     }
 
     /// This test verifies the following:

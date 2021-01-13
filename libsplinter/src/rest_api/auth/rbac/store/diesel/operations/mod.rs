@@ -14,6 +14,7 @@
 
 pub(super) mod add_assignment;
 pub(super) mod add_role;
+pub(super) mod get_assigned_roles;
 pub(super) mod get_assignment;
 pub(super) mod get_role;
 pub(super) mod list_assignments;
