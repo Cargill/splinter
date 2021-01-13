@@ -14,28 +14,39 @@
 
 use diesel::{dsl::delete, prelude::*};
 
-use crate::rest_api::auth::roles::store::{
-    diesel::schema::{role_permissions, roles},
-    RoleBasedAuthorizationStoreError,
+use crate::rest_api::auth::rbac::store::{
+    diesel::schema::{assignments, identities},
+    Identity, RoleBasedAuthorizationStoreError,
 };
 
 use super::RoleBasedAuthorizationStoreOperations;
 
-pub trait RoleBasedAuthorizationStoreRemoveRole {
-    fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError>;
+pub trait RoleBasedAuthorizationStoreRemoveAssignment {
+    fn remove_assignment(
+        &self,
+        identity: &Identity,
+    ) -> Result<(), RoleBasedAuthorizationStoreError>;
 }
 
-impl<'a, C> RoleBasedAuthorizationStoreRemoveRole for RoleBasedAuthorizationStoreOperations<'a, C>
+impl<'a, C> RoleBasedAuthorizationStoreRemoveAssignment
+    for RoleBasedAuthorizationStoreOperations<'a, C>
 where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
+    fn remove_assignment(
+        &self,
+        identity: &Identity,
+    ) -> Result<(), RoleBasedAuthorizationStoreError> {
+        let search_identity = match identity {
+            Identity::Key(ref key) => key,
+            Identity::User(ref user_id) => user_id,
+        };
         self.conn.transaction::<_, _, _>(|| {
-            delete(role_permissions::table.filter(role_permissions::role_id.eq(role_id)))
+            delete(assignments::table.filter(assignments::identity.eq(search_identity)))
                 .execute(self.conn)?;
-
-            delete(roles::table.filter(roles::id.eq(role_id))).execute(self.conn)?;
+            delete(identities::table.filter(identities::identity.eq(search_identity)))
+                .execute(self.conn)?;
 
             Ok(())
         })

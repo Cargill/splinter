@@ -98,9 +98,9 @@ impl StoreFactory for PgStoreFactory {
     #[cfg(feature = "role-based-authorization-store-postgres")]
     fn get_role_based_authorization_store(
         &self,
-    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+    ) -> Box<dyn crate::rest_api::auth::rbac::store::RoleBasedAuthorizationStore> {
         Box::new(
-            crate::rest_api::auth::roles::store::DieselRoleBasedAuthorizationStore::new(
+            crate::rest_api::auth::rbac::store::DieselRoleBasedAuthorizationStore::new(
                 self.pool.clone(),
             ),
         )
@@ -112,7 +112,7 @@ impl StoreFactory for PgStoreFactory {
     ))]
     fn get_role_based_authorization_store(
         &self,
-    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
+    ) -> Box<dyn crate::rest_api::auth::rbac::store::RoleBasedAuthorizationStore> {
         unimplemented!()
     }
 
