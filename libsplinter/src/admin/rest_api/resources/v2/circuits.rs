@@ -30,6 +30,7 @@ pub(crate) struct CircuitResponse<'a> {
     pub roster: Vec<ServiceResponse<'a>>,
     pub management_type: &'a str,
     pub display_name: &'a Option<String>,
+    pub circuit_version: i32,
 }
 
 impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
@@ -40,6 +41,7 @@ impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
             roster: circuit.roster().iter().map(ServiceResponse::from).collect(),
             management_type: circuit.circuit_management_type(),
             display_name: circuit.display_name(),
+            circuit_version: circuit.circuit_version(),
         }
     }
 }

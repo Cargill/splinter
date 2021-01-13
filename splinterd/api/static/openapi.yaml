@@ -1903,6 +1903,9 @@ components:
                 description: Human readable name for the circuit
                 type: string
                 nullable: true
+              circuit_version:
+                  description: The protocol version the circuit adheres to
+                  type: integer
         votes:
           type: array
           items:
