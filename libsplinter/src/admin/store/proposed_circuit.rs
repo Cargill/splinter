@@ -22,6 +22,7 @@ use crate::protos::admin;
 
 use super::{
     AuthorizationType, DurabilityType, PersistenceType, ProposedNode, ProposedService, RouteType,
+    UNSET_CIRCUIT_VERSION,
 };
 
 /// Native representation of a circuit that is being proposed in a proposal
@@ -38,6 +39,7 @@ pub struct ProposedCircuit {
     application_metadata: Option<Vec<u8>>,
     comments: Option<String>,
     display_name: Option<String>,
+    circuit_version: i32,
 }
 
 impl ProposedCircuit {
@@ -95,6 +97,11 @@ impl ProposedCircuit {
         &self.display_name
     }
 
+    /// Returns the protocol version for the circuit
+    pub fn circuit_version(&self) -> i32 {
+        self.circuit_version
+    }
+
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, InvalidStateError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
@@ -150,6 +157,12 @@ impl ProposedCircuit {
             Some(proto.take_application_metadata())
         };
 
+        let circuit_version = if proto.get_circuit_version() == 0 {
+            UNSET_CIRCUIT_VERSION
+        } else {
+            proto.get_circuit_version()
+        };
+
         Ok(Self {
             circuit_id: proto.take_circuit_id(),
             roster: proto
@@ -170,6 +183,7 @@ impl ProposedCircuit {
             application_metadata,
             comments,
             display_name,
+            circuit_version,
         })
     }
 
@@ -202,6 +216,10 @@ impl ProposedCircuit {
 
         if let Some(display_name) = self.display_name {
             circuit.set_display_name(display_name);
+        }
+
+        if self.circuit_version != UNSET_CIRCUIT_VERSION {
+            circuit.set_circuit_version(self.circuit_version);
         }
 
         match self.authorization_type {
@@ -244,6 +262,7 @@ pub struct ProposedCircuitBuilder {
     application_metadata: Option<Vec<u8>>,
     comments: Option<String>,
     display_name: Option<String>,
+    circuit_version: Option<i32>,
 }
 
 impl ProposedCircuitBuilder {
@@ -305,6 +324,11 @@ impl ProposedCircuitBuilder {
     /// Returns the display name for the circuit proposal in the builder
     pub fn display_name(&self) -> Option<String> {
         self.display_name.clone()
+    }
+
+    /// Returns the protocol version for the circuit proposal in the builder
+    pub fn circuit_version(&self) -> Option<i32> {
+        self.circuit_version
     }
 
     /// Sets the circuit ID
@@ -423,6 +447,18 @@ impl ProposedCircuitBuilder {
         self
     }
 
+    /// Sets the circuit protocol versions for the proposed circuits
+    ///
+    /// # Arguments
+    ///
+    ///  * `circuit_version` - The protocol version the circuit must implement
+    ///
+    /// If this is not set, the circuit version is assumed to be 1.
+    pub fn with_circuit_version(mut self, circuit_version: i32) -> ProposedCircuitBuilder {
+        self.circuit_version = Some(circuit_version);
+        self
+    }
+
     /// Builds a `ProposedCircuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
@@ -472,6 +508,8 @@ impl ProposedCircuitBuilder {
 
         let display_name = self.display_name;
 
+        let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
+
         let create_circuit_message = ProposedCircuit {
             circuit_id,
             roster,
@@ -484,6 +522,7 @@ impl ProposedCircuitBuilder {
             application_metadata,
             comments,
             display_name,
+            circuit_version,
         };
 
         Ok(create_circuit_message)
@@ -512,7 +551,8 @@ impl TryFrom<&messages::CreateCircuit> for ProposedCircuit {
             .with_persistence(&PersistenceType::from(&create_circuit.persistence))
             .with_durability(&DurabilityType::from(&create_circuit.durability))
             .with_routes(&RouteType::from(&create_circuit.routes))
-            .with_circuit_management_type(&create_circuit.circuit_management_type);
+            .with_circuit_management_type(&create_circuit.circuit_management_type)
+            .with_circuit_version(create_circuit.circuit_version);
         // Add the `application_metadata` if not empty
         if !create_circuit.application_metadata.is_empty() {
             circuit_builder =

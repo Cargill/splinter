@@ -698,6 +698,7 @@ mod tests {
                         .with_circuit_management_type("mgmt_type_2")
                         .with_comments("mock circuit 2")
                         .with_display_name("circuit_2")
+                        .with_circuit_version(2)
                         .build()
                         .expect("Unable to create proposed circuit"),
                 )
@@ -754,6 +755,7 @@ mod tests {
                 application_metadata: vec![],
                 comments: Some("mock circuit 1".into()),
                 display_name: Some("circuit_1".into()),
+                circuit_version: 1,
             },
             votes: vec![],
             requester: vec![],
@@ -778,6 +780,7 @@ mod tests {
                 application_metadata: vec![],
                 comments: Some("mock circuit 2".into()),
                 display_name: Some("circuit_2".into()),
+                circuit_version: 2,
             },
             votes: vec![],
             requester: vec![],
@@ -805,6 +808,7 @@ mod tests {
                 application_metadata: vec![],
                 comments: Some("mock circuit 3".into()),
                 display_name: None,
+                circuit_version: 1,
             },
             votes: vec![],
             requester: vec![],

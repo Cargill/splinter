@@ -33,6 +33,7 @@ table! {
         application_metadata -> Nullable<Binary>,
         comments -> Nullable<Text>,
         display_name -> Nullable<Text>,
+        circuit_version -> Integer,
     }
 }
 
@@ -112,6 +113,7 @@ table! {
         routes -> Text,
         circuit_management_type -> Text,
         display_name -> Nullable<Text>,
+        circuit_version -> Integer,
     }
 }
 

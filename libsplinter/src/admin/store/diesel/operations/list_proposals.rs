@@ -68,6 +68,7 @@ where
             Nullable<Binary>,
             Nullable<Text>,
             Nullable<Text>,
+            Integer,
         ),
         C::Backend,
     >,
@@ -177,9 +178,8 @@ where
                                 proposed_circuit.durability,
                             )?)
                             .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
-                            .with_circuit_management_type(
-                                &proposed_circuit.circuit_management_type,
-                            );
+                            .with_circuit_management_type(&proposed_circuit.circuit_management_type)
+                            .with_circuit_version(proposed_circuit.circuit_version);
 
                         if let Some(application_metadata) = &proposed_circuit.application_metadata {
                             proposed_circuit_builder = proposed_circuit_builder

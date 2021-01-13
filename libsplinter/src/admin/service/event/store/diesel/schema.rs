@@ -43,6 +43,7 @@ table! {
         application_metadata -> Nullable<Binary>,
         comments -> Nullable<Text>,
         display_name -> Nullable<Text>,
+        circuit_version -> Integer,
     }
 }
 

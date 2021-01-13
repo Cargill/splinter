@@ -333,6 +333,7 @@ mod tests {
                 application_metadata: vec![],
                 comments: Some("mock circuit".into()),
                 display_name: Some("test_circuit".into()),
+                circuit_version: 1,
             },
             votes: vec![],
             requester: vec![],

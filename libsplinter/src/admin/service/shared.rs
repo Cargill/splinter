@@ -33,7 +33,9 @@ use crate::hex::to_hex;
 use crate::keys::KeyPermissionManager;
 use crate::orchestrator::{ServiceDefinition, ServiceOrchestrator};
 use crate::peer::{PeerManagerConnector, PeerRef};
-use crate::protocol::{ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION};
+use crate::protocol::{
+    ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
+};
 #[cfg(feature = "service-arg-validation")]
 use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
@@ -1484,14 +1486,32 @@ impl AdminServiceShared {
         protocol: u32,
     ) -> Result<(), AdminSharedError> {
         match protocol {
-            // if using the current most versionm, no extra checks are required
-            ADMIN_SERVICE_PROTOCOL_VERSION => (),
-            // if using the previous version, display name cannot be set
+            ADMIN_SERVICE_PROTOCOL_VERSION => {
+                // verify that the circuit version is supported
+                if circuit.get_circuit_version() > CIRCUIT_PROTOCOL_VERSION {
+                    return Err(AdminSharedError::ValidationFailed(format!(
+                        "Proposed circuit's version is unsupported: {}",
+                        circuit.get_circuit_version()
+                    )));
+                }
+            }
+
             1 => {
+                // if using the previous version, display name cannot be set
                 if !circuit.get_display_name().is_empty() {
                     return Err(AdminSharedError::ValidationFailed(
                         "Proposed circuit cannot have a display name on protocol 1".to_string(),
                     ));
+                }
+
+                // check that the circuit includes supported versions
+                match circuit.get_circuit_version() {
+                    0 => (),
+                    _ => {
+                        return Err(AdminSharedError::ValidationFailed(
+                            "Proposed circuit version is not supported by protocol 1".to_string(),
+                        ))
+                    }
                 }
             }
             // Unsupported version, this should never happen

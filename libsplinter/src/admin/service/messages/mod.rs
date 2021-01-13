@@ -24,6 +24,8 @@ use crate::protos::admin::{self, CircuitCreateRequest};
 
 use super::error::MarshallingError;
 
+pub const UNSET_CIRCUIT_VERSION: i32 = 1;
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct CreateCircuit {
     pub circuit_id: String,
@@ -43,6 +45,8 @@ pub struct CreateCircuit {
     #[serde(default)]
     pub comments: Option<String>,
     pub display_name: Option<String>,
+    #[serde(default)]
+    pub circuit_version: i32,
 }
 
 impl CreateCircuit {
@@ -93,6 +97,12 @@ impl CreateCircuit {
             Some(proto.get_comments().into())
         };
 
+        let circuit_version = if proto.get_circuit_version() == 0 {
+            UNSET_CIRCUIT_VERSION
+        } else {
+            proto.get_circuit_version()
+        };
+
         Ok(Self {
             circuit_id: proto.take_circuit_id(),
             roster: proto
@@ -113,6 +123,7 @@ impl CreateCircuit {
             application_metadata: proto.take_application_metadata(),
             comments,
             display_name,
+            circuit_version,
         })
     }
 
@@ -142,6 +153,10 @@ impl CreateCircuit {
 
         if let Some(display_name) = self.display_name {
             circuit.set_display_name(display_name);
+        }
+
+        if self.circuit_version != UNSET_CIRCUIT_VERSION {
+            circuit.set_circuit_version(self.circuit_version);
         }
 
         match self.authorization_type {
@@ -419,6 +434,7 @@ impl From<store::CircuitProposal> for CircuitProposal {
                 .unwrap_or_default(),
             comments: store_circuit.comments().clone(),
             display_name: store_circuit.display_name().clone(),
+            circuit_version: store_circuit.circuit_version(),
         };
 
         Self {
