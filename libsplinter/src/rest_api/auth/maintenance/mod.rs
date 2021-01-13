@@ -14,6 +14,8 @@
 
 //! An authorization handler that allows write permissions to be temporarily revoked
 
+mod routes;
+
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
