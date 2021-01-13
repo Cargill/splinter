@@ -35,6 +35,7 @@ pub struct CreateCircuitMessageBuilder {
     application_metadata: Vec<u8>,
     comments: Option<String>,
     display_name: Option<String>,
+    circuit_version: Option<i32>,
 }
 
 impl CreateCircuitMessageBuilder {
@@ -49,6 +50,7 @@ impl CreateCircuitMessageBuilder {
             application_metadata: vec![],
             comments: None,
             display_name: None,
+            circuit_version: None,
         }
     }
 
@@ -238,6 +240,10 @@ impl CreateCircuitMessageBuilder {
         self.display_name = Some(display_name.into());
     }
 
+    pub fn set_circuit_version(&mut self, circuit_version: i32) {
+        self.circuit_version = Some(circuit_version);
+    }
+
     pub fn build(mut self) -> Result<CreateCircuit, CliError> {
         let circuit_builder = self.create_circuit_builder();
 
@@ -303,6 +309,10 @@ impl CreateCircuitMessageBuilder {
 
         if let Some(display_name) = self.display_name {
             create_circuit_builder = create_circuit_builder.with_display_name(&display_name);
+        }
+
+        if let Some(circuit_version) = self.circuit_version {
+            create_circuit_builder = create_circuit_builder.with_circuit_version(circuit_version);
         }
 
         #[cfg(feature = "circuit-auth-type")]

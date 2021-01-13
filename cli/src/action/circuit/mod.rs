@@ -26,6 +26,7 @@ use std::fs::File;
 use clap::ArgMatches;
 use serde::Deserialize;
 use splinter::admin::messages::{CreateCircuit, SplinterService};
+use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
 use crate::error::CliError;
 #[cfg(feature = "circuit-template")]
@@ -167,6 +168,10 @@ impl Action for CircuitProposeAction {
                 ));
             }
             builder.set_display_name(display_name);
+        }
+
+        if args.value_of("compat_version") != Some("0.4") {
+            builder.set_circuit_version(CIRCUIT_PROTOCOL_VERSION);
         }
 
         let create_circuit = builder.build()?;
@@ -526,6 +531,7 @@ impl TryFrom<&CreateCircuit> for CircuitSlice {
                 .collect::<Result<Vec<CircuitServiceSlice>, CliError>>()?,
             management_type: circuit.circuit_management_type.clone(),
             display_name: circuit.display_name.clone(),
+            circuit_version: circuit.circuit_version,
         })
     }
 }
