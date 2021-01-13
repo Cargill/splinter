@@ -107,6 +107,104 @@ impl SplinterRestClient {
                 }
             })
     }
+
+    /// Checks whether or not maintenance mode is enabled for the Splinter node.
+    #[cfg(feature = "maintenance-mode")]
+    pub fn is_maintenance_mode_enabled(&self) -> Result<bool, CliError> {
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new().get(&format!("{}/authorization/maintenance", self.url));
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
+        request
+            .send()
+            .map_err(|err| {
+                CliError::ActionError(format!("Failed to check maintenance mode status: {}", err))
+            })
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.text()
+                        .map_err(|err| {
+                            CliError::ActionError(format!(
+                                "Request was successful, but failed to parse response body: {}",
+                                err
+                            ))
+                        })?
+                        .parse()
+                        .map_err(|_| {
+                            CliError::ActionError(
+                                "Request was successful, but received an invalid response".into(),
+                            )
+                        })
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            CliError::ActionError(format!(
+                                "Maintenance mode check request failed with status code '{}', but \
+                                 error response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(CliError::ActionError(format!(
+                        "Failed to check maintenance mode status: {}",
+                        message
+                    )))
+                }
+            })
+    }
+
+    /// Turns maintenance mode on or off for the Splinter node.
+    #[cfg(feature = "maintenance-mode")]
+    pub fn set_maintenance_mode(&self, enabled: bool) -> Result<(), CliError> {
+        // Allowing unused_mut because request must be mutable if experimental feature
+        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut request = Client::new()
+            .post(&format!("{}/authorization/maintenance", self.url))
+            .query(&[("enabled", enabled)]);
+
+        #[cfg(feature = "splinter-cli-jwt")]
+        {
+            request = request.header("Authorization", &self.auth);
+        }
+
+        request
+            .send()
+            .map_err(|err| {
+                CliError::ActionError(format!("Failed to set maintenance mode: {}", err))
+            })
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    Ok(())
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            CliError::ActionError(format!(
+                                "Maintenance mode set request failed with status code '{}', but \
+                                 error response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(CliError::ActionError(format!(
+                        "Failed to set maintenance mode: {}",
+                        message
+                    )))
+                }
+            })
+    }
 }
 
 #[derive(Deserialize)]
