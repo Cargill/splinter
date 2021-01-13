@@ -16,7 +16,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use cylinder::{jwt::JsonWebTokenParser, Verifier};
+use cylinder::{jwt::JsonWebTokenParser, PublicKey, Verifier};
 
 use crate::error::InternalError;
 use crate::rest_api::auth::{AuthorizationHeader, BearerToken};
@@ -58,7 +58,8 @@ impl IdentityProvider for CylinderKeyIdentityProvider {
             })?)
             .parse(token)
             .ok()
-            .map(|parsed_token| Identity::Key(parsed_token.issuer().as_hex())),
+            .and_then(|parsed_token| PublicKey::new_from_hex(&parsed_token.issuer().as_hex()).ok())
+            .map(Identity::Key),
         )
     }
 

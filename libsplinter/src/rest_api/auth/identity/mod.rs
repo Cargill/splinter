@@ -21,6 +21,9 @@ pub mod cylinder;
 #[cfg(feature = "oauth")]
 pub mod oauth;
 
+#[cfg(feature = "cylinder-jwt")]
+use ::cylinder::PublicKey;
+
 use crate::error::InternalError;
 
 use super::AuthorizationHeader;
@@ -32,7 +35,7 @@ pub enum Identity {
     Custom(String),
     #[cfg(feature = "cylinder-jwt")]
     /// A Cylinder public key
-    Key(String),
+    Key(PublicKey),
     #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
     /// A Biome user ID
     User(String),
