@@ -31,9 +31,9 @@ use crate::rest_api::ErrorResponse;
 #[cfg(feature = "authorization")]
 use crate::rest_api::Method;
 
-use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 #[cfg(feature = "authorization")]
-use super::{AuthorizationHandler, PermissionMap};
+use super::{authorization::PermissionMap, AuthorizationHandler};
+use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 
 /// Wrapper for the authorization middleware
 #[derive(Clone)]

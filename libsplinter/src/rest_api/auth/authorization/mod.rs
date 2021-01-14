@@ -18,5 +18,8 @@
 pub mod allow_keys;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
+mod permission_map;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
+
+pub(in crate::rest_api) use permission_map::PermissionMap;

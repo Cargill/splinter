@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::rest_api::Method;
-
-use super::Permission;
+use crate::rest_api::{auth::Permission, Method};
 
 /// A map used to correlate requests with the permissions that guard them.
 #[derive(Default)]

@@ -20,7 +20,7 @@ use futures::Future;
 
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::{AuthorizationHandler, PermissionMap};
+use crate::rest_api::auth::{authorization::PermissionMap, AuthorizationHandler};
 #[cfg(feature = "rest-api-cors")]
 use crate::rest_api::cors::Cors;
 use crate::rest_api::{RestApiBind, RestApiServerError};

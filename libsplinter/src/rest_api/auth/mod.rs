@@ -19,8 +19,6 @@ pub(crate) mod actix;
 #[cfg(feature = "authorization")]
 pub mod authorization;
 pub mod identity;
-#[cfg(feature = "authorization")]
-mod permission_map;
 
 use std::str::FromStr;
 
@@ -31,9 +29,9 @@ use crate::error::InvalidArgumentError;
 #[cfg(feature = "authorization")]
 use super::Method;
 
-use identity::{Identity, IdentityProvider};
 #[cfg(feature = "authorization")]
-pub(in crate::rest_api) use permission_map::PermissionMap;
+use authorization::PermissionMap;
+use identity::{Identity, IdentityProvider};
 
 /// A permission assigned to an endpoint
 #[cfg(feature = "authorization")]
