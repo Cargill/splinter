@@ -16,8 +16,6 @@
 
 #[cfg(feature = "rest-api-actix")]
 pub(crate) mod actix;
-#[cfg(feature = "authorization-handler-allow-keys")]
-pub mod allow_keys;
 #[cfg(feature = "authorization")]
 pub mod authorization;
 pub mod identity;

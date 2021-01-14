@@ -13,3 +13,6 @@
 // limitations under the License.
 
 //! Tools for determining client/user authorization
+
+#[cfg(feature = "authorization-handler-allow-keys")]
+pub mod allow_keys;
