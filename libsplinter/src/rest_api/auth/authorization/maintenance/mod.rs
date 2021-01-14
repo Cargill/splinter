@@ -22,8 +22,7 @@ use std::sync::{
 };
 
 use crate::error::InternalError;
-
-use super::{identity::Identity, AuthorizationHandler, AuthorizationHandlerResult};
+use crate::rest_api::auth::{identity::Identity, AuthorizationHandler, AuthorizationHandlerResult};
 
 /// An authorization handler that allows write permissions to be temporarily revoked
 ///

@@ -23,7 +23,7 @@ use futures::{future::IntoFuture, Future};
 use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    auth::maintenance::MaintenanceModeAuthorizationHandler,
+    auth::authorization::maintenance::MaintenanceModeAuthorizationHandler,
     ErrorResponse,
 };
 

@@ -19,8 +19,6 @@ pub(crate) mod actix;
 #[cfg(feature = "authorization")]
 pub mod authorization;
 pub mod identity;
-#[cfg(feature = "authorization-handler-maintenance")]
-pub mod maintenance;
 #[cfg(feature = "authorization")]
 mod permission_map;
 #[cfg(feature = "authorization")]
