@@ -39,6 +39,7 @@ use identity::{Identity, IdentityProvider};
 #[cfg(feature = "authorization")]
 pub(in crate::rest_api) use permission_map::PermissionMap;
 
+/// A permission assigned to an endpoint
 #[cfg(feature = "authorization")]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Permission {
