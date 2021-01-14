@@ -18,6 +18,8 @@
 pub(crate) mod actix;
 #[cfg(feature = "authorization-handler-allow-keys")]
 pub mod allow_keys;
+#[cfg(feature = "authorization")]
+pub mod authorization;
 pub mod identity;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
