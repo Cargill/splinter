@@ -20,7 +20,7 @@ use crate::actix_web::{web, Error as ActixError, HttpRequest, HttpResponse};
 use crate::futures::Future;
 use crate::rest_api::actix_web_1::{Continuation, Method, RequestGuard};
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::authorization::Permission;
 
 use super::Service;
 

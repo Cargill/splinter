@@ -21,7 +21,7 @@ use crate::biome::profile::store::UserProfileStore;
 use crate::futures::IntoFuture;
 use crate::protocol;
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     ErrorResponse,

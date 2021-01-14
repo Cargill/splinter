@@ -17,7 +17,7 @@ pub mod actix;
 pub mod resources;
 
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::Permission;
+use splinter::rest_api::auth::authorization::Permission;
 
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
 const SCABBARD_READ_PERMISSION: Permission = Permission::Check("scabbard.read");

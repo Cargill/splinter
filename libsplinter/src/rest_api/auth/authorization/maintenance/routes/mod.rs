@@ -21,7 +21,7 @@ mod resources;
 
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(feature = "rest-api-actix")]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::authorization::Permission;
 
 use super::MaintenanceModeAuthorizationHandler;
 

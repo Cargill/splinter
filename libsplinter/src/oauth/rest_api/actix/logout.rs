@@ -20,7 +20,7 @@ use futures::{future::IntoFuture, Future};
 use crate::biome::oauth::store::{OAuthUserSessionStore, OAuthUserSessionStoreError};
 use crate::protocol;
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::{AuthorizationHeader, BearerToken},

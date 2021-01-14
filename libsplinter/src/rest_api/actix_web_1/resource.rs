@@ -21,7 +21,7 @@ use futures::{future::IntoFuture, stream::Stream, Future};
 use protobuf::{self, Message};
 
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::{authorization::PermissionMap, Permission};
+use crate::rest_api::auth::authorization::{Permission, PermissionMap};
 
 use super::{Continuation, RequestGuard};
 

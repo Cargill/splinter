@@ -28,6 +28,20 @@ use super::identity::Identity;
 
 pub(in crate::rest_api) use permission_map::PermissionMap;
 
+/// A permission assigned to an endpoint
+#[derive(Clone, Debug, PartialEq)]
+pub enum Permission {
+    /// Check that the authenticated client has the specified permission.
+    Check(&'static str),
+    /// Allow any request that has been authenticated (the client's identity has been determined).
+    /// This may be used by endpoints that need to know the client's identity but do not require a
+    /// special permission to be checked (the Biome key management and OAuth logout routes are an
+    /// example of this).
+    AllowAuthenticated,
+    /// Allow any request without checking for authorization.
+    AllowUnauthenticated,
+}
+
 /// An authorization handler's decision about whether to allow, deny, or pass on the request
 #[cfg(feature = "authorization")]
 pub enum AuthorizationHandlerResult {

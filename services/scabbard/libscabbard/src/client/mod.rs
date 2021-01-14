@@ -503,9 +503,8 @@ mod tests {
     use actix_web::HttpResponse;
     use futures::future::IntoFuture;
     #[cfg(feature = "authorization")]
-    use splinter::rest_api::auth::{
-        authorization::{AuthorizationHandler, AuthorizationHandlerResult},
-        Permission,
+    use splinter::rest_api::auth::authorization::{
+        AuthorizationHandler, AuthorizationHandlerResult, Permission,
     };
     use splinter::{
         error::InternalError,
