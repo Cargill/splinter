@@ -16,6 +16,8 @@
 
 #[cfg(feature = "rest-api-actix")]
 pub(crate) mod actix;
+#[cfg(all(feature = "authorization", feature = "cylinder-jwt"))]
+pub mod allow_keys;
 pub mod identity;
 #[cfg(feature = "authorization")]
 mod permission_map;
@@ -52,15 +54,19 @@ pub enum Permission {
 /// An authorization handler's decision about whether to allow, deny, or pass on the request
 #[cfg(feature = "authorization")]
 pub enum AuthorizationHandlerResult {
+    /// The authorization handler has granted the requested permission
     Allow,
+    /// The authorization handler has denied the requested permission
     Deny,
+    /// The authorization handler is not able to determine if the requested permission should be
+    /// granted or denied
     Continue,
 }
 
-/// Determines if a client (identity) has the requested permissions (represented by the permission
-/// ID)
+/// Determines if a client has some permissions
 #[cfg(feature = "authorization")]
 pub trait AuthorizationHandler: Send + Sync {
+    /// Determines if the given identity has the requested permission
     fn has_permission(
         &self,
         identity: &Identity,

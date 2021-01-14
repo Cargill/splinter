@@ -59,7 +59,9 @@ use splinter::registry::{
     UnifiedRegistry,
 };
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::Permission;
+use splinter::rest_api::auth::{
+    allow_keys::AllowKeysAuthorizationHandler, AuthorizationHandler, Permission,
+};
 #[cfg(feature = "auth")]
 use splinter::rest_api::{AuthConfig, OAuthConfig};
 use splinter::rest_api::{
@@ -533,6 +535,9 @@ impl SplinterDaemon {
         #[cfg(feature = "authorization")]
         {
             rest_api_builder = rest_api_builder
+                .with_authorization_handlers(vec![create_allow_keys_authorization_handler(
+                    &self.state_dir,
+                )?])
                 .add_resource(Resource::build("/openapi.yaml").add_method(
                     Method::Get,
                     Permission::AllowAuthenticated,
@@ -1461,6 +1466,31 @@ impl RegistryShutdownHandle {
             .iter()
             .for_each(|handle| handle.shutdown());
     }
+}
+
+#[cfg(feature = "authorization")]
+fn create_allow_keys_authorization_handler(
+    state_dir: &str,
+) -> Result<Box<dyn AuthorizationHandler>, StartError> {
+    let allow_keys_path = Path::new(state_dir)
+        .join("allow_keys")
+        .to_str()
+        .expect("path built from &str cannot be invalid")
+        .to_string();
+
+    debug!(
+        "Creating allow keys authorization handler file: {:?}",
+        allow_keys_path
+    );
+
+    Ok(Box::new(
+        AllowKeysAuthorizationHandler::new(&allow_keys_path).map_err(|err| {
+            StartError::StorageError(format!(
+                "Failed to initialize allow keys authorization handler: {}",
+                err
+            ))
+        })?,
+    ))
 }
 
 #[derive(Debug)]
