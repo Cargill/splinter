@@ -30,7 +30,10 @@ const TLS_REST_API_CERT: &str = "rest_api.crt";
 const TLS_REST_API_KEY: &str = "private/rest_api.key";
 const TLS_CA_FILE: &str = "ca.pem";
 
+#[cfg(not(feature = "https-bind"))]
 const REST_API_ENDPOINT: &str = "127.0.0.1:8080";
+#[cfg(feature = "https-bind")]
+const REST_API_ENDPOINT: &str = "127.0.0.1:8443";
 #[cfg(feature = "service-endpoint")]
 const SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
 const NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
