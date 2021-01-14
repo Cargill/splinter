@@ -18,7 +18,7 @@ use super::schema::user_profile;
 #[table_name = "user_profile"]
 pub struct ProfileModel {
     pub id: i64,
-    pub user_id: String,
+    pub subject: String,
     pub name: Option<String>,
     pub given_name: Option<String>,
     pub family_name: Option<String>,
@@ -29,7 +29,7 @@ pub struct ProfileModel {
 #[derive(Insertable, PartialEq, Debug)]
 #[table_name = "user_profile"]
 pub struct NewProfileModel {
-    pub user_id: String,
+    pub subject: String,
     pub name: Option<String>,
     pub given_name: Option<String>,
     pub family_name: Option<String>,

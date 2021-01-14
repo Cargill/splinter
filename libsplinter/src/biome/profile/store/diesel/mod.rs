@@ -118,7 +118,7 @@ impl UserProfileStore for DieselUserProfileStore<diesel::sqlite::SqliteConnectio
 impl From<ProfileModel> for Profile {
     fn from(user_profile: ProfileModel) -> Self {
         Self {
-            user_id: user_profile.user_id,
+            subject: user_profile.subject,
             name: user_profile.name,
             given_name: user_profile.given_name,
             family_name: user_profile.family_name,

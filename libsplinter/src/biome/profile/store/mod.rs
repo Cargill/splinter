@@ -18,7 +18,6 @@ pub mod error;
 pub(in crate::biome) mod memory;
 
 use crate::error::InvalidStateError;
-
 use serde::{Deserialize, Serialize};
 
 pub use error::UserProfileStoreError;
@@ -28,7 +27,7 @@ use self::diesel::models::NewProfileModel;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
-    user_id: String,
+    subject: String,
     name: Option<String>,
     given_name: Option<String>,
     family_name: Option<String>,
@@ -37,9 +36,9 @@ pub struct Profile {
 }
 
 impl Profile {
-    /// Returns the user_id for the profile
-    pub fn user_id(&self) -> &str {
-        &self.user_id
+    /// Returns the subject for the profile
+    pub fn subject(&self) -> &str {
+        &self.subject
     }
 
     /// Returns the name for the profile
@@ -71,7 +70,7 @@ impl Profile {
 /// Builder for profile.
 #[derive(Default)]
 pub struct ProfileBuilder {
-    user_id: Option<String>,
+    subject: Option<String>,
     name: Option<String>,
     given_name: Option<String>,
     family_name: Option<String>,
@@ -84,9 +83,9 @@ impl ProfileBuilder {
         Self::default()
     }
 
-    /// Sets the user id for the profile
-    pub fn with_user_id(mut self, user_id: String) -> ProfileBuilder {
-        self.user_id = Some(user_id);
+    /// Sets the subject for the profile
+    pub fn with_subject(mut self, subject: String) -> ProfileBuilder {
+        self.subject = Some(subject);
         self
     }
 
@@ -123,7 +122,7 @@ impl ProfileBuilder {
     /// Builds the profile
     pub fn build(self) -> Result<Profile, InvalidStateError> {
         Ok(Profile {
-            user_id: self.user_id.ok_or_else(|| {
+            subject: self.subject.ok_or_else(|| {
                 InvalidStateError::with_message("A user id is required to build a Profile".into())
             })?,
             name: self.name,
