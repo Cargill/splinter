@@ -166,12 +166,7 @@ pub trait UserProfileStore: Sync + Send {
     ///
     /// #Arguments
     ///
-    ///  * `user_id` - The unique identifier of the user the profile belongs to
-    ///  * `name` - The updated name for the user profile
-    ///  * `given_name` - The updated given name for the user profile
-    ///  * `family_name` - The updated family name for the user profile
-    ///  * `email` - The updated email for the user profile
-    ///  * `picture` - The updated picture for the user profile
+    ///  * `profile` - The profile to be added
     ///
     /// # Errors
     ///
