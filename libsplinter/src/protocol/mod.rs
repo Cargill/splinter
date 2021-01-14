@@ -42,6 +42,9 @@ pub const ADMIN_SERVICE_PROTOCOL_VERSION: u32 = 2;
 #[cfg(feature = "admin-service")]
 pub(crate) const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
 
+// The currently supported circuit version
+pub const CIRCUIT_PROTOCOL_VERSION: i32 = 2;
+
 #[cfg(feature = "oauth")]
 pub const OAUTH_PROTOCOL_VERSION: u32 = 1;
 

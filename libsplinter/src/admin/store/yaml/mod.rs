@@ -1022,6 +1022,8 @@ struct YamlCircuit {
     routes: YamlRouteType,
     circuit_management_type: String,
     display_name: Option<String>,
+    #[serde(default = "default_circuit_value")]
+    circuit_version: i32,
 }
 
 impl TryFrom<YamlCircuit> for Circuit {
@@ -1042,7 +1044,8 @@ impl TryFrom<YamlCircuit> for Circuit {
             .with_persistence(&PersistenceType::from(circuit.persistence))
             .with_durability(&DurabilityType::from(circuit.durability))
             .with_routes(&RouteType::from(circuit.routes))
-            .with_circuit_management_type(&circuit.circuit_management_type);
+            .with_circuit_management_type(&circuit.circuit_management_type)
+            .with_circuit_version(circuit.circuit_version);
 
         if let Some(display_name) = &circuit.display_name {
             builder = builder.with_display_name(display_name);
@@ -1068,6 +1071,7 @@ impl From<Circuit> for YamlCircuit {
             routes: circuit.routes().clone().into(),
             circuit_management_type: circuit.circuit_management_type().into(),
             display_name: circuit.display_name().clone(),
+            circuit_version: circuit.circuit_version(),
         }
     }
 }
@@ -1342,6 +1346,8 @@ struct YamlProposedCircuit {
     application_metadata: Option<String>,
     comments: Option<String>,
     display_name: Option<String>,
+    #[serde(default = "default_circuit_value")]
+    circuit_version: i32,
 }
 
 impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
@@ -1368,7 +1374,8 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
             .with_persistence(&PersistenceType::from(circuit.persistence))
             .with_durability(&DurabilityType::from(circuit.durability))
             .with_routes(&RouteType::from(circuit.routes))
-            .with_circuit_management_type(&circuit.circuit_management_type);
+            .with_circuit_management_type(&circuit.circuit_management_type)
+            .with_circuit_version(circuit.circuit_version);
 
         if let Some(application_metadata) = circuit.application_metadata {
             builder = builder.with_application_metadata(&parse_hex(&application_metadata).map_err(
@@ -1424,6 +1431,7 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
             application_metadata,
             comments: circuit.comments().clone(),
             display_name: circuit.display_name().clone(),
+            circuit_version: circuit.circuit_version(),
         }
     }
 }
@@ -1658,6 +1666,10 @@ struct YamlState {
     circuit_state: CircuitState,
     proposal_state: ProposalState,
     service_directory: BTreeMap<ServiceId, Service>,
+}
+
+fn default_circuit_value() -> i32 {
+    1
 }
 
 #[cfg(test)]
@@ -2405,6 +2417,7 @@ proposals:
             ])
             .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
             .with_circuit_management_type("gameroom")
+            .with_circuit_version(1)
             .build()
             .expect("Unable to build circuit")
     }

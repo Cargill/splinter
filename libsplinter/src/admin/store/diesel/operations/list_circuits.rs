@@ -214,7 +214,8 @@ where
                         .with_persistence(&PersistenceType::try_from(model.persistence)?)
                         .with_durability(&DurabilityType::try_from(model.durability)?)
                         .with_routes(&RouteType::try_from(model.routes)?)
-                        .with_circuit_management_type(&model.circuit_management_type);
+                        .with_circuit_management_type(&model.circuit_management_type)
+                        .with_circuit_version(model.circuit_version);
 
                     if let Some(display_name) = &model.display_name {
                         circuit_builder = circuit_builder.with_display_name(&display_name);

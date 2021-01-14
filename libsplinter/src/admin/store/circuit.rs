@@ -17,7 +17,7 @@
 use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
 
-use super::{ProposedCircuit, Service};
+use super::{ProposedCircuit, Service, UNSET_CIRCUIT_VERSION};
 
 /// Native representation of a circuit in state
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,6 +31,7 @@ pub struct Circuit {
     routes: RouteType,
     circuit_management_type: String,
     display_name: Option<String>,
+    circuit_version: i32,
 }
 
 impl Circuit {
@@ -77,6 +78,11 @@ impl Circuit {
     /// Returns the display name for the circuit
     pub fn display_name(&self) -> &Option<String> {
         &self.display_name
+    }
+
+    /// Returns the circuit version for the circuit
+    pub fn circuit_version(&self) -> i32 {
+        self.circuit_version
     }
 }
 
@@ -160,6 +166,7 @@ pub struct CircuitBuilder {
     routes: Option<RouteType>,
     circuit_management_type: Option<String>,
     display_name: Option<String>,
+    circuit_version: Option<i32>,
 }
 
 impl CircuitBuilder {
@@ -211,6 +218,11 @@ impl CircuitBuilder {
     /// Returns the display_name in the builder
     pub fn display_name(&self) -> Option<String> {
         self.display_name.clone()
+    }
+
+    /// Returns the circuit version in the builder
+    pub fn circuit_version(&self) -> Option<i32> {
+        self.circuit_version
     }
 
     /// Sets the circuit ID
@@ -306,6 +318,18 @@ impl CircuitBuilder {
         self
     }
 
+    /// Sets the circuit version for the circuit
+    ///
+    /// # Arguments
+    ///
+    ///  * `circuit_version` - The protocol version the circuit must implement
+    ///
+    /// If this is not set, the circuit version is assumed to be 1.
+    pub fn with_circuit_version(mut self, circuit_version: i32) -> CircuitBuilder {
+        self.circuit_version = Some(circuit_version);
+        self
+    }
+
     /// Builds a `Circuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
@@ -351,6 +375,8 @@ impl CircuitBuilder {
 
         let display_name = self.display_name;
 
+        let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
+
         let circuit = Circuit {
             id: circuit_id,
             roster,
@@ -361,6 +387,7 @@ impl CircuitBuilder {
             routes,
             circuit_management_type,
             display_name,
+            circuit_version,
         };
 
         Ok(circuit)
@@ -383,6 +410,7 @@ impl From<ProposedCircuit> for Circuit {
             routes: circuit.routes().clone(),
             circuit_management_type: circuit.circuit_management_type().into(),
             display_name: circuit.display_name().clone(),
+            circuit_version: circuit.circuit_version(),
         }
     }
 }

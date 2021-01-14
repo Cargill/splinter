@@ -1293,6 +1293,7 @@ mod test {
             application_metadata,
             comments: Some("test circuit".to_string()),
             display_name: None,
+            circuit_version: 1,
         }
     }
 

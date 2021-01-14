@@ -52,6 +52,7 @@ where
             Nullable<Binary>,
             Nullable<Text>,
             Nullable<Text>,
+            Integer,
         ),
         C::Backend,
     >,

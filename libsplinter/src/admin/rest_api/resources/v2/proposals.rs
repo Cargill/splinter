@@ -93,6 +93,7 @@ pub(crate) struct CircuitResponse<'a> {
     pub application_metadata: &'a [u8],
     pub comments: &'a Option<String>,
     pub display_name: &'a Option<String>,
+    pub circuit_version: i32,
 }
 
 impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
@@ -111,6 +112,7 @@ impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
             application_metadata: &circuit.application_metadata,
             comments: &circuit.comments,
             display_name: &circuit.display_name,
+            circuit_version: circuit.circuit_version,
         })
     }
 }

@@ -91,6 +91,7 @@ pub struct AdminEventProposedCircuitModel {
     pub application_metadata: Option<Vec<u8>>,
     pub comments: Option<String>,
     pub display_name: Option<String>,
+    pub circuit_version: i32,
 }
 
 impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
@@ -112,6 +113,7 @@ impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
             application_metadata,
             comments: create_circuit.comments.clone(),
             display_name: create_circuit.display_name.clone(),
+            circuit_version: create_circuit.circuit_version,
         }
     }
 }

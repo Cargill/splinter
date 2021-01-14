@@ -55,6 +55,8 @@ pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
 pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};
 pub use self::service::{Service, ServiceBuilder};
 
+pub const UNSET_CIRCUIT_VERSION: i32 = 1;
+
 /// The unique ID of service made up of a circuit ID and the individual service ID.
 /// A service ID is only required to be unique from within a circuit.
 #[derive(Clone, Debug, PartialEq)]

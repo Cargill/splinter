@@ -70,6 +70,7 @@ pub struct ProposedCircuitModel {
     pub application_metadata: Option<Vec<u8>>,
     pub comments: Option<String>,
     pub display_name: Option<String>,
+    pub circuit_version: i32,
 }
 
 impl From<&ProposedCircuit> for ProposedCircuitModel {
@@ -84,6 +85,7 @@ impl From<&ProposedCircuit> for ProposedCircuitModel {
             application_metadata: proposed_circuit.application_metadata().clone(),
             comments: proposed_circuit.comments().clone(),
             display_name: proposed_circuit.display_name().clone(),
+            circuit_version: proposed_circuit.circuit_version(),
         }
     }
 }
@@ -390,6 +392,7 @@ pub struct CircuitModel {
     pub routes: String,
     pub circuit_management_type: String,
     pub display_name: Option<String>,
+    pub circuit_version: i32,
 }
 
 impl From<&Circuit> for CircuitModel {
@@ -402,6 +405,7 @@ impl From<&Circuit> for CircuitModel {
             routes: String::from(circuit.routes()),
             circuit_management_type: circuit.circuit_management_type().into(),
             display_name: circuit.display_name().clone(),
+            circuit_version: circuit.circuit_version(),
         }
     }
 }

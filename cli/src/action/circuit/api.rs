@@ -280,6 +280,7 @@ pub struct CircuitSlice {
     pub roster: Vec<CircuitServiceSlice>,
     pub management_type: String,
     pub display_name: Option<String>,
+    pub circuit_version: i32,
 }
 
 impl fmt::Display for CircuitSlice {
@@ -292,7 +293,10 @@ impl fmt::Display for CircuitSlice {
             display_string += "Display Name: -\n    ";
         }
 
-        display_string += &format!("Management Type: {}\n", self.management_type);
+        display_string += &format!(
+            "Version: {}\n    Management Type: {}\n",
+            self.circuit_version, self.management_type
+        );
 
         for member in self.members.iter() {
             display_string += &format!("\n    {}\n", member);
@@ -363,7 +367,10 @@ impl fmt::Display for ProposalSlice {
             display_string += "Display Name: -\n    ";
         }
 
-        display_string += &format!("Management Type: {}\n", self.circuit.management_type);
+        display_string += &format!(
+            "Version: {}\n    Management Type: {}\n",
+            self.circuit.circuit_version, self.circuit.management_type
+        );
 
         for member in self.circuit.members.iter() {
             display_string += &format!("\n    {} ({:?})\n", member.node_id, member.endpoints);
@@ -421,6 +428,7 @@ pub struct ProposalCircuitSlice {
     pub management_type: String,
     pub comments: Option<String>,
     pub display_name: Option<String>,
+    pub circuit_version: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

@@ -75,7 +75,8 @@ where
                 .with_persistence(&PersistenceType::try_from(circuit.persistence)?)
                 .with_durability(&DurabilityType::try_from(circuit.durability)?)
                 .with_routes(&RouteType::try_from(circuit.routes)?)
-                .with_circuit_management_type(&circuit.circuit_management_type);
+                .with_circuit_management_type(&circuit.circuit_management_type)
+                .with_circuit_version(circuit.circuit_version);
 
             // if display name is set, add to builder
             if let Some(display_name) = circuit.display_name {

@@ -18,7 +18,7 @@ use crate::base62::generate_random_base62_string;
 
 use super::{
     is_valid_circuit_id, is_valid_service_id, AuthorizationType, CreateCircuit, DurabilityType,
-    PersistenceType, RouteType, SplinterNode, SplinterService,
+    PersistenceType, RouteType, SplinterNode, SplinterService, UNSET_CIRCUIT_VERSION,
 };
 
 #[derive(Default, Clone)]
@@ -34,6 +34,7 @@ pub struct CreateCircuitBuilder {
     application_metadata: Option<Vec<u8>>,
     comments: Option<String>,
     display_name: Option<String>,
+    circuit_version: Option<i32>,
 }
 
 impl CreateCircuitBuilder {
@@ -83,6 +84,10 @@ impl CreateCircuitBuilder {
 
     pub fn display_name(&self) -> Option<String> {
         self.display_name.clone()
+    }
+
+    pub fn circuit_version(&self) -> Option<i32> {
+        self.circuit_version
     }
 
     pub fn with_circuit_id(mut self, circuit_id: &str) -> CreateCircuitBuilder {
@@ -149,6 +154,11 @@ impl CreateCircuitBuilder {
         self
     }
 
+    pub fn with_circuit_version(mut self, circuit_version: i32) -> CreateCircuitBuilder {
+        self.circuit_version = Some(circuit_version);
+        self
+    }
+
     pub fn build(self) -> Result<CreateCircuit, BuilderError> {
         let circuit_id = match self.circuit_id {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
@@ -212,6 +222,8 @@ impl CreateCircuitBuilder {
 
         let display_name = self.display_name;
 
+        let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
+
         let create_circuit_message = CreateCircuit {
             circuit_id,
             roster,
@@ -224,6 +236,7 @@ impl CreateCircuitBuilder {
             application_metadata,
             comments,
             display_name,
+            circuit_version,
         };
 
         Ok(create_circuit_message)

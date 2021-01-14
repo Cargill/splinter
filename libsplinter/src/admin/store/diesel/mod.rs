@@ -885,6 +885,7 @@ pub mod tests {
                             .build().expect("Unable to build node"),
                         ]
                     )
+                    .with_circuit_version(3)
                     .with_application_metadata(b"test")
                     .with_comments("This is a test")
                     .with_circuit_management_type("gameroom")
@@ -1005,6 +1006,7 @@ pub mod tests {
             .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
             .with_circuit_management_type("gameroom")
             .with_display_name("test_display")
+            .with_circuit_version(3)
             .build()
             .expect("Unable to build circuit")
     }
