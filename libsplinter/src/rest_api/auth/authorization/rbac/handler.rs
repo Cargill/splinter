@@ -14,7 +14,10 @@
 
 use crate::error::InternalError;
 
-use crate::rest_api::auth::{identity::Identity, AuthorizationHandler, AuthorizationHandlerResult};
+use crate::rest_api::auth::{
+    authorization::{AuthorizationHandler, AuthorizationHandlerResult},
+    identity::Identity,
+};
 
 use super::store::{Identity as StoreIdentity, RoleBasedAuthorizationStore};
 

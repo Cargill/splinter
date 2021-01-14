@@ -415,7 +415,8 @@ mod tests {
     use crate::rest_api::actix_web_1::{AuthConfig, RestApiBuilder, RestApiShutdownHandle};
     #[cfg(feature = "authorization")]
     use crate::rest_api::auth::{
-        identity::Identity, AuthorizationHandler, AuthorizationHandlerResult,
+        authorization::{AuthorizationHandler, AuthorizationHandlerResult},
+        identity::Identity,
     };
 
     #[derive(Serialize)]

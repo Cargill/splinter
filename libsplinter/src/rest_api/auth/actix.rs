@@ -32,7 +32,7 @@ use crate::rest_api::ErrorResponse;
 use crate::rest_api::Method;
 
 #[cfg(feature = "authorization")]
-use super::{authorization::PermissionMap, AuthorizationHandler};
+use super::authorization::{AuthorizationHandler, PermissionMap};
 use super::{authorize, identity::IdentityProvider, AuthorizationResult};
 
 /// Wrapper for the authorization middleware

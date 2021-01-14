@@ -67,7 +67,7 @@ use splinter::rest_api::auth::authorization::rbac::{
     rest_api::RoleBasedAuthorizationResourceProvider, RoleBasedAuthorizationHandler,
 };
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::{AuthorizationHandler, Permission};
+use splinter::rest_api::auth::{authorization::AuthorizationHandler, Permission};
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{

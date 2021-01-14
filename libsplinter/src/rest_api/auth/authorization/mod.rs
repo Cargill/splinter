@@ -22,4 +22,42 @@ mod permission_map;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
 
+use crate::error::InternalError;
+
+use super::identity::Identity;
+
 pub(in crate::rest_api) use permission_map::PermissionMap;
+
+/// An authorization handler's decision about whether to allow, deny, or pass on the request
+#[cfg(feature = "authorization")]
+pub enum AuthorizationHandlerResult {
+    /// The authorization handler has granted the requested permission
+    Allow,
+    /// The authorization handler has denied the requested permission
+    Deny,
+    /// The authorization handler is not able to determine if the requested permission should be
+    /// granted or denied
+    Continue,
+}
+
+/// Determines if a client has some permissions
+#[cfg(feature = "authorization")]
+pub trait AuthorizationHandler: Send + Sync {
+    /// Determines if the given identity has the requested permission
+    fn has_permission(
+        &self,
+        identity: &Identity,
+        permission_id: &str,
+    ) -> Result<AuthorizationHandlerResult, InternalError>;
+
+    /// Clone implementation for `AuthorizationHandler`. The implementation of the `Clone` trait for
+    /// `Box<dyn AuthorizationHandler>` calls this method.
+    fn clone_box(&self) -> Box<dyn AuthorizationHandler>;
+}
+
+#[cfg(feature = "authorization")]
+impl Clone for Box<dyn AuthorizationHandler> {
+    fn clone(&self) -> Box<dyn AuthorizationHandler> {
+        self.clone_box()
+    }
+}

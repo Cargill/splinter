@@ -115,7 +115,9 @@ mod tests {
     };
 
     #[cfg(feature = "authorization")]
-    use splinter::rest_api::auth::{AuthorizationHandler, AuthorizationHandlerResult};
+    use splinter::rest_api::auth::authorization::{
+        AuthorizationHandler, AuthorizationHandlerResult,
+    };
     use splinter::{
         error::InternalError,
         rest_api::{

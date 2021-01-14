@@ -21,7 +21,9 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::error::InternalError;
-use crate::rest_api::auth::{identity::Identity, AuthorizationHandler, AuthorizationHandlerResult};
+use crate::rest_api::auth::identity::Identity;
+
+use super::{AuthorizationHandler, AuthorizationHandlerResult};
 
 /// A file-backed authorization handler that permits admin keys
 ///

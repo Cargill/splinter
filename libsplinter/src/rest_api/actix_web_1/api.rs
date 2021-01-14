@@ -18,9 +18,9 @@ use std::thread;
 use actix_web::{middleware, App, HttpServer};
 use futures::Future;
 
-use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::{authorization::PermissionMap, AuthorizationHandler};
+use crate::rest_api::auth::authorization::{AuthorizationHandler, PermissionMap};
+use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "rest-api-cors")]
 use crate::rest_api::cors::Cors;
 use crate::rest_api::{RestApiBind, RestApiServerError};
