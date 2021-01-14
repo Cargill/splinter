@@ -32,6 +32,7 @@ pub struct Circuit {
     circuit_management_type: String,
     display_name: Option<String>,
     circuit_version: i32,
+    circuit_status: CircuitStatus,
 }
 
 impl Circuit {
@@ -83,6 +84,11 @@ impl Circuit {
     /// Returns the circuit version for the circuit
     pub fn circuit_version(&self) -> i32 {
         self.circuit_version
+    }
+
+    /// Returns the status of the circuit
+    pub fn circuit_status(&self) -> &CircuitStatus {
+        &self.circuit_status
     }
 }
 
@@ -154,6 +160,30 @@ impl From<&messages::RouteType> for RouteType {
     }
 }
 
+/// Status of the circuit
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CircuitStatus {
+    Active,
+    Disbanded,
+    Abandoned,
+}
+
+impl Default for CircuitStatus {
+    fn default() -> Self {
+        CircuitStatus::Active
+    }
+}
+
+impl From<&messages::CircuitStatus> for CircuitStatus {
+    fn from(message_enum: &messages::CircuitStatus) -> Self {
+        match *message_enum {
+            messages::CircuitStatus::Active => CircuitStatus::Active,
+            messages::CircuitStatus::Disbanded => CircuitStatus::Disbanded,
+            messages::CircuitStatus::Abandoned => CircuitStatus::Abandoned,
+        }
+    }
+}
+
 /// Builder to be used to build a `Circuit`
 #[derive(Default, Clone)]
 pub struct CircuitBuilder {
@@ -167,6 +197,7 @@ pub struct CircuitBuilder {
     circuit_management_type: Option<String>,
     display_name: Option<String>,
     circuit_version: Option<i32>,
+    circuit_status: Option<CircuitStatus>,
 }
 
 impl CircuitBuilder {
@@ -223,6 +254,11 @@ impl CircuitBuilder {
     /// Returns the circuit version in the builder
     pub fn circuit_version(&self) -> Option<i32> {
         self.circuit_version
+    }
+
+    /// Returns the circuit status in the builder
+    pub fn circuit_status(&self) -> Option<CircuitStatus> {
+        self.circuit_status.clone()
     }
 
     /// Sets the circuit ID
@@ -330,6 +366,16 @@ impl CircuitBuilder {
         self
     }
 
+    /// Sets the status for the circuit
+    ///
+    /// # Arguments
+    ///
+    ///  * `circuit_status` - The status for the circuit
+    pub fn with_circuit_status(mut self, circuit_status: &CircuitStatus) -> CircuitBuilder {
+        self.circuit_status = Some(circuit_status.clone());
+        self
+    }
+
     /// Builds a `Circuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
@@ -377,6 +423,8 @@ impl CircuitBuilder {
 
         let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
 
+        let circuit_status = self.circuit_status.unwrap_or_default();
+
         let circuit = Circuit {
             id: circuit_id,
             roster,
@@ -388,6 +436,7 @@ impl CircuitBuilder {
             circuit_management_type,
             display_name,
             circuit_version,
+            circuit_status,
         };
 
         Ok(circuit)
@@ -411,6 +460,7 @@ impl From<ProposedCircuit> for Circuit {
             circuit_management_type: circuit.circuit_management_type().into(),
             display_name: circuit.display_name().clone(),
             circuit_version: circuit.circuit_version(),
+            circuit_status: circuit.circuit_status().clone(),
         }
     }
 }

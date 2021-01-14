@@ -125,8 +125,8 @@ pub mod tests {
 
     use crate::admin::service::event::EventType;
     use crate::admin::store::{
-        CircuitProposal, CircuitProposalBuilder, ProposalType, ProposedCircuitBuilder,
-        ProposedNodeBuilder, ProposedServiceBuilder,
+        CircuitProposal, CircuitProposalBuilder, CircuitStatus, ProposalType,
+        ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
     };
     use crate::hex::parse_hex;
     use crate::migrations::run_sqlite_migrations;
@@ -446,6 +446,7 @@ pub mod tests {
                     .with_comments("This is a test")
                     .with_circuit_management_type(management_type)
                     .with_display_name("test_display")
+                    .with_circuit_status(&CircuitStatus::Active)
                     .build().expect("Unable to build circuit")
             )
             .with_requester(

@@ -1906,6 +1906,13 @@ components:
               circuit_version:
                   description: The protocol version the circuit adheres to
                   type: integer
+              circuit_status:
+                  description: The status of the circuit
+                  type: string
+                  enum:
+                    - Active
+                    - Disbanded
+                    - Abandoned
         votes:
           type: array
           items:

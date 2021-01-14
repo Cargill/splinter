@@ -15,6 +15,15 @@
 //! Database representations used to implement a diesel backend for the `AdminServiceEventStore`.
 
 use std::convert::TryFrom;
+use std::io::Write;
+
+use diesel::{
+    backend::Backend,
+    deserialize::{self, FromSql},
+    expression::{helper_types::AsExprOf, AsExpression},
+    serialize::{self, Output, ToSql},
+    sql_types::SmallInt,
+};
 
 use crate::admin::service::event::{
     store::{
@@ -92,6 +101,7 @@ pub struct AdminEventProposedCircuitModel {
     pub comments: Option<String>,
     pub display_name: Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: CircuitStatusModel,
 }
 
 impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
@@ -114,6 +124,7 @@ impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
             comments: create_circuit.comments.clone(),
             display_name: create_circuit.display_name.clone(),
             circuit_version: create_circuit.circuit_version,
+            circuit_status: CircuitStatusModel::from(&create_circuit.circuit_status),
         }
     }
 }
@@ -364,6 +375,55 @@ impl AdminEventProposedServiceArgumentModel {
     }
 }
 
+#[repr(i16)]
+#[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
+pub enum CircuitStatusModel {
+    Active = 1,
+    Disbanded = 2,
+    Abandoned = 3,
+}
+
+impl<DB> ToSql<SmallInt, DB> for CircuitStatusModel
+where
+    DB: Backend,
+    i16: ToSql<SmallInt, DB>,
+{
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        (*self as i16).to_sql(out)
+    }
+}
+
+impl AsExpression<SmallInt> for CircuitStatusModel {
+    type Expression = AsExprOf<i16, SmallInt>;
+
+    fn as_expression(self) -> Self::Expression {
+        <i16 as AsExpression<SmallInt>>::as_expression(self as i16)
+    }
+}
+
+impl<'a> AsExpression<SmallInt> for &'a CircuitStatusModel {
+    type Expression = AsExprOf<i16, SmallInt>;
+
+    fn as_expression(self) -> Self::Expression {
+        <i16 as AsExpression<SmallInt>>::as_expression((*self) as i16)
+    }
+}
+
+impl<DB> FromSql<SmallInt, DB> for CircuitStatusModel
+where
+    DB: Backend,
+    i16: FromSql<SmallInt, DB>,
+{
+    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+        match i16::from_sql(bytes)? {
+            1 => Ok(CircuitStatusModel::Active),
+            2 => Ok(CircuitStatusModel::Disbanded),
+            3 => Ok(CircuitStatusModel::Abandoned),
+            int => Err(format!("Invalid circuit status {}", int).into()),
+        }
+    }
+}
+
 // All enums associated with the above structs have TryFrom and From implemented in order to
 // translate the enums to a `Text` representation to be stored in the database.
 
@@ -416,6 +476,36 @@ impl From<&messages::RouteType> for String {
     fn from(variant: &messages::RouteType) -> Self {
         match variant {
             messages::RouteType::Any => String::from("Any"),
+        }
+    }
+}
+
+impl From<&messages::CircuitStatus> for String {
+    fn from(variant: &messages::CircuitStatus) -> Self {
+        match variant {
+            messages::CircuitStatus::Active => String::from("Active"),
+            messages::CircuitStatus::Disbanded => String::from("Disbanded"),
+            messages::CircuitStatus::Abandoned => String::from("Abandoned"),
+        }
+    }
+}
+
+impl From<&messages::CircuitStatus> for CircuitStatusModel {
+    fn from(messages_status: &messages::CircuitStatus) -> Self {
+        match *messages_status {
+            messages::CircuitStatus::Active => CircuitStatusModel::Active,
+            messages::CircuitStatus::Disbanded => CircuitStatusModel::Disbanded,
+            messages::CircuitStatus::Abandoned => CircuitStatusModel::Abandoned,
+        }
+    }
+}
+
+impl From<&CircuitStatusModel> for messages::CircuitStatus {
+    fn from(status_model: &CircuitStatusModel) -> Self {
+        match *status_model {
+            CircuitStatusModel::Active => messages::CircuitStatus::Active,
+            CircuitStatusModel::Disbanded => messages::CircuitStatus::Disbanded,
+            CircuitStatusModel::Abandoned => messages::CircuitStatus::Abandoned,
         }
     }
 }

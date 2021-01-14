@@ -16,7 +16,7 @@
 
 use diesel::{
     prelude::*,
-    sql_types::{Binary, Integer, Nullable, Text},
+    sql_types::{Binary, Integer, Nullable, SmallInt, Text},
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -34,9 +34,9 @@ use crate::admin::store::{
         },
     },
     error::AdminServiceStoreError,
-    AuthorizationType, CircuitProposal, CircuitProposalBuilder, DurabilityType, PersistenceType,
-    ProposalType, ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder, ProposedService,
-    ProposedServiceBuilder, RouteType, VoteRecord,
+    AuthorizationType, CircuitProposal, CircuitProposalBuilder, CircuitStatus, DurabilityType,
+    PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder,
+    ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchProposalOperation {
@@ -65,6 +65,7 @@ where
             Nullable<Text>,
             Nullable<Text>,
             Integer,
+            SmallInt,
         ),
         C::Backend,
     >,
@@ -237,7 +238,8 @@ where
                 .with_durability(&DurabilityType::try_from(proposed_circuit.durability)?)
                 .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
                 .with_circuit_management_type(&proposed_circuit.circuit_management_type)
-                .with_circuit_version(proposed_circuit.circuit_version);
+                .with_circuit_version(proposed_circuit.circuit_version)
+                .with_circuit_status(&CircuitStatus::from(&proposed_circuit.circuit_status));
 
             if let Some(application_metadata) = &proposed_circuit.application_metadata {
                 builder = builder.with_application_metadata(&application_metadata);

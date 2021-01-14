@@ -233,8 +233,8 @@ mod tests {
 
     use crate::admin::{
         messages::{
-            AuthorizationType, CircuitProposal, CreateCircuit, DurabilityType, PersistenceType,
-            ProposalType, RouteType, SplinterNode,
+            AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
+            PersistenceType, ProposalType, RouteType, SplinterNode,
         },
         service::proposal_store::{ProposalIter, ProposalStoreError},
         store::{
@@ -768,6 +768,7 @@ mod tests {
                 comments: Some("mock circuit 1".into()),
                 display_name: Some("circuit_1".into()),
                 circuit_version: 1,
+                circuit_status: CircuitStatus::Active,
             },
             votes: vec![],
             requester: vec![],
@@ -793,6 +794,7 @@ mod tests {
                 comments: Some("mock circuit 2".into()),
                 display_name: Some("circuit_2".into()),
                 circuit_version: 2,
+                circuit_status: CircuitStatus::Active,
             },
             votes: vec![],
             requester: vec![],
@@ -821,6 +823,7 @@ mod tests {
                 comments: Some("mock circuit 3".into()),
                 display_name: None,
                 circuit_version: 1,
+                circuit_status: CircuitStatus::Active,
             },
             votes: vec![],
             requester: vec![],

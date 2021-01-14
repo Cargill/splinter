@@ -265,9 +265,9 @@ pub mod tests {
     use super::*;
 
     use crate::admin::store::{
-        CircuitBuilder, CircuitNodeBuilder, CircuitProposal, CircuitProposalBuilder, ProposalType,
-        ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder, ServiceBuilder, Vote,
-        VoteRecordBuilder,
+        CircuitBuilder, CircuitNodeBuilder, CircuitProposal, CircuitProposalBuilder, CircuitStatus,
+        ProposalType, ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,
+        ServiceBuilder, Vote, VoteRecordBuilder,
     };
     use crate::hex::parse_hex;
     use crate::migrations::run_sqlite_migrations;
@@ -890,7 +890,8 @@ pub mod tests {
                     .with_comments("This is a test")
                     .with_circuit_management_type("gameroom")
                     .with_display_name("test_display")
-                    .build().expect("Unable to build circuit")
+                    .build()
+                    .expect("Unable to build circuit")
             )
             .with_requester(
                 &parse_hex(
@@ -967,6 +968,7 @@ pub mod tests {
                         ]
                     )
                     .with_circuit_management_type("gameroom")
+                    .with_circuit_status(&CircuitStatus::Active)
                     .build().expect("Unable to build circuit")
             )
             .with_requester(
@@ -1007,6 +1009,7 @@ pub mod tests {
             .with_circuit_management_type("gameroom")
             .with_display_name("test_display")
             .with_circuit_version(3)
+            .with_circuit_status(&CircuitStatus::Active)
             .build()
             .expect("Unable to build circuit")
     }

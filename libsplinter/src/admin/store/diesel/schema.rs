@@ -34,6 +34,7 @@ table! {
         comments -> Nullable<Text>,
         display_name -> Nullable<Text>,
         circuit_version -> Integer,
+        circuit_status -> SmallInt,
     }
 }
 
@@ -114,6 +115,7 @@ table! {
         circuit_management_type -> Text,
         display_name -> Nullable<Text>,
         circuit_version -> Integer,
+        circuit_status -> SmallInt,
     }
 }
 

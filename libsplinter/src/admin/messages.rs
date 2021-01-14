@@ -14,8 +14,8 @@
 
 pub use super::service::messages::{
     is_valid_circuit_id, is_valid_service_id, AdminServiceEvent, AuthorizationType,
-    CircuitProposal, CircuitProposalVote, CreateCircuit, DurabilityType, PersistenceType,
-    ProposalType, RouteType, SplinterNode, SplinterService, Vote, VoteRecord,
+    CircuitProposal, CircuitProposalVote, CircuitStatus, CreateCircuit, DurabilityType,
+    PersistenceType, ProposalType, RouteType, SplinterNode, SplinterService, Vote, VoteRecord,
 };
 
 pub use super::service::messages::builders::{

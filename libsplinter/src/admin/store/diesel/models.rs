@@ -17,6 +17,15 @@
 //! the requirements for storing data with a diesel backend.
 
 use std::convert::TryFrom;
+use std::io::Write;
+
+use diesel::{
+    backend::Backend,
+    deserialize::{self, FromSql},
+    expression::{helper_types::AsExprOf, AsExpression},
+    serialize::{self, Output, ToSql},
+    sql_types::SmallInt,
+};
 
 use crate::admin::store::diesel::schema::{
     circuit, circuit_member, circuit_proposal, node_endpoint, proposed_circuit, proposed_node,
@@ -25,8 +34,8 @@ use crate::admin::store::diesel::schema::{
 };
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::admin::store::{
-    AuthorizationType, DurabilityType, PersistenceType, ProposalType, RouteType, Vote, VoteRecord,
-    VoteRecordBuilder,
+    AuthorizationType, CircuitStatus, DurabilityType, PersistenceType, ProposalType, RouteType,
+    Vote, VoteRecord, VoteRecordBuilder,
 };
 use crate::admin::store::{Circuit, CircuitProposal, ProposedCircuit};
 use crate::error::{InternalError, InvalidStateError};
@@ -71,6 +80,7 @@ pub struct ProposedCircuitModel {
     pub comments: Option<String>,
     pub display_name: Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: CircuitStatusModel,
 }
 
 impl From<&ProposedCircuit> for ProposedCircuitModel {
@@ -86,6 +96,7 @@ impl From<&ProposedCircuit> for ProposedCircuitModel {
             comments: proposed_circuit.comments().clone(),
             display_name: proposed_circuit.display_name().clone(),
             circuit_version: proposed_circuit.circuit_version(),
+            circuit_status: CircuitStatusModel::from(proposed_circuit.circuit_status()),
         }
     }
 }
@@ -393,6 +404,7 @@ pub struct CircuitModel {
     pub circuit_management_type: String,
     pub display_name: Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: CircuitStatusModel,
 }
 
 impl From<&Circuit> for CircuitModel {
@@ -406,6 +418,7 @@ impl From<&Circuit> for CircuitModel {
             circuit_management_type: circuit.circuit_management_type().into(),
             display_name: circuit.display_name().clone(),
             circuit_version: circuit.circuit_version(),
+            circuit_status: CircuitStatusModel::from(circuit.circuit_status()),
         }
     }
 }
@@ -588,6 +601,99 @@ impl From<&RouteType> for String {
     fn from(variant: &RouteType) -> Self {
         match variant {
             RouteType::Any => String::from("Any"),
+        }
+    }
+}
+
+impl TryFrom<String> for CircuitStatus {
+    type Error = AdminServiceStoreError;
+    fn try_from(variant: String) -> Result<Self, Self::Error> {
+        match variant.as_ref() {
+            "Active" => Ok(CircuitStatus::Active),
+            "Disbanded" => Ok(CircuitStatus::Disbanded),
+            "Abandoned" => Ok(CircuitStatus::Abandoned),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message("Unable to convert string to CircuitStatus".into()),
+            )),
+        }
+    }
+}
+
+impl From<&CircuitStatus> for String {
+    fn from(variant: &CircuitStatus) -> Self {
+        match variant {
+            CircuitStatus::Active => String::from("Active"),
+            CircuitStatus::Disbanded => String::from("Disbanded"),
+            CircuitStatus::Abandoned => String::from("Abandoned"),
+        }
+    }
+}
+
+#[repr(i16)]
+#[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
+pub enum CircuitStatusModel {
+    Active = 1,
+    Disbanded = 2,
+    Abandoned = 3,
+}
+
+impl From<&CircuitStatus> for CircuitStatusModel {
+    fn from(store_status: &CircuitStatus) -> Self {
+        match *store_status {
+            CircuitStatus::Active => CircuitStatusModel::Active,
+            CircuitStatus::Disbanded => CircuitStatusModel::Disbanded,
+            CircuitStatus::Abandoned => CircuitStatusModel::Abandoned,
+        }
+    }
+}
+
+impl From<&CircuitStatusModel> for CircuitStatus {
+    fn from(status_model: &CircuitStatusModel) -> Self {
+        match *status_model {
+            CircuitStatusModel::Active => CircuitStatus::Active,
+            CircuitStatusModel::Disbanded => CircuitStatus::Disbanded,
+            CircuitStatusModel::Abandoned => CircuitStatus::Abandoned,
+        }
+    }
+}
+
+impl<DB> ToSql<SmallInt, DB> for CircuitStatusModel
+where
+    DB: Backend,
+    i16: ToSql<SmallInt, DB>,
+{
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        (*self as i16).to_sql(out)
+    }
+}
+
+impl AsExpression<SmallInt> for CircuitStatusModel {
+    type Expression = AsExprOf<i16, SmallInt>;
+
+    fn as_expression(self) -> Self::Expression {
+        <i16 as AsExpression<SmallInt>>::as_expression(self as i16)
+    }
+}
+
+impl<'a> AsExpression<SmallInt> for &'a CircuitStatusModel {
+    type Expression = AsExprOf<i16, SmallInt>;
+
+    fn as_expression(self) -> Self::Expression {
+        <i16 as AsExpression<SmallInt>>::as_expression((*self) as i16)
+    }
+}
+
+impl<DB> FromSql<SmallInt, DB> for CircuitStatusModel
+where
+    DB: Backend,
+    i16: FromSql<SmallInt, DB>,
+{
+    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+        match i16::from_sql(bytes)? {
+            1 => Ok(CircuitStatusModel::Active),
+            2 => Ok(CircuitStatusModel::Disbanded),
+            3 => Ok(CircuitStatusModel::Abandoned),
+            int => Err(format!("Invalid circuit status {}", int).into()),
         }
     }
 }

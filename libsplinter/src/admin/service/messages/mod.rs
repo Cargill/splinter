@@ -47,6 +47,7 @@ pub struct CreateCircuit {
     pub display_name: Option<String>,
     #[serde(default)]
     pub circuit_version: i32,
+    pub circuit_status: CircuitStatus,
 }
 
 impl CreateCircuit {
@@ -82,6 +83,16 @@ impl CreateCircuit {
             admin::Circuit_RouteType::ANY_ROUTE => RouteType::Any,
             admin::Circuit_RouteType::UNSET_ROUTE_TYPE => {
                 return Err(MarshallingError::UnsetField("Unset route type".to_string()));
+            }
+        };
+
+        let circuit_status = match proto.get_circuit_status() {
+            admin::Circuit_CircuitStatus::ACTIVE => CircuitStatus::Active,
+            admin::Circuit_CircuitStatus::DISBANDED => CircuitStatus::Disbanded,
+            admin::Circuit_CircuitStatus::ABANDONED => CircuitStatus::Abandoned,
+            admin::Circuit_CircuitStatus::UNSET_CIRCUIT_STATUS => {
+                debug!("Defaulting `UNSET_CIRCUIT_STATUS` of proposed circuit to `Active`");
+                CircuitStatus::Active
             }
         };
 
@@ -124,6 +135,7 @@ impl CreateCircuit {
             comments,
             display_name,
             circuit_version,
+            circuit_status,
         })
     }
 
@@ -181,6 +193,18 @@ impl CreateCircuit {
             RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
         };
 
+        match self.circuit_status {
+            CircuitStatus::Active => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+            }
+            CircuitStatus::Disbanded => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
+            }
+            CircuitStatus::Abandoned => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
+            }
+        };
+
         let mut create_request = CircuitCreateRequest::new();
         create_request.set_circuit(circuit);
 
@@ -230,6 +254,29 @@ pub enum RouteType {
 impl Default for RouteType {
     fn default() -> Self {
         RouteType::Any
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum CircuitStatus {
+    Active,
+    Disbanded,
+    Abandoned,
+}
+
+impl Default for CircuitStatus {
+    fn default() -> Self {
+        CircuitStatus::Active
+    }
+}
+
+impl From<&store::CircuitStatus> for CircuitStatus {
+    fn from(store_enum: &store::CircuitStatus) -> Self {
+        match *store_enum {
+            store::CircuitStatus::Active => CircuitStatus::Active,
+            store::CircuitStatus::Disbanded => CircuitStatus::Disbanded,
+            store::CircuitStatus::Abandoned => CircuitStatus::Abandoned,
+        }
     }
 }
 
@@ -435,6 +482,7 @@ impl From<store::CircuitProposal> for CircuitProposal {
             comments: store_circuit.comments().clone(),
             display_name: store_circuit.display_name().clone(),
             circuit_version: store_circuit.circuit_version(),
+            circuit_status: CircuitStatus::from(&store_circuit.circuit_status().clone()),
         };
 
         Self {

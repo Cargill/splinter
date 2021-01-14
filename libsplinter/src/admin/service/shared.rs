@@ -42,8 +42,9 @@ use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
     CircuitProposalVote, CircuitProposalVote_Vote, CircuitProposal_ProposalType,
-    Circuit_AuthorizationType, Circuit_DurabilityType, Circuit_PersistenceType, Circuit_RouteType,
-    MemberReady, ServiceProtocolVersionRequest, SplinterNode,
+    Circuit_AuthorizationType, Circuit_CircuitStatus, Circuit_DurabilityType,
+    Circuit_PersistenceType, Circuit_RouteType, MemberReady, ServiceProtocolVersionRequest,
+    SplinterNode,
 };
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -1499,6 +1500,12 @@ impl AdminServiceShared {
                     return Err(AdminSharedError::ValidationFailed(
                         "Proposed circuit cannot have a display name on protocol 1".to_string(),
                     ));
+                } else if circuit.get_circuit_status()
+                    != Circuit_CircuitStatus::UNSET_CIRCUIT_STATUS
+                {
+                    return Err(AdminSharedError::ValidationFailed(
+                        "Proposed circuit cannot have a circuit status on protocol 1".to_string(),
+                    ));
                 }
 
                 // check that the circuit includes supported versions
@@ -2003,7 +2010,8 @@ mod tests {
     };
     use crate::protos::admin;
     use crate::protos::admin::{
-        CircuitProposalVote_Vote, CircuitProposal_VoteRecord, SplinterNode, SplinterService,
+        CircuitProposalVote_Vote, CircuitProposal_VoteRecord, Circuit_CircuitStatus, SplinterNode,
+        SplinterService,
     };
     use crate::protos::authorization;
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
@@ -2080,6 +2088,7 @@ mod tests {
         circuit.set_circuit_management_type("test app auth handler".into());
         circuit.set_comments("test circuit".into());
         circuit.set_display_name("test_display".into());
+        circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -2213,6 +2222,7 @@ mod tests {
         circuit.set_circuit_management_type("test app auth handler".into());
         circuit.set_comments("test circuit".into());
         circuit.set_display_name("test_display".into());
+        circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
 
         circuit.set_members(protobuf::RepeatedField::from_vec(vec![
             splinter_node("test-node", &["inproc://someplace:8000".to_string()]),
@@ -3928,7 +3938,10 @@ mod tests {
         let mut circuit = Circuit::new();
         circuit.set_circuit_id("01234-ABCDE".to_string());
         circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
-        circuit.set_roster(RepeatedField::from_vec(vec![service_b, service_a]));
+        circuit.set_roster(RepeatedField::from_vec(vec![
+            service_b.clone(),
+            service_a.clone(),
+        ]));
         circuit.set_authorization_type(Circuit_AuthorizationType::TRUST_AUTHORIZATION);
         circuit.set_persistence(Circuit_PersistenceType::ANY_PERSISTENCE);
         circuit.set_durability(Circuit_DurabilityType::NO_DURABILITY);
@@ -3937,7 +3950,33 @@ mod tests {
         circuit.set_application_metadata(b"test_data".to_vec());
         circuit.set_comments("test circuit".to_string());
         circuit.set_display_name("test_display".into());
+        circuit.set_circuit_status(Circuit_CircuitStatus::ACTIVE);
 
+        let mut service_b = SplinterService::new();
+        service_b.set_service_id("ABCD".to_string());
+        service_b.set_service_type("type_a".to_string());
+        service_b.set_allowed_nodes(RepeatedField::from_vec(vec!["node_b".to_string()]));
+
+        let mut node_a = SplinterNode::new();
+        node_a.set_node_id("node_a".to_string());
+        node_a.set_endpoints(vec!["test://endpoint_a:0".to_string()].into());
+
+        let mut node_b = SplinterNode::new();
+        node_b.set_node_id("node_b".to_string());
+        node_b.set_endpoints(vec!["test://endpoint_b:0".to_string()].into());
+
+        let mut circuit = Circuit::new();
+        circuit.set_circuit_id("01234-ABCDE".to_string());
+        circuit.set_members(RepeatedField::from_vec(vec![node_a, node_b]));
+        circuit.set_roster(RepeatedField::from_vec(vec![service_b, service_a]));
+        circuit.set_authorization_type(Circuit_AuthorizationType::TRUST_AUTHORIZATION);
+        circuit.set_persistence(Circuit_PersistenceType::ANY_PERSISTENCE);
+        circuit.set_durability(Circuit_DurabilityType::NO_DURABILITY);
+        circuit.set_routes(Circuit_RouteType::ANY_ROUTE);
+        circuit.set_circuit_management_type("test_circuit".to_string());
+        circuit.set_application_metadata(b"test_data".to_vec());
+        circuit.set_comments("test circuit".to_string());
+        circuit.set_circuit_status(Circuit_CircuitStatus::ACTIVE);
         circuit
     }
 

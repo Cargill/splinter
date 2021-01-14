@@ -64,6 +64,19 @@ message Circuit {
         ANY_ROUTE = 1;
     }
 
+    enum CircuitStatus {
+        UNSET_CIRCUIT_STATUS = 0;
+
+        ACTIVE = 1;
+
+        // The circuit has been disbanded and no longer has networking
+        // capabilities
+        DISBANDED = 2;
+
+        // The circuit has been abandoned and may be removed from storage
+        ABANDONED = 3;
+    }
+
     // The unique circuit name
     string circuit_id = 1;
 
@@ -101,6 +114,9 @@ message Circuit {
 
     // The version of the circuit
     int32 circuit_version = 12;
+
+    // The status of the circuit
+    CircuitStatus circuit_status = 13;
 }
 
 // Contains the vote counts for a given proposal.

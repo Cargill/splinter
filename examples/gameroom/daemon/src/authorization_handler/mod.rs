@@ -737,8 +737,8 @@ mod test {
     };
 
     use splinter::admin::messages::{
-        AuthorizationType, CreateCircuit, DurabilityType, PersistenceType, ProposalType, RouteType,
-        Vote, VoteRecord,
+        AuthorizationType, CircuitStatus, CreateCircuit, DurabilityType, PersistenceType,
+        ProposalType, RouteType, Vote, VoteRecord,
     };
 
     static DATABASE_URL: &str = "postgres://gameroom_test:gameroom_test@db-test:5432/gameroom_test";
@@ -1294,6 +1294,7 @@ mod test {
             comments: Some("test circuit".to_string()),
             display_name: None,
             circuit_version: 1,
+            circuit_status: CircuitStatus::Active,
         }
     }
 

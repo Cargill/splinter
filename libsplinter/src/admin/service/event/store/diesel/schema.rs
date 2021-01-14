@@ -44,6 +44,7 @@ table! {
         comments -> Nullable<Text>,
         display_name -> Nullable<Text>,
         circuit_version -> Integer,
+        circuit_status -> SmallInt,
     }
 }
 

@@ -66,7 +66,8 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .with_persistence(proposed_circuit.persistence())
                 .with_durability(proposed_circuit.durability())
                 .with_routes(proposed_circuit.routes())
-                .with_circuit_management_type(proposed_circuit.circuit_management_type());
+                .with_circuit_management_type(proposed_circuit.circuit_management_type())
+                .with_circuit_status(proposed_circuit.circuit_status());
 
             if let Some(display_name) = proposed_circuit.display_name() {
                 builder = builder.with_display_name(display_name);
@@ -127,7 +128,8 @@ impl<'a> AdminServiceStoreUpgradeProposalToCircuitOperation
                 .with_durability(proposed_circuit.durability())
                 .with_routes(proposed_circuit.routes())
                 .with_circuit_management_type(proposed_circuit.circuit_management_type())
-                .with_circuit_version(proposed_circuit.circuit_version());
+                .with_circuit_version(proposed_circuit.circuit_version())
+                .with_circuit_status(proposed_circuit.circuit_status());
 
             if let Some(display_name) = proposed_circuit.display_name() {
                 builder = builder.with_display_name(display_name);
