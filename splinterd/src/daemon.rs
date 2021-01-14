@@ -60,6 +60,8 @@ use splinter::registry::{
 };
 #[cfg(feature = "maintenance-mode")]
 use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
+#[cfg(feature = "authorization-handler-rbac")]
+use splinter::rest_api::auth::rbac::RoleBasedAuthorizationHandler;
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::{
     allow_keys::AllowKeysAuthorizationHandler, AuthorizationHandler, Permission,
@@ -538,6 +540,14 @@ impl SplinterDaemon {
         {
             let mut authorization_handlers = vec![];
             authorization_handlers.push(create_allow_keys_authorization_handler(&self.state_dir)?);
+
+            #[cfg(feature = "authorization-handler-rbac")]
+            {
+                authorization_handlers.push(Box::new(RoleBasedAuthorizationHandler::new(
+                    store_factory.get_role_based_authorization_store(),
+                )));
+            }
+
             #[cfg(feature = "maintenance-mode")]
             {
                 let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::new();
