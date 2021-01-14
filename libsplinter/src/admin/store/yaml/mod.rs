@@ -1273,7 +1273,7 @@ pub enum YamlProposalType {
     UpdateRoster,
     AddNode,
     RemoveNode,
-    Destroy,
+    Disband,
 }
 
 impl From<YamlProposalType> for ProposalType {
@@ -1283,7 +1283,7 @@ impl From<YamlProposalType> for ProposalType {
             YamlProposalType::UpdateRoster => ProposalType::UpdateRoster,
             YamlProposalType::AddNode => ProposalType::AddNode,
             YamlProposalType::RemoveNode => ProposalType::RemoveNode,
-            YamlProposalType::Destroy => ProposalType::Destroy,
+            YamlProposalType::Disband => ProposalType::Disband,
         }
     }
 }
@@ -1295,7 +1295,7 @@ impl From<ProposalType> for YamlProposalType {
             ProposalType::UpdateRoster => YamlProposalType::UpdateRoster,
             ProposalType::AddNode => YamlProposalType::AddNode,
             ProposalType::RemoveNode => YamlProposalType::RemoveNode,
-            ProposalType::Destroy => YamlProposalType::Destroy,
+            ProposalType::Disband => YamlProposalType::Disband,
         }
     }
 }

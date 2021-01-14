@@ -379,7 +379,7 @@ impl CircuitProposal {
             admin::CircuitProposal_ProposalType::UPDATE_ROSTER => ProposalType::UpdateRoster,
             admin::CircuitProposal_ProposalType::ADD_NODE => ProposalType::AddNode,
             admin::CircuitProposal_ProposalType::REMOVE_NODE => ProposalType::RemoveNode,
-            admin::CircuitProposal_ProposalType::DESTROY => ProposalType::Destroy,
+            admin::CircuitProposal_ProposalType::DISBAND => ProposalType::Disband,
             admin::CircuitProposal_ProposalType::UNSET_PROPOSAL_TYPE => {
                 return Err(MarshallingError::UnsetField(
                     "Unset proposal type".to_string(),
@@ -410,7 +410,7 @@ impl CircuitProposal {
             ProposalType::UpdateRoster => admin::CircuitProposal_ProposalType::UPDATE_ROSTER,
             ProposalType::AddNode => admin::CircuitProposal_ProposalType::ADD_NODE,
             ProposalType::RemoveNode => admin::CircuitProposal_ProposalType::REMOVE_NODE,
-            ProposalType::Destroy => admin::CircuitProposal_ProposalType::DESTROY,
+            ProposalType::Disband => admin::CircuitProposal_ProposalType::DISBAND,
         };
 
         let votes = self
@@ -441,7 +441,7 @@ impl From<store::CircuitProposal> for CircuitProposal {
             store::ProposalType::UpdateRoster => ProposalType::UpdateRoster,
             store::ProposalType::AddNode => ProposalType::AddNode,
             store::ProposalType::RemoveNode => ProposalType::RemoveNode,
-            store::ProposalType::Destroy => ProposalType::Destroy,
+            store::ProposalType::Disband => ProposalType::Disband,
         };
 
         let store_circuit = store_proposal.circuit();
@@ -518,7 +518,7 @@ pub enum ProposalType {
     UpdateRoster,
     AddNode,
     RemoveNode,
-    Destroy,
+    Disband,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

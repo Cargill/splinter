@@ -1869,7 +1869,7 @@ components:
             - UpdateRoster
             - AddNode
             - RemoveNode
-            - Destroy
+            - Disband
         circuit_id:
           type: string
           example: 01234-ABCDE

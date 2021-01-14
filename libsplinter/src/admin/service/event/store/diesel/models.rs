@@ -443,7 +443,7 @@ impl From<&messages::ProposalType> for String {
             messages::ProposalType::UpdateRoster => String::from("UpdateRoster"),
             messages::ProposalType::AddNode => String::from("AddNode"),
             messages::ProposalType::RemoveNode => String::from("RemoveNode"),
-            messages::ProposalType::Destroy => String::from("Destroy"),
+            messages::ProposalType::Disband => String::from("Disband"),
         }
     }
 }

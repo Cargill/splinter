@@ -499,7 +499,7 @@ impl TryFrom<String> for ProposalType {
             "UpdateRoster" => Ok(ProposalType::UpdateRoster),
             "AddNode" => Ok(ProposalType::AddNode),
             "RemoveNode" => Ok(ProposalType::RemoveNode),
-            "Destroy" => Ok(ProposalType::Destroy),
+            "Disband" => Ok(ProposalType::Disband),
             _ => Err(AdminServiceStoreError::InvalidStateError(
                 InvalidStateError::with_message("Unable to convert string to ProposalType".into()),
             )),
@@ -514,7 +514,7 @@ impl From<&ProposalType> for String {
             ProposalType::UpdateRoster => String::from("UpdateRoster"),
             ProposalType::AddNode => String::from("AddNode"),
             ProposalType::RemoveNode => String::from("RemoveNode"),
-            ProposalType::Destroy => String::from("Destroy"),
+            ProposalType::Disband => String::from("Disband"),
         }
     }
 }
