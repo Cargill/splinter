@@ -57,7 +57,7 @@ pub fn make_login_route(client: OAuthClient) -> Resource {
                                 return Box::new(
                                     HttpResponse::BadRequest()
                                         .json(ErrorResponse::bad_request(
-                                            "No valid redirect URL supplied",
+                                            "Referer header is set, but is not a valid URL",
                                         ))
                                         .into_future(),
                                 )
@@ -194,8 +194,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(TestInflightOAuthRequestStore),
-        )
-        .expect("Failed to create client");
+        );
 
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_login_route(client)]);
@@ -258,8 +257,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(TestInflightOAuthRequestStore),
-        )
-        .expect("Failed to create client");
+        );
 
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_login_route(client)]);
@@ -316,8 +314,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-        )
-        .expect("Failed to create client");
+        );
 
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_login_route(client)]);

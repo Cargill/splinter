@@ -77,24 +77,20 @@ impl OAuthClient {
     ///   identifiers
     /// * `inflight_request_store` - The store for information about in-flight request to a
     /// provider.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any of the auth, redirect, or token URLs are invalid
     fn new(
         client: BasicClient,
         extra_auth_params: Vec<(String, String)>,
         scopes: Vec<String>,
         subject_provider: Box<dyn SubjectProvider>,
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
-    ) -> Result<Self, InvalidArgumentError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             client,
             extra_auth_params,
             scopes,
             subject_provider,
             inflight_request_store,
-        })
+        }
     }
 
     /// Generates the URL that the end user should be redirected to for authorization
@@ -311,27 +307,18 @@ mod tests {
     const CLIENT_REDIRECT_URL: &str = "http://client/redirect";
     const SUBJECT: &str = "subject";
 
-    /// Verifies that the `OAuthClient::new` is successful when valid URLs are provided but returns
+    /// Verifies that the `new_basic_client` is successful when valid URLs are provided but returns
     /// appropriate errors when invalid URLs are provided.
     #[test]
     fn client_construction() {
-        let subject_box: Box<dyn SubjectProvider> = Box::new(TestSubjectProvider);
-        let inflight_request_store = Box::new(TestInflightOAuthRequestStore);
-        OAuthClient::new(
-            new_basic_client(
-                "client_id".into(),
-                "client_secret".into(),
-                "https://provider.com/auth".into(),
-                "https://localhost/oauth/callback".into(),
-                "https://provider.com/token".into(),
-            )
-            .expect("Failed to create basic client"),
-            vec![],
-            vec![],
-            subject_box.clone_box(),
-            inflight_request_store.clone_box(),
+        new_basic_client(
+            "client_id".into(),
+            "client_secret".into(),
+            "https://provider.com/auth".into(),
+            "https://localhost/oauth/callback".into(),
+            "https://provider.com/token".into(),
         )
-        .expect("Failed to create client from valid inputs");
+        .expect("Failed to create basic client");
 
         assert!(matches!(
             new_basic_client(
@@ -393,8 +380,7 @@ mod tests {
             vec![SCOPE1.into(), SCOPE2.into()],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-        )
-        .expect("Failed to create client");
+        );
 
         let generated_auth_url = Url::parse(
             &client
@@ -569,8 +555,7 @@ mod actix_tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-        )
-        .expect("Failed to create client");
+        );
 
         let (user_info, client_redirect_url) = client
             .exchange_authorization_code(AUTH_CODE.into(), csrf_token)
@@ -626,8 +611,7 @@ mod actix_tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-        )
-        .expect("Failed to create client");
+        );
 
         let access_token = client
             .exchange_refresh_token(REFRESH_TOKEN.into())
