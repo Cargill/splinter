@@ -24,8 +24,8 @@ use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
 use crate::admin::store::{AdminServiceStore, CircuitPredicate};
 use crate::protocol;
 use crate::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    actix_web_1::{get_paging_query, Method, ProtocolVersionRangeGuard, Resource},
+    paging::{get_response_paging_info, PagingQuery},
     ErrorResponse,
 };
 
@@ -67,38 +67,9 @@ fn list_circuits(
             );
         };
 
-    let offset = match query.get("offset") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid offset value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_OFFSET,
-    };
-
-    let limit = match query.get("limit") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid limit value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_LIMIT,
+    let paging_query = match get_paging_query(&query) {
+        Ok(paging_query) => paging_query,
+        Err(err) => return err.into_future(),
     };
 
     let mut link = req.uri().path().to_string();
@@ -131,8 +102,7 @@ fn list_circuits(
         store,
         link,
         filters,
-        Some(offset),
-        Some(limit),
+        paging_query,
         protocol_version,
     ))
 }
@@ -141,8 +111,7 @@ fn query_list_circuits(
     store: web::Data<Box<dyn AdminServiceStore>>,
     link: String,
     filters: Option<String>,
-    offset: Option<usize>,
-    limit: Option<usize>,
+    paging_query: PagingQuery,
     protocol_version: String,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
@@ -158,26 +127,23 @@ fn query_list_circuits(
             .list_circuits(&filters)
             .map_err(|err| CircuitListError::CircuitStoreError(err.to_string()))?;
 
-        let offset_value = offset.unwrap_or(0);
         let total = circuits.len();
-        let limit_value = limit.unwrap_or_else(|| total as usize);
 
         let circuits = circuits
-            .skip(offset_value)
-            .take(limit_value)
+            .skip(paging_query.offset)
+            .take(paging_query.limit)
             .collect::<Vec<_>>();
 
         Ok((
             circuits,
             link,
-            limit,
-            offset,
+            paging_query,
             total as usize,
             protocol_version,
         ))
     })
     .then(|res| match res {
-        Ok((circuits, link, limit, offset, total_count, protocol_version)) => {
+        Ok((circuits, link, paging_query, total_count, protocol_version)) => {
             match protocol_version.as_str() {
                 "1" => Ok(
                     HttpResponse::Ok().json(resources::v1::circuits::ListCircuitsResponse {
@@ -185,7 +151,7 @@ fn query_list_circuits(
                             .iter()
                             .map(resources::v1::circuits::CircuitResponse::from)
                             .collect(),
-                        paging: get_response_paging_info(limit, offset, &link, total_count),
+                        paging: get_response_paging_info(paging_query, &link, total_count),
                     }),
                 ),
 
@@ -196,7 +162,7 @@ fn query_list_circuits(
                             .iter()
                             .map(resources::v2::circuits::CircuitResponse::from)
                             .collect(),
-                        paging: get_response_paging_info(limit, offset, &link, total_count),
+                        paging: get_response_paging_info(paging_query, &link, total_count),
                     }),
                 ),
             }

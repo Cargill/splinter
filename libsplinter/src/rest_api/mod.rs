@@ -84,10 +84,10 @@ pub use response_models::ErrorResponse;
 #[cfg(feature = "auth")]
 pub use actix_web_1::AuthConfig;
 pub use actix_web_1::{
-    get_authorization_token, into_bytes, into_protobuf, new_websocket_event_sender, require_header,
-    Continuation, EventSender, HandlerFunction, Method, ProtocolVersionRangeGuard, Request,
-    RequestGuard, Resource, Response, ResponseError, RestApi, RestApiBuilder,
-    RestApiShutdownHandle, RestResourceProvider,
+    get_authorization_token, get_paging_query, into_bytes, into_protobuf,
+    new_websocket_event_sender, require_header, BadPagingRequest, Continuation, EventSender,
+    HandlerFunction, Method, ProtocolVersionRangeGuard, Request, RequestGuard, Resource, Response,
+    ResponseError, RestApi, RestApiBuilder, RestApiShutdownHandle, RestResourceProvider,
 };
 
 const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS

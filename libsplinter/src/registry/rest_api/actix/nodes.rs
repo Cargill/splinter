@@ -30,8 +30,8 @@ use crate::registry::{
     RwRegistry,
 };
 use crate::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    actix_web_1::{get_paging_query, Method, ProtocolVersionRangeGuard, Resource},
+    paging::{get_response_paging_info, PagingQuery},
     percent_encode_filter_query, ErrorResponse,
 };
 
@@ -70,6 +70,8 @@ fn list_nodes(
     req: HttpRequest,
     registry: web::Data<Box<dyn RegistryReader>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let mut link = format!("{}?", req.uri().path());
+
     let query: web::Query<HashMap<String, String>> =
         if let Ok(q) = web::Query::from_query(req.query_string()) {
             q
@@ -81,41 +83,10 @@ fn list_nodes(
             );
         };
 
-    let offset = match query.get("offset") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid offset value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_OFFSET,
+    let paging_query = match get_paging_query(&query) {
+        Ok(paging_query) => paging_query,
+        Err(err) => return err.into_future(),
     };
-
-    let limit = match query.get("limit") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid limit value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_LIMIT,
-    };
-
-    let mut link = format!("{}?", req.uri().path());
 
     let filters = match query.get("filter") {
         Some(value) => match serde_json::from_str(value) {
@@ -151,40 +122,31 @@ fn list_nodes(
         }
     };
 
-    Box::new(query_list_nodes(
-        registry,
-        link,
-        predicates,
-        Some(offset),
-        Some(limit),
-    ))
+    Box::new(query_list_nodes(registry, link, predicates, paging_query))
 }
 
 fn query_list_nodes(
     registry: web::Data<Box<dyn RegistryReader>>,
     link: String,
     filters: Vec<MetadataPredicate>,
-    offset: Option<usize>,
-    limit: Option<usize>,
+    paging_query: PagingQuery,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
         let nodes = registry.list_nodes(&filters)?;
-        let offset_value = offset.unwrap_or(0);
         let total = nodes.len();
-        let limit_value = limit.unwrap_or_else(|| total as usize);
 
         let nodes = nodes
-            .skip(offset_value)
-            .take(limit_value)
+            .skip(paging_query.offset)
+            .take(paging_query.limit)
             .collect::<Vec<_>>();
 
-        Ok((nodes, link, limit, offset, total as usize))
+        Ok((nodes, link, paging_query, total as usize))
     })
     .then(|res: Result<_, BlockingError<RegistryError>>| match res {
-        Ok((nodes, link, limit, offset, total_count)) => {
+        Ok((nodes, link, paging_query, total_count)) => {
             Ok(HttpResponse::Ok().json(ListNodesResponse {
                 data: nodes.iter().map(NodeResponse::from).collect(),
-                paging: get_response_paging_info(limit, offset, &link, total_count),
+                paging: get_response_paging_info(paging_query, &link, total_count),
             }))
         }
         Err(err) => {

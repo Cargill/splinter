@@ -16,6 +16,20 @@
 pub const DEFAULT_LIMIT: usize = 100;
 pub const DEFAULT_OFFSET: usize = 0;
 
+pub struct PagingQuery {
+    pub offset: usize,
+    pub limit: usize,
+}
+
+impl Default for PagingQuery {
+    fn default() -> Self {
+        Self {
+            offset: DEFAULT_OFFSET,
+            limit: DEFAULT_LIMIT,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Paging {
     pub current: String,
@@ -29,13 +43,11 @@ pub struct Paging {
 }
 
 pub fn get_response_paging_info(
-    limit: Option<usize>,
-    offset: Option<usize>,
+    paging_query: PagingQuery,
     link: &str,
     query_count: usize,
 ) -> Paging {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT);
-    let offset = offset.unwrap_or(DEFAULT_OFFSET);
+    let PagingQuery { offset, limit } = paging_query;
 
     let base_link = {
         // if the link does not already contain ? add it to the end
@@ -90,7 +102,8 @@ mod tests {
     #[test]
     fn test_default_paging_response() {
         // Create paging response from default limit, default offset, a total of 1000
-        let test_paging_response = get_response_paging_info(None, None, TEST_LINK, 1000);
+        let test_paging_response =
+            get_response_paging_info(PagingQuery::default(), TEST_LINK, 1000);
         let generated_paging_response =
             create_test_paging_response(DEFAULT_OFFSET, DEFAULT_LIMIT, 100, 0, 900);
         assert_eq!(test_paging_response, generated_paging_response);
@@ -99,7 +112,14 @@ mod tests {
     #[test]
     fn test_50offset_paging_response() {
         // Create paging response from default limit, offset of 50, and a total of 1000
-        let test_paging_response = get_response_paging_info(None, Some(50), TEST_LINK, 1000);
+        let test_paging_response = get_response_paging_info(
+            PagingQuery {
+                limit: DEFAULT_LIMIT,
+                offset: 50,
+            },
+            TEST_LINK,
+            1000,
+        );
         let generated_paging_response = create_test_paging_response(50, DEFAULT_LIMIT, 150, 0, 900);
         assert_eq!(test_paging_response, generated_paging_response);
     }
@@ -107,7 +127,14 @@ mod tests {
     #[test]
     fn test_550offset_paging_response() {
         // Create paging response from default limit, offset value of 150, and a total of 1000
-        let test_paging_response = get_response_paging_info(None, Some(550), TEST_LINK, 1000);
+        let test_paging_response = get_response_paging_info(
+            PagingQuery {
+                limit: DEFAULT_LIMIT,
+                offset: 550,
+            },
+            TEST_LINK,
+            1000,
+        );
         let generated_paging_response =
             create_test_paging_response(550, DEFAULT_LIMIT, 650, 450, 900);
         assert_eq!(test_paging_response, generated_paging_response);
@@ -116,7 +143,14 @@ mod tests {
     #[test]
     fn test_950offset_paging_response() {
         // Create paging response from default limit, offset value of 950, and a total of 1000
-        let test_paging_response = get_response_paging_info(None, Some(950), TEST_LINK, 1000);
+        let test_paging_response = get_response_paging_info(
+            PagingQuery {
+                limit: DEFAULT_LIMIT,
+                offset: 950,
+            },
+            TEST_LINK,
+            1000,
+        );
         let generated_paging_response =
             create_test_paging_response(950, DEFAULT_LIMIT, 900, 850, 900);
         assert_eq!(test_paging_response, generated_paging_response);
@@ -125,7 +159,14 @@ mod tests {
     #[test]
     fn test_50limit_paging_response() {
         // Create paging response from default limit, offset of 50, and a total of 1000
-        let test_paging_response = get_response_paging_info(Some(50), None, TEST_LINK, 1000);
+        let test_paging_response = get_response_paging_info(
+            PagingQuery {
+                offset: DEFAULT_OFFSET,
+                limit: 50,
+            },
+            TEST_LINK,
+            1000,
+        );
         let generated_paging_response = create_test_paging_response(DEFAULT_OFFSET, 50, 50, 0, 950);
         assert_eq!(test_paging_response, generated_paging_response);
     }
@@ -133,7 +174,14 @@ mod tests {
     #[test]
     fn test_50limit_150offset_paging_response() {
         // Create paging response from limit of 50, offset of 150, and total of 1000
-        let test_paging_response = get_response_paging_info(Some(50), Some(150), TEST_LINK, 1000);
+        let test_paging_response = get_response_paging_info(
+            PagingQuery {
+                offset: 150,
+                limit: 50,
+            },
+            TEST_LINK,
+            1000,
+        );
         let generated_paging_response = create_test_paging_response(150, 50, 200, 100, 950);
         assert_eq!(test_paging_response, generated_paging_response);
     }

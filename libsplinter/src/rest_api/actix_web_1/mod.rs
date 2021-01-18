@@ -17,6 +17,7 @@ mod auth;
 mod builder;
 mod error;
 mod guard;
+mod paging;
 mod resource;
 mod websocket;
 
@@ -27,6 +28,7 @@ pub use auth::{get_authorization_token, require_header};
 pub use builder::RestApiBuilder;
 pub use error::ResponseError;
 pub use guard::{Continuation, ProtocolVersionRangeGuard, RequestGuard};
+pub use paging::{get_paging_query, BadPagingRequest};
 pub use resource::{
     into_bytes, into_protobuf, HandlerFunction, Method, Resource, RestResourceProvider,
 };

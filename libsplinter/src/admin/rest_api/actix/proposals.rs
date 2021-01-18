@@ -25,8 +25,8 @@ use crate::admin::service::proposal_store::ProposalStore;
 use crate::admin::store::CircuitPredicate;
 use crate::protocol;
 use crate::rest_api::{
-    actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    actix_web_1::{get_paging_query, Method, ProtocolVersionRangeGuard, Resource},
+    paging::{get_response_paging_info, PagingQuery},
     ErrorResponse,
 };
 
@@ -69,38 +69,9 @@ fn list_proposals<PS: ProposalStore + 'static>(
             );
         };
 
-    let offset = match query.get("offset") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid offset value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_OFFSET,
-    };
-
-    let limit = match query.get("limit") {
-        Some(value) => match value.parse::<usize>() {
-            Ok(val) => val,
-            Err(err) => {
-                return Box::new(
-                    HttpResponse::BadRequest()
-                        .json(ErrorResponse::bad_request(&format!(
-                            "Invalid limit value passed: {}. Error: {}",
-                            value, err
-                        )))
-                        .into_future(),
-                )
-            }
-        },
-        None => DEFAULT_LIMIT,
+    let paging_query = match get_paging_query(&query) {
+        Ok(paging_query) => paging_query,
+        Err(err) => return err.into_future(),
     };
 
     let mut new_queries = vec![];
@@ -139,8 +110,7 @@ fn list_proposals<PS: ProposalStore + 'static>(
         link,
         management_type_filter,
         member_filter,
-        Some(offset),
-        Some(limit),
+        paging_query,
         protocol_version,
     ))
 }
@@ -150,8 +120,7 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
     link: String,
     management_type_filter: Option<String>,
     member_filter: Option<String>,
-    offset: Option<usize>,
-    limit: Option<usize>,
+    paging_query: PagingQuery,
     protocol_version: String,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
@@ -166,19 +135,17 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
         let proposals = proposal_store
             .proposals(filters)
             .map_err(|err| ProposalListError::InternalError(err.to_string()))?;
-        let offset_value = offset.unwrap_or(0);
         let total = proposals.total() as usize;
-        let limit_value = limit.unwrap_or(total);
 
         let proposals = proposals
-            .skip(offset_value)
-            .take(limit_value)
+            .skip(paging_query.offset)
+            .take(paging_query.limit)
             .collect::<Vec<_>>();
 
-        Ok((proposals, link, limit, offset, total, protocol_version))
+        Ok((proposals, link, paging_query, total, protocol_version))
     })
     .then(|res| match res {
-        Ok((proposals, link, limit, offset, total_count, protocol_version)) => {
+        Ok((proposals, link, paging_query, total_count, protocol_version)) => {
             match protocol_version.as_str() {
                 "1" => Ok(HttpResponse::Ok().json(
                     resources::v1::proposals::ListProposalsResponse {
@@ -186,7 +153,7 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
                             .iter()
                             .map(resources::v1::proposals::ProposalResponse::from)
                             .collect(),
-                        paging: get_response_paging_info(limit, offset, &link, total_count),
+                        paging: get_response_paging_info(paging_query, &link, total_count),
                     },
                 )),
                 // Handles 2 (and catch all)
@@ -206,7 +173,7 @@ fn query_list_proposals<PS: ProposalStore + 'static>(
                     Ok(
                         HttpResponse::Ok().json(resources::v2::proposals::ListProposalsResponse {
                             data: proposal_responses,
-                            paging: get_response_paging_info(limit, offset, &link, total_count),
+                            paging: get_response_paging_info(paging_query, &link, total_count),
                         }),
                     )
                 }
