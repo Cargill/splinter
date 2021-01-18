@@ -21,6 +21,7 @@ pub mod maintenance;
 mod permission_map;
 #[cfg(feature = "authorization-handler-rbac")]
 pub mod rbac;
+pub(in crate::rest_api) mod routes;
 
 use crate::error::InternalError;
 

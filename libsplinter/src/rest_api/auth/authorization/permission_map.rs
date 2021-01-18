@@ -28,6 +28,11 @@ impl PermissionMap {
         Self::default()
     }
 
+    /// Gets a list of all permissions.
+    pub fn permissions(&self) -> impl Iterator<Item = Permission> + '_ {
+        self.internal.iter().map(|(_, perm)| *perm)
+    }
+
     /// Sets the permission for the given (method, endpoint) pair. The endpoint may contain path
     /// variables surrounded by `{}`.
     pub fn add_permission(&mut self, method: Method, endpoint: &str, permission: Permission) {

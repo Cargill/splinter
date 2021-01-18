@@ -399,6 +399,36 @@ paths:
         401:
           description: The client is unauthorized
 
+  /authorization/permissions:
+    get:
+      tags:
+        - Authorization
+        - Permissions
+      description: Fetches the list of all REST API permissions
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: Successfully retrieved the list of REST API permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: '#/components/schemas/Permission'
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+
   /authorization/roles:
     get:
       summary: Fetches a list of roles
@@ -2335,6 +2365,22 @@ components:
           type: string
           description: "Username of a user"
           example: "bob@biome.com"
+
+    Permission:
+      type: object
+      properties:
+        permission_id:
+          type: string
+          description: "Unique identifier for the permission"
+          example: "circuit.read"
+        permission_display_name:
+          type: string
+          description: "A human readable name of the permission"
+          example: "Circuit read"
+        permission_description:
+          type: string
+          description: "A helpful description of the permission"
+          example: "Allows the client to modify circuit state"
 
     Role:
       type: object
