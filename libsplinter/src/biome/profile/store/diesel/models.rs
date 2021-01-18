@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::biome::profile::store::Profile;
+
 use super::schema::user_profile;
 
-#[derive(Queryable, Identifiable, Associations, PartialEq, Debug)]
+#[derive(Insertable, Queryable, Identifiable, Associations, PartialEq, Debug)]
 #[table_name = "user_profile"]
+#[primary_key(user_id)]
 pub struct ProfileModel {
-    pub id: i64,
+    pub user_id: String,
     pub subject: String,
     pub name: Option<String>,
     pub given_name: Option<String>,
@@ -26,13 +29,16 @@ pub struct ProfileModel {
     pub picture: Option<String>,
 }
 
-#[derive(Insertable, PartialEq, Debug)]
-#[table_name = "user_profile"]
-pub struct NewProfileModel {
-    pub subject: String,
-    pub name: Option<String>,
-    pub given_name: Option<String>,
-    pub family_name: Option<String>,
-    pub email: Option<String>,
-    pub picture: Option<String>,
+impl From<Profile> for ProfileModel {
+    fn from(profile: Profile) -> Self {
+        ProfileModel {
+            user_id: profile.user_id,
+            subject: profile.subject,
+            name: profile.name,
+            given_name: profile.given_name,
+            family_name: profile.family_name,
+            email: profile.email,
+            picture: profile.picture,
+        }
+    }
 }

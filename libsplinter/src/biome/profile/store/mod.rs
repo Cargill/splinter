@@ -22,11 +22,9 @@ use serde::{Deserialize, Serialize};
 
 pub use error::UserProfileStoreError;
 
-#[cfg(feature = "diesel")]
-use self::diesel::models::NewProfileModel;
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
+    user_id: String,
     subject: String,
     name: Option<String>,
     given_name: Option<String>,
@@ -36,6 +34,11 @@ pub struct Profile {
 }
 
 impl Profile {
+    /// Returns the user_id for the profile
+    pub fn user_id(&self) -> &str {
+        &self.user_id
+    }
+
     /// Returns the subject for the profile
     pub fn subject(&self) -> &str {
         &self.subject
@@ -70,6 +73,7 @@ impl Profile {
 /// Builder for profile.
 #[derive(Default)]
 pub struct ProfileBuilder {
+    user_id: Option<String>,
     subject: Option<String>,
     name: Option<String>,
     given_name: Option<String>,
@@ -81,6 +85,12 @@ pub struct ProfileBuilder {
 impl ProfileBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Sets the user_id for the profile
+    pub fn with_user_id(mut self, user_id: String) -> ProfileBuilder {
+        self.user_id = Some(user_id);
+        self
     }
 
     /// Sets the subject for the profile
@@ -122,8 +132,11 @@ impl ProfileBuilder {
     /// Builds the profile
     pub fn build(self) -> Result<Profile, InvalidStateError> {
         Ok(Profile {
-            subject: self.subject.ok_or_else(|| {
+            user_id: self.user_id.ok_or_else(|| {
                 InvalidStateError::with_message("A user id is required to build a Profile".into())
+            })?,
+            subject: self.subject.ok_or_else(|| {
+                InvalidStateError::with_message("A subject is required to build a Profile".into())
             })?,
             name: self.name,
             given_name: self.given_name,
@@ -234,19 +247,5 @@ where
 
     fn clone_box(&self) -> Box<dyn UserProfileStore> {
         (**self).clone_box()
-    }
-}
-
-#[cfg(feature = "diesel")]
-impl Into<NewProfileModel> for Profile {
-    fn into(self) -> NewProfileModel {
-        NewProfileModel {
-            user_id: self.user_id,
-            name: self.name,
-            given_name: self.given_name,
-            family_name: self.family_name,
-            email: self.email,
-            picture: self.picture,
-        }
     }
 }
