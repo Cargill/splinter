@@ -291,8 +291,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-        )
-        .expect("Failed to create client");
+        );
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
@@ -391,8 +390,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-        )
-        .expect("Failed to create client");
+        );
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
@@ -463,8 +461,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-        )
-        .expect("Failed to create client");
+        );
 
         let session_store = MemoryOAuthUserSessionStore::new();
 
@@ -537,8 +534,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-        )
-        .expect("Failed to create client");
+        );
 
         let session_store = MemoryOAuthUserSessionStore::new();
 

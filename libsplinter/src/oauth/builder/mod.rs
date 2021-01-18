@@ -97,14 +97,13 @@ impl OAuthClientBuilder {
                     .into(),
             )
         })?;
-        OAuthClient::new(
+        Ok(OAuthClient::new(
             new_basic_client(client_id, client_secret, auth_url, redirect_url, token_url)?,
             self.extra_auth_params,
             self.scopes,
             subject_provider.clone(),
             inflight_request_store,
-        )
-        .map_err(OAuthClientBuildError::from)
+        ))
     }
 
     /// Sets the client ID for the OAuth2 provider.
