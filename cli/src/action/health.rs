@@ -45,10 +45,7 @@ impl Action for StatusAction {
         {
             let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
 
-            request = request.header(
-                "Authorization",
-                format!("Bearer Cylinder:{}", create_cylinder_jwt_auth(key)?),
-            );
+            request = request.header("Authorization", create_cylinder_jwt_auth(key)?);
         }
 
         request
