@@ -17,10 +17,7 @@ use super::UserProfileStoreOperations;
 use diesel::{dsl::insert_into, prelude::*, result::Error::NotFound};
 
 use crate::biome::profile::store::{
-    diesel::{
-        models::{NewProfileModel, ProfileModel},
-        schema::user_profile,
-    },
+    diesel::{models::ProfileModel, schema::user_profile},
     Profile, UserProfileStoreError,
 };
 
@@ -53,10 +50,8 @@ impl<'a> UserProfileStoreAddProfile
             ));
         }
 
-        let new_profile: NewProfileModel = profile.into();
-
         insert_into(user_profile::table)
-            .values(new_profile)
+            .values(ProfileModel::from(profile))
             .execute(self.conn)
             .map(|_| ())
             .map_err(|_| {
@@ -89,10 +84,8 @@ impl<'a> UserProfileStoreAddProfile for UserProfileStoreOperations<'a, diesel::p
             ));
         }
 
-        let new_profile: NewProfileModel = profile.into();
-
         insert_into(user_profile::table)
-            .values(new_profile)
+            .values(ProfileModel::from(profile))
             .execute(self.conn)
             .map(|_| ())
             .map_err(|_| {

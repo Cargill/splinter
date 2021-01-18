@@ -14,8 +14,8 @@
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS user_profile (
-  id           BIGSERIAL    PRIMARY KEY,
-  user_id      TEXT,
+  user_id      TEXT        PRIMARY KEY,
+  subject      TEXT        NOT NULL UNIQUE,
   name         TEXT,
   given_name   TEXT,
   family_name  TEXT,

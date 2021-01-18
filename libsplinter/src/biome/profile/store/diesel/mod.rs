@@ -119,6 +119,7 @@ impl From<ProfileModel> for Profile {
     fn from(user_profile: ProfileModel) -> Self {
         Self {
             user_id: user_profile.user_id,
+            subject: user_profile.subject,
             name: user_profile.name,
             given_name: user_profile.given_name,
             family_name: user_profile.family_name,
@@ -154,10 +155,12 @@ pub mod tests {
         let user_profile_store = DieselUserProfileStore::new(pool);
 
         let user_id = "user_id".to_string();
+        let subject = "subject".to_string();
         let name = Some("name".to_string());
 
         let profile = ProfileBuilder::new()
             .with_user_id(user_id.clone())
+            .with_subject(subject.clone())
             .with_name(name)
             .with_given_name(None)
             .with_family_name(None)
@@ -174,6 +177,7 @@ pub mod tests {
             .expect("Unable to get profile");
 
         assert_eq!(profile.user_id(), &user_id);
+        assert_eq!(profile.subject(), &subject);
         assert_eq!(profile.name(), Some("name"));
         assert_eq!(profile.given_name(), None);
         assert_eq!(profile.family_name(), None);
@@ -197,10 +201,12 @@ pub mod tests {
         let user_profile_store = DieselUserProfileStore::new(pool);
 
         let user_id = "user_id".to_string();
+        let subject = "subject".to_string();
         let name = Some("name".to_string());
 
         let profile = ProfileBuilder::new()
             .with_user_id(user_id.clone())
+            .with_subject(subject.clone())
             .with_name(name)
             .with_given_name(None)
             .with_family_name(None)
@@ -218,6 +224,7 @@ pub mod tests {
         let profile = &profiles.unwrap()[0];
 
         assert_eq!(profile.user_id(), "user_id");
+        assert_eq!(profile.subject(), "subject");
         assert_eq!(profile.name(), Some("name"));
         assert!(profile.given_name().is_none());
         assert!(profile.family_name().is_none());
@@ -243,10 +250,12 @@ pub mod tests {
         let user_profile_store = DieselUserProfileStore::new(pool);
 
         let user_id = "user_id".to_string();
+        let subject = "subject".to_string();
         let name = Some("name".to_string());
 
         let profile = ProfileBuilder::new()
             .with_user_id(user_id.clone())
+            .with_subject(subject.clone())
             .with_name(name)
             .with_given_name(None)
             .with_family_name(None)
@@ -260,6 +269,7 @@ pub mod tests {
 
         let updated_profile = ProfileBuilder::new()
             .with_user_id(user_id.clone())
+            .with_subject(subject.clone())
             .with_name(Some("New Name".to_string()))
             .with_given_name(Some("New".to_string()))
             .with_family_name(Some("Name".to_string()))
@@ -277,6 +287,7 @@ pub mod tests {
             .expect("Unable to get updated profile");
 
         assert_eq!(updated_profile.user_id(), "user_id");
+        assert_eq!(updated_profile.subject(), "subject");
         assert_eq!(updated_profile.name(), Some("New Name"));
         assert_eq!(updated_profile.given_name(), Some("New"));
         assert_eq!(updated_profile.family_name(), Some("Name"));
@@ -285,6 +296,7 @@ pub mod tests {
 
         let bad_profile = ProfileBuilder::new()
             .with_user_id("bad_id".to_string())
+            .with_subject(subject.clone())
             .with_name(None)
             .with_given_name(None)
             .with_family_name(None)
@@ -311,10 +323,12 @@ pub mod tests {
         let user_profile_store = DieselUserProfileStore::new(pool);
 
         let user_id = "user_id".to_string();
+        let subject = "subject".to_string();
         let name = Some("name".to_string());
 
         let profile = ProfileBuilder::new()
             .with_user_id(user_id.clone())
+            .with_subject(subject.clone())
             .with_name(name)
             .with_given_name(None)
             .with_family_name(None)
@@ -322,6 +336,7 @@ pub mod tests {
             .with_picture(None)
             .build()
             .expect("Unable to build profile");
+
         user_profile_store
             .add_profile(profile)
             .expect("Unable to add profile");

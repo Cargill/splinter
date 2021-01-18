@@ -18,17 +18,14 @@ pub mod error;
 pub(in crate::biome) mod memory;
 
 use crate::error::InvalidStateError;
-
 use serde::{Deserialize, Serialize};
 
 pub use error::UserProfileStoreError;
 
-#[cfg(feature = "diesel")]
-use self::diesel::models::NewProfileModel;
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
     user_id: String,
+    subject: String,
     name: Option<String>,
     given_name: Option<String>,
     family_name: Option<String>,
@@ -40,6 +37,11 @@ impl Profile {
     /// Returns the user_id for the profile
     pub fn user_id(&self) -> &str {
         &self.user_id
+    }
+
+    /// Returns the subject for the profile
+    pub fn subject(&self) -> &str {
+        &self.subject
     }
 
     /// Returns the name for the profile
@@ -72,6 +74,7 @@ impl Profile {
 #[derive(Default)]
 pub struct ProfileBuilder {
     user_id: Option<String>,
+    subject: Option<String>,
     name: Option<String>,
     given_name: Option<String>,
     family_name: Option<String>,
@@ -84,9 +87,15 @@ impl ProfileBuilder {
         Self::default()
     }
 
-    /// Sets the user id for the profile
+    /// Sets the user_id for the profile
     pub fn with_user_id(mut self, user_id: String) -> ProfileBuilder {
         self.user_id = Some(user_id);
+        self
+    }
+
+    /// Sets the subject for the profile
+    pub fn with_subject(mut self, subject: String) -> ProfileBuilder {
+        self.subject = Some(subject);
         self
     }
 
@@ -126,6 +135,9 @@ impl ProfileBuilder {
             user_id: self.user_id.ok_or_else(|| {
                 InvalidStateError::with_message("A user id is required to build a Profile".into())
             })?,
+            subject: self.subject.ok_or_else(|| {
+                InvalidStateError::with_message("A subject is required to build a Profile".into())
+            })?,
             name: self.name,
             given_name: self.given_name,
             family_name: self.family_name,
@@ -154,12 +166,7 @@ pub trait UserProfileStore: Sync + Send {
     ///
     /// #Arguments
     ///
-    ///  * `user_id` - The unique identifier of the user the profile belongs to
-    ///  * `name` - The updated name for the user profile
-    ///  * `given_name` - The updated given name for the user profile
-    ///  * `family_name` - The updated family name for the user profile
-    ///  * `email` - The updated email for the user profile
-    ///  * `picture` - The updated picture for the user profile
+    ///  * `profile` - The profile to be added
     ///
     /// # Errors
     ///
@@ -235,19 +242,5 @@ where
 
     fn clone_box(&self) -> Box<dyn UserProfileStore> {
         (**self).clone_box()
-    }
-}
-
-#[cfg(feature = "diesel")]
-impl Into<NewProfileModel> for Profile {
-    fn into(self) -> NewProfileModel {
-        NewProfileModel {
-            user_id: self.user_id,
-            name: self.name,
-            given_name: self.given_name,
-            family_name: self.family_name,
-            email: self.email,
-            picture: self.picture,
-        }
     }
 }

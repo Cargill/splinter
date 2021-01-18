@@ -14,8 +14,8 @@
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS user_profile (
-  id           INTEGER    PRIMARY KEY AUTOINCREMENT,
-  user_id      TEXT       NOT NULL,
+  user_id      TEXT        PRIMARY KEY,
+  subject      TEXT        NOT NULL UNIQUE,
   name         TEXT,
   given_name   TEXT,
   family_name  TEXT,

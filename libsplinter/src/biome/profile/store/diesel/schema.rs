@@ -13,9 +13,9 @@
 // limitations under the License.
 
 table! {
-    user_profile {
-        id -> Int8,
+    user_profile (user_id) {
         user_id -> Text,
+        subject -> Text,
         name -> Nullable<Text>,
         given_name -> Nullable<Text>,
         family_name -> Nullable<Text>,
