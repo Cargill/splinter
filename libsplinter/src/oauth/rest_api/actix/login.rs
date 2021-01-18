@@ -57,7 +57,7 @@ pub fn make_login_route(client: OAuthClient) -> Resource {
                                 return Box::new(
                                     HttpResponse::BadRequest()
                                         .json(ErrorResponse::bad_request(
-                                            "No valid redirect URL supplied",
+                                            "Referer header is set, but is not a valid URL",
                                         ))
                                         .into_future(),
                                 )
