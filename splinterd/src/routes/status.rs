@@ -18,7 +18,11 @@ use splinter::futures::{Future, IntoFuture};
 use splinter::rest_api::auth::authorization::Permission;
 
 #[cfg(feature = "authorization")]
-pub const STATUS_READ_PERMISSION: Permission = Permission::Check("status.read");
+pub const STATUS_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "status.read",
+    permission_display_name: "Status read",
+    permission_description: "Allows the client to get node status info",
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Status {

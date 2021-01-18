@@ -24,7 +24,15 @@ use crate::rest_api::auth::Permission;
 pub use actix_web_1::RoleBasedAuthorizationResourceProvider;
 
 #[cfg(feature = "rest-api-actix")]
-const RBAC_READ_PERMISSION: Permission = Permission::Check("authorization.rbac.read");
+const RBAC_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "authorization.rbac.read",
+    permission_display_name: "RBAC read",
+    permission_description: "Allows the client to read roles, identities, and role assignments",
+};
 
 #[cfg(feature = "rest-api-actix")]
-const RBAC_WRITE_PERMISSION: Permission = Permission::Check("authorization.rbac.write");
+const RBAC_WRITE_PERMISSION: Permission = Permission::Check {
+    permission_id: "authorization.rbac.write",
+    permission_display_name: "RBAC write",
+    permission_description: "Allows the client to modify roles, identities, and role assignments",
+};

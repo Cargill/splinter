@@ -20,6 +20,14 @@ pub mod resources;
 use splinter::rest_api::auth::authorization::Permission;
 
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const SCABBARD_READ_PERMISSION: Permission = Permission::Check("scabbard.read");
+const SCABBARD_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "scabbard.read",
+    permission_display_name: "Scabbard read",
+    permission_description: "Allows the client to read scabbard services' state and batch statuses",
+};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check("scabbard.write");
+const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check {
+    permission_id: "scabbard.write",
+    permission_display_name: "Scabbard write",
+    permission_description: "Allows the client to submit batches to scabbard services",
+};

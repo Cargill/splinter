@@ -26,11 +26,17 @@ use crate::rest_api::auth::authorization::Permission;
 use super::MaintenanceModeAuthorizationHandler;
 
 #[cfg(feature = "rest-api-actix")]
-const AUTHORIZATION_MAINTENANCE_READ_PERMISSION: Permission =
-    Permission::Check("authorization.maintenance.read");
+const AUTHORIZATION_MAINTENANCE_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "authorization.maintenance.read",
+    permission_display_name: "Maintenance mode read",
+    permission_description: "Allows the client to check maintenance mode status",
+};
 #[cfg(feature = "rest-api-actix")]
-const AUTHORIZATION_MAINTENANCE_WRITE_PERMISSION: Permission =
-    Permission::Check("authorization.maintenance.write");
+const AUTHORIZATION_MAINTENANCE_WRITE_PERMISSION: Permission = Permission::Check {
+    permission_id: "authorization.maintenance.write",
+    permission_display_name: "Maintenance mode write",
+    permission_description: "Allows the client to enable/disable maintenance mode",
+};
 
 /// The `MaintenanceModeAuthorizationHandler` provides the following endpoints as REST API
 /// resources:

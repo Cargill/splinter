@@ -27,9 +27,17 @@ use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 use crate::rest_api::auth::authorization::Permission;
 
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const CIRCUIT_READ_PERMISSION: Permission = Permission::Check("circuit.read");
+const CIRCUIT_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "circuit.read",
+    permission_display_name: "Circuit read",
+    permission_description: "Allows the client to read circuit state",
+};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const CIRCUIT_WRITE_PERMISSION: Permission = Permission::Check("circuit.write");
+const CIRCUIT_WRITE_PERMISSION: Permission = Permission::Check {
+    permission_id: "circuit.write",
+    permission_display_name: "Circuit write",
+    permission_description: "Allows the client to modify circuit state",
+};
 
 /// The admin service provides the following endpoints as REST API resources:
 ///

@@ -377,10 +377,15 @@ mod test {
     #[cfg(feature = "authorization")]
     #[test]
     fn test_resource_permission() {
+        let permission = Permission::Check {
+            permission_id: "test",
+            permission_display_name: "",
+            permission_description: "",
+        };
         let (_, permission_map) = Resource::build("/test")
             .add_method(
                 Method::Get,
-                Permission::Check("test"),
+                permission,
                 |_: HttpRequest, _: web::Payload| Box::new(Response::Ok().finish().into_future()),
             )
             .into_route();
@@ -389,7 +394,7 @@ mod test {
             permission_map
                 .get_permission(&Method::Get, "/test")
                 .expect("Missing permission"),
-            &Permission::Check("test"),
+            &permission,
         );
     }
 }
