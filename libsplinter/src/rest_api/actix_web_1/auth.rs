@@ -13,24 +13,20 @@
 // limitations under the License.
 
 use actix_web::HttpRequest;
-#[cfg(all(feature = "auth", feature = "cylinder-jwt"))]
+#[cfg(feature = "cylinder-jwt")]
 use cylinder::Verifier;
 
-#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+#[cfg(feature = "biome-credentials")]
 use crate::biome::rest_api::BiomeRestResourceManager;
 #[cfg(feature = "oauth")]
 use crate::biome::OAuthUserSessionStore;
-#[cfg(feature = "auth")]
-use crate::rest_api::auth::identity::IdentityProvider;
 #[cfg(feature = "oauth")]
 use crate::rest_api::OAuthConfig;
-use crate::rest_api::RequestError;
+use crate::rest_api::{auth::identity::IdentityProvider, RequestError};
 
-#[cfg(feature = "auth")]
 use super::Resource;
 
 /// Configurations for the various authentication methods supported by the Splinter REST API.
-#[cfg(feature = "auth")]
 pub enum AuthConfig {
     /// Biome credentials authentication
     #[cfg(feature = "biome-credentials")]

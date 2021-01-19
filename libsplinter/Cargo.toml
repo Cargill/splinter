@@ -97,7 +97,6 @@ experimental = [
     # The following features are experimental:
     "admin-service-event-store",
     "admin-service-event-store-diesel",
-    "auth",
     "authorization",
     "biome-notifications",
     "biome-oauth",
@@ -124,8 +123,7 @@ benchmark = []
 admin-service = []
 admin-service-event-store = ["admin-service"]
 admin-service-event-store-diesel = ["diesel", "admin-service-event-store"]
-auth = []
-authorization = ["auth"]
+authorization = ["rest-api"]
 biome-credentials = ["bcrypt"]
 biome-key-management = []
 biome-notifications = []
@@ -137,7 +135,7 @@ cylinder-jwt = ["cylinder/jwt"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 maintenance-mode = ["authorization"]
-oauth = ["auth", "biome-oauth", "oauth2"]
+oauth = ["biome-oauth", "oauth2", "rest-api"]
 oauth-github = ["oauth"]
 oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 oauth-openid = ["oauth", "reqwest"]
