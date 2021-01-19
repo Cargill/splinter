@@ -22,8 +22,6 @@ use std::time::SystemTime;
 
 use crate::error::InternalError;
 
-use cylinder::PublicKey;
-
 use super::{identity::Identity, AuthorizationHandler, AuthorizationHandlerResult};
 
 /// A file-backed authorization handler that permits admin keys
@@ -36,8 +34,7 @@ use super::{identity::Identity, AuthorizationHandler, AuthorizationHandlerResult
 /// [`AuthorizationHandler::has_permission`] is ignored because this authorization handler provides
 /// admin privileges (all permissions).
 ///
-/// The authorization handler's backing file must be a list of valid Cylinder [`PublicKey`]s,
-/// separated by newlines.
+/// The authorization handler's backing file must be a list of keys separated by newlines.
 ///
 /// The list of keys in the file are cached in-memory by the authorization handler; this means that
 /// the handler will not have to read from the file every time permissions are checked. Instead,
@@ -101,7 +98,7 @@ impl AuthorizationHandler for AllowKeysAuthorizationHandler {
 /// Internal state of the authorization handler
 struct Internal {
     file_path: String,
-    cached_keys: Vec<PublicKey>,
+    cached_keys: Vec<String>,
     last_read: SystemTime,
 }
 
@@ -131,7 +128,7 @@ impl Internal {
 
     /// Gets the internal list of keys. If the backing file has been modified since the last read,
     /// attempts to refresh the cache. If the file is unavailable, clears the cache.
-    fn get_keys(&mut self) -> &[PublicKey] {
+    fn get_keys(&mut self) -> &[String] {
         let file_read_result = std::fs::metadata(&self.file_path)
             .and_then(|metadata| metadata.modified())
             .map_err(|err| {
@@ -172,17 +169,7 @@ impl Internal {
             .enumerate()
             .filter_map(|(idx, res)| {
                 match res {
-                    Ok(line) => match PublicKey::new_from_hex(&line) {
-                        Ok(key) => Some(key),
-                        Err(err) => {
-                            error!(
-                                "Invalid key on line {} of allow keys file: {}",
-                                idx + 1, // Lines are 1-indexed, iterators are 0-indexed
-                                err
-                            );
-                            None
-                        }
-                    },
+                    Ok(line) => Some(line),
                     Err(err) => {
                         error!(
                             "Failed to read key from line {} of allow keys file: {}",
@@ -268,9 +255,8 @@ mod tests {
 
         let handler = AllowKeysAuthorizationHandler::new(&path).expect("Failed to create handler");
 
-        let key = PublicKey::new_from_hex(KEY2).expect("Failed to parse key");
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key), "permission"),
+            handler.has_permission(&Identity::Key(KEY2.into()), "permission"),
             Ok(AuthorizationHandlerResult::Continue),
         ));
     }
@@ -295,14 +281,12 @@ mod tests {
 
         let handler = AllowKeysAuthorizationHandler::new(&path).expect("Failed to create handler");
 
-        let key1 = PublicKey::new_from_hex(KEY1).expect("Failed to parse key1");
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key1), "permission"),
+            handler.has_permission(&Identity::Key(KEY1.into()), "permission"),
             Ok(AuthorizationHandlerResult::Allow),
         ));
-        let key2 = PublicKey::new_from_hex(KEY2).expect("Failed to parse key2");
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key2), "permission"),
+            handler.has_permission(&Identity::Key(KEY2.into()), "permission"),
             Ok(AuthorizationHandlerResult::Allow),
         ));
     }
@@ -364,14 +348,12 @@ mod tests {
 
         write_to_file(&[KEY1, KEY2], &path);
 
-        let key1 = PublicKey::new_from_hex(KEY1).expect("Failed to parse key1");
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key1), "permission"),
+            handler.has_permission(&Identity::Key(KEY1.into()), "permission"),
             Ok(AuthorizationHandlerResult::Allow),
         ));
-        let key2 = PublicKey::new_from_hex(KEY2).expect("Failed to parse key2");
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key2.clone()), "permission"),
+            handler.has_permission(&Identity::Key(KEY2.into()), "permission"),
             Ok(AuthorizationHandlerResult::Allow),
         ));
 
@@ -382,7 +364,7 @@ mod tests {
         write_to_file(&[KEY1], &path);
 
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key2), "permission"),
+            handler.has_permission(&Identity::Key(KEY2.into()), "permission"),
             Ok(AuthorizationHandlerResult::Continue),
         ));
     }
@@ -411,9 +393,8 @@ mod tests {
         remove_file(&path).expect("Failed to remove file");
         assert!(!PathBuf::from(&path).exists());
 
-        let key1 = PublicKey::new_from_hex(KEY1).expect("Failed to parse key1");
         assert!(matches!(
-            handler.has_permission(&Identity::Key(key1), "permission"),
+            handler.has_permission(&Identity::Key(KEY1.into()), "permission"),
             Ok(AuthorizationHandlerResult::Continue),
         ));
     }
