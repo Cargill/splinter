@@ -81,6 +81,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization",
+    "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "admin-service-event-store",
@@ -104,6 +105,7 @@ authorization = [
     "scabbard/authorization",
     "splinter/authorization",
 ]
+authorization-handler-allow-keys = ["splinter/authorization-handler-allow-keys"]
 authorization-handler-maintenance = [
     "splinter/authorization-handler-maintenance",
 ]

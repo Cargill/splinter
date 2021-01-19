@@ -16,7 +16,7 @@
 
 #[cfg(feature = "rest-api-actix")]
 pub(crate) mod actix;
-#[cfg(all(feature = "authorization", feature = "cylinder-jwt"))]
+#[cfg(feature = "authorization-handler-allow-keys")]
 pub mod allow_keys;
 pub mod identity;
 #[cfg(feature = "authorization-handler-maintenance")]
