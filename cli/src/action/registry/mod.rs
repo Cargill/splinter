@@ -27,7 +27,6 @@ use super::{
     SPLINTER_REST_API_URL_ENV,
 };
 
-#[cfg(feature = "splinter-cli-jwt")]
 use super::create_cylinder_jwt_auth;
 
 const DEFAULT_OUTPUT_FILE: &str = "./nodes.yaml";
@@ -64,16 +63,12 @@ impl Action for RegistryGenerateAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-        let mut builder = SplinterRestClientBuilder::new();
-        builder = builder.with_url(url);
+        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
 
-        #[cfg(feature = "splinter-cli-jwt")]
-        {
-            let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
-            builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
-        }
-
-        let client = builder.build()?;
+        let client = SplinterRestClientBuilder::new()
+            .with_url(url)
+            .with_auth(create_cylinder_jwt_auth(key)?)
+            .build()?;
 
         let node_status = client.get_node_status()?;
 

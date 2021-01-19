@@ -27,7 +27,6 @@ pub mod maintenance;
 pub mod registry;
 
 use std::collections::HashMap;
-#[cfg(feature = "splinter-cli-jwt")]
 use std::env;
 use std::ffi::CString;
 use std::fs::File;
@@ -35,7 +34,6 @@ use std::io::{Error as IoError, ErrorKind, Read};
 use std::path::Path;
 
 use clap::ArgMatches;
-#[cfg(feature = "splinter-cli-jwt")]
 use cylinder::{
     current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
     load_key_from_path, secp256k1::Secp256k1Context, Context,
@@ -138,7 +136,6 @@ fn msg_from_io_error(err: IoError) -> String {
     }
 }
 
-#[cfg(feature = "splinter-cli-jwt")]
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
     let private_key = if let Some(key_name) = key_name {

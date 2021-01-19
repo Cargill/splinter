@@ -63,14 +63,10 @@ fn new_client(arg_matches: Option<&ArgMatches<'_>>) -> Result<SplinterRestClient
         .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
         .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-    let mut builder = SplinterRestClientBuilder::new();
-    builder = builder.with_url(url);
+    let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
 
-    #[cfg(feature = "splinter-cli-jwt")]
-    {
-        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
-        builder = builder.with_auth(create_cylinder_jwt_auth(key)?);
-    }
-
-    builder.build()
+    SplinterRestClientBuilder::new()
+        .with_url(url)
+        .with_auth(create_cylinder_jwt_auth(key)?)
+        .build()
 }
