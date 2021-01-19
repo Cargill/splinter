@@ -73,8 +73,8 @@ services:
             sleep 1
         done
 
-        # check if splinterd-node is available
-        while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node:8085/status) -ne 200 ]] ; do
+        # check if splinterd-node is available (will get 401 because no auth is provided)
+        while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node:8085/status) -ne 401 ]] ; do
            >&2 echo \"SplinterD is unavailable - sleeping\"
            sleep 1
         done
