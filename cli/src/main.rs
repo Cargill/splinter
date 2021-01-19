@@ -756,6 +756,72 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
+    #[cfg(feature = "maintenance-mode")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("maintenance")
+                .about("Maintenance mode commands")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand(
+                    SubCommand::with_name("status")
+                        .about("Checks if maintenance mode is enabled for a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("enable")
+                        .about("Enables maintenance mode for a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("disable")
+                        .about("Disables maintenance mode for a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        ),
+                ),
+        )
+    }
+
     let matches = app.get_matches_from_safe(args)?;
 
     // set default to info
@@ -838,6 +904,18 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         subcommands = subcommands.with_command(
             "database",
             SubcommandActions::new().with_command("migrate", database::MigrateAction),
+        )
+    }
+
+    #[cfg(feature = "maintenance-mode")]
+    {
+        use action::maintenance;
+        subcommands = subcommands.with_command(
+            "maintenance",
+            SubcommandActions::new()
+                .with_command("status", maintenance::StatusAction)
+                .with_command("enable", maintenance::EnableAction)
+                .with_command("disable", maintenance::DisableAction),
         )
     }
 

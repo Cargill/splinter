@@ -71,6 +71,7 @@ experimental = [
     "circuit-auth-type",
     "health",
     "https-certs",
+    "maintenance-mode",
     "splinter-cli-jwt",
 ]
 
@@ -82,6 +83,7 @@ splinter-cli-jwt = ["cylinder/jwt", "cylinder/key-load"]
 health = []
 
 https-certs = []
+maintenance-mode = ["splinter-cli-jwt"]
 
 database = ["diesel"]
 postgres = [

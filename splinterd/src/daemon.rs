@@ -58,6 +58,8 @@ use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
 };
+#[cfg(feature = "maintenance-mode")]
+use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::{
     allow_keys::AllowKeysAuthorizationHandler, AuthorizationHandler, Permission,
@@ -534,10 +536,18 @@ impl SplinterDaemon {
 
         #[cfg(feature = "authorization")]
         {
+            let mut authorization_handlers = vec![];
+            authorization_handlers.push(create_allow_keys_authorization_handler(&self.state_dir)?);
+            #[cfg(feature = "maintenance-mode")]
+            {
+                let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::new();
+                rest_api_builder =
+                    rest_api_builder.add_resources(maintenance_mode_auth_handler.resources());
+                authorization_handlers.push(Box::new(maintenance_mode_auth_handler));
+            }
+
             rest_api_builder = rest_api_builder
-                .with_authorization_handlers(vec![create_allow_keys_authorization_handler(
-                    &self.state_dir,
-                )?])
+                .with_authorization_handlers(authorization_handlers)
                 .add_resource(Resource::build("/openapi.yaml").add_method(
                     Method::Get,
                     Permission::AllowAuthenticated,

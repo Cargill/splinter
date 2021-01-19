@@ -45,6 +45,12 @@ pub(crate) const ADMIN_SERVICE_PROTOCOL_MIN: u32 = 1;
 // The currently supported circuit version
 pub const CIRCUIT_PROTOCOL_VERSION: i32 = 2;
 
+#[cfg(feature = "authorization")]
+pub const AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
+
+#[cfg(all(feature = "maintenance-mode", feature = "rest-api-actix"))]
+pub(crate) const AUTHORIZATION_MAINTENANCE_MIN: u32 = 1;
+
 #[cfg(feature = "oauth")]
 pub const OAUTH_PROTOCOL_VERSION: u32 = 1;
 
