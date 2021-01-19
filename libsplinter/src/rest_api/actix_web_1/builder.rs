@@ -33,7 +33,7 @@ use crate::rest_api::{auth::identity::IdentityProvider, RestApiBind, RestApiServ
 use crate::rest_api::{OAuthConfig, OAuthResourceProvider};
 
 use super::AuthConfig;
-#[cfg(feature = "oauth")]
+#[cfg(any(feature = "biome-credentials", feature = "oauth"))]
 use super::RestResourceProvider;
 use super::{Resource, RestApi};
 
