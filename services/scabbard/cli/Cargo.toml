@@ -30,7 +30,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
-cylinder = "0.2.2"
+cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
 dirs = "2.0"
 flexi_logger = "0.14"
 log = "0.4"
@@ -52,10 +52,8 @@ experimental = [
   "stable",
   # The following features are experimental:
   "smart-permissions",
-  "scabbard-cli-jwt"
 ]
 
-scabbard-cli-jwt = ["cylinder/jwt", "cylinder/key-load"]
 smart-permissions = []
 
 [package.metadata.deb]
