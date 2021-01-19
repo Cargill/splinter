@@ -22,7 +22,7 @@ pub mod database;
 #[cfg(feature = "health")]
 pub mod health;
 pub mod keygen;
-#[cfg(feature = "maintenance-mode")]
+#[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
 pub mod registry;
 

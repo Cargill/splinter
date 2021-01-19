@@ -19,7 +19,7 @@ pub(crate) mod actix;
 #[cfg(all(feature = "authorization", feature = "cylinder-jwt"))]
 pub mod allow_keys;
 pub mod identity;
-#[cfg(feature = "maintenance-mode")]
+#[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
 #[cfg(feature = "authorization")]
 mod permission_map;

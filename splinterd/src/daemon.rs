@@ -58,7 +58,7 @@ use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
 };
-#[cfg(feature = "maintenance-mode")]
+#[cfg(feature = "authorization-handler-maintenance")]
 use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
 #[cfg(feature = "authorization-handler-rbac")]
 use splinter::rest_api::auth::rbac::RoleBasedAuthorizationHandler;
@@ -548,7 +548,7 @@ impl SplinterDaemon {
                 )));
             }
 
-            #[cfg(feature = "maintenance-mode")]
+            #[cfg(feature = "authorization-handler-maintenance")]
             {
                 let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::new();
                 rest_api_builder =

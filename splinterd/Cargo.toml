@@ -81,12 +81,12 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization",
+    "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "admin-service-event-store",
     "biome-oauth",
     "health",
     "https-bind",
-    "maintenance-mode",
     "oauth",
     "registry-database",
     "service-arg-validation",
@@ -104,6 +104,9 @@ authorization = [
     "scabbard/authorization",
     "splinter/authorization",
 ]
+authorization-handler-maintenance = [
+    "splinter/authorization-handler-maintenance",
+]
 authorization-handler-rbac = [
     "splinter/authorization",
     "splinter/authorization-handler-rbac",
@@ -118,7 +121,6 @@ biome-oauth = [
 ]
 database = ["splinter/postgres", "splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
-maintenance-mode = ["splinter/maintenance-mode"]
 oauth = [
     "splinter/oauth-github",
     "splinter/oauth-inflight-request-store-postgres",
