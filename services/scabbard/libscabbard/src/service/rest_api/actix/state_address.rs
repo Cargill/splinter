@@ -90,17 +90,16 @@ mod tests {
     };
 
     #[cfg(feature = "authorization")]
-    use splinter::error::InternalError;
-    #[cfg(feature = "authorization")]
-    use splinter::rest_api::{
-        auth::{
-            identity::{Identity, IdentityProvider},
-            AuthorizationHandler, AuthorizationHandlerResult, AuthorizationHeader,
-        },
-        AuthConfig,
-    };
+    use splinter::rest_api::auth::{AuthorizationHandler, AuthorizationHandlerResult};
     use splinter::{
-        rest_api::{Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle},
+        error::InternalError,
+        rest_api::{
+            auth::{
+                identity::{Identity, IdentityProvider},
+                AuthorizationHeader,
+            },
+            AuthConfig, Resource, RestApiBuilder, RestApiServerError, RestApiShutdownHandle,
+        },
         service::Service,
     };
 
@@ -286,13 +285,13 @@ mod tests {
                 let bind_url = format!("127.0.0.1:{}", port);
                 let rest_api_builder = RestApiBuilder::new()
                     .with_bind(&bind_url)
-                    .add_resources(resources.clone());
-                #[cfg(feature = "authorization")]
-                let rest_api_builder = rest_api_builder
+                    .add_resources(resources.clone())
                     .with_auth_configs(vec![AuthConfig::Custom {
                         resources: vec![],
                         identity_provider: Box::new(AlwaysAcceptIdentityProvider),
-                    }])
+                    }]);
+                #[cfg(feature = "authorization")]
+                let rest_api_builder = rest_api_builder
                     .with_authorization_handlers(vec![Box::new(AlwaysAllowAuthorizationHandler)]);
                 let result = rest_api_builder
                     .build()
@@ -310,11 +309,9 @@ mod tests {
     }
 
     /// An identity provider that always returns `Ok(Some(_))`
-    #[cfg(feature = "authorization")]
     #[derive(Clone)]
     struct AlwaysAcceptIdentityProvider;
 
-    #[cfg(feature = "authorization")]
     impl IdentityProvider for AlwaysAcceptIdentityProvider {
         fn get_identity(
             &self,
