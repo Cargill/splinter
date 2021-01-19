@@ -14,7 +14,13 @@
 
 //! REST API Response structs for Role-based authorization structs.
 
-use crate::rest_api::{auth::rbac::store::Role, paging::Paging};
+use std::convert::TryFrom;
+
+use crate::error::InvalidStateError;
+use crate::rest_api::{
+    auth::rbac::store::{Role, RoleBuilder},
+    paging::Paging,
+};
 
 #[derive(Serialize)]
 pub struct ListRoleResponse<'a> {
@@ -29,6 +35,13 @@ pub struct RoleResponse<'a> {
     pub permissions: &'a [String],
 }
 
+#[derive(Deserialize)]
+pub struct RolePayload {
+    pub role_id: String,
+    pub display_name: String,
+    pub permissions: Vec<String>,
+}
+
 impl<'a> From<&'a Role> for RoleResponse<'a> {
     fn from(role: &'a Role) -> Self {
         Self {
@@ -36,5 +49,17 @@ impl<'a> From<&'a Role> for RoleResponse<'a> {
             display_name: role.display_name(),
             permissions: role.permissions(),
         }
+    }
+}
+
+impl TryFrom<RolePayload> for Role {
+    type Error = InvalidStateError;
+
+    fn try_from(payload: RolePayload) -> Result<Self, Self::Error> {
+        RoleBuilder::new()
+            .with_id(payload.role_id)
+            .with_display_name(payload.display_name)
+            .with_permissions(payload.permissions)
+            .build()
     }
 }
