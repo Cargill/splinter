@@ -25,8 +25,8 @@ use crate::admin::store::{
         schema::{circuit, circuit_member, service, service_argument},
     },
     error::AdminServiceStoreError,
-    AuthorizationType, Circuit, CircuitBuilder, CircuitPredicate, DurabilityType, PersistenceType,
-    RouteType, Service, ServiceBuilder,
+    AuthorizationType, Circuit, CircuitBuilder, CircuitPredicate, CircuitStatus, DurabilityType,
+    PersistenceType, RouteType, Service, ServiceBuilder,
 };
 
 use super::AdminServiceStoreOperations;
@@ -44,6 +44,7 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
 {
     fn list_circuits(
         &self,
@@ -215,7 +216,8 @@ where
                         .with_durability(&DurabilityType::try_from(model.durability)?)
                         .with_routes(&RouteType::try_from(model.routes)?)
                         .with_circuit_management_type(&model.circuit_management_type)
-                        .with_circuit_version(model.circuit_version);
+                        .with_circuit_version(model.circuit_version)
+                        .with_circuit_status(&CircuitStatus::from(&model.circuit_status));
 
                     if let Some(display_name) = &model.display_name {
                         circuit_builder = circuit_builder.with_display_name(&display_name);

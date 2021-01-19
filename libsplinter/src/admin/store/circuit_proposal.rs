@@ -87,7 +87,7 @@ impl CircuitProposal {
             admin::CircuitProposal_ProposalType::UPDATE_ROSTER => ProposalType::UpdateRoster,
             admin::CircuitProposal_ProposalType::ADD_NODE => ProposalType::AddNode,
             admin::CircuitProposal_ProposalType::REMOVE_NODE => ProposalType::RemoveNode,
-            admin::CircuitProposal_ProposalType::DESTROY => ProposalType::Destroy,
+            admin::CircuitProposal_ProposalType::DISBAND => ProposalType::Disband,
             admin::CircuitProposal_ProposalType::UNSET_PROPOSAL_TYPE => {
                 return Err(InvalidStateError::with_message(
                     "unable to build, missing field: `proposal type`".to_string(),
@@ -118,7 +118,7 @@ impl CircuitProposal {
             ProposalType::UpdateRoster => admin::CircuitProposal_ProposalType::UPDATE_ROSTER,
             ProposalType::AddNode => admin::CircuitProposal_ProposalType::ADD_NODE,
             ProposalType::RemoveNode => admin::CircuitProposal_ProposalType::REMOVE_NODE,
-            ProposalType::Destroy => admin::CircuitProposal_ProposalType::DESTROY,
+            ProposalType::Disband => admin::CircuitProposal_ProposalType::DISBAND,
         };
 
         let votes = self
@@ -497,7 +497,7 @@ pub enum ProposalType {
     UpdateRoster,
     AddNode,
     RemoveNode,
-    Destroy,
+    Disband,
 }
 
 impl From<&messages::ProposalType> for ProposalType {
@@ -507,7 +507,7 @@ impl From<&messages::ProposalType> for ProposalType {
             messages::ProposalType::UpdateRoster => ProposalType::UpdateRoster,
             messages::ProposalType::AddNode => ProposalType::AddNode,
             messages::ProposalType::RemoveNode => ProposalType::RemoveNode,
-            messages::ProposalType::Destroy => ProposalType::Destroy,
+            messages::ProposalType::Disband => ProposalType::Disband,
         }
     }
 }

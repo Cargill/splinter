@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::admin::store::{Circuit, Service};
+use crate::admin::store::{Circuit, CircuitStatus, Service};
 use crate::rest_api::paging::Paging;
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
@@ -31,6 +31,7 @@ pub(crate) struct CircuitResponse<'a> {
     pub management_type: &'a str,
     pub display_name: &'a Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: &'a CircuitStatus,
 }
 
 impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
@@ -42,6 +43,7 @@ impl<'a> From<&'a Circuit> for CircuitResponse<'a> {
             management_type: circuit.circuit_management_type(),
             display_name: circuit.display_name(),
             circuit_version: circuit.circuit_version(),
+            circuit_status: circuit.circuit_status(),
         }
     }
 }

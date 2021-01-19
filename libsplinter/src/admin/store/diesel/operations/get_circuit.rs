@@ -24,8 +24,8 @@ use crate::admin::store::{
         schema::{circuit, circuit_member},
     },
     error::AdminServiceStoreError,
-    AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
-    Service,
+    AuthorizationType, Circuit, CircuitBuilder, CircuitStatus, DurabilityType, PersistenceType,
+    RouteType, Service,
 };
 
 pub(in crate::admin::store::diesel) trait AdminServiceStoreFetchCircuitOperation {
@@ -38,6 +38,7 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     i32: diesel::deserialize::FromSql<diesel::sql_types::Integer, C::Backend>,
+    i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
 {
     fn get_circuit(&self, circuit_id: &str) -> Result<Option<Circuit>, AdminServiceStoreError> {
         self.conn.transaction::<Option<Circuit>, _, _>(|| {
@@ -76,7 +77,8 @@ where
                 .with_durability(&DurabilityType::try_from(circuit.durability)?)
                 .with_routes(&RouteType::try_from(circuit.routes)?)
                 .with_circuit_management_type(&circuit.circuit_management_type)
-                .with_circuit_version(circuit.circuit_version);
+                .with_circuit_version(circuit.circuit_version)
+                .with_circuit_status(&CircuitStatus::from(&circuit.circuit_status));
 
             // if display name is set, add to builder
             if let Some(display_name) = circuit.display_name {

@@ -135,8 +135,8 @@ mod tests {
 
     use crate::admin::{
         messages::{
-            AuthorizationType, CircuitProposal, CreateCircuit, DurabilityType, PersistenceType,
-            ProposalType, RouteType,
+            AuthorizationType, CircuitProposal, CircuitStatus, CreateCircuit, DurabilityType,
+            PersistenceType, ProposalType, RouteType,
         },
         service::proposal_store::{ProposalIter, ProposalStoreError},
         store::CircuitPredicate,
@@ -279,6 +279,7 @@ mod tests {
                 comments: Some("mock circuit".into()),
                 display_name: Some("test_circuit".into()),
                 circuit_version: 1,
+                circuit_status: CircuitStatus::Active,
             },
             votes: vec![],
             requester: vec![],

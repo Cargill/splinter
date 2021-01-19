@@ -43,7 +43,8 @@ use std::cmp::Ordering;
 use std::fmt;
 
 pub use self::circuit::{
-    AuthorizationType, Circuit, CircuitBuilder, DurabilityType, PersistenceType, RouteType,
+    AuthorizationType, Circuit, CircuitBuilder, CircuitStatus, DurabilityType, PersistenceType,
+    RouteType,
 };
 pub use self::circuit_node::{CircuitNode, CircuitNodeBuilder};
 pub use self::circuit_proposal::{

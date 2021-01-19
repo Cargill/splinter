@@ -21,8 +21,8 @@ use crate::error::InvalidStateError;
 use crate::protos::admin;
 
 use super::{
-    AuthorizationType, DurabilityType, PersistenceType, ProposedNode, ProposedService, RouteType,
-    UNSET_CIRCUIT_VERSION,
+    AuthorizationType, CircuitStatus, DurabilityType, PersistenceType, ProposedNode,
+    ProposedService, RouteType, UNSET_CIRCUIT_VERSION,
 };
 
 /// Native representation of a circuit that is being proposed in a proposal
@@ -40,6 +40,7 @@ pub struct ProposedCircuit {
     comments: Option<String>,
     display_name: Option<String>,
     circuit_version: i32,
+    circuit_status: CircuitStatus,
 }
 
 impl ProposedCircuit {
@@ -102,6 +103,11 @@ impl ProposedCircuit {
         self.circuit_version
     }
 
+    /// Returns the status of the circuit
+    pub fn circuit_status(&self) -> &CircuitStatus {
+        &self.circuit_status
+    }
+
     pub fn from_proto(mut proto: admin::Circuit) -> Result<Self, InvalidStateError> {
         let authorization_type = match proto.get_authorization_type() {
             admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => AuthorizationType::Trust,
@@ -136,6 +142,16 @@ impl ProposedCircuit {
                 return Err(InvalidStateError::with_message(
                     "unable to build, missing field: `route type`".to_string(),
                 ));
+            }
+        };
+
+        let circuit_status = match proto.get_circuit_status() {
+            admin::Circuit_CircuitStatus::ACTIVE => CircuitStatus::Active,
+            admin::Circuit_CircuitStatus::DISBANDED => CircuitStatus::Disbanded,
+            admin::Circuit_CircuitStatus::ABANDONED => CircuitStatus::Abandoned,
+            admin::Circuit_CircuitStatus::UNSET_CIRCUIT_STATUS => {
+                debug!("Defaulting `UNSET_CIRCUIT_STATUS` of proposed circuit to `Active`");
+                CircuitStatus::default()
             }
         };
 
@@ -184,6 +200,7 @@ impl ProposedCircuit {
             comments,
             display_name,
             circuit_version,
+            circuit_status,
         })
     }
 
@@ -244,6 +261,18 @@ impl ProposedCircuit {
             RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
         };
 
+        match self.circuit_status {
+            CircuitStatus::Active => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+            }
+            CircuitStatus::Disbanded => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
+            }
+            CircuitStatus::Abandoned => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
+            }
+        };
+
         circuit
     }
 }
@@ -263,6 +292,7 @@ pub struct ProposedCircuitBuilder {
     comments: Option<String>,
     display_name: Option<String>,
     circuit_version: Option<i32>,
+    circuit_status: Option<CircuitStatus>,
 }
 
 impl ProposedCircuitBuilder {
@@ -329,6 +359,11 @@ impl ProposedCircuitBuilder {
     /// Returns the protocol version for the circuit proposal in the builder
     pub fn circuit_version(&self) -> Option<i32> {
         self.circuit_version
+    }
+
+    /// Returns the status of the circuit proposal in the builder
+    pub fn circuit_status(&self) -> Option<CircuitStatus> {
+        self.circuit_status.clone()
     }
 
     /// Sets the circuit ID
@@ -459,6 +494,16 @@ impl ProposedCircuitBuilder {
         self
     }
 
+    /// Sets the circuit status
+    ///
+    /// # Arguments
+    ///
+    ///  * `circuit_status` - The status for the circuit
+    pub fn with_circuit_status(mut self, circuit_status: &CircuitStatus) -> ProposedCircuitBuilder {
+        self.circuit_status = Some(circuit_status.clone());
+        self
+    }
+
     /// Builds a `ProposedCircuit`
     ///
     /// Returns an error if the circuit ID, roster, members or circuit management
@@ -510,6 +555,8 @@ impl ProposedCircuitBuilder {
 
         let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
 
+        let circuit_status = self.circuit_status.unwrap_or_else(CircuitStatus::default);
+
         let create_circuit_message = ProposedCircuit {
             circuit_id,
             roster,
@@ -523,6 +570,7 @@ impl ProposedCircuitBuilder {
             comments,
             display_name,
             circuit_version,
+            circuit_status,
         };
 
         Ok(create_circuit_message)
@@ -552,7 +600,9 @@ impl TryFrom<&messages::CreateCircuit> for ProposedCircuit {
             .with_durability(&DurabilityType::from(&create_circuit.durability))
             .with_routes(&RouteType::from(&create_circuit.routes))
             .with_circuit_management_type(&create_circuit.circuit_management_type)
-            .with_circuit_version(create_circuit.circuit_version);
+            .with_circuit_version(create_circuit.circuit_version)
+            .with_circuit_status(&CircuitStatus::from(&create_circuit.circuit_status));
+
         // Add the `application_metadata` if not empty
         if !create_circuit.application_metadata.is_empty() {
             circuit_builder =

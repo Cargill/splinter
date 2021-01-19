@@ -17,8 +17,9 @@ use std::error::Error as StdError;
 use crate::base62::generate_random_base62_string;
 
 use super::{
-    is_valid_circuit_id, is_valid_service_id, AuthorizationType, CreateCircuit, DurabilityType,
-    PersistenceType, RouteType, SplinterNode, SplinterService, UNSET_CIRCUIT_VERSION,
+    is_valid_circuit_id, is_valid_service_id, AuthorizationType, CircuitStatus, CreateCircuit,
+    DurabilityType, PersistenceType, RouteType, SplinterNode, SplinterService,
+    UNSET_CIRCUIT_VERSION,
 };
 
 #[derive(Default, Clone)]
@@ -35,6 +36,7 @@ pub struct CreateCircuitBuilder {
     comments: Option<String>,
     display_name: Option<String>,
     circuit_version: Option<i32>,
+    circuit_status: Option<CircuitStatus>,
 }
 
 impl CreateCircuitBuilder {
@@ -88,6 +90,10 @@ impl CreateCircuitBuilder {
 
     pub fn circuit_version(&self) -> Option<i32> {
         self.circuit_version
+    }
+
+    pub fn circuit_status(&self) -> Option<CircuitStatus> {
+        self.circuit_status.clone()
     }
 
     pub fn with_circuit_id(mut self, circuit_id: &str) -> CreateCircuitBuilder {
@@ -159,6 +165,11 @@ impl CreateCircuitBuilder {
         self
     }
 
+    pub fn with_circuit_status(mut self, status: &CircuitStatus) -> CreateCircuitBuilder {
+        self.circuit_status = Some(status.clone());
+        self
+    }
+
     pub fn build(self) -> Result<CreateCircuit, BuilderError> {
         let circuit_id = match self.circuit_id {
             Some(circuit_id) if is_valid_circuit_id(&circuit_id) => circuit_id,
@@ -224,6 +235,8 @@ impl CreateCircuitBuilder {
 
         let circuit_version = self.circuit_version.unwrap_or(UNSET_CIRCUIT_VERSION);
 
+        let circuit_status = self.circuit_status.unwrap_or_else(CircuitStatus::default);
+
         let create_circuit_message = CreateCircuit {
             circuit_id,
             roster,
@@ -237,6 +250,7 @@ impl CreateCircuitBuilder {
             comments,
             display_name,
             circuit_version,
+            circuit_status,
         };
 
         Ok(create_circuit_message)

@@ -29,9 +29,10 @@ use std::sync::{Arc, Mutex};
 use super::{
     AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit, CircuitBuilder,
     CircuitNode, CircuitNodeBuilder, CircuitPredicate, CircuitProposal, CircuitProposalBuilder,
-    DurabilityType, PersistenceType, ProposalType, ProposedCircuit, ProposedCircuitBuilder,
-    ProposedNode, ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, Service,
-    ServiceBuilder, ServiceId, Vote, VoteRecord, VoteRecordBuilder,
+    CircuitStatus, DurabilityType, PersistenceType, ProposalType, ProposedCircuit,
+    ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder, ProposedService,
+    ProposedServiceBuilder, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
+    VoteRecordBuilder,
 };
 
 use crate::error::{
@@ -1024,6 +1025,7 @@ struct YamlCircuit {
     display_name: Option<String>,
     #[serde(default = "default_circuit_value")]
     circuit_version: i32,
+    circuit_status: YamlCircuitStatus,
 }
 
 impl TryFrom<YamlCircuit> for Circuit {
@@ -1045,7 +1047,8 @@ impl TryFrom<YamlCircuit> for Circuit {
             .with_durability(&DurabilityType::from(circuit.durability))
             .with_routes(&RouteType::from(circuit.routes))
             .with_circuit_management_type(&circuit.circuit_management_type)
-            .with_circuit_version(circuit.circuit_version);
+            .with_circuit_version(circuit.circuit_version)
+            .with_circuit_status(&CircuitStatus::from(circuit.circuit_status));
 
         if let Some(display_name) = &circuit.display_name {
             builder = builder.with_display_name(display_name);
@@ -1072,6 +1075,7 @@ impl From<Circuit> for YamlCircuit {
             circuit_management_type: circuit.circuit_management_type().into(),
             display_name: circuit.display_name().clone(),
             circuit_version: circuit.circuit_version(),
+            circuit_status: circuit.circuit_status().clone().into(),
         }
     }
 }
@@ -1269,7 +1273,7 @@ pub enum YamlProposalType {
     UpdateRoster,
     AddNode,
     RemoveNode,
-    Destroy,
+    Disband,
 }
 
 impl From<YamlProposalType> for ProposalType {
@@ -1279,7 +1283,7 @@ impl From<YamlProposalType> for ProposalType {
             YamlProposalType::UpdateRoster => ProposalType::UpdateRoster,
             YamlProposalType::AddNode => ProposalType::AddNode,
             YamlProposalType::RemoveNode => ProposalType::RemoveNode,
-            YamlProposalType::Destroy => ProposalType::Destroy,
+            YamlProposalType::Disband => ProposalType::Disband,
         }
     }
 }
@@ -1291,7 +1295,7 @@ impl From<ProposalType> for YamlProposalType {
             ProposalType::UpdateRoster => YamlProposalType::UpdateRoster,
             ProposalType::AddNode => YamlProposalType::AddNode,
             ProposalType::RemoveNode => YamlProposalType::RemoveNode,
-            ProposalType::Destroy => YamlProposalType::Destroy,
+            ProposalType::Disband => YamlProposalType::Disband,
         }
     }
 }
@@ -1348,6 +1352,7 @@ struct YamlProposedCircuit {
     display_name: Option<String>,
     #[serde(default = "default_circuit_value")]
     circuit_version: i32,
+    circuit_status: YamlCircuitStatus,
 }
 
 impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
@@ -1375,7 +1380,8 @@ impl TryFrom<YamlProposedCircuit> for ProposedCircuit {
             .with_durability(&DurabilityType::from(circuit.durability))
             .with_routes(&RouteType::from(circuit.routes))
             .with_circuit_management_type(&circuit.circuit_management_type)
-            .with_circuit_version(circuit.circuit_version);
+            .with_circuit_version(circuit.circuit_version)
+            .with_circuit_status(&CircuitStatus::from(circuit.circuit_status));
 
         if let Some(application_metadata) = circuit.application_metadata {
             builder = builder.with_application_metadata(&parse_hex(&application_metadata).map_err(
@@ -1432,6 +1438,7 @@ impl From<ProposedCircuit> for YamlProposedCircuit {
             comments: circuit.comments().clone(),
             display_name: circuit.display_name().clone(),
             circuit_version: circuit.circuit_version(),
+            circuit_status: circuit.circuit_status().clone().into(),
         }
     }
 }
@@ -1672,6 +1679,34 @@ fn default_circuit_value() -> i32 {
     1
 }
 
+/// YAML file specific CircuitStatus definition for serialization.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum YamlCircuitStatus {
+    Active,
+    Disbanded,
+    Abandoned,
+}
+
+impl From<CircuitStatus> for YamlCircuitStatus {
+    fn from(circuit_status: CircuitStatus) -> Self {
+        match circuit_status {
+            CircuitStatus::Active => YamlCircuitStatus::Active,
+            CircuitStatus::Disbanded => YamlCircuitStatus::Disbanded,
+            CircuitStatus::Abandoned => YamlCircuitStatus::Abandoned,
+        }
+    }
+}
+
+impl From<YamlCircuitStatus> for CircuitStatus {
+    fn from(yaml_circuit_status: YamlCircuitStatus) -> Self {
+        match yaml_circuit_status {
+            YamlCircuitStatus::Active => CircuitStatus::Active,
+            YamlCircuitStatus::Disbanded => CircuitStatus::Disbanded,
+            YamlCircuitStatus::Abandoned => CircuitStatus::Abandoned,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Read;
@@ -1721,7 +1756,8 @@ circuits:
         persistence: Any
         durability: NoDurability
         routes: Any
-        circuit_management_type: gameroom";
+        circuit_management_type: gameroom
+        circuit_status: Active";
 
     const PROPOSAL_STATE: &[u8] = b"---
 proposals:
@@ -1763,6 +1799,7 @@ proposals:
             routes: Any
             circuit_management_type: gameroom
             display_name: \"test_display\"
+            circuit_status: Active
         votes: []
         requester: 0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482
         requester_node_id: acme-node-000";
@@ -2046,6 +2083,7 @@ proposals:
                 ])
                 .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
                 .with_circuit_management_type("test")
+                .with_circuit_status(&CircuitStatus::default())
                 .build()
                 .expect("Unable to build circuit");
 
@@ -2376,6 +2414,7 @@ proposals:
                     )
                     .with_circuit_management_type("gameroom")
                     .with_display_name("test_display")
+                    .with_circuit_status(&CircuitStatus::default())
                     .build().expect("Unable to build circuit")
             )
             .with_requester(
@@ -2418,6 +2457,7 @@ proposals:
             .with_members(&vec!["bubba-node-000".into(), "acme-node-000".into()])
             .with_circuit_management_type("gameroom")
             .with_circuit_version(1)
+            .with_circuit_status(&CircuitStatus::default())
             .build()
             .expect("Unable to build circuit")
     }
@@ -2467,6 +2507,7 @@ proposals:
                         ]
                     )
                     .with_circuit_management_type("test")
+                    .with_circuit_status(&CircuitStatus::default())
                     .build().expect("Unable to build circuit")
             )
             .with_requester(
@@ -2509,6 +2550,7 @@ proposals:
                 ]
             )
             .with_circuit_management_type("test")
+            .with_circuit_status(&CircuitStatus::default())
             .build().expect("Unable to build circuit"),
         CircuitNodeBuilder::default()
             .with_node_id("new-node-000".into())

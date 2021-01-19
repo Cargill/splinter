@@ -420,6 +420,7 @@ mod tests {
                 comments: Some("mock circuit".into()),
                 display_name: None,
                 circuit_version: 1,
+                circuit_status: messages::CircuitStatus::Active,
             },
             votes: vec![],
             requester: vec![],

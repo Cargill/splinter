@@ -17,7 +17,7 @@
 use diesel::{
     dsl::delete,
     prelude::*,
-    sql_types::{Binary, Integer, Nullable, Text},
+    sql_types::{Binary, Integer, Nullable, SmallInt, Text},
 };
 
 use crate::admin::store::{
@@ -53,6 +53,7 @@ where
             Nullable<Text>,
             Nullable<Text>,
             Integer,
+            SmallInt,
         ),
         C::Backend,
     >,

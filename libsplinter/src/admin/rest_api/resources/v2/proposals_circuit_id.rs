@@ -15,7 +15,8 @@
 use std::convert::TryFrom;
 
 use crate::admin::messages::{
-    CircuitProposal, CreateCircuit, ProposalType, SplinterNode, SplinterService, Vote, VoteRecord,
+    CircuitProposal, CircuitStatus, CreateCircuit, ProposalType, SplinterNode, SplinterService,
+    Vote, VoteRecord,
 };
 use crate::hex::as_hex;
 
@@ -40,7 +41,7 @@ impl<'a> TryFrom<&'a CircuitProposal> for ProposalResponse<'a> {
             ProposalType::UpdateRoster => "UpdateRoster",
             ProposalType::AddNode => "AddNode",
             ProposalType::RemoveNode => "RemoveNode",
-            ProposalType::Destroy => "Destroy",
+            ProposalType::Disband => "Disband",
         };
 
         Ok(Self {
@@ -89,6 +90,7 @@ pub(crate) struct CircuitResponse<'a> {
     pub comments: &'a Option<String>,
     pub display_name: &'a Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: &'a CircuitStatus,
 }
 
 impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
@@ -108,6 +110,7 @@ impl<'a> TryFrom<&'a CreateCircuit> for CircuitResponse<'a> {
             comments: &circuit.comments,
             display_name: &circuit.display_name,
             circuit_version: circuit.circuit_version,
+            circuit_status: &circuit.circuit_status,
         })
     }
 }

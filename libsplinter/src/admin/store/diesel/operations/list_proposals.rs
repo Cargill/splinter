@@ -20,7 +20,7 @@ use std::convert::TryFrom;
 use diesel::{
     dsl::exists,
     prelude::*,
-    sql_types::{Binary, Integer, Nullable, Text},
+    sql_types::{Binary, Integer, Nullable, SmallInt, Text},
 };
 
 use crate::admin::store::{
@@ -35,9 +35,9 @@ use crate::admin::store::{
         },
     },
     error::AdminServiceStoreError,
-    AuthorizationType, CircuitPredicate, CircuitProposal, CircuitProposalBuilder, DurabilityType,
-    PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder,
-    ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
+    AuthorizationType, CircuitPredicate, CircuitProposal, CircuitProposalBuilder, CircuitStatus,
+    DurabilityType, PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode,
+    ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
 use crate::error::InvalidStateError;
 
@@ -69,6 +69,7 @@ where
             Nullable<Text>,
             Nullable<Text>,
             Integer,
+            SmallInt,
         ),
         C::Backend,
     >,
@@ -179,7 +180,10 @@ where
                             )?)
                             .with_routes(&RouteType::try_from(proposed_circuit.routes)?)
                             .with_circuit_management_type(&proposed_circuit.circuit_management_type)
-                            .with_circuit_version(proposed_circuit.circuit_version);
+                            .with_circuit_version(proposed_circuit.circuit_version)
+                            .with_circuit_status(&CircuitStatus::from(
+                                &proposed_circuit.circuit_status,
+                            ));
 
                         if let Some(application_metadata) = &proposed_circuit.application_metadata {
                             proposed_circuit_builder = proposed_circuit_builder

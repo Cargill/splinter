@@ -36,7 +36,7 @@ impl<'a> From<&'a CircuitProposal> for ProposalResponse<'a> {
             ProposalType::UpdateRoster => "UpdateRoster",
             ProposalType::AddNode => "AddNode",
             ProposalType::RemoveNode => "RemoveNode",
-            ProposalType::Destroy => "Destroy",
+            ProposalType::Disband => "Disband",
         };
 
         Self {
