@@ -56,6 +56,7 @@ features = [
 path = "../libsplinter"
 features = [
   "admin-service",
+  "cylinder-jwt",
   "registry",
   "registry-remote",
   "rest-api",
@@ -98,7 +99,6 @@ admin-service-event-store = [
   "splinter/admin-service-event-store-diesel",
 ]
 auth = [
-    "splinter/cylinder-jwt",
     "splinter/oauth-github",
     "splinter/oauth-inflight-request-store-postgres",
     "splinter/oauth-openid"
