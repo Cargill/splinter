@@ -132,7 +132,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             )
         }
 
-        #[cfg(feature = "auth")]
+        #[cfg(feature = "oauth")]
         {
             partial_config = partial_config
                 .with_oauth_provider(self.matches.value_of("oauth_provider").map(String::from))

@@ -25,15 +25,15 @@ const STATE_DIR_ENV: &str = "SPLINTER_STATE_DIR";
 const CERT_DIR_ENV: &str = "SPLINTER_CERT_DIR";
 const SPLINTER_HOME_ENV: &str = "SPLINTER_HOME";
 const SPLINTER_STRICT_REF_COUNT_ENV: &str = "SPLINTER_STRICT_REF_COUNT";
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 const OAUTH_PROVIDER_ENV: &str = "OAUTH_PROVIDER";
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 const OAUTH_CLIENT_ID_ENV: &str = "OAUTH_CLIENT_ID";
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 const OAUTH_CLIENT_SECRET_ENV: &str = "OAUTH_CLIENT_SECRET";
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 const OAUTH_REDIRECT_URL_ENV: &str = "OAUTH_REDIRECT_URL";
-#[cfg(feature = "auth")]
+#[cfg(feature = "oauth")]
 const OAUTH_OPENID_URL_ENV: &str = "OAUTH_OPENID_URL";
 
 pub struct EnvPartialConfigBuilder;
@@ -107,7 +107,7 @@ impl PartialConfigBuilder for EnvPartialConfigBuilder {
             .with_state_dir(state_dir_env)
             .with_strict_ref_counts(strict_ref_counts);
 
-        #[cfg(feature = "auth")]
+        #[cfg(feature = "oauth")]
         {
             config = config
                 .with_oauth_provider(env::var(OAUTH_PROVIDER_ENV).ok())

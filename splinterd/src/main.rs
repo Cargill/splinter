@@ -352,7 +352,7 @@ fn main() {
             .help("Whitelisted domains"),
     );
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     let app = app
         .arg(
             Arg::with_name("oauth_provider")
@@ -511,7 +511,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         daemon_builder = daemon_builder.with_whitelist(config.whitelist().map(ToOwned::to_owned));
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     {
         daemon_builder = daemon_builder
             .with_oauth_provider(config.oauth_provider().map(ToOwned::to_owned))
