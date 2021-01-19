@@ -147,9 +147,18 @@ fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> 
             let path = &current_user_search_path();
             load_key(key_name, path)
                 .map_err(|err| CliError::ActionError(err.to_string()))?
-                .ok_or_else(|| CliError::ActionError( {
-                    format!("No signing key found in {:?}.  Either specify the --key argument or generate the default key via splinter keygen", path)
-                }))?
+                .ok_or_else(|| {
+                    CliError::ActionError({
+                        format!(
+                            "No signing key found in {}. Either specify the --key argument or \
+                            generate the default key via splinter keygen",
+                            path.iter()
+                                .map(|path| path.as_path().display().to_string())
+                                .collect::<Vec<String>>()
+                                .join(":")
+                        )
+                    })
+                })?
         }
     } else {
         let path = match env::var("CYLINDER_PATH") {
@@ -168,9 +177,18 @@ fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> 
         };
         load_key(&current_user_key_name(), &path)
             .map_err(|err| CliError::ActionError(err.to_string()))?
-            .ok_or_else(|| CliError::ActionError({
-                format!("No signing key found in {:?}.  Either specify the --key argument or generate the default key via splinter keygen", path)
-            }))?
+            .ok_or_else(|| {
+                CliError::ActionError({
+                    format!(
+                        "No signing key found in {}. Either specify the --key argument or \
+                        generate the default key via splinter keygen",
+                        path.iter()
+                            .map(|path| path.as_path().display().to_string())
+                            .collect::<Vec<String>>()
+                            .join(":")
+                    )
+                })
+            })?
     };
 
     let context = Secp256k1Context::new();
