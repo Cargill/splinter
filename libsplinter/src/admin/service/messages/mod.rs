@@ -612,6 +612,7 @@ pub enum AdminServiceEvent {
     ProposalAccepted((CircuitProposal, Vec<u8>)),
     ProposalRejected((CircuitProposal, Vec<u8>)),
     CircuitReady(CircuitProposal),
+    CircuitDisbanded(CircuitProposal),
 }
 
 impl AdminServiceEvent {
@@ -622,6 +623,7 @@ impl AdminServiceEvent {
             AdminServiceEvent::ProposalAccepted((proposal, _)) => proposal,
             AdminServiceEvent::ProposalRejected((proposal, _)) => proposal,
             AdminServiceEvent::CircuitReady(proposal) => proposal,
+            AdminServiceEvent::CircuitDisbanded(proposal) => proposal,
         }
     }
 }
@@ -642,6 +644,7 @@ impl From<&event::AdminServiceEvent> for AdminServiceEvent {
                 AdminServiceEvent::ProposalRejected((admin_proposal, requester.to_vec()))
             }
             EventType::CircuitReady => AdminServiceEvent::CircuitReady(admin_proposal),
+            EventType::CircuitDisbanded => AdminServiceEvent::CircuitDisbanded(admin_proposal),
         }
     }
 }

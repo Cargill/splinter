@@ -533,6 +533,10 @@ impl<'a> From<&'a messages::AdminServiceEvent> for NewAdminServiceEventModel<'a>
                 event_type: "CircuitReady",
                 data: None,
             },
+            messages::AdminServiceEvent::CircuitDisbanded(_) => NewAdminServiceEventModel {
+                event_type: "CircuitDisbanded",
+                data: None,
+            },
         }
     }
 }
@@ -567,6 +571,11 @@ impl TryFrom<(AdminServiceEventModel, CircuitProposal)> for AdminServiceEvent {
             ("CircuitReady", None) => Ok(AdminServiceEvent {
                 event_id: event_model.id,
                 event_type: EventType::CircuitReady,
+                proposal,
+            }),
+            ("CircuitDisbanded", None) => Ok(AdminServiceEvent {
+                event_id: event_model.id,
+                event_type: EventType::CircuitDisbanded,
                 proposal,
             }),
             _ => Err(AdminServiceEventStoreError::InvalidStateError(

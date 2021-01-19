@@ -556,6 +556,9 @@ fn process_admin_event(
 
             igniter.start_ws(&xo_ws).map_err(AppAuthHandlerError::from)
         }
+        AdminServiceEvent::CircuitDisbanded(_) => Err(AppAuthHandlerError::InvalidMessageError(
+            "Unsupported event type".to_string(),
+        )),
     }
 }
 
