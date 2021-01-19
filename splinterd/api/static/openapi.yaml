@@ -401,6 +401,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+    post:
+      summary: Add a role
+      description: |
+        This endpoint can be used to add a new role to the Splinter Role-based
+        authorization system. The role must conform to the role schema and have
+        unique "role_id" value.
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Role'
+      responses:
+        200:
+          description: The role was successfully added
+        400:
+          description: The request was malformed or the role was invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+        500:
+          description: An internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 
   /registry/nodes:
     post:

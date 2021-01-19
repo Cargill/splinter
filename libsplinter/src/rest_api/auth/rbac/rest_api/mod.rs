@@ -25,3 +25,6 @@ pub use actix_web_1::RoleBasedAuthorizationResourceProvider;
 
 #[cfg(feature = "rest-api-actix")]
 const RBAC_READ_PERMISSION: Permission = Permission::Check("authorization.rbac.read");
+
+#[cfg(feature = "rest-api-actix")]
+const RBAC_WRITE_PERMISSION: Permission = Permission::Check("authorization.rbac.write");

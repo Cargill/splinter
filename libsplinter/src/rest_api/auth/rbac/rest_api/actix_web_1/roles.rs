@@ -16,17 +16,20 @@
 //!
 //! * `GET /authorization/roles` for listing roles
 
+use std::convert::TryInto;
+
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
-use crate::futures::{Future, IntoFuture};
+use crate::error::InvalidStateError;
+use crate::futures::{stream::Stream, Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::rbac::{
         rest_api::{
-            resources::roles::{ListRoleResponse, RoleResponse},
-            RBAC_READ_PERMISSION,
+            resources::roles::{ListRoleResponse, RolePayload, RoleResponse},
+            RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
         },
-        store::RoleBasedAuthorizationStore,
+        store::{Role, RoleBasedAuthorizationStore},
     },
     paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
     ErrorResponse,
@@ -53,7 +56,8 @@ fn default_offset() -> usize {
 pub fn make_roles_resource(
     role_based_authorization_store: Box<dyn RoleBasedAuthorizationStore>,
 ) -> Resource {
-    let list_store = role_based_authorization_store;
+    let list_store = role_based_authorization_store.clone();
+    let post_store = role_based_authorization_store;
     Resource::build("/authorization/roles")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::AUTHORIZATION_RBAC_ROLES_MIN,
@@ -61,6 +65,9 @@ pub fn make_roles_resource(
         ))
         .add_method(Method::Get, RBAC_READ_PERMISSION, move |r, _| {
             list_roles(r, web::Data::new(list_store.clone()))
+        })
+        .add_method(Method::Post, RBAC_WRITE_PERMISSION, move |_, p| {
+            add_role(p, web::Data::new(post_store.clone()))
         })
 }
 
@@ -118,6 +125,64 @@ fn list_roles(
     )
 }
 
+fn add_role(
+    payload: web::Payload,
+    role_based_authorization_store: web::Data<Box<dyn RoleBasedAuthorizationStore>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    Box::new(
+        payload
+            .from_err::<Error>()
+            .fold(web::BytesMut::new(), move |mut body, chunk| {
+                body.extend_from_slice(&chunk);
+                Ok::<_, Error>(body)
+            })
+            .into_future()
+            .and_then(move |body| {
+                let role_res: Result<Role, _> = serde_json::from_slice::<RolePayload>(&body)
+                    .map_err(|err| err.to_string())
+                    .and_then(|role_payload| {
+                        role_payload
+                            .try_into()
+                            .map_err(|err: InvalidStateError| err.to_string())
+                    });
+
+                match role_res {
+                    Ok(role) => Box::new(
+                        web::block(move || {
+                            role_based_authorization_store
+                                .add_role(role)
+                                .map_err(SendableRoleBasedAuthorizationStoreError::from)
+                        })
+                        .then(|res| {
+                            Ok(match res {
+                                Ok(_) => HttpResponse::Ok().finish(),
+                                Err(BlockingError::Error(
+                                    SendableRoleBasedAuthorizationStoreError::ConstraintViolation(
+                                        msg,
+                                    ),
+                                )) => HttpResponse::Conflict().json(ErrorResponse::conflict(&msg)),
+                                Err(err) => {
+                                    error!("Unable to add role: {}", err);
+                                    HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                }
+                            })
+                        }),
+                    )
+                        as Box<dyn Future<Item = HttpResponse, Error = Error>>,
+                    Err(err) => Box::new(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request(&format!(
+                                "Invalid role payload: {}",
+                                err
+                            )))
+                            .into_future(),
+                    ),
+                }
+            }),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,6 +193,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
+    use crate::error::{ConstraintViolationError, ConstraintViolationType};
     use crate::rest_api::auth::rbac::store::{
         Assignment, Identity, Role, RoleBasedAuthorizationStoreError, RoleBuilder,
     };
@@ -347,6 +413,115 @@ mod tests {
         join_handle.join().expect("Unable to join rest api thread");
     }
 
+    /// Tests a POST /authorization/roles request with a valid returns OK.
+    /// Verify that the role has been added by querying the list of roles.
+    #[test]
+    fn test_post_role_ok() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_roles_resource(Box::new(role_based_auth_store))]);
+
+        let url = Url::parse(&format!("http://{}/authorization/roles", bind_url))
+            .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .post(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "role_id": "new_test_role",
+                "display_name": "New Test Display Name",
+                "permissions": ["my-permission-1", "my-permission-2"],
+            }))
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // verify the role is in the list
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        let json_roles = body
+            .get("data")
+            .expect("No data field in response")
+            .as_array()
+            .expect("data field is not an array")
+            .to_vec();
+        assert_eq!(1, json_roles.len());
+
+        assert_eq!(
+            &to_value(RoleResponse {
+                role_id: "new_test_role",
+                display_name: "New Test Display Name",
+                permissions: &["my-permission-1".to_string(), "my-permission-2".to_string()],
+            })
+            .expect("Failed to convert to value"),
+            json_roles.get(0).expect("no first item")
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    /// Tests a POST /authorization/roles request with a valid returns OK.
+    /// Verify that the role has been added by querying the list of roles.
+    #[test]
+    fn test_post_role_conflict() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_roles_resource(Box::new(role_based_auth_store))]);
+
+        let url = Url::parse(&format!("http://{}/authorization/roles", bind_url))
+            .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .post(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "role_id": "test-role-1",
+                "display_name": "Doesn't matter",
+                "permissions": ["my-permission-1", "my-permission-2"],
+            }))
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
     fn run_rest_api_on_open_port(
         resources: Vec<Resource>,
     ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
@@ -429,12 +604,19 @@ mod tests {
         }
 
         fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
-            self.roles
+            let mut roles = self
+                .roles
                 .lock()
-                .expect("mem role based authorization store lock was poisoned")
-                .insert(role.id().to_string(), role);
+                .expect("mem role based authorization store lock was poisoned");
 
-            Ok(())
+            if !roles.contains_key(role.id()) {
+                roles.insert(role.id().to_string(), role);
+                Ok(())
+            } else {
+                Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
+                ))
+            }
         }
 
         fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
