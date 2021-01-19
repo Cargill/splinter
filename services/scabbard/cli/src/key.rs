@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "scabbard-cli-jwt")]
+use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+#[cfg(feature = "scabbard-cli-jwt")]
+use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "scabbard-cli-jwt")]
-use cylinder::{jwt::JsonWebTokenBuilder, load_user_key};
+use cylinder::{
+    current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
+    load_key_from_path,
+};
 use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey, Signer};
 
 use super::error::CliError;
@@ -96,23 +103,39 @@ fn determine_key_file_path(key: &str) -> Result<PathBuf, CliError> {
 /// * `key_name` - name or path of the private key file
 #[cfg(feature = "scabbard-cli-jwt")]
 pub fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
-    let default_key_path = dirs::home_dir()
-        .map(|mut p| {
-            p.push(".splinter/keys");
-            p
-        })
-        .ok_or_else(|| CliError::action_error("Home directory not found"))?;
-    let default_path_string = {
-        if let Some(path) = default_key_path.to_str() {
-            path
+    let private_key = if let Some(key_name) = key_name {
+        if key_name.contains('/') {
+            load_key_from_path(Path::new(key_name))
+                .map_err(|err| CliError::action_error(&err.to_string()))?
         } else {
-            return Err(CliError::action_error("Path is not valid unicode"));
+            let path = &current_user_search_path();
+            load_key(key_name, path)
+                .map_err(|err| CliError::action_error(&err.to_string()))?
+                .ok_or_else(|| CliError::action_error( {
+                    &format!("No signing key found in {:?}.  Either specify the --key argument or generate the default key via splinter keygen", path)
+                }))?
         }
+    } else {
+        let path = match env::var("CYLINDER_PATH") {
+            Ok(_) => current_user_search_path(),
+            Err(_) => {
+                let mut splinter_path = match dirs::home_dir() {
+                    Some(dir) => dir,
+                    None => Path::new(".").to_path_buf(),
+                };
+                splinter_path.push(".splinter");
+                splinter_path.push("keys");
+                let mut paths = current_user_search_path();
+                paths.push(splinter_path);
+                paths
+            }
+        };
+        load_key(&current_user_key_name(), &path)
+            .map_err(|err| CliError::action_error(&err.to_string()))?
+            .ok_or_else(|| CliError::action_error({
+                &format!("No signing key found in {:?}.  Either specify the --key argument or generate the default key via splinter keygen", path)
+            }))?
     };
-
-    let private_key = load_user_key(key_name, default_path_string).map_err(|err| {
-        CliError::action_error_with_source("unable to get private key from file", err.into())
-    })?;
 
     let context = Secp256k1Context::new();
     let signer = context.new_signer(private_key);

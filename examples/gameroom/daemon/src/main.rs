@@ -27,9 +27,10 @@ mod config;
 mod error;
 mod rest_api;
 
+use std::path::PathBuf;
 use std::thread;
 
-use cylinder::{jwt::JsonWebTokenBuilder, load_user_key, secp256k1::Secp256k1Context, Context};
+use cylinder::{jwt::JsonWebTokenBuilder, load_key, secp256k1::Secp256k1Context, Context};
 use flexi_logger::{style, DeferredNow, LogSpecBuilder, Logger};
 use gameroom_database::ConnectionPool;
 use log::Record;
@@ -100,8 +101,11 @@ fn run() -> Result<(), GameroomDaemonError> {
 
     // Get the public/private key pair
     let context = Secp256k1Context::new();
-    let private_key = load_user_key(Some(config.key()), "")
-        .map_err(|err| GameroomDaemonError::SigningError(err.to_string()))?;
+    let private_key = load_key(config.key(), &[PathBuf::from("")])
+        .map_err(|err| GameroomDaemonError::SigningError(err.to_string()))?
+        .ok_or_else(|| GameroomDaemonError::SigningError( {
+            format!("No signing key found in {:?}.  Either specify the --key argument or generate the default key via splinter keygen", config.key())
+        }))?;
     let private_key_hex = private_key.as_hex();
     let public_key_hex = context.get_public_key(&private_key)?.as_hex();
 
