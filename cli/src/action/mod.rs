@@ -161,6 +161,8 @@ fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> 
                 })?
         }
     } else {
+        // If the `CYLINDER_PATH` environment variable is not set, add `$HOME/.splinter/keys`
+        // to the vector of paths to search. This is for backwards compatibility.
         let path = match env::var("CYLINDER_PATH") {
             Ok(_) => current_user_search_path(),
             Err(_) => {
