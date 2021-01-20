@@ -37,8 +37,9 @@ impl RoleBasedAuthorizationResourceProvider {
 
 impl RestResourceProvider for RoleBasedAuthorizationResourceProvider {
     fn resources(&self) -> Vec<Resource> {
-        vec![roles::make_roles_resource(
-            self.role_based_authorization_store.clone(),
-        )]
+        vec![
+            roles::make_roles_resource(self.role_based_authorization_store.clone()),
+            roles::make_role_resource(self.role_based_authorization_store.clone()),
+        ]
     }
 }

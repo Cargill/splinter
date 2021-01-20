@@ -434,6 +434,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /authorization/roles/{role_id}:
+    get:
+      summary: Fetches a role by its ID
+      description: |
+        This endpoint can be used to view a specific role.
+      tags:
+        - Roles
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+        - name: role_id
+          in: path
+          description: ID of the role to fetch
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Successfully retrieved the requested role
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Role'
+        401:
+          description: The client is unauthorized
+        404:
+          description: The requested role was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: An internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /registry/nodes:
     post:
