@@ -99,6 +99,7 @@ experimental = [
     "admin-service-event-store",
     "admin-service-event-store-diesel",
     "authorization",
+    "authorization-handler-rbac",
     "biome-notifications",
     "biome-oauth",
     "biome-oauth-user-store-postgres",
@@ -124,6 +125,7 @@ admin-service = []
 admin-service-event-store = ["admin-service"]
 admin-service-event-store-diesel = ["diesel", "admin-service-event-store"]
 authorization = ["rest-api"]
+authorization-handler-rbac = ["authorization"]
 biome-credentials = ["bcrypt"]
 biome-key-management = []
 biome-notifications = []

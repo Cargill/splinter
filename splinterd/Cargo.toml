@@ -81,6 +81,7 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization",
+    "authorization-handler-rbac",
     "admin-service-event-store",
     "biome-oauth",
     "health",
@@ -102,6 +103,11 @@ authorization = [
     "health/authorization",
     "scabbard/authorization",
     "splinter/authorization",
+]
+authorization-handler-rbac = [
+    "splinter/authorization",
+    "splinter/authorization-handler-rbac",
+    "splinter/role-based-authorization-store-postgres",
 ]
 biome-credentials = ["database", "splinter/biome-credentials"]
 biome-key-management = ["database", "splinter/biome-key-management"]
