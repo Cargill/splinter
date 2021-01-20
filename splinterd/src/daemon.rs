@@ -545,19 +545,19 @@ impl SplinterDaemon {
             #[cfg(feature = "authorization-handler-allow-keys")]
             authorization_handlers.push(create_allow_keys_authorization_handler(&self.state_dir)?);
 
-            #[cfg(feature = "authorization-handler-rbac")]
-            {
-                authorization_handlers.push(Box::new(RoleBasedAuthorizationHandler::new(
-                    store_factory.get_role_based_authorization_store(),
-                )));
-            }
-
             #[cfg(feature = "authorization-handler-maintenance")]
             {
                 let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::new();
                 rest_api_builder =
                     rest_api_builder.add_resources(maintenance_mode_auth_handler.resources());
                 authorization_handlers.push(Box::new(maintenance_mode_auth_handler));
+            }
+
+            #[cfg(feature = "authorization-handler-rbac")]
+            {
+                authorization_handlers.push(Box::new(RoleBasedAuthorizationHandler::new(
+                    store_factory.get_role_based_authorization_store(),
+                )));
             }
 
             rest_api_builder = rest_api_builder
