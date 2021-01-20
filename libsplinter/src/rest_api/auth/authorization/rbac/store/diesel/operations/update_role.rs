@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use diesel::{dsl::insert_into, prelude::*};
+use diesel::{
+    dsl::{delete, insert_into, update},
+    prelude::*,
+};
 
-use crate::rest_api::auth::rbac::store::{
+use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
         schema::{role_permissions, roles},
@@ -24,19 +27,24 @@ use crate::rest_api::auth::rbac::store::{
 
 use super::RoleBasedAuthorizationStoreOperations;
 
-pub trait RoleBasedAuthorizationStoreAddRole {
-    fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError>;
+pub trait RoleBasedAuthorizationStoreUpdateRole {
+    fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError>;
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> RoleBasedAuthorizationStoreAddRole
+impl<'a> RoleBasedAuthorizationStoreUpdateRole
     for RoleBasedAuthorizationStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
-    fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+    fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
 
         self.conn.transaction::<_, _, _>(|| {
-            insert_into(roles::table).values(role).execute(self.conn)?;
+            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
+                .execute(self.conn)?;
+
+            update(roles::table.find(&role.id))
+                .set(roles::display_name.eq(&role.display_name))
+                .execute(self.conn)?;
 
             insert_into(role_permissions::table)
                 .values(permissions)
@@ -48,13 +56,19 @@ impl<'a> RoleBasedAuthorizationStoreAddRole
 }
 
 #[cfg(feature = "role-based-authorization-store-postgres")]
-impl<'a> RoleBasedAuthorizationStoreAddRole
+impl<'a> RoleBasedAuthorizationStoreUpdateRole
     for RoleBasedAuthorizationStoreOperations<'a, diesel::pg::PgConnection>
 {
-    fn add_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+    fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
+
         self.conn.transaction::<_, _, _>(|| {
-            insert_into(roles::table).values(role).execute(self.conn)?;
+            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
+                .execute(self.conn)?;
+
+            update(roles::table.find(&role.id))
+                .set(roles::display_name.eq(&role.display_name))
+                .execute(self.conn)?;
 
             insert_into(role_permissions::table)
                 .values(permissions)

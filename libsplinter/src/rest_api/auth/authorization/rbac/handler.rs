@@ -75,7 +75,7 @@ impl AuthorizationHandler for RoleBasedAuthorizationHandler {
 mod tests {
     use super::*;
 
-    use crate::rest_api::auth::rbac::store::{
+    use crate::rest_api::auth::authorization::rbac::store::{
         AssignmentBuilder, DieselRoleBasedAuthorizationStore, RoleBuilder,
     };
 

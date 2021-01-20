@@ -18,7 +18,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::error::InvalidStateError;
-use crate::rest_api::auth::rbac::store::RoleBasedAuthorizationStoreError;
+use crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStoreError;
 
 #[derive(Debug)]
 pub(crate) enum SendableRoleBasedAuthorizationStoreError {

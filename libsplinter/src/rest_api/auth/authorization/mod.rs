@@ -18,3 +18,4 @@
 pub mod allow_keys;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
+pub mod rbac;

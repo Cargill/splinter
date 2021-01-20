@@ -21,8 +21,6 @@ pub mod authorization;
 pub mod identity;
 #[cfg(feature = "authorization")]
 mod permission_map;
-#[cfg(feature = "authorization")]
-pub mod rbac;
 
 use std::str::FromStr;
 

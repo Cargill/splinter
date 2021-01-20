@@ -14,7 +14,7 @@
 
 use diesel::{dsl::delete, prelude::*};
 
-use crate::rest_api::auth::rbac::store::{
+use crate::rest_api::auth::authorization::rbac::store::{
     diesel::schema::{role_permissions, roles},
     RoleBasedAuthorizationStoreError,
 };

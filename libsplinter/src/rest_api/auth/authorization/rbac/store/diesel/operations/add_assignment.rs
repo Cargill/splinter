@@ -12,43 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use diesel::{
-    dsl::{delete, insert_into},
-    prelude::*,
-};
+use diesel::{dsl::insert_into, prelude::*};
 
-use crate::rest_api::auth::rbac::store::{
+use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{AssignmentModel, IdentityModel},
-        schema::assignments,
+        schema::{assignments, identities},
     },
     Assignment, RoleBasedAuthorizationStoreError,
 };
 
 use super::RoleBasedAuthorizationStoreOperations;
 
-pub trait RoleBasedAuthorizationStoreUpdateAssignment {
-    fn update_assignment(
+pub trait RoleBasedAuthorizationStoreAddAssignment {
+    fn add_assignment(
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError>;
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
+impl<'a> RoleBasedAuthorizationStoreAddAssignment
     for RoleBasedAuthorizationStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
-    fn update_assignment(
+    fn add_assignment(
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let (identity, roles): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
+        let (identity, assignments): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
-            delete(assignments::table.filter(assignments::identity.eq(&identity.identity)))
+            insert_into(identities::table)
+                .values(identity)
                 .execute(self.conn)?;
 
             insert_into(assignments::table)
-                .values(roles)
+                .values(assignments)
                 .execute(self.conn)?;
 
             Ok(())
@@ -57,20 +55,21 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
 }
 
 #[cfg(feature = "role-based-authorization-store-postgres")]
-impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
+impl<'a> RoleBasedAuthorizationStoreAddAssignment
     for RoleBasedAuthorizationStoreOperations<'a, diesel::pg::PgConnection>
 {
-    fn update_assignment(
+    fn add_assignment(
         &self,
         assignment: Assignment,
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
-        let (identity, roles): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
+        let (identity, assignments): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
-            delete(assignments::table.filter(assignments::identity.eq(&identity.identity)))
+            insert_into(identities::table)
+                .values(identity)
                 .execute(self.conn)?;
 
             insert_into(assignments::table)
-                .values(roles)
+                .values(assignments)
                 .execute(self.conn)?;
 
             Ok(())

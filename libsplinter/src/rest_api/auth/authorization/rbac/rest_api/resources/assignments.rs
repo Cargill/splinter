@@ -16,7 +16,7 @@ use std::convert::TryFrom;
 
 use crate::error::InvalidStateError;
 use crate::rest_api::{
-    auth::rbac::store::{Assignment, AssignmentBuilder, Identity},
+    auth::authorization::rbac::store::{Assignment, AssignmentBuilder, Identity},
     paging::Paging,
 };
 

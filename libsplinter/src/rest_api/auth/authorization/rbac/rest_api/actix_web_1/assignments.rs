@@ -20,7 +20,7 @@ use crate::futures::{Future, IntoFuture, Stream};
 use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
-    auth::rbac::{
+    auth::authorization::rbac::{
         rest_api::{
             resources::{
                 assignments::{
@@ -373,7 +373,7 @@ mod tests {
     use serde_json::{to_value, Value as JsonValue};
 
     use crate::error::{ConstraintViolationError, ConstraintViolationType};
-    use crate::rest_api::auth::rbac::store::{
+    use crate::rest_api::auth::authorization::rbac::store::{
         Assignment, AssignmentBuilder, Identity, Role, RoleBasedAuthorizationStoreError,
         RoleBuilder,
     };

@@ -19,7 +19,7 @@ mod error;
 mod roles;
 
 use crate::rest_api::{
-    auth::rbac::store::RoleBasedAuthorizationStore, Resource, RestResourceProvider,
+    auth::authorization::rbac::store::RoleBasedAuthorizationStore, Resource, RestResourceProvider,
 };
 
 /// REST Resource Provider for Role-based Authorization REST resources.

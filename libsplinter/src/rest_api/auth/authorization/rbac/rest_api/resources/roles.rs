@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 
 use crate::error::InvalidStateError;
 use crate::rest_api::{
-    auth::rbac::store::{Role, RoleBuilder},
+    auth::authorization::rbac::store::{Role, RoleBuilder},
     paging::Paging,
 };
 
