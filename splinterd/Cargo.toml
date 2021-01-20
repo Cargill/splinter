@@ -111,7 +111,6 @@ authorization-handler-maintenance = [
     "splinter/authorization-handler-maintenance",
 ]
 authorization-handler-rbac = [
-    "splinter/authorization",
     "splinter/authorization-handler-rbac",
     "splinter/role-based-authorization-store-postgres",
 ]
