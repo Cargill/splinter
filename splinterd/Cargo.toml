@@ -80,11 +80,11 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "admin-service-event-store",
     "authorization",
     "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
-    "admin-service-event-store",
     "biome-oauth",
     "health",
     "https-bind",
