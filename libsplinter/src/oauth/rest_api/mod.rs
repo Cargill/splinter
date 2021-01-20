@@ -34,7 +34,7 @@ use super::OAuthClient;
 ///
 /// * `rest-api-actix`
 #[derive(Clone)]
-pub(crate) struct OAuthResourceProvider {
+pub struct OAuthResourceProvider {
     client: OAuthClient,
     oauth_user_session_store: Box<dyn OAuthUserSessionStore>,
 }

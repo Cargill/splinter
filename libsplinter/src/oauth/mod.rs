@@ -17,7 +17,7 @@
 mod builder;
 mod error;
 #[cfg(feature = "rest-api")]
-pub mod rest_api;
+pub(crate) mod rest_api;
 pub mod store;
 mod subject;
 
