@@ -7,6 +7,7 @@
 | Darian Plumb | dplumb94 |
 | Dave Cecchi | davececchi |
 | Davey Newhall | dnewh |
+| Isabel Tomb | isabeltomb |
 | James Mitchell | jsmitchell |
 | Logan Seeley | ltseeley |
 | Peter Schwarz | peterschwarz |
