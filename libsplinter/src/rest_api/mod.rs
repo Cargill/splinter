@@ -175,6 +175,10 @@ pub enum OAuthConfig {
         redirect_url: String,
         /// The URL of the OpenID discovery document for the OpenId OAuth app
         oauth_openid_url: String,
+        /// Additional parameters to add to auth requests made to the OpenID OAuth provider
+        auth_params: Option<Vec<(String, String)>>,
+        /// Additional scopes to request from the OpenID OAuth provider
+        scopes: Option<Vec<String>>,
         /// The store for in-flight requests
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },

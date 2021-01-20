@@ -206,14 +206,24 @@ impl RestApiBuilder {
                                 client_secret,
                                 redirect_url,
                                 oauth_openid_url,
+                                auth_params,
+                                scopes,
                                 inflight_request_store,
-                            } => OpenIdOAuthClientBuilder::new()
-                                .with_discovery_url(oauth_openid_url)
-                                .with_client_id(client_id)
-                                .with_client_secret(client_secret)
-                                .with_redirect_url(redirect_url)
-                                .with_inflight_request_store(inflight_request_store)
-                                .build()?,
+                            } => {
+                                let mut builder = OpenIdOAuthClientBuilder::new()
+                                    .with_discovery_url(oauth_openid_url)
+                                    .with_client_id(client_id)
+                                    .with_client_secret(client_secret)
+                                    .with_redirect_url(redirect_url)
+                                    .with_inflight_request_store(inflight_request_store);
+                                if let Some(auth_params) = auth_params {
+                                    builder = builder.with_extra_auth_params(auth_params);
+                                }
+                                if let Some(scopes) = scopes {
+                                    builder = builder.with_scopes(scopes);
+                                }
+                                builder.build()?
+                            }
                         };
 
                         identity_providers.push(Box::new(OAuthUserIdentityProvider::new(
