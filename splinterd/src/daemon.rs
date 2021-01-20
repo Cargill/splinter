@@ -64,10 +64,10 @@ use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
 use splinter::rest_api::auth::{
     allow_keys::AllowKeysAuthorizationHandler, AuthorizationHandler, Permission,
 };
-#[cfg(feature = "auth")]
-use splinter::rest_api::{AuthConfig, OAuthConfig};
+#[cfg(feature = "oauth")]
+use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{
-    Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
+    AuthConfig, Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
@@ -120,15 +120,15 @@ pub struct SplinterDaemon {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_id: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_secret: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_redirect_url: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
     heartbeat: u64,
     strict_ref_counts: bool,
@@ -154,7 +154,7 @@ impl SplinterDaemon {
         #[cfg(all(
             not(feature = "database"),
             any(
-                feature = "auth",
+                feature = "oauth",
                 feature = "biome-credentials",
                 feature = "biome-key-management",
                 feature = "admin-service-event-store"
@@ -164,7 +164,7 @@ impl SplinterDaemon {
 
         #[cfg(any(
             feature = "database",
-            feature = "auth",
+            feature = "oauth",
             feature = "biome-credentials",
             feature = "biome-key-management",
             feature = "admin-service-event-store",
@@ -596,15 +596,25 @@ impl SplinterDaemon {
             }
         }
 
-        #[cfg(feature = "auth")]
-        {
-            let mut auth_configs = vec![];
+        let mut auth_configs = vec![];
 
-            // Add Cylinder JWT as an auth provider
-            auth_configs.push(AuthConfig::Cylinder {
-                verifier: Secp256k1Context::new().new_verifier(),
+        // Add Cylinder JWT as an auth provider
+        auth_configs.push(AuthConfig::Cylinder {
+            verifier: Secp256k1Context::new().new_verifier(),
+        });
+
+        // Add Biome as an auth provider if the `biome-credentials` feature is enabled and Biome
+        // is configured. This informs the REST API that Biome is providing auth.
+        #[cfg(feature = "biome-credentials")]
+        if self.enable_biome {
+            let biome_resource_manager = build_biome_routes(&*store_factory)?;
+            auth_configs.push(AuthConfig::Biome {
+                biome_resource_manager,
             });
+        }
 
+        #[cfg(feature = "oauth")]
+        {
             // Handle OAuth config. If no OAuth config values are provided, just skip this;
             // otherwise, require that all are set.
             let any_oauth_args_provided = self.oauth_provider.is_some()
@@ -672,25 +682,13 @@ impl SplinterDaemon {
                     oauth_user_session_store: store_factory.get_biome_oauth_user_session_store(),
                 });
             }
-
-            // Add Biome as an auth provider if the `biome-credentials` feature is enabled and Biome
-            // is configured. This informs the REST API that Biome is providing auth.
-            #[cfg(feature = "biome-credentials")]
-            if self.enable_biome {
-                let biome_resource_manager = build_biome_routes(&*store_factory)?;
-                auth_configs.push(AuthConfig::Biome {
-                    biome_resource_manager,
-                });
-            }
-
-            rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
         }
 
-        // If Biome is enabled but wasn't already added as an auth provider, add it now
-        #[cfg(all(
-            any(feature = "biome-credentials", feature = "biome-key-management"),
-            not(all(feature = "auth", feature = "biome-credentials"))
-        ))]
+        rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
+
+        // If `biome-key-management` is enabled but `biome-credentials` isn't then the Biome
+        // endpoints weren't added as an auth provider, so add them now
+        #[cfg(all(feature = "biome-key-management", not(feature = "biome-credentials")))]
         if self.enable_biome {
             let biome_resources = build_biome_routes(&*store_factory)?;
             rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
@@ -1013,15 +1011,15 @@ pub struct SplinterDaemonBuilder {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_id: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_secret: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_redirect_url: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
     strict_ref_counts: Option<bool>,
 }
@@ -1132,31 +1130,31 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn with_oauth_provider(mut self, value: Option<String>) -> Self {
         self.oauth_provider = value;
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn with_oauth_client_id(mut self, value: Option<String>) -> Self {
         self.oauth_client_id = value;
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn with_oauth_client_secret(mut self, value: Option<String>) -> Self {
         self.oauth_client_secret = value;
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn with_oauth_redirect_url(mut self, value: Option<String>) -> Self {
         self.oauth_redirect_url = value;
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn with_oauth_openid_url(mut self, value: Option<String>) -> Self {
         self.oauth_openid_url = value;
         self
@@ -1268,15 +1266,15 @@ impl SplinterDaemonBuilder {
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_provider: self.oauth_provider,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_client_id: self.oauth_client_id,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_client_secret: self.oauth_client_secret,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_redirect_url: self.oauth_redirect_url,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_openid_url: self.oauth_openid_url,
             heartbeat,
             strict_ref_counts,

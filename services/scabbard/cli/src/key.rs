@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "scabbard-cli-jwt")]
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-#[cfg(feature = "scabbard-cli-jwt")]
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-#[cfg(feature = "scabbard-cli-jwt")]
 use cylinder::{
     current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
-    load_key_from_path,
+    load_key_from_path, secp256k1::Secp256k1Context, Context, PrivateKey, Signer,
 };
-use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey, Signer};
 
 use super::error::CliError;
 
@@ -101,7 +96,6 @@ fn determine_key_file_path(key: &str) -> Result<PathBuf, CliError> {
 /// # Arguments
 ///
 /// * `key_name` - name or path of the private key file
-#[cfg(feature = "scabbard-cli-jwt")]
 pub fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
     let private_key = if let Some(key_name) = key_name {
         if key_name.contains('/') {

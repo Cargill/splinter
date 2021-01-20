@@ -46,20 +46,25 @@ services:
             ipv4_address: 172.28.1.1
         volumes:
           - registry:/registry
+          - acme-keys:/acme_keys
+          - bubba-keys:/bubba_keys
+        depends_on:
+          - splinterd-node-acme
+          - splinterd-node-bubba
         command: |
           bash -c "
             if [ ! -f /registry/registry.yaml ]
             then
-              # generate keys
+              # generate user keys
               splinter admin keygen alice -d /registry
               splinter admin keygen bob -d /registry
-              # check if splinterd-node-acme is available
-              while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-acme:8085/status) -ne 200 ]] ; do
+              # check if splinterd-node-acme is available (will get 401 because no auth is provided)
+              while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-acme:8085/status) -ne 401 ]] ; do
                  >&2 echo \"splinterd is unavailable - sleeping\"
                  sleep 1
               done
-              # check if splinterd-node-bubba is available
-              while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-bubba:8085/status) -ne 200 ]] ; do
+              # check if splinterd-node-bubba is available (will get 401 because no auth is provided)
+              while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-bubba:8085/status) -ne 401 ]] ; do
                  >&2 echo \"splinterd is unavailable - sleeping\"
                  sleep 1
               done
@@ -67,11 +72,13 @@ services:
               splinter registry build \
                 http://splinterd-node-acme:8085 \
                 --file /registry/registry.yaml \
+                --key /acme_keys/acme.priv \
                 --key-file /registry/alice.pub \
                 --metadata organization='ACME Corporation'
               splinter registry build \
                 http://splinterd-node-bubba:8085 \
                 --file /registry/registry.yaml \
+                --key /bubba_keys/bubba.priv \
                 --key-file /registry/bob.pub \
                 --metadata organization='Bubba Bakery'
             fi
@@ -162,8 +169,8 @@ services:
                 sleep 1
             done
 
-            # check if splinterd-node-acme is available
-            while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-acme:8085/status) -ne 200 ]] ; do
+            # check if splinterd-node-acme is available (will get 401 because no auth is provided)
+            while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-acme:8085/status) -ne 401 ]] ; do
                >&2 echo \"splinterd is unavailable - sleeping\"
                sleep 1
             done
@@ -307,8 +314,8 @@ services:
                 sleep 1
             done
 
-            # check if splinterd-node-bubba is available
-            while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-bubba:8085/status) -ne 200 ]] ; do
+            # check if splinterd-node-bubba is available (will get 401 because no auth is provided)
+            while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node-bubba:8085/status) -ne 401 ]] ; do
                >&2 echo \"splinterd is unavailable - sleeping\"
                sleep 1
             done

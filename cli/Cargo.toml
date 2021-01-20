@@ -30,7 +30,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
-cylinder = "0.2.2"
+cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
 diesel = { version = "1.0", features = ["postgres"], optional = true }
 dirs = "2.0"
 flexi_logger = "0.14"
@@ -72,18 +72,15 @@ experimental = [
     "health",
     "https-certs",
     "maintenance-mode",
-    "splinter-cli-jwt",
 ]
 
 circuit-auth-type = []
 circuit-template = ["splinter/circuit-template"]
 
-splinter-cli-jwt = ["cylinder/jwt", "cylinder/key-load"]
-
 health = []
 
 https-certs = []
-maintenance-mode = ["splinter-cli-jwt"]
+maintenance-mode = []
 
 database = ["diesel"]
 postgres = [

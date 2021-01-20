@@ -52,6 +52,7 @@ impl Authorization {
     ) -> Self {
         Self {
             identity_providers,
+            #[cfg(feature = "authorization")]
             authorization_handlers,
         }
     }
@@ -73,6 +74,7 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ok(AuthorizationMiddleware {
             identity_providers: self.identity_providers.clone(),
+            #[cfg(feature = "authorization")]
             authorization_handlers: self.authorization_handlers.clone(),
             service,
         })
@@ -199,6 +201,7 @@ where
                     .into_future(),
                 )
             }
+            #[cfg(feature = "authorization")]
             AuthorizationResult::UnknownEndpoint => {
                 return Box::new(
                     req.into_response(

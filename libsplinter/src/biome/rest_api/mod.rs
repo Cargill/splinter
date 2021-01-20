@@ -30,7 +30,7 @@ use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
 use crate::rest_api::auth::Permission;
-#[cfg(all(feature = "auth", feature = "biome-credentials"))]
+#[cfg(feature = "biome-credentials")]
 use crate::rest_api::{
     auth::identity::biome::BiomeUserIdentityProvider, sessions::default_validation,
 };
@@ -114,7 +114,7 @@ pub struct BiomeRestResourceManager {
 
 impl BiomeRestResourceManager {
     /// Creates a new Biome user identity provider for the Splinter REST API
-    #[cfg(all(feature = "auth", feature = "biome-credentials"))]
+    #[cfg(feature = "biome-credentials")]
     pub fn get_identity_provider(&self) -> BiomeUserIdentityProvider {
         BiomeUserIdentityProvider::new(
             self.token_secret_manager.clone(),
@@ -183,15 +183,9 @@ impl RestResourceProvider for BiomeRestResourceManager {
 
         #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
         {
-            resources.push(make_key_management_route(
-                self.rest_config.clone(),
-                self.key_store.clone(),
-                self.token_secret_manager.clone(),
-            ));
+            resources.push(make_key_management_route(self.key_store.clone()));
             resources.push(make_key_management_route_with_public_key(
-                self.rest_config.clone(),
                 self.key_store.clone(),
-                self.token_secret_manager.clone(),
             ));
         }
         resources
@@ -370,9 +364,7 @@ mod tests {
     use crate::biome::{MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore};
     #[cfg(feature = "authorization")]
     use crate::error::InternalError;
-    #[cfg(feature = "auth")]
-    use crate::rest_api::actix_web_1::AuthConfig;
-    use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
+    use crate::rest_api::actix_web_1::{AuthConfig, RestApiBuilder, RestApiShutdownHandle};
     #[cfg(feature = "authorization")]
     use crate::rest_api::auth::{
         identity::Identity, AuthorizationHandler, AuthorizationHandlerResult,
@@ -498,14 +490,10 @@ mod tests {
 
         rest_api_builder = rest_api_builder
             .with_bind(bind)
-            .add_resources(resource_manager.resources());
-
-        #[cfg(feature = "auth")]
-        {
-            rest_api_builder = rest_api_builder.with_auth_configs(vec![AuthConfig::Biome {
+            .add_resources(resource_manager.resources())
+            .with_auth_configs(vec![AuthConfig::Biome {
                 biome_resource_manager: resource_manager,
             }]);
-        }
 
         #[cfg(feature = "authorization")]
         {

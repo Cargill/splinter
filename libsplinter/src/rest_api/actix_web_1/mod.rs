@@ -21,9 +21,7 @@ mod resource;
 mod websocket;
 
 pub use api::{RestApi, RestApiShutdownHandle};
-#[cfg(feature = "auth")]
-pub use auth::AuthConfig;
-pub use auth::{get_authorization_token, require_header};
+pub use auth::{get_authorization_token, require_header, AuthConfig};
 pub use builder::RestApiBuilder;
 pub use error::ResponseError;
 pub use guard::{Continuation, ProtocolVersionRangeGuard, RequestGuard};

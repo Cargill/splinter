@@ -64,7 +64,6 @@ experimental = [
   "stable",
   # The following features are experimental:
   "authorization",
-  "client-auth"
 ]
 
 authorization = ["splinter/authorization"]
@@ -72,5 +71,4 @@ client = ["reqwest"]
 events = ["splinter/events"]
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
-client-auth = []
 service-arg-validation = ["splinter/service-arg-validation"]

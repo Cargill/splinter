@@ -22,7 +22,6 @@ use super::CliError;
 #[derive(Default)]
 pub struct SplinterRestClientBuilder {
     pub url: Option<String>,
-    #[cfg(feature = "splinter-cli-jwt")]
     pub auth: Option<String>,
 }
 
@@ -36,7 +35,6 @@ impl SplinterRestClientBuilder {
         self
     }
 
-    #[cfg(feature = "splinter-cli-jwt")]
     pub fn with_auth(mut self, auth: String) -> Self {
         self.auth = Some(auth);
         self
@@ -47,7 +45,6 @@ impl SplinterRestClientBuilder {
             url: self.url.ok_or_else(|| {
                 CliError::ActionError("Failed to build client, url not provided".to_string())
             })?,
-            #[cfg(feature = "splinter-cli-jwt")]
             auth: self.auth.ok_or_else(|| {
                 CliError::ActionError(
                     "Failed to build client, jwt authorization not provided".to_string(),
@@ -60,24 +57,15 @@ impl SplinterRestClientBuilder {
 /// A wrapper around the Splinter REST API.
 pub struct SplinterRestClient {
     pub url: String,
-    #[cfg(feature = "splinter-cli-jwt")]
     pub auth: String,
 }
 
 impl SplinterRestClient {
     /// Gets the Splinter node's status.
     pub fn get_node_status(&self) -> Result<NodeStatus, CliError> {
-        // Allowing unused_mut because request must be mutable if experimental feature
-        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
-        #[allow(unused_mut)]
-        let mut request = Client::new().get(&format!("{}/status", self.url));
-
-        #[cfg(feature = "splinter-cli-jwt")]
-        {
-            request = request.header("Authorization", &self.auth);
-        }
-
-        request
+        Client::new()
+            .get(&format!("{}/status", self.url))
+            .header("Authorization", &self.auth)
             .send()
             .map_err(|err| CliError::ActionError(format!("Failed to fetch node ID: {}", err)))
             .and_then(|res| {
@@ -111,17 +99,9 @@ impl SplinterRestClient {
     /// Checks whether or not maintenance mode is enabled for the Splinter node.
     #[cfg(feature = "maintenance-mode")]
     pub fn is_maintenance_mode_enabled(&self) -> Result<bool, CliError> {
-        // Allowing unused_mut because request must be mutable if experimental feature
-        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
-        #[allow(unused_mut)]
-        let mut request = Client::new().get(&format!("{}/authorization/maintenance", self.url));
-
-        #[cfg(feature = "splinter-cli-jwt")]
-        {
-            request = request.header("Authorization", &self.auth);
-        }
-
-        request
+        Client::new()
+            .get(&format!("{}/authorization/maintenance", self.url))
+            .header("Authorization", &self.auth)
             .send()
             .map_err(|err| {
                 CliError::ActionError(format!("Failed to check maintenance mode status: {}", err))
@@ -165,19 +145,10 @@ impl SplinterRestClient {
     /// Turns maintenance mode on or off for the Splinter node.
     #[cfg(feature = "maintenance-mode")]
     pub fn set_maintenance_mode(&self, enabled: bool) -> Result<(), CliError> {
-        // Allowing unused_mut because request must be mutable if experimental feature
-        // splinter-cli-jwt is enabled, if feature is removed unused_mut notation can be removed
-        #[allow(unused_mut)]
-        let mut request = Client::new()
+        Client::new()
             .post(&format!("{}/authorization/maintenance", self.url))
-            .query(&[("enabled", enabled)]);
-
-        #[cfg(feature = "splinter-cli-jwt")]
-        {
-            request = request.header("Authorization", &self.auth);
-        }
-
-        request
+            .query(&[("enabled", enabled)])
+            .header("Authorization", &self.auth)
             .send()
             .map_err(|err| {
                 CliError::ActionError(format!("Failed to set maintenance mode: {}", err))

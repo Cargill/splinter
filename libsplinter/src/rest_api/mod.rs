@@ -57,7 +57,6 @@
 //! ```
 
 pub(crate) mod actix_web_1;
-#[cfg(feature = "auth")]
 pub mod auth;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;
@@ -81,12 +80,10 @@ pub use errors::{RequestError, RestApiServerError};
 
 pub use response_models::ErrorResponse;
 
-#[cfg(feature = "auth")]
-pub use actix_web_1::AuthConfig;
 pub use actix_web_1::{
     get_authorization_token, into_bytes, into_protobuf, new_websocket_event_sender, require_header,
-    Continuation, EventSender, HandlerFunction, Method, ProtocolVersionRangeGuard, Request,
-    RequestGuard, Resource, Response, ResponseError, RestApi, RestApiBuilder,
+    AuthConfig, Continuation, EventSender, HandlerFunction, Method, ProtocolVersionRangeGuard,
+    Request, RequestGuard, Resource, Response, ResponseError, RestApi, RestApiBuilder,
     RestApiShutdownHandle, RestResourceProvider,
 };
 

@@ -67,15 +67,15 @@ pub struct PartialConfig {
     enable_biome: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_id: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_secret: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_redirect_url: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
     strict_ref_counts: Option<bool>,
 }
@@ -119,15 +119,15 @@ impl PartialConfig {
             enable_biome: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_provider: None,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_client_id: None,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_client_secret: None,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_redirect_url: None,
-            #[cfg(feature = "auth")]
+            #[cfg(feature = "oauth")]
             oauth_openid_url: None,
             strict_ref_counts: None,
         }
@@ -255,27 +255,27 @@ impl PartialConfig {
         self.whitelist.clone()
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn oauth_provider(&self) -> Option<String> {
         self.oauth_provider.clone()
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn oauth_client_id(&self) -> Option<String> {
         self.oauth_client_id.clone()
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn oauth_client_secret(&self) -> Option<String> {
         self.oauth_client_secret.clone()
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn oauth_redirect_url(&self) -> Option<String> {
         self.oauth_redirect_url.clone()
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     pub fn oauth_openid_url(&self) -> Option<String> {
         self.oauth_openid_url.clone()
     }
@@ -608,7 +608,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     /// Adds an `oauth_provider` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -620,7 +620,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     /// Adds an `oauth_client_id` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -632,7 +632,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     /// Adds an `oauth_client_secret` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -644,7 +644,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     /// Adds an `oauth_redirect_url` value to the `PartialConfig` object.
     ///
     /// # Arguments
@@ -656,7 +656,7 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     /// Adds an `with_oauth_openid_url` value to the `PartialConfig` object.
     ///
     /// # Arguments

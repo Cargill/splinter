@@ -18,7 +18,6 @@ use std::thread;
 use actix_web::{middleware, App, HttpServer};
 use futures::Future;
 
-#[cfg(feature = "auth")]
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::{AuthorizationHandler, PermissionMap};
@@ -51,7 +50,6 @@ pub struct RestApi {
     pub(super) bind: RestApiBind,
     #[cfg(feature = "rest-api-cors")]
     pub(super) whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
     pub(super) identity_providers: Vec<Box<dyn IdentityProvider>>,
     #[cfg(feature = "authorization")]
     pub(super) authorization_handlers: Vec<Box<dyn AuthorizationHandler>>,
@@ -67,7 +65,6 @@ impl RestApi {
         let resources = self.resources;
         #[cfg(feature = "rest-api-cors")]
         let whitelist = self.whitelist;
-        #[cfg(feature = "auth")]
         let authorization = Authorization::new(
             self.identity_providers.to_owned(),
             #[cfg(feature = "authorization")]
@@ -111,10 +108,9 @@ impl RestApi {
                     #[cfg(feature = "rest-api-cors")]
                     let app = app.wrap(cors.clone());
 
-                    #[cfg(feature = "auth")]
-                    let app = app.wrap(authorization.clone());
-
-                    let mut app = app.wrap(middleware::Logger::default());
+                    let mut app = app
+                        .wrap(authorization.clone())
+                        .wrap(middleware::Logger::default());
 
                     #[cfg(feature = "authorization")]
                     let mut permission_map = PermissionMap::new();

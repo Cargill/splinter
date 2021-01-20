@@ -120,6 +120,7 @@ pub async fn login(
             return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
         }
     };
+    let authorization = format!("Bearer {}", token.token);
 
     // Get user's key
     let mut key_response = client
@@ -128,7 +129,7 @@ pub async fn login(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),
         )
-        .header("Authorization", token.token.clone())
+        .header("Authorization", authorization)
         .send()
         .await?;
 
@@ -249,6 +250,7 @@ pub async fn register(
             return Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()));
         }
     };
+    let authorization = format!("Bearer {}", token.token);
 
     // Create Key
     let create_key_response = client
@@ -257,7 +259,7 @@ pub async fn register(
             "SplinterProtocolVersion",
             protocol::BIOME_PROTOCOL_VERSION.to_string(),
         )
-        .header("Authorization", token.token.clone())
+        .header("Authorization", authorization)
         .send_json(&NewKey {
             display_name: new_user.email.clone(),
             encrypted_private_key: new_user.encrypted_private_key.clone(),

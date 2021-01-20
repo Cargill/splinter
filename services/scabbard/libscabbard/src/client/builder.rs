@@ -21,7 +21,6 @@ use super::ScabbardClient;
 #[derive(Default)]
 pub struct ScabbardClientBuilder {
     url: Option<String>,
-    #[cfg(feature = "client-auth")]
     auth: Option<String>,
 }
 
@@ -48,7 +47,6 @@ impl ScabbardClientBuilder {
     /// # Arguments
     ///
     /// * `auth` - The authorization string to be submitted to the Splinter REST API.
-    #[cfg(feature = "client-auth")]
     pub fn with_auth(mut self, auth: &str) -> Self {
         self.auth = Some(auth.into());
         self
@@ -60,13 +58,12 @@ impl ScabbardClientBuilder {
     ///
     /// Returns an error in any of the following cases:
     /// * Returns an error if url is not set
-    /// * Returns an error if the client-auth feature is enabled and auth is not set
+    /// * Returns an error if auth is not set
     pub fn build(self) -> Result<ScabbardClient, ScabbardClientError> {
         Ok(ScabbardClient {
             url: self.url.ok_or_else(|| {
                 ScabbardClientError::new("Failed to build client, url not provided")
             })?,
-            #[cfg(feature = "client-auth")]
             auth: self.auth.ok_or_else(|| {
                 ScabbardClientError::new("Failed to build client, jwt authorization not provided")
             })?,

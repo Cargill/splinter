@@ -88,6 +88,7 @@ pub trait AuthorizationHandler: Send + Sync {
     fn clone_box(&self) -> Box<dyn AuthorizationHandler>;
 }
 
+#[cfg(feature = "authorization")]
 impl Clone for Box<dyn AuthorizationHandler> {
     fn clone(&self) -> Box<dyn AuthorizationHandler> {
         self.clone_box()
@@ -103,6 +104,7 @@ enum AuthorizationResult {
     /// The authorization header is empty or invalid
     Unauthorized,
     /// The request endpoint is not defined
+    #[cfg(feature = "authorization")]
     UnknownEndpoint,
 }
 

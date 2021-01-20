@@ -21,23 +21,17 @@ use crate::biome::key_management::{
     Key,
 };
 use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey, UpdatedKey};
-use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::Permission;
-use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
     ErrorResponse,
 };
 
 /// Defines a REST endpoint for managing keys including inserting, listing and updating keys
-pub fn make_key_management_route(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> Resource {
+pub fn make_key_management_route(key_store: Arc<dyn KeyStore>) -> Resource {
     let resource =
         Resource::build("/biome/keys").add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
@@ -49,63 +43,34 @@ pub fn make_key_management_route(
             .add_method(
                 Method::Post,
                 Permission::AllowAuthenticated,
-                handle_post(
-                    rest_config.clone(),
-                    key_store.clone(),
-                    secret_manager.clone(),
-                ),
+                handle_post(key_store.clone()),
             )
             .add_method(
                 Method::Get,
                 Permission::AllowAuthenticated,
-                handle_get(
-                    rest_config.clone(),
-                    key_store.clone(),
-                    secret_manager.clone(),
-                ),
+                handle_get(key_store.clone()),
             )
             .add_method(
                 Method::Patch,
                 Permission::AllowAuthenticated,
-                handle_patch(rest_config, key_store, secret_manager),
+                handle_patch(key_store),
             )
     }
     #[cfg(not(feature = "authorization"))]
     {
         resource
-            .add_method(
-                Method::Post,
-                handle_post(
-                    rest_config.clone(),
-                    key_store.clone(),
-                    secret_manager.clone(),
-                ),
-            )
-            .add_method(
-                Method::Get,
-                handle_get(
-                    rest_config.clone(),
-                    key_store.clone(),
-                    secret_manager.clone(),
-                ),
-            )
-            .add_method(
-                Method::Patch,
-                handle_patch(rest_config, key_store, secret_manager),
-            )
+            .add_method(Method::Post, handle_post(key_store.clone()))
+            .add_method(Method::Get, handle_get(key_store.clone()))
+            .add_method(Method::Patch, handle_patch(key_store))
     }
 }
 
 /// Defines a REST endpoint for adding a key to the underlying storage
-fn handle_post(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> HandlerFunction {
+fn handle_post(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
 
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+        let user = match get_authorized_user(&request) {
             Ok(user) => user,
             Err(response) => return response,
         };
@@ -155,15 +120,11 @@ fn handle_post(
 }
 
 /// Defines a REST endpoint for retrieving keys from the underlying storage
-fn handle_get(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> HandlerFunction {
+fn handle_get(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
 
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+        let user = match get_authorized_user(&request) {
             Ok(user) => user,
             Err(response) => return response,
         };
@@ -193,14 +154,10 @@ fn handle_get(
 }
 
 /// Defines a REST endpoint for updating a key in the underlying storage
-fn handle_patch(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> HandlerFunction {
+fn handle_patch(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+        let user = match get_authorized_user(&request) {
             Ok(user) => user,
             Err(response) => return response,
         };
@@ -244,11 +201,7 @@ fn handle_patch(
 }
 
 /// Defines a REST endpoint for managing keys including fetching and deleting a user's key
-pub fn make_key_management_route_with_public_key(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> Resource {
+pub fn make_key_management_route_with_public_key(key_store: Arc<dyn KeyStore>) -> Resource {
     let resource = Resource::build("/biome/keys/{public_key}").add_request_guard(
         ProtocolVersionRangeGuard::new(
             protocol::BIOME_KEYS_PROTOCOL_MIN,
@@ -261,42 +214,24 @@ pub fn make_key_management_route_with_public_key(
             .add_method(
                 Method::Get,
                 Permission::AllowAuthenticated,
-                handle_fetch(
-                    rest_config.clone(),
-                    key_store.clone(),
-                    secret_manager.clone(),
-                ),
+                handle_fetch(key_store.clone()),
             )
             .add_method(
                 Method::Delete,
                 Permission::AllowAuthenticated,
-                handle_delete(rest_config, key_store, secret_manager),
+                handle_delete(key_store),
             )
     }
     #[cfg(not(feature = "authorization"))]
     {
         resource
-            .add_method(
-                Method::Get,
-                handle_fetch(
-                    rest_config.clone(),
-                    key_store.clone(),
-                    secret_manager.clone(),
-                ),
-            )
-            .add_method(
-                Method::Delete,
-                handle_delete(rest_config, key_store, secret_manager),
-            )
+            .add_method(Method::Get, handle_fetch(key_store.clone()))
+            .add_method(Method::Delete, handle_delete(key_store))
     }
 }
 
 /// Defines a REST endpoint method to fetch a key from the underlying storage
-fn handle_fetch(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> HandlerFunction {
+fn handle_fetch(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
 
@@ -314,7 +249,7 @@ fn handle_fetch(
             }
         };
 
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+        let user = match get_authorized_user(&request) {
             Ok(user) => user,
             Err(response) => return response,
         };
@@ -348,11 +283,7 @@ fn handle_fetch(
 }
 
 /// Defines a REST endpoint method to delete a key from the underlying storage
-fn handle_delete(
-    rest_config: Arc<BiomeRestConfig>,
-    key_store: Arc<dyn KeyStore>,
-    secret_manager: Arc<dyn SecretManager>,
-) -> HandlerFunction {
+fn handle_delete(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
 
@@ -370,7 +301,7 @@ fn handle_delete(
             }
         };
 
-        let user = match get_authorized_user(&request, &secret_manager, &rest_config) {
+        let user = match get_authorized_user(&request) {
             Ok(user) => user,
             Err(response) => return response,
         };

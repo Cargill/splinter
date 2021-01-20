@@ -56,6 +56,7 @@ features = [
 path = "../libsplinter"
 features = [
   "admin-service",
+  "cylinder-jwt",
   "registry",
   "registry-remote",
   "rest-api",
@@ -79,13 +80,13 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "auth",
     "authorization",
     "admin-service-event-store",
     "biome-oauth",
     "health",
     "https-bind",
     "maintenance-mode",
+    "oauth",
     "registry-database",
     "service-arg-validation",
     "service-endpoint",
@@ -97,14 +98,7 @@ admin-service-event-store = [
   "splinter/admin-service",
   "splinter/admin-service-event-store-diesel",
 ]
-auth = [
-    "splinter/cylinder-jwt",
-    "splinter/oauth-github",
-    "splinter/oauth-inflight-request-store-postgres",
-    "splinter/oauth-openid"
-]
 authorization = [
-    "auth",
     "health/authorization",
     "scabbard/authorization",
     "splinter/authorization",
@@ -112,13 +106,18 @@ authorization = [
 biome-credentials = ["database", "splinter/biome-credentials"]
 biome-key-management = ["database", "splinter/biome-key-management"]
 biome-oauth = [
-    "auth",
+    "oauth",
     "splinter/biome-oauth",
     "splinter/biome-oauth-user-store-postgres"
 ]
 database = ["splinter/postgres", "splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
 maintenance-mode = ["splinter/maintenance-mode"]
+oauth = [
+    "splinter/oauth-github",
+    "splinter/oauth-inflight-request-store-postgres",
+    "splinter/oauth-openid"
+]
 registry-database = ["database", "splinter/registry-database"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [

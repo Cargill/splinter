@@ -57,15 +57,15 @@ struct TomlConfig {
     version: Option<String>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_id: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_client_secret: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_redirect_url: Option<String>,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
 
     // Deprecated values
@@ -170,7 +170,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             partial_config = partial_config.with_whitelist(self.toml_config.whitelist);
         }
 
-        #[cfg(feature = "auth")]
+        #[cfg(feature = "oauth")]
         {
             partial_config = partial_config
                 .with_oauth_provider(self.toml_config.oauth_provider)

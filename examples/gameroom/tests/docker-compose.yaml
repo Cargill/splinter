@@ -36,7 +36,7 @@ services:
            done
 
            # check if splinterd-node-acme is available
-           while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node:8085/status) -ne 200 ]] ; do
+           while [[ $$(curl --write-out %{http_code} --silent --output /dev/null http://splinterd-node:8085/status) -ne 401 ]] ; do
               >&2 echo \"splinterd is unavailable - sleeping\"
               sleep 1
            done
