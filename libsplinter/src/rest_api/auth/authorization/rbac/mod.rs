@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "authorization-handler-rbac")]
 mod handler;
 pub mod rest_api;
 pub mod store;
 
-#[cfg(feature = "authorization-handler-rbac")]
 pub use handler::RoleBasedAuthorizationHandler;
