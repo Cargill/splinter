@@ -756,7 +756,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
-    #[cfg(feature = "maintenance-mode")]
+    #[cfg(feature = "authorization-handler-maintenance")]
     {
         app = app.subcommand(
             SubCommand::with_name("maintenance")
@@ -907,7 +907,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
-    #[cfg(feature = "maintenance-mode")]
+    #[cfg(feature = "authorization-handler-maintenance")]
     {
         use action::maintenance;
         subcommands = subcommands.with_command(

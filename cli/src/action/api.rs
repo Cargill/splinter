@@ -97,7 +97,7 @@ impl SplinterRestClient {
     }
 
     /// Checks whether or not maintenance mode is enabled for the Splinter node.
-    #[cfg(feature = "maintenance-mode")]
+    #[cfg(feature = "authorization-handler-maintenance")]
     pub fn is_maintenance_mode_enabled(&self) -> Result<bool, CliError> {
         Client::new()
             .get(&format!("{}/authorization/maintenance", self.url))
@@ -143,7 +143,7 @@ impl SplinterRestClient {
     }
 
     /// Turns maintenance mode on or off for the Splinter node.
-    #[cfg(feature = "maintenance-mode")]
+    #[cfg(feature = "authorization-handler-maintenance")]
     pub fn set_maintenance_mode(&self, enabled: bool) -> Result<(), CliError> {
         Client::new()
             .post(&format!("{}/authorization/maintenance", self.url))

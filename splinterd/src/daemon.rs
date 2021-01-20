@@ -58,14 +58,14 @@ use splinter::registry::{
     LocalYamlRegistry, RegistryReader, RemoteYamlRegistry, RemoteYamlShutdownHandle, RwRegistry,
     UnifiedRegistry,
 };
-#[cfg(feature = "maintenance-mode")]
+#[cfg(feature = "authorization-handler-allow-keys")]
+use splinter::rest_api::auth::allow_keys::AllowKeysAuthorizationHandler;
+#[cfg(feature = "authorization-handler-maintenance")]
 use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
 #[cfg(feature = "authorization-handler-rbac")]
 use splinter::rest_api::auth::rbac::RoleBasedAuthorizationHandler;
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::{
-    allow_keys::AllowKeysAuthorizationHandler, AuthorizationHandler, Permission,
-};
+use splinter::rest_api::auth::{AuthorizationHandler, Permission};
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{
@@ -538,22 +538,26 @@ impl SplinterDaemon {
 
         #[cfg(feature = "authorization")]
         {
+            // Allowing unused_mut because authorization_handlers must be mutable if
+            // `authorization-handler-allow-keys` or `auth-handler-maintenance` are enabled
+            #[allow(unused_mut)]
             let mut authorization_handlers = vec![];
+            #[cfg(feature = "authorization-handler-allow-keys")]
             authorization_handlers.push(create_allow_keys_authorization_handler(&self.state_dir)?);
+
+            #[cfg(feature = "authorization-handler-maintenance")]
+            {
+                let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::new();
+                rest_api_builder =
+                    rest_api_builder.add_resources(maintenance_mode_auth_handler.resources());
+                authorization_handlers.push(Box::new(maintenance_mode_auth_handler));
+            }
 
             #[cfg(feature = "authorization-handler-rbac")]
             {
                 authorization_handlers.push(Box::new(RoleBasedAuthorizationHandler::new(
                     store_factory.get_role_based_authorization_store(),
                 )));
-            }
-
-            #[cfg(feature = "maintenance-mode")]
-            {
-                let maintenance_mode_auth_handler = MaintenanceModeAuthorizationHandler::new();
-                rest_api_builder =
-                    rest_api_builder.add_resources(maintenance_mode_auth_handler.resources());
-                authorization_handlers.push(Box::new(maintenance_mode_auth_handler));
             }
 
             rest_api_builder = rest_api_builder
@@ -1486,7 +1490,7 @@ impl RegistryShutdownHandle {
     }
 }
 
-#[cfg(feature = "authorization")]
+#[cfg(feature = "authorization-handler-allow-keys")]
 fn create_allow_keys_authorization_handler(
     state_dir: &str,
 ) -> Result<Box<dyn AuthorizationHandler>, StartError> {

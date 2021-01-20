@@ -68,19 +68,19 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "authorization-handler-maintenance",
     "circuit-auth-type",
     "health",
     "https-certs",
-    "maintenance-mode",
 ]
 
+authorization-handler-maintenance = []
 circuit-auth-type = []
 circuit-template = ["splinter/circuit-template"]
 
 health = []
 
 https-certs = []
-maintenance-mode = []
 
 database = ["diesel"]
 postgres = [
