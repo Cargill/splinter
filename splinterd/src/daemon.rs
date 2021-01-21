@@ -1516,7 +1516,7 @@ fn create_allow_keys_authorization_handler(
         .to_string();
 
     debug!(
-        "Creating allow keys authorization handler file: {:?}",
+        "Reading allow keys authorization handler file: {:?}",
         allow_keys_path
     );
 
