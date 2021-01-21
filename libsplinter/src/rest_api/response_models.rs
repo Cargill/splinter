@@ -61,4 +61,11 @@ impl ErrorResponse {
             message: message.to_string(),
         }
     }
+
+    pub fn conflict(message: &str) -> ErrorResponse {
+        ErrorResponse {
+            code: "409".to_string(),
+            message: message.to_string(),
+        }
+    }
 }

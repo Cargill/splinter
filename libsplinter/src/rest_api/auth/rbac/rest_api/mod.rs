@@ -1,4 +1,4 @@
-// Copyright 2018-2020 Cargill Incorporated
+// Copyright 2018-2021 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "authorization-handler-rbac")]
-mod handler;
-pub mod rest_api;
-pub mod store;
+//! Role-based Authorization REST API resources.
 
-#[cfg(feature = "authorization-handler-rbac")]
-pub use handler::RoleBasedAuthorizationHandler;
+#[cfg(feature = "rest-api-actix")]
+mod actix_web_1;
+mod resources;
+
+use crate::rest_api::auth::Permission;
+
+#[cfg(feature = "rest-api-actix")]
+pub use actix_web_1::RoleBasedAuthorizationResourceProvider;
+
+#[cfg(feature = "rest-api-actix")]
+const RBAC_READ_PERMISSION: Permission = Permission::Check("authorization.rbac.read");
+
+#[cfg(feature = "rest-api-actix")]
+const RBAC_WRITE_PERMISSION: Permission = Permission::Check("authorization.rbac.write");

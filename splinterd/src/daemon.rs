@@ -63,7 +63,9 @@ use splinter::rest_api::auth::allow_keys::AllowKeysAuthorizationHandler;
 #[cfg(feature = "authorization-handler-maintenance")]
 use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
 #[cfg(feature = "authorization-handler-rbac")]
-use splinter::rest_api::auth::rbac::RoleBasedAuthorizationHandler;
+use splinter::rest_api::auth::rbac::{
+    rest_api::RoleBasedAuthorizationResourceProvider, RoleBasedAuthorizationHandler,
+};
 #[cfg(feature = "authorization")]
 use splinter::rest_api::auth::{AuthorizationHandler, Permission};
 #[cfg(feature = "oauth")]
@@ -580,7 +582,13 @@ impl SplinterDaemon {
                             advertised_endpoints.clone(),
                         )
                     },
-                ));
+                ))
+                .add_resources(
+                    RoleBasedAuthorizationResourceProvider::new(
+                        store_factory.get_role_based_authorization_store(),
+                    )
+                    .resources(),
+                );
         }
         #[cfg(not(feature = "authorization"))]
         {

@@ -116,7 +116,7 @@ paths:
         401:
           description: The client is unauthorized
         500:
-          description: An internal server error occurrred
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -155,7 +155,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: An internal server error occurrred
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -297,7 +297,7 @@ paths:
         401:
           description: The client is unauthorized
         500:
-          description: An internal server error occurrred
+          description: An internal server error occurred
           content:
             application/json:
               schema:
@@ -336,11 +336,104 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         500:
-          description: An internal server error occurrred
+          description: An internal server error occurred
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /authorization/roles:
+    get:
+      summary: Fetches a list of roles
+      description: |
+        This endpoint can be used to view all of the available roles configured
+        for the node.  These roles control access to various permissions in the
+        system.
+
+        This endpoint requires the permission "authorization.rbac.read".
+      tags:
+        - Roles
+        - Permissions
+        - RBAC
+        - Authorization
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+        - name: offset
+          in: query
+          description: paging offset
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          description: maximum number of items to return (max 100)
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        200:
+          description: Successfully retrieved the requested list of roles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Role'
+                  paging:
+                    $ref: '#/components/schemas/Paging'
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+        500:
+          description: An internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Add a role
+      description: |
+        This endpoint can be used to add a new role to the Splinter Role-based
+        authorization system. The role must conform to the role schema and have
+        unique "role_id" value.
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Role'
+      responses:
+        200:
+          description: The role was successfully added
+        400:
+          description: The request was malformed or the role was invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+        500:
+          description: An internal server error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 
   /registry/nodes:
     post:
@@ -2112,6 +2205,22 @@ components:
           description: "Username of a user"
           example: "bob@biome.com"
 
+    Role:
+      type: object
+      properties:
+        role_id:
+          type: string
+          description: "Unique identifier for the role"
+          example: "circuit-administrator"
+        display_name:
+          type: string
+          description: "A human readable name of the role."
+          example: "Circuit Administrator"
+        permissions:
+          type: array
+          description: "An array of permissions included with this role."
+          items:
+            type: string
 
 tags:
   - name: Biome

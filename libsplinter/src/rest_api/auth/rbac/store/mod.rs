@@ -26,6 +26,7 @@ pub use self::diesel::DieselRoleBasedAuthorizationStore;
 pub use error::RoleBasedAuthorizationStoreError;
 
 /// A Role is a named set of permissions.
+#[derive(Clone)]
 pub struct Role {
     id: String,
     display_name: String,
@@ -192,7 +193,7 @@ impl RoleUpdateBuilder {
 }
 
 /// An identity that may be assigned roles.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Identity {
     /// A public key-based identity.
     Key(String),
@@ -201,6 +202,7 @@ pub enum Identity {
 }
 
 /// An assignment of roles to a particular identity.
+#[derive(Clone)]
 pub struct Assignment {
     identity: Identity,
     roles: Vec<String>,
