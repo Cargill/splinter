@@ -75,7 +75,8 @@ pub fn make_role_resource(
     role_based_authorization_store: Box<dyn RoleBasedAuthorizationStore>,
 ) -> Resource {
     let get_store = role_based_authorization_store.clone();
-    let patch_store = role_based_authorization_store;
+    let patch_store = role_based_authorization_store.clone();
+    let delete_store = role_based_authorization_store;
     Resource::build("/authorization/roles/{role_id}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::AUTHORIZATION_RBAC_ROLE_MIN,
@@ -86,6 +87,9 @@ pub fn make_role_resource(
         })
         .add_method(Method::Patch, RBAC_WRITE_PERMISSION, move |r, p| {
             patch_role(r, p, web::Data::new(patch_store.clone()))
+        })
+        .add_method(Method::Delete, RBAC_WRITE_PERMISSION, move |r, _| {
+            delete_role(r, web::Data::new(delete_store.clone()))
         })
 }
 
@@ -325,6 +329,29 @@ fn update_role(
                 )
             }
         })
+}
+
+fn delete_role(
+    req: HttpRequest,
+    role_based_auth_store: web::Data<Box<dyn RoleBasedAuthorizationStore>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let role_id = req.match_info().get("role_id").unwrap_or("").to_string();
+    Box::new(
+        web::block(move || {
+            role_based_auth_store
+                .remove_role(&role_id)
+                .map_err(SendableRoleBasedAuthorizationStoreError::from)
+        })
+        .then(|role_res| {
+            Ok(match role_res {
+                Ok(()) => HttpResponse::Ok().finish(),
+                Err(err) => {
+                    error!("Unable to delete role: {}", err);
+                    HttpResponse::InternalServerError().json(ErrorResponse::internal_error())
+                }
+            })
+        }),
+    )
 }
 
 #[cfg(test)]
@@ -1011,6 +1038,63 @@ mod tests {
             .send()
             .expect("Failed to perform request");
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    /// Test that a DELETE to /authorization/roles/{role-id} with a valid role succeeds.
+    #[test]
+    fn test_delete_role_ok() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_role_resource(role_based_auth_store.clone_box())]);
+
+        let url = Url::parse(&format!(
+            "http://{}/authorization/roles/{}",
+            bind_url, "test-role-1"
+        ))
+        .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .delete(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        assert!(role_based_auth_store
+            .get_role("test-role-1")
+            .expect("Unable to get node")
+            .is_none());
+
+        // verify that it is idempotent
+        let resp = Client::new()
+            .delete(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
 
         shutdown_handle
             .shutdown()
