@@ -342,6 +342,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /authorization/maintenance:
+    get:
+      tags:
+        - Authorization
+      description: Checks whether or not maintenance mode is enabled
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: Successfully checked maintenance mode
+          content:
+            text/plain:
+              schema:
+                type: string
+                properties:
+                  message:
+                    type: string
+                    enum:
+                      - true
+                      - false
+        401:
+          description: The client is unauthorized
+    post:
+      tags:
+        - Authorization
+      description: Sets whether or not maintenance mode is enabled
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+        - name: enabled
+          in: query
+          description: |
+            If "true", maintenance mode will be enabled; if "false", maintenance
+            mode will be disabled.
+          required: true
+          schema:
+            type: boolean
+      responses:
+        200:
+          description: Successfully checked maintenance mode
+          content:
+            text/plain:
+              schema:
+                type: string
+                properties:
+                  message:
+                    type: boolean
+        400:
+          description: Request was malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: The client is unauthorized
+
   /authorization/roles:
     get:
       summary: Fetches a list of roles
@@ -1862,63 +1919,6 @@ paths:
             application/json:
                 schema:
                   $ref: '#/components/schemas/Error'
-
-  /authorization/maintenance:
-    get:
-      tags:
-        - Authorization
-      description: Checks whether or not maintenance mode is enabled
-      parameters:
-        - $ref: "#/components/parameters/auth"
-        - $ref: "#/components/parameters/protocol_version"
-      responses:
-        200:
-          description: Successfully checked maintenance mode
-          content:
-            text/plain:
-              schema:
-                type: string
-                properties:
-                  message:
-                    type: string
-                    enum:
-                      - true
-                      - false
-        401:
-          description: The client is unauthorized
-    post:
-      tags:
-        - Authorization
-      description: Sets whether or not maintenance mode is enabled
-      parameters:
-        - $ref: "#/components/parameters/auth"
-        - $ref: "#/components/parameters/protocol_version"
-        - name: enabled
-          in: query
-          description: |
-            If "true", maintenance mode will be enabled; if "false", maintenance
-            mode will be disabled.
-          required: true
-          schema:
-            type: boolean
-      responses:
-        200:
-          description: Successfully checked maintenance mode
-          content:
-            text/plain:
-              schema:
-                type: string
-                properties:
-                  message:
-                    type: boolean
-        400:
-          description: Request was malformed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        401:
-          description: The client is unauthorized
 
 components:
   parameters:
