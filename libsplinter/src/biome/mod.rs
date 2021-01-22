@@ -34,7 +34,7 @@ pub mod key_management;
 #[cfg(feature = "biome-notifications")]
 pub mod notifications;
 
-#[cfg(feature = "biome-oauth")]
+#[cfg(feature = "oauth")]
 pub mod oauth;
 
 #[cfg(feature = "biome-profile")]
@@ -60,11 +60,11 @@ pub use key_management::store::memory::MemoryKeyStore;
 #[cfg(feature = "biome-key-management")]
 pub use key_management::store::KeyStore;
 
-#[cfg(all(feature = "biome-oauth", feature = "diesel"))]
+#[cfg(all(feature = "oauth", feature = "diesel"))]
 pub use oauth::store::diesel::DieselOAuthUserSessionStore;
-#[cfg(feature = "biome-oauth")]
+#[cfg(feature = "oauth")]
 pub use oauth::store::memory::MemoryOAuthUserSessionStore;
-#[cfg(feature = "biome-oauth")]
+#[cfg(feature = "oauth")]
 pub use oauth::store::OAuthUserSessionStore;
 
 #[cfg(all(feature = "biome-profile", feature = "diesel"))]

@@ -66,8 +66,8 @@ mod base62;
     feature = "biome-credentials",
     feature = "biome-key-management",
     feature = "biome-notifications",
-    feature = "biome-oauth",
-    feature = "biome-profile"
+    feature = "biome-profile",
+    feature = "oauth"
 ))]
 pub mod biome;
 pub mod channel;

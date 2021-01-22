@@ -45,7 +45,7 @@ pub trait StoreFactory {
     fn get_biome_refresh_token_store(&self) -> Box<dyn crate::biome::RefreshTokenStore>;
 
     /// Get a new `OAuthUserSessionStore`
-    #[cfg(feature = "biome-oauth")]
+    #[cfg(feature = "oauth")]
     fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore>;
 
     #[cfg(feature = "admin-service")]

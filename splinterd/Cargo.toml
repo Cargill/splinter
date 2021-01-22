@@ -85,7 +85,6 @@ experimental = [
     "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
-    "biome-oauth",
     "biome-profile",
     "health",
     "https-bind",
@@ -116,15 +115,11 @@ authorization-handler-rbac = [
 ]
 biome-credentials = ["database", "splinter/biome-credentials"]
 biome-key-management = ["database", "splinter/biome-key-management"]
-biome-oauth = [
-    "oauth",
-    "splinter/biome-oauth",
-    "splinter/biome-oauth-user-store-postgres"
-]
 biome-profile = ["splinter/biome-profile"]
 database = ["splinter/postgres", "splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
 oauth = [
+    "splinter/biome-oauth-user-store-postgres",
     "splinter/oauth-github",
     "splinter/oauth-inflight-request-store-postgres",
     "splinter/oauth-openid"

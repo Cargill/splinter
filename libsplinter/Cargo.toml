@@ -103,7 +103,6 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-notifications",
-    "biome-oauth",
     "biome-oauth-user-store-postgres",
     "biome-profile",
     "https-bind",
@@ -132,14 +131,13 @@ authorization-handler-rbac = ["authorization"]
 biome-credentials = ["bcrypt"]
 biome-key-management = []
 biome-notifications = []
-biome-oauth = []
-biome-oauth-user-store-postgres = ["biome-oauth", "postgres"]
+biome-oauth-user-store-postgres = ["oauth", "postgres"]
 biome-profile = []
 circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
-oauth = ["biome-oauth", "oauth2", "rest-api"]
+oauth = ["oauth2", "rest-api"]
 oauth-github = ["oauth"]
 oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 oauth-openid = ["oauth", "reqwest"]
