@@ -24,6 +24,8 @@ pub mod health;
 pub mod keygen;
 #[cfg(feature = "authorization-handler-maintenance")]
 pub mod maintenance;
+#[cfg(feature = "permissions")]
+pub mod permissions;
 pub mod registry;
 
 use std::collections::HashMap;

@@ -822,6 +822,38 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
+    #[cfg(feature = "permissions")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("permissions")
+                .about("Lists REST API permissions for a Splinter node")
+                .arg(
+                    Arg::with_name("format")
+                        .short("F")
+                        .long("format")
+                        .help("Output format")
+                        .possible_values(&["human", "csv", "json"])
+                        .default_value("human")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("url")
+                        .short("U")
+                        .long("url")
+                        .help("URL of the Splinter daemon REST API")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("private_key_file")
+                        .value_name("private-key-file")
+                        .short("k")
+                        .long("key")
+                        .takes_value(true)
+                        .help("Name or path of private key"),
+                ),
+        )
+    }
+
     let matches = app.get_matches_from_safe(args)?;
 
     // set default to info
@@ -917,6 +949,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .with_command("enable", maintenance::EnableAction)
                 .with_command("disable", maintenance::DisableAction),
         )
+    }
+
+    #[cfg(feature = "permissions")]
+    {
+        use action::permissions;
+        subcommands = subcommands.with_command("permissions", permissions::ListAction)
     }
 
     subcommands.run(Some(&matches))
