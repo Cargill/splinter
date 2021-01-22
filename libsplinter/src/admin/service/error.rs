@@ -17,7 +17,7 @@ use std::fmt;
 
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
-use crate::orchestrator::InitializeServiceError;
+use crate::orchestrator::{InitializeServiceError, ShutdownServiceError};
 use crate::service::error::{ServiceError, ServiceSendError};
 
 use protobuf::error;
@@ -161,6 +161,10 @@ pub enum AdminSharedError {
         context: String,
         source: Option<InitializeServiceError>,
     },
+    ServiceShutdownFailed {
+        context: String,
+        source: Option<ShutdownServiceError>,
+    },
     ServiceSendError(ServiceSendError),
     UnknownAction(String),
     ValidationFailed(String),
@@ -180,6 +184,13 @@ impl Error for AdminSharedError {
             AdminSharedError::InvalidMessageFormat(err) => Some(err),
             AdminSharedError::NoPendingChanges => None,
             AdminSharedError::ServiceInitializationFailed { source, .. } => {
+                if let Some(ref err) = source {
+                    Some(err)
+                } else {
+                    None
+                }
+            }
+            AdminSharedError::ServiceShutdownFailed { source, .. } => {
                 if let Some(ref err) = source {
                     Some(err)
                 } else {
@@ -207,6 +218,13 @@ impl fmt::Display for AdminSharedError {
                 write!(f, "tried to commit without pending changes")
             }
             AdminSharedError::ServiceInitializationFailed { context, source } => {
+                if let Some(ref err) = source {
+                    write!(f, "{}: {}", context, err)
+                } else {
+                    f.write_str(&context)
+                }
+            }
+            AdminSharedError::ServiceShutdownFailed { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
