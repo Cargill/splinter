@@ -12,20 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::TryInto;
+
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
-use crate::futures::{Future, IntoFuture};
+use crate::error::InvalidStateError;
+use crate::futures::{Future, IntoFuture, Stream};
 use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::rbac::{
         rest_api::{
             resources::{
-                assignments::{AssignmentResponse, ListAssignmentsResponse},
+                assignments::{AssignmentPayload, AssignmentResponse, ListAssignmentsResponse},
                 PagingQuery,
             },
-            RBAC_READ_PERMISSION,
+            RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
         },
-        store::RoleBasedAuthorizationStore,
+        store::{Assignment, RoleBasedAuthorizationStore},
     },
     paging::get_response_paging_info,
     ErrorResponse,
@@ -36,7 +39,8 @@ use super::error::SendableRoleBasedAuthorizationStoreError;
 pub fn make_assignments_resource(
     role_based_auth_store: Box<dyn RoleBasedAuthorizationStore>,
 ) -> Resource {
-    let list_store = role_based_auth_store;
+    let list_store = role_based_auth_store.clone();
+    let add_store = role_based_auth_store;
     Resource::build("/authorization/assignments")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::AUTHORIZATION_RBAC_ASSIGNMENTS_MIN,
@@ -44,6 +48,9 @@ pub fn make_assignments_resource(
         ))
         .add_method(Method::Get, RBAC_READ_PERMISSION, move |r, _| {
             list_assignments(r, web::Data::new(list_store.clone()))
+        })
+        .add_method(Method::Post, RBAC_WRITE_PERMISSION, move |_, p| {
+            add_assignment(p, web::Data::new(add_store.clone()))
         })
 }
 
@@ -98,6 +105,65 @@ fn list_assignments(
                 }
             },
         ),
+    )
+}
+
+fn add_assignment(
+    payload: web::Payload,
+    role_based_auth_store: web::Data<Box<dyn RoleBasedAuthorizationStore>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    Box::new(
+        payload
+            .from_err::<Error>()
+            .fold(web::BytesMut::new(), move |mut body, chunk| {
+                body.extend_from_slice(&chunk);
+                Ok::<_, Error>(body)
+            })
+            .into_future()
+            .and_then(move |body| {
+                let assignment_res: Result<Assignment, _> =
+                    serde_json::from_slice::<AssignmentPayload>(&body)
+                        .map_err(|err| err.to_string())
+                        .and_then(|assignment_payload| {
+                            assignment_payload
+                                .try_into()
+                                .map_err(|err: InvalidStateError| err.to_string())
+                        });
+
+                match assignment_res {
+                    Ok(assignment) => Box::new(
+                        web::block(move || {
+                            role_based_auth_store
+                                .add_assignment(assignment)
+                                .map_err(SendableRoleBasedAuthorizationStoreError::from)
+                        })
+                        .then(|res| {
+                            Ok(match res {
+                                Ok(_) => HttpResponse::Ok().finish(),
+                                Err(BlockingError::Error(
+                                    SendableRoleBasedAuthorizationStoreError::ConstraintViolation(
+                                        msg,
+                                    ),
+                                )) => HttpResponse::Conflict().json(ErrorResponse::conflict(&msg)),
+                                Err(err) => {
+                                    error!("Unable to add assignment: {}", err);
+                                    HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                }
+                            })
+                        }),
+                    )
+                        as Box<dyn Future<Item = HttpResponse, Error = Error>>,
+                    Err(err) => Box::new(
+                        HttpResponse::BadRequest()
+                            .json(ErrorResponse::bad_request(&format!(
+                                "Invalid assignment payload: {}",
+                                err
+                            )))
+                            .into_future(),
+                    ),
+                }
+            }),
     )
 }
 
@@ -385,6 +451,181 @@ mod tests {
         join_handle.join().expect("Unable to join rest api thread");
     }
 
+    /// Tests a POST /authorization/assignments with a valid assignment returns OK.
+    /// 1. Add two roles to the store
+    /// 2. POST an assignment which includes the two roles
+    /// 3. Verify the assignment by GET /authorization/assignments
+    #[test]
+    fn test_post_assignment_ok() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+
+        let role = RoleBuilder::new()
+            .with_id("role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_assignments_resource(Box::new(
+                role_based_auth_store.clone(),
+            ))]);
+
+        let url = Url::parse(&format!("http://{}/authorization/assignments", bind_url))
+            .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .post(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "identity": "Bob",
+                "identity_type": "user",
+                "roles": ["role-1", "role-2"],
+            }))
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        let json_assignments = get_in!(body, &["data"], as_array)
+            .expect("data field is not an array")
+            .to_vec();
+
+        assert_eq!(1, json_assignments.len());
+
+        assert_eq!(
+            &json!({
+                "identity": "Bob",
+                "identity_type": "user",
+                "roles": ["role-1", "role-2"],
+            }),
+            json_assignments.get(0).expect("no first item")
+        );
+
+        let assignment = role_based_auth_store
+            .get_assignment(&Identity::User("Bob".into()))
+            .expect("Failed to get assignment")
+            .expect("No assignment found");
+
+        assert_eq!(&Identity::User("Bob".into()), assignment.identity());
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    /// Test a POST /authorization/assignments request with a duplicate assignment returns a 409
+    /// 1. Add two roles to the store
+    /// 2. POST an assignment which includes the two roles
+    /// 3. POST the same assignment again
+    /// 3. Verify the response is 409 CONFLICT
+    #[test]
+    fn test_post_assignment_conflict() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+
+        let role = RoleBuilder::new()
+            .with_id("role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_assignments_resource(Box::new(
+                role_based_auth_store.clone(),
+            ))]);
+
+        let url = Url::parse(&format!("http://{}/authorization/assignments", bind_url))
+            .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .post(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "identity": "Bob",
+                "identity_type": "user",
+                "roles": ["role-1", "role-2"],
+            }))
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let assignment = role_based_auth_store
+            .get_assignment(&Identity::User("Bob".into()))
+            .expect("Failed to get assignment")
+            .expect("No assignment found");
+
+        assert_eq!(&Identity::User("Bob".into()), assignment.identity());
+
+        let resp = Client::new()
+            .post(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "identity": "Bob",
+                "identity_type": "user",
+                "roles": ["role-1", "role-2"],
+            }))
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
     fn run_rest_api_on_open_port(
         resources: Vec<Resource>,
     ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
@@ -467,9 +708,14 @@ mod tests {
 
         fn get_assignment(
             &self,
-            _identity: &Identity,
+            identity: &Identity,
         ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
-            unimplemented!()
+            Ok(self
+                .assignments
+                .lock()
+                .expect("mem role based authorization store lock was poisoned")
+                .get(&id_to_string(identity))
+                .cloned())
         }
 
         fn get_assigned_roles(

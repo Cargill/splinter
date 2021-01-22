@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::convert::TryFrom;
+
+use crate::error::InvalidStateError;
 use crate::rest_api::{
-    auth::rbac::store::{Assignment, Identity},
+    auth::rbac::store::{Assignment, AssignmentBuilder, Identity},
     paging::Paging,
 };
 
@@ -53,5 +56,36 @@ impl<'a> From<&'a Identity> for IdentityResponse<'a> {
             Identity::User(user) => IdentityResponse::User(user),
             Identity::Key(key) => IdentityResponse::Key(key),
         }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct AssignmentPayload {
+    #[serde(flatten)]
+    identity: IdentityPayload,
+    roles: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "identity_type", content = "identity")]
+#[serde(rename_all = "lowercase")]
+pub enum IdentityPayload {
+    Key(String),
+    User(String),
+}
+
+impl TryFrom<AssignmentPayload> for Assignment {
+    type Error = InvalidStateError;
+
+    fn try_from(
+        AssignmentPayload { identity, roles }: AssignmentPayload,
+    ) -> Result<Self, Self::Error> {
+        AssignmentBuilder::new()
+            .with_identity(match identity {
+                IdentityPayload::Key(key) => Identity::Key(key),
+                IdentityPayload::User(user) => Identity::User(user),
+            })
+            .with_roles(roles)
+            .build()
     }
 }
