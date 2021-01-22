@@ -14,6 +14,7 @@
 
 //! Web-framework-agnostic resources.
 
+pub mod assignments;
 pub mod roles;
 
 use crate::rest_api::paging::{DEFAULT_LIMIT, DEFAULT_OFFSET};
