@@ -89,3 +89,8 @@ impl TryFrom<AssignmentPayload> for Assignment {
             .build()
     }
 }
+
+#[derive(Deserialize)]
+pub struct AssignmentUpdatePayload {
+    pub roles: Vec<String>,
+}

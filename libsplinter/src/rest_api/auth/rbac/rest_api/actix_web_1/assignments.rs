@@ -23,7 +23,10 @@ use crate::rest_api::{
     auth::rbac::{
         rest_api::{
             resources::{
-                assignments::{AssignmentPayload, AssignmentResponse, ListAssignmentsResponse},
+                assignments::{
+                    AssignmentPayload, AssignmentResponse, AssignmentUpdatePayload,
+                    ListAssignmentsResponse,
+                },
                 PagingQuery,
             },
             RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
@@ -57,7 +60,8 @@ pub fn make_assignments_resource(
 pub fn make_assignment_resource(
     role_based_auth_store: Box<dyn RoleBasedAuthorizationStore>,
 ) -> Resource {
-    let get_store = role_based_auth_store;
+    let get_store = role_based_auth_store.clone();
+    let patch_store = role_based_auth_store;
     Resource::build("/authorization/assignments/{identity_type}/{identity}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::AUTHORIZATION_RBAC_ASSIGNMENTS_MIN,
@@ -65,6 +69,9 @@ pub fn make_assignment_resource(
         ))
         .add_method(Method::Get, RBAC_READ_PERMISSION, move |r, _| {
             get_assignment(r, web::Data::new(get_store.clone()))
+        })
+        .add_method(Method::Patch, RBAC_WRITE_PERMISSION, move |r, p| {
+            patch_assignment(r, p, web::Data::new(patch_store.clone()))
         })
 }
 
@@ -181,32 +188,39 @@ fn add_assignment(
     )
 }
 
+macro_rules! try_identity_from_req {
+    ($req:expr) => {{
+        let identity_type = $req
+            .match_info()
+            .get("identity_type")
+            .unwrap_or("")
+            .to_lowercase()
+            .to_string();
+        let identity = $req.match_info().get("identity").unwrap_or("").to_string();
+        let identity = match identity_type.as_str() {
+            "key" => Identity::Key(identity),
+            "user" => Identity::User(identity),
+            _ => {
+                return Box::new(
+                    HttpResponse::BadRequest()
+                        .json(ErrorResponse::bad_request(&format!(
+                            "Invalid identity type {}",
+                            identity_type
+                        )))
+                        .into_future(),
+                )
+            }
+        };
+
+        identity
+    }};
+}
+
 fn get_assignment(
     req: HttpRequest,
     role_based_auth_store: web::Data<Box<dyn RoleBasedAuthorizationStore>>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let identity_type = req
-        .match_info()
-        .get("identity_type")
-        .unwrap_or("")
-        .to_lowercase()
-        .to_string();
-    let identity = req.match_info().get("identity").unwrap_or("").to_string();
-    let identity = match identity_type.as_str() {
-        "key" => Identity::Key(identity),
-        "user" => Identity::User(identity),
-        _ => {
-            return Box::new(
-                HttpResponse::BadRequest()
-                    .json(ErrorResponse::bad_request(&format!(
-                        "Invalid identity type {}",
-                        identity_type
-                    )))
-                    .into_future(),
-            )
-        }
-    };
-
+    let identity = try_identity_from_req!(req);
     Box::new(
         web::block(move || {
             role_based_auth_store
@@ -228,6 +242,97 @@ fn get_assignment(
             })
         }),
     )
+}
+
+fn patch_assignment(
+    req: HttpRequest,
+    payload: web::Payload,
+    role_based_auth_store: web::Data<Box<dyn RoleBasedAuthorizationStore>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let identity = try_identity_from_req!(req);
+    Box::new(
+        payload
+            .from_err::<Error>()
+            .fold(web::BytesMut::new(), move |mut body, chunk| {
+                body.extend_from_slice(&chunk);
+                Ok::<_, Error>(body)
+            })
+            .into_future()
+            .and_then(move |body| {
+                let assignment_update =
+                    match serde_json::from_slice::<AssignmentUpdatePayload>(&body) {
+                        Ok(assignment_update) => assignment_update,
+                        Err(err) => {
+                            return Box::new(
+                                HttpResponse::BadRequest()
+                                    .json(ErrorResponse::bad_request(&format!(
+                                        "Invalid assignment payload: {}",
+                                        err
+                                    )))
+                                    .into_future(),
+                            )
+                                as Box<dyn Future<Item = HttpResponse, Error = Error>>;
+                        }
+                    };
+
+                Box::new(
+                    web::block(move || {
+                        update_assignment(&**role_based_auth_store, &identity, assignment_update)
+                    })
+                    .then(|res| {
+                        use SendableRoleBasedAuthorizationStoreError::*;
+                        Ok(match res {
+                            Ok(_) => HttpResponse::Ok().finish(),
+                            Err(BlockingError::Error(InvalidState(err))) => {
+                                HttpResponse::BadRequest()
+                                    .json(ErrorResponse::bad_request(&err.to_string()))
+                            }
+                            Err(BlockingError::Error(ConstraintViolation(msg))) => {
+                                HttpResponse::NotFound().json(ErrorResponse::not_found(&msg))
+                            }
+                            Err(err) => {
+                                error!("Unable to update assignment: {}", err);
+                                HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
+                            }
+                        })
+                    }),
+                ) as Box<dyn Future<Item = HttpResponse, Error = Error>>
+            }),
+    )
+}
+
+fn update_assignment(
+    role_based_auth_store: &dyn RoleBasedAuthorizationStore,
+    identity: &Identity,
+    AssignmentUpdatePayload { roles }: AssignmentUpdatePayload,
+) -> Result<(), SendableRoleBasedAuthorizationStoreError> {
+    role_based_auth_store
+        .get_assignment(identity)
+        .map_err(SendableRoleBasedAuthorizationStoreError::from)
+        .and_then(|assignment_opt| {
+            if let Some(assignment) = assignment_opt {
+                let updated_assignment = assignment
+                    .into_update_builder()
+                    .with_roles(roles)
+                    .build()
+                    .map_err(SendableRoleBasedAuthorizationStoreError::InvalidState)?;
+
+                role_based_auth_store
+                    .update_assignment(updated_assignment)
+                    .map_err(SendableRoleBasedAuthorizationStoreError::from)
+            } else {
+                Err(
+                    SendableRoleBasedAuthorizationStoreError::ConstraintViolation(format!(
+                        "assignment for {} not found",
+                        match identity {
+                            Identity::Key(key) => key,
+                            Identity::User(user) => user,
+                        }
+                    )),
+                )
+            }
+        })
 }
 
 #[cfg(test)]
@@ -885,6 +990,158 @@ mod tests {
         join_handle.join().expect("Unable to join rest api thread");
     }
 
+    /// Test a PATCH /authorization/assignment/{type}/{identity} returns OK on a valid identity
+    /// with a valid payload.
+    /// 1. Adds two roles to the store
+    /// 2. Add two assignments, one for a key identity, one for a user identity and assign both the
+    ///    roles to each
+    /// 3. Perform a PATCH on /authorization/assignments/key/{key} and alter the assigned roles
+    /// 4. Verify that the update was made via a GET on the same URL
+    /// 5. Perform a PATCH on /authorization/assignments/user/{user} and alter the assigned roles
+    /// 6. Verify that the update was made via a GET on the same URL
+    #[test]
+    fn test_patch_assignment_ok() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+
+        let role = RoleBuilder::new()
+            .with_id("role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::Key("x".into()))
+            .with_roles(vec!["role-1".to_string(), "role-2".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("y".into()))
+            .with_roles(vec!["role-1".to_string(), "role-2".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_assignment_resource(Box::new(
+                role_based_auth_store,
+            ))]);
+
+        let url = Url::parse(&format!(
+            "http://{}/authorization/assignments/key/x",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .patch(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "roles": ["role-1"]
+            }))
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        assert_eq!(
+            json!({
+                "data": {
+                    "identity": "x",
+                    "identity_type": "key",
+                    "roles": ["role-1"],
+                }
+            }),
+            body
+        );
+
+        let url = Url::parse(&format!(
+            "http://{}/authorization/assignments/user/y",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .patch(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .json(&json!({
+                "roles": ["role-2"]
+            }))
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        assert_eq!(
+            json!({
+                "data": {
+                    "identity": "y",
+                    "identity_type": "user",
+                    "roles": ["role-2"],
+                }
+            }),
+            body
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
     fn run_rest_api_on_open_port(
         resources: Vec<Resource>,
     ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
@@ -1023,9 +1280,23 @@ mod tests {
 
         fn update_assignment(
             &self,
-            _assignment: Assignment,
+            assignment: Assignment,
         ) -> Result<(), RoleBasedAuthorizationStoreError> {
-            unimplemented!()
+            let mut assignments = self
+                .assignments
+                .lock()
+                .expect("mem role based authorization store lock was poisoned");
+
+            let key = id_to_string(assignment.identity());
+
+            if assignments.contains_key(&key) {
+                assignments.insert(key, assignment);
+                Ok(())
+            } else {
+                Err(RoleBasedAuthorizationStoreError::InvalidState(
+                    InvalidStateError::with_message("No assignment found".into()),
+                ))
+            }
         }
 
         fn remove_assignment(
