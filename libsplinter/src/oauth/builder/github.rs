@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "biome-profile")]
+use crate::oauth::GithubProfileProvider;
 use crate::oauth::{
     builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
     GithubSubjectProvider, OAuthClient,
@@ -25,12 +27,20 @@ pub struct GithubOAuthClientBuilder {
 impl GithubOAuthClientBuilder {
     /// Constructs a Github OAuthClient builder.
     pub fn new() -> Self {
-        Self {
-            inner: OAuthClientBuilder::new()
-                .with_auth_url("https://github.com/login/oauth/authorize".into())
-                .with_token_url("https://github.com/login/oauth/access_token".into())
-                .with_subject_provider(Box::new(GithubSubjectProvider)),
+        // Allowing unused_mut because inner must be mutable if experimental feature
+        // biome-profile is enabled, if feature is removed unused_mut notation can be removed
+        #[allow(unused_mut)]
+        let mut inner = OAuthClientBuilder::new()
+            .with_auth_url("https://github.com/login/oauth/authorize".into())
+            .with_token_url("https://github.com/login/oauth/access_token".into())
+            .with_subject_provider(Box::new(GithubSubjectProvider));
+
+        #[cfg(feature = "biome-profile")]
+        {
+            inner = inner.with_profile_provider(Box::new(GithubProfileProvider));
         }
+
+        Self { inner }
     }
 
     /// Sets the client ID for the OAuth2 provider.

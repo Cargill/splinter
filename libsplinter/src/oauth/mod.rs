@@ -16,6 +16,8 @@
 
 mod builder;
 mod error;
+#[cfg(feature = "biome-profile")]
+mod profile;
 #[cfg(feature = "rest-api")]
 pub(crate) mod rest_api;
 pub mod store;
@@ -39,6 +41,12 @@ pub use builder::OAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 pub use builder::OpenIdOAuthClientBuilder;
 pub use error::OAuthClientBuildError;
+#[cfg(all(feature = "biome-profile", feature = "oauth-github"))]
+pub use profile::GithubProfileProvider;
+#[cfg(all(feature = "biome-profile", feature = "oauth-openid"))]
+pub use profile::OpenIdProfileProvider;
+#[cfg(feature = "biome-profile")]
+pub use profile::ProfileProvider;
 #[cfg(feature = "oauth-github")]
 pub use subject::GithubSubjectProvider;
 #[cfg(feature = "oauth-openid")]
@@ -63,6 +71,10 @@ pub struct OAuthClient {
     /// Store for pending authorization requests, including the CSRF token, PKCE verifier, and
     /// client's redirect URL
     inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+
+    /// OAuth2 profile provider used to retrieve user's profile details
+    #[cfg(feature = "biome-profile")]
+    profile_provider: Box<dyn ProfileProvider>,
 }
 
 impl OAuthClient {
@@ -83,6 +95,7 @@ impl OAuthClient {
         scopes: Vec<String>,
         subject_provider: Box<dyn SubjectProvider>,
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
+        #[cfg(feature = "biome-profile")] profile_provider: Box<dyn ProfileProvider>,
     ) -> Self {
         Self {
             client,
@@ -90,6 +103,8 @@ impl OAuthClient {
             scopes,
             subject_provider,
             inflight_request_store,
+            #[cfg(feature = "biome-profile")]
+            profile_provider,
         }
     }
 
@@ -165,6 +180,15 @@ impl OAuthClient {
                 ))
             })?;
 
+        #[cfg(feature = "biome-profile")]
+        let profile = self
+            .profile_provider
+            .get_profile(token_response.access_token().secret())
+            .map_err(|err| {
+                InternalError::with_message(format!("failed to get profile details: {}", err,))
+            })?
+            .ok_or_else(|| InternalError::with_message("profile details not found".into()))?;
+
         // Fetch the users subject identifier from OAuth provider
         let subject = self
             .get_subject(token_response.access_token().secret())?
@@ -177,6 +201,8 @@ impl OAuthClient {
                 .refresh_token()
                 .map(|token| token.secret().into()),
             subject,
+            #[cfg(feature = "biome-profile")]
+            profile,
         };
 
         Ok(Some((user_info, pending_authorization.client_redirect_url)))
@@ -245,6 +271,9 @@ pub struct UserInfo {
     refresh_token: Option<String>,
     /// The user's subject identifier
     subject: String,
+    /// The user's profile details
+    #[cfg(feature = "biome-profile")]
+    profile: Profile,
 }
 
 impl UserInfo {
@@ -269,20 +298,43 @@ impl UserInfo {
     pub fn subject(&self) -> &str {
         &self.subject
     }
+
+    /// Gets the user's profile details
+    #[cfg(feature = "biome-profile")]
+    pub fn profile(&self) -> &Profile {
+        &self.profile
+    }
 }
 
 impl std::fmt::Debug for UserInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("UserInfo")
+        let mut debug_struct = f.debug_struct("UserInfo");
+
+        debug_struct
             .field("access_token", &"<Redacted>".to_string())
             .field("expires_in", &self.expires_in)
             .field(
                 "refresh_token",
                 &self.refresh_token.as_deref().map(|_| "<Redacted>"),
             )
-            .field("subject", &self.subject)
-            .finish()
+            .field("subject", &self.subject);
+
+        #[cfg(feature = "biome-profile")]
+        debug_struct.field("profile", &self.profile);
+
+        debug_struct.finish()
     }
+}
+
+#[cfg(feature = "biome-profile")]
+#[derive(Clone, Debug)]
+pub struct Profile {
+    pub subject: String,
+    pub name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+    pub email: Option<String>,
+    pub picture: Option<String>,
 }
 
 #[cfg(test)]
@@ -380,6 +432,8 @@ mod tests {
             vec![SCOPE1.into(), SCOPE2.into()],
             Box::new(TestSubjectProvider),
             request_store.clone(),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let generated_auth_url = Url::parse(
@@ -458,6 +512,28 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "biome-profile")]
+    #[derive(Clone)]
+    pub struct TestProfileProvider;
+
+    #[cfg(feature = "biome-profile")]
+    impl ProfileProvider for TestProfileProvider {
+        fn get_profile(&self, _: &str) -> Result<Option<Profile>, InternalError> {
+            Ok(Some(Profile {
+                subject: "".to_string(),
+                name: None,
+                given_name: None,
+                family_name: None,
+                email: None,
+                picture: None,
+            }))
+        }
+
+        fn clone_box(&self) -> Box<dyn ProfileProvider> {
+            Box::new(self.clone())
+        }
+    }
+
     #[derive(Clone)]
     pub struct TestInflightOAuthRequestStore;
 
@@ -498,6 +574,8 @@ mod actix_tests {
 
     use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
+    #[cfg(feature = "biome-profile")]
+    use super::tests::TestProfileProvider;
     use super::tests::TestSubjectProvider;
 
     const CLIENT_ID: &str = "client_id";
@@ -555,6 +633,8 @@ mod actix_tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let (user_info, client_redirect_url) = client
@@ -611,6 +691,8 @@ mod actix_tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
+            #[cfg(feature = "biome-profile")]
+            Box::new(TestProfileProvider),
         );
 
         let access_token = client

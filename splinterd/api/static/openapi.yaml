@@ -1387,6 +1387,97 @@ paths:
                 schema:
                   $ref: '#/components/schemas/ErrorBiome'
 
+  /biome/profiles:
+    get:
+      tags:
+        - Biome
+        description: List all user profiles
+        parameters:
+          - $ref: "#/components/parameters/auth"
+          - $ref: "#/components/parameters/protocol_version"
+        responses:
+          200:
+            description: List of profiles for all users
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BiomeProfile'
+          401:
+            description: The client is unauthorized
+          500:
+            description: Internal server error occurred
+            content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorBiome' 
+
+  /biome/profiles/{user_id}:
+    get:
+      tags:
+      - Biome
+      description: Fetch a profile by ID
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+        - name: user_id
+          in: path
+          description: ID of the user
+          required: true
+          schema:
+            type: string
+            example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
+      responses:
+        200:
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                $ref: '#/components/schemas/BiomeProfile'
+        401:
+          description: The client is unauthorized
+        404:
+          description: Resource not found
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
+
+  /biome/profile:
+    get:
+      tags:
+        - Biome
+        description: Get the profile of the authenticated user
+        parameters:
+          - $ref: "#/components/parameters/auth"
+          - $ref: "#/components/parameters/protocol_version"
+        responses:
+          200:
+            description: User's profile
+            content:
+              application/json:
+                schema:
+                  type: object
+                    properties:
+                    $ref: '#/components/schemas/BiomeProfile'
+          401:
+            description: The client is unauthorized
+          500:
+            description: Internal server error occurred
+            content:
+              application/json:
+                  schema:
+                    $ref: '#/components/schemas/ErrorBiome'
+
   /biome/keys:
     get:
       tags:
@@ -2221,6 +2312,38 @@ components:
           description: "An array of permissions included with this role."
           items:
             type: string
+
+    BiomeProfile:
+      type: object
+      properties:
+        user_id:
+          type: string
+          description: "Internal unique identifier for the user"
+          example: "f35aacc1-a9cd-4eda-b6d0-2efaddf0c8a4"
+        subject:
+          type: string
+          description: "Oauth provider's unique identifier for the user"
+          example: "129367690558975733497"
+        name:
+          type: string
+          description: "User's name"
+          example: "Alice Foo"
+        given_name:
+          type: string
+          description: "The given name of the user"
+          example: "Alice"
+        family_name:
+          type: string
+          description: "The family name of the user"
+          example: "Foo"
+        email:
+          type: string
+          description: "The email address of the user"
+          example: "alice@gmail.com"
+        picture:
+          type: string
+          description: "The profile picture for the user's account"
+          example: "https://lh6.googleusercontent.com/AMZpcempiaceeiA/s96-c/photo.jpg"
 
 tags:
   - name: Biome

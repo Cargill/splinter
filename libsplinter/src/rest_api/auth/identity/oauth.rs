@@ -194,6 +194,8 @@ mod tests {
     use crate::oauth::{
         store::MemoryInflightOAuthRequestStore, OAuthClientBuilder, SubjectProvider,
     };
+    #[cfg(feature = "biome-profile")]
+    use crate::oauth::{Profile, ProfileProvider};
 
     const TOKEN_ENDPOINT: &str = "/token";
     const REFRESH_TOKEN: &str = "refresh_token";
@@ -457,9 +459,12 @@ mod tests {
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url(format!("{}{}", address, TOKEN_ENDPOINT))
             .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
-            .build()
-            .expect("Failed to build OAuth client");
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
+
+        #[cfg(feature = "biome-profile")]
+        let client = client.with_profile_provider(Box::new(RefreshedTokenProfileProvider));
+
+        let client = client.build().expect("Failed to build OAuth client");
 
         let identity_provider = OAuthUserIdentityProvider::new(
             client,
@@ -530,9 +535,12 @@ mod tests {
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url(format!("{}{}", address, TOKEN_ENDPOINT))
             .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
-            .build()
-            .expect("Failed to build OAuth client");
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
+
+        #[cfg(feature = "biome-profile")]
+        let client = client.with_profile_provider(Box::new(RefreshedTokenProfileProvider));
+
+        let client = client.build().expect("Failed to build OAuth client");
 
         let identity_provider = OAuthUserIdentityProvider::new(
             client,
@@ -557,16 +565,20 @@ mod tests {
 
     /// Returns a mock OAuth client that wraps an `AlwaysSomeSubjectProvider`
     fn always_some_client() -> OAuthClient {
-        OAuthClientBuilder::new()
+        let client = OAuthClientBuilder::new()
             .with_client_id("client_id".into())
             .with_client_secret("client_secret".into())
             .with_auth_url("http://test.com/auth".into())
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url("http://test.com/token".into())
             .with_subject_provider(Box::new(AlwaysSomeSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
-            .build()
-            .expect("Failed to build OAuth client")
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
+
+        #[cfg(feature = "biome-profile")]
+        let client = client.with_profile_provider(Box::new(AlwaysSomeProfileProvider));
+
+        let client = client.build().expect("Failed to build OAuth client");
+        client
     }
 
     /// Subject provider that always returns a subject
@@ -583,18 +595,46 @@ mod tests {
         }
     }
 
+    /// Profile provider that always returns a profile
+    #[cfg(feature = "biome-profile")]
+    #[derive(Clone)]
+    struct AlwaysSomeProfileProvider;
+
+    #[cfg(feature = "biome-profile")]
+    impl ProfileProvider for AlwaysSomeProfileProvider {
+        fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
+            let profile = Profile {
+                subject: "subject".to_string(),
+                name: None,
+                given_name: None,
+                family_name: None,
+                email: None,
+                picture: None,
+            };
+            Ok(Some(profile))
+        }
+
+        fn clone_box(&self) -> Box<dyn ProfileProvider> {
+            Box::new(self.clone())
+        }
+    }
+
     /// Returns a mock OAuth client that wraps an `AlwaysNoneSubjectProvider`
     fn always_none_client() -> OAuthClient {
-        OAuthClientBuilder::new()
+        let client = OAuthClientBuilder::new()
             .with_client_id("client_id".into())
             .with_client_secret("client_secret".into())
             .with_auth_url("http://test.com/auth".into())
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url("http://test.com/token".into())
             .with_subject_provider(Box::new(AlwaysNoneSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
-            .build()
-            .expect("Failed to build OAuth client")
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
+
+        #[cfg(feature = "biome-profile")]
+        let client = client.with_profile_provider(Box::new(AlwaysNoneProfileProvider));
+
+        let client = client.build().expect("Failed to build OAuth client");
+        client
     }
 
     /// Subject provider that always returns `Ok(None)`
@@ -611,18 +651,38 @@ mod tests {
         }
     }
 
+    /// Profile provider that always returns `Ok(None)`
+    #[cfg(feature = "biome-profile")]
+    #[derive(Clone)]
+    struct AlwaysNoneProfileProvider;
+
+    #[cfg(feature = "biome-profile")]
+    impl ProfileProvider for AlwaysNoneProfileProvider {
+        fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
+            Ok(None)
+        }
+
+        fn clone_box(&self) -> Box<dyn ProfileProvider> {
+            Box::new(self.clone())
+        }
+    }
+
     /// Returns a mock OAuth client that wraps an `AlwaysErrSubjectProvider`
     fn always_err_client() -> OAuthClient {
-        OAuthClientBuilder::new()
+        let client = OAuthClientBuilder::new()
             .with_client_id("client_id".into())
             .with_client_secret("client_secret".into())
             .with_auth_url("http://test.com/auth".into())
             .with_redirect_url("http://test.com/redirect".into())
             .with_token_url("http://test.com/token".into())
             .with_subject_provider(Box::new(AlwaysErrSubjectProvider))
-            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()))
-            .build()
-            .expect("Failed to build OAuth client")
+            .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
+
+        #[cfg(feature = "biome-profile")]
+        let client = client.with_profile_provider(Box::new(AlwaysErrProfileProvider));
+
+        let client = client.build().expect("Failed to build OAuth client");
+        client
     }
 
     /// Subject provider that always returns `Err`
@@ -635,6 +695,22 @@ mod tests {
         }
 
         fn clone_box(&self) -> Box<dyn SubjectProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// Profile provider that always returns `Err`
+    #[cfg(feature = "biome-profile")]
+    #[derive(Clone)]
+    struct AlwaysErrProfileProvider;
+
+    #[cfg(feature = "biome-profile")]
+    impl ProfileProvider for AlwaysErrProfileProvider {
+        fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
+            Err(InternalError::with_message("error".into()))
+        }
+
+        fn clone_box(&self) -> Box<dyn ProfileProvider> {
             Box::new(self.clone())
         }
     }
@@ -654,6 +730,35 @@ mod tests {
         }
 
         fn clone_box(&self) -> Box<dyn SubjectProvider> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// Profile provider that returns a profile when the new `NEW_OAUTH_ACCESS_TOKEN` is provided;
+    /// returns `Ok(None)` otherwise.
+    #[cfg(feature = "biome-profile")]
+    #[derive(Clone)]
+    struct RefreshedTokenProfileProvider;
+
+    #[cfg(feature = "biome-profile")]
+    impl ProfileProvider for RefreshedTokenProfileProvider {
+        fn get_profile(&self, access_token: &str) -> Result<Option<Profile>, InternalError> {
+            if access_token == NEW_OAUTH_ACCESS_TOKEN {
+                let profile = Profile {
+                    subject: "subject".to_string(),
+                    name: None,
+                    given_name: None,
+                    family_name: None,
+                    email: None,
+                    picture: None,
+                };
+                Ok(Some(profile))
+            } else {
+                Ok(None)
+            }
+        }
+
+        fn clone_box(&self) -> Box<dyn ProfileProvider> {
             Box::new(self.clone())
         }
     }

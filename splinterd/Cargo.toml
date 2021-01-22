@@ -86,6 +86,7 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-oauth",
+    "biome-profile",
     "health",
     "https-bind",
     "oauth",
@@ -121,6 +122,7 @@ biome-oauth = [
     "splinter/biome-oauth",
     "splinter/biome-oauth-user-store-postgres"
 ]
+biome-profile = ["splinter/biome-profile"]
 database = ["splinter/postgres", "splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
 oauth = [

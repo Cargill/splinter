@@ -150,6 +150,8 @@ impl RestApiBuilder {
                     AuthConfig::OAuth {
                         oauth_config,
                         oauth_user_session_store,
+                        #[cfg(feature = "biome-profile")]
+                        user_profile_store,
                     } => {
                         if oauth_configured {
                             return Err(RestApiServerError::InvalidStateError(
@@ -220,8 +222,13 @@ impl RestApiBuilder {
                             None,
                         )));
                         self.resources.append(
-                            &mut OAuthResourceProvider::new(oauth_client, oauth_user_session_store)
-                                .resources(),
+                            &mut OAuthResourceProvider::new(
+                                oauth_client,
+                                oauth_user_session_store,
+                                #[cfg(feature = "biome-profile")]
+                                user_profile_store,
+                            )
+                            .resources(),
                         );
                         oauth_configured = true;
                     }
