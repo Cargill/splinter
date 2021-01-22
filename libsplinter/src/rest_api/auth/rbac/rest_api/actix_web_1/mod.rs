@@ -42,6 +42,7 @@ impl RestResourceProvider for RoleBasedAuthorizationResourceProvider {
             roles::make_roles_resource(self.role_based_authorization_store.clone()),
             roles::make_role_resource(self.role_based_authorization_store.clone()),
             assignments::make_assignments_resource(self.role_based_authorization_store.clone()),
+            assignments::make_assignment_resource(self.role_based_authorization_store.clone()),
         ]
     }
 }
