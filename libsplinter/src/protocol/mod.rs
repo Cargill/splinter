@@ -57,6 +57,8 @@ pub(crate) const AUTHORIZATION_MAINTENANCE_MIN: u32 = 1;
 // Authorization (namely RBAC management)  protocol versions
 #[cfg(feature = "authorization")]
 pub(crate) const AUTHORIZATION_RBAC_ROLES_MIN: u32 = 1;
+#[cfg(feature = "authorization")]
+pub(crate) const AUTHORIZATION_RBAC_ROLE_MIN: u32 = 1;
 
 #[cfg(feature = "oauth")]
 pub const OAUTH_PROTOCOL_VERSION: u32 = 1;

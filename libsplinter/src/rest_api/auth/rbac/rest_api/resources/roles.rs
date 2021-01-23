@@ -42,6 +42,12 @@ pub struct RolePayload {
     pub permissions: Vec<String>,
 }
 
+#[derive(Deserialize)]
+pub struct RoleUpdatePayload {
+    pub display_name: Option<String>,
+    pub permissions: Option<Vec<String>>,
+}
+
 impl<'a> From<&'a Role> for RoleResponse<'a> {
     fn from(role: &'a Role) -> Self {
         Self {
