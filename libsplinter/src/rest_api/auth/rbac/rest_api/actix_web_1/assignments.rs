@@ -61,7 +61,8 @@ pub fn make_assignment_resource(
     role_based_auth_store: Box<dyn RoleBasedAuthorizationStore>,
 ) -> Resource {
     let get_store = role_based_auth_store.clone();
-    let patch_store = role_based_auth_store;
+    let patch_store = role_based_auth_store.clone();
+    let delete_store = role_based_auth_store;
     Resource::build("/authorization/assignments/{identity_type}/{identity}")
         .add_request_guard(ProtocolVersionRangeGuard::new(
             protocol::AUTHORIZATION_RBAC_ASSIGNMENTS_MIN,
@@ -72,6 +73,9 @@ pub fn make_assignment_resource(
         })
         .add_method(Method::Patch, RBAC_WRITE_PERMISSION, move |r, p| {
             patch_assignment(r, p, web::Data::new(patch_store.clone()))
+        })
+        .add_method(Method::Delete, RBAC_WRITE_PERMISSION, move |r, _| {
+            delete_assignment(r, web::Data::new(delete_store.clone()))
         })
 }
 
@@ -333,6 +337,29 @@ fn update_assignment(
                 )
             }
         })
+}
+
+fn delete_assignment(
+    req: HttpRequest,
+    role_based_auth_store: web::Data<Box<dyn RoleBasedAuthorizationStore>>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let identity = try_identity_from_req!(req);
+    Box::new(
+        web::block(move || {
+            role_based_auth_store
+                .remove_assignment(&identity)
+                .map_err(SendableRoleBasedAuthorizationStoreError::from)
+        })
+        .then(|res| {
+            Ok(match res {
+                Ok(()) => HttpResponse::Ok().finish(),
+                Err(err) => {
+                    error!("Unable to delete assignment: {}", err);
+                    HttpResponse::InternalServerError().json(ErrorResponse::internal_error())
+                }
+            })
+        }),
+    )
 }
 
 #[cfg(test)]
@@ -1142,6 +1169,150 @@ mod tests {
         join_handle.join().expect("Unable to join rest api thread");
     }
 
+    /// Test a DELETE /authorization/assignments/{type}/{identity} returns OK on a valid identity
+    /// with a valid payload.
+    /// 1. Adds two roles to the store
+    /// 2. Add two assignments, one for a key identity, one for a user identity and assign both the
+    ///    roles to each
+    /// 3. Perform a DELETE against /authorization/assignments/key/{key}
+    /// 4. Verify that a GET against the same URL returns a 404
+    /// 5. Perform a DELETE against /authorization/assignments/user/{user}
+    /// 6. Verify that a GET against the same URL returns a 404
+    /// 7. Verify that both items have been deleted from the store
+    #[test]
+    fn test_delete_assignment_ok() {
+        let role_based_auth_store = MemRoleBasedAuthorizationStore::default();
+
+        let role = RoleBuilder::new()
+            .with_id("role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::Key("x".into()))
+            .with_roles(vec!["role-1".to_string(), "role-2".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("y".into()))
+            .with_roles(vec!["role-1".to_string(), "role-2".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_assignment_resource(Box::new(
+                role_based_auth_store.clone(),
+            ))]);
+
+        let url = Url::parse(&format!(
+            "http://{}/authorization/assignments/key/x",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .delete(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let resp = Client::new()
+            .get(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        let url = Url::parse(&format!(
+            "http://{}/authorization/assignments/user/y",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+
+        let resp = Client::new()
+            .delete(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let resp = Client::new()
+            .get(url.clone())
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+        // show delete is idempotent
+        let resp = Client::new()
+            .delete(url)
+            .header(
+                "SplinterProtocolVersion",
+                protocol::AUTHORIZATION_PROTOCOL_VERSION,
+            )
+            .send()
+            .expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // verify the items are deleted from the store
+        assert!(role_based_auth_store
+            .get_assignment(&Identity::Key("x".into()))
+            .expect("Unable to fetch assignments")
+            .is_none());
+        assert!(role_based_auth_store
+            .get_assignment(&Identity::User("y".into()))
+            .expect("Unable to fetch assignments")
+            .is_none());
+
+        shutdown_handle
+            .shutdown()
+            .expect("Unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
     fn run_rest_api_on_open_port(
         resources: Vec<Resource>,
     ) -> (RestApiShutdownHandle, std::thread::JoinHandle<()>, String) {
@@ -1301,9 +1472,18 @@ mod tests {
 
         fn remove_assignment(
             &self,
-            _identity: &Identity,
+            identity: &Identity,
         ) -> Result<(), RoleBasedAuthorizationStoreError> {
-            unimplemented!()
+            let mut assignments = self
+                .assignments
+                .lock()
+                .expect("mem role based authorization store lock was poisoned");
+
+            let key = id_to_string(&identity);
+
+            assignments.remove(&key);
+
+            Ok(())
         }
 
         fn clone_box(&self) -> Box<dyn RoleBasedAuthorizationStore> {
