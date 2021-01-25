@@ -14,4 +14,23 @@
 
 //! Web-framework-agnostic resources.
 
+pub mod assignments;
 pub mod roles;
+
+use crate::rest_api::paging::{DEFAULT_LIMIT, DEFAULT_OFFSET};
+
+#[derive(Deserialize)]
+pub struct PagingQuery {
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+    #[serde(default = "default_offset")]
+    pub offset: usize,
+}
+
+fn default_limit() -> usize {
+    DEFAULT_LIMIT
+}
+
+fn default_offset() -> usize {
+    DEFAULT_OFFSET
+}

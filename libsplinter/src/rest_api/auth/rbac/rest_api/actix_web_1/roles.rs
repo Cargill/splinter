@@ -26,32 +26,19 @@ use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
     auth::rbac::{
         rest_api::{
-            resources::roles::{ListRoleResponse, RolePayload, RoleResponse, RoleUpdatePayload},
+            resources::{
+                roles::{ListRoleResponse, RolePayload, RoleResponse, RoleUpdatePayload},
+                PagingQuery,
+            },
             RBAC_READ_PERMISSION, RBAC_WRITE_PERMISSION,
         },
         store::{Role, RoleBasedAuthorizationStore},
     },
-    paging::{get_response_paging_info, DEFAULT_LIMIT, DEFAULT_OFFSET},
+    paging::get_response_paging_info,
     ErrorResponse,
 };
 
 use super::error::SendableRoleBasedAuthorizationStoreError;
-
-#[derive(Deserialize)]
-struct PagingQuery {
-    #[serde(default = "default_limit")]
-    limit: usize,
-    #[serde(default = "default_offset")]
-    offset: usize,
-}
-
-fn default_limit() -> usize {
-    DEFAULT_LIMIT
-}
-
-fn default_offset() -> usize {
-    DEFAULT_OFFSET
-}
 
 pub fn make_roles_resource(
     role_based_authorization_store: Box<dyn RoleBasedAuthorizationStore>,

@@ -14,6 +14,7 @@
 
 //! Actix Web 1.x RBAC REST Resource implementations.
 
+mod assignments;
 mod error;
 mod roles;
 
@@ -40,6 +41,8 @@ impl RestResourceProvider for RoleBasedAuthorizationResourceProvider {
         vec![
             roles::make_roles_resource(self.role_based_authorization_store.clone()),
             roles::make_role_resource(self.role_based_authorization_store.clone()),
+            assignments::make_assignments_resource(self.role_based_authorization_store.clone()),
+            assignments::make_assignment_resource(self.role_based_authorization_store.clone()),
         ]
     }
 }
