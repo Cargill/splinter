@@ -25,7 +25,7 @@ use std::fs::File;
 
 use clap::ArgMatches;
 use serde::Deserialize;
-use splinter::admin::messages::{CreateCircuit, SplinterService};
+use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterService};
 use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
 use crate::error::CliError;
@@ -171,6 +171,7 @@ impl Action for CircuitProposeAction {
 
         if args.value_of("compat_version") != Some("0.4") {
             builder.set_circuit_version(CIRCUIT_PROTOCOL_VERSION);
+            builder.set_circuit_status(CircuitStatus::Active);
         }
 
         let create_circuit = builder.build()?;
