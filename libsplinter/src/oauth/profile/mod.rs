@@ -14,7 +14,6 @@
 
 //! APIs and implementations for fetching profile details from OAuth servers
 
-#[cfg(feature = "oauth-github")]
 mod github;
 #[cfg(feature = "oauth-openid")]
 mod openid;
@@ -22,7 +21,6 @@ mod openid;
 use crate::error::InternalError;
 use crate::oauth::Profile;
 
-#[cfg(feature = "oauth-github")]
 pub use github::GithubProfileProvider;
 #[cfg(feature = "oauth-openid")]
 pub use openid::OpenIdProfileProvider;

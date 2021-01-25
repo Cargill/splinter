@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use crate::error::InvalidStateError;
-#[cfg(feature = "oauth-github")]
+#[cfg(feature = "oauth")]
 use crate::oauth::GithubOAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 use crate::oauth::OpenIdOAuthClientBuilder;
@@ -26,10 +26,10 @@ use crate::oauth::OpenIdOAuthClientBuilder;
 use crate::rest_api::auth::authorization::AuthorizationHandler;
 #[cfg(feature = "cylinder-jwt")]
 use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
-#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
-use crate::rest_api::OAuthConfig;
 #[cfg(feature = "oauth")]
-use crate::rest_api::{auth::identity::oauth::OAuthUserIdentityProvider, OAuthResourceProvider};
+use crate::rest_api::{
+    auth::identity::oauth::OAuthUserIdentityProvider, OAuthConfig, OAuthResourceProvider,
+};
 use crate::rest_api::{auth::identity::IdentityProvider, RestApiBind, RestApiServerError};
 
 use super::AuthConfig;
@@ -176,7 +176,6 @@ impl RestApiBuilder {
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
                                 .build()?,
-                            #[cfg(feature = "oauth-github")]
                             OAuthConfig::GitHub {
                                 client_id,
                                 client_secret,

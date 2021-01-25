@@ -14,7 +14,6 @@
 
 //! Builders for [OAuthClient](crate::oauth::OAuthClient) structs.
 
-#[cfg(feature = "oauth-github")]
 mod github;
 #[cfg(feature = "oauth-openid")]
 mod openid;
@@ -26,7 +25,6 @@ use super::error::OAuthClientBuildError;
 use super::ProfileProvider;
 use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient, SubjectProvider};
 
-#[cfg(feature = "oauth-github")]
 pub use github::GithubOAuthClientBuilder;
 
 #[cfg(feature = "oauth-openid")]

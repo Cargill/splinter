@@ -107,7 +107,6 @@ experimental = [
     "biome-oauth-user-store-postgres",
     "biome-profile",
     "https-bind",
-    "oauth-github",
     "oauth-openid",
     "oauth-inflight-request-store-postgres",
     "registry-database",
@@ -138,7 +137,6 @@ cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 oauth = ["oauth2", "rest-api"]
-oauth-github = ["oauth"]
 oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 oauth-openid = ["oauth", "reqwest"]
 postgres = ["diesel/postgres", "diesel_migrations"]

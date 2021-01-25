@@ -68,13 +68,11 @@ pub mod sessions;
 
 use percent_encoding::{AsciiSet, CONTROLS};
 
-#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+#[cfg(feature = "oauth")]
 use std::boxed::Box;
 
 #[cfg(feature = "oauth")]
-use crate::oauth::rest_api::OAuthResourceProvider;
-#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
-use crate::oauth::store::InflightOAuthRequestStore;
+use crate::oauth::{rest_api::OAuthResourceProvider, store::InflightOAuthRequestStore};
 
 pub use errors::{RequestError, RestApiServerError};
 
@@ -143,7 +141,6 @@ pub enum OAuthConfig {
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
     /// OAuth provided by GitHub
-    #[cfg(feature = "oauth-github")]
     GitHub {
         /// The client ID of the GitHub OAuth app
         client_id: String,
