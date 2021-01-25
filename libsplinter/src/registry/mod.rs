@@ -276,13 +276,6 @@ pub trait RegistryWriter: Send + Sync {
 pub trait RwRegistry: RegistryWriter + RegistryReader {
     /// Clone implementation for `RwRegistry`. The implementation of the `Clone` trait for
     /// `Box<RwRegistry>` calls this method.
-    ///
-    /// # Example
-    ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn RwRegistry> {
-    ///     Box::new(self.clone())
-    ///  }
-    ///```
     fn clone_box(&self) -> Box<dyn RwRegistry>;
 
     /// Clone the `RwRegistry` as a `Box<dyn RegistryReader>`.

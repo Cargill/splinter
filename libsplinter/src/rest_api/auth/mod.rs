@@ -77,14 +77,6 @@ pub trait AuthorizationHandler: Send + Sync {
 
     /// Clone implementation for `AuthorizationHandler`. The implementation of the `Clone` trait for
     /// `Box<dyn AuthorizationHandler>` calls this method.
-    ///
-    /// # Example
-    ///
-    ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
-    ///     Box::new(self.clone())
-    ///  }
-    ///```
     fn clone_box(&self) -> Box<dyn AuthorizationHandler>;
 }
 
