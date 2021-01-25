@@ -34,14 +34,6 @@ pub trait SubjectProvider: Send + Sync {
 
     /// Clone implementation for `SubjectProvider`. The implementation of the `Clone` trait for
     /// `Box<dyn SubjectProvider>` calls this method.
-    ///
-    /// # Example
-    ///
-    ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn SubjectProvider> {
-    ///     Box::new(self.clone())
-    ///  }
-    ///```
     fn clone_box(&self) -> Box<dyn SubjectProvider>;
 }
 
