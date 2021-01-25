@@ -16,7 +16,7 @@
 extern crate log;
 
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::Permission;
+use splinter::rest_api::auth::authorization::Permission;
 use splinter::{
     actix_web::HttpResponse,
     futures::IntoFuture,

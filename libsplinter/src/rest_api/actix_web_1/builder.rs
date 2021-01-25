@@ -22,12 +22,12 @@ use crate::error::InvalidStateError;
 use crate::oauth::GithubOAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 use crate::oauth::OpenIdOAuthClientBuilder;
+#[cfg(feature = "authorization")]
+use crate::rest_api::auth::authorization::AuthorizationHandler;
 #[cfg(feature = "cylinder-jwt")]
 use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
 #[cfg(feature = "oauth")]
 use crate::rest_api::auth::identity::oauth::OAuthUserIdentityProvider;
-#[cfg(feature = "authorization")]
-use crate::rest_api::auth::AuthorizationHandler;
 use crate::rest_api::{auth::identity::IdentityProvider, RestApiBind, RestApiServerError};
 #[cfg(feature = "oauth")]
 use crate::rest_api::{OAuthConfig, OAuthResourceProvider};

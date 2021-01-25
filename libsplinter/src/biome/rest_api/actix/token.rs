@@ -26,7 +26,7 @@ use crate::biome::{
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::secrets::SecretManager;
 use crate::rest_api::{
     actix_web_1::{into_bytes, Method, ProtocolVersionRangeGuard, Resource},

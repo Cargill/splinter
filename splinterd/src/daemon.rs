@@ -59,15 +59,15 @@ use splinter::registry::{
     UnifiedRegistry,
 };
 #[cfg(feature = "authorization-handler-allow-keys")]
-use splinter::rest_api::auth::allow_keys::AllowKeysAuthorizationHandler;
+use splinter::rest_api::auth::authorization::allow_keys::AllowKeysAuthorizationHandler;
 #[cfg(feature = "authorization-handler-maintenance")]
-use splinter::rest_api::auth::maintenance::MaintenanceModeAuthorizationHandler;
+use splinter::rest_api::auth::authorization::maintenance::MaintenanceModeAuthorizationHandler;
 #[cfg(feature = "authorization-handler-rbac")]
-use splinter::rest_api::auth::rbac::{
+use splinter::rest_api::auth::authorization::rbac::{
     rest_api::RoleBasedAuthorizationResourceProvider, RoleBasedAuthorizationHandler,
 };
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::{AuthorizationHandler, Permission};
+use splinter::rest_api::auth::authorization::{AuthorizationHandler, Permission};
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{

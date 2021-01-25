@@ -55,11 +55,11 @@ pub const AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
 pub(crate) const AUTHORIZATION_MAINTENANCE_MIN: u32 = 1;
 
 // Authorization (namely RBAC management)  protocol versions
-#[cfg(feature = "authorization")]
+#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]
 pub(crate) const AUTHORIZATION_RBAC_ROLES_MIN: u32 = 1;
-#[cfg(feature = "authorization")]
+#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]
 pub(crate) const AUTHORIZATION_RBAC_ROLE_MIN: u32 = 1;
-#[cfg(feature = "authorization")]
+#[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]
 pub(crate) const AUTHORIZATION_RBAC_ASSIGNMENTS_MIN: u32 = 1;
 
 #[cfg(feature = "oauth")]

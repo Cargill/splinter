@@ -402,7 +402,7 @@ mod tests {
 
     use crate::rest_api::actix_web_1::{Method, Resource, RestApiBuilder, RestApiShutdownHandle};
     #[cfg(feature = "authorization")]
-    use crate::rest_api::auth::Permission;
+    use crate::rest_api::auth::authorization::Permission;
 
     /// Verifies that a remote file that contains two nodes with the same identity is rejected (not
     /// loaded).

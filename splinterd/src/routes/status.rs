@@ -15,7 +15,7 @@
 use splinter::actix_web::{web, Error, HttpRequest, HttpResponse};
 use splinter::futures::{Future, IntoFuture};
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::Permission;
+use splinter::rest_api::auth::authorization::Permission;
 
 #[cfg(feature = "authorization")]
 pub const STATUS_READ_PERMISSION: Permission = Permission::Check("status.read");

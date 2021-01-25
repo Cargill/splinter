@@ -16,76 +16,20 @@
 
 #[cfg(feature = "rest-api-actix")]
 pub(crate) mod actix;
-#[cfg(feature = "authorization-handler-allow-keys")]
-pub mod allow_keys;
+#[cfg(feature = "authorization")]
+pub mod authorization;
 pub mod identity;
-#[cfg(feature = "authorization-handler-maintenance")]
-pub mod maintenance;
-#[cfg(feature = "authorization")]
-mod permission_map;
-#[cfg(feature = "authorization")]
-pub mod rbac;
 
 use std::str::FromStr;
 
-#[cfg(feature = "authorization")]
-use crate::error::InternalError;
 use crate::error::InvalidArgumentError;
 
 #[cfg(feature = "authorization")]
 use super::Method;
 
+#[cfg(feature = "authorization")]
+use authorization::{AuthorizationHandler, AuthorizationHandlerResult, Permission, PermissionMap};
 use identity::{Identity, IdentityProvider};
-#[cfg(feature = "authorization")]
-pub(in crate::rest_api) use permission_map::PermissionMap;
-
-#[cfg(feature = "authorization")]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Permission {
-    /// Check that the authenticated client has the specified permission.
-    Check(&'static str),
-    /// Allow any request that has been authenticated (the client's identity has been determined).
-    /// This may be used by endpoints that need to know the client's identity but do not require a
-    /// special permission to be checked (the Biome key management and OAuth logout routes are an
-    /// example of this).
-    AllowAuthenticated,
-    /// Allow any request without checking for authorization.
-    AllowUnauthenticated,
-}
-
-/// An authorization handler's decision about whether to allow, deny, or pass on the request
-#[cfg(feature = "authorization")]
-pub enum AuthorizationHandlerResult {
-    /// The authorization handler has granted the requested permission
-    Allow,
-    /// The authorization handler has denied the requested permission
-    Deny,
-    /// The authorization handler is not able to determine if the requested permission should be
-    /// granted or denied
-    Continue,
-}
-
-/// Determines if a client has some permissions
-#[cfg(feature = "authorization")]
-pub trait AuthorizationHandler: Send + Sync {
-    /// Determines if the given identity has the requested permission
-    fn has_permission(
-        &self,
-        identity: &Identity,
-        permission_id: &str,
-    ) -> Result<AuthorizationHandlerResult, InternalError>;
-
-    /// Clone implementation for `AuthorizationHandler`. The implementation of the `Clone` trait for
-    /// `Box<dyn AuthorizationHandler>` calls this method.
-    fn clone_box(&self) -> Box<dyn AuthorizationHandler>;
-}
-
-#[cfg(feature = "authorization")]
-impl Clone for Box<dyn AuthorizationHandler> {
-    fn clone(&self) -> Box<dyn AuthorizationHandler> {
-        self.clone_box()
-    }
-}
 
 /// The possible outcomes of attempting to authorize a client
 enum AuthorizationResult {

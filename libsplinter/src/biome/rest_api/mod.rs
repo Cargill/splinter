@@ -29,7 +29,7 @@ use std::sync::Arc;
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-use crate::rest_api::auth::Permission;
+use crate::rest_api::auth::authorization::Permission;
 #[cfg(feature = "biome-credentials")]
 use crate::rest_api::{
     auth::identity::biome::BiomeUserIdentityProvider, sessions::default_validation,
@@ -415,7 +415,8 @@ mod tests {
     use crate::rest_api::actix_web_1::{AuthConfig, RestApiBuilder, RestApiShutdownHandle};
     #[cfg(feature = "authorization")]
     use crate::rest_api::auth::{
-        identity::Identity, AuthorizationHandler, AuthorizationHandlerResult,
+        authorization::{AuthorizationHandler, AuthorizationHandlerResult},
+        identity::Identity,
     };
 
     #[derive(Serialize)]
