@@ -201,3 +201,36 @@ fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> 
 
     Ok(format!("Bearer Cylinder:{}", encoded_token))
 }
+
+// Takes a vec of vecs of strings. The first vec should include the title of the columns.
+// The max length of each column is calculated and is used as the column with when printing the
+// table.
+fn print_table(table: Vec<Vec<String>>) {
+    let mut max_lengths = Vec::new();
+
+    // find the max lengths of the columns
+    for row in table.iter() {
+        for (i, col) in row.iter().enumerate() {
+            if let Some(length) = max_lengths.get_mut(i) {
+                if col.len() > *length {
+                    *length = col.len()
+                }
+            } else {
+                max_lengths.push(col.len())
+            }
+        }
+    }
+
+    // print each row with correct column size
+    for row in table.iter() {
+        let mut col_string = String::from("");
+        for (i, len) in max_lengths.iter().enumerate() {
+            if let Some(value) = row.get(i) {
+                col_string += &format!("{}{} ", value, " ".repeat(*len - value.len()),);
+            } else {
+                col_string += &" ".repeat(*len);
+            }
+        }
+        println!("{}", col_string);
+    }
+}
