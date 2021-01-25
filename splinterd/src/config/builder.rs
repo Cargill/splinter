@@ -390,6 +390,20 @@ impl ConfigBuilder {
                     None => None,
                 }
             }),
+            #[cfg(feature = "oauth")]
+            oauth_openid_auth_params: self.partial_configs.iter().find_map(|p| {
+                match p.oauth_openid_auth_params() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }
+            }),
+            #[cfg(feature = "oauth")]
+            oauth_openid_scopes: self.partial_configs.iter().find_map(|p| {
+                match p.oauth_openid_scopes() {
+                    Some(v) => Some((v, p.source())),
+                    None => None,
+                }
+            }),
             strict_ref_counts: self
                 .partial_configs
                 .iter()

@@ -162,6 +162,16 @@ OPTIONS
 `--oauth-client-secret OAUTH-CLIENT-SECRET`
 : Specifies the client secret for the OAuth provider used by the REST API.
 
+`--oauth-openid-auth-params` `[,...]`
+: Specifies one or more additional parameters to add to OAuth OpenID auth
+  requests. Each parameter must be formatted as a `<key>=<value>` pair. This
+  option only has an effect when `--oauth-provider openid` is used.
+
+`--oauth-openid-scopes` `[,...]`
+: Specifies one or more additional scopes to request from the OAuth OpenID
+  provider. This option only has an effect when `--oauth-provider openid` is
+  used.
+
 `--oauth-openid-url OAUTH-OPENID-URL`
 : OpenID discovery document URL for the OAuth provider used by the REST API.
   This option is required when `--oauth-provider azure` or
@@ -353,6 +363,17 @@ The Splinter daemon provides 5 options for configuring OAuth for the REST API:
   be used to find the OAuth and OpenID endpoints for authentication. This option
   is required if the `oauth-provider` option is set to `azure` or `openid`; if a
   different provider is configured, this option will have no effect.
+
+* `oauth-openid-auth-params` for specifying additional parameters to add to
+  OAuth OpenID auth requests. Each parameter must be formatted as a
+  `<key>=<value>` pair. This option only has an effect when
+  `--oauth-provider openid` is used; if a different provider is configured,
+  this option will have no effect.
+
+* `oauth-openid-scopes` for specifying one or more additional scopes to request
+  from the OAuth OpenID provider. This option only has an effect when
+  `--oauth-provider openid` is used; if a different provider is configured,
+  this option will have no effect.
 
 The first 4 of the above arguments (provider, client ID, client secret, and
 redirect URL) must be provided when using OAuth authorization. If some but not

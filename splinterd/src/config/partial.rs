@@ -77,6 +77,10 @@ pub struct PartialConfig {
     oauth_redirect_url: Option<String>,
     #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_auth_params: Option<Vec<(String, String)>>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
 }
 
@@ -129,6 +133,10 @@ impl PartialConfig {
             oauth_redirect_url: None,
             #[cfg(feature = "oauth")]
             oauth_openid_url: None,
+            #[cfg(feature = "oauth")]
+            oauth_openid_auth_params: None,
+            #[cfg(feature = "oauth")]
+            oauth_openid_scopes: None,
             strict_ref_counts: None,
         }
     }
@@ -278,6 +286,16 @@ impl PartialConfig {
     #[cfg(feature = "oauth")]
     pub fn oauth_openid_url(&self) -> Option<String> {
         self.oauth_openid_url.clone()
+    }
+
+    #[cfg(feature = "oauth")]
+    pub fn oauth_openid_auth_params(&self) -> Option<Vec<(String, String)>> {
+        self.oauth_openid_auth_params.clone()
+    }
+
+    #[cfg(feature = "oauth")]
+    pub fn oauth_openid_scopes(&self) -> Option<Vec<String>> {
+        self.oauth_openid_scopes.clone()
     }
 
     pub fn strict_ref_counts(&self) -> Option<bool> {
@@ -665,6 +683,34 @@ impl PartialConfig {
     ///
     pub fn with_oauth_openid_url(mut self, oauth_openid_url: Option<String>) -> Self {
         self.oauth_openid_url = oauth_openid_url;
+        self
+    }
+
+    #[cfg(feature = "oauth")]
+    /// Adds an `with_oauth_openid_auth_params` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `oauth_openid_auth_params` - Add extra auth request parameters to the REST API OAuth
+    ///   OpenID configuration
+    ///
+    pub fn with_oauth_openid_auth_params(
+        mut self,
+        oauth_openid_auth_params: Option<Vec<(String, String)>>,
+    ) -> Self {
+        self.oauth_openid_auth_params = oauth_openid_auth_params;
+        self
+    }
+
+    #[cfg(feature = "oauth")]
+    /// Adds an `with_oauth_openid_scopes` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `oauth_openid_scopes` - Add extra scopes to the REST API OAuth OpenID configuration
+    ///
+    pub fn with_oauth_openid_scopes(mut self, oauth_openid_scopes: Option<Vec<String>>) -> Self {
+        self.oauth_openid_scopes = oauth_openid_scopes;
         self
     }
 

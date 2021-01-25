@@ -148,6 +148,35 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                         .map(String::from),
                 )
                 .with_oauth_openid_url(self.matches.value_of("oauth_openid_url").map(String::from))
+                .with_oauth_openid_auth_params(
+                    self.matches
+                        .values_of("oauth_openid_auth_params")
+                        .map(|values| {
+                            values
+                                .map(|value| {
+                                    let mut parts = value.splitn(2, '=');
+                                    match (parts.next(), parts.next()) {
+                                        (Some(key), Some(val)) => {
+                                            Ok((key.to_owned(), val.to_owned()))
+                                        }
+                                        (Some(_), None) => Err(ConfigError::InvalidArgument(
+                                            "OAuth OpenID auth parameters must be in the format \
+                                             <key>=<value>"
+                                                .to_string(),
+                                        )),
+                                        // splitn always returns at least one item
+                                        _ => unreachable!(),
+                                    }
+                                })
+                                .collect::<Result<_, _>>()
+                        })
+                        .transpose()?,
+                )
+                .with_oauth_openid_scopes(
+                    self.matches
+                        .values_of("oauth_openid_scopes")
+                        .map(|values| values.map(String::from).collect()),
+                )
         }
 
         Ok(partial_config)
