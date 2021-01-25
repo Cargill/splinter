@@ -27,7 +27,7 @@ fn parse_value(matches: &ArgMatches, arg: &str) -> Result<Option<u64>, ConfigErr
     match value_t!(matches.value_of(arg), u64) {
         Ok(v) => Ok(Some(v)),
         Err(e) => match e.kind {
-            ErrorKind::ValueValidation => Err(ConfigError::InvalidArgument(e)),
+            ErrorKind::ValueValidation => Err(ConfigError::InvalidArgument(e.to_string())),
             _ => Ok(None),
         },
     }
