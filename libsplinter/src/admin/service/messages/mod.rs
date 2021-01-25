@@ -193,17 +193,19 @@ impl CreateCircuit {
             RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
         };
 
-        match self.circuit_status {
-            CircuitStatus::Active => {
-                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
-            }
-            CircuitStatus::Disbanded => {
-                circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
-            }
-            CircuitStatus::Abandoned => {
-                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
-            }
-        };
+        if self.circuit_version > UNSET_CIRCUIT_VERSION {
+            match self.circuit_status {
+                CircuitStatus::Active => {
+                    circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+                }
+                CircuitStatus::Disbanded => {
+                    circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
+                }
+                CircuitStatus::Abandoned => {
+                    circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
+                }
+            };
+        }
 
         let mut create_request = CircuitCreateRequest::new();
         create_request.set_circuit(circuit);
