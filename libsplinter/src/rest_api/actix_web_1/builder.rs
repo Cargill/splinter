@@ -26,11 +26,11 @@ use crate::oauth::OpenIdOAuthClientBuilder;
 use crate::rest_api::auth::authorization::AuthorizationHandler;
 #[cfg(feature = "cylinder-jwt")]
 use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
+#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+use crate::rest_api::OAuthConfig;
 #[cfg(feature = "oauth")]
-use crate::rest_api::auth::identity::oauth::OAuthUserIdentityProvider;
+use crate::rest_api::{auth::identity::oauth::OAuthUserIdentityProvider, OAuthResourceProvider};
 use crate::rest_api::{auth::identity::IdentityProvider, RestApiBind, RestApiServerError};
-#[cfg(feature = "oauth")]
-use crate::rest_api::{OAuthConfig, OAuthResourceProvider};
 
 use super::AuthConfig;
 #[cfg(any(feature = "biome-credentials", feature = "oauth"))]

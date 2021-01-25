@@ -68,7 +68,7 @@ pub mod sessions;
 
 use percent_encoding::{AsciiSet, CONTROLS};
 
-#[cfg(feature = "oauth")]
+#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
 use std::boxed::Box;
 
 #[cfg(feature = "oauth")]

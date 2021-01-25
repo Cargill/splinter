@@ -26,7 +26,9 @@ use crate::biome::oauth::store::{InsertableOAuthUserSessionBuilder, OAuthUserSes
 use crate::biome::{
     profile::store::ProfileBuilder, profile::store::UserProfileStoreError, UserProfileStore,
 };
+#[cfg(feature = "biome-profile")]
 use crate::error::InternalError;
+#[cfg(feature = "biome-profile")]
 use crate::oauth::Profile as OauthProfile;
 use crate::oauth::{
     rest_api::resources::callback::{generate_redirect_query, CallbackQuery},
