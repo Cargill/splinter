@@ -53,6 +53,8 @@ pub const AUTHORIZATION_PROTOCOL_VERSION: u32 = 1;
     feature = "rest-api-actix"
 ))]
 pub(crate) const AUTHORIZATION_MAINTENANCE_MIN: u32 = 1;
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+pub(crate) const AUTHORIZATION_PERMISSIONS_MIN: u32 = 1;
 
 // Authorization (namely RBAC management)  protocol versions
 #[cfg(all(feature = "authorization-handler-rbac", feature = "rest-api-actix"))]

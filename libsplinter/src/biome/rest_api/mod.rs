@@ -80,9 +80,17 @@ use super::credentials::store::CredentialsStore;
 use crate::rest_api::sessions::AccessTokenIssuer;
 
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const BIOME_USER_READ_PERMISSION: Permission = Permission::Check("biome.user.read");
+const BIOME_USER_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "biome.user.read",
+    permission_display_name: "Biome user read",
+    permission_description: "Allows the client to view all Biome users",
+};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check("biome.user.write");
+const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check {
+    permission_id: "biome.user.write",
+    permission_display_name: "Biome user write",
+    permission_description: "Allows the client to modify all Biome users",
+};
 
 /// Provides the REST API endpoints for biome
 ///

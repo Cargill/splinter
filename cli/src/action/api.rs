@@ -176,6 +176,44 @@ impl SplinterRestClient {
                 }
             })
     }
+
+    /// Lists all REST API permissions for a Splinter node.
+    #[cfg(feature = "permissions")]
+    pub fn list_permissions(&self) -> Result<Vec<Permission>, CliError> {
+        Client::new()
+            .get(&format!("{}/authorization/permissions", self.url))
+            .header("Authorization", &self.auth)
+            .send()
+            .map_err(|err| CliError::ActionError(format!("Failed to get permissions: {}", err)))
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    res.json::<PermissionsResponse>()
+                        .map(|response| response.data)
+                        .map_err(|_| {
+                            CliError::ActionError(
+                                "Request was successful, but received an invalid response".into(),
+                            )
+                        })
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            CliError::ActionError(format!(
+                                "Permissions list request failed with status code '{}', but \
+                                 error response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(CliError::ActionError(format!(
+                        "Failed to get permissions list: {}",
+                        message
+                    )))
+                }
+            })
+    }
 }
 
 #[derive(Deserialize)]
@@ -190,4 +228,16 @@ pub struct NodeStatus {
     pub network_endpoints: Vec<String>,
     pub advertised_endpoints: Vec<String>,
     pub version: String,
+}
+
+#[derive(Deserialize)]
+struct PermissionsResponse {
+    pub data: Vec<Permission>,
+}
+
+#[derive(Deserialize)]
+pub struct Permission {
+    pub permission_id: String,
+    pub permission_display_name: String,
+    pub permission_description: String,
 }

@@ -75,25 +75,27 @@ fn authorize(
                 Some(identity) => AuthorizationResult::Authorized(identity),
                 None => AuthorizationResult::Unauthorized,
             },
-            Permission::Check(perm) => match get_identity(auth_header, identity_providers) {
-                Some(identity) => {
-                    for handler in authorization_handlers {
-                        match handler.has_permission(&identity, perm) {
-                            Ok(AuthorizationHandlerResult::Allow) => {
-                                return AuthorizationResult::Authorized(identity)
+            Permission::Check { permission_id, .. } => {
+                match get_identity(auth_header, identity_providers) {
+                    Some(identity) => {
+                        for handler in authorization_handlers {
+                            match handler.has_permission(&identity, permission_id) {
+                                Ok(AuthorizationHandlerResult::Allow) => {
+                                    return AuthorizationResult::Authorized(identity)
+                                }
+                                Ok(AuthorizationHandlerResult::Deny) => {
+                                    return AuthorizationResult::Unauthorized
+                                }
+                                Ok(AuthorizationHandlerResult::Continue) => {}
+                                Err(err) => error!("{}", err),
                             }
-                            Ok(AuthorizationHandlerResult::Deny) => {
-                                return AuthorizationResult::Unauthorized
-                            }
-                            Ok(AuthorizationHandlerResult::Continue) => {}
-                            Err(err) => error!("{}", err),
                         }
+                        // No handler allowed the request, so deny by default
+                        AuthorizationResult::Unauthorized
                     }
-                    // No handler allowed the request, so deny by default
-                    AuthorizationResult::Unauthorized
+                    None => AuthorizationResult::Unauthorized,
                 }
-                None => AuthorizationResult::Unauthorized,
-            },
+            }
         }
     }
     #[cfg(not(feature = "authorization"))]
@@ -651,7 +653,11 @@ mod tests {
             map.add_permission(
                 Method::Get,
                 "/test/endpoint",
-                Permission::Check("permission"),
+                Permission::Check {
+                    permission_id: "permission",
+                    permission_display_name: "",
+                    permission_description: "",
+                },
             );
             map
         };
@@ -680,7 +686,11 @@ mod tests {
             map.add_permission(
                 Method::Get,
                 "/test/endpoint",
-                Permission::Check("permission"),
+                Permission::Check {
+                    permission_id: "permission",
+                    permission_display_name: "",
+                    permission_description: "",
+                },
             );
             map
         };
@@ -708,7 +718,11 @@ mod tests {
             map.add_permission(
                 Method::Get,
                 "/test/endpoint",
-                Permission::Check("permission"),
+                Permission::Check {
+                    permission_id: "permission",
+                    permission_display_name: "",
+                    permission_description: "",
+                },
             );
             map
         };
@@ -746,7 +760,11 @@ mod tests {
             map.add_permission(
                 Method::Get,
                 "/test/endpoint",
-                Permission::Check("permission"),
+                Permission::Check {
+                    permission_id: "permission",
+                    permission_display_name: "",
+                    permission_description: "",
+                },
             );
             map
         };
@@ -784,7 +802,11 @@ mod tests {
             map.add_permission(
                 Method::Get,
                 "/test/endpoint",
-                Permission::Check("permission"),
+                Permission::Check {
+                    permission_id: "permission",
+                    permission_display_name: "",
+                    permission_description: "",
+                },
             );
             map
         };
@@ -822,7 +844,11 @@ mod tests {
             map.add_permission(
                 Method::Get,
                 "/test/endpoint",
-                Permission::Check("permission"),
+                Permission::Check {
+                    permission_id: "permission",
+                    permission_display_name: "",
+                    permission_description: "",
+                },
             );
             map
         };

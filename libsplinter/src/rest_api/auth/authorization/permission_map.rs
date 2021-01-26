@@ -28,6 +28,11 @@ impl PermissionMap {
         Self::default()
     }
 
+    /// Gets a list of all permissions.
+    pub fn permissions(&self) -> impl Iterator<Item = Permission> + '_ {
+        self.internal.iter().map(|(_, perm)| *perm)
+    }
+
     /// Sets the permission for the given (method, endpoint) pair. The endpoint may contain path
     /// variables surrounded by `{}`.
     pub fn add_permission(&mut self, method: Method, endpoint: &str, permission: Permission) {
@@ -161,13 +166,21 @@ mod tests {
     /// Verifies that the `PermissionMap` works correctly
     #[test]
     fn permission_map() {
-        let perm1 = Permission::Check("perm1");
-        let perm2 = Permission::Check("perm2");
+        let perm1 = Permission::Check {
+            permission_id: "perm1",
+            permission_display_name: "",
+            permission_description: "",
+        };
+        let perm2 = Permission::Check {
+            permission_id: "perm2",
+            permission_display_name: "",
+            permission_description: "",
+        };
 
         let mut map = PermissionMap::new();
         assert!(map.internal.is_empty());
 
-        map.add_permission(Method::Get, "/test/endpoint", perm1.clone());
+        map.add_permission(Method::Get, "/test/endpoint", perm1);
         assert_eq!(map.internal.len(), 1);
         assert_eq!(
             map.get_permission(&Method::Get, "/test/endpoint"),
@@ -177,7 +190,7 @@ mod tests {
         assert_eq!(map.get_permission(&Method::Get, "/test/other"), None);
 
         let mut other_map = PermissionMap::new();
-        other_map.add_permission(Method::Put, "/test/endpoint/{variable}", perm2.clone());
+        other_map.add_permission(Method::Put, "/test/endpoint/{variable}", perm2);
         map.append(&mut other_map);
         assert_eq!(map.internal.len(), 2);
         assert_eq!(

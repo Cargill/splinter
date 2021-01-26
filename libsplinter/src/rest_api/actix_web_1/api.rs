@@ -19,13 +19,17 @@ use actix_web::{middleware, App, HttpServer};
 use futures::Future;
 
 #[cfg(feature = "authorization")]
-use crate::rest_api::auth::authorization::{AuthorizationHandler, PermissionMap};
+use crate::rest_api::auth::authorization::{
+    routes::AuthorizationResourceProvider, AuthorizationHandler, PermissionMap,
+};
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "rest-api-cors")]
 use crate::rest_api::cors::Cors;
 use crate::rest_api::{RestApiBind, RestApiServerError};
 
 use super::Resource;
+#[cfg(feature = "authorization")]
+use super::RestResourceProvider;
 
 /// Shutdown handle returned by `RestApi::run`. Allows rest api instance to be shut down
 /// gracefully.
@@ -129,7 +133,21 @@ impl RestApi {
                     }
 
                     #[cfg(feature = "authorization")]
-                    let app = app.data(permission_map);
+                    {
+                        // Add authorization's own endpoints
+                        for resource in AuthorizationResourceProvider::new(
+                            permission_map.permissions().collect(),
+                        )
+                        .resources()
+                        {
+                            let (route, mut permissions) = resource.into_route();
+                            permission_map.append(&mut permissions);
+                            app = app.service(route);
+                        }
+
+                        // Add the permission map to actix data
+                        app = app.data(permission_map);
+                    }
 
                     app
                 });

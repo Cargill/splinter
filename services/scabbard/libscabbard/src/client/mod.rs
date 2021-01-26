@@ -536,9 +536,18 @@ mod tests {
     // These have to be redefined here because the `scabbard::service::rest_api` module where these
     // are originally defined is private
     #[cfg(feature = "authorization")]
-    const SCABBARD_READ_PERMISSION: Permission = Permission::Check("scabbard.read");
+    const SCABBARD_READ_PERMISSION: Permission = Permission::Check {
+        permission_id: "scabbard.read",
+        permission_display_name: "Scabbard read",
+        permission_description:
+            "Allows the client to read scabbard services' state and batch statuses",
+    };
     #[cfg(feature = "authorization")]
-    const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check("scabbard.write");
+    const SCABBARD_WRITE_PERMISSION: Permission = Permission::Check {
+        permission_id: "scabbard.write",
+        permission_display_name: "Scabbard write",
+        permission_description: "Allows the client to submit batches to scabbard services",
+    };
 
     /// Verify that a `ServiceId` can be correctly parsed from a fully-qualified service ID string.
     #[test]

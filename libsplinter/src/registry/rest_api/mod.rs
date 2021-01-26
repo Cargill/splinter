@@ -25,9 +25,17 @@ use crate::rest_api::auth::authorization::Permission;
 use super::RwRegistry;
 
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const REGISTRY_READ_PERMISSION: Permission = Permission::Check("registry.read");
+const REGISTRY_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "registry.read",
+    permission_display_name: "Registry read",
+    permission_description: "Allows the client to read the registry",
+};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
-const REGISTRY_WRITE_PERMISSION: Permission = Permission::Check("registry.write");
+const REGISTRY_WRITE_PERMISSION: Permission = Permission::Check {
+    permission_id: "registry.write",
+    permission_display_name: "Registry write",
+    permission_description: "Allows the client to modify the registry",
+};
 
 /// The `RwRegistry` trait service provides the following endpoints as REST API resources:
 ///

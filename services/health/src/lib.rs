@@ -29,7 +29,11 @@ use splinter::{
 use std::any::Any;
 
 #[cfg(feature = "authorization")]
-pub const HEALTH_READ_PERMISSION: Permission = Permission::Check("health.read");
+const HEALTH_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "health.read",
+    permission_display_name: "Health read",
+    permission_description: "Allows the client to check node health",
+};
 
 pub struct HealthService {
     service_id: String,
