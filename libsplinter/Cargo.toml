@@ -106,6 +106,7 @@ experimental = [
     "biome-oauth",
     "biome-oauth-user-store-postgres",
     "biome-profile",
+    "circuit-disband",
     "https-bind",
     "oauth",
     "oauth-github",
@@ -135,6 +136,7 @@ biome-notifications = []
 biome-oauth = []
 biome-oauth-user-store-postgres = ["biome-oauth", "postgres"]
 biome-profile = []
+circuit-disband = []
 circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]

@@ -17,7 +17,9 @@ use std::fmt;
 
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
-use crate::orchestrator::{InitializeServiceError, ShutdownServiceError};
+use crate::orchestrator::InitializeServiceError;
+#[cfg(feature = "circuit-disband")]
+use crate::orchestrator::ShutdownServiceError;
 use crate::service::error::{ServiceError, ServiceSendError};
 
 use protobuf::error;
@@ -161,6 +163,7 @@ pub enum AdminSharedError {
         context: String,
         source: Option<InitializeServiceError>,
     },
+    #[cfg(feature = "circuit-disband")]
     ServiceShutdownFailed {
         context: String,
         source: Option<ShutdownServiceError>,
@@ -190,6 +193,7 @@ impl Error for AdminSharedError {
                     None
                 }
             }
+            #[cfg(feature = "circuit-disband")]
             AdminSharedError::ServiceShutdownFailed { source, .. } => {
                 if let Some(ref err) = source {
                     Some(err)
@@ -224,6 +228,7 @@ impl fmt::Display for AdminSharedError {
                     f.write_str(&context)
                 }
             }
+            #[cfg(feature = "circuit-disband")]
             AdminSharedError::ServiceShutdownFailed { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
