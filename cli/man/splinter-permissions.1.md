@@ -58,10 +58,10 @@ $ splinter permissions \
   --key /path/to/key.priv \
   --url http://example.com:8080
 ID                              NAME                   DESCRIPTION
-registry.read                   Registry read          Allows the client to read the registry
-registry.write                  Registry write         Allows the client to modify the registry
-circuit.read                    Circuit read           Allows the client to read circuit state
-circuit.write                   Circuit write          Allows the client to modify circuit state
+authorization.maintenance.read  Maintenance mode read  Allows the client to check maintenance mode status
+authorization.maintenance.write Maintenance mode write Allows the client to enable/disable maintenance mode
+authorization.permissions.read  Permissions read       Allows the client to read REST API permissions
+authorization.rbac.read         RBAC read              Allows the client to read roles, identities, and role assignments
 ...
 ```
 
@@ -73,10 +73,10 @@ $ splinter permissions \
   --key /path/to/key.priv \
   --url http://example.com:8080
 ID,NAME,DESCRIPTION
-registry.read,Registry read,Allows the client to read the registry
-registry.write,Registry write,Allows the client to modify the registry
-circuit.read,Circuit read,Allows the client to read circuit state
-circuit.write,Circuit write,Allows the client to modify circuit state
+authorization.maintenance.read,Maintenance mode read,Allows the client to check maintenance mode status
+authorization.maintenance.write,Maintenance mode write,Allows the client to enable/disable maintenance mode
+authorization.permissions.read,Permissions read,Allows the client to read REST API permissions
+authorization.rbac.read,RBAC read,Allows the client to read roles, identities, and role assignments
 ...
 ```
 
@@ -89,31 +89,31 @@ $ splinter permissions \
   --key /path/to/key.priv \
   --url http://example.com:8080
 [
-  [
-    "ID",
-    "NAME",
-    "DESCRIPTION"
-  ],
-  [
-    "registry.read",
-    "Registry read",
-    "Allows the client to read the registry"
-  ],
-  [
-    "registry.write",
-    "Registry write",
-    "Allows the client to modify the registry"
-  ],
-  [
-    "circuit.read",
-    "Circuit read",
-    "Allows the client to read circuit state"
-  ],
-  [
-    "circuit.write",
-    "Circuit write",
-    "Allows the client to modify circuit state"
-  ],
+ [
+   "ID",
+   "NAME",
+   "DESCRIPTION"
+ ],
+ [
+   "authorization.maintenance.read",
+   "Maintenance mode read",
+   "Allows the client to check maintenance mode status"
+ ],
+ [
+   "authorization.maintenance.write",
+   "Maintenance mode write",
+   "Allows the client to enable/disable maintenance mode"
+ ],
+ [
+   "authorization.permissions.read",
+   "Permissions read",
+   "Allows the client to read REST API permissions"
+ ],
+ [
+   "authorization.rbac.read",
+   "RBAC read",
+   "Allows the client to read roles, identities, and role assignments"
+ ],
   ...
 ]
 ```
