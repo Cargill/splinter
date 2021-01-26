@@ -61,6 +61,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                     circuit::durability.eq(circuit_model.durability),
                     circuit::routes.eq(circuit_model.routes),
                     circuit::circuit_management_type.eq(circuit_model.circuit_management_type),
+                    circuit::circuit_status.eq(circuit_model.circuit_status),
                 ))
                 .execute(self.conn)?;
             // Delete existing data associated with the `Circuit`
@@ -69,6 +70,10 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
             delete(
                 service_argument::table
                     .filter(service_argument::circuit_id.eq(circuit.circuit_id())),
+            )
+            .execute(self.conn)?;
+            delete(
+                circuit_member::table.filter(circuit_member::circuit_id.eq(circuit.circuit_id())),
             )
             .execute(self.conn)?;
             // Insert new data associate with the `Circuit`
@@ -115,6 +120,7 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
                     circuit::durability.eq(circuit_model.durability),
                     circuit::routes.eq(circuit_model.routes),
                     circuit::circuit_management_type.eq(circuit_model.circuit_management_type),
+                    circuit::circuit_status.eq(circuit_model.circuit_status),
                 ))
                 .execute(self.conn)?;
             // Delete existing data associated with the `Circuit`
@@ -123,6 +129,10 @@ impl<'a> AdminServiceStoreUpdateCircuitOperation
             delete(
                 service_argument::table
                     .filter(service_argument::circuit_id.eq(circuit.circuit_id())),
+            )
+            .execute(self.conn)?;
+            delete(
+                circuit_member::table.filter(circuit_member::circuit_id.eq(circuit.circuit_id())),
             )
             .execute(self.conn)?;
             // Insert new data associate with the `Circuit`
