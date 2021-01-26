@@ -16,7 +16,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::error::{InternalError, InvalidStateError};
-#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+#[cfg(feature = "oauth")]
 use crate::oauth::OAuthClientBuildError;
 
 /// Error module for `rest_api`.
@@ -36,7 +36,7 @@ impl From<std::io::Error> for RestApiServerError {
     }
 }
 
-#[cfg(any(feature = "oauth-github", feature = "oauth-openid"))]
+#[cfg(feature = "oauth")]
 impl From<OAuthClientBuildError> for RestApiServerError {
     fn from(err: OAuthClientBuildError) -> Self {
         match err {

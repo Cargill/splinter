@@ -35,19 +35,16 @@ use crate::error::{InternalError, InvalidArgumentError};
 
 use store::InflightOAuthRequestStore;
 
-#[cfg(feature = "oauth-github")]
-pub use builder::GithubOAuthClientBuilder;
-pub use builder::OAuthClientBuilder;
 #[cfg(feature = "oauth-openid")]
 pub use builder::OpenIdOAuthClientBuilder;
+pub use builder::{GithubOAuthClientBuilder, OAuthClientBuilder};
 pub use error::OAuthClientBuildError;
-#[cfg(all(feature = "biome-profile", feature = "oauth-github"))]
+#[cfg(feature = "biome-profile")]
 pub use profile::GithubProfileProvider;
 #[cfg(all(feature = "biome-profile", feature = "oauth-openid"))]
 pub use profile::OpenIdProfileProvider;
 #[cfg(feature = "biome-profile")]
 pub use profile::ProfileProvider;
-#[cfg(feature = "oauth-github")]
 pub use subject::GithubSubjectProvider;
 #[cfg(feature = "oauth-openid")]
 pub use subject::OpenIdSubjectProvider;

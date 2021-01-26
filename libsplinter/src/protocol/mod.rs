@@ -86,7 +86,7 @@ pub(crate) const REGISTRY_FETCH_NODE_MIN: u32 = 1;
     feature = "biome-credentials",
     feature = "biome-key-management",
     feature = "biome-notifications",
-    feature = "biome-oauth"
+    feature = "oauth"
 ))]
 pub const BIOME_PROTOCOL_VERSION: u32 = 1;
 

@@ -57,7 +57,7 @@ impl StoreFactory for PgStoreFactory {
         ))
     }
 
-    #[cfg(all(feature = "biome-oauth", not(feature = "postgres")))]
+    #[cfg(all(feature = "oauth", not(feature = "biome-oauth-user-store-postgres")))]
     fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore> {
         // This configuration cannot be reached within this implementation as the whole struct is
         // guarded by "postgres". It merely satisfies the compiler.

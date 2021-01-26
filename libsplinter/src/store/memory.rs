@@ -22,7 +22,7 @@ use diesel::{
 
 #[cfg(feature = "admin-service-event-store")]
 use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
-#[cfg(feature = "biome-oauth")]
+#[cfg(feature = "oauth")]
 use crate::biome::MemoryOAuthUserSessionStore;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::{
@@ -49,7 +49,7 @@ pub struct MemoryStoreFactory {
     biome_key_store: MemoryKeyStore,
     #[cfg(feature = "biome-credentials")]
     biome_refresh_token_store: MemoryRefreshTokenStore,
-    #[cfg(feature = "biome-oauth")]
+    #[cfg(feature = "oauth")]
     biome_oauth_user_session_store: MemoryOAuthUserSessionStore,
     #[cfg(feature = "oauth")]
     inflight_request_store: MemoryInflightOAuthRequestStore,
@@ -67,7 +67,7 @@ impl MemoryStoreFactory {
         #[cfg(all(feature = "biome-key-management", not(feature = "biome-credentials")))]
         let biome_key_store = MemoryKeyStore::new();
 
-        #[cfg(feature = "biome-oauth")]
+        #[cfg(feature = "oauth")]
         let biome_oauth_user_session_store = MemoryOAuthUserSessionStore::new();
 
         #[cfg(feature = "oauth")]
@@ -83,7 +83,7 @@ impl MemoryStoreFactory {
             biome_key_store,
             #[cfg(feature = "biome-credentials")]
             biome_refresh_token_store: MemoryRefreshTokenStore::new(),
-            #[cfg(feature = "biome-oauth")]
+            #[cfg(feature = "oauth")]
             biome_oauth_user_session_store,
             #[cfg(feature = "oauth")]
             inflight_request_store,
@@ -109,7 +109,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(self.biome_refresh_token_store.clone())
     }
 
-    #[cfg(feature = "biome-oauth")]
+    #[cfg(feature = "oauth")]
     fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore> {
         Box::new(self.biome_oauth_user_session_store.clone())
     }
