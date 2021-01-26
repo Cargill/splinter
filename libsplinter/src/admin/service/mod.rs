@@ -684,8 +684,25 @@ impl Service for AdminService {
 
                 Ok(())
             }
+            #[cfg(feature = "circuit-disband")]
+            AdminMessage_Type::DISBANDED_CIRCUIT => {
+                let disbanded_circuit = admin_message.get_disbanded_circuit();
+                let circuit_id = disbanded_circuit.get_circuit_id();
+                let member_node_id = disbanded_circuit.get_member_node_id();
+
+                let mut shared = self.admin_service_shared.lock().map_err(|_| {
+                    ServiceError::PoisonedLock("the admin shared lock was poisoned".into())
+                })?;
+                shared
+                    .add_member_ready_to_disband(circuit_id, member_node_id)
+                    .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
+            }
             AdminMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 AdminError::MessageTypeUnset,
+            ))),
+            #[cfg(not(feature = "circuit-disband"))]
+            _ => Err(ServiceError::UnableToHandleMessage(Box::new(
+                AdminError::MessageTypeUnhandled,
             ))),
         }
     }
