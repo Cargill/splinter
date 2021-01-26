@@ -189,7 +189,13 @@ impl SplinterRestClient {
                 let status = res.status();
                 if status.is_success() {
                     res.json::<PermissionsResponse>()
-                        .map(|response| response.data)
+                        .map(|mut response| {
+                            response.data.sort_by(|a, b| {
+                                // Unwrapping because comparing strings always returns `Some(_)`
+                                a.permission_id.partial_cmp(&b.permission_id).unwrap()
+                            });
+                            response.data
+                        })
                         .map_err(|_| {
                             CliError::ActionError(
                                 "Request was successful, but received an invalid response".into(),
