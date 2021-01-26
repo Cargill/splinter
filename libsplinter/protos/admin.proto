@@ -335,7 +335,7 @@ message MemberReady {
     string member_node_id = 2;
 }
 
-// This message is sent to a connection AdminService to agree upon prtocol
+// This message is sent to a connection AdminService to agree upon protocol
 // version.
 //
 // The sending service will provide the min and max protocol versions they

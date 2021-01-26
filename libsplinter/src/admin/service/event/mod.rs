@@ -42,6 +42,7 @@ pub enum EventType {
     ProposalAccepted { requester: Vec<u8> },
     ProposalRejected { requester: Vec<u8> },
     CircuitReady,
+    CircuitDisbanded,
 }
 
 impl TryFrom<(i64, &messages::AdminServiceEvent)> for AdminServiceEvent {
@@ -81,6 +82,11 @@ impl TryFrom<(i64, &messages::AdminServiceEvent)> for AdminServiceEvent {
             messages::AdminServiceEvent::CircuitReady(_) => Ok(AdminServiceEvent {
                 event_id,
                 event_type: EventType::CircuitReady,
+                proposal,
+            }),
+            messages::AdminServiceEvent::CircuitDisbanded(_) => Ok(AdminServiceEvent {
+                event_id,
+                event_type: EventType::CircuitDisbanded,
                 proposal,
             }),
         }

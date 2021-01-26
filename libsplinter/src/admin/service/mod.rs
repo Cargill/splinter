@@ -37,7 +37,7 @@ use protobuf::{self, Message};
 
 #[cfg(feature = "admin-service-event-store")]
 use crate::admin::service::event::store::AdminServiceEventStore;
-use crate::admin::store::AdminServiceStore;
+use crate::admin::store::{self, AdminServiceStore};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
 use crate::hex::to_hex;
@@ -298,9 +298,9 @@ impl AdminService {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .get_circuits()
-            .map_err(|err| {
-                ServiceStartError::Internal(format!("Unable to get circuits: {}", err))
-            })?;
+            .map_err(|err| ServiceStartError::Internal(format!("Unable to get circuits: {}", err)))?
+            .filter(|circuit| circuit.circuit_status() == &store::CircuitStatus::Active)
+            .collect::<Vec<store::Circuit>>();
 
         let nodes = self
             .admin_service_shared

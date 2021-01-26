@@ -14,10 +14,13 @@
 
 //! Structs for building circuits
 
+use std::convert::TryFrom;
+
 use crate::admin::messages::{self, is_valid_circuit_id};
 use crate::error::InvalidStateError;
+use crate::protos::admin;
 
-use super::{ProposedCircuit, Service, UNSET_CIRCUIT_VERSION};
+use super::{ProposedCircuit, Service, ServiceBuilder, UNSET_CIRCUIT_VERSION};
 
 /// Native representation of a circuit in state
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -92,6 +95,56 @@ impl Circuit {
     }
 }
 
+impl TryFrom<&admin::Circuit> for Circuit {
+    type Error = InvalidStateError;
+
+    fn try_from(proto: &admin::Circuit) -> Result<Self, Self::Error> {
+        let roster = proto
+            .get_roster()
+            .iter()
+            .map(|service| {
+                ServiceBuilder::new()
+                    .with_service_id(service.get_service_id())
+                    .with_service_type(service.get_service_type())
+                    .with_node_id(service.get_allowed_nodes().get(0).ok_or_else(|| {
+                        InvalidStateError::with_message("No node ID was provided".to_string())
+                    })?)
+                    .with_arguments(
+                        &service
+                            .get_arguments()
+                            .iter()
+                            .map(|arg| (arg.get_key().to_string(), arg.get_value().to_string()))
+                            .collect::<Vec<(String, String)>>(),
+                    )
+                    .build()
+            })
+            .collect::<Result<Vec<Service>, InvalidStateError>>()?;
+        let members = proto
+            .get_members()
+            .iter()
+            .map(|node| node.get_node_id().to_string())
+            .collect::<Vec<String>>();
+        let mut builder = CircuitBuilder::new()
+            .with_circuit_id(proto.get_circuit_id())
+            .with_roster(&roster)
+            .with_members(&members)
+            .with_authorization_type(&AuthorizationType::try_from(
+                &proto.get_authorization_type(),
+            )?)
+            .with_persistence(&PersistenceType::try_from(&proto.get_persistence())?)
+            .with_durability(&DurabilityType::try_from(&proto.get_durability())?)
+            .with_routes(&RouteType::try_from(&proto.get_routes())?)
+            .with_circuit_management_type(proto.get_circuit_management_type())
+            .with_circuit_version(proto.get_circuit_version())
+            .with_circuit_status(&CircuitStatus::try_from(&proto.get_circuit_status())?);
+        if !proto.get_display_name().is_empty() {
+            builder = builder.with_display_name(proto.get_display_name());
+        }
+
+        builder.build()
+    }
+}
+
 /// What type of authorization the circuit requires
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthorizationType {
@@ -102,6 +155,19 @@ impl From<&messages::AuthorizationType> for AuthorizationType {
     fn from(message_enum: &messages::AuthorizationType) -> Self {
         match *message_enum {
             messages::AuthorizationType::Trust => AuthorizationType::Trust,
+        }
+    }
+}
+
+impl TryFrom<&admin::Circuit_AuthorizationType> for AuthorizationType {
+    type Error = InvalidStateError;
+
+    fn try_from(proto: &admin::Circuit_AuthorizationType) -> Result<Self, Self::Error> {
+        match *proto {
+            admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION => Ok(AuthorizationType::Trust),
+            admin::Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE => Err(
+                InvalidStateError::with_message("AuthorizationType is unset".to_string()),
+            ),
         }
     }
 }
@@ -126,6 +192,19 @@ impl From<&messages::PersistenceType> for PersistenceType {
     }
 }
 
+impl TryFrom<&admin::Circuit_PersistenceType> for PersistenceType {
+    type Error = InvalidStateError;
+
+    fn try_from(proto: &admin::Circuit_PersistenceType) -> Result<Self, Self::Error> {
+        match *proto {
+            admin::Circuit_PersistenceType::ANY_PERSISTENCE => Ok(PersistenceType::Any),
+            admin::Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE => Err(
+                InvalidStateError::with_message("PersistenceType is unset".to_string()),
+            ),
+        }
+    }
+}
+
 /// A circuits durability requirement
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DurabilityType {
@@ -136,6 +215,19 @@ impl From<&messages::DurabilityType> for DurabilityType {
     fn from(message_enum: &messages::DurabilityType) -> Self {
         match *message_enum {
             messages::DurabilityType::NoDurability => DurabilityType::NoDurability,
+        }
+    }
+}
+
+impl TryFrom<&admin::Circuit_DurabilityType> for DurabilityType {
+    type Error = InvalidStateError;
+
+    fn try_from(proto: &admin::Circuit_DurabilityType) -> Result<Self, Self::Error> {
+        match *proto {
+            admin::Circuit_DurabilityType::NO_DURABILITY => Ok(DurabilityType::NoDurability),
+            admin::Circuit_DurabilityType::UNSET_DURABILITY_TYPE => Err(
+                InvalidStateError::with_message("DurabilityType is unset".to_string()),
+            ),
         }
     }
 }
@@ -160,6 +252,19 @@ impl From<&messages::RouteType> for RouteType {
     }
 }
 
+impl TryFrom<&admin::Circuit_RouteType> for RouteType {
+    type Error = InvalidStateError;
+
+    fn try_from(proto: &admin::Circuit_RouteType) -> Result<Self, Self::Error> {
+        match *proto {
+            admin::Circuit_RouteType::ANY_ROUTE => Ok(RouteType::Any),
+            admin::Circuit_RouteType::UNSET_ROUTE_TYPE => Err(InvalidStateError::with_message(
+                "RouteType is unset".to_string(),
+            )),
+        }
+    }
+}
+
 /// Status of the circuit
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CircuitStatus {
@@ -180,6 +285,22 @@ impl From<&messages::CircuitStatus> for CircuitStatus {
             messages::CircuitStatus::Active => CircuitStatus::Active,
             messages::CircuitStatus::Disbanded => CircuitStatus::Disbanded,
             messages::CircuitStatus::Abandoned => CircuitStatus::Abandoned,
+        }
+    }
+}
+
+impl TryFrom<&admin::Circuit_CircuitStatus> for CircuitStatus {
+    type Error = InvalidStateError;
+
+    fn try_from(proto: &admin::Circuit_CircuitStatus) -> Result<Self, Self::Error> {
+        match *proto {
+            admin::Circuit_CircuitStatus::ACTIVE => Ok(CircuitStatus::Active),
+            admin::Circuit_CircuitStatus::DISBANDED => Ok(CircuitStatus::Disbanded),
+            admin::Circuit_CircuitStatus::ABANDONED => Ok(CircuitStatus::Abandoned),
+            admin::Circuit_CircuitStatus::UNSET_CIRCUIT_STATUS => {
+                debug!("Defaulting `UNSET_CIRCUIT_STATUS` of proposed circuit to `Active`");
+                Ok(CircuitStatus::Active)
+            }
         }
     }
 }

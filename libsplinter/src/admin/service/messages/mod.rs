@@ -210,6 +210,75 @@ impl CreateCircuit {
 
         Ok(create_request)
     }
+
+    pub fn into_circuit_proto(self) -> Result<admin::Circuit, MarshallingError> {
+        let mut circuit = admin::Circuit::new();
+
+        circuit.set_circuit_id(self.circuit_id);
+        circuit.set_roster(RepeatedField::from_vec(
+            self.roster
+                .into_iter()
+                .map(SplinterService::into_proto)
+                .collect(),
+        ));
+        circuit.set_members(RepeatedField::from_vec(
+            self.members
+                .into_iter()
+                .map(SplinterNode::into_proto)
+                .collect(),
+        ));
+
+        circuit.set_circuit_management_type(self.circuit_management_type);
+        circuit.set_application_metadata(self.application_metadata);
+
+        if let Some(comments) = self.comments {
+            circuit.set_comments(comments);
+        }
+
+        if let Some(display_name) = self.display_name {
+            circuit.set_display_name(display_name);
+        }
+
+        if self.circuit_version != UNSET_CIRCUIT_VERSION {
+            circuit.set_circuit_version(self.circuit_version);
+        }
+
+        match self.authorization_type {
+            AuthorizationType::Trust => {
+                circuit
+                    .set_authorization_type(admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION);
+            }
+        };
+
+        match self.persistence {
+            PersistenceType::Any => {
+                circuit.set_persistence(admin::Circuit_PersistenceType::ANY_PERSISTENCE);
+            }
+        };
+        match self.durability {
+            DurabilityType::NoDurability => {
+                circuit.set_durability(admin::Circuit_DurabilityType::NO_DURABILITY);
+            }
+        };
+
+        match self.routes {
+            RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
+        };
+
+        match self.circuit_status {
+            CircuitStatus::Active => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+            }
+            CircuitStatus::Disbanded => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
+            }
+            CircuitStatus::Abandoned => {
+                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
+            }
+        };
+
+        Ok(circuit)
+    }
 }
 
 /// Determines if a circuit ID is valid. A valid circuit ID is an 11 character string composed of
@@ -230,6 +299,14 @@ pub enum AuthorizationType {
     Trust,
 }
 
+impl From<&store::AuthorizationType> for AuthorizationType {
+    fn from(store_enum: &store::AuthorizationType) -> Self {
+        match *store_enum {
+            store::AuthorizationType::Trust => AuthorizationType::Trust,
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum PersistenceType {
     Any,
@@ -241,9 +318,25 @@ impl Default for PersistenceType {
     }
 }
 
+impl From<&store::PersistenceType> for PersistenceType {
+    fn from(store_enum: &store::PersistenceType) -> Self {
+        match *store_enum {
+            store::PersistenceType::Any => PersistenceType::Any,
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum DurabilityType {
     NoDurability,
+}
+
+impl From<&store::DurabilityType> for DurabilityType {
+    fn from(store_enum: &store::DurabilityType) -> Self {
+        match *store_enum {
+            store::DurabilityType::NoDurability => DurabilityType::NoDurability,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -254,6 +347,14 @@ pub enum RouteType {
 impl Default for RouteType {
     fn default() -> Self {
         RouteType::Any
+    }
+}
+
+impl From<&store::RouteType> for RouteType {
+    fn from(store_enum: &store::RouteType) -> Self {
+        match *store_enum {
+            store::RouteType::Any => RouteType::Any,
+        }
     }
 }
 
@@ -612,6 +713,7 @@ pub enum AdminServiceEvent {
     ProposalAccepted((CircuitProposal, Vec<u8>)),
     ProposalRejected((CircuitProposal, Vec<u8>)),
     CircuitReady(CircuitProposal),
+    CircuitDisbanded(CircuitProposal),
 }
 
 impl AdminServiceEvent {
@@ -622,6 +724,7 @@ impl AdminServiceEvent {
             AdminServiceEvent::ProposalAccepted((proposal, _)) => proposal,
             AdminServiceEvent::ProposalRejected((proposal, _)) => proposal,
             AdminServiceEvent::CircuitReady(proposal) => proposal,
+            AdminServiceEvent::CircuitDisbanded(proposal) => proposal,
         }
     }
 }
@@ -642,6 +745,7 @@ impl From<&event::AdminServiceEvent> for AdminServiceEvent {
                 AdminServiceEvent::ProposalRejected((admin_proposal, requester.to_vec()))
             }
             EventType::CircuitReady => AdminServiceEvent::CircuitReady(admin_proposal),
+            EventType::CircuitDisbanded => AdminServiceEvent::CircuitDisbanded(admin_proposal),
         }
     }
 }

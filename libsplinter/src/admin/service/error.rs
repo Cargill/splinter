@@ -18,6 +18,8 @@ use std::fmt;
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
 use crate::orchestrator::InitializeServiceError;
+#[cfg(feature = "circuit-disband")]
+use crate::orchestrator::ShutdownServiceError;
 use crate::service::error::{ServiceError, ServiceSendError};
 
 use protobuf::error;
@@ -161,6 +163,11 @@ pub enum AdminSharedError {
         context: String,
         source: Option<InitializeServiceError>,
     },
+    #[cfg(feature = "circuit-disband")]
+    ServiceShutdownFailed {
+        context: String,
+        source: Option<ShutdownServiceError>,
+    },
     ServiceSendError(ServiceSendError),
     UnknownAction(String),
     ValidationFailed(String),
@@ -180,6 +187,14 @@ impl Error for AdminSharedError {
             AdminSharedError::InvalidMessageFormat(err) => Some(err),
             AdminSharedError::NoPendingChanges => None,
             AdminSharedError::ServiceInitializationFailed { source, .. } => {
+                if let Some(ref err) = source {
+                    Some(err)
+                } else {
+                    None
+                }
+            }
+            #[cfg(feature = "circuit-disband")]
+            AdminSharedError::ServiceShutdownFailed { source, .. } => {
                 if let Some(ref err) = source {
                     Some(err)
                 } else {
@@ -207,6 +222,14 @@ impl fmt::Display for AdminSharedError {
                 write!(f, "tried to commit without pending changes")
             }
             AdminSharedError::ServiceInitializationFailed { context, source } => {
+                if let Some(ref err) = source {
+                    write!(f, "{}: {}", context, err)
+                } else {
+                    f.write_str(&context)
+                }
+            }
+            #[cfg(feature = "circuit-disband")]
+            AdminSharedError::ServiceShutdownFailed { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
                 } else {
