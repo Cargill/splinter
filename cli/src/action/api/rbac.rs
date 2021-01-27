@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::collections::VecDeque;
+use std::fmt;
 
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,20 @@ pub struct Role {
     pub role_id: String,
     pub display_name: String,
     pub permissions: Vec<String>,
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Id: {}", self.role_id)?;
+        write!(f, "\n    Name: {}", self.display_name)?;
+        f.write_str("\n    Permissions:")?;
+
+        for perm in self.permissions.iter() {
+            write!(f, "\n        {}", perm)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Deserialize)]
