@@ -67,6 +67,10 @@ struct TomlConfig {
     oauth_redirect_url: Option<String>,
     #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_auth_params: Option<Vec<(String, String)>>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_scopes: Option<Vec<String>>,
 
     // Deprecated values
     cert_dir: Option<String>,
@@ -177,7 +181,9 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
                 .with_oauth_client_id(self.toml_config.oauth_client_id)
                 .with_oauth_client_secret(self.toml_config.oauth_client_secret)
                 .with_oauth_redirect_url(self.toml_config.oauth_redirect_url)
-                .with_oauth_openid_url(self.toml_config.oauth_openid_url);
+                .with_oauth_openid_url(self.toml_config.oauth_openid_url)
+                .with_oauth_openid_auth_params(self.toml_config.oauth_openid_auth_params)
+                .with_oauth_openid_scopes(self.toml_config.oauth_openid_scopes);
         }
 
         // deprecated values, only set if the current value was not set
@@ -253,6 +259,12 @@ mod tests {
     static EXAMPLE_REGISTRY_AUTO: u64 = 19;
     static EXAMPLE_REGISTRY_FORCE: u64 = 18;
     static EXAMPLE_ADMIN_TIMEOUT: u64 = 17;
+    #[cfg(feature = "oauth")]
+    static EXAMPLE_OAUTH_OPENID_AUTH_PARAM_KEY: &str = "key";
+    #[cfg(feature = "oauth")]
+    static EXAMPLE_OAUTH_OPENID_AUTH_PARAM_VAL: &str = "val";
+    #[cfg(feature = "oauth")]
+    static EXAMPLE_OAUTH_OPENID_SCOPE: &str = "scope";
 
     /// Converts a list of tuples to a toml `Table` `Value` used to write a toml file.
     fn get_toml_value() -> Value {
@@ -293,6 +305,24 @@ mod tests {
         values.iter().for_each(|v| {
             config_values.insert(v.0.clone(), Value::String(v.1.clone()));
         });
+
+        #[cfg(feature = "oauth")]
+        {
+            config_values.insert(
+                "oauth_openid_auth_params".into(),
+                Value::try_from(vec![vec![
+                    EXAMPLE_OAUTH_OPENID_AUTH_PARAM_KEY.to_string(),
+                    EXAMPLE_OAUTH_OPENID_AUTH_PARAM_VAL.to_string(),
+                ]])
+                .expect("Failed to parse oauth_openid_auth_params"),
+            );
+            config_values.insert(
+                "oauth_openid_scopes".into(),
+                Value::try_from(vec![EXAMPLE_OAUTH_OPENID_SCOPE])
+                    .expect("Failed to parse oauth_openid_scopes"),
+            );
+        }
+
         Value::Table(config_values)
     }
 
@@ -388,6 +418,19 @@ mod tests {
         assert_eq!(config.registry_forced_refresh(), None);
         assert_eq!(config.heartbeat(), None);
         assert_eq!(config.admin_timeout(), None);
+        #[cfg(feature = "oauth")]
+        assert_eq!(
+            config.oauth_openid_auth_params(),
+            Some(vec![(
+                EXAMPLE_OAUTH_OPENID_AUTH_PARAM_KEY.into(),
+                EXAMPLE_OAUTH_OPENID_AUTH_PARAM_VAL.into()
+            )])
+        );
+        #[cfg(feature = "oauth")]
+        assert_eq!(
+            config.oauth_openid_scopes(),
+            Some(vec![EXAMPLE_OAUTH_OPENID_SCOPE.into()])
+        );
     }
 
     /// Asserts config values based on the example configuration values.

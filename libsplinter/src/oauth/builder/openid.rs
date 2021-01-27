@@ -85,6 +85,22 @@ impl OpenIdOAuthClientBuilder {
         }
     }
 
+    /// Sets extra parameters that will be added to an authorization request.
+    pub fn with_extra_auth_params(self, extra_auth_params: Vec<(String, String)>) -> Self {
+        Self {
+            openid_discovery_url: self.openid_discovery_url,
+            inner: self.inner.with_extra_auth_params(extra_auth_params),
+        }
+    }
+
+    /// Sets the scopes to request from the OAuth2 provider.
+    pub fn with_scopes(self, scopes: Vec<String>) -> Self {
+        Self {
+            openid_discovery_url: self.openid_discovery_url,
+            inner: self.inner.with_scopes(scopes),
+        }
+    }
+
     /// Sets the in-flight request store in order to store values between requests to and from the
     /// OAuth2 provider.
     pub fn with_inflight_request_store(

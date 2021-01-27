@@ -84,6 +84,10 @@ pub struct Config {
     oauth_redirect_url: Option<(String, ConfigSource)>,
     #[cfg(feature = "oauth")]
     oauth_openid_url: Option<(String, ConfigSource)>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_auth_params: Option<(Vec<(String, String)>, ConfigSource)>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_scopes: Option<(Vec<String>, ConfigSource)>,
     strict_ref_counts: (bool, ConfigSource),
 }
 
@@ -267,6 +271,24 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "oauth")]
+    pub fn oauth_openid_auth_params(&self) -> Option<&[(String, String)]> {
+        if let Some((auth_params, _)) = &self.oauth_openid_auth_params {
+            Some(auth_params)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "oauth")]
+    pub fn oauth_openid_scopes(&self) -> Option<&[String]> {
+        if let Some((scopes, _)) = &self.oauth_openid_scopes {
+            Some(scopes)
+        } else {
+            None
+        }
+    }
+
     pub fn strict_ref_counts(&self) -> bool {
         self.strict_ref_counts.0
     }
@@ -444,6 +466,24 @@ impl Config {
     #[cfg(feature = "oauth")]
     pub fn oauth_openid_url_source(&self) -> Option<&ConfigSource> {
         if let Some((_, source)) = &self.oauth_openid_url {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "oauth")]
+    pub fn oauth_openid_auth_params_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_openid_auth_params {
+            Some(source)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "oauth")]
+    pub fn oauth_openid_scopes_source(&self) -> Option<&ConfigSource> {
+        if let Some((_, source)) = &self.oauth_openid_scopes {
             Some(source)
         } else {
             None
@@ -636,6 +676,21 @@ impl Config {
                     "Config: oauth_openid_url: {} (source: {:?})",
                     openid_url, source,
                 );
+            }
+            if let (Some(auth_params), Some(source)) = (
+                self.oauth_openid_auth_params(),
+                self.oauth_openid_auth_params_source(),
+            ) {
+                debug!(
+                    "Config: oauth_openid_auth_params: {:?} (source: {:?})",
+                    auth_params, source,
+                );
+            }
+            if let (Some(scopes), Some(source)) = (
+                self.oauth_openid_scopes(),
+                self.oauth_openid_scopes_source(),
+            ) {
+                debug!("Config: oauth_scopes: {:?} (source: {:?})", scopes, source,);
             }
         }
         debug!(

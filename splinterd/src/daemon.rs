@@ -134,6 +134,10 @@ pub struct SplinterDaemon {
     oauth_redirect_url: Option<String>,
     #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_auth_params: Option<Vec<(String, String)>>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_scopes: Option<Vec<String>>,
     heartbeat: u64,
     strict_ref_counts: bool,
 }
@@ -689,6 +693,8 @@ impl SplinterDaemon {
                                 "missing OAuth OpenID discovery document URL configuration".into(),
                             )
                         })?,
+                        auth_params: self.oauth_openid_auth_params.clone(),
+                        scopes: self.oauth_openid_scopes.clone(),
                         inflight_request_store: store_factory.get_oauth_inflight_request_store(),
                     },
                     other_provider => {
@@ -1050,6 +1056,10 @@ pub struct SplinterDaemonBuilder {
     oauth_redirect_url: Option<String>,
     #[cfg(feature = "oauth")]
     oauth_openid_url: Option<String>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_auth_params: Option<Vec<(String, String)>>,
+    #[cfg(feature = "oauth")]
+    oauth_openid_scopes: Option<Vec<String>>,
     strict_ref_counts: Option<bool>,
 }
 
@@ -1189,6 +1199,18 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "oauth")]
+    pub fn with_oauth_openid_auth_params(mut self, value: Option<Vec<(String, String)>>) -> Self {
+        self.oauth_openid_auth_params = value;
+        self
+    }
+
+    #[cfg(feature = "oauth")]
+    pub fn with_oauth_openid_scopes(mut self, value: Option<Vec<String>>) -> Self {
+        self.oauth_openid_scopes = value;
+        self
+    }
+
     pub fn with_strict_ref_counts(mut self, strict_ref_counts: bool) -> Self {
         self.strict_ref_counts = Some(strict_ref_counts);
         self
@@ -1305,6 +1327,10 @@ impl SplinterDaemonBuilder {
             oauth_redirect_url: self.oauth_redirect_url,
             #[cfg(feature = "oauth")]
             oauth_openid_url: self.oauth_openid_url,
+            #[cfg(feature = "oauth")]
+            oauth_openid_auth_params: self.oauth_openid_auth_params,
+            #[cfg(feature = "oauth")]
+            oauth_openid_scopes: self.oauth_openid_scopes,
             heartbeat,
             strict_ref_counts,
         })

@@ -384,6 +384,28 @@ fn main() {
                 .long("oauth-openid-url")
                 .long_help("URL for an OpenID discovery document used by the REST API")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("oauth_openid_auth_params")
+                .long("oauth-openid-auth-params")
+                .alias("oauth-openid-auth-param")
+                .long_help(
+                    "Addtional parameters to add to OAuth OpenID auth requests, formatted as \
+                     `key=value` pairs (requires `--oauth-provider openid`)",
+                )
+                .takes_value(true)
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("oauth_openid_scopes")
+                .long("oauth-openid-scopes")
+                .alias("oauth-openid-scope")
+                .long_help(
+                    "Addtional scopes to request from the OAuth OpenID provider (requires \
+                     `--oauth-provider openid`)",
+                )
+                .takes_value(true)
+                .multiple(true),
         );
 
     let matches = app.get_matches();
@@ -518,7 +540,9 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
             .with_oauth_client_id(config.oauth_client_id().map(ToOwned::to_owned))
             .with_oauth_client_secret(config.oauth_client_secret().map(ToOwned::to_owned))
             .with_oauth_redirect_url(config.oauth_redirect_url().map(ToOwned::to_owned))
-            .with_oauth_openid_url(config.oauth_openid_url().map(ToOwned::to_owned));
+            .with_oauth_openid_url(config.oauth_openid_url().map(ToOwned::to_owned))
+            .with_oauth_openid_auth_params(config.oauth_openid_auth_params().map(ToOwned::to_owned))
+            .with_oauth_openid_scopes(config.oauth_openid_scopes().map(ToOwned::to_owned));
     }
 
     let mut node = daemon_builder.build().map_err(|err| {
