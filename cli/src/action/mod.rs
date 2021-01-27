@@ -26,6 +26,8 @@ pub mod keygen;
 pub mod maintenance;
 #[cfg(feature = "permissions")]
 pub mod permissions;
+#[cfg(feature = "authorization-handler-rbac")]
+pub mod rbac;
 pub mod registry;
 
 use std::collections::HashMap;
