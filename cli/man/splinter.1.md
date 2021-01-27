@@ -96,6 +96,7 @@ SEE ALSO
 | `splinter-database-migrate(1)`
 | `splinter-health-status(1)`
 | `splinter-keygen(1)`
+| `splinter-role-list(1)`
 |
 | `splinterd(1)`
 |
