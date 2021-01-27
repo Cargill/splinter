@@ -199,7 +199,7 @@ impl Action for CircuitProposeAction {
                 make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
             client.submit_admin_payload(signed_payload)?;
 
-            info!("The circuit proposal was submited successfully");
+            info!("The circuit proposal was submitted successfully");
         }
 
         info!("{}", circuit_slice);
@@ -904,6 +904,7 @@ fn list_proposals(
         "MANAGEMENT".to_string(),
         "MEMBERS".to_string(),
         "COMMENTS".to_string(),
+        "PROPOSAL_TYPE".to_string(),
     ]);
     proposals.data.iter().for_each(|proposal| {
         let display_name = {
@@ -943,6 +944,7 @@ fn list_proposals(
             proposal.circuit.management_type.to_string(),
             members,
             comments,
+            proposal.proposal_type.to_string(),
         ]);
     });
 

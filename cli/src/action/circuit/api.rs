@@ -331,7 +331,12 @@ pub struct ProposalSlice {
 
 impl fmt::Display for ProposalSlice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut display_string = format!("Proposal to create: {}\n    ", self.circuit_id,);
+        let mut display_string;
+        if self.proposal_type == "Disband" {
+            display_string = format!("Proposal to disband: {}\n    ", self.circuit_id);
+        } else {
+            display_string = format!("Proposal to create: {}\n    ", self.circuit_id);
+        }
 
         if let Some(display_name) = &self.circuit.display_name {
             display_string += &format!("Display Name: {}\n    ", display_name);
