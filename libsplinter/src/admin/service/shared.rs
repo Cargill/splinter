@@ -395,94 +395,17 @@ impl AdminServiceShared {
                 match self.check_approved(&circuit_proposal) {
                     Ok(CircuitProposalStatus::Accepted) => {
                         let status = circuit_proposal.get_circuit_proposal().get_circuit_status();
-                        match status {
-                            Circuit_CircuitStatus::ACTIVE => {
-                                // commit new circuit
-                                self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
-                                let circuit =
-                                    self.admin_store.get_circuit(circuit_id)?.ok_or_else(|| {
-                                        AdminSharedError::SplinterStateError(format!(
-                                            "Unable to get circuit that was just set: {}",
-                                            circuit_id
-                                        ))
-                                    })?;
-
-                                let routing_circuit = routing::Circuit::new(
-                                    circuit.circuit_id().to_string(),
-                                    circuit
-                                        .roster()
-                                        .iter()
-                                        .map(|service| {
-                                            routing::Service::new(
-                                                service.service_id().to_string(),
-                                                service.service_type().to_string(),
-                                                service.node_id().to_string(),
-                                                service.arguments().to_vec(),
-                                            )
-                                        })
-                                        .collect(),
-                                    circuit.members().to_vec(),
-                                );
-
-                                let routing_members = circuit_proposal
-                                    .get_circuit_proposal()
-                                    .get_members()
-                                    .iter()
-                                    .map(|node| {
-                                        routing::CircuitNode::new(
-                                            node.get_node_id().to_string(),
-                                            node.get_endpoints().to_vec(),
-                                        )
-                                    })
-                                    .collect::<Vec<routing::CircuitNode>>();
-
-                                self.routing_table_writer
-                                    .add_circuit(
-                                        circuit.circuit_id().to_string(),
-                                        routing_circuit,
-                                        routing_members,
-                                    )
-                                    .map_err(|_| {
-                                        AdminSharedError::SplinterStateError(format!(
-                                            "Unable to add new circuit to routing table: {}",
-                                            circuit_id
-                                        ))
-                                    })?;
-
-                                // send message about circuit acceptance
-                                let circuit_proposal_proto =
-                                    messages::CircuitProposal::from_proto(circuit_proposal.clone())
-                                        .map_err(AdminSharedError::InvalidMessageFormat)?;
-                                let event = messages::AdminServiceEvent::ProposalAccepted((
-                                    circuit_proposal_proto,
-                                    circuit_proposal_context.signer_public_key,
-                                ));
-                                self.send_event(&mgmt_type, event);
-
-                                // send MEMBER_READY message to all other members' admin services
-                                if let Some(ref network_sender) = self.network_sender {
-                                    let mut member_ready = MemberReady::new();
-                                    member_ready.set_circuit_id(circuit_id.to_string());
-                                    member_ready.set_member_node_id(self.node_id.clone());
-                                    let mut msg = AdminMessage::new();
-                                    msg.set_message_type(AdminMessage_Type::MEMBER_READY);
-                                    msg.set_member_ready(member_ready);
-
-                                    let envelope_bytes =
-                                        msg.write_to_bytes().map_err(MarshallingError::from)?;
-                                    for member in circuit.members().iter() {
-                                        if member != &self.node_id {
-                                            network_sender
-                                                .send(&admin_service_id(member), &envelope_bytes)?;
-                                        }
-                                    }
-                                }
-
-                                // add circuit as pending initialization
-                                self.add_uninitialized_circuit(circuit_proposal.clone())?;
-                            }
-                            #[cfg(feature = "circuit-disband")]
-                            Circuit_CircuitStatus::DISBANDED => {
+                        // Verifying if the circuit proposal is associated with a disband request.
+                        // If the status is set to `DISBANDED`, the proposal is associated with
+                        // a disband request. Otherwise, the admin service should continue with
+                        // committing a new circuit proposal. For 0.4 compatibility, this is the
+                        // default action as these proposals will not have the `circuit_status`
+                        // field set.
+                        #[cfg(feature = "circuit-disband")]
+                        {
+                            if circuit_proposal.get_circuit_proposal().get_circuit_status()
+                                == Circuit_CircuitStatus::DISBANDED
+                            {
                                 // Circuit has been disbanded: all associated services will be shut
                                 // down, the circuit removed from the routing table, and peer refs
                                 // for this circuit will be removed.
@@ -506,9 +429,9 @@ impl AdminServiceShared {
                                     StoreCircuit::try_from(circuit_proposal.get_circuit_proposal())
                                         .map_err(|err| {
                                             AdminSharedError::SplinterStateError(format!(
-                                        "Unable to convert proto Circuit to store Circuit: {}",
-                                        err.to_string()
-                                    ))
+                                            "Unable to convert proto Circuit to store Circuit: {}",
+                                            err.to_string()
+                                        ))
                                         })?;
                                 // Updating the corresponding `active` circuit from the admin store
                                 self.admin_store
@@ -543,12 +466,93 @@ impl AdminServiceShared {
                                 );
                                 self.send_event(&mgmt_type, event);
                             }
-                            _ => {
-                                return Err(AdminSharedError::SplinterStateError(format!(
-                                    "Proposed circuit {} must be ACTIVE",
-                                    circuit_id
-                                )));
+                        }
+                        if status == Circuit_CircuitStatus::ACTIVE
+                            || status == Circuit_CircuitStatus::UNSET_CIRCUIT_STATUS
+                        {
+                            // commit new circuit
+                            self.admin_store.upgrade_proposal_to_circuit(circuit_id)?;
+                            let circuit =
+                                self.admin_store.get_circuit(circuit_id)?.ok_or_else(|| {
+                                    AdminSharedError::SplinterStateError(format!(
+                                        "Unable to get circuit that was just set: {}",
+                                        circuit_id
+                                    ))
+                                })?;
+
+                            let routing_circuit = routing::Circuit::new(
+                                circuit.circuit_id().to_string(),
+                                circuit
+                                    .roster()
+                                    .iter()
+                                    .map(|service| {
+                                        routing::Service::new(
+                                            service.service_id().to_string(),
+                                            service.service_type().to_string(),
+                                            service.node_id().to_string(),
+                                            service.arguments().to_vec(),
+                                        )
+                                    })
+                                    .collect(),
+                                circuit.members().to_vec(),
+                            );
+
+                            let routing_members = circuit_proposal
+                                .get_circuit_proposal()
+                                .get_members()
+                                .iter()
+                                .map(|node| {
+                                    routing::CircuitNode::new(
+                                        node.get_node_id().to_string(),
+                                        node.get_endpoints().to_vec(),
+                                    )
+                                })
+                                .collect::<Vec<routing::CircuitNode>>();
+
+                            self.routing_table_writer
+                                .add_circuit(
+                                    circuit.circuit_id().to_string(),
+                                    routing_circuit,
+                                    routing_members,
+                                )
+                                .map_err(|_| {
+                                    AdminSharedError::SplinterStateError(format!(
+                                        "Unable to add new circuit to routing table: {}",
+                                        circuit_id
+                                    ))
+                                })?;
+
+                            // send message about circuit acceptance
+                            let circuit_proposal_proto =
+                                messages::CircuitProposal::from_proto(circuit_proposal.clone())
+                                    .map_err(AdminSharedError::InvalidMessageFormat)?;
+                            let event = messages::AdminServiceEvent::ProposalAccepted((
+                                circuit_proposal_proto,
+                                circuit_proposal_context.signer_public_key,
+                            ));
+                            self.send_event(&mgmt_type, event);
+
+                            // send MEMBER_READY message to all other members' admin services
+                            if let Some(ref network_sender) = self.network_sender {
+                                let mut member_ready = MemberReady::new();
+                                member_ready.set_circuit_id(circuit_id.to_string());
+                                member_ready.set_member_node_id(self.node_id.clone());
+                                let mut msg = AdminMessage::new();
+                                msg.set_message_type(AdminMessage_Type::MEMBER_READY);
+                                msg.set_member_ready(member_ready);
+
+                                let envelope_bytes =
+                                    msg.write_to_bytes().map_err(MarshallingError::from)?;
+                                for member in circuit.members().iter() {
+                                    if member != &self.node_id {
+                                        network_sender
+                                            .send(&admin_service_id(member), &envelope_bytes)?;
+                                    }
+                                }
                             }
+
+                            // add circuit as pending initialization
+                            self.add_uninitialized_circuit(circuit_proposal.clone())?;
                         }
                         Ok(())
                     }

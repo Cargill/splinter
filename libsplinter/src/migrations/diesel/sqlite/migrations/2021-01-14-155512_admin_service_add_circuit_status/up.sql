@@ -14,10 +14,10 @@
 -- --
 
 ALTER TABLE circuit
-ADD COLUMN circuit_status INTEGER;
+ADD COLUMN circuit_status INTEGER NOT NULL DEFAULT 1;
 
 ALTER TABLE proposed_circuit
-ADD COLUMN circuit_status INTEGER;
+ADD COLUMN circuit_status INTEGER NOT NULL DEFAULT 1;
 
 ALTER TABLE admin_event_proposed_circuit
-ADD COLUMN circuit_status INTEGER;
+ADD COLUMN circuit_status INTEGER NOT NULL DEFAULT 1;

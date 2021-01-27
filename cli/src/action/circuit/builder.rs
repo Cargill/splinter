@@ -15,8 +15,8 @@
 #[cfg(feature = "circuit-auth-type")]
 use splinter::admin::messages::AuthorizationType;
 use splinter::admin::messages::{
-    BuilderError, CreateCircuit, CreateCircuitBuilder, SplinterNode, SplinterNodeBuilder,
-    SplinterServiceBuilder,
+    BuilderError, CircuitStatus, CreateCircuit, CreateCircuitBuilder, SplinterNode,
+    SplinterNodeBuilder, SplinterServiceBuilder,
 };
 
 use crate::error::CliError;
@@ -36,6 +36,7 @@ pub struct CreateCircuitMessageBuilder {
     comments: Option<String>,
     display_name: Option<String>,
     circuit_version: Option<i32>,
+    circuit_status: Option<CircuitStatus>,
 }
 
 impl CreateCircuitMessageBuilder {
@@ -51,6 +52,7 @@ impl CreateCircuitMessageBuilder {
             comments: None,
             display_name: None,
             circuit_version: None,
+            circuit_status: None,
         }
     }
 
@@ -244,6 +246,10 @@ impl CreateCircuitMessageBuilder {
         self.circuit_version = Some(circuit_version);
     }
 
+    pub fn set_circuit_status(&mut self, circuit_status: CircuitStatus) {
+        self.circuit_status = Some(circuit_status);
+    }
+
     pub fn build(mut self) -> Result<CreateCircuit, CliError> {
         let circuit_builder = self.create_circuit_builder();
 
@@ -313,6 +319,10 @@ impl CreateCircuitMessageBuilder {
 
         if let Some(circuit_version) = self.circuit_version {
             create_circuit_builder = create_circuit_builder.with_circuit_version(circuit_version);
+        }
+
+        if let Some(circuit_status) = self.circuit_status {
+            create_circuit_builder = create_circuit_builder.with_circuit_status(&circuit_status);
         }
 
         #[cfg(feature = "circuit-auth-type")]

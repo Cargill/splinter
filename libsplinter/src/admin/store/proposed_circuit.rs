@@ -261,17 +261,21 @@ impl ProposedCircuit {
             RouteType::Any => circuit.set_routes(admin::Circuit_RouteType::ANY_ROUTE),
         };
 
-        match self.circuit_status {
-            CircuitStatus::Active => {
-                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+        // If the circuit version is equal to the `CIRCUIT_PROTOCOL_VERSION`, the `circuit_status`
+        // value should be set.
+        if self.circuit_version > UNSET_CIRCUIT_VERSION {
+            match self.circuit_status {
+                CircuitStatus::Active => {
+                    circuit.set_circuit_status(admin::Circuit_CircuitStatus::ACTIVE);
+                }
+                CircuitStatus::Disbanded => {
+                    circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
+                }
+                CircuitStatus::Abandoned => {
+                    circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
+                }
             }
-            CircuitStatus::Disbanded => {
-                circuit.set_circuit_status(admin::Circuit_CircuitStatus::DISBANDED);
-            }
-            CircuitStatus::Abandoned => {
-                circuit.set_circuit_status(admin::Circuit_CircuitStatus::ABANDONED);
-            }
-        };
+        }
 
         circuit
     }
