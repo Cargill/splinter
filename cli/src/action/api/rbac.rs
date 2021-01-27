@@ -15,13 +15,13 @@
 use std::collections::VecDeque;
 
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::CliError;
 
 const RBAC_PROTOCOL_VERSION: u32 = 1;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Role {
     pub role_id: String,
     pub display_name: String,
