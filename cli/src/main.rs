@@ -822,6 +822,43 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         )
     }
 
+    #[cfg(feature = "authorization-handler-rbac")]
+    {
+        app = app.subcommand(
+            SubCommand::with_name("role")
+                .about("Role-based authorization role-related commands")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand(
+                    SubCommand::with_name("list")
+                        .about("Lists the available roles for a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("format")
+                                .short("F")
+                                .long("format")
+                                .help("Output format")
+                                .possible_values(&["human", "csv"])
+                                .default_value("human")
+                                .takes_value(true),
+                        ),
+                ),
+        );
+    }
+
     #[cfg(feature = "permissions")]
     {
         app = app.subcommand(
@@ -948,6 +985,14 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 .with_command("status", maintenance::StatusAction)
                 .with_command("enable", maintenance::EnableAction)
                 .with_command("disable", maintenance::DisableAction),
+        )
+    }
+    #[cfg(feature = "authorization-handler-rbac")]
+    {
+        use action::rbac;
+        subcommands = subcommands.with_command(
+            "role",
+            SubcommandActions::new().with_command("list", rbac::ListRolesAction),
         )
     }
 
