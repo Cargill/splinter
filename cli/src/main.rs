@@ -474,6 +474,34 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 ),
         );
 
+    #[cfg(feature = "circuit-disband")]
+    let circuit_command = circuit_command.subcommand(
+        SubCommand::with_name("disband")
+            .about("Propose to disband an existing circuit")
+            .arg(
+                Arg::with_name("url")
+                    .short("U")
+                    .long("url")
+                    .takes_value(true)
+                    .help("URL of Splinter Daemon"),
+            )
+            .arg(
+                Arg::with_name("private_key_file")
+                    .value_name("private-key-file")
+                    .short("k")
+                    .long("key")
+                    .takes_value(true)
+                    .help("Path to private key file"),
+            )
+            .arg(
+                Arg::with_name("circuit_id")
+                    .value_name("circuit-id")
+                    .takes_value(true)
+                    .required(true)
+                    .help("ID of the proposed circuit"),
+            ),
+    );
+
     #[cfg(not(feature = "https-certs"))]
     let cert_generate_subcommand = SubCommand::with_name("generate")
         .long_about(
@@ -1123,6 +1151,9 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
         .with_command("list", circuit::CircuitListAction)
         .with_command("show", circuit::CircuitShowAction)
         .with_command("proposals", circuit::CircuitProposalsAction);
+
+    #[cfg(feature = "circuit-disband")]
+    let circuit_command = circuit_command.with_command("disband", circuit::CircuitDisbandAction);
 
     #[cfg(feature = "circuit-template")]
     let circuit_command = circuit_command.with_command(
