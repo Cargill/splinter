@@ -51,7 +51,6 @@ pub enum Permission {
 }
 
 /// An authorization handler's decision about whether to allow, deny, or pass on the request
-#[cfg(feature = "authorization")]
 pub enum AuthorizationHandlerResult {
     /// The authorization handler has granted the requested permission
     Allow,
@@ -63,7 +62,6 @@ pub enum AuthorizationHandlerResult {
 }
 
 /// Determines if a client has some permissions
-#[cfg(feature = "authorization")]
 pub trait AuthorizationHandler: Send + Sync {
     /// Determines if the given identity has the requested permission
     fn has_permission(
@@ -77,7 +75,6 @@ pub trait AuthorizationHandler: Send + Sync {
     fn clone_box(&self) -> Box<dyn AuthorizationHandler>;
 }
 
-#[cfg(feature = "authorization")]
 impl Clone for Box<dyn AuthorizationHandler> {
     fn clone(&self) -> Box<dyn AuthorizationHandler> {
         self.clone_box()
