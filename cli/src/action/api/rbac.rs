@@ -44,6 +44,12 @@ impl fmt::Display for Role {
 }
 
 #[derive(Deserialize)]
+struct RoleGet {
+    #[serde(rename = "data")]
+    role: Role,
+}
+
+#[derive(Deserialize)]
 pub struct RoleList {
     #[serde(rename = "data")]
     pub roles: VecDeque<Role>,
@@ -169,4 +175,47 @@ impl<'a> Iterator for RoleIter<'a> {
                 .transpose();
         }
     }
+}
+
+pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Role, CliError> {
+    Client::new()
+        .get(&format!("{}/authorization/roles/{}", base_url, role_id))
+        .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
+        .header("Authorization", auth)
+        .send()
+        .map_err(|err| CliError::ActionError(format!("Failed to fetch role {}: {}", role_id, err)))
+        .and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                res.json::<RoleGet>().map_err(|_| {
+                    CliError::ActionError(
+                        "Request was successful, but received an invalid response".into(),
+                    )
+                })
+            } else if status.as_u16() == 401 {
+                Err(CliError::ActionError("Not Authorized".into()))
+            } else if status.as_u16() == 404 {
+                Err(CliError::ActionError(format!(
+                    "Role {} does not exist",
+                    role_id
+                )))
+            } else {
+                let message = res
+                    .json::<super::ServerError>()
+                    .map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Get role fetch request failed with status code '{}', but error \
+                                 response was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                Err(CliError::ActionError(format!(
+                    "Failed to get role {}: {}",
+                    role_id, message
+                )))
+            }
+        })
+        .map(|wrapper| wrapper.role)
 }
