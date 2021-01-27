@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A subject provider that looks up OpenID subject identifiers
+
 use reqwest::{blocking::Client, StatusCode};
 
 use crate::error::InternalError;
 
 use super::SubjectProvider;
 
+/// Retrieves a subject identifier from an Oauth OpenID provider's user_info
+/// endpoint
 #[derive(Clone)]
 pub struct OpenIdSubjectProvider {
     userinfo_endpoint: String,
