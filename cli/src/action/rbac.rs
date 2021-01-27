@@ -54,6 +54,42 @@ impl Action for ListRolesAction {
     }
 }
 
+pub struct ShowRoleAction;
+
+impl Action for ShowRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let format = arg_matches
+            .and_then(|args| args.value_of("format"))
+            .unwrap_or("human");
+
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role ID must be specified".into()))?;
+
+        let role = new_client(&arg_matches)?.get_role(role_id)?;
+
+        match format {
+            "json" => println!(
+                "\n {}",
+                serde_json::to_string(&role).map_err(|err| CliError::ActionError(format!(
+                    "Cannot format role into json: {}",
+                    err
+                )))?
+            ),
+            "yaml" => println!(
+                "{}",
+                serde_yaml::to_string(&role).map_err(|err| CliError::ActionError(format!(
+                    "Cannot format role into yaml: {}",
+                    err
+                )))?
+            ),
+            _ => println!("{}", role),
+        }
+
+        Ok(())
+    }
+}
+
 fn new_client(arg_matches: &Option<&ArgMatches<'_>>) -> Result<SplinterRestClient, CliError> {
     let url = arg_matches
         .and_then(|args| args.value_of("url"))
