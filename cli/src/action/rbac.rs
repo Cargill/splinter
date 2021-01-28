@@ -17,7 +17,7 @@ use clap::ArgMatches;
 use crate::error::CliError;
 
 use super::{
-    api::{SplinterRestClient, SplinterRestClientBuilder},
+    api::{RoleBuilder, SplinterRestClient, SplinterRestClientBuilder},
     create_cylinder_jwt_auth, print_table, Action, DEFAULT_SPLINTER_REST_API_URL,
     SPLINTER_REST_API_URL_ENV,
 };
@@ -87,6 +87,36 @@ impl Action for ShowRoleAction {
         }
 
         Ok(())
+    }
+}
+
+pub struct CreateRoleAction;
+
+impl Action for CreateRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role must have an ID".into()))?;
+
+        let display_name = arg_matches
+            .and_then(|args| args.value_of("display_name"))
+            .ok_or_else(|| CliError::ActionError("A role must have a display name".into()))?;
+
+        let permissions = arg_matches
+            .and_then(|args| args.values_of("permission"))
+            .ok_or_else(|| {
+                CliError::ActionError("A role must have at least one permission".into())
+            })?
+            .map(|s| s.to_owned())
+            .collect();
+
+        new_client(&arg_matches)?.create_role(
+            RoleBuilder::default()
+                .with_role_id(role_id.into())
+                .with_display_name(display_name.into())
+                .with_permissions(permissions)
+                .build()?,
+        )
     }
 }
 
