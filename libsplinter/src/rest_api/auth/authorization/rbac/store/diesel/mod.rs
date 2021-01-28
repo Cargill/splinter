@@ -25,8 +25,8 @@ use crate::error::{
 use diesel::r2d2::{ConnectionManager, Pool};
 
 use super::{
-    Assignment, AssignmentBuilder, Identity, Role, RoleBasedAuthorizationStore,
-    RoleBasedAuthorizationStoreError, RoleBuilder,
+    Assignment, Identity, Role, RoleBasedAuthorizationStore, RoleBasedAuthorizationStoreError,
+    RoleBuilder,
 };
 
 use operations::add_assignment::RoleBasedAuthorizationStoreAddAssignment as _;
@@ -372,15 +372,17 @@ impl TryFrom<(models::IdentityModel, Vec<models::AssignmentModel>)> for Assignme
             models::IdentityModelType::Key => Identity::Key(identity),
             models::IdentityModelType::User => Identity::User(identity),
         };
-        AssignmentBuilder::new()
-            .with_identity(identity)
-            .with_roles(
-                assignments
-                    .into_iter()
-                    .map(|assignment| assignment.role_id)
-                    .collect(),
-            )
-            .build()
+        // We create the assignment directly, vs using the builder, as a deleted role may result
+        // in an empty assignment.  The builder prevents the library user from constructing an
+        // assignment with no roles, but we have no way of preventing the database from creating
+        // this situation.
+        Ok(Assignment {
+            identity,
+            roles: assignments
+                .into_iter()
+                .map(|models::AssignmentModel { role_id, .. }| role_id)
+                .collect(),
+        })
     }
 }
 
@@ -417,9 +419,10 @@ impl From<diesel::r2d2::PoolError> for RoleBasedAuthorizationStoreError {
 mod tests {
     use super::*;
 
-    use crate::rest_api::auth::authorization::rbac::store::RoleBuilder;
+    use crate::rest_api::auth::authorization::rbac::store::{AssignmentBuilder, RoleBuilder};
 
     use crate::migrations::run_sqlite_migrations;
+    use crate::store::ForeignKeyCustomizer;
 
     use diesel::{
         prelude::*,
@@ -985,12 +988,77 @@ mod tests {
             .expect("Unable to remove assignment");
     }
 
+    /// This test verifies the following:
+    /// 1. Add a role
+    /// 2. Add an assignment for the role and verify it with the store API
+    /// 3. Remove the role
+    /// 4. Verify that the assignment may still be loaded.
+    #[test]
+    fn sqlite_remove_assigned_role() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-user-id".into()))
+            .with_roles(vec!["test-role".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert_eq!(&vec!["test-role".to_string()], stored_assignment.roles());
+
+        role_based_auth_store
+            .remove_role("test-role")
+            .expect("Unable to remove assignment");
+
+        let assigned_roles = role_based_auth_store
+            .get_assigned_roles(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assigned roles");
+        assert_eq!(0, assigned_roles.len());
+
+        let stored_assignment = role_based_auth_store
+            .get_assignment(&Identity::User("some-user-id".into()))
+            .expect("Unable to get assignment")
+            .expect("Assignment was not found");
+
+        assert_eq!(
+            &Identity::User("some-user-id".into()),
+            stored_assignment.identity()
+        );
+        assert!(stored_assignment.roles().is_empty());
+    }
+
     /// Creates a connection pool for an in-memory SQLite database with only a single connection
     /// available. Each connection is backed by a different in-memory SQLite database, so limiting
     /// the pool to a single connection insures that the same DB is used for all operations.
     fn create_connection_pool_and_migrate() -> Pool<ConnectionManager<SqliteConnection>> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
+            .connection_customizer(Box::new(ForeignKeyCustomizer))
             .max_size(1)
             .build(connection_manager)
             .expect("Failed to build connection pool");
