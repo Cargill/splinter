@@ -36,6 +36,11 @@ enum AuthorizationResult {
     /// The client was authorized to the given identity based on the authorization header
     Authorized(Identity),
     /// The requested endpoint does not require authorization
+    #[cfg(any(
+        feature = "authorization",
+        feature = "biome-credentials",
+        feature = "oauth"
+    ))]
     NoAuthorizationNecessary,
     /// The authorization header is empty or invalid
     Unauthorized,
@@ -55,7 +60,18 @@ enum AuthorizationResult {
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
 fn authorize(
     #[cfg(feature = "authorization")] method: &Method,
+    #[cfg(any(
+        feature = "authorization",
+        feature = "biome-credentials",
+        feature = "oauth"
+    ))]
     endpoint: &str,
+    #[cfg(not(any(
+        feature = "authorization",
+        feature = "biome-credentials",
+        feature = "oauth"
+    )))]
+    _endpoint: &str,
     auth_header: Option<&str>,
     #[cfg(feature = "authorization")] permission_map: &PermissionMap,
     identity_providers: &[Box<dyn IdentityProvider>],
@@ -100,19 +116,24 @@ fn authorize(
     }
     #[cfg(not(feature = "authorization"))]
     {
-        // Authorization isn't necessary when using one of the authorization endpoints
-        let mut is_auth_endpoint = false;
-        #[cfg(feature = "biome-credentials")]
-        if endpoint == "/biome/register" || endpoint == "/biome/login" || endpoint == "/biome/token"
+        #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
         {
-            is_auth_endpoint = true;
-        }
-        #[cfg(feature = "oauth")]
-        if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
-            is_auth_endpoint = true;
-        }
-        if is_auth_endpoint {
-            return AuthorizationResult::NoAuthorizationNecessary;
+            // Authorization isn't necessary when using one of the authorization endpoints
+            let mut is_auth_endpoint = false;
+            #[cfg(feature = "biome-credentials")]
+            if endpoint == "/biome/register"
+                || endpoint == "/biome/login"
+                || endpoint == "/biome/token"
+            {
+                is_auth_endpoint = true;
+            }
+            #[cfg(feature = "oauth")]
+            if endpoint == "/oauth/login" || endpoint == "/oauth/callback" {
+                is_auth_endpoint = true;
+            }
+            if is_auth_endpoint {
+                return AuthorizationResult::NoAuthorizationNecessary;
+            }
         }
 
         match get_identity(auth_header, identity_providers) {
