@@ -282,6 +282,40 @@ pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Role, CliEr
         .map(|wrapper| wrapper.role)
 }
 
+pub fn create_role(base_url: &str, auth: &str, role: Role) -> Result<(), CliError> {
+    Client::new()
+        .post(&format!("{}/authorization/roles", base_url))
+        .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
+        .header("Authorization", auth)
+        .json(&role)
+        .send()
+        .map_err(|err| CliError::ActionError(format!("Failed to create role: {}", err)))
+        .and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                Ok(())
+            } else if status.as_u16() == 401 {
+                Err(CliError::ActionError("Not Authorized".into()))
+            } else {
+                let message = res
+                    .json::<super::ServerError>()
+                    .map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Create role request failed with status code '{}', but error response \
+                            was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                Err(CliError::ActionError(format!(
+                    "Failed to create role: {}",
+                    message
+                )))
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
