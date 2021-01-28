@@ -23,8 +23,10 @@ pub mod sqlite;
 
 use std::str::FromStr;
 
-#[cfg(feature = "sqlite")]
+#[cfg(all(feature = "sqlite", not(test)))]
 use self::sqlite::ForeignKeyCustomizer;
+#[cfg(all(feature = "sqlite", test))]
+pub use self::sqlite::ForeignKeyCustomizer;
 #[cfg(feature = "diesel")]
 use diesel::r2d2::{ConnectionManager, Pool};
 
