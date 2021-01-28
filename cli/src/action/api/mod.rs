@@ -22,6 +22,9 @@ use serde::Deserialize;
 
 use super::CliError;
 
+#[cfg(feature = "authorization-handler-rbac")]
+pub use rbac::{Role, RoleBuilder};
+
 #[derive(Default)]
 pub struct SplinterRestClientBuilder {
     pub url: Option<String>,
@@ -230,12 +233,12 @@ impl SplinterRestClient {
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
-    pub fn get_role(&self, role_id: &str) -> Result<rbac::Role, CliError> {
+    pub fn get_role(&self, role_id: &str) -> Result<Role, CliError> {
         rbac::get_role(&self.url, &self.auth, role_id)
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
-    pub fn create_role(&self, role: rbac::Role) -> Result<(), CliError> {
+    pub fn create_role(&self, role: Role) -> Result<(), CliError> {
         rbac::create_role(&self.url, &self.auth, role)
     }
 }
