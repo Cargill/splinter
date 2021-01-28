@@ -1267,111 +1267,119 @@ impl AdminServiceShared {
         let mut pending_peers = vec![];
         let mut added_peers: Vec<String> = vec![];
         let mut pending_members = vec![];
-        // Allowing `unused_mut` to avoid compiler warnings when the `circuit-disband` feature is
-        // not enabled. If the `circuit-disband` feature is removed or stabilized, the
-        // `#allow(unused_mut)` may also be removed.
-        #[allow(unused_mut)]
-        let mut members: Vec<SplinterNode> = payload
-            .get_circuit_create_request()
-            .get_circuit()
-            .get_members()
-            .to_vec();
+        let mut members = vec![];
+        // Check if that payload is to create a circuit, in which case PeerRefs for the new
+        // members must be added.
+        if payload.has_circuit_create_request() {
+            let create_request_members = payload
+                .get_circuit_create_request()
+                .get_circuit()
+                .get_members()
+                .to_vec();
+            for node in &create_request_members {
+                if self.node_id() != node.get_node_id() {
+                    debug!("Referencing node {:?}", node);
+                    let peer_ref = self
+                        .peer_connector
+                        .add_peer_ref(
+                            node.get_node_id().to_string(),
+                            node.get_endpoints().to_vec(),
+                        )
+                        .map_err(|err| {
+                            // remove all peer refs added for this proposal
+                            for node_id in added_peers.iter() {
+                                self.remove_peer_ref(node_id);
+                            }
+
+                            ServiceError::UnableToHandleMessage(Box::new(err))
+                        })?;
+
+                    self.add_peer_ref(peer_ref);
+                    added_peers.push(node.get_node_id().to_string());
+
+                    // if we have a protocol the connection exists for the peer already
+                    if self
+                        .service_protocols
+                        .get(&admin_service_id(node.get_node_id()))
+                        .is_none()
+                    {
+                        pending_peers.push(node.get_node_id().to_string());
+                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                    }
+                }
+                pending_members.push(node.get_node_id().to_string())
+            }
+            members.extend(create_request_members);
+        }
 
         // If the `circuit-disband` feature is enabled, a `CircuitDisbandRequest` may be present
         // in the payload. Therefore, the members are gathered from the admin store based on the
         // provided circuit id.
         #[cfg(feature = "circuit-disband")]
         {
-            members = {
-                if payload.has_circuit_disband_request() {
-                    let circuit_id = payload.get_circuit_disband_request().get_circuit_id();
-                    // If the proposed circuit is being disbanded, the circuit information must be
-                    // gathered from the admin store, as the `CircuitDisbandRequest` only contains
-                    // the `circuit_id`.
-                    let circuit = self
-                        .admin_store
-                        .get_circuit(circuit_id)
-                        .map_err(|err| {
-                            ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "error occurred when trying to get circuit {}",
-                                    err
-                                )),
-                            ))
-                        })?
-                        .ok_or_else(|| {
-                            ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "unable to get circuit {}",
-                                    circuit_id
-                                )),
-                            ))
-                        })?;
-
-                    // Collecting the node endpoints associated with the currently active version of the
-                    // circuit proposed to be disbanded.
-                    let node_ids = circuit.members().to_vec();
-                    self.admin_store
-                        .list_nodes()
-                        .map_err(|err| {
-                            ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "error occurred when trying to get circuit nodes {}",
-                                    err
-                                )),
-                            ))
-                        })?
-                        .filter_map(|circuit_node| {
-                            if node_ids.contains(&circuit_node.node_id().to_string()) {
-                                return Some(
-                                    messages::SplinterNode {
-                                        node_id: circuit_node.node_id().to_string(),
-                                        endpoints: circuit_node.endpoints().to_vec(),
-                                    }
-                                    .into_proto(),
-                                );
-                            }
-                            None
-                        })
-                        .collect::<Vec<SplinterNode>>()
-                } else {
-                    members
+            if payload.has_circuit_disband_request() {
+                // If the members list has already been updated, the payload was to create a
+                // new circuit.
+                if !members.is_empty() {
+                    return Err(ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(
+                            "Invalid payload; has two requests".to_string(),
+                        ),
+                    )));
                 }
-            };
-        }
-
-        for node in members {
-            if self.node_id() != node.get_node_id() {
-                debug!("Referencing node {:?}", node);
-                let peer_ref = self
-                    .peer_connector
-                    .add_peer_ref(
-                        node.get_node_id().to_string(),
-                        node.get_endpoints().to_vec(),
-                    )
+                let circuit_id = payload.get_circuit_disband_request().get_circuit_id();
+                // If the proposed circuit is being disbanded, the circuit information must be
+                // gathered from the admin store, as the `CircuitDisbandRequest` only contains
+                // the `circuit_id`.
+                let circuit = self
+                    .admin_store
+                    .get_circuit(circuit_id)
                     .map_err(|err| {
-                        // remove all peer refs added for this proposal
-                        for node_id in added_peers.iter() {
-                            self.remove_peer_ref(node_id);
-                        }
-
-                        ServiceError::UnableToHandleMessage(Box::new(err))
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "error occurred when trying to get circuit {}",
+                                err
+                            )),
+                        ))
+                    })?
+                    .ok_or_else(|| {
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "unable to get circuit {}",
+                                circuit_id
+                            )),
+                        ))
                     })?;
 
-                self.add_peer_ref(peer_ref);
-                added_peers.push(node.get_node_id().to_string());
-
-                // if we have a protocol the connection exists for the peer already
-                if self
-                    .service_protocols
-                    .get(&admin_service_id(node.get_node_id()))
-                    .is_none()
-                {
-                    pending_peers.push(node.get_node_id().to_string());
-                    missing_protocol_ids.push(admin_service_id(node.get_node_id()))
-                }
+                // Collecting the node endpoints associated with the currently active version of the
+                // circuit proposed to be disbanded.
+                let node_ids = circuit.members().to_vec();
+                let disband_members = self
+                    .admin_store
+                    .list_nodes()
+                    .map_err(|err| {
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "error occurred when trying to get circuit nodes {}",
+                                err
+                            )),
+                        ))
+                    })?
+                    .filter_map(|circuit_node| {
+                        if node_ids.contains(&circuit_node.node_id().to_string()) {
+                            return Some(
+                                messages::SplinterNode {
+                                    node_id: circuit_node.node_id().to_string(),
+                                    endpoints: circuit_node.endpoints().to_vec(),
+                                }
+                                .into_proto(),
+                            );
+                        }
+                        None
+                    })
+                    .collect::<Vec<SplinterNode>>();
+                members.extend(disband_members);
             }
-            pending_members.push(node.get_node_id().to_string())
         }
 
         if missing_protocol_ids.is_empty() {
