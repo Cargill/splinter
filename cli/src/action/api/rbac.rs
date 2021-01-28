@@ -43,6 +43,68 @@ impl fmt::Display for Role {
     }
 }
 
+/// Constructs roles for submission to a splinter node.
+#[derive(Default)]
+pub struct RoleBuilder {
+    role_id: Option<String>,
+    display_name: Option<String>,
+    permissions: Vec<String>,
+}
+
+impl RoleBuilder {
+    /// Sets the role id of the resulting Role.
+    ///
+    /// Must not be empty.
+    pub fn with_role_id(mut self, role_id: String) -> Self {
+        self.role_id = Some(role_id);
+        self
+    }
+
+    /// Sets the display name of the resulting Role.
+    pub fn with_display_name(mut self, display_name: String) -> Self {
+        self.display_name = Some(display_name);
+        self
+    }
+
+    /// Sets the permissions included in the resulting Role.
+    ///
+    /// Must not be empty.
+    pub fn with_permissions(mut self, permissions: Vec<String>) -> Self {
+        self.permissions = permissions;
+        self
+    }
+
+    /// Constructs the Role.
+    pub fn build(self) -> Result<Role, CliError> {
+        let RoleBuilder {
+            role_id,
+            display_name,
+            permissions,
+        } = self;
+
+        if permissions.is_empty() {
+            return Err(CliError::ActionError(
+                "A role must have at least one permission".into(),
+            ));
+        }
+
+        let role_id =
+            role_id.ok_or_else(|| CliError::ActionError("A role must have a role ID".into()))?;
+        if role_id.is_empty() {
+            return Err(CliError::ActionError("A role ID must not be blank".into()));
+        }
+
+        let display_name = display_name
+            .ok_or_else(|| CliError::ActionError("A role must have a display name".into()))?;
+
+        Ok(Role {
+            role_id,
+            display_name,
+            permissions,
+        })
+    }
+}
+
 #[derive(Deserialize)]
 struct RoleGet {
     #[serde(rename = "data")]
@@ -218,4 +280,70 @@ pub fn get_role(base_url: &str, auth: &str, role_id: &str) -> Result<Role, CliEr
             }
         })
         .map(|wrapper| wrapper.role)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests the role builder in both Ok and Err scenarios
+    /// 1. Construct a valid role
+    /// 2. Fail with no role_id
+    /// 3. Fail with an empty role_id
+    /// 4. Fail with no display name
+    /// 4. Succeed with empty display name
+    /// 5. Fail with empty permissions
+    #[test]
+    fn test_role_builder() {
+        // Ok Role
+        let role = RoleBuilder::default()
+            .with_role_id("valid_role".into())
+            .with_display_name("Valid Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string()])
+            .build()
+            .expect("could not build a valid role");
+
+        assert_eq!("valid_role", &role.role_id);
+        assert_eq!("Valid Role", &role.display_name);
+        assert_eq!(vec!["a".to_string(), "b".to_string()], role.permissions);
+
+        // Missing role_id
+        let res = RoleBuilder::default()
+            .with_display_name("No ID Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string()])
+            .build();
+
+        assert!(res.is_err());
+
+        // Empty role_id
+        let res = RoleBuilder::default()
+            .with_role_id("".into())
+            .with_display_name("Empty ID Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string()])
+            .build();
+        assert!(res.is_err());
+
+        // No display name
+        let res = RoleBuilder::default()
+            .with_role_id("no_display_name".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string()])
+            .build();
+        assert!(res.is_err());
+
+        // Empty display name
+        RoleBuilder::default()
+            .with_role_id("empty_display_name".into())
+            .with_display_name("".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string()])
+            .build()
+            .expect("Could not build a role with an empty display name");
+
+        // Empty permissions
+        let res = RoleBuilder::default()
+            .with_role_id("empty_permissions".into())
+            .with_display_name("Empty Permissions".into())
+            .with_permissions(vec![])
+            .build();
+        assert!(res.is_err());
+    }
 }
