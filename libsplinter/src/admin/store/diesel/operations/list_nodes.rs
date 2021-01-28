@@ -62,6 +62,9 @@ where
         nodes_info.into_iter().for_each(|(node, node_endpoint)| {
             if let Some(endpoint_list) = node_map.get_mut(&node.node_id) {
                 endpoint_list.push(node_endpoint.endpoint);
+                // Ensure only unique endpoints are added to the node's endpoint list
+                endpoint_list.sort();
+                endpoint_list.dedup();
             } else {
                 node_map.insert(node.node_id.to_string(), vec![node_endpoint.endpoint]);
             }
