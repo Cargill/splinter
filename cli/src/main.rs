@@ -988,6 +988,32 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .value_name("ROLE ID")
                                 .help("ID of role to be updated"),
                         ),
+                )
+                .subcommand(
+                    SubCommand::with_name("delete")
+                        .about("Delete a specific role from a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("role_id")
+                                .required(true)
+                                .takes_value(true)
+                                .value_name("ROLE ID")
+                                .help("ID of role to be deleted"),
+                        ),
                 ),
         );
     }
@@ -1128,6 +1154,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             SubcommandActions::new()
                 .with_command("create", rbac::CreateRoleAction)
                 .with_command("update", rbac::UpdateRoleAction)
+                .with_command("delete", rbac::DeleteRoleAction)
                 .with_command("list", rbac::ListRolesAction)
                 .with_command("show", rbac::ShowRoleAction),
         )
