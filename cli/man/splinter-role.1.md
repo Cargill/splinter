@@ -48,6 +48,7 @@ SUBCOMMANDS
 SEE ALSO
 ========
 | `splinter-role-create(1)`
+| `splinter-role-update(1)`
 | `splinter-role-list(1)`
 | `splinter-role-show(1)`
 |
