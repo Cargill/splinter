@@ -62,13 +62,7 @@ macro_rules! mutex_lock_unwrap {
 #[cfg(feature = "admin-service")]
 pub mod admin;
 mod base62;
-#[cfg(any(
-    feature = "biome-credentials",
-    feature = "biome-key-management",
-    feature = "biome-notifications",
-    feature = "biome-profile",
-    feature = "oauth"
-))]
+#[cfg(feature = "biome")]
 pub mod biome;
 pub mod channel;
 pub mod circuit;
