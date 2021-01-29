@@ -246,6 +246,11 @@ impl SplinterRestClient {
     pub fn update_role(&self, role_update: RoleUpdate) -> Result<(), CliError> {
         rbac::update_role(&self.url, &self.auth, role_update)
     }
+
+    #[cfg(feature = "authorization-handler-rbac")]
+    pub fn delete_role(&self, role_id: &str) -> Result<(), CliError> {
+        rbac::delete_role(&self.url, &self.auth, role_id)
+    }
 }
 
 #[derive(Deserialize)]

@@ -429,6 +429,39 @@ pub fn update_role(base_url: &str, auth: &str, role_update: RoleUpdate) -> Resul
         })
 }
 
+pub fn delete_role(base_url: &str, auth: &str, role_id: &str) -> Result<(), CliError> {
+    Client::new()
+        .delete(&format!("{}/authorization/roles/{}", base_url, role_id))
+        .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
+        .header("Authorization", auth)
+        .send()
+        .map_err(|err| CliError::ActionError(format!("Failed to delete role {}: {}", role_id, err)))
+        .and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                Ok(())
+            } else if status.as_u16() == 401 {
+                Err(CliError::ActionError("Not Authorized".into()))
+            } else {
+                let message = res
+                    .json::<super::ServerError>()
+                    .map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Delete role request failed with status code '{}', but error response \
+                            was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                Err(CliError::ActionError(format!(
+                    "Failed to delete role {}: {}",
+                    role_id, message
+                )))
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
