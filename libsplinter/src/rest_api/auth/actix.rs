@@ -190,6 +190,11 @@ where
                 debug!("Authenticated user {:?}", identity);
                 req.extensions_mut().insert(identity);
             }
+            #[cfg(any(
+                feature = "authorization",
+                feature = "biome-credentials",
+                feature = "oauth"
+            ))]
             AuthorizationResult::NoAuthorizationNecessary => {}
             AuthorizationResult::Unauthorized => {
                 return Box::new(
