@@ -527,7 +527,10 @@ pub mod tests {
             .expect("Unable to get circuit")
             .expect("Got None when expecting circuit");
 
-        assert_eq!(create_circuit(), fetched_circuit);
+        assert_eq!(
+            create_circuit("WBKLF-BBBBB", CircuitStatus::Active),
+            fetched_circuit
+        );
     }
 
     /// Verify that a circuit can be added to the store correctly and then fetched from the store
@@ -546,7 +549,7 @@ pub mod tests {
 
         let store = DieselAdminServiceStore::new(pool);
 
-        let circuit = create_circuit();
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
 
         let nodes = create_nodes();
 
@@ -588,20 +591,29 @@ pub mod tests {
     ///    returned
     /// 8. List circuits from store with mismatching management type predicate, validate no
     ///    circuits are returned
+    /// 9. Add a `Disbanded` circuit to the store
+    /// 10. List circuits from store with no circuit status predicate, validate that only the
+    ///     `Active` circuits are returned
+    /// 11. List circuits with the `CircuitStatus::Disbanded` circuit status predicate, validate
+    ///     only the `Disbanded` circuit is returned
+    /// 12. List circuits with the `CircuitStatus::Abandoned` circuit status predicate, validate
+    ///     no circuits are returned
+    /// 13. List circuits from store with predicates, validate only the 2 `Active` circuits are
+    ///    returned
     #[test]
     fn test_list_circuits() {
         let pool = create_connection_pool_and_migrate();
 
         let store = DieselAdminServiceStore::new(pool);
 
-        let circuit = create_circuit();
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
         let nodes = create_nodes();
 
-        let extra_circuit = create_extra_circuit();
+        let extra_circuit = create_extra_circuit("WBKLF-CCCCC");
         let extra_nodes = create_extra_nodes();
 
         store
-            .add_circuit(circuit.clone(), nodes)
+            .add_circuit(circuit.clone(), nodes.clone())
             .expect("Unable to add circuit");
 
         // test no predicates
@@ -642,13 +654,49 @@ pub mod tests {
             ])])
             .expect("Unable to list circuits with members include predicate");
 
-        assert_eq!(circuits.next(), Some(extra_circuit));
+        assert_eq!(circuits.next(), Some(extra_circuit.clone()));
         assert_eq!(circuits.next(), None);
 
-        // show all circuits are returned
+        // test circuit status predicate
+
+        // Add a `Disbanded` circuit
+        let disbanded_circuit = create_circuit("WBKLF-DDDDD", CircuitStatus::Disbanded);
+        store
+            .add_circuit(disbanded_circuit.clone(), nodes.clone())
+            .expect("Unable to add disbanded circuit");
+
+        // Return circuits with no predicates, this should by default only return `Active` circuits
+        let mut circuits = store
+            .list_circuits(&vec![])
+            .expect("Unable to list circuits");
+
+        assert_eq!(circuits.next(), Some(extra_circuit.clone()));
+        assert_eq!(circuits.next(), Some(circuit.clone()));
+        assert_eq!(circuits.next(), None);
+
+        // Return circuits with the `CircuitStatus(CircuitStatus::Disbanded)` predicate
+        let mut circuits = store
+            .list_circuits(&vec![CircuitPredicate::CircuitStatus(
+                CircuitStatus::Disbanded,
+            )])
+            .expect("Unable to list circuits with `CircuitStatus` predicate");
+
+        assert_eq!(circuits.next(), Some(disbanded_circuit.clone()));
+        assert_eq!(circuits.next(), None);
+
+        // Return circuits with the `CircuitStatus(CircuitStatus::Abandoned)` predicate
+        let mut circuits = store
+            .list_circuits(&vec![CircuitPredicate::CircuitStatus(
+                CircuitStatus::Abandoned,
+            )])
+            .expect("Unable to list circuits with `CircuitStatus` predicate");
+
+        assert_eq!(circuits.next(), None);
+
+        // show all `Active` circuits are returned
         let circuits = store
             .list_circuits(&vec![])
-            .expect("Unable to list circuits with members include predicate");
+            .expect("Unable to list circuits");
 
         assert_eq!(circuits.len(), 2);
     }
@@ -669,7 +717,7 @@ pub mod tests {
 
         let store = DieselAdminServiceStore::new(pool);
 
-        let circuit = create_circuit();
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
         let nodes = create_nodes();
 
         store
@@ -708,7 +756,7 @@ pub mod tests {
 
         let store = DieselAdminServiceStore::new(pool);
 
-        let circuit = create_circuit();
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
         let nodes = create_nodes();
 
         store
@@ -745,7 +793,7 @@ pub mod tests {
 
         let store = DieselAdminServiceStore::new(pool);
 
-        let circuit = create_circuit();
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
         let nodes = create_nodes();
 
         store
@@ -788,7 +836,7 @@ pub mod tests {
 
         let store = DieselAdminServiceStore::new(pool);
 
-        let circuit = create_circuit();
+        let circuit = create_circuit("WBKLF-BBBBB", CircuitStatus::Active);
         let nodes = create_nodes();
 
         store
@@ -978,9 +1026,9 @@ pub mod tests {
             .build().expect("Unable to build proposals")
     }
 
-    fn create_circuit() -> Circuit {
+    fn create_circuit(circuit_id: &str, status: CircuitStatus) -> Circuit {
         CircuitBuilder::default()
-            .with_circuit_id("WBKLF-BBBBB")
+            .with_circuit_id(circuit_id)
             .with_roster(&vec![
                 ServiceBuilder::default()
                     .with_service_id("a000")
@@ -1009,14 +1057,14 @@ pub mod tests {
             .with_circuit_management_type("gameroom")
             .with_display_name("test_display")
             .with_circuit_version(3)
-            .with_circuit_status(&CircuitStatus::Active)
+            .with_circuit_status(&status)
             .build()
             .expect("Unable to build circuit")
     }
 
-    fn create_extra_circuit() -> Circuit {
+    fn create_extra_circuit(circuit_id: &str) -> Circuit {
         CircuitBuilder::default()
-            .with_circuit_id("WBKLF-CCCCC")
+            .with_circuit_id(circuit_id)
             .with_roster(&vec![
                 ServiceBuilder::default()
                     .with_service_id("a000")
