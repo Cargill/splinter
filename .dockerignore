@@ -18,9 +18,6 @@
 /splinterd/target
 /splinterd/Cargo.lock
 
-/client/target
-/client/Cargo.lock
-
 /cli/target
 /cli/Cargo.lock
 

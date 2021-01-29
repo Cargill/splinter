@@ -53,7 +53,6 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/proto
 # Create empty cargo projects for top-level projects
 WORKDIR /build
 RUN USER=root cargo new --bin cli
-RUN USER=root cargo new --bin client
 RUN USER=root cargo new --lib libsplinter
 RUN USER=root cargo new --bin splinterd
 
@@ -70,7 +69,6 @@ RUN USER=root cargo new --lib services/scabbard/libscabbard
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
 COPY cli/Cargo.toml /build/cli/Cargo.toml
-COPY client/Cargo.toml /build/client/Cargo.toml
 COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
 COPY libsplinter/protos /build/libsplinter/protos
@@ -100,15 +98,13 @@ RUN rm \
     target/release/health* \
     target/release/libsplinter* \
     target/release/scabbard* \
-    target/release/splinter-cli* \
-    target/release/splinterd* \
+    target/release/splinter* \
     target/release/deps/gameroom_database* \
     target/release/deps/gameroomd* \
     target/release/deps/health* \
     target/release/deps/libsplinter* \
     target/release/deps/scabbard* \
-    target/release/deps/splinter_cli* \
-    target/release/deps/splinterd*
+    target/release/deps/splinter*
 
 # Clean up leftover files
 RUN find . -name 'Cargo.toml' -exec \
