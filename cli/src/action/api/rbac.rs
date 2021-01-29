@@ -105,6 +105,77 @@ impl RoleBuilder {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct RoleUpdate {
+    #[serde(skip)]
+    role_id: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    permissions: Option<Vec<String>>,
+}
+
+#[derive(Default)]
+pub struct RoleUpdateBuilder {
+    role_id: Option<String>,
+    display_name: Option<String>,
+    permissions: Option<Vec<String>>,
+}
+
+impl RoleUpdateBuilder {
+    /// Sets the role id of the resulting Role.
+    ///
+    /// Must not be empty.
+    pub fn with_role_id(mut self, role_id: String) -> Self {
+        self.role_id = Some(role_id);
+        self
+    }
+
+    /// Sets the display name of the resulting Role.
+    pub fn with_display_name(mut self, display_name: Option<String>) -> Self {
+        self.display_name = display_name;
+        self
+    }
+
+    /// Sets the permissions included in the resulting Role.
+    ///
+    /// Must not be empty.
+    pub fn with_permissions(mut self, permissions: Option<Vec<String>>) -> Self {
+        self.permissions = permissions;
+        self
+    }
+
+    /// Constructs the Role.
+    pub fn build(self) -> Result<RoleUpdate, CliError> {
+        let RoleUpdateBuilder {
+            role_id,
+            display_name,
+            permissions,
+        } = self;
+
+        let role_id =
+            role_id.ok_or_else(|| CliError::ActionError("A role must have a role ID".into()))?;
+        if role_id.is_empty() {
+            return Err(CliError::ActionError("A role ID must not be blank".into()));
+        }
+
+        if let Some(permissions) = permissions.as_ref() {
+            if permissions.is_empty() {
+                return Err(CliError::ActionError(
+                    "A role must have at least one permission".into(),
+                ));
+            }
+        }
+
+        Ok(RoleUpdate {
+            role_id,
+            display_name,
+            permissions,
+        })
+    }
+}
+
 #[derive(Deserialize)]
 struct RoleGet {
     #[serde(rename = "data")]
@@ -316,6 +387,48 @@ pub fn create_role(base_url: &str, auth: &str, role: Role) -> Result<(), CliErro
         })
 }
 
+pub fn update_role(base_url: &str, auth: &str, role_update: RoleUpdate) -> Result<(), CliError> {
+    Client::new()
+        .patch(&format!(
+            "{}/authorization/roles/{}",
+            base_url, role_update.role_id
+        ))
+        .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
+        .header("Authorization", auth)
+        .json(&role_update)
+        .send()
+        .map_err(|err| CliError::ActionError(format!("Failed to update role: {}", err)))
+        .and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                Ok(())
+            } else if status.as_u16() == 401 {
+                Err(CliError::ActionError("Not Authorized".into()))
+            } else if status.as_u16() == 404 {
+                Err(CliError::ActionError(format!(
+                    "Role {} does not exist",
+                    role_update.role_id
+                )))
+            } else {
+                let message = res
+                    .json::<super::ServerError>()
+                    .map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Update role request failed with status code '{}', but error response \
+                            was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                Err(CliError::ActionError(format!(
+                    "Failed to update role: {}",
+                    message
+                )))
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,6 +490,71 @@ mod tests {
             .with_role_id("empty_permissions".into())
             .with_display_name("Empty Permissions".into())
             .with_permissions(vec![])
+            .build();
+        assert!(res.is_err());
+    }
+
+    /// Tests the role update builder in both Ok and Err scenarios
+    /// 1. Construct a valid update with all items
+    /// 2. Construct a valid update with no permission changes
+    /// 3. Construct a valid update with no display name changes
+    /// 4. Fail with no role_id
+    /// 5. Fail with empty permissions
+    #[test]
+    fn test_role_update_builder() {
+        // Complete valid role update
+        let role_update = RoleUpdateBuilder::default()
+            .with_role_id("valid_role".into())
+            .with_display_name(Some("Valid Role".into()))
+            .with_permissions(Some(vec!["a".to_string(), "b".to_string()]))
+            .build()
+            .expect("could not build a valid role");
+
+        assert_eq!("valid_role", &role_update.role_id);
+        assert_eq!(Some("Valid Role"), role_update.display_name.as_deref());
+        assert_eq!(
+            Some(vec!["a".to_string(), "b".to_string()]),
+            role_update.permissions
+        );
+
+        // Valid role update with no permission change
+        let role_update = RoleUpdateBuilder::default()
+            .with_role_id("valid_role".into())
+            .with_display_name(Some("Valid Role".into()))
+            .build()
+            .expect("could not build a valid role");
+
+        assert_eq!("valid_role", &role_update.role_id);
+        assert_eq!(Some("Valid Role"), role_update.display_name.as_deref());
+        assert_eq!(None, role_update.permissions);
+
+        // Valid role update with no display name
+        let role_update = RoleUpdateBuilder::default()
+            .with_role_id("valid_role".into())
+            .with_permissions(Some(vec!["a".to_string(), "b".to_string()]))
+            .build()
+            .expect("could not build a valid role");
+
+        assert_eq!("valid_role", &role_update.role_id);
+        assert_eq!(None, role_update.display_name);
+        assert_eq!(
+            Some(vec!["a".to_string(), "b".to_string()]),
+            role_update.permissions
+        );
+
+        // Missing role_id
+        let res = RoleUpdateBuilder::default()
+            .with_display_name(Some("No ID Role".into()))
+            .with_permissions(Some(vec!["a".to_string(), "b".to_string()]))
+            .build();
+
+        assert!(res.is_err());
+
+        // Empty permissions
+        let res = RoleUpdateBuilder::default()
+            .with_role_id("missing_perms_update".into())
+            .with_display_name(Some("Missing Permissions Update".into()))
+            .with_permissions(Some(vec![]))
             .build();
         assert!(res.is_err());
     }
