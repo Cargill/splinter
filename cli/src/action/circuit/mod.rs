@@ -527,6 +527,7 @@ impl TryFrom<&CreateCircuit> for CircuitSlice {
             management_type: circuit.circuit_management_type.clone(),
             display_name: circuit.display_name.clone(),
             circuit_version: circuit.circuit_version,
+            circuit_status: Some(circuit.circuit_status.clone()),
         })
     }
 }
