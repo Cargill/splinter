@@ -108,6 +108,7 @@ experimental = [
     "biome-oauth-user-store-postgres",
     "biome-profile",
     "circuit-disband",
+    "circuit-purge",
     "https-bind",
     "oauth-inflight-request-store-postgres",
     "registry-database",
@@ -135,6 +136,7 @@ biome-notifications = ["biome"]
 biome-oauth-user-store-postgres = ["oauth", "postgres"]
 biome-profile = ["biome"]
 circuit-disband = []
+circuit-purge = ["circuit-disband"]
 circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
