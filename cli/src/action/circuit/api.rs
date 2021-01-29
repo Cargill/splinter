@@ -63,10 +63,17 @@ impl SplinterRestClient {
             })
     }
 
-    pub fn list_circuits(&self, filter: Option<&str>) -> Result<CircuitListSlice, CliError> {
+    pub fn list_circuits(
+        &self,
+        member_filter: Option<&str>,
+        status_filter: Option<&str>,
+    ) -> Result<CircuitListSlice, CliError> {
         let mut url = format!("{}/admin/circuits?limit={}", self.url, PAGING_LIMIT);
-        if let Some(filter) = filter {
-            url = format!("{}&filter={}", &url, &filter);
+        if let Some(member_filter) = member_filter {
+            url = format!("{}&filter={}", &url, &member_filter);
+        }
+        if let Some(status_filter) = status_filter {
+            url = format!("{}&status={}", &url, &status_filter);
         }
 
         Client::new()

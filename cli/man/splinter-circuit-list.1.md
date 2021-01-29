@@ -22,7 +22,8 @@ with the headers `ID`, `MANAGEMENT` and `MEMBERS`. This makes it possible to
 verify that circuits have been successfully created as well as being able to
 access the generated circuit ID assigned to a circuit. The information displayed
 will be the same for all member nodes. The circuits listed have been accepted by
-all members.
+all members and are currently active, meaning their `circuit_status` is
+`Active`.
 
 FLAGS
 =====
@@ -54,6 +55,10 @@ OPTIONS
 : Filter the circuits list by a node ID that is present in the circuits’ members
   list.
 
+`--circuit-status` CIRCUIT-STATUS
+: Filter the circuit proposals list by their circuit status. Possible values
+  for the `circuit-status` filter are `active`, `disbanded` and `abandoned`.
+
 `-U`, `--url` URL
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
   `$SPLINTER_REST_API_URL` is set.
@@ -62,10 +67,10 @@ EXAMPLES
 ========
 This command displays information about circuits with a default `human`
 formatting, meaning the information is displayed in a table. The `--member`
-option allows for filtering the circuits.
+and `--circuit-status` options allow for filtering the circuits.
 
-The following command does not specify any filters, therefore all circuits
-the local node, `alpha-node-000` is a member of are displayed.
+The following command does not specify any filters, therefore all active
+circuits the local node, `alpha-node-000` is a member of are displayed.
 ```
 $ splinter circuit list \
   --url URL-of-alpha-node-splinterd-REST-API
@@ -75,20 +80,35 @@ ID            NAME      MANAGEMENT    MEMBERS
 56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
-The next command specifies a `--member` filter, therefore all circuits
-the local node, `alpha-node-000` is a part of including the `gamma-node-000` node
-ID will be listed.
+The next command specifies a `--member` filter, therefore all
+active circuits the local node, `alpha-node-000` is a part of including the
+`gamma-node-000` node ID will be listed.
 ```
 $ splinter circuit list \
-  member gamma-node-000 \
+  --member gamma-node-000 \
   --url URL-of-alpha-node-splinterd-REST-API
 ID            NAME      MANAGEMENT    MEMBERS
 43210-ABCDE   circuit1  mgmt001       alpha-node-000;gamma-node-000
 56789-ABCDE   -         mgmt002       alpha-node-000;gamma-node-000
 ```
 
-Since all of the circuits listed have been accepted by each member, the same
-circuit information will be displayed for member nodes.
+The next command specifies a `--circuit-status` filter, therefore all
+circuits the local node, `alpha-node-000` is a part of that have the provided
+`circuit_status` will be listed. Note: The circuits listed have a
+`circuit_status` of `Disbanded`. Therefore, these circuits will not be listed
+using `splinter circuit list` with no filters as only `Active` circuits are
+listed by default.
+```
+$ splinter circuit list \
+  --circuit-status disbanded \
+  --url URL-of-alpha-node-splinterd-REST-API
+ID            NAME      MANAGEMENT    MEMBERS
+43210-GHIJK   circuit0  mgmt001       alpha-node-000;gamma-node-000
+56789-GHIJK   -         mgmt001       alpha-node-000;beta-node-000
+```
+
+Since all of the active circuits listed have been accepted by each member, the
+same circuit information will be displayed for member nodes.
 
 From the perspective of the `gamma-node-000` node, this command will display the
 following with no filters:
