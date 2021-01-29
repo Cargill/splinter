@@ -14,6 +14,9 @@
 
 //! Provides convenient functions for sending REST API requests to a splinter node.
 
+#[cfg(feature = "authorization-handler-rbac")]
+mod rbac;
+
 use reqwest::blocking::Client;
 use serde::Deserialize;
 
@@ -219,6 +222,11 @@ impl SplinterRestClient {
                     )))
                 }
             })
+    }
+
+    #[cfg(feature = "authorization-handler-rbac")]
+    pub fn list_roles(&self) -> Result<rbac::RoleIter, CliError> {
+        Ok(rbac::RoleIter::new(&self.url, &self.auth))
     }
 }
 
