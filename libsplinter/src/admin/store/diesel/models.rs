@@ -605,30 +605,6 @@ impl From<&RouteType> for String {
     }
 }
 
-impl TryFrom<String> for CircuitStatus {
-    type Error = AdminServiceStoreError;
-    fn try_from(variant: String) -> Result<Self, Self::Error> {
-        match variant.as_ref() {
-            "Active" => Ok(CircuitStatus::Active),
-            "Disbanded" => Ok(CircuitStatus::Disbanded),
-            "Abandoned" => Ok(CircuitStatus::Abandoned),
-            _ => Err(AdminServiceStoreError::InvalidStateError(
-                InvalidStateError::with_message("Unable to convert string to CircuitStatus".into()),
-            )),
-        }
-    }
-}
-
-impl From<&CircuitStatus> for String {
-    fn from(variant: &CircuitStatus) -> Self {
-        match variant {
-            CircuitStatus::Active => String::from("Active"),
-            CircuitStatus::Disbanded => String::from("Disbanded"),
-            CircuitStatus::Abandoned => String::from("Abandoned"),
-        }
-    }
-}
-
 #[repr(i16)]
 #[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
 pub enum CircuitStatusModel {

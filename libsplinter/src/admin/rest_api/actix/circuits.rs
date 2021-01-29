@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 #[cfg(feature = "authorization")]
 use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-use crate::admin::store::{AdminServiceStore, CircuitPredicate};
+use crate::admin::store::{AdminServiceStore, CircuitPredicate, CircuitStatus};
 use crate::protocol;
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
@@ -101,15 +101,26 @@ fn list_circuits(
         None => DEFAULT_LIMIT,
     };
 
-    let mut link = req.uri().path().to_string();
-
-    let filters = match query.get("filter") {
+    let mut new_queries = vec![];
+    let member_filter = match query.get("filter") {
         Some(value) => {
-            link.push_str(&format!("?filter={}&", value));
+            new_queries.push(format!("filter={}", value));
             Some(value.to_string())
         }
         None => None,
     };
+
+    let status_filter = match query.get("status") {
+        Some(value) => {
+            new_queries.push(format!("status={}", value));
+            Some(value.to_string())
+        }
+        None => None,
+    };
+    let mut link = req.uri().path().to_string();
+    if !new_queries.is_empty() {
+        link.push_str(&format!("?{}&", new_queries.join("&")));
+    }
 
     let protocol_version = match req.headers().get("SplinterProtocolVersion") {
         Some(header_value) => match header_value.to_str() {
@@ -130,7 +141,8 @@ fn list_circuits(
     Box::new(query_list_circuits(
         store,
         link,
-        filters,
+        member_filter,
+        status_filter,
         Some(offset),
         Some(limit),
         protocol_version,
@@ -140,19 +152,23 @@ fn list_circuits(
 fn query_list_circuits(
     store: web::Data<Box<dyn AdminServiceStore>>,
     link: String,
-    filters: Option<String>,
+    member_filter: Option<String>,
+    status_filter: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
     protocol_version: String,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
-        let filters = {
-            if let Some(member) = filters {
+        let mut filters = {
+            if let Some(member) = member_filter {
                 vec![CircuitPredicate::MembersInclude(vec![member])]
             } else {
                 vec![]
             }
         };
+        if let Some(status) = status_filter {
+            filters.push(CircuitPredicate::CircuitStatus(CircuitStatus::from(status)));
+        }
 
         let circuits = store
             .list_circuits(&filters)
@@ -372,6 +388,147 @@ mod tests {
     }
 
     #[test]
+    /// Tests a GET /admin/circuits request with the `status` filter returns the expected circuit.
+    fn test_list_circuit_with_status_ok() {
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
+
+        let url = Url::parse(&format!(
+            "http://{}/admin/circuits?status=disbanded",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+        let req = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+        let resp = req.send().expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let circuits: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        assert_eq!(
+            circuits.get("data").expect("no data field in response"),
+            &to_value(vec![resources::v2::circuits::CircuitResponse::from(
+                &get_circuit_3().0
+            )])
+            .expect("failed to convert expected data"),
+        );
+
+        assert_eq!(
+            circuits.get("paging").expect("no paging field in response"),
+            &to_value(create_test_paging_response(
+                0,
+                100,
+                0,
+                0,
+                0,
+                1,
+                &format!("/admin/circuits?status=disbanded&"),
+            ))
+            .expect("failed to convert expected paging")
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    #[test]
+    /// Tests a GET /admin/circuits request with the `status` filter returns the expected circuit.
+    fn test_list_circuit_with_filter_and_status_ok() {
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
+
+        let url = Url::parse(&format!(
+            "http://{}/admin/circuits?filter=node_5&\
+                status=disbanded",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+        let req = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+        let resp = req.send().expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let circuits: JsonValue = resp.json().expect("Failed to deserialize body");
+
+        assert_eq!(
+            circuits.get("data").expect("no data field in response"),
+            &to_value(vec![resources::v2::circuits::CircuitResponse::from(
+                &get_circuit_3().0
+            )])
+            .expect("failed to convert expected data"),
+        );
+
+        assert_eq!(
+            circuits.get("paging").expect("no paging field in response"),
+            &to_value(create_test_paging_response(
+                0,
+                100,
+                0,
+                0,
+                0,
+                1,
+                &format!("/admin/circuits?filter=node_5&status=disbanded&"),
+            ))
+            .expect("failed to convert expected paging")
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    #[test]
+    /// Tests a GET /admin/circuits request with a member filter and `status` filter returns no
+    /// circuit if both filters are not matched.
+    fn test_list_circuit_with_filter_and_status_none() {
+        let (shutdown_handle, join_handle, bind_url) =
+            run_rest_api_on_open_port(vec![make_list_circuits_resource(filled_splinter_state())]);
+
+        let url = Url::parse(&format!(
+            "http://{}/admin/circuits?filter=node_5&\
+                status=active",
+            bind_url
+        ))
+        .expect("Failed to parse URL");
+        let req = Client::new()
+            .get(url)
+            .header("SplinterProtocolVersion", protocol::ADMIN_PROTOCOL_VERSION);
+        let resp = req.send().expect("Failed to perform request");
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let circuits: JsonValue = resp.json().expect("Failed to deserialize body");
+        let empty_value: Vec<String> = vec![];
+        assert_eq!(
+            circuits.get("data").expect("no data field in response"),
+            &to_value(empty_value).expect("failed to convert expected data"),
+        );
+
+        assert_eq!(
+            circuits.get("paging").expect("no paging field in response"),
+            &to_value(create_test_paging_response(
+                0,
+                100,
+                0,
+                0,
+                0,
+                0,
+                &format!("/admin/circuits?filter=node_5&status=active&"),
+            ))
+            .expect("failed to convert expected paging")
+        );
+
+        shutdown_handle
+            .shutdown()
+            .expect("unable to shutdown rest api");
+        join_handle.join().expect("Unable to join rest api thread");
+    }
+
+    #[test]
     /// Tests a GET /admin/circuits?limit=1 request returns the expected circuit.
     fn test_list_circuit_with_limit() {
         let (shutdown_handle, join_handle, bind_url) =
@@ -562,6 +719,44 @@ mod tests {
         )
     }
 
+    fn get_circuit_3() -> (Circuit, Vec<CircuitNode>) {
+        let service = ServiceBuilder::new()
+            .with_service_id("cccc")
+            .with_service_type("other_type")
+            .with_node_id("node_5")
+            .build()
+            .expect("unable to build service");
+
+        let nodes = vec![
+            CircuitNodeBuilder::new()
+                .with_node_id("node_5")
+                .with_endpoints(&["tcp://localhost:8000".to_string()])
+                .build()
+                .expect("Unable to build node"),
+            CircuitNodeBuilder::new()
+                .with_node_id("node_6")
+                .with_endpoints(&["tcp://localhost:8001".to_string()])
+                .build()
+                .expect("Unable to build node"),
+        ];
+
+        (
+            CircuitBuilder::new()
+                .with_circuit_id("efghi-12345")
+                .with_authorization_type(&AuthorizationType::Trust)
+                .with_members(&["node_5".to_string(), "node_6".to_string()])
+                .with_roster(&[service])
+                .with_persistence(&PersistenceType::Any)
+                .with_durability(&DurabilityType::NoDurability)
+                .with_routes(&RouteType::Any)
+                .with_circuit_management_type("circuit_3_type")
+                .with_circuit_status(&CircuitStatus::Disbanded)
+                .build()
+                .expect("Should have built a correct circuit"),
+            nodes,
+        )
+    }
+
     fn setup_admin_service_store() -> Box<dyn AdminServiceStore> {
         let connection_manager = DieselConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
@@ -586,6 +781,11 @@ mod tests {
         admin_store
             .add_circuit(circuit, nodes)
             .expect("Unable to add circuit_2");
+
+        let (circuit, nodes) = get_circuit_3();
+        admin_store
+            .add_circuit(circuit, nodes)
+            .expect("Unable to add circuit_3");
 
         admin_store
     }
