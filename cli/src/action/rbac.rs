@@ -166,6 +166,18 @@ impl Action for UpdateRoleAction {
     }
 }
 
+pub struct DeleteRoleAction;
+
+impl Action for DeleteRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role ID must be specified".into()))?;
+
+        new_client(&arg_matches)?.delete_role(role_id)
+    }
+}
+
 fn new_client(arg_matches: &Option<&ArgMatches<'_>>) -> Result<SplinterRestClient, CliError> {
     let url = arg_matches
         .and_then(|args| args.value_of("url"))
