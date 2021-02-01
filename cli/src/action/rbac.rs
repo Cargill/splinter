@@ -33,7 +33,7 @@ impl Action for ListRolesAction {
         let client = new_client(&arg_matches)?;
         let roles = client.list_roles()?;
 
-        let header = vec!["ID".to_string(), "DISPLAY NAME".to_string()];
+        let header = vec!["ID".to_string(), "NAME".to_string()];
 
         if format == "csv" {
             println!("{}", header.join(","));

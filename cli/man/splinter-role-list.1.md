@@ -61,7 +61,7 @@ formatting, meaning the information is displayed in a table.
 ```
 $ splinter role list \
   --url URL-of-splinterd-REST-API
-ID             DISPLAY NAME
+ID             NAME
 circuit_admin  Circuit Administrator
 circuit_reader Circuit Reader
 ```
