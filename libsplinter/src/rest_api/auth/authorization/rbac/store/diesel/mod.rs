@@ -26,7 +26,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 
 use super::{
     Assignment, Identity, Role, RoleBasedAuthorizationStore, RoleBasedAuthorizationStoreError,
-    RoleBuilder,
+    RoleBuilder, ADMIN_ROLE_ID,
 };
 
 use operations::add_assignment::RoleBasedAuthorizationStoreAddAssignment as _;
@@ -87,6 +87,13 @@ impl RoleBasedAuthorizationStore
     ///
     /// Returns a `InvalidState` error if the role does not exist.
     fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+        if role.id() == ADMIN_ROLE_ID {
+            return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                ConstraintViolationError::with_violation_type(ConstraintViolationType::Other(
+                    format!("'{}' role cannot be altered", ADMIN_ROLE_ID),
+                )),
+            ));
+        }
         let connection = self.connection_pool.get()?;
         RoleBasedAuthorizationStoreOperations::new(&*connection).update_role(role)
     }
@@ -97,6 +104,13 @@ impl RoleBasedAuthorizationStore
     ///
     /// Returns a `InvalidState` error if the role does not exist.
     fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
+        if role_id == ADMIN_ROLE_ID {
+            return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                ConstraintViolationError::with_violation_type(ConstraintViolationType::Other(
+                    format!("'{}' role cannot be removed", ADMIN_ROLE_ID),
+                )),
+            ));
+        }
         let connection = self.connection_pool.get()?;
         RoleBasedAuthorizationStoreOperations::new(&*connection).remove_role(role_id)
     }
@@ -208,6 +222,13 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
     ///
     /// Returns a `InvalidState` error if the role does not exist.
     fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+        if role.id() == ADMIN_ROLE_ID {
+            return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                ConstraintViolationError::with_violation_type(ConstraintViolationType::Other(
+                    format!("'{}' role cannot be altered", ADMIN_ROLE_ID),
+                )),
+            ));
+        }
         let connection = self.connection_pool.get()?;
         RoleBasedAuthorizationStoreOperations::new(&*connection).update_role(role)
     }
@@ -218,6 +239,13 @@ impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::p
     ///
     /// Returns a `InvalidState` error if the role does not exist.
     fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
+        if role_id == ADMIN_ROLE_ID {
+            return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                ConstraintViolationError::with_violation_type(ConstraintViolationType::Other(
+                    format!("'{}' role cannot be removed", ADMIN_ROLE_ID),
+                )),
+            ));
+        }
         let connection = self.connection_pool.get()?;
         RoleBasedAuthorizationStoreOperations::new(&*connection).remove_role(role_id)
     }
@@ -470,7 +498,8 @@ mod tests {
 
     /// This tests verifies the following:
     /// 1. Adds two roles via the store API
-    /// 2. Verifies they have been added by listing the roles via the store API
+    /// 2. Verifies the `admin` role and two new roles are present by listing the roles via the
+    ///    store API
     #[test]
     fn sqlite_list_roles() {
         let pool = create_connection_pool_and_migrate();
@@ -503,11 +532,19 @@ mod tests {
             .list_roles()
             .expect("Unable to lookup role by id");
 
-        assert_eq!(2, stored_role_iter.len());
+        // The store has a predefined `admin` role, so there should be 3 now
+        assert_eq!(3, stored_role_iter.len());
 
         let stored_role = stored_role_iter
             .next()
-            .expect("has 2 items, but returned None");
+            .expect("has 3 items, but returned None");
+        assert_eq!("admin", stored_role.id());
+        assert_eq!("Administrator", stored_role.display_name());
+        assert_eq!(&["*".to_string()], stored_role.permissions());
+
+        let stored_role = stored_role_iter
+            .next()
+            .expect("has 3 items, but returned None");
         assert_eq!("test-role-1", stored_role.id());
         assert_eq!("Test Role 1", stored_role.display_name());
         assert_eq!(
@@ -517,7 +554,7 @@ mod tests {
 
         let stored_role = stored_role_iter
             .next()
-            .expect("has 2 items, but returned None");
+            .expect("has 3 items, but returned None");
         assert_eq!("test-role-2", stored_role.id());
         assert_eq!("Test Role 2", stored_role.display_name());
         assert_eq!(
@@ -1050,6 +1087,23 @@ mod tests {
             stored_assignment.identity()
         );
         assert!(stored_assignment.roles().is_empty());
+    }
+
+    /// This tests verifies that the `admin` role is present by default and cannot be removed or
+    /// modified
+    #[test]
+    fn sqlite_admin_role() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool);
+
+        let role = role_based_auth_store
+            .get_role(ADMIN_ROLE_ID)
+            .expect("Unable to lookup role by id")
+            .expect("Role not found");
+        assert_eq!(ADMIN_ROLE_ID, role.id());
+        assert!(role_based_auth_store.update_role(role).is_err());
+        assert!(role_based_auth_store.remove_role(ADMIN_ROLE_ID).is_err());
     }
 
     /// Creates a connection pool for an in-memory SQLite database with only a single connection

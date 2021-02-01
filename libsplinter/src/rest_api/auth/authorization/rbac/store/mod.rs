@@ -25,6 +25,8 @@ pub use self::diesel::DieselRoleBasedAuthorizationStore;
 
 pub use error::RoleBasedAuthorizationStoreError;
 
+pub const ADMIN_ROLE_ID: &str = "admin";
+
 /// A Role is a named set of permissions.
 #[derive(Clone)]
 pub struct Role {

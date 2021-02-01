@@ -19,7 +19,7 @@ use crate::rest_api::auth::{
     identity::Identity,
 };
 
-use super::store::RoleBasedAuthorizationStore;
+use super::store::{RoleBasedAuthorizationStore, ADMIN_ROLE_ID};
 
 /// A Role-based authorization handler.
 ///
@@ -52,7 +52,10 @@ impl AuthorizationHandler for RoleBasedAuthorizationHandler {
                 .role_based_auth_store
                 .get_assigned_roles(&identity)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?
-                .find(|role| role.permissions().iter().any(|perm| perm == permission_id))
+                .find(|role| {
+                    role.id() == ADMIN_ROLE_ID
+                        || role.permissions().iter().any(|perm| perm == permission_id)
+                })
                 .map(|_| AuthorizationHandlerResult::Allow)
                 .unwrap_or(AuthorizationHandlerResult::Continue)),
             None => Ok(AuthorizationHandlerResult::Continue),
@@ -93,6 +96,22 @@ mod tests {
     #[test]
     fn allow_user_identity_with_assignment() {
         test_allow_identity_with_assignment(
+            Identity::User("some-user-id".into()),
+            StoreIdentity::User("some-user-id".into()),
+        );
+    }
+
+    #[test]
+    fn allow_key_identity_admin() {
+        test_allow_identity_admin(
+            Identity::Key("abc123".into()),
+            StoreIdentity::Key("abc123".into()),
+        );
+    }
+
+    #[test]
+    fn allow_user_identity_admin() {
+        test_allow_identity_admin(
             Identity::User("some-user-id".into()),
             StoreIdentity::User("some-user-id".into()),
         );
@@ -183,6 +202,31 @@ mod tests {
         // Check a permission in the second role
         let result = handler
             .has_permission(&identity, "z")
+            .expect("Should have returned an auth result");
+
+        assert!(matches!(result, AuthorizationHandlerResult::Allow));
+    }
+
+    /// This test checks that an identity that is assigned the admin role will return Allow when
+    /// queried.
+    fn test_allow_identity_admin(identity: Identity, store_identity: StoreIdentity) {
+        let role_based_auth_store = create_role_based_authorization_store();
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(store_identity)
+            .with_roles(vec![ADMIN_ROLE_ID.to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        role_based_auth_store
+            .add_assignment(assignment)
+            .expect("Unable to add assignment");
+
+        let handler = RoleBasedAuthorizationHandler::new(role_based_auth_store);
+
+        // Check an arbitrary permission
+        let result = handler
+            .has_permission(&identity, "perm")
             .expect("Should have returned an auth result");
 
         assert!(matches!(result, AuthorizationHandlerResult::Allow));
