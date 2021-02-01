@@ -1,4 +1,4 @@
-% SPLINTER-ROLE-LIST(1) Cargill, Incorporated | Splinter Commands
+% SPLINTER-ROLE-SHOW(1) Cargill, Incorporated | Splinter Commands
 <!--
   Copyright 2018-2021 Cargill Incorporated
   Licensed under Creative Commons Attribution 4.0 International License
@@ -8,20 +8,16 @@
 NAME
 ====
 
-**splinter-role-list** — Displays the existing roles for this Splinter node
+**splinter-role-show** — Displays information about a role
 
 SYNOPSIS
 ========
-**splinter role list** \[**FLAGS**\] \[**OPTIONS**\]
+**splinter role show** \[**FLAGS**\] \[**OPTIONS**\] ROLE-ID
 
 DESCRIPTION
 ===========
-This command lists all of the roles the local node has available. This command
-displays abbreviated information pertaining to roles in columns, with the
-headers `ID` and `DISPLAY NAME`. This makes it possible to verify that
-roles have been successfully created as well as being able to access the
-available role ID for use when assigning a role to an identity. The information
-displayed is only relevant to the queried splinter node.
+Display the entire definition of a role. This definition includes the set of
+permissions allowed by the role.
 
 FLAGS
 =====
@@ -42,8 +38,8 @@ FLAGS
 OPTIONS
 =======
 `-F`, `--format` FORMAT
-: Specifies the output format of the list. (default `human`). Possible values
-  for formatting are `human` and `csv`.
+: Specifies the output format of the role proposal. (default `human`).
+  Possible values for formatting are `human`, `json`, or `yaml`.
 
 `-k`, `--key` PRIVATE-KEY-FILE
 : Specifies the private signing key (either a file path or the name of a
@@ -53,17 +49,32 @@ OPTIONS
 : Specifies the URL for the `splinterd` REST API. The URL is required unless
   `$SPLINTER_REST_API_URL` is set.
 
+
+ARGUMENTS
+=========
+`ROLE-ID`
+: Specify the role ID of the role to be shown.
+
 EXAMPLES
 ========
-This command displays information about roles with a default `human`
-formatting, meaning the information is displayed in a table. 
+This command displays information about a role with the default `human`
+formatting, which intends to use indentation and labels to make the role
+information understandable.
+
+* The role has ID `circuit_admin`.
+
+The information displayed below is local to the node where the role has been
+defined.
 
 ```
-$ splinter role list \
-  --url URL-of-splinterd-REST-API
-ID             NAME
-circuit_admin  Circuit Administrator
-circuit_reader Circuit Reader
+$ splinter role show \
+  --url URL-of-splinterd-REST-API \
+  circuit_admin
+ID: circuit_admin
+    Name: Circuit Administrator
+    Permissions:
+        circuit.read
+        circuit.write
 ```
 
 ENVIRONMENT VARIABLES
@@ -73,4 +84,6 @@ ENVIRONMENT VARIABLES
 
 SEE ALSO
 ========
+| `splinter-role-list(1)`
+|
 | Splinter documentation: https://www.splinter.dev/docs/0.5/

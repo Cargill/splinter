@@ -97,6 +97,7 @@ SEE ALSO
 | `splinter-health-status(1)`
 | `splinter-keygen(1)`
 | `splinter-role-list(1)`
+| `splinter-role-show(1)`
 |
 | `splinterd(1)`
 |

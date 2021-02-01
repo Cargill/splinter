@@ -17,7 +17,7 @@ use clap::ArgMatches;
 use crate::error::CliError;
 
 use super::{
-    api::{SplinterRestClient, SplinterRestClientBuilder},
+    api::{RoleBuilder, RoleUpdateBuilder, SplinterRestClient, SplinterRestClientBuilder},
     create_cylinder_jwt_auth, print_table, Action, DEFAULT_SPLINTER_REST_API_URL,
     SPLINTER_REST_API_URL_ENV,
 };
@@ -33,7 +33,7 @@ impl Action for ListRolesAction {
         let client = new_client(&arg_matches)?;
         let roles = client.list_roles()?;
 
-        let header = vec!["ID".to_string(), "DISPLAY NAME".to_string()];
+        let header = vec!["ID".to_string(), "NAME".to_string()];
 
         if format == "csv" {
             println!("{}", header.join(","));
@@ -51,6 +51,130 @@ impl Action for ListRolesAction {
         }
 
         Ok(())
+    }
+}
+
+pub struct ShowRoleAction;
+
+impl Action for ShowRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let format = arg_matches
+            .and_then(|args| args.value_of("format"))
+            .unwrap_or("human");
+
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role ID must be specified".into()))?;
+
+        let role = new_client(&arg_matches)?.get_role(role_id)?;
+
+        match format {
+            "json" => println!(
+                "\n {}",
+                serde_json::to_string(&role).map_err(|err| CliError::ActionError(format!(
+                    "Cannot format role into json: {}",
+                    err
+                )))?
+            ),
+            "yaml" => println!(
+                "{}",
+                serde_yaml::to_string(&role).map_err(|err| CliError::ActionError(format!(
+                    "Cannot format role into yaml: {}",
+                    err
+                )))?
+            ),
+            _ => println!("{}", role),
+        }
+
+        Ok(())
+    }
+}
+
+pub struct CreateRoleAction;
+
+impl Action for CreateRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role must have an ID".into()))?;
+
+        let display_name = arg_matches
+            .and_then(|args| args.value_of("display_name"))
+            .ok_or_else(|| CliError::ActionError("A role must have a display name".into()))?;
+
+        let permissions = arg_matches
+            .and_then(|args| args.values_of("permission"))
+            .ok_or_else(|| {
+                CliError::ActionError("A role must have at least one permission".into())
+            })?
+            .map(|s| s.to_owned())
+            .collect();
+
+        new_client(&arg_matches)?.create_role(
+            RoleBuilder::default()
+                .with_role_id(role_id.into())
+                .with_display_name(display_name.into())
+                .with_permissions(permissions)
+                .build()?,
+        )
+    }
+}
+
+pub struct UpdateRoleAction;
+
+impl Action for UpdateRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role id must be provided.".into()))?;
+
+        let display_name = arg_matches
+            .and_then(|args| args.value_of("display_name"))
+            .map(|s| s.to_owned());
+
+        let permissions_to_add = arg_matches
+            .and_then(|args| args.values_of("add_permission"))
+            .map(|vals| vals.map(|s| s.to_owned()).collect())
+            .unwrap_or_else(Vec::new);
+
+        let permissions_to_rm = arg_matches
+            .and_then(|args| args.values_of("rm_permission"))
+            .map(|vals| vals.map(|s| s.to_owned()).collect())
+            .unwrap_or_else(Vec::new);
+
+        let client = new_client(&arg_matches)?;
+
+        let role = client.get_role(role_id)?;
+
+        let mut permissions = role
+            .permissions
+            .into_iter()
+            .chain(permissions_to_add.into_iter())
+            .filter(|perm| !permissions_to_rm.contains(&perm))
+            .collect::<Vec<_>>();
+
+        permissions.sort();
+        permissions.dedup();
+
+        client.update_role(
+            RoleUpdateBuilder::default()
+                .with_role_id(role_id.into())
+                .with_display_name(display_name)
+                .with_permissions(Some(permissions))
+                .build()?,
+        )
+    }
+}
+
+pub struct DeleteRoleAction;
+
+impl Action for DeleteRoleAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let role_id = arg_matches
+            .and_then(|args| args.value_of("role_id"))
+            .ok_or_else(|| CliError::ActionError("A role ID must be specified".into()))?;
+
+        new_client(&arg_matches)?.delete_role(role_id)
     }
 }
 
