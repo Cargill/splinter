@@ -19,7 +19,7 @@ use crate::rest_api::auth::{
     identity::Identity,
 };
 
-use super::store::{Identity as StoreIdentity, RoleBasedAuthorizationStore};
+use super::store::RoleBasedAuthorizationStore;
 
 /// A Role-based authorization handler.
 ///
@@ -47,24 +47,16 @@ impl AuthorizationHandler for RoleBasedAuthorizationHandler {
         identity: &Identity,
         permission_id: &str,
     ) -> Result<AuthorizationHandlerResult, InternalError> {
-        let store_identity = match identity {
-            Identity::Custom(_) =>
-            // RoleBasedAuthorization does not currently support custom identities, so return
-            // continue in case a downstream handler will support it.
-            {
-                return Ok(AuthorizationHandlerResult::Continue)
-            }
-            Identity::Key(key) => StoreIdentity::Key(key.to_string()),
-            Identity::User(user_id) => StoreIdentity::User(user_id.to_string()),
-        };
-
-        Ok(self
-            .role_based_auth_store
-            .get_assigned_roles(&store_identity)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?
-            .find(|role| role.permissions().iter().any(|perm| perm == permission_id))
-            .map(|_| AuthorizationHandlerResult::Allow)
-            .unwrap_or(AuthorizationHandlerResult::Continue))
+        match identity.into() {
+            Some(identity) => Ok(self
+                .role_based_auth_store
+                .get_assigned_roles(&identity)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?
+                .find(|role| role.permissions().iter().any(|perm| perm == permission_id))
+                .map(|_| AuthorizationHandlerResult::Allow)
+                .unwrap_or(AuthorizationHandlerResult::Continue)),
+            None => Ok(AuthorizationHandlerResult::Continue),
+        }
     }
 
     fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
@@ -79,7 +71,8 @@ mod tests {
     use super::*;
 
     use crate::rest_api::auth::authorization::rbac::store::{
-        AssignmentBuilder, DieselRoleBasedAuthorizationStore, RoleBuilder,
+        AssignmentBuilder, DieselRoleBasedAuthorizationStore, Identity as StoreIdentity,
+        RoleBuilder,
     };
 
     use crate::migrations::run_sqlite_migrations;

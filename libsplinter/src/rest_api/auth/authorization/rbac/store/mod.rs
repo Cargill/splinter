@@ -201,6 +201,21 @@ pub enum Identity {
     User(String),
 }
 
+impl From<&crate::rest_api::auth::identity::Identity> for Option<Identity> {
+    fn from(identity: &crate::rest_api::auth::identity::Identity) -> Self {
+        match identity {
+            // RoleBasedAuthorization does not currently support custom identities
+            crate::rest_api::auth::identity::Identity::Custom(_) => None,
+            crate::rest_api::auth::identity::Identity::Key(key) => {
+                Some(Identity::Key(key.to_string()))
+            }
+            crate::rest_api::auth::identity::Identity::User(user_id) => {
+                Some(Identity::User(user_id.to_string()))
+            }
+        }
+    }
+}
+
 /// An assignment of roles to a particular identity.
 #[derive(Clone)]
 pub struct Assignment {
