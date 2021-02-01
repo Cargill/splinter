@@ -35,6 +35,9 @@ FLAGS
 : Increases verbosity (the opposite of -q). Specify multiple times for more
   output.
 
+`--rm-all`
+: Remove all of the permissions currently associated with the role.
+
 OPTIONS
 =======
 `-k`, `--key` PRIVATE-KEY-FILE

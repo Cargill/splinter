@@ -137,33 +137,67 @@ impl Action for UpdateRoleAction {
             .map(|vals| vals.map(|s| s.to_owned()).collect())
             .unwrap_or_else(Vec::new);
 
-        let permissions_to_rm = arg_matches
-            .and_then(|args| args.values_of("rm_permission"))
-            .map(|vals| vals.map(|s| s.to_owned()).collect())
-            .unwrap_or_else(Vec::new);
+        let rm_all = arg_matches
+            .map(|args| args.is_present("rm_all"))
+            .unwrap_or(false);
+        let permission_removal = if rm_all {
+            PermissionRemoval::RemoveAll
+        } else {
+            PermissionRemoval::Remove(
+                arg_matches
+                    .and_then(|args| args.values_of("rm_permission"))
+                    .map(|vals| vals.map(|s| s.to_owned()).collect())
+                    .unwrap_or_else(Vec::new),
+            )
+        };
 
-        let client = new_client(&arg_matches)?;
+        update_role(
+            new_client(&arg_matches)?,
+            role_id,
+            display_name,
+            permissions_to_add,
+            permission_removal,
+        )
+    }
+}
 
-        let role = client.get_role(role_id)?;
+enum PermissionRemoval {
+    RemoveAll,
+    Remove(Vec<String>),
+}
 
-        let mut permissions = role
+fn update_role(
+    client: SplinterRestClient,
+    role_id: &str,
+    display_name: Option<String>,
+    permissions_to_add: Vec<String>,
+    permission_removal: PermissionRemoval,
+) -> Result<(), CliError> {
+    let role = client.get_role(role_id)?;
+
+    let mut permissions = match permission_removal {
+        PermissionRemoval::RemoveAll => {
+            println!("Removing permissions {}", role.permissions.join(", "));
+            permissions_to_add
+        }
+        PermissionRemoval::Remove(permissions_to_rm) => role
             .permissions
             .into_iter()
             .chain(permissions_to_add.into_iter())
             .filter(|perm| !permissions_to_rm.contains(&perm))
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>(),
+    };
 
-        permissions.sort();
-        permissions.dedup();
+    permissions.sort();
+    permissions.dedup();
 
-        client.update_role(
-            RoleUpdateBuilder::default()
-                .with_role_id(role_id.into())
-                .with_display_name(display_name)
-                .with_permissions(Some(permissions))
-                .build()?,
-        )
-    }
+    client.update_role(
+        RoleUpdateBuilder::default()
+            .with_role_id(role_id.into())
+            .with_display_name(display_name)
+            .with_permissions(Some(permissions))
+            .build()?,
+    )
 }
 
 pub struct DeleteRoleAction;
