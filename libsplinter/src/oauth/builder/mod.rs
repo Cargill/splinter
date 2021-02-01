@@ -15,7 +15,6 @@
 //! Builders for [OAuthClient](crate::oauth::OAuthClient) structs.
 
 mod github;
-#[cfg(feature = "oauth-openid")]
 mod openid;
 
 use crate::error::InvalidStateError;
@@ -26,8 +25,6 @@ use super::ProfileProvider;
 use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient, SubjectProvider};
 
 pub use github::GithubOAuthClientBuilder;
-
-#[cfg(feature = "oauth-openid")]
 pub use openid::OpenIdOAuthClientBuilder;
 
 /// A builder for a new [`OAuthClient`].

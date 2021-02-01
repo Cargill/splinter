@@ -19,9 +19,7 @@ use std::sync::Mutex;
 
 use crate::error::InvalidStateError;
 #[cfg(feature = "oauth")]
-use crate::oauth::GithubOAuthClientBuilder;
-#[cfg(feature = "oauth-openid")]
-use crate::oauth::OpenIdOAuthClientBuilder;
+use crate::oauth::{GithubOAuthClientBuilder, OpenIdOAuthClientBuilder};
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::AuthorizationHandler;
 #[cfg(feature = "cylinder-jwt")]
@@ -162,7 +160,6 @@ impl RestApiBuilder {
                         }
 
                         let oauth_client = match oauth_config {
-                            #[cfg(feature = "oauth-openid")]
                             OAuthConfig::Azure {
                                 client_id,
                                 client_secret,
@@ -187,7 +184,6 @@ impl RestApiBuilder {
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
                                 .build()?,
-                            #[cfg(feature = "oauth-openid")]
                             OAuthConfig::Google {
                                 client_id,
                                 client_secret,
@@ -199,7 +195,6 @@ impl RestApiBuilder {
                                 .with_redirect_url(redirect_url)
                                 .with_inflight_request_store(inflight_request_store)
                                 .build()?,
-                            #[cfg(feature = "oauth-openid")]
                             OAuthConfig::OpenId {
                                 client_id,
                                 client_secret,

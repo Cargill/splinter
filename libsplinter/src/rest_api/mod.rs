@@ -127,7 +127,6 @@ impl std::fmt::Display for RestApiBind {
 /// OAuth configurations that are supported out-of-the-box by the Splinter REST API.
 #[cfg(feature = "oauth")]
 pub enum OAuthConfig {
-    #[cfg(feature = "oauth-openid")]
     Azure {
         /// The client ID of the Azure OAuth app
         client_id: String,
@@ -151,7 +150,6 @@ pub enum OAuthConfig {
         /// The store for in-flight requests
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
-    #[cfg(feature = "oauth-openid")]
     Google {
         /// The client ID of the Google OAuth app
         client_id: String,
@@ -162,7 +160,6 @@ pub enum OAuthConfig {
         /// The store for in-flight requests
         inflight_request_store: Box<dyn InflightOAuthRequestStore>,
     },
-    #[cfg(feature = "oauth-openid")]
     OpenId {
         /// The client ID of the OpenId OAuth app
         client_id: String,
