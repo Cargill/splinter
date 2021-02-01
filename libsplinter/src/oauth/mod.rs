@@ -40,15 +40,12 @@ pub use builder::OpenIdOAuthClientBuilder;
 pub use builder::{GithubOAuthClientBuilder, OAuthClientBuilder};
 pub use error::OAuthClientBuildError;
 #[cfg(feature = "biome-profile")]
-pub use profile::GithubProfileProvider;
+pub use profile::{GithubProfileProvider, ProfileProvider};
 #[cfg(all(feature = "biome-profile", feature = "oauth-openid"))]
 pub use profile::OpenIdProfileProvider;
-#[cfg(feature = "biome-profile")]
-pub use profile::ProfileProvider;
-pub use subject::GithubSubjectProvider;
+pub use subject::{GithubSubjectProvider, SubjectProvider};
 #[cfg(feature = "oauth-openid")]
 pub use subject::OpenIdSubjectProvider;
-pub use subject::SubjectProvider;
 
 /// An OAuth2 client for Splinter
 ///
