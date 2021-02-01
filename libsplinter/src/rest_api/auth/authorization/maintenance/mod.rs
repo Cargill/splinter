@@ -22,6 +22,10 @@ use std::sync::{
 };
 
 use crate::error::InternalError;
+#[cfg(feature = "authorization-handler-rbac")]
+use crate::rest_api::auth::authorization::rbac::store::{
+    Identity as RBACIdentity, RoleBasedAuthorizationStore, ADMIN_ROLE_ID,
+};
 use crate::rest_api::auth::identity::Identity;
 
 use super::{AuthorizationHandler, AuthorizationHandlerResult};
@@ -41,12 +45,22 @@ use super::{AuthorizationHandler, AuthorizationHandlerResult};
 #[derive(Clone, Default)]
 pub struct MaintenanceModeAuthorizationHandler {
     maintenance_mode: Arc<AtomicBool>,
+    #[cfg(feature = "authorization-handler-rbac")]
+    rbac_store: Option<Box<dyn RoleBasedAuthorizationStore>>,
 }
 
 impl MaintenanceModeAuthorizationHandler {
     /// Constructs a new `MaintenanceModeAuthorizationHandler`
-    pub fn new() -> Self {
-        Self::default()
+    ///
+    /// # Arguments
+    ///
+    /// * `rbac_store` - If provided, this will be used to allow identities with the "admin" role
+    ///   defined in the RBAC store to perform write operations even with maintenance mode enabled
+    pub fn new(rbac_store: Option<Box<dyn RoleBasedAuthorizationStore>>) -> Self {
+        Self {
+            rbac_store,
+            ..Default::default()
+        }
     }
 
     /// Returns whether or not maintenance mode is enabled
@@ -64,10 +78,33 @@ impl MaintenanceModeAuthorizationHandler {
 impl AuthorizationHandler for MaintenanceModeAuthorizationHandler {
     fn has_permission(
         &self,
-        _identity: &Identity,
+        // Allow `unused_variables` in case `authorization-handler-rbac` feature is not enabled
+        #[allow(unused_variables)] identity: &Identity,
         permission_id: &str,
     ) -> Result<AuthorizationHandlerResult, InternalError> {
         if !permission_id.ends_with(".read") && self.maintenance_mode.load(Ordering::Relaxed) {
+            // Check if the client has the "admin" role, in which case they're not denied permission
+            #[cfg(feature = "authorization-handler-rbac")]
+            {
+                let is_admin = self
+                    .rbac_store
+                    .as_ref()
+                    .and_then(|store| {
+                        let rbac_identity: Option<RBACIdentity> = identity.into();
+                        Some(
+                            store
+                                .get_assignment(&rbac_identity?)
+                                .ok()??
+                                .roles()
+                                .iter()
+                                .any(|role| role == ADMIN_ROLE_ID),
+                        )
+                    })
+                    .unwrap_or(false);
+                if is_admin {
+                    return Ok(AuthorizationHandlerResult::Continue);
+                }
+            }
             Ok(AuthorizationHandlerResult::Deny)
         } else {
             Ok(AuthorizationHandlerResult::Continue)
@@ -83,6 +120,14 @@ impl AuthorizationHandler for MaintenanceModeAuthorizationHandler {
 mod tests {
     use super::*;
 
+    use crate::rest_api::auth::authorization::rbac::store::{
+        Assignment, AssignmentBuilder, Role, RoleBasedAuthorizationStore,
+        RoleBasedAuthorizationStoreError,
+    };
+
+    const ADMIN_USER_IDENTITY: &str = "admin_user";
+    const NON_ADMIN_USER_IDENTITY: &str = "non_admin_user";
+
     /// Verifies that the maintenance mode authorization handler returns a `Continue` for all read
     /// operations, regardless of whether or not maintenance mode is enabled.
     ///
@@ -95,7 +140,7 @@ mod tests {
     ///    returned
     #[test]
     fn auth_handler_read_permissions() {
-        let handler = MaintenanceModeAuthorizationHandler::new();
+        let handler = MaintenanceModeAuthorizationHandler::default();
         assert_eq!(handler.is_maintenance_mode_enabled(), false);
 
         assert!(matches!(
@@ -122,7 +167,7 @@ mod tests {
     ///    `has_permission` again
     #[test]
     fn auth_handler_non_read_permissions() {
-        let handler = MaintenanceModeAuthorizationHandler::new();
+        let handler = MaintenanceModeAuthorizationHandler::default();
         assert_eq!(handler.is_maintenance_mode_enabled(), false);
         assert!(matches!(
             handler.has_permission(&Identity::Custom("identity".into()), "permission"),
@@ -142,5 +187,140 @@ mod tests {
             handler.has_permission(&Identity::Custom("identity".into()), "permission"),
             Ok(AuthorizationHandlerResult::Continue)
         ));
+    }
+
+    /// Verifies that the maintenance mode authorization handler returns the correct result for
+    /// identities that have been assigned the admin role in the RBAC store.
+    ///
+    /// 1. Create a new `MaintenanceModeAuthorizationHandler` with a mock RBAC store
+    /// 2. Enable maintenance mode
+    /// 3. Verify that a `Continue` result is returned by `has_permission` when an identity with the
+    ///    admin role is speicified
+    /// 4. Verify that a `Deny` result is returned by `has_permission` when an identity without the
+    ///    admin role is speicified
+    /// 5. Verify that a `Deny` result is returned by `has_permission` when an unknown identity is
+    ///    specified
+    #[cfg(feature = "authorization-handler-rbac")]
+    #[test]
+    fn auth_handler_rbac_admin() {
+        let handler = MaintenanceModeAuthorizationHandler::new(Some(Box::new(
+            MockRoleBasedAuthorizationStore,
+        )));
+
+        handler.set_maintenance_mode(true);
+        assert_eq!(handler.is_maintenance_mode_enabled(), true);
+
+        assert!(matches!(
+            handler.has_permission(&Identity::User(ADMIN_USER_IDENTITY.into()), "permission"),
+            Ok(AuthorizationHandlerResult::Continue)
+        ));
+
+        assert!(matches!(
+            handler.has_permission(
+                &Identity::User(NON_ADMIN_USER_IDENTITY.into()),
+                "permission"
+            ),
+            Ok(AuthorizationHandlerResult::Deny)
+        ));
+
+        assert!(matches!(
+            handler.has_permission(&Identity::User("unknown".into()), "permission"),
+            Ok(AuthorizationHandlerResult::Deny)
+        ));
+    }
+
+    #[derive(Clone)]
+    struct MockRoleBasedAuthorizationStore;
+
+    impl RoleBasedAuthorizationStore for MockRoleBasedAuthorizationStore {
+        fn get_role(&self, _id: &str) -> Result<Option<Role>, RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn list_roles(
+            &self,
+        ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError>
+        {
+            unimplemented!()
+        }
+
+        fn add_role(&self, _role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn update_role(&self, _role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn remove_role(&self, _role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn get_assignment(
+            &self,
+            identity: &RBACIdentity,
+        ) -> Result<Option<Assignment>, RoleBasedAuthorizationStoreError> {
+            let admin_identity = RBACIdentity::User(ADMIN_USER_IDENTITY.into());
+            if identity == &admin_identity {
+                return Ok(Some(
+                    AssignmentBuilder::new()
+                        .with_identity(admin_identity)
+                        .with_roles(vec![ADMIN_ROLE_ID.into()])
+                        .build()?,
+                ));
+            }
+
+            let non_admin_identity = RBACIdentity::User(NON_ADMIN_USER_IDENTITY.into());
+            if identity == &non_admin_identity {
+                return Ok(Some(
+                    AssignmentBuilder::new()
+                        .with_identity(non_admin_identity)
+                        .with_roles(vec!["other".into()])
+                        .build()?,
+                ));
+            }
+
+            Ok(None)
+        }
+
+        fn get_assigned_roles(
+            &self,
+            _identity: &RBACIdentity,
+        ) -> Result<Box<dyn ExactSizeIterator<Item = Role>>, RoleBasedAuthorizationStoreError>
+        {
+            unimplemented!()
+        }
+
+        fn list_assignments(
+            &self,
+        ) -> Result<Box<dyn ExactSizeIterator<Item = Assignment>>, RoleBasedAuthorizationStoreError>
+        {
+            unimplemented!()
+        }
+
+        fn add_assignment(
+            &self,
+            _assignment: Assignment,
+        ) -> Result<(), RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn update_assignment(
+            &self,
+            _assignment: Assignment,
+        ) -> Result<(), RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn remove_assignment(
+            &self,
+            _identity: &RBACIdentity,
+        ) -> Result<(), RoleBasedAuthorizationStoreError> {
+            unimplemented!()
+        }
+
+        fn clone_box(&self) -> Box<dyn RoleBasedAuthorizationStore> {
+            Box::new(self.clone())
+        }
     }
 }
