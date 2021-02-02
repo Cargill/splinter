@@ -183,14 +183,14 @@ fn update_role(
 ) -> Result<(), CliError> {
     let role = client.get_role(role_id)?;
 
-    let mut permissions = match permission_removal {
+    let permissions = match permission_removal {
         PermissionRemoval::RemoveAll => {
             println!("Removing permissions {}", role.permissions.join(", "));
             permissions_to_add
         }
         PermissionRemoval::Remove(permissions_to_rm) => {
-            let permissions_to_add = permissions_to_add.into_iter().collect::<BTreeSet<_>>();
-            let permissions_to_rm = permissions_to_rm.into_iter().collect::<BTreeSet<_>>();
+            let mut permissions_to_add = permissions_to_add.into_iter().collect::<BTreeSet<_>>();
+            let mut permissions_to_rm = permissions_to_rm.into_iter().collect::<BTreeSet<_>>();
 
             if !force && permissions_to_add.intersection(&permissions_to_rm).count() > 0 {
                 return Err(CliError::ActionError(format!(
@@ -203,16 +203,30 @@ fn update_role(
                 )));
             }
 
-            role.permissions
+            let mut current_permissions = role
+                .permissions
                 .into_iter()
-                .filter(|perm| !permissions_to_rm.contains(perm))
-                .chain(permissions_to_add.into_iter())
-                .collect::<Vec<_>>()
+                .filter(|perm| !permissions_to_rm.remove(perm))
+                .collect::<BTreeSet<_>>();
+
+            current_permissions.append(&mut permissions_to_add);
+
+            let permissions = current_permissions.into_iter().collect::<Vec<_>>();
+
+            if !force && !permissions_to_rm.is_empty() {
+                return Err(CliError::ActionError(format!(
+                    "Cannot remove permissions that do not belong to the role: {}",
+                    permissions_to_rm
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+
+            permissions
         }
     };
-
-    permissions.sort();
-    permissions.dedup();
 
     client.update_role(
         RoleUpdateBuilder::default()
