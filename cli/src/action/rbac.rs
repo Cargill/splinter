@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::BTreeSet;
+
 use clap::ArgMatches;
 
 use crate::error::CliError;
@@ -151,12 +153,17 @@ impl Action for UpdateRoleAction {
             )
         };
 
+        let force = arg_matches
+            .map(|args| args.is_present("force"))
+            .unwrap_or(false);
+
         update_role(
             new_client(&arg_matches)?,
             role_id,
             display_name,
             permissions_to_add,
             permission_removal,
+            force,
         )
     }
 }
@@ -172,6 +179,7 @@ fn update_role(
     display_name: Option<String>,
     permissions_to_add: Vec<String>,
     permission_removal: PermissionRemoval,
+    force: bool,
 ) -> Result<(), CliError> {
     let role = client.get_role(role_id)?;
 
@@ -180,12 +188,27 @@ fn update_role(
             println!("Removing permissions {}", role.permissions.join(", "));
             permissions_to_add
         }
-        PermissionRemoval::Remove(permissions_to_rm) => role
-            .permissions
-            .into_iter()
-            .chain(permissions_to_add.into_iter())
-            .filter(|perm| !permissions_to_rm.contains(&perm))
-            .collect::<Vec<_>>(),
+        PermissionRemoval::Remove(permissions_to_rm) => {
+            let permissions_to_add = permissions_to_add.into_iter().collect::<BTreeSet<_>>();
+            let permissions_to_rm = permissions_to_rm.into_iter().collect::<BTreeSet<_>>();
+
+            if !force && permissions_to_add.intersection(&permissions_to_rm).count() > 0 {
+                return Err(CliError::ActionError(format!(
+                    "Cannot add and remove the same permissions: {}",
+                    permissions_to_add
+                        .intersection(&permissions_to_rm)
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+
+            role.permissions
+                .into_iter()
+                .filter(|perm| !permissions_to_rm.contains(perm))
+                .chain(permissions_to_add.into_iter())
+                .collect::<Vec<_>>()
+        }
     };
 
     permissions.sort();

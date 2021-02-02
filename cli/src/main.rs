@@ -992,6 +992,12 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 ),
                         )
                         .arg(
+                            Arg::with_name("force")
+                                .short("f")
+                                .long("force")
+                                .help("Ignore errors, such as adding and removing the same value."),
+                        )
+                        .arg(
                             Arg::with_name("role_id")
                                 .required(true)
                                 .takes_value(true)
