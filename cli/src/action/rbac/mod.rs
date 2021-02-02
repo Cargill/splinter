@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod assignments;
 mod roles;
 
 use clap::ArgMatches;
@@ -22,6 +23,7 @@ use crate::action::{
 };
 use crate::error::CliError;
 
+pub use assignments::ListAssignmentsAction;
 pub use roles::{
     CreateRoleAction, DeleteRoleAction, ListRolesAction, ShowRoleAction, UpdateRoleAction,
 };
