@@ -340,7 +340,7 @@ impl From<&events::AdminServiceEvent> for JsonAdminEvent {
         Self {
             timestamp: time::SystemTime::now(),
             event: AdminServiceEvent::from(event),
-            event_id: Some(event.event_id),
+            event_id: Some(*event.event_id()),
         }
     }
 }

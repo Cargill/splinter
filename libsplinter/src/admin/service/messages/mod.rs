@@ -744,8 +744,8 @@ impl AdminServiceEvent {
 #[cfg(feature = "admin-service-event-store")]
 impl From<&events::AdminServiceEvent> for AdminServiceEvent {
     fn from(event_entry: &events::AdminServiceEvent) -> Self {
-        let admin_proposal = CircuitProposal::from(event_entry.proposal.clone());
-        match &event_entry.event_type {
+        let admin_proposal = CircuitProposal::from(event_entry.proposal().clone());
+        match event_entry.event_type() {
             EventType::ProposalSubmitted => AdminServiceEvent::ProposalSubmitted(admin_proposal),
             EventType::ProposalVote { requester } => {
                 AdminServiceEvent::ProposalVote((admin_proposal, requester.to_vec()))
