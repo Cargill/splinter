@@ -228,8 +228,12 @@ impl SplinterRestClient {
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
-    pub fn list_roles(&self) -> Result<rbac::RoleIter, CliError> {
-        Ok(rbac::RoleIter::new(&self.url, &self.auth))
+    pub fn list_roles(&self) -> Result<rbac::PagingIter<Role>, CliError> {
+        Ok(rbac::PagingIter::new(
+            &self.url,
+            &self.auth,
+            "/authorization/roles",
+        ))
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
