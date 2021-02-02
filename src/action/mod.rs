@@ -13,10 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "workload")]
+pub mod workload;
+
 use std::collections::HashMap;
+#[cfg(feature = "workload")]
 use std::path::Path;
 
 use clap::ArgMatches;
+#[cfg(feature = "workload")]
 use cylinder::{
     current_user_search_path, jwt::JsonWebTokenBuilder, load_key, load_key_from_path,
     secp256k1::Secp256k1Context, Context, Signer,
@@ -38,6 +43,7 @@ pub struct SubcommandActions<'a> {
     actions: HashMap<String, Box<dyn Action + 'a>>,
 }
 
+#[cfg(feature = "workload")]
 impl<'a> SubcommandActions<'a> {
     pub fn new() -> Self {
         Self::default()
@@ -68,6 +74,7 @@ impl<'s> Action for SubcommandActions<'s> {
     }
 }
 
+#[cfg(feature = "workload")]
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth_signer_key(
     key_name: &str,

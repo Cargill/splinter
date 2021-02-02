@@ -33,9 +33,11 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
-cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
+ctrlc = { version = "3.0", optional = true }
+cylinder = { version = "0.2.2", features = ["jwt", "key-load"], optional = true }
 flexi_logger = "0.14"
 log = "0.4"
+rand = { version = "0.8", optional = true }
 transact = {path = "../libtransact", features=["family-smallbank-workload"]}
 
 
@@ -51,7 +53,10 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "workload"
 ]
+
+workload = ["ctrlc", "cylinder", "rand"]
 
 [package.metadata.docs.rs]
 features = [
