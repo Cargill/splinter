@@ -36,7 +36,7 @@ use crate::error::InternalError;
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct EventEntry {
     id: i64,
-    event: messages::AdminServiceEvent,
+    event: AdminServiceEvent,
 }
 
 impl cmp::Ord for EventEntry {
@@ -125,13 +125,15 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
         }
         // Uses the `fetch_add` method to increment the `last_event_id`
         self.last_event_id.fetch_add(1, Ordering::Relaxed);
+        // Fetch the current event ID to create the native `AdminServiceEvent` struct.
+        let id = self.last_event_id.load(Ordering::Relaxed);
+        let event = AdminServiceEvent::try_from((id, &event))
+            .map_err(AdminServiceEventStoreError::InvalidStateError)?;
         inner.insert(EventEntry {
-            id: self.last_event_id.load(Ordering::Relaxed),
+            id,
             event: event.clone(),
         });
-
-        AdminServiceEvent::try_from((self.last_event_id.load(Ordering::Relaxed), &event))
-            .map_err(AdminServiceEventStoreError::InvalidStateError)
+        Ok(event)
     }
 
     /// List `AdminServiceEvent`s that have been added to the store since the provided index.
@@ -144,12 +146,12 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
         // Increment the `start` index to exclude that ID
         let exclusive_start = start + 1;
         // Construct a list of tuples of the event ID and the corresponding event to be returned.
-        let inner_iter: Vec<AdminServiceEvent> = inner
+        let inner_iter = inner
             .range(exclusive_start..)
-            .map(|entry| AdminServiceEvent::try_from((entry.id, &entry.event)))
-            .collect::<Result<Vec<AdminServiceEvent>, _>>()
-            .map_err(AdminServiceEventStoreError::InvalidStateError)?;
-        Ok(Box::new(inner_iter.into_iter()))
+            .map(|entry| entry.event.clone())
+            .collect::<Vec<AdminServiceEvent>>()
+            .into_iter();
+        Ok(Box::new(inner_iter))
     }
 
     /// List `AdminServiceEvent`s, with a corresponding `CircuitProposal` that has the specified
@@ -167,18 +169,17 @@ impl AdminServiceEventStore for MemoryAdminServiceEventStore {
         // Increment the `start` index to exclude that ID
         let exclusive_start = start + 1;
         // Construct a list of tuples of the event ID and the corresponding event to be returned.
-        let inner_iter: Vec<AdminServiceEvent> = inner
+        let inner_iter = inner
             .range(exclusive_start..)
             .filter_map(|entry| {
-                if entry.event.proposal().circuit.circuit_management_type == management_type {
-                    return Some((entry.id, entry.event.clone()));
+                if entry.event.proposal().circuit().circuit_management_type() == management_type {
+                    return Some(entry.event.clone());
                 }
                 None
             })
-            .map(|(id, event)| AdminServiceEvent::try_from((id, &event)))
-            .collect::<Result<Vec<AdminServiceEvent>, _>>()
-            .map_err(AdminServiceEventStoreError::InvalidStateError)?;
-        Ok(Box::new(inner_iter.into_iter()))
+            .collect::<Vec<AdminServiceEvent>>()
+            .into_iter();
+        Ok(Box::new(inner_iter))
     }
 }
 
