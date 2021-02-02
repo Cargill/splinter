@@ -121,7 +121,7 @@ https-bind = ["splinter/https-bind"]
 oauth = [
     "splinter/biome-oauth-user-store-postgres",
     "splinter/oauth-inflight-request-store-postgres",
-    "splinter/oauth-openid"
+    "splinter/oauth"
 ]
 registry-database = ["database", "splinter/registry-database"]
 rest-api-cors = ["splinter/rest-api-cors"]

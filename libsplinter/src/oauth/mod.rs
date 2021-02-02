@@ -35,20 +35,11 @@ use crate::error::{InternalError, InvalidArgumentError};
 
 use store::InflightOAuthRequestStore;
 
-#[cfg(feature = "oauth-openid")]
-pub use builder::OpenIdOAuthClientBuilder;
-pub use builder::{GithubOAuthClientBuilder, OAuthClientBuilder};
+pub use builder::{GithubOAuthClientBuilder, OAuthClientBuilder, OpenIdOAuthClientBuilder};
 pub use error::OAuthClientBuildError;
 #[cfg(feature = "biome-profile")]
-pub use profile::GithubProfileProvider;
-#[cfg(all(feature = "biome-profile", feature = "oauth-openid"))]
-pub use profile::OpenIdProfileProvider;
-#[cfg(feature = "biome-profile")]
-pub use profile::ProfileProvider;
-pub use subject::GithubSubjectProvider;
-#[cfg(feature = "oauth-openid")]
-pub use subject::OpenIdSubjectProvider;
-pub use subject::SubjectProvider;
+pub use profile::{GithubProfileProvider, OpenIdProfileProvider, ProfileProvider};
+pub use subject::{GithubSubjectProvider, OpenIdSubjectProvider, SubjectProvider};
 
 /// An OAuth2 client for Splinter
 ///

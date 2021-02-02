@@ -15,13 +15,11 @@
 //! APIs and implementations for fetching subject identifiers from OAuth servers
 
 mod github;
-#[cfg(feature = "oauth-openid")]
 mod openid;
 
 use crate::error::InternalError;
 
 pub use github::GithubSubjectProvider;
-#[cfg(feature = "oauth-openid")]
 pub use openid::OpenIdSubjectProvider;
 
 /// A service that fetches subject identifiers from a backing OAuth server
