@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Used by operations to retrieve all `AdminServiceEvent` instances in the database that match
-//! the specifie event IDs.
+//! the specified event IDs.
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
