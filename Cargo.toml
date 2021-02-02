@@ -1,0 +1,60 @@
+# Copyright 2018-2019 Bitwise IO, Inc.
+# Copyright 2019-2021 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[package]
+name = "transact-cli"
+version = "0.3.7"
+authors = ["Cargill Incorporated"]
+edition = "2018"
+license = "Apache-2.0"
+readme = "../README.md"
+description = """\
+    Transact is a transaction execution platform designed to be used as \
+    a library or component when implementing distributed ledgers, including \
+    blockchains.
+"""
+repository = "http://github.com/hyperledger/transact"
+
+[[bin]]
+name = "transact"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2"
+flexi_logger = "0.14"
+log = "0.4"
+transact = {path = "../libtransact", features=["family-smallbank-workload"]}
+
+
+[features]
+default = []
+
+stable = [
+    # The stable feature extends default:
+    "default",
+]
+
+experimental = [
+    # The experimental feature extends stable:
+    "stable",
+    # The following features are experimental:
+]
+
+[package.metadata.docs.rs]
+features = [
+  "default",
+  "experimental",
+  "stable",
+]
