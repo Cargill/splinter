@@ -196,6 +196,27 @@ impl Pageable for Role {
 }
 
 #[derive(Deserialize)]
+#[serde(tag = "identity_type", content = "identity")]
+#[serde(rename_all = "lowercase")]
+pub enum Identity {
+    Key(String),
+    User(String),
+}
+
+#[derive(Deserialize)]
+pub struct Assignment {
+    #[serde(flatten)]
+    pub identity: Identity,
+    pub roles: Vec<String>,
+}
+
+impl Pageable for Assignment {
+    fn label() -> &'static str {
+        "assignment list"
+    }
+}
+
+#[derive(Deserialize)]
 pub struct Paging {
     next: String,
     total: usize,

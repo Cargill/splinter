@@ -23,7 +23,7 @@ use serde::Deserialize;
 use super::CliError;
 
 #[cfg(feature = "authorization-handler-rbac")]
-pub use rbac::{Role, RoleBuilder, RoleUpdate, RoleUpdateBuilder};
+pub use rbac::{Assignment, Identity, Role, RoleBuilder, RoleUpdate, RoleUpdateBuilder};
 
 #[derive(Default)]
 pub struct SplinterRestClientBuilder {
@@ -254,6 +254,15 @@ impl SplinterRestClient {
     #[cfg(feature = "authorization-handler-rbac")]
     pub fn delete_role(&self, role_id: &str) -> Result<(), CliError> {
         rbac::delete_role(&self.url, &self.auth, role_id)
+    }
+
+    #[cfg(feature = "authorization-handler-rbac")]
+    pub fn list_assignments(&self) -> Result<rbac::PagingIter<Assignment>, CliError> {
+        Ok(rbac::PagingIter::new(
+            &self.url,
+            &self.auth,
+            "/authorization/assignments",
+        ))
     }
 }
 
