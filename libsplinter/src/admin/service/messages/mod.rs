@@ -383,6 +383,16 @@ impl From<&store::CircuitStatus> for CircuitStatus {
     }
 }
 
+impl std::fmt::Display for CircuitStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CircuitStatus::Active => f.write_str("Active"),
+            CircuitStatus::Disbanded => f.write_str("Disbanded"),
+            CircuitStatus::Abandoned => f.write_str("Abandoned"),
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct SplinterNode {
     pub node_id: String,

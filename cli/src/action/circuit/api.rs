@@ -18,6 +18,7 @@ use std::fmt;
 use reqwest::{blocking::Client, header, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::error::Result as JsonResult;
+use splinter::admin::messages::CircuitStatus;
 
 use crate::action::api::{ServerError, SplinterRestClient};
 use crate::error::CliError;
@@ -63,10 +64,17 @@ impl SplinterRestClient {
             })
     }
 
-    pub fn list_circuits(&self, filter: Option<&str>) -> Result<CircuitListSlice, CliError> {
+    pub fn list_circuits(
+        &self,
+        member_filter: Option<&str>,
+        status_filter: Option<&str>,
+    ) -> Result<CircuitListSlice, CliError> {
         let mut url = format!("{}/admin/circuits?limit={}", self.url, PAGING_LIMIT);
-        if let Some(filter) = filter {
-            url = format!("{}&filter={}", &url, &filter);
+        if let Some(member_filter) = member_filter {
+            url = format!("{}&filter={}", &url, &member_filter);
+        }
+        if let Some(status_filter) = status_filter {
+            url = format!("{}&status={}", &url, &status_filter);
         }
 
         Client::new()
@@ -238,6 +246,7 @@ pub struct CircuitSlice {
     pub management_type: String,
     pub display_name: Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: Option<CircuitStatus>,
 }
 
 impl fmt::Display for CircuitSlice {
@@ -248,6 +257,12 @@ impl fmt::Display for CircuitSlice {
             display_string += &format!("Display Name: {}\n    ", display_name);
         } else {
             display_string += "Display Name: -\n    ";
+        }
+
+        if let Some(status) = &self.circuit_status {
+            display_string += &format!("Circuit Status: {}\n    ", status);
+        } else {
+            display_string += "Circuit Status: Active\n    ";
         }
 
         display_string += &format!(
@@ -324,6 +339,12 @@ impl fmt::Display for ProposalSlice {
             display_string += "Display Name: -\n    ";
         }
 
+        if let Some(status) = &self.circuit.circuit_status {
+            display_string += &format!("Circuit Status: {}\n    ", status);
+        } else {
+            display_string += "Circuit Status: Active\n    ";
+        }
+
         display_string += &format!(
             "Version: {}\n    Management Type: {}\n",
             self.circuit.circuit_version, self.circuit.management_type
@@ -386,6 +407,7 @@ pub struct ProposalCircuitSlice {
     pub comments: Option<String>,
     pub display_name: Option<String>,
     pub circuit_version: i32,
+    pub circuit_status: Option<CircuitStatus>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

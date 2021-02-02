@@ -247,8 +247,10 @@ paths:
         This endpoint can be used to view all or some of the circuits that the
         node is a member of. If a node ID is provided via the "filter" query
         parameter, only circuits that have the given node ID as a member will be
-        returned; if no filter is provided, all of the node's circuits will be
-        returned.
+        returned. If a circuit status is provided via the "status" query
+        parameter, only circuits that have the given circuit status will be
+        returned; if no filter is provided, all of the node's `Active` circuits
+        will be returned.
       tags:
         - Circuits
       parameters:
@@ -271,6 +273,12 @@ paths:
         - name: filter
           in: query
           description: Node ID that must be present in the returned circuits
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Circuit status of the returned circuits
           required: false
           schema:
             type: string
@@ -2155,6 +2163,14 @@ components:
           description: Human readable name for the circuit
           type: string
           nullable: true
+        circuit_status:
+            description: The status of the circuit
+            type: string
+            nullable: true
+            enum:
+              - Active
+              - Disbanded
+              - Abandoned
 
     CircuitService:
       type: object

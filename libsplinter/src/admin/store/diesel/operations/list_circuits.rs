@@ -21,7 +21,10 @@ use diesel::{dsl::exists, prelude::*};
 
 use crate::admin::store::{
     diesel::{
-        models::{CircuitMemberModel, CircuitModel, ServiceArgumentModel, ServiceModel},
+        models::{
+            CircuitMemberModel, CircuitModel, CircuitStatusModel, ServiceArgumentModel,
+            ServiceModel,
+        },
         schema::{circuit, circuit_member, service, service_argument},
     },
     error::AdminServiceStoreError,
@@ -67,7 +70,13 @@ where
             })
             .flatten()
             .collect();
-
+        let statuses: Vec<CircuitStatusModel> = predicates
+            .iter()
+            .filter_map(|pred| match pred {
+                CircuitPredicate::CircuitStatus(status) => Some(CircuitStatusModel::from(status)),
+                _ => None,
+            })
+            .collect();
         self.conn
             .transaction::<Box<dyn ExactSizeIterator<Item = Circuit>>, _, _>(|| {
                 // Collects circuits which match the circuit predicates
@@ -87,6 +96,16 @@ where
                                 .and(circuit_member::node_id.eq_any(members)),
                         ),
                     ));
+                }
+
+                if statuses.is_empty() {
+                    // By default, only display active circuits
+                    query = query.filter(circuit::circuit_status.eq(CircuitStatusModel::Active));
+                } else {
+                    query = query.filter(
+                        // Select only circuits that have the `CircuitStatus` in the predicates
+                        circuit::circuit_status.eq_any(statuses),
+                    );
                 }
 
                 let circuits: Vec<CircuitModel> = query

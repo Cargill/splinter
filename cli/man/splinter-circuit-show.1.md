@@ -76,13 +76,14 @@ The information displayed below will appear the same on all proposed member node
 If all member nodes vote to accept the circuit, the `splinter-circuit-show`
 command will display the same information, without the `Vote` as all nodes would
 have accepted the proposal. If any of the member nodes vote to reject the circuit,
-the proposal will not be viewable by any nodes.
+the proposal will be removed and is not viewable by any nodes.
 
 ```
 $ splinter circuit show 01234-ABCDE \
   ---url URL-of-alpha-node-splinterd-REST-API
 Proposal to create: 01234-ABCDE
     Display Name: -
+    Circuit Status: Active
     Version: 2
     Management Type: mgmt001
 
@@ -103,6 +104,42 @@ Proposal to create: 01234-ABCDE
             peer_services:
                 AA01
 ```
+
+The information displayed below will appear the same on all proposed member
+nodes for a circuit proposal to disband an existing circuit.
+If all member nodes vote to accept disbanding the circuit, the
+`splinter-circuit-show` command will display the same information, without the
+`Vote` as all nodes would have accepted the proposal. If any of the member
+nodes vote to reject disbanding the circuit, the proposal will be removed and
+is not viewable by any nodes.
+
+```
+$ splinter circuit show 01234-ABCDE \
+  ---url URL-of-alpha-node-splinterd-REST-API
+Proposal to disband: 56789-ABCDE
+    Display Name: Circuit1
+    Circuit Status: Disbanded
+    Version: 2
+    Management Type: mgmt001
+
+    alpha-001 (tcps://splinterd-node-alpha001:8044)
+        Vote: ACCEPT (implied as requester):
+            ALPHA-PUBLIC-KEY
+        Service: AA01
+            admin_keys:
+                ALPHA-PUBLIC-KEY
+            peer_services:
+                BB01
+
+    beta-001 (tcps://splinterd-node-beta001:8044)
+        Vote: PENDING
+        Service: AA01
+            admin_keys:
+                ALPHA-PUBLIC-KEY
+            peer_services:
+                AA01
+```
+
 
 ENVIRONMENT VARIABLES
 =====================

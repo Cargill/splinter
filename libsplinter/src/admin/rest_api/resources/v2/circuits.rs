@@ -70,3 +70,13 @@ impl<'a> From<&'a Service> for ServiceResponse<'a> {
         }
     }
 }
+
+impl From<String> for CircuitStatus {
+    fn from(str: String) -> Self {
+        match &*str {
+            "disbanded" => CircuitStatus::Disbanded,
+            "abandoned" => CircuitStatus::Abandoned,
+            _ => CircuitStatus::Active,
+        }
+    }
+}

@@ -480,16 +480,6 @@ impl From<&messages::RouteType> for String {
     }
 }
 
-impl From<&messages::CircuitStatus> for String {
-    fn from(variant: &messages::CircuitStatus) -> Self {
-        match variant {
-            messages::CircuitStatus::Active => String::from("Active"),
-            messages::CircuitStatus::Disbanded => String::from("Disbanded"),
-            messages::CircuitStatus::Abandoned => String::from("Abandoned"),
-        }
-    }
-}
-
 impl From<&messages::CircuitStatus> for CircuitStatusModel {
     fn from(messages_status: &messages::CircuitStatus) -> Self {
         match *messages_status {

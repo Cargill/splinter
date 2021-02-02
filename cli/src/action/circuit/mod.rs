@@ -527,6 +527,7 @@ impl TryFrom<&CreateCircuit> for CircuitSlice {
             management_type: circuit.circuit_management_type.clone(),
             display_name: circuit.display_name.clone(),
             circuit_version: circuit.circuit_version,
+            circuit_status: Some(circuit.circuit_status.clone()),
         })
     }
 }
@@ -635,7 +636,8 @@ impl Action for CircuitListAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-        let filter = arg_matches.and_then(|args| args.value_of("member"));
+        let member_filter = arg_matches.and_then(|args| args.value_of("member"));
+        let status_filter = arg_matches.and_then(|args| args.value_of("circuit_status"));
 
         let format = arg_matches
             .and_then(|args| {
@@ -649,13 +651,14 @@ impl Action for CircuitListAction {
 
         let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
 
-        list_circuits(&url, filter, format, key)
+        list_circuits(&url, member_filter, status_filter, format, key)
     }
 }
 
 fn list_circuits(
     url: &str,
-    filter: Option<&str>,
+    member_filter: Option<&str>,
+    status_filter: Option<&str>,
     format: &str,
     key: Option<&str>,
 ) -> Result<(), CliError> {
@@ -664,7 +667,7 @@ fn list_circuits(
         .with_auth(create_cylinder_jwt_auth(key)?)
         .build()?;
 
-    let circuits = client.list_circuits(filter)?;
+    let circuits = client.list_circuits(member_filter, status_filter)?;
     let mut data = Vec::new();
     data.push(vec![
         "ID".to_string(),

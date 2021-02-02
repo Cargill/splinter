@@ -125,6 +125,7 @@ impl PartialOrd for ServiceId {
 pub enum CircuitPredicate {
     ManagementTypeEq(String),
     MembersInclude(Vec<String>),
+    CircuitStatus(CircuitStatus),
 }
 
 impl CircuitPredicate {
@@ -142,6 +143,7 @@ impl CircuitPredicate {
                 }
                 true
             }
+            CircuitPredicate::CircuitStatus(status) => circuit.circuit_status() == status,
         }
     }
 
@@ -164,6 +166,9 @@ impl CircuitPredicate {
                     }
                 }
                 true
+            }
+            CircuitPredicate::CircuitStatus(status) => {
+                proposal.circuit().circuit_status() == status
             }
         }
     }

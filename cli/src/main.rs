@@ -345,6 +345,13 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         .takes_value(true),
                 )
                 .arg(
+                    Arg::with_name("circuit_status")
+                        .long("circuit-status")
+                        .help("Filter circuits by a circuit status")
+                        .possible_values(&["active", "disbanded", "abandoned"])
+                        .takes_value(true),
+                )
+                .arg(
                     Arg::with_name("format")
                         .short("F")
                         .long("format")
