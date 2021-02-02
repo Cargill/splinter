@@ -123,7 +123,7 @@ impl StoreFactory for PgStoreFactory {
         Box::new(crate::biome::DieselUserProfileStore::new(self.pool.clone()))
     }
 
-    #[cfg(feature = "admin-service-event-store-diesel")]
+    #[cfg(feature = "admin-service-event-store-postgres")]
     fn get_admin_service_event_store(
         &self,
     ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
@@ -136,7 +136,7 @@ impl StoreFactory for PgStoreFactory {
 
     #[cfg(all(
         feature = "admin-service-event-store",
-        not(feature = "admin-service-event-store-diesel")
+        not(feature = "admin-service-event-store-postgres")
     ))]
     fn get_admin_service_event_store(
         &self,

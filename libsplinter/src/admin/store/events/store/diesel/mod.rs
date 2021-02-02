@@ -86,7 +86,7 @@ impl AdminServiceEventStore for DieselAdminServiceEventStore<diesel::sqlite::Sql
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "admin-service-event-store-postgres")]
 impl Clone for DieselAdminServiceEventStore<diesel::pg::PgConnection> {
     fn clone(&self) -> Self {
         Self {
@@ -95,7 +95,7 @@ impl Clone for DieselAdminServiceEventStore<diesel::pg::PgConnection> {
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "admin-service-event-store-postgres")]
 impl AdminServiceEventStore for DieselAdminServiceEventStore<diesel::pg::PgConnection> {
     fn add_event(
         &self,

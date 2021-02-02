@@ -19,7 +19,7 @@
 //!
 //! [`AdminServiceEventStore`]: trait.AdminServiceEventStore.html
 
-#[cfg(feature = "admin-service-event-store-diesel")]
+#[cfg(any(feature = "admin-service-event-store-postgres", feature = "sqlite"))]
 pub mod diesel;
 mod error;
 pub mod memory;

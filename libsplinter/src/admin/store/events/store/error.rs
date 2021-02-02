@@ -16,7 +16,7 @@
 use std::fmt;
 
 use crate::admin::store::error::AdminServiceStoreError;
-#[cfg(feature = "admin-service-event-store-diesel")]
+#[cfg(any(feature = "admin-service-event-store-postgres", feature = "sqlite"))]
 use crate::error::ConstraintViolationType;
 use crate::error::{
     ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
@@ -68,7 +68,7 @@ impl From<AdminServiceStoreError> for AdminServiceEventStoreError {
     }
 }
 
-#[cfg(feature = "admin-service-event-store-diesel")]
+#[cfg(any(feature = "admin-service-event-store-postgres", feature = "sqlite"))]
 impl From<diesel::r2d2::PoolError> for AdminServiceEventStoreError {
     fn from(err: diesel::r2d2::PoolError) -> Self {
         AdminServiceEventStoreError::ResourceTemporarilyUnavailableError(
@@ -77,7 +77,7 @@ impl From<diesel::r2d2::PoolError> for AdminServiceEventStoreError {
     }
 }
 
-#[cfg(feature = "admin-service-event-store-diesel")]
+#[cfg(any(feature = "admin-service-event-store-postgres", feature = "sqlite"))]
 impl From<diesel::result::Error> for AdminServiceEventStoreError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
