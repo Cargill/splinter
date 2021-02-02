@@ -33,6 +33,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
+cylinder = { version = "0.2.2", features = ["jwt", "key-load"] }
 flexi_logger = "0.14"
 log = "0.4"
 transact = {path = "../libtransact", features=["family-smallbank-workload"]}

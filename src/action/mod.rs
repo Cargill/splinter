@@ -17,6 +17,10 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use clap::ArgMatches;
+use cylinder::{
+    current_user_search_path, jwt::JsonWebTokenBuilder, load_key, load_key_from_path,
+    secp256k1::Secp256k1Context, Context, Signer,
+};
 
 use super::error::CliError;
 
@@ -62,4 +66,38 @@ impl<'s> Action for SubcommandActions<'s> {
             Err(CliError::InvalidSubcommand)
         }
     }
+}
+
+// build a signed json web token using the private key
+fn create_cylinder_jwt_auth_signer_key(
+    key_name: &str,
+) -> Result<(String, Box<dyn Signer>), CliError> {
+    let private_key = if key_name.contains('/') {
+        load_key_from_path(Path::new(key_name))
+            .map_err(|err| CliError::ActionError(err.to_string()))?
+    } else {
+        let path = &current_user_search_path();
+        load_key(key_name, path)
+            .map_err(|err| CliError::ActionError(err.to_string()))?
+            .ok_or_else(|| {
+                CliError::ActionError({
+                    format!(
+                        "No signing key found in {}. Specify the --key argument",
+                        path.iter()
+                            .map(|path| path.as_path().display().to_string())
+                            .collect::<Vec<String>>()
+                            .join(":")
+                    )
+                })
+            })?
+    };
+
+    let context = Secp256k1Context::new();
+    let signer = context.new_signer(private_key);
+
+    let encoded_token = JsonWebTokenBuilder::new()
+        .build(&*signer)
+        .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;
+
+    Ok((format!("Bearer Cylinder:{}", encoded_token), signer))
 }
