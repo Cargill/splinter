@@ -1160,6 +1160,38 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .help("ID of role to be deleted"),
                         ),
                 ),
+        ).subcommand(
+            SubCommand::with_name("authid")
+                .about("Role-based authorization role assignment commands")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand(
+                    SubCommand::with_name("list")
+                        .about("Lists the authorized identities on a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("format")
+                                .short("F")
+                                .long("format")
+                                .help("Output format")
+                                .possible_values(&["human", "csv"])
+                                .default_value("human")
+                                .takes_value(true),
+                        ),
+                )
         );
     }
 
@@ -1303,15 +1335,20 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     #[cfg(feature = "authorization-handler-rbac")]
     {
         use action::rbac;
-        subcommands = subcommands.with_command(
-            "role",
-            SubcommandActions::new()
-                .with_command("create", rbac::CreateRoleAction)
-                .with_command("update", rbac::UpdateRoleAction)
-                .with_command("delete", rbac::DeleteRoleAction)
-                .with_command("list", rbac::ListRolesAction)
-                .with_command("show", rbac::ShowRoleAction),
-        )
+        subcommands = subcommands
+            .with_command(
+                "role",
+                SubcommandActions::new()
+                    .with_command("create", rbac::CreateRoleAction)
+                    .with_command("update", rbac::UpdateRoleAction)
+                    .with_command("delete", rbac::DeleteRoleAction)
+                    .with_command("list", rbac::ListRolesAction)
+                    .with_command("show", rbac::ShowRoleAction),
+            )
+            .with_command(
+                "authid",
+                SubcommandActions::new().with_command("list", rbac::ListAssignmentsAction),
+            )
     }
 
     #[cfg(feature = "permissions")]
