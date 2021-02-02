@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides the "list events since" operation for the `DieselAdminServiceEventStore`.
+//! Provides the "list events by management type" operation for the `DieselAdminServiceEventStore`.
 
 use diesel::{prelude::*, types::HasSqlType};
 
@@ -20,16 +20,20 @@ use super::{
     list_events::AdminServiceEventStoreListEventsOperation, AdminServiceEventStoreOperations,
 };
 
-use crate::admin::service::event::store::{
-    diesel::schema::admin_service_event, AdminServiceEventStoreError, EventIter,
+use crate::admin::store::events::store::{
+    diesel::schema::admin_event_proposed_circuit, AdminServiceEventStoreError, EventIter,
 };
 
-pub(in crate::admin::service::event::store::diesel) trait AdminServiceEventStoreListEventsSinceOperation
+pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreListEventsByManagementTypeSinceOperation
 {
-    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceEventStoreError>;
+    fn list_events_by_management_type_since(
+        &self,
+        management_type: String,
+        start: i64,
+    ) -> Result<EventIter, AdminServiceEventStoreError>;
 }
 
-impl<'a, C> AdminServiceEventStoreListEventsSinceOperation
+impl<'a, C> AdminServiceEventStoreListEventsByManagementTypeSinceOperation
     for AdminServiceEventStoreOperations<'a, C>
 where
     C: diesel::Connection,
@@ -40,11 +44,16 @@ where
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
 {
-    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceEventStoreError> {
+    fn list_events_by_management_type_since(
+        &self,
+        management_type: String,
+        start: i64,
+    ) -> Result<EventIter, AdminServiceEventStoreError> {
         self.conn.transaction::<EventIter, _, _>(|| {
-            let event_ids: Vec<i64> = admin_service_event::table
-                .filter(admin_service_event::id.gt(start))
-                .select(admin_service_event::id)
+            let event_ids: Vec<i64> = admin_event_proposed_circuit::table
+                .filter(admin_event_proposed_circuit::event_id.gt(start))
+                .filter(admin_event_proposed_circuit::circuit_management_type.eq(management_type))
+                .select(admin_event_proposed_circuit::event_id)
                 .load(self.conn)?;
             AdminServiceEventStoreOperations::new(self.conn).list_events(event_ids)
         })

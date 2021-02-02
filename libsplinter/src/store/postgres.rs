@@ -126,9 +126,9 @@ impl StoreFactory for PgStoreFactory {
     #[cfg(feature = "admin-service-event-store-diesel")]
     fn get_admin_service_event_store(
         &self,
-    ) -> Box<dyn crate::admin::service::event::store::AdminServiceEventStore> {
+    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
         Box::new(
-            crate::admin::service::event::store::diesel::DieselAdminServiceEventStore::new(
+            crate::admin::store::events::store::diesel::DieselAdminServiceEventStore::new(
                 self.pool.clone(),
             ),
         )
@@ -140,7 +140,7 @@ impl StoreFactory for PgStoreFactory {
     ))]
     fn get_admin_service_event_store(
         &self,
-    ) -> Box<dyn crate::admin::service::event::store::AdminServiceEventStore> {
+    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
         unimplemented!()
     }
 }

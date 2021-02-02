@@ -25,11 +25,11 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::admin::service::event::{
+use crate::admin::service::messages;
+use crate::admin::store::events::{
     store::{AdminServiceEventStore, AdminServiceEventStoreError, EventIter},
     AdminServiceEvent,
 };
-use crate::admin::service::messages;
 use crate::error::InternalError;
 
 /// A simple entry for `AdminServiceEvent` values, to be ordered by the `id`

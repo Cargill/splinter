@@ -22,7 +22,7 @@ use diesel::{prelude::*, types::HasSqlType};
 
 use super::AdminServiceEventStoreOperations;
 
-use crate::admin::service::event::{
+use crate::admin::store::events::{
     store::{
         diesel::{
             models::{
@@ -48,8 +48,7 @@ use crate::admin::store::{
     ProposedServiceBuilder, RouteType, VoteRecord,
 };
 
-pub(in crate::admin::service::event::store::diesel) trait AdminServiceEventStoreListEventsOperation
-{
+pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreListEventsOperation {
     fn list_events(&self, events_id: Vec<i64>) -> Result<EventIter, AdminServiceEventStoreError>;
 }
 

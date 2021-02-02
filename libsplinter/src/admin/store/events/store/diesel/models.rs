@@ -25,7 +25,8 @@ use diesel::{
     sql_types::SmallInt,
 };
 
-use crate::admin::service::event::{
+use crate::admin::service::messages::{self, CreateCircuit};
+use crate::admin::store::events::{
     store::{
         diesel::schema::{
             admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
@@ -36,7 +37,6 @@ use crate::admin::service::event::{
     },
     AdminServiceEvent, EventType,
 };
-use crate::admin::service::messages::{self, CreateCircuit};
 use crate::admin::store::{CircuitProposal, Vote, VoteRecord, VoteRecordBuilder};
 use crate::error::{InternalError, InvalidStateError};
 

@@ -67,7 +67,7 @@ use super::{
     Events,
 };
 #[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event::{self, store::AdminServiceEventStore};
+use crate::admin::store::events::{self, store::AdminServiceEventStore};
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
@@ -147,7 +147,7 @@ impl SubscriberMap {
     }
 
     #[cfg(feature = "admin-service-event-store")]
-    fn broadcast_by_type(&self, event_type: &str, admin_service_event: &event::AdminServiceEvent) {
+    fn broadcast_by_type(&self, event_type: &str, admin_service_event: &events::AdminServiceEvent) {
         let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
         if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
             subscribers.retain(
@@ -2554,7 +2554,7 @@ mod tests {
     };
 
     #[cfg(feature = "admin-service-event-store")]
-    use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
+    use crate::admin::service::events::store::memory::MemoryAdminServiceEventStore;
 
     use crate::admin::service::AdminKeyVerifierError;
     #[cfg(feature = "circuit-disband")]
