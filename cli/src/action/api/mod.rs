@@ -23,7 +23,10 @@ use serde::Deserialize;
 use super::CliError;
 
 #[cfg(feature = "authorization-handler-rbac")]
-pub use rbac::{Assignment, Identity, Role, RoleBuilder, RoleUpdate, RoleUpdateBuilder};
+pub use rbac::{
+    assignments::{Assignment, Identity},
+    roles::{Role, RoleBuilder, RoleUpdate, RoleUpdateBuilder},
+};
 
 #[derive(Default)]
 pub struct SplinterRestClientBuilder {
@@ -238,22 +241,22 @@ impl SplinterRestClient {
 
     #[cfg(feature = "authorization-handler-rbac")]
     pub fn get_role(&self, role_id: &str) -> Result<Role, CliError> {
-        rbac::get_role(&self.url, &self.auth, role_id)
+        rbac::roles::get_role(&self.url, &self.auth, role_id)
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
     pub fn create_role(&self, role: Role) -> Result<(), CliError> {
-        rbac::create_role(&self.url, &self.auth, role)
+        rbac::roles::create_role(&self.url, &self.auth, role)
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
     pub fn update_role(&self, role_update: RoleUpdate) -> Result<(), CliError> {
-        rbac::update_role(&self.url, &self.auth, role_update)
+        rbac::roles::update_role(&self.url, &self.auth, role_update)
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
     pub fn delete_role(&self, role_id: &str) -> Result<(), CliError> {
-        rbac::delete_role(&self.url, &self.auth, role_id)
+        rbac::roles::delete_role(&self.url, &self.auth, role_id)
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
