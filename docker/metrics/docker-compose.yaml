@@ -1,0 +1,54 @@
+# Copyright 2018-2021 Cargill Incorporated
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.7"
+
+volumes:
+  grafana-splinter:
+  influx-splinter:
+
+services:
+  grafana:
+    image: grafana/grafana:7.3.7
+    container_name: splinter-grafana
+    volumes:
+      - ../../docker/metrics/grafana/provisioning:/etc/grafana/provisioning
+      - ../../docker/metrics/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-splinter:/var/lib/grafana
+    ports:
+      - 3000:3000
+
+  influx:
+    image: influxdb:1.7.6
+    container_name: splinter-influx
+    volumes:
+      - influx-splinter:/var/lib/influxdb
+    ports:
+      - 8086:8086
+    restart: always
+    environment:
+      INFLUXDB_DB: metrics
+      INFLUXDB_HTTP_AUTH_ENABLED: "true"
+      INFLUXDB_ADMIN_USER: admin
+      INFLUXDB_ADMIN_PASSWORD: foobar
+
+  telegraf:
+    image: telegraf
+    container_name: splinter-telegraf
+    build:
+      context: ../../docker/metrics
+      dockerfile: telegraf.dockerfile
+    volumes:
+      - ../../docker/metrics:/project
+    entrypoint: telegraf -config /project/telegraf.toml
