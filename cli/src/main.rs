@@ -1285,6 +1285,79 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .help("A role to be assigned to the provided identity"),
                         ),
                 )
+                .subcommand(
+                    SubCommand::with_name("update")
+                        .about("Updates an authorized identity on a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("id_key")
+                                .value_name("public-key")
+                                .long("id-key")
+                                .takes_value(true)
+                                .required_unless("id_user")
+                                .conflicts_with("id_user")
+                                .help("The public key identity being assigned roles"),
+                        )
+                        .arg(
+                            Arg::with_name("id_user")
+                                .value_name("user-id")
+                                .long("id-user")
+                                .takes_value(true)
+                                .required_unless("id_key")
+                                .conflicts_with("id_key")
+                                .help("The user identity being assigned roles"),
+                        )
+                        .arg(
+                            Arg::with_name("add_role")
+                                .value_name("role")
+                                .long("add-role")
+                                .takes_value(true)
+                                .multiple(true)
+                                .number_of_values(1)
+                                .help("A role to be added to the provided identity's assignments"),
+                        )
+                        .arg(
+                            Arg::with_name("force")
+                                .short("f")
+                                .long("force")
+                                .help("Ignore errors, such as adding and removing the same value."),
+                        )
+                        .arg(
+                            Arg::with_name("rm_role")
+                                .value_name("role")
+                                .long("rm-role")
+                                .takes_value(true)
+                                .multiple(true)
+                                .number_of_values(1)
+                                .conflicts_with("rm_all")
+                                .help(
+                                    "A role to be removed from the provided identity's assignments"
+                                ),
+                        )
+                        .arg(
+                            Arg::with_name("rm_all")
+                                .long("rm-all")
+                                .conflicts_with("rm_role")
+                                .help(
+                                    "Remove all of the roles currently assigned to the authorized \
+                                    identity",
+                                ),
+                        )
+                )
         );
     }
 
@@ -1443,7 +1516,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 SubcommandActions::new()
                     .with_command("list", rbac::ListAssignmentsAction)
                     .with_command("show", rbac::ShowAssignmentAction)
-                    .with_command("create", rbac::CreateAssignmentAction),
+                    .with_command("create", rbac::CreateAssignmentAction)
+                    .with_command("update", rbac::UpdateAssignmentAction),
             )
     }
 
