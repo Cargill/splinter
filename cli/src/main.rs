@@ -1193,6 +1193,52 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                         ),
                 )
                 .subcommand(
+                    SubCommand::with_name("show")
+                        .about("Show a specific authorized identity on a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("format")
+                                .short("F")
+                                .long("format")
+                                .help("Output format")
+                                .possible_values(&["human", "json", "yaml"])
+                                .default_value("human")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("id_key")
+                                .value_name("public-key")
+                                .long("id-key")
+                                .takes_value(true)
+                                .required_unless("id_user")
+                                .conflicts_with("id_user")
+                                .help("A public key identity to show"),
+                        )
+                        .arg(
+                            Arg::with_name("id_user")
+                                .value_name("user-id")
+                                .long("id-user")
+                                .takes_value(true)
+                                .required_unless("id_key")
+                                .conflicts_with("id_key")
+                                .help("A user identity to show"),
+                        ),
+                )
+                .subcommand(
                     SubCommand::with_name("create")
                         .about("Creates an authorized identity on a Splinter node")
                         .arg(
@@ -1396,6 +1442,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                 "authid",
                 SubcommandActions::new()
                     .with_command("list", rbac::ListAssignmentsAction)
+                    .with_command("show", rbac::ShowAssignmentAction)
                     .with_command("create", rbac::CreateAssignmentAction),
             )
     }
