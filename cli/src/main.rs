@@ -1192,6 +1192,53 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .takes_value(true),
                         ),
                 )
+                .subcommand(
+                    SubCommand::with_name("create")
+                        .about("Creates an authorized identity on a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("id_key")
+                                .value_name("public-key")
+                                .long("id-key")
+                                .takes_value(true)
+                                .required_unless("id_user")
+                                .conflicts_with("id_user")
+                                .help("The public key identity being assigned roles"),
+                        )
+                        .arg(
+                            Arg::with_name("id_user")
+                                .value_name("user-id")
+                                .long("id-user")
+                                .takes_value(true)
+                                .required_unless("id_key")
+                                .conflicts_with("id_key")
+                                .help("The user identity being assigned roles"),
+                        )
+                        .arg(
+                            Arg::with_name("role")
+                                .value_name("role")
+                                .long("role")
+                                .takes_value(true)
+                                .multiple(true)
+                                .number_of_values(1)
+                                .required(true)
+                                .help("A role to be assigned to the provided identity"),
+                        ),
+                )
         );
     }
 
@@ -1347,7 +1394,9 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
             )
             .with_command(
                 "authid",
-                SubcommandActions::new().with_command("list", rbac::ListAssignmentsAction),
+                SubcommandActions::new()
+                    .with_command("list", rbac::ListAssignmentsAction)
+                    .with_command("create", rbac::CreateAssignmentAction),
             )
     }
 
