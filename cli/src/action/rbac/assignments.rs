@@ -14,7 +14,7 @@
 
 use clap::ArgMatches;
 
-use crate::action::{api::Identity, print_table, Action};
+use crate::action::{api::{AssignmentBuilder, Identity}, print_table, Action};
 use crate::error::CliError;
 
 use super::new_client;
@@ -61,4 +61,47 @@ impl Action for ListAssignmentsAction {
 
         Ok(())
     }
+}
+
+pub struct CreateAssignmentAction;
+
+impl Action for CreateAssignmentAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let identity = get_identity_arg(&arg_matches)?;
+
+        let roles = arg_matches
+            .and_then(|args| args.values_of("role"))
+            .ok_or_else(|| {
+                CliError::ActionError("At least one role must be assigned".into())
+            })?
+            .map(|s| s.to_owned())
+            .collect();
+
+        new_client(&arg_matches)?.create_assignment(
+            AssignmentBuilder::default()
+            .with_identity(identity)
+            .with_roles(roles)
+            .build()?,
+        )
+    }
+}
+
+fn get_identity_arg<'a>(arg_matches: &Option<&ArgMatches<'a>>) -> Result<Identity, CliError> {
+    if let Some(key) = arg_matches
+        .and_then(|args| args.value_of("id_key"))
+        .map(|s| s.to_string())
+    {
+        return Ok(Identity::Key(key));
+    }
+
+    if let Some(user_id) = arg_matches
+        .and_then(|args| args.value_of("id_user"))
+        .map(|s| s.to_string())
+    {
+        return Ok(Identity::User(user_id));
+    }
+
+    Err(CliError::ActionError(
+        "Must specify either key or user identity".into(),
+    ))
 }

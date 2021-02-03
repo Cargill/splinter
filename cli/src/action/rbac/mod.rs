@@ -23,7 +23,7 @@ use crate::action::{
 };
 use crate::error::CliError;
 
-pub use assignments::ListAssignmentsAction;
+pub use assignments::{CreateAssignmentAction, ListAssignmentsAction};
 pub use roles::{
     CreateRoleAction, DeleteRoleAction, ListRolesAction, ShowRoleAction, UpdateRoleAction,
 };
