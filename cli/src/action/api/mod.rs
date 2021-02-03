@@ -284,6 +284,11 @@ impl SplinterRestClient {
     pub fn update_assignment(&self, assignment_update: AssignmentUpdate) -> Result<(), CliError> {
         rbac::assignments::update_assignment(&self.url, &self.auth, assignment_update)
     }
+
+    #[cfg(feature = "authorization-handler-rbac")]
+    pub fn delete_assignment(&self, identity: &Identity) -> Result<(), CliError> {
+        rbac::assignments::delete_assignment(&self.url, &self.auth, identity)
+    }
 }
 
 #[derive(Deserialize)]

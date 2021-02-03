@@ -292,6 +292,53 @@ pub fn update_assignment(
         })
 }
 
+pub fn delete_assignment(base_url: &str, auth: &str, identity: &Identity) -> Result<(), CliError> {
+    let (id_value, id_type) = identity.parts();
+
+    Client::new()
+        .delete(&format!(
+            "{}/authorization/assignments/{}/{}",
+            base_url, id_type, id_value
+        ))
+        .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
+        .header("Authorization", auth)
+        .send()
+        .map_err(|err| CliError::ActionError(format!("Failed to delete assignment: {}", err)))
+        .and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                Ok(())
+            } else if status.as_u16() == 401 {
+                Err(CliError::ActionError("Not Authorized".into()))
+            } else if status.as_u16() == 404 {
+                Err(CliError::ActionError(format!(
+                    "Authorized identity {} {} does not exist",
+                    id_type, id_value,
+                )))
+            } else if status.as_u16() == 409 {
+                Err(CliError::ActionError(
+                    "One or more of the roles provided does not exist".into(),
+                ))
+            } else {
+                let message = res
+                    .json::<ServerError>()
+                    .map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Delete assignment request failed with status code '{}', but error \
+                            response was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                Err(CliError::ActionError(format!(
+                    "Failed to delete assignment: {}",
+                    message
+                )))
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
