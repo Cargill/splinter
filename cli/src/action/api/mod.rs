@@ -24,7 +24,9 @@ use super::CliError;
 
 #[cfg(feature = "authorization-handler-rbac")]
 pub use rbac::{
-    assignments::{Assignment, AssignmentBuilder, Identity},
+    assignments::{
+        Assignment, AssignmentBuilder, AssignmentUpdate, AssignmentUpdateBuilder, Identity,
+    },
     roles::{Role, RoleBuilder, RoleUpdate, RoleUpdateBuilder},
 };
 
@@ -276,6 +278,11 @@ impl SplinterRestClient {
     #[cfg(feature = "authorization-handler-rbac")]
     pub fn create_assignment(&self, assignment: Assignment) -> Result<(), CliError> {
         rbac::assignments::create_assignment(&self.url, &self.auth, assignment)
+    }
+
+    #[cfg(feature = "authorization-handler-rbac")]
+    pub fn update_assignment(&self, assignment_update: AssignmentUpdate) -> Result<(), CliError> {
+        rbac::assignments::update_assignment(&self.url, &self.auth, assignment_update)
     }
 }
 
