@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::BTreeSet;
+
 use clap::ArgMatches;
 
 use crate::error::CliError;
@@ -137,33 +139,102 @@ impl Action for UpdateRoleAction {
             .map(|vals| vals.map(|s| s.to_owned()).collect())
             .unwrap_or_else(Vec::new);
 
-        let permissions_to_rm = arg_matches
-            .and_then(|args| args.values_of("rm_permission"))
-            .map(|vals| vals.map(|s| s.to_owned()).collect())
-            .unwrap_or_else(Vec::new);
+        let rm_all = arg_matches
+            .map(|args| args.is_present("rm_all"))
+            .unwrap_or(false);
+        let permission_removal = if rm_all {
+            PermissionRemoval::RemoveAll
+        } else {
+            PermissionRemoval::Remove(
+                arg_matches
+                    .and_then(|args| args.values_of("rm_permission"))
+                    .map(|vals| vals.map(|s| s.to_owned()).collect())
+                    .unwrap_or_else(Vec::new),
+            )
+        };
 
-        let client = new_client(&arg_matches)?;
+        let force = arg_matches
+            .map(|args| args.is_present("force"))
+            .unwrap_or(false);
 
-        let role = client.get_role(role_id)?;
-
-        let mut permissions = role
-            .permissions
-            .into_iter()
-            .chain(permissions_to_add.into_iter())
-            .filter(|perm| !permissions_to_rm.contains(&perm))
-            .collect::<Vec<_>>();
-
-        permissions.sort();
-        permissions.dedup();
-
-        client.update_role(
-            RoleUpdateBuilder::default()
-                .with_role_id(role_id.into())
-                .with_display_name(display_name)
-                .with_permissions(Some(permissions))
-                .build()?,
+        update_role(
+            new_client(&arg_matches)?,
+            role_id,
+            display_name,
+            permissions_to_add,
+            permission_removal,
+            force,
         )
     }
+}
+
+enum PermissionRemoval {
+    RemoveAll,
+    Remove(Vec<String>),
+}
+
+fn update_role(
+    client: SplinterRestClient,
+    role_id: &str,
+    display_name: Option<String>,
+    permissions_to_add: Vec<String>,
+    permission_removal: PermissionRemoval,
+    force: bool,
+) -> Result<(), CliError> {
+    let role = client.get_role(role_id)?;
+
+    let permissions = match permission_removal {
+        PermissionRemoval::RemoveAll => {
+            println!("Removing permissions {}", role.permissions.join(", "));
+            permissions_to_add
+        }
+        PermissionRemoval::Remove(permissions_to_rm) => {
+            let mut permissions_to_add = permissions_to_add.into_iter().collect::<BTreeSet<_>>();
+            let mut permissions_to_rm = permissions_to_rm.into_iter().collect::<BTreeSet<_>>();
+
+            if !force && permissions_to_add.intersection(&permissions_to_rm).count() > 0 {
+                return Err(CliError::ActionError(format!(
+                    "Cannot add and remove the same permissions: {}",
+                    permissions_to_add
+                        .intersection(&permissions_to_rm)
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+
+            let mut current_permissions = role
+                .permissions
+                .into_iter()
+                .filter(|perm| !permissions_to_rm.remove(perm))
+                .collect::<BTreeSet<_>>();
+
+            current_permissions.append(&mut permissions_to_add);
+
+            let permissions = current_permissions.into_iter().collect::<Vec<_>>();
+
+            if !force && !permissions_to_rm.is_empty() {
+                return Err(CliError::ActionError(format!(
+                    "Cannot remove permissions that do not belong to the role: {}",
+                    permissions_to_rm
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+
+            permissions
+        }
+    };
+
+    client.update_role(
+        RoleUpdateBuilder::default()
+            .with_role_id(role_id.into())
+            .with_display_name(display_name)
+            .with_permissions(Some(permissions))
+            .build()?,
+    )
 }
 
 pub struct DeleteRoleAction;

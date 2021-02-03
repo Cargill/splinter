@@ -986,7 +986,23 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .takes_value(true)
                                 .multiple(true)
                                 .number_of_values(1)
+                                .conflicts_with("rm_all")
                                 .help("A permission to be removed from the role"),
+                        )
+                        .arg(
+                            Arg::with_name("rm_all")
+                                .long("rm-all")
+                                .conflicts_with("rm_permission")
+                                .help(
+                                    "Remove all of the permissions currently associated with the \
+                                    role",
+                                ),
+                        )
+                        .arg(
+                            Arg::with_name("force")
+                                .short("f")
+                                .long("force")
+                                .help("Ignore errors, such as adding and removing the same value."),
                         )
                         .arg(
                             Arg::with_name("role_id")
