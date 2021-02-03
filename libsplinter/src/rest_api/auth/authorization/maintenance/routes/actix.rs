@@ -99,7 +99,7 @@ mod tests {
     fn get_and_post() {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_maintenance_resource(
-                MaintenanceModeAuthorizationHandler::new(),
+                MaintenanceModeAuthorizationHandler::default(),
             )]);
 
         let url = Url::parse(&format!("http://{}/authorization/maintenance", bind_url))
@@ -182,7 +182,7 @@ mod tests {
     ///    still enabled
     #[test]
     fn post_idempotent() {
-        let handler = MaintenanceModeAuthorizationHandler::new();
+        let handler = MaintenanceModeAuthorizationHandler::default();
 
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(vec![make_maintenance_resource(handler.clone())]);

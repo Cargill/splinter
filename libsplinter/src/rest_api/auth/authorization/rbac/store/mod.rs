@@ -25,6 +25,8 @@ pub use self::diesel::DieselRoleBasedAuthorizationStore;
 
 pub use error::RoleBasedAuthorizationStoreError;
 
+pub const ADMIN_ROLE_ID: &str = "admin";
+
 /// A Role is a named set of permissions.
 #[derive(Clone)]
 pub struct Role {
@@ -199,6 +201,21 @@ pub enum Identity {
     Key(String),
     /// A user ID-based identity.
     User(String),
+}
+
+impl From<&crate::rest_api::auth::identity::Identity> for Option<Identity> {
+    fn from(identity: &crate::rest_api::auth::identity::Identity) -> Self {
+        match identity {
+            // RoleBasedAuthorization does not currently support custom identities
+            crate::rest_api::auth::identity::Identity::Custom(_) => None,
+            crate::rest_api::auth::identity::Identity::Key(key) => {
+                Some(Identity::Key(key.to_string()))
+            }
+            crate::rest_api::auth::identity::Identity::User(user_id) => {
+                Some(Identity::User(user_id.to_string()))
+            }
+        }
+    }
 }
 
 /// An assignment of roles to a particular identity.
