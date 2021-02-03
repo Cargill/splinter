@@ -269,6 +269,11 @@ impl SplinterRestClient {
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
+    pub fn get_assignment(&self, identity: &Identity) -> Result<Assignment, CliError> {
+        rbac::assignments::get_assignment(&self.url, &self.auth, identity)
+    }
+
+    #[cfg(feature = "authorization-handler-rbac")]
     pub fn create_assignment(&self, assignment: Assignment) -> Result<(), CliError> {
         rbac::assignments::create_assignment(&self.url, &self.auth, assignment)
     }

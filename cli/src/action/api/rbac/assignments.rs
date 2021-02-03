@@ -41,6 +41,12 @@ impl Pageable for Assignment {
     }
 }
 
+#[derive(Deserialize)]
+struct AssignmentGet {
+    #[serde(rename = "data")]
+    assignment: Assignment,
+}
+
 #[derive(Default)]
 pub struct AssignmentBuilder {
     identity: Option<Identity>,
@@ -125,6 +131,66 @@ pub fn create_assignment(
                 )))
             }
         })
+}
+
+pub fn get_assignment(
+    base_url: &str,
+    auth: &str,
+    identity: &Identity,
+) -> Result<Assignment, CliError> {
+    let (id_value, id_type) = match identity {
+        Identity::Key(key) => (key, "key"),
+        Identity::User(user) => (user, "user"),
+    };
+
+    Client::new()
+        .get(&format!(
+            "{}/authorization/assignments/{}/{}",
+            base_url, id_type, id_value
+        ))
+        .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
+        .header("Authorization", auth)
+        .send()
+        .map_err(|err| {
+            CliError::ActionError(format!(
+                "Failed to fetch authorized identity {} {}: {}",
+                id_type, id_value, err
+            ))
+        })
+        .and_then(|res| {
+            let status = res.status();
+            if status.is_success() {
+                res.json::<AssignmentGet>().map_err(|_| {
+                    CliError::ActionError(
+                        "Request was successful, but received an invalid response".into(),
+                    )
+                })
+            } else if status.as_u16() == 401 {
+                Err(CliError::ActionError("Not Authorized".into()))
+            } else if status.as_u16() == 404 {
+                Err(CliError::ActionError(format!(
+                    "Authorized identity {} {} does not exist",
+                    id_type, id_value,
+                )))
+            } else {
+                let message = res
+                    .json::<ServerError>()
+                    .map_err(|_| {
+                        CliError::ActionError(format!(
+                            "Get authorized identity request failed with status code '{}', but \
+                            error response was not valid",
+                            status
+                        ))
+                    })?
+                    .message;
+
+                Err(CliError::ActionError(format!(
+                    "Failed to get authorized identity {} {}: {}",
+                    id_type, id_value, message
+                )))
+            }
+        })
+        .map(|wrapper| wrapper.assignment)
 }
 
 #[cfg(test)]
