@@ -16,6 +16,8 @@ use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey};
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
+#[cfg(feature = "circuit-disband")]
+use splinter::protos::admin::CircuitDisbandRequest;
 use splinter::protos::admin::{
     CircuitCreateRequest, CircuitManagementPayload, CircuitManagementPayload_Action as Action,
     CircuitManagementPayload_Header as Header, CircuitProposalVote, CircuitProposalVote_Vote,
@@ -23,6 +25,8 @@ use splinter::protos::admin::{
 
 use crate::error::CliError;
 
+#[cfg(feature = "circuit-disband")]
+use super::CircuitDisband;
 use super::{CircuitVote, Vote};
 
 /// A circuit action that has a type and can be converted into a protobuf-serializable struct.
@@ -137,5 +141,25 @@ impl CircuitAction<CircuitProposalVote> for CircuitVote {
 impl ApplyToEnvelope for CircuitProposalVote {
     fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
         circuit_management_payload.set_circuit_proposal_vote(self);
+    }
+}
+
+#[cfg(feature = "circuit-disband")]
+impl CircuitAction<CircuitDisbandRequest> for CircuitDisband {
+    fn action_type(&self) -> Action {
+        Action::CIRCUIT_DISBAND_REQUEST
+    }
+
+    fn into_proto(self) -> Result<CircuitDisbandRequest, CliError> {
+        let mut disband_request = CircuitDisbandRequest::new();
+        disband_request.set_circuit_id(self.circuit_id);
+        Ok(disband_request)
+    }
+}
+
+#[cfg(feature = "circuit-disband")]
+impl ApplyToEnvelope for CircuitDisbandRequest {
+    fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
+        circuit_management_payload.set_circuit_disband_request(self);
     }
 }

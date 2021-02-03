@@ -40,6 +40,8 @@ use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
+#[cfg(feature = "circuit-disband")]
+use crate::protos::admin::DisbandedCircuit;
 #[cfg(feature = "service-arg-validation")]
 use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
@@ -109,6 +111,12 @@ struct CircuitProposalContext {
 }
 
 struct UninitializedCircuit {
+    pub circuit: Option<CircuitProposal>,
+    pub ready_members: HashSet<String>,
+}
+
+#[cfg(feature = "circuit-disband")]
+struct PendingDisbandedCircuit {
     pub circuit: Option<CircuitProposal>,
     pub ready_members: HashSet<String>,
 }
@@ -231,6 +239,9 @@ pub struct AdminServiceShared {
 
     #[cfg(feature = "admin-service-event-store")]
     admin_event_store: Box<dyn AdminServiceEventStore>,
+    #[cfg(feature = "circuit-disband")]
+    // List of circuits to be completely disbanded once all nodes have agreed
+    pending_consensus_disbanded_circuits: HashMap<String, PendingDisbandedCircuit>,
 }
 
 impl AdminServiceShared {
@@ -285,6 +296,8 @@ impl AdminServiceShared {
             routing_table_writer,
             #[cfg(feature = "admin-service-event-store")]
             admin_event_store,
+            #[cfg(feature = "circuit-disband")]
+            pending_consensus_disbanded_circuits: HashMap::new(),
         })
     }
 
@@ -403,28 +416,7 @@ impl AdminServiceShared {
                         // field set.
                         #[cfg(feature = "circuit-disband")]
                         {
-                            if circuit_proposal.get_circuit_proposal().get_circuit_status()
-                                == Circuit_CircuitStatus::DISBANDED
-                            {
-                                // Circuit has been disbanded: all associated services will be shut
-                                // down, the circuit removed from the routing table, and peer refs
-                                // for this circuit will be removed.
-                                self.shutdown_services(circuit_proposal.get_circuit_proposal())?;
-                                // Removing the circuit from the routing table
-                                self.routing_table_writer
-                                    .remove_circuit(circuit_id)
-                                    .map_err(|_| {
-                                        AdminSharedError::SplinterStateError(format!(
-                                            "Unable to remove circuit from routing table: {}",
-                                            circuit_id
-                                        ))
-                                    })?;
-                                // Removing the circuit's peer refs
-                                for member in circuit_proposal.get_circuit_proposal().get_members()
-                                {
-                                    self.remove_peer_ref(member.get_node_id());
-                                }
-
+                            if status == Circuit_CircuitStatus::DISBANDED {
                                 let store_circuit =
                                     StoreCircuit::try_from(circuit_proposal.get_circuit_proposal())
                                         .map_err(|err| {
@@ -433,38 +425,58 @@ impl AdminServiceShared {
                                             err.to_string()
                                         ))
                                         })?;
+
+                                if store_circuit.circuit_status() != &StoreCircuitStatus::Disbanded
+                                {
+                                    return Err(AdminSharedError::SplinterStateError(format!(
+                                        "Circuit should be disbanded: {}",
+                                        circuit_id
+                                    )));
+                                }
                                 // Updating the corresponding `active` circuit from the admin store
+                                // and then removing the corresponding `CircuitProposal` from the
+                                // disband request
                                 self.admin_store
-                                    .update_circuit(store_circuit)
+                                    .update_circuit(store_circuit.clone())
                                     .map_err(|_| {
                                         AdminSharedError::SplinterStateError(format!(
                                             "Unable to update circuit {}",
                                             circuit_id
                                         ))
+                                    })
+                                    .and_then(|_| {
+                                        self.remove_proposal(store_circuit.circuit_id())
                                     })?;
-                                // Verifying the upgraded disbanded circuit is now available
-                                let circuit =
-                                    self.admin_store.get_circuit(circuit_id)?.ok_or_else(|| {
-                                        AdminSharedError::SplinterStateError(format!(
-                                            "Unable to get circuit that was just set: {}",
-                                            circuit_id
-                                        ))
-                                    })?;
-                                if circuit.circuit_status() != &StoreCircuitStatus::Disbanded {
-                                    return Err(AdminSharedError::SplinterStateError(format!(
-                                        "Set circuit should be disbanded: {}",
-                                        circuit_id
-                                    )));
-                                }
 
-                                // send message about circuit disband being committed
+                                // send message about circuit disband proposal being accepted
                                 let circuit_proposal_proto =
                                     messages::CircuitProposal::from_proto(circuit_proposal.clone())
                                         .map_err(AdminSharedError::InvalidMessageFormat)?;
-                                let event = messages::AdminServiceEvent::CircuitDisbanded(
+                                let event = messages::AdminServiceEvent::ProposalAccepted((
                                     circuit_proposal_proto,
-                                );
+                                    circuit_proposal_context.signer_public_key.clone(),
+                                ));
                                 self.send_event(&mgmt_type, event);
+                                // send DISBANDED_CIRCUIT message to all other members' admin
+                                // services
+                                if let Some(ref network_sender) = self.network_sender {
+                                    let mut disbanded_circuit = DisbandedCircuit::new();
+                                    disbanded_circuit.set_circuit_id(circuit_id.to_string());
+                                    disbanded_circuit.set_member_node_id(self.node_id.clone());
+                                    let mut msg = AdminMessage::new();
+                                    msg.set_message_type(AdminMessage_Type::DISBANDED_CIRCUIT);
+                                    msg.set_disbanded_circuit(disbanded_circuit);
+
+                                    let envelope_bytes =
+                                        msg.write_to_bytes().map_err(MarshallingError::from)?;
+                                    for member in store_circuit.members().iter() {
+                                        if member != &self.node_id {
+                                            network_sender
+                                                .send(&admin_service_id(member), &envelope_bytes)?;
+                                        }
+                                    }
+                                }
+                                self.add_pending_disbanded_circuit(circuit_proposal.clone())?;
                             }
                         }
                         if status == Circuit_CircuitStatus::ACTIVE
@@ -1255,111 +1267,119 @@ impl AdminServiceShared {
         let mut pending_peers = vec![];
         let mut added_peers: Vec<String> = vec![];
         let mut pending_members = vec![];
-        // Allowing `unused_mut` to avoid compiler warnings when the `circuit-disband` feature is
-        // not enabled. If the `circuit-disband` feature is removed or stabilized, the
-        // `#allow(unused_mut)` may also be removed.
-        #[allow(unused_mut)]
-        let mut members: Vec<SplinterNode> = payload
-            .get_circuit_create_request()
-            .get_circuit()
-            .get_members()
-            .to_vec();
+        let mut members = vec![];
+        // Check if that payload is to create a circuit, in which case PeerRefs for the new
+        // members must be added.
+        if payload.has_circuit_create_request() {
+            let create_request_members = payload
+                .get_circuit_create_request()
+                .get_circuit()
+                .get_members()
+                .to_vec();
+            for node in &create_request_members {
+                if self.node_id() != node.get_node_id() {
+                    debug!("Referencing node {:?}", node);
+                    let peer_ref = self
+                        .peer_connector
+                        .add_peer_ref(
+                            node.get_node_id().to_string(),
+                            node.get_endpoints().to_vec(),
+                        )
+                        .map_err(|err| {
+                            // remove all peer refs added for this proposal
+                            for node_id in added_peers.iter() {
+                                self.remove_peer_ref(node_id);
+                            }
+
+                            ServiceError::UnableToHandleMessage(Box::new(err))
+                        })?;
+
+                    self.add_peer_ref(peer_ref);
+                    added_peers.push(node.get_node_id().to_string());
+
+                    // if we have a protocol the connection exists for the peer already
+                    if self
+                        .service_protocols
+                        .get(&admin_service_id(node.get_node_id()))
+                        .is_none()
+                    {
+                        pending_peers.push(node.get_node_id().to_string());
+                        missing_protocol_ids.push(admin_service_id(node.get_node_id()))
+                    }
+                }
+                pending_members.push(node.get_node_id().to_string())
+            }
+            members.extend(create_request_members);
+        }
 
         // If the `circuit-disband` feature is enabled, a `CircuitDisbandRequest` may be present
         // in the payload. Therefore, the members are gathered from the admin store based on the
         // provided circuit id.
         #[cfg(feature = "circuit-disband")]
         {
-            members = {
-                if payload.has_circuit_disband_request() {
-                    let circuit_id = payload.get_circuit_disband_request().get_circuit_id();
-                    // If the proposed circuit is being disbanded, the circuit information must be
-                    // gathered from the admin store, as the `CircuitDisbandRequest` only contains
-                    // the `circuit_id`.
-                    let circuit = self
-                        .admin_store
-                        .get_circuit(circuit_id)
-                        .map_err(|err| {
-                            ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "error occurred when trying to get circuit {}",
-                                    err
-                                )),
-                            ))
-                        })?
-                        .ok_or_else(|| {
-                            ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "unable to get circuit {}",
-                                    circuit_id
-                                )),
-                            ))
-                        })?;
-
-                    // Collecting the node endpoints associated with the currently active version of the
-                    // circuit proposed to be disbanded.
-                    let node_ids = circuit.members().to_vec();
-                    self.admin_store
-                        .list_nodes()
-                        .map_err(|err| {
-                            ServiceError::UnableToHandleMessage(Box::new(
-                                AdminSharedError::ValidationFailed(format!(
-                                    "error occurred when trying to get circuit nodes {}",
-                                    err
-                                )),
-                            ))
-                        })?
-                        .filter_map(|circuit_node| {
-                            if node_ids.contains(&circuit_node.node_id().to_string()) {
-                                return Some(
-                                    messages::SplinterNode {
-                                        node_id: circuit_node.node_id().to_string(),
-                                        endpoints: circuit_node.endpoints().to_vec(),
-                                    }
-                                    .into_proto(),
-                                );
-                            }
-                            None
-                        })
-                        .collect::<Vec<SplinterNode>>()
-                } else {
-                    members
+            if payload.has_circuit_disband_request() {
+                // If the members list has already been updated, the payload was to create a
+                // new circuit.
+                if !members.is_empty() {
+                    return Err(ServiceError::UnableToHandleMessage(Box::new(
+                        AdminSharedError::ValidationFailed(
+                            "Invalid payload; has two requests".to_string(),
+                        ),
+                    )));
                 }
-            };
-        }
-
-        for node in members {
-            if self.node_id() != node.get_node_id() {
-                debug!("Referencing node {:?}", node);
-                let peer_ref = self
-                    .peer_connector
-                    .add_peer_ref(
-                        node.get_node_id().to_string(),
-                        node.get_endpoints().to_vec(),
-                    )
+                let circuit_id = payload.get_circuit_disband_request().get_circuit_id();
+                // If the proposed circuit is being disbanded, the circuit information must be
+                // gathered from the admin store, as the `CircuitDisbandRequest` only contains
+                // the `circuit_id`.
+                let circuit = self
+                    .admin_store
+                    .get_circuit(circuit_id)
                     .map_err(|err| {
-                        // remove all peer refs added for this proposal
-                        for node_id in added_peers.iter() {
-                            self.remove_peer_ref(node_id);
-                        }
-
-                        ServiceError::UnableToHandleMessage(Box::new(err))
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "error occurred when trying to get circuit {}",
+                                err
+                            )),
+                        ))
+                    })?
+                    .ok_or_else(|| {
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "unable to get circuit {}",
+                                circuit_id
+                            )),
+                        ))
                     })?;
 
-                self.add_peer_ref(peer_ref);
-                added_peers.push(node.get_node_id().to_string());
-
-                // if we have a protocol the connection exists for the peer already
-                if self
-                    .service_protocols
-                    .get(&admin_service_id(node.get_node_id()))
-                    .is_none()
-                {
-                    pending_peers.push(node.get_node_id().to_string());
-                    missing_protocol_ids.push(admin_service_id(node.get_node_id()))
-                }
+                // Collecting the node endpoints associated with the currently active version of the
+                // circuit proposed to be disbanded.
+                let node_ids = circuit.members().to_vec();
+                let disband_members = self
+                    .admin_store
+                    .list_nodes()
+                    .map_err(|err| {
+                        ServiceError::UnableToHandleMessage(Box::new(
+                            AdminSharedError::ValidationFailed(format!(
+                                "error occurred when trying to get circuit nodes {}",
+                                err
+                            )),
+                        ))
+                    })?
+                    .filter_map(|circuit_node| {
+                        if node_ids.contains(&circuit_node.node_id().to_string()) {
+                            return Some(
+                                messages::SplinterNode {
+                                    node_id: circuit_node.node_id().to_string(),
+                                    endpoints: circuit_node.endpoints().to_vec(),
+                                }
+                                .into_proto(),
+                            );
+                        }
+                        None
+                    })
+                    .collect::<Vec<SplinterNode>>();
+                members.extend(disband_members);
             }
-            pending_members.push(node.get_node_id().to_string())
         }
 
         if missing_protocol_ids.is_empty() {
@@ -2200,7 +2220,8 @@ impl AdminServiceShared {
             )));
         }
 
-        // Verifying the circuit has not already been disbanded or abandoned
+        // Verifying the circuit has not already been disbanded or abandoned and has a valid
+        // version to perform the disband request
         let stored_circuit = self
             .admin_store
             .get_circuit(circuit.get_circuit_id())
@@ -2222,10 +2243,12 @@ impl AdminServiceShared {
                 "Attempting to disband an inactive circuit {}",
                 circuit.get_circuit_id()
             )));
-        } else if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
+        }
+
+        if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Attempting to disband a circuit with version {}, must be {}",
-                circuit.get_circuit_id(),
+                stored_circuit.circuit_version(),
                 CIRCUIT_PROTOCOL_VERSION,
             )));
         }
@@ -2458,6 +2481,38 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
+    fn add_pending_disbanded_circuit(
+        &mut self,
+        circuit: CircuitProposal,
+    ) -> Result<(), AdminSharedError> {
+        let circuit_id = circuit.get_circuit_id().to_string();
+        match self
+            .pending_consensus_disbanded_circuits
+            .get_mut(&circuit_id)
+        {
+            Some(pending_disband_circuit) => pending_disband_circuit.circuit = Some(circuit),
+            None => {
+                self.pending_consensus_disbanded_circuits.insert(
+                    circuit_id.to_string(),
+                    PendingDisbandedCircuit {
+                        circuit: Some(circuit),
+                        ready_members: HashSet::new(),
+                    },
+                );
+            }
+        }
+
+        // Add self as ready
+        self.pending_consensus_disbanded_circuits
+            .get_mut(&circuit_id)
+            .expect("Pending disbanded circuit not set")
+            .ready_members
+            .insert(self.node_id.clone());
+
+        self.cleanup_disbanded_circuit_if_members_ready(&circuit_id)
+    }
+
+    #[cfg(feature = "circuit-disband")]
     /// Shutdown all services that this node was running on the disbanded circuit using the service
     /// orchestrator. This may not include all services if they are not supported locally. It is
     /// expected that some services will be stopped externally.
@@ -2484,6 +2539,7 @@ impl AdminServiceShared {
 
         // Shutdown all services the orchestrator has a factory for
         for service in services {
+            debug!("Removing service: {}", service.service_id.clone());
             let service_definition = ServiceDefinition {
                 circuit: circuit.circuit_id.clone(),
                 service_id: service.service_id.clone(),
@@ -2499,6 +2555,103 @@ impl AdminServiceShared {
                     ),
                     source: Some(err),
                 })?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "circuit-disband")]
+    pub fn add_member_ready_to_disband(
+        &mut self,
+        circuit_id: &str,
+        member_node_id: &str,
+    ) -> Result<(), AdminSharedError> {
+        // Check if the `DisbandedCircuit` message is associated with a pending disband proposal
+        if self
+            .pending_consensus_disbanded_circuits
+            .get(circuit_id)
+            .is_none()
+        {
+            self.pending_consensus_disbanded_circuits.insert(
+                circuit_id.to_string(),
+                PendingDisbandedCircuit {
+                    circuit: None,
+                    ready_members: HashSet::new(),
+                },
+            );
+        }
+        self.pending_consensus_disbanded_circuits
+            .get_mut(circuit_id)
+            .expect("Pending disband circuit not set")
+            .ready_members
+            .insert(member_node_id.to_string());
+
+        self.cleanup_disbanded_circuit_if_members_ready(circuit_id)
+    }
+
+    #[cfg(feature = "circuit-disband")]
+    /// Verify all members are ready before cleaning up after the disbanded circuit, i.e. removing
+    /// peer refs, removing the circuit from the routing table, and shutting down the circuit's
+    /// associated services.
+    pub fn cleanup_disbanded_circuit_if_members_ready(
+        &mut self,
+        circuit_id: &str,
+    ) -> Result<(), AdminSharedError> {
+        let ready = {
+            if let Some(disbanded_circuit) =
+                self.pending_consensus_disbanded_circuits.get(circuit_id)
+            {
+                if let Some(ref circuit_proposal) = disbanded_circuit.circuit {
+                    let all_members = circuit_proposal
+                        .get_circuit_proposal()
+                        .members
+                        .iter()
+                        .map(|node| node.node_id.clone())
+                        .collect::<HashSet<String>>();
+                    all_members.is_subset(&disbanded_circuit.ready_members)
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+
+        if ready {
+            let circuit_proposal = self
+                .pending_consensus_disbanded_circuits
+                .remove(circuit_id)
+                .expect("Pending disband circuit not set")
+                .circuit
+                .expect("Pending disband circuit's circuit proposal not set");
+            // send message about circuit acceptance
+            let circuit_proposal_proto =
+                messages::CircuitProposal::from_proto(circuit_proposal.clone())
+                    .map_err(AdminSharedError::InvalidMessageFormat)?;
+            let mgmt_type = circuit_proposal
+                .get_circuit_proposal()
+                .circuit_management_type
+                .clone();
+            let event = messages::AdminServiceEvent::CircuitDisbanded(circuit_proposal_proto);
+            self.send_event(&mgmt_type, event);
+
+            // Circuit has been disbanded: all associated services will be shut
+            // down, the circuit removed from the routing table, and peer refs
+            // for this circuit will be removed.
+            self.shutdown_services(circuit_proposal.get_circuit_proposal())?;
+            // Removing the circuit from the routing table
+            self.routing_table_writer
+                .remove_circuit(circuit_proposal.get_circuit_id())
+                .map_err(|_| {
+                    AdminSharedError::SplinterStateError(format!(
+                        "Unable to remove circuit from routing table: {}",
+                        circuit_id
+                    ))
+                })?;
+            // Removing the circuit's peer refs
+            for member in circuit_proposal.get_circuit_proposal().get_members() {
+                self.remove_peer_ref(member.get_node_id());
+            }
         }
 
         Ok(())
