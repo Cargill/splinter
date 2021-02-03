@@ -58,6 +58,8 @@ enum AuthorizationResult {
 /// * `endpoint` - The endpoint that is being requested. Example: "/endpoint/path"
 /// * `auth_header` - The value of the Authorization HTTP header for the request
 /// * `identity_providers` - The identity providers that will be used to check the client's identity
+/// * `authorization_handlers` - The authorization handlers that will be used to check the client's
+///   permissions
 fn authorize(
     #[cfg(feature = "authorization")] method: &Method,
     #[cfg(any(
