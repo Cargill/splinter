@@ -28,6 +28,17 @@ pub enum Identity {
     User(String),
 }
 
+impl Identity {
+    /// Returns a tuple of the parts (id, id_type)
+    /// Type can be "key" or "user"
+    pub fn parts(&self) -> (&str, &str) {
+        match self {
+            Identity::Key(key) => (key, "key"),
+            Identity::User(user) => (user, "user"),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct Assignment {
     #[serde(flatten)]

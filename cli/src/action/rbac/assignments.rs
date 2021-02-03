@@ -14,7 +14,10 @@
 
 use clap::ArgMatches;
 
-use crate::action::{api::{AssignmentBuilder, Identity}, print_table, Action};
+use crate::action::{
+    api::{Assignment, AssignmentBuilder, Identity},
+    print_table, Action,
+};
 use crate::error::CliError;
 
 use super::new_client;
@@ -33,12 +36,12 @@ impl Action for ListAssignmentsAction {
             .list_assignments()?
             .map(|res| {
                 res.map(|assignment| {
-                    let (id, id_type) = match assignment.identity {
-                        Identity::Key(key) => (key, String::from("key")),
-                        Identity::User(user_id) => (user_id, String::from("user")),
-                    };
-
-                    vec![id, id_type, assignment.roles.len().to_string()]
+                    let (id, id_type) = assignment.identity.parts();
+                    vec![
+                        id.to_string(),
+                        id_type.to_string(),
+                        assignment.roles.len().to_string(),
+                    ]
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -71,18 +74,58 @@ impl Action for CreateAssignmentAction {
 
         let roles = arg_matches
             .and_then(|args| args.values_of("role"))
-            .ok_or_else(|| {
-                CliError::ActionError("At least one role must be assigned".into())
-            })?
+            .ok_or_else(|| CliError::ActionError("At least one role must be assigned".into()))?
             .map(|s| s.to_owned())
             .collect();
 
         new_client(&arg_matches)?.create_assignment(
             AssignmentBuilder::default()
-            .with_identity(identity)
-            .with_roles(roles)
-            .build()?,
+                .with_identity(identity)
+                .with_roles(roles)
+                .build()?,
         )
+    }
+}
+
+pub struct ShowAssignmentAction;
+
+impl Action for ShowAssignmentAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let format = arg_matches
+            .and_then(|args| args.value_of("format"))
+            .unwrap_or("human");
+
+        let identity = get_identity_arg(&arg_matches)?;
+
+        let assignment = new_client(&arg_matches)?.get_assignment(&identity)?;
+
+        match format {
+            "json" => println!(
+                "\n {}",
+                serde_json::to_string(&assignment).map_err(|err| CliError::ActionError(
+                    format!("Cannot format assignment into json: {}", err)
+                ))?
+            ),
+            "yaml" => println!(
+                "{}",
+                serde_yaml::to_string(&assignment).map_err(|err| CliError::ActionError(
+                    format!("Cannot format assignment into yaml: {}", err)
+                ))?
+            ),
+            _ => display_human_readable(&assignment),
+        }
+
+        Ok(())
+    }
+}
+
+fn display_human_readable(assignment: &Assignment) {
+    let (id, id_type) = assignment.identity.parts();
+    println!("ID: {}", id);
+    println!("    Type: {}", id_type);
+    println!("    Roles:");
+    for role in &assignment.roles {
+        println!("        {}", role);
     }
 }
 
