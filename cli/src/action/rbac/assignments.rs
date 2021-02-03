@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::BTreeSet;
+
 use clap::ArgMatches;
 
 use crate::action::{
-    api::{Assignment, AssignmentBuilder, Identity},
+    api::{Assignment, AssignmentBuilder, AssignmentUpdateBuilder, Identity, SplinterRestClient},
     print_table, Action,
 };
 use crate::error::CliError;
@@ -117,6 +119,112 @@ impl Action for ShowAssignmentAction {
 
         Ok(())
     }
+}
+
+pub struct UpdateAssignmentAction;
+
+impl Action for UpdateAssignmentAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let identity = get_identity_arg(&arg_matches)?;
+
+        let force = arg_matches
+            .map(|args| args.is_present("force"))
+            .unwrap_or(false);
+
+        let roles_to_add = arg_matches
+            .and_then(|args| args.values_of("add_role"))
+            .map(|vals| vals.map(|s| s.to_owned()).collect())
+            .unwrap_or_else(Vec::new);
+
+        let rm_all = arg_matches
+            .map(|args| args.is_present("rm_all"))
+            .unwrap_or(false);
+        let role_removal = if rm_all {
+            RoleRemoval::RemoveAll
+        } else {
+            RoleRemoval::Remove(
+                arg_matches
+                    .and_then(|args| args.values_of("rm_role"))
+                    .map(|vals| vals.map(|s| s.to_owned()).collect())
+                    .unwrap_or_else(Vec::new),
+            )
+        };
+
+        update_assignment(
+            new_client(&arg_matches)?,
+            identity,
+            roles_to_add,
+            role_removal,
+            force,
+        )
+    }
+}
+
+enum RoleRemoval {
+    RemoveAll,
+    Remove(Vec<String>),
+}
+
+fn update_assignment(
+    client: SplinterRestClient,
+    identity: Identity,
+    roles_to_add: Vec<String>,
+    role_removal: RoleRemoval,
+    force: bool,
+) -> Result<(), CliError> {
+    let assignment = client.get_assignment(&identity)?;
+
+    let roles = match role_removal {
+        RoleRemoval::RemoveAll => {
+            println!("Removing roles {}", assignment.roles.join(", "));
+            roles_to_add
+        }
+        RoleRemoval::Remove(roles_to_rm) => {
+            let mut roles_to_add = roles_to_add.into_iter().collect::<BTreeSet<_>>();
+            let mut roles_to_rm = roles_to_rm.into_iter().collect::<BTreeSet<_>>();
+
+            if !force && roles_to_add.intersection(&roles_to_rm).count() > 0 {
+                return Err(CliError::ActionError(format!(
+                    "Cannot add and remove the same roles: {}",
+                    roles_to_add
+                        .intersection(&roles_to_rm)
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+
+            let mut current_roles = assignment
+                .roles
+                .into_iter()
+                .filter(|perm| !roles_to_rm.remove(perm))
+                .collect::<BTreeSet<_>>();
+
+            current_roles.append(&mut roles_to_add);
+
+            let roles = current_roles.into_iter().collect::<Vec<_>>();
+
+            if !force && !roles_to_rm.is_empty() {
+                return Err(CliError::ActionError(format!(
+                    "Cannot remove roles that do not belong to the assignment: {}",
+                    roles_to_rm
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+
+            roles
+        }
+    };
+
+    client.update_assignment(
+        AssignmentUpdateBuilder::default()
+            .with_identity(identity)
+            .with_roles(Some(roles))
+            .build()?,
+    )
 }
 
 fn display_human_readable(assignment: &Assignment) {
