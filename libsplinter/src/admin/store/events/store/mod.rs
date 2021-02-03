@@ -19,13 +19,14 @@
 //!
 //! [`AdminServiceEventStore`]: trait.AdminServiceEventStore.html
 
-#[cfg(feature = "admin-service-event-store-diesel")]
+#[cfg(any(feature = "admin-service-event-store-postgres", feature = "sqlite"))]
 pub mod diesel;
 mod error;
 pub mod memory;
 
 pub use self::error::AdminServiceEventStoreError;
-use crate::admin::service::{event::AdminServiceEvent, messages};
+use crate::admin::service::messages;
+use crate::admin::store::events::AdminServiceEvent;
 
 /// Return type of the `AdminServiceEventStore` `list_events_*` methods.
 pub type EventIter = Box<dyn ExactSizeIterator<Item = AdminServiceEvent> + Send>;

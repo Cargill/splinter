@@ -22,11 +22,11 @@ use std::time;
 use crate::admin::messages::AdminServiceEvent;
 #[cfg(feature = "authorization")]
 use crate::admin::rest_api::CIRCUIT_READ_PERMISSION;
-#[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event;
 use crate::admin::service::{
     AdminCommands, AdminServiceEventSubscriber, AdminServiceStatus, AdminSubscriberError,
 };
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::store::events;
 use crate::protocol;
 use crate::rest_api::actix_web_1::{
     new_websocket_event_sender, EventSender, Method, ProtocolVersionRangeGuard, Request, Resource,
@@ -296,7 +296,7 @@ impl AdminServiceEventSubscriber for WsAdminServiceEventSubscriber {
     }
 
     #[cfg(feature = "admin-service-event-store")]
-    fn handle_event(&self, event: &event::AdminServiceEvent) -> Result<(), AdminSubscriberError> {
+    fn handle_event(&self, event: &events::AdminServiceEvent) -> Result<(), AdminSubscriberError> {
         let json_event = JsonAdminEvent::from(event);
         self.sender.send(json_event).map_err(|_| {
             debug!("Dropping admin service event and unsubscribing due to websocket being closed");
@@ -335,12 +335,12 @@ impl From<(time::SystemTime, AdminServiceEvent)> for JsonAdminEvent {
 // `timestamp` is set to the `UNIX_EPOCH` value to allow for backward-compatibility, as the
 // `timestamp` is not used by the `AdminServiceEventStore`.
 #[cfg(feature = "admin-service-event-store")]
-impl From<&event::AdminServiceEvent> for JsonAdminEvent {
-    fn from(event: &event::AdminServiceEvent) -> Self {
+impl From<&events::AdminServiceEvent> for JsonAdminEvent {
+    fn from(event: &events::AdminServiceEvent) -> Self {
         Self {
             timestamp: time::SystemTime::now(),
             event: AdminServiceEvent::from(event),
-            event_id: Some(event.event_id),
+            event_id: Some(*event.event_id()),
         }
     }
 }

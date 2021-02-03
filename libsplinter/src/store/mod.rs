@@ -72,7 +72,7 @@ pub trait StoreFactory {
     #[cfg(feature = "admin-service-event-store")]
     fn get_admin_service_event_store(
         &self,
-    ) -> Box<dyn crate::admin::service::event::store::AdminServiceEventStore>;
+    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection

@@ -14,8 +14,6 @@
 
 mod consensus;
 pub(crate) mod error;
-#[cfg(feature = "admin-service-event-store")]
-pub mod event;
 #[cfg(not(feature = "admin-service-event-store"))]
 mod mailbox;
 pub(crate) mod messages;
@@ -36,7 +34,7 @@ use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
 #[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event::store::AdminServiceEventStore;
+use crate::admin::store::events::{self, store::AdminServiceEventStore};
 use crate::admin::store::{self, AdminServiceStore};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
@@ -80,7 +78,7 @@ pub trait AdminServiceEventSubscriber: Send {
     #[cfg(feature = "admin-service-event-store")]
     fn handle_event(
         &self,
-        admin_service_event: &event::AdminServiceEvent,
+        admin_service_event: &events::AdminServiceEvent,
     ) -> Result<(), AdminSubscriberError>;
 }
 
@@ -169,12 +167,12 @@ impl Iterator for Events {
 
 #[cfg(feature = "admin-service-event-store")]
 pub struct Events {
-    inner: Box<dyn ExactSizeIterator<Item = event::AdminServiceEvent> + Send>,
+    inner: Box<dyn ExactSizeIterator<Item = events::AdminServiceEvent> + Send>,
 }
 
 #[cfg(feature = "admin-service-event-store")]
 impl Iterator for Events {
-    type Item = event::AdminServiceEvent;
+    type Item = events::AdminServiceEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
@@ -853,9 +851,9 @@ mod tests {
         sqlite::SqliteConnection,
     };
 
-    #[cfg(feature = "admin-service-event-store")]
-    use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
     use crate::admin::store::diesel::DieselAdminServiceStore;
+    #[cfg(feature = "admin-service-event-store")]
+    use crate::admin::store::events::store::memory::MemoryAdminServiceEventStore;
     use crate::circuit::routing::memory::RoutingTable;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;

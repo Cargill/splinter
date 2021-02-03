@@ -98,7 +98,7 @@ experimental = [
 admin-service-event-store = [
   "splinter/admin-service-event-store",
   "splinter/admin-service",
-  "splinter/admin-service-event-store-diesel",
+  "splinter/admin-service-event-store-postgres",
 ]
 authorization = [
     "health/authorization",

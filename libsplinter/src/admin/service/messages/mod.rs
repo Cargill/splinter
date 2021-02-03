@@ -16,9 +16,9 @@ pub mod builders;
 
 use protobuf::{self, RepeatedField};
 
-#[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event::{self, EventType};
 use crate::admin::store;
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::store::events::{self, EventType};
 use crate::hex::{as_hex, deserialize_hex};
 use crate::protos::admin::{self, CircuitCreateRequest};
 
@@ -742,10 +742,10 @@ impl AdminServiceEvent {
 }
 
 #[cfg(feature = "admin-service-event-store")]
-impl From<&event::AdminServiceEvent> for AdminServiceEvent {
-    fn from(event_entry: &event::AdminServiceEvent) -> Self {
-        let admin_proposal = CircuitProposal::from(event_entry.proposal.clone());
-        match &event_entry.event_type {
+impl From<&events::AdminServiceEvent> for AdminServiceEvent {
+    fn from(event_entry: &events::AdminServiceEvent) -> Self {
+        let admin_proposal = CircuitProposal::from(event_entry.proposal().clone());
+        match event_entry.event_type() {
             EventType::ProposalSubmitted => AdminServiceEvent::ProposalSubmitted(admin_proposal),
             EventType::ProposalVote { requester } => {
                 AdminServiceEvent::ProposalVote((admin_proposal, requester.to_vec()))

@@ -26,15 +26,15 @@ use crate::admin::service::messages;
 use crate::admin::store as admin_store;
 use crate::error::InvalidStateError;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// Representation of an `AdminServiceEvent` defined by the admin messages
 pub struct AdminServiceEvent {
-    pub event_id: i64,
-    pub event_type: EventType,
-    pub proposal: admin_store::CircuitProposal,
+    event_id: i64,
+    event_type: EventType,
+    proposal: admin_store::CircuitProposal,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// Native representation of the `AdminServiceEvent` enum variants
 pub enum EventType {
     ProposalSubmitted,
@@ -43,6 +43,20 @@ pub enum EventType {
     ProposalRejected { requester: Vec<u8> },
     CircuitReady,
     CircuitDisbanded,
+}
+
+impl AdminServiceEvent {
+    pub fn event_id(&self) -> &i64 {
+        &self.event_id
+    }
+
+    pub fn event_type(&self) -> &EventType {
+        &self.event_type
+    }
+
+    pub fn proposal(&self) -> &admin_store::CircuitProposal {
+        &self.proposal
+    }
 }
 
 impl TryFrom<(i64, &messages::AdminServiceEvent)> for AdminServiceEvent {

@@ -26,11 +26,11 @@ mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
-use crate::admin::service::event::{
+use crate::admin::service::messages;
+use crate::admin::store::events::{
     store::{AdminServiceEventStore, AdminServiceEventStoreError, EventIter},
     AdminServiceEvent,
 };
-use crate::admin::service::messages;
 
 use operations::add_event::AdminServiceEventStoreAddEventOperation as _;
 use operations::list_events_by_management_type_since::AdminServiceEventStoreListEventsByManagementTypeSinceOperation as _;
@@ -86,7 +86,7 @@ impl AdminServiceEventStore for DieselAdminServiceEventStore<diesel::sqlite::Sql
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "admin-service-event-store-postgres")]
 impl Clone for DieselAdminServiceEventStore<diesel::pg::PgConnection> {
     fn clone(&self) -> Self {
         Self {
@@ -95,7 +95,7 @@ impl Clone for DieselAdminServiceEventStore<diesel::pg::PgConnection> {
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "admin-service-event-store-postgres")]
 impl AdminServiceEventStore for DieselAdminServiceEventStore<diesel::pg::PgConnection> {
     fn add_event(
         &self,
@@ -123,7 +123,7 @@ impl AdminServiceEventStore for DieselAdminServiceEventStore<diesel::pg::PgConne
 pub mod tests {
     use super::*;
 
-    use crate::admin::service::event::EventType;
+    use crate::admin::store::events::EventType;
     use crate::admin::store::{
         CircuitProposal, CircuitProposalBuilder, CircuitStatus, ProposalType,
         ProposedCircuitBuilder, ProposedNodeBuilder, ProposedServiceBuilder,

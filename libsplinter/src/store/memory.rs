@@ -21,7 +21,7 @@ use diesel::{
 };
 
 #[cfg(feature = "admin-service-event-store")]
-use crate::admin::service::event::store::memory::MemoryAdminServiceEventStore;
+use crate::admin::store::events::store::memory::MemoryAdminServiceEventStore;
 #[cfg(feature = "oauth")]
 use crate::biome::MemoryOAuthUserSessionStore;
 #[cfg(feature = "biome-credentials")]
@@ -199,7 +199,7 @@ impl StoreFactory for MemoryStoreFactory {
     #[cfg(feature = "admin-service-event-store")]
     fn get_admin_service_event_store(
         &self,
-    ) -> Box<dyn crate::admin::service::event::store::AdminServiceEventStore> {
+    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
         MemoryAdminServiceEventStore::new_boxed_with_bound(
             std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
         )

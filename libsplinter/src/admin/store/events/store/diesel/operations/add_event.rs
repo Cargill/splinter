@@ -20,7 +20,8 @@ use diesel::{dsl::insert_into, prelude::*};
 
 use super::AdminServiceEventStoreOperations;
 
-use crate::admin::service::event::{
+use crate::admin::service::messages;
+use crate::admin::store::events::{
     store::{
         diesel::{
             models::{
@@ -40,18 +41,17 @@ use crate::admin::service::event::{
     },
     AdminServiceEvent,
 };
-use crate::admin::service::messages;
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType};
 
-pub(in crate::admin::service::event::store::diesel) trait AdminServiceEventStoreAddEventOperation {
+pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreAddEventOperation {
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
     ) -> Result<AdminServiceEvent, AdminServiceEventStoreError>;
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "admin-service-event-store-postgres")]
 impl<'a> AdminServiceEventStoreAddEventOperation
     for AdminServiceEventStoreOperations<'a, diesel::pg::PgConnection>
 {
