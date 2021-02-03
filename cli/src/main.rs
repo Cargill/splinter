@@ -1358,6 +1358,43 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 ),
                         )
                 )
+                .subcommand(
+                    SubCommand::with_name("delete")
+                        .about("Deletes an authorized identity on a Splinter node")
+                        .arg(
+                            Arg::with_name("url")
+                                .short("U")
+                                .long("url")
+                                .help("URL of the Splinter daemon REST API")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("private_key_file")
+                                .value_name("private-key-file")
+                                .short("k")
+                                .long("key")
+                                .takes_value(true)
+                                .help("Name or path of private key"),
+                        )
+                        .arg(
+                            Arg::with_name("id_key")
+                                .value_name("public-key")
+                                .long("id-key")
+                                .takes_value(true)
+                                .required_unless("id_user")
+                                .conflicts_with("id_user")
+                                .help("The public key identity being deleted"),
+                        )
+                        .arg(
+                            Arg::with_name("id_user")
+                                .value_name("user-id")
+                                .long("id-user")
+                                .takes_value(true)
+                                .required_unless("id_key")
+                                .conflicts_with("id_key")
+                                .help("The user identity being deleted"),
+                        )
+                )
         );
     }
 
@@ -1517,7 +1554,8 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                     .with_command("list", rbac::ListAssignmentsAction)
                     .with_command("show", rbac::ShowAssignmentAction)
                     .with_command("create", rbac::CreateAssignmentAction)
-                    .with_command("update", rbac::UpdateAssignmentAction),
+                    .with_command("update", rbac::UpdateAssignmentAction)
+                    .with_command("delete", rbac::DeleteAssignmentAction),
             )
     }
 
