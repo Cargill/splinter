@@ -24,7 +24,8 @@ use crate::action::{
 use crate::error::CliError;
 
 pub use assignments::{
-    CreateAssignmentAction, ListAssignmentsAction, ShowAssignmentAction, UpdateAssignmentAction,
+    CreateAssignmentAction, DeleteAssignmentAction, ListAssignmentsAction, ShowAssignmentAction,
+    UpdateAssignmentAction,
 };
 pub use roles::{
     CreateRoleAction, DeleteRoleAction, ListRolesAction, ShowRoleAction, UpdateRoleAction,

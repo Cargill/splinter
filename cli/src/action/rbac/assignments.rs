@@ -227,6 +227,15 @@ fn update_assignment(
     )
 }
 
+pub struct DeleteAssignmentAction;
+
+impl Action for DeleteAssignmentAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let identity = get_identity_arg(&arg_matches)?;
+        new_client(&arg_matches)?.delete_assignment(&identity)
+    }
+}
+
 fn display_human_readable(assignment: &Assignment) {
     let (id, id_type) = assignment.identity.parts();
     println!("ID: {}", id);
