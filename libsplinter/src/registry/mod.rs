@@ -262,7 +262,24 @@ pub trait RegistryWriter: Send + Sync {
     ///
     /// * `node` - The node to be added to or updated in the registry.
     ///
+    #[deprecated(since = "0.5.1", note = "replaced by `add_node` and `update_node`")]
     fn insert_node(&self, node: Node) -> Result<(), RegistryError>;
+
+    /// Adds a new node to the registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node to be added to the registry.
+    ///
+    fn add_node(&self, node: Node) -> Result<(), RegistryError>;
+
+    /// Replaces an existing node with the same identity.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node to be updated in the registry.
+    ///
+    fn update_node(&self, node: Node) -> Result<(), RegistryError>;
 
     /// Deletes a node with the given identity and returns the node if it was in the registry.
     ///
@@ -320,7 +337,16 @@ where
     NW: RegistryWriter + ?Sized,
 {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
+        #[allow(deprecated)]
         (**self).insert_node(node)
+    }
+
+    fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+        (**self).add_node(node)
+    }
+
+    fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+        (**self).update_node(node)
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {

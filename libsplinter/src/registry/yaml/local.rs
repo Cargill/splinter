@@ -27,8 +27,8 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::registry::{
-    validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
-    RegistryWriter, RwRegistry,
+    validate_nodes, InvalidNodeError, MetadataPredicate, Node, NodeIter, RegistryError,
+    RegistryReader, RegistryWriter, RwRegistry,
 };
 
 /// A local, read/write registry.
@@ -126,6 +126,28 @@ impl RegistryWriter for LocalYamlRegistry {
         nodes.retain(|existing_node| existing_node.identity != node.identity);
         nodes.push(node);
         self.write_nodes(nodes)
+    }
+
+    fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+        let mut nodes = self.get_nodes()?;
+        nodes.push(node);
+        self.write_nodes(nodes)
+    }
+
+    fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+        let mut nodes = self.get_nodes()?;
+        if nodes.iter().any(|n| n.identity == node.identity) {
+            nodes.retain(|existing_node| existing_node.identity != node.identity);
+            nodes.push(node);
+            self.write_nodes(nodes)
+        } else {
+            Err(RegistryError::InvalidNode(
+                InvalidNodeError::InvalidIdentity(
+                    node.identity,
+                    "Node does not exist in the registry".to_string(),
+                ),
+            ))
+        }
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
@@ -768,7 +790,7 @@ mod test {
     /// Verifies that insert_node successfully adds a new node to the yaml file.
     ///
     #[test]
-    fn test_add_node_ok() {
+    fn test_insert_add_node_ok() {
         let temp_dir = TempDir::new("test_add_node_ok").expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -783,6 +805,7 @@ mod test {
 
         let node = get_node_1();
 
+        #[allow(deprecated)]
         registry
             .insert_node(node.clone())
             .expect("Failed to insert node");
@@ -799,7 +822,7 @@ mod test {
     /// Verifies that insert_node successfully updates an existing node in the yaml file.
     ///
     #[test]
-    fn test_update_node_ok() {
+    fn test_insert_update_node_ok() {
         let temp_dir = TempDir::new("test_update_node_ok").expect("Failed to create temp dir");
         let path = temp_dir
             .path()
@@ -816,6 +839,7 @@ mod test {
         node.metadata
             .insert("location".to_string(), "Minneapolis".to_string());
 
+        #[allow(deprecated)]
         registry
             .insert_node(node.clone())
             .expect("Failed to insert node");
@@ -851,6 +875,7 @@ mod test {
 
         let mut node = get_node_2();
         node.endpoints = node1.endpoints.clone();
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -886,6 +911,7 @@ mod test {
 
         let mut node = get_node_1();
         node.identity = "".to_string();
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -919,6 +945,7 @@ mod test {
 
         let mut node = get_node_1();
         node.endpoints = vec!["".to_string()];
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -952,6 +979,7 @@ mod test {
 
         let mut node = get_node_1();
         node.display_name = "".to_string();
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -985,6 +1013,7 @@ mod test {
 
         let mut node = get_node_1();
         node.keys = vec!["".to_string()];
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -1018,6 +1047,7 @@ mod test {
 
         let mut node = get_node_1();
         node.endpoints = vec![];
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -1051,6 +1081,7 @@ mod test {
 
         let mut node = get_node_1();
         node.keys = vec![];
+        #[allow(deprecated)]
         let result = registry.insert_node(node);
 
         match result {
@@ -1058,6 +1089,313 @@ mod test {
             Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
             Err(err) => panic!(
                 "Should have gotten InvalidNodeError::MissingKeys but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::DuplicateEndpoint when a node
+    /// with the same endpoint already exists in the yaml file.
+    ///
+    #[test]
+    fn test_add_node_duplicate_endpoint_error() {
+        let temp_dir = TempDir::new("test_xv_node_duplicate_endpoint_error")
+            .expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        let node1 = get_node_1();
+
+        write_to_file(&vec![node1.clone()], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_2();
+        node.endpoints = node1.endpoints.clone();
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
+                assert!(node1.endpoints.contains(&endpoint))
+            }
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::EmptyIdentity when a node with
+    /// an empty string as its identity is added to the registry.
+    ///
+    #[test]
+    fn test_add_node_empty_identity_error() {
+        let temp_dir =
+            TempDir::new("test_add_node_empty_identity_error").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_1();
+        node.identity = "".to_string();
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node identity is empty. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::EmptyEndpoint when a node with
+    /// an empty string in its endpoints is added to the registry.
+    ///
+    #[test]
+    fn test_add_node_empty_endpoint_error() {
+        let temp_dir =
+            TempDir::new("test_add_node_empty_endpoint_error").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_1();
+        node.endpoints = vec!["".to_string()];
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node endpoint is empty. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::EmptyDisplayName when a node
+    /// with an empty string as its display_name is added to the registry.
+    ///
+    #[test]
+    fn test_add_node_empty_display_name_error() {
+        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+            .expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_1();
+        node.display_name = "".to_string();
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node display_name is empty. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::EmptyKey when a node with
+    /// an empty string in its keys is added to the registry.
+    ///
+    #[test]
+    fn test_add_node_empty_key_error() {
+        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+            .expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_1();
+        node.keys = vec!["".to_string()];
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node key is empty. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::EmptyKey but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::MissingEndpoints when a node with no
+    /// endpoints is added to the registry.
+    ///
+    #[test]
+    fn test_add_node_missing_endpoints_error() {
+        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+            .expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_1();
+        node.endpoints = vec![];
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node endpoints is empty. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that add_node returns InvalidNodeError::MissingKeys when a node with no
+    /// keys is added to the registry.
+    ///
+    #[test]
+    fn test_add_node_missing_keys_error() {
+        let temp_dir = TempDir::new("test_add_node_missing_endpoints_error")
+            .expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        write_to_file(&vec![], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_1();
+        node.keys = vec![];
+        let result = registry.add_node(node);
+
+        match result {
+            Ok(_) => panic!("Node keys is empty. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::MissingKeys but got {}",
+                err
+            ),
+        }
+    }
+
+    ///
+    /// Verifies that update_node successfully updates an existing node in the yaml file.
+    ///
+    #[test]
+    fn test_update_node_ok() {
+        let temp_dir = TempDir::new("test_update_node_ok").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        let mut node = get_node_1();
+        write_to_file(&vec![node.clone()], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        node.metadata
+            .insert("location".to_string(), "Minneapolis".to_string());
+
+        #[allow(deprecated)]
+        registry
+            .update_node(node.clone())
+            .expect("Failed to insert node");
+
+        let nodes = registry
+            .list_nodes(&[])
+            .expect("Failed to retrieve nodes")
+            .collect::<Vec<_>>();
+
+        assert_eq!(nodes, vec![node]);
+    }
+
+    ///
+    /// Verifies that update_node returns InvalidNodeError::DuplicateEndpoint when a node
+    /// with the same endpoint already exists in the yaml file.
+    ///
+    #[test]
+    fn test_update_node_duplicate_endpoint_error() {
+        let temp_dir = TempDir::new("test_xv_node_duplicate_endpoint_error")
+            .expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("registry.yaml")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        let node1 = get_node_1();
+        let node2 = get_node_2();
+
+        write_to_file(&vec![node1.clone(), node2.clone()], &path);
+
+        let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
+
+        let mut node = get_node_2();
+        node.endpoints = node1.endpoints.clone();
+        let result = registry.update_node(node);
+
+        match result {
+            Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
+            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
+                assert!(node1.endpoints.contains(&endpoint))
+            }
+            Err(err) => panic!(
+                "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
                 err
             ),
         }

@@ -14,12 +14,14 @@
 
 //! Provides database operations for the `DieselRegistry`.
 
+pub(super) mod add_node;
 pub(super) mod count_nodes;
 pub(super) mod delete_node;
 pub(super) mod fetch_node;
 pub(super) mod has_node;
 pub(super) mod insert_node;
 pub(super) mod list_nodes;
+pub(super) mod update_node;
 
 use diesel::{
     dsl::{exists, not},

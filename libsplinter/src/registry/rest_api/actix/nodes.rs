@@ -26,8 +26,7 @@ use crate::protocol;
 use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
     rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
-    InvalidNodeError, MetadataPredicate, Node, RegistryError, RegistryReader, RegistryWriter,
-    RwRegistry,
+    MetadataPredicate, Node, RegistryError, RegistryReader, RegistryWriter, RwRegistry,
 };
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
@@ -225,17 +224,8 @@ fn add_node(
             })
             .into_future()
             .and_then(move |body| match serde_json::from_slice::<Node>(&body) {
-                Ok(node) => Box::new(
-                    web::block(move || {
-                        if registry.has_node(&node.identity)? {
-                            Err(RegistryError::InvalidNode(
-                                InvalidNodeError::DuplicateIdentity(node.identity),
-                            ))
-                        } else {
-                            registry.insert_node(node)
-                        }
-                    })
-                    .then(|res| {
+                Ok(node) => {
+                    Box::new(web::block(move || registry.add_node(node)).then(|res| {
                         Ok(match res {
                             Ok(_) => HttpResponse::Ok().finish(),
                             Err(BlockingError::Error(RegistryError::InvalidNode(err))) => {
@@ -249,9 +239,8 @@ fn add_node(
                                     .json(ErrorResponse::internal_error())
                             }
                         })
-                    }),
-                )
-                    as Box<dyn Future<Item = HttpResponse, Error = Error>>,
+                    })) as Box<dyn Future<Item = HttpResponse, Error = Error>>
+                }
                 Err(err) => Box::new(
                     HttpResponse::BadRequest()
                         .json(ErrorResponse::bad_request(&format!(
@@ -273,7 +262,7 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::registry::NodeIter;
+    use crate::registry::{InvalidNodeError, NodeIter};
     use crate::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
@@ -451,21 +440,6 @@ mod tests {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        // Verify a duplicate node gets a BAD_REQUEST response
-        let url = Url::parse(&format!("http://{}/registry/nodes", bind_url))
-            .expect("Failed to parse URL");
-        let resp = Client::new()
-            .post(url)
-            .header(
-                "SplinterProtocolVersion",
-                protocol::REGISTRY_PROTOCOL_VERSION,
-            )
-            .json(&get_node_1())
-            .send()
-            .expect("Failed to perform request");
-
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-
         shutdown_handle
             .shutdown()
             .expect("Unable to shutdown rest api");
@@ -595,6 +569,30 @@ mod tests {
                 .expect("mem registry lock was poisoned")
                 .insert(node.identity.clone(), node);
             Ok(())
+        }
+
+        fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+            self.nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .insert(node.identity.clone(), node);
+            Ok(())
+        }
+
+        fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+            let mut inner = self.nodes.lock().expect("mem registry lock was poisoned");
+
+            if inner.contains_key(&node.identity) {
+                inner.insert(node.identity.clone(), node);
+                Ok(())
+            } else {
+                Err(RegistryError::InvalidNode(
+                    InvalidNodeError::InvalidIdentity(
+                        node.identity,
+                        "Node does not exist in the registry".to_string(),
+                    ),
+                ))
+            }
         }
 
         fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {

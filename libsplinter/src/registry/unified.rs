@@ -201,7 +201,16 @@ impl RegistryReader for UnifiedRegistry {
 
 impl RegistryWriter for UnifiedRegistry {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
+        #[allow(deprecated)]
         self.internal_source.insert_node(node)
+    }
+
+    fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+        self.internal_source.add_node(node)
+    }
+
+    fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+        self.internal_source.update_node(node)
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
@@ -230,6 +239,7 @@ mod test {
     use std::sync::{Arc, Mutex};
 
     use super::*;
+    use crate::registry::InvalidNodeError;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
         let mut builder = Node::builder(id).with_endpoint(endpoint).with_key("abcd");
@@ -258,17 +268,11 @@ mod test {
         let node3 = new_node("node1", "endpoint3", &[("meta_c", "val_c")]);
 
         let writeable = MemRegistry::default();
-        writeable
-            .insert_node(node1)
-            .expect("Unable to insert node1");
-        writeable
-            .insert_node(node2)
-            .expect("Unable to insert node2");
+        writeable.add_node(node1).expect("Unable to insert node1");
+        writeable.add_node(node2).expect("Unable to insert node2");
 
         let readable = MemRegistry::default();
-        writeable
-            .insert_node(node3)
-            .expect("Unable to insert node3");
+        writeable.add_node(node3).expect("Unable to insert node3");
 
         let unified = UnifiedRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
 
@@ -295,15 +299,11 @@ mod test {
         );
 
         let writeable = MemRegistry::default();
-        writeable
-            .insert_node(node1)
-            .expect("Unable to insert node1");
-        writeable
-            .insert_node(node2)
-            .expect("Unable to insert node2");
+        writeable.add_node(node1).expect("Unable to insert node1");
+        writeable.add_node(node2).expect("Unable to insert node2");
 
         let readable = MemRegistry::default();
-        readable.insert_node(node3).expect("Unable to insert node3");
+        readable.add_node(node3).expect("Unable to insert node3");
 
         let unified = UnifiedRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
 
@@ -325,7 +325,7 @@ mod test {
 
         let readable = MemRegistry::default();
         readable
-            .insert_node(node.clone())
+            .add_node(node.clone())
             .expect("Unable to insert node");
 
         let unified =
@@ -346,7 +346,7 @@ mod test {
 
         let writable = MemRegistry::default();
         writable
-            .insert_node(node.clone())
+            .add_node(node.clone())
             .expect("Unable to insert node");
 
         let unified =
@@ -381,17 +381,17 @@ mod test {
 
         let high_precedence_readable = MemRegistry::default();
         high_precedence_readable
-            .insert_node(high_precedence_node)
+            .add_node(high_precedence_node)
             .expect("Unable to insert high-precedence node");
 
         let med_precedence_readable = MemRegistry::default();
         med_precedence_readable
-            .insert_node(med_precedence_node)
+            .add_node(med_precedence_node)
             .expect("Unable to insert medium-precedence node");
 
         let low_precedence_readable = MemRegistry::default();
         low_precedence_readable
-            .insert_node(low_precedence_node)
+            .add_node(low_precedence_node)
             .expect("Unable to insert low-precedence node");
 
         let unified = UnifiedRegistry::new(
@@ -432,17 +432,17 @@ mod test {
 
         let writable = MemRegistry::default();
         writable
-            .insert_node(high_precedence_node)
+            .add_node(high_precedence_node)
             .expect("Unable to insert high-precedence node");
 
         let med_precedence_readable = MemRegistry::default();
         med_precedence_readable
-            .insert_node(med_precedence_node)
+            .add_node(med_precedence_node)
             .expect("Unable to insert medium-precedence node");
 
         let low_precedence_readable = MemRegistry::default();
         low_precedence_readable
-            .insert_node(low_precedence_node)
+            .add_node(low_precedence_node)
             .expect("Unable to insert low-precedence node");
 
         let unified = UnifiedRegistry::new(
@@ -469,12 +469,12 @@ mod test {
 
         let writable = MemRegistry::default();
         writable
-            .insert_node(node1.clone())
+            .add_node(node1.clone())
             .expect("Unable to insert node");
 
         let readable = MemRegistry::default();
         readable
-            .insert_node(node2.clone())
+            .add_node(node2.clone())
             .expect("Unable to insert node");
 
         let unified = UnifiedRegistry::new(Box::new(writable), vec![Box::new(readable)]);
@@ -533,20 +533,20 @@ mod test {
 
         let writable = MemRegistry::default();
         writable
-            .insert_node(node1_internal)
+            .add_node(node1_internal)
             .expect("Unable to insert internal node1");
 
         let readable_high = MemRegistry::default();
         readable_high
-            .insert_node(node1_read_only)
+            .add_node(node1_read_only)
             .expect("Unable to insert read-only node1");
         readable_high
-            .insert_node(node2_high)
+            .add_node(node2_high)
             .expect("Unable to insert high-precedence node2");
 
         let readable_low = MemRegistry::default();
         readable_low
-            .insert_node(node2_low)
+            .add_node(node2_low)
             .expect("Unable to insert low-precedence node2");
 
         let unified = UnifiedRegistry::new(
@@ -584,14 +584,12 @@ mod test {
 
         let writeable = MemRegistry::default();
         writeable
-            .insert_node(node1.clone())
+            .add_node(node1.clone())
             .expect("Unable to insert node1");
-        writeable
-            .insert_node(node2)
-            .expect("Unable to insert node2");
+        writeable.add_node(node2).expect("Unable to insert node2");
 
         let readable = MemRegistry::default();
-        readable.insert_node(node3).expect("Unable to insert node3");
+        readable.add_node(node3).expect("Unable to insert node3");
 
         let unified = UnifiedRegistry::new(Box::new(writeable), vec![Box::new(readable)]);
 
@@ -617,7 +615,7 @@ mod test {
 
         let readable = MemRegistry::default();
         readable
-            .insert_node(node2.clone())
+            .add_node(node2.clone())
             .expect("Unable to insert node2 into read-only registry");
 
         let unified = UnifiedRegistry::new(
@@ -627,7 +625,7 @@ mod test {
 
         // Verify node1 is only added to writeable
         unified
-            .insert_node(node1.clone())
+            .add_node(node1.clone())
             .expect("Unable to add node1");
         assert!(unified
             .has_node(&node1.identity)
@@ -706,6 +704,30 @@ mod test {
                 .expect("mem registry lock was poisoned")
                 .insert(node.identity.clone(), node);
             Ok(())
+        }
+
+        fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+            self.nodes
+                .lock()
+                .expect("mem registry lock was poisoned")
+                .insert(node.identity.clone(), node);
+            Ok(())
+        }
+
+        fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+            let mut inner = self.nodes.lock().expect("mem registry lock was poisoned");
+
+            if inner.contains_key(&node.identity) {
+                inner.insert(node.identity.clone(), node);
+                Ok(())
+            } else {
+                Err(RegistryError::InvalidNode(
+                    InvalidNodeError::InvalidIdentity(
+                        node.identity,
+                        "Node does not exist in the registry".to_string(),
+                    ),
+                ))
+            }
         }
 
         fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {

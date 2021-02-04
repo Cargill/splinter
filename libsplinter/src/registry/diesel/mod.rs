@@ -30,12 +30,14 @@ use super::{
     MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader, RegistryWriter, RwRegistry,
 };
 
+use operations::add_node::RegistryAddNodeOperation as _;
 use operations::count_nodes::RegistryCountNodesOperation as _;
 use operations::delete_node::RegistryDeleteNodeOperation as _;
 use operations::fetch_node::RegistryFetchNodeOperation as _;
 use operations::has_node::RegistryHasNodeOperation as _;
 use operations::insert_node::RegistryInsertNodeOperation as _;
 use operations::list_nodes::RegistryListNodesOperation as _;
+use operations::update_node::RegistryUpdateNodeOperation as _;
 use operations::RegistryOperations;
 
 /// A database-backed registry, powered by [`Diesel`](https://crates.io/crates/diesel).
@@ -106,6 +108,14 @@ impl RegistryWriter for DieselRegistry<diesel::pg::PgConnection> {
         RegistryOperations::new(&*self.connection_pool.get()?).insert_node(node)
     }
 
+    fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+        RegistryOperations::new(&*self.connection_pool.get()?).add_node(node)
+    }
+
+    fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+        RegistryOperations::new(&*self.connection_pool.get()?).update_node(node)
+    }
+
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         RegistryOperations::new(&*self.connection_pool.get()?).delete_node(identity)
     }
@@ -115,6 +125,14 @@ impl RegistryWriter for DieselRegistry<diesel::pg::PgConnection> {
 impl RegistryWriter for DieselRegistry<diesel::sqlite::SqliteConnection> {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
         RegistryOperations::new(&*self.connection_pool.get()?).insert_node(node)
+    }
+
+    fn add_node(&self, node: Node) -> Result<(), RegistryError> {
+        RegistryOperations::new(&*self.connection_pool.get()?).add_node(node)
+    }
+
+    fn update_node(&self, node: Node) -> Result<(), RegistryError> {
+        RegistryOperations::new(&*self.connection_pool.get()?).update_node(node)
     }
 
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
@@ -180,6 +198,7 @@ pub mod tests {
         let pool = create_connection_pool_and_migrate();
         let registry = DieselRegistry::new(pool);
 
+        #[allow(deprecated)]
         registry
             .insert_node(get_node_1())
             .expect("Unable to insert node");
@@ -195,6 +214,28 @@ pub mod tests {
         }
     }
 
+    ///  Test that a new node can be add to the registry and fetched
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Add node 1
+    /// 3. Validate that the node can be fetched correctly from state
+    #[test]
+    fn test_add_node() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        #[allow(deprecated)]
+        registry
+            .add_node(get_node_1())
+            .expect("Unable to insert node");
+        let node = registry
+            .fetch_node(&get_node_1().identity)
+            .expect("Failed to fetch node")
+            .expect("Node not found");
+
+        assert_eq!(node, get_node_1());
+    }
+
     ///  Test that a new node can be inserted into the registry and fetched
     ///
     /// 1. Setup sqlite database
@@ -206,10 +247,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         assert_eq!(
@@ -231,7 +272,7 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
 
         assert!(registry
@@ -253,10 +294,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         let nodes = registry
@@ -296,10 +337,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Eq(
@@ -328,13 +369,13 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_3())
+            .add_node(get_node_3())
             .expect("Unable to insert node");
 
         let filter = vec![
@@ -369,10 +410,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Eq(
@@ -399,10 +440,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Ne(
@@ -430,10 +471,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Gt(
@@ -461,13 +502,13 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_3())
+            .add_node(get_node_3())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Ge(
@@ -495,10 +536,10 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Lt(
@@ -526,13 +567,13 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_3())
+            .add_node(get_node_3())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Le(
@@ -561,13 +602,13 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_3())
+            .add_node(get_node_3())
             .expect("Unable to insert node");
 
         registry
@@ -594,13 +635,13 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_3())
+            .add_node(get_node_3())
             .expect("Unable to insert node");
 
         let count = registry.count_nodes(&[]).expect("Failed to retrieve nodes");
@@ -619,13 +660,13 @@ pub mod tests {
         let registry = DieselRegistry::new(pool);
 
         registry
-            .insert_node(get_node_1())
+            .add_node(get_node_1())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_2())
+            .add_node(get_node_2())
             .expect("Unable to insert node");
         registry
-            .insert_node(get_node_3())
+            .add_node(get_node_3())
             .expect("Unable to insert node");
 
         let filter = vec![MetadataPredicate::Eq(

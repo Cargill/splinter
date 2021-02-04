@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "registry")]
+mod api;
+
+use clap::ArgMatches;
+use splinter::registry::Node;
+#[cfg(feature = "registry")]
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use clap::ArgMatches;
-use splinter::registry::Node;
-
 use crate::error::CliError;
+#[cfg(feature = "registry")]
+use crate::registry::api::RegistryNode;
 
 use super::api::SplinterRestClientBuilder;
 use super::{
@@ -170,5 +176,124 @@ impl Action for RegistryGenerateAction {
         info!("Added node '{}' to '{}'", node_status.node_id, output_file);
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "registry")]
+pub struct RegistryAddAction;
+
+#[cfg(feature = "registry")]
+impl Action for RegistryAddAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
+
+        let url = args
+            .value_of("url")
+            .map(ToOwned::to_owned)
+            .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+            .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
+
+        let identity = args
+            .value_of("identity")
+            .ok_or_else(|| CliError::ActionError("Identity must be specified".into()))?
+            .to_string();
+
+        let display_name = args
+            .value_of("display_name")
+            .unwrap_or(&identity)
+            .to_string();
+
+        let private_key = args.value_of("private_key_file");
+
+        let client = SplinterRestClientBuilder::new()
+            .with_url(url)
+            .with_auth(create_cylinder_jwt_auth(private_key)?)
+            .build()?;
+
+        let mut node_metadata: HashMap<String, String> = HashMap::new();
+        if let Some(metadata) = args.values_of("metadata") {
+            for pair in metadata {
+                let (key, value) = parse_metadata(pair)?;
+                node_metadata.insert(key, value);
+            }
+        }
+
+        if args.is_present("from_remote") {
+            let remote_node = client.get_node(&identity)?.ok_or_else(|| {
+                CliError::ActionError("Unable to retrieve node from remote".into())
+            })?;
+
+            let node = RegistryNode {
+                identity: remote_node.identity,
+                endpoints: remote_node.endpoints,
+                display_name: remote_node.display_name,
+                keys: remote_node.keys,
+                metadata: remote_node.metadata,
+            };
+
+            if !args.is_present("dry_run") {
+                client.add_node(&node)?;
+            }
+
+            info!("{}", node);
+
+            Ok(())
+        } else {
+            let endpoints: Vec<String> = args
+                .values_of("endpoint")
+                .ok_or_else(|| {
+                    CliError::ActionError("One or more endpoints must be specified".into())
+                })?
+                .map(String::from)
+                .collect::<Vec<String>>();
+
+            let keys: Vec<String> = args
+                .values_of("key_files")
+                .ok_or_else(|| {
+                    CliError::ActionError("One or more key files must be specified".into())
+                })?
+                .map(|key_file| read_private_key(key_file))
+                .collect::<Result<_, _>>()?;
+
+            let node = RegistryNode {
+                identity,
+                endpoints,
+                display_name,
+                keys,
+                metadata: node_metadata,
+            };
+
+            if !args.is_present("dry_run") {
+                client.add_node(&node)?
+            }
+
+            info!("{}", node);
+
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "registry")]
+fn parse_metadata(metadata: &str) -> Result<(String, String), CliError> {
+    let mut parts = metadata.splitn(2, ':');
+    match (parts.next(), parts.next()) {
+        (Some(key), Some(value)) => match key {
+            "" => Err(CliError::ActionError(
+                "Empty '--metadata' argument detected".into(),
+            )),
+            _ => match value {
+                "" => Err(CliError::ActionError(format!(
+                    "Empty value detected for key: {}",
+                    key
+                ))),
+                _ => Ok((key.to_string(), value.to_string())),
+            },
+        },
+        (Some(key), None) => Err(CliError::ActionError(format!(
+            "Missing value for metadata key '{}'",
+            key
+        ))),
+        _ => unreachable!(), // splitn always returns at least one item
     }
 }
