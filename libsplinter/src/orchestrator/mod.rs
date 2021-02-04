@@ -73,6 +73,9 @@ pub struct ServiceOrchestrator {
     inbound_router: InboundRouter<CircuitMessageType>,
     /// `running` and `join_handles` are used to shutdown the orchestrator's background threads
     running: Arc<AtomicBool>,
+    /// A (ServiceDefinition, ManagedService) map of services that have been stopped, but yet to
+    /// be completely destroyed
+    stopped_services: Arc<Mutex<HashMap<ServiceDefinition, Box<dyn Service>>>>,
 }
 
 impl ServiceOrchestrator {
@@ -86,6 +89,7 @@ impl ServiceOrchestrator {
         channel_capacity: usize,
     ) -> Result<(Self, JoinHandles<Result<(), OrchestratorError>>), NewOrchestratorError> {
         let services = Arc::new(Mutex::new(HashMap::new()));
+        let stopped_services = Arc::new(Mutex::new(HashMap::new()));
         let mesh = Mesh::new(incoming_capacity, outgoing_capacity);
         let mesh_id = format!("{}", Uuid::new_v4());
         mesh.add(connection, mesh_id.to_string())
@@ -175,6 +179,7 @@ impl ServiceOrchestrator {
                 network_sender,
                 inbound_router,
                 running,
+                stopped_services,
             },
             JoinHandles::new(vec![
                 incoming_join_handle,
@@ -230,8 +235,8 @@ impl ServiceOrchestrator {
         Ok(())
     }
 
-    /// Shut down (stop and destroy) the specified service.
-    pub fn shutdown_service(
+    /// Stop the specified service.
+    pub fn stop_service(
         &self,
         service_definition: &ServiceDefinition,
     ) -> Result<(), ShutdownServiceError> {
@@ -248,6 +253,28 @@ impl ServiceOrchestrator {
         service.stop(&registry).map_err(|err| {
             ShutdownServiceError::ShutdownFailed((service_definition.clone(), Box::new(err)))
         })?;
+
+        self.stopped_services
+            .lock()
+            .map_err(|_| ShutdownServiceError::LockPoisoned)?
+            .insert(service_definition.clone(), service);
+
+        Ok(())
+    }
+
+    /// Destroy the specified service. This action will also remove the LMDB files used by the
+    /// service state.
+    pub fn destroy_service(
+        &self,
+        service_definition: &ServiceDefinition,
+    ) -> Result<(), ShutdownServiceError> {
+        let service = self
+            .stopped_services
+            .lock()
+            .map_err(|_| ShutdownServiceError::LockPoisoned)?
+            .remove(service_definition)
+            .ok_or(ShutdownServiceError::UnknownService)?;
+
         service.destroy().map_err(|err| {
             ShutdownServiceError::ShutdownFailed((service_definition.clone(), Box::new(err)))
         })?;

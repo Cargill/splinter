@@ -2644,10 +2644,10 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
-    /// Shutdown all services that this node was running on the disbanded circuit using the service
+    /// Stops all services that this node was running on the disbanded circuit using the service
     /// orchestrator. This may not include all services if they are not supported locally. It is
     /// expected that some services will be stopped externally.
-    pub fn shutdown_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
+    pub fn stop_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
         let orchestrator =
             self.orchestrator
                 .lock()
@@ -2670,7 +2670,7 @@ impl AdminServiceShared {
 
         // Shutdown all services the orchestrator has a factory for
         for service in services {
-            debug!("Removing service: {}", service.service_id.clone());
+            debug!("Stopping service: {}", service.service_id.clone());
             let service_definition = ServiceDefinition {
                 circuit: circuit.circuit_id.clone(),
                 service_id: service.service_id.clone(),
@@ -2678,7 +2678,7 @@ impl AdminServiceShared {
             };
 
             orchestrator
-                .shutdown_service(&service_definition)
+                .stop_service(&service_definition)
                 .map_err(|err| AdminSharedError::ServiceShutdownFailed {
                     context: format!(
                         "Unable to shutdown service {} on circuit {}",
@@ -2769,7 +2769,7 @@ impl AdminServiceShared {
             // Circuit has been disbanded: all associated services will be shut
             // down, the circuit removed from the routing table, and peer refs
             // for this circuit will be removed.
-            self.shutdown_services(circuit_proposal.get_circuit_proposal())?;
+            self.stop_services(circuit_proposal.get_circuit_proposal())?;
             // Removing the circuit from the routing table
             self.routing_table_writer
                 .remove_circuit(circuit_proposal.get_circuit_id())
