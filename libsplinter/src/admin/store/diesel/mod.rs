@@ -27,10 +27,14 @@ mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::messages;
 use crate::admin::store::{
     error::AdminServiceStoreError, AdminServiceStore, Circuit, CircuitNode, CircuitPredicate,
     CircuitProposal, Service, ServiceId,
 };
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::store::{AdminServiceEvent, EventIter};
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
 use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
@@ -166,6 +170,28 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
     }
 
+    #[cfg(feature = "admin-service-event-store-postgres")]
+    fn add_event(
+        &self,
+        event: messages::AdminServiceEvent,
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "admin-service-event-store-postgres")]
+    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "admin-service-event-store-postgres")]
+    fn list_events_by_management_type_since(
+        &self,
+        management_type: String,
+        start: i64,
+    ) -> Result<EventIter, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
         Box::new(self.clone())
     }
@@ -253,6 +279,28 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn add_event(
+        &self,
+        event: messages::AdminServiceEvent,
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    fn list_events_by_management_type_since(
+        &self,
+        management_type: String,
+        start: i64,
+    ) -> Result<EventIter, AdminServiceStoreError> {
+        unimplemented!()
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {

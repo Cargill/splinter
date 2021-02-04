@@ -26,6 +26,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "admin-service-event-store")]
+use super::{AdminServiceEvent, EventIter};
 use super::{
     AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit, CircuitBuilder,
     CircuitNode, CircuitNodeBuilder, CircuitPredicate, CircuitProposal, CircuitProposalBuilder,
@@ -34,6 +36,8 @@ use super::{
     ProposedServiceBuilder, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
     VoteRecordBuilder,
 };
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::messages;
 
 use crate::error::{
     ConstraintViolationError, ConstraintViolationType, InternalError, InvalidStateError,
@@ -1001,6 +1005,46 @@ impl AdminServiceStore for YamlAdminServiceStore {
                 .to_vec();
 
         Ok(Box::new(services.into_iter()))
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    /// Add an event to the `AdminServiceEventStore`.  Returns the recorded event index and
+    /// a copy of the event.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - the `AdminServiceEvent` to be added to the store
+    fn add_event(
+        &self,
+        _event: messages::AdminServiceEvent,
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    /// List `AdminServiceEvent`s that have been added to the store since the provided index.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - index used to filter events
+    fn list_events_since(&self, _start: i64) -> Result<EventIter, AdminServiceStoreError> {
+        unimplemented!()
+    }
+
+    #[cfg(feature = "admin-service-event-store")]
+    /// List `AdminServiceEvent`s, with a corresponding `CircuitProposal` that has the specified
+    /// `circuit_management_type`, that have been added to the store since the provided index.
+    ///
+    /// # Arguments
+    ///
+    /// * `management_type` - management type used to filter `CircuitProposal`s
+    /// * `start` - index used to filter events
+    fn list_events_by_management_type_since(
+        &self,
+        _management_type: String,
+        _start: i64,
+    ) -> Result<EventIter, AdminServiceStoreError> {
+        unimplemented!()
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
