@@ -27,6 +27,8 @@ use protobuf::Message;
 
 #[cfg(any(feature = "circuit-purge", feature = "circuit-disband"))]
 use crate::admin::store::CircuitStatus as StoreCircuitStatus;
+#[cfg(feature = "circuit-purge")]
+use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
     AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
     CircuitProposal as StoreProposal, ProposalType, ProposedNode, Vote, VoteRecordBuilder,
@@ -980,6 +982,27 @@ impl AdminServiceShared {
 
     #[cfg(feature = "circuit-purge")]
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
+        // Verifying the circuit is able to be purged
+        let stored_circuit = self
+            .admin_store
+            .get_circuit(circuit_id)
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!("error occurred when trying to get circuit {}", err),
+                )))
+            })?
+            .ok_or_else(|| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!(
+                        "Received purged request for a circuit that does not exist: circuit id {}",
+                        circuit_id
+                    ),
+                )))
+            })?;
+
+        self.destroy_services(circuit_id, &stored_circuit.roster())
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
         if let Some(circuit) = self
             .remove_circuit(circuit_id)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
@@ -2686,6 +2709,59 @@ impl AdminServiceShared {
                     ),
                     source: Some(err),
                 })?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Destroys all services that this node was running on the disbanded circuit using the service
+    /// orchestrator. Destroying a service will also remove the service's state LMDB files.
+    pub fn destroy_services(
+        &mut self,
+        circuit_id: &str,
+        services: &[StoreService],
+    ) -> Result<(), AdminSharedError> {
+        let orchestrator =
+            self.orchestrator
+                .lock()
+                .map_err(|_| AdminSharedError::ServiceShutdownFailed {
+                    context: "ServiceOrchestrator lock poisoned".into(),
+                    source: None,
+                })?;
+
+        // Get all services this node is allowed to run
+        let services = services
+            .iter()
+            .filter_map(|service| {
+                if service.node_id() == self.node_id
+                    && orchestrator
+                        .supported_service_types()
+                        .contains(&service.service_type().to_string())
+                {
+                    return Some(ServiceDefinition {
+                        circuit: circuit_id.to_string(),
+                        service_id: service.service_id().to_string(),
+                        service_type: service.service_type().to_string(),
+                    });
+                }
+                None
+            })
+            .collect::<Vec<ServiceDefinition>>();
+
+        // Shutdown all services the orchestrator has a factory for
+        for service in services {
+            debug!("Destroying service: {}", service.service_id.clone());
+
+            orchestrator.destroy_service(&service).map_err(|err| {
+                AdminSharedError::ServiceShutdownFailed {
+                    context: format!(
+                        "Unable to shutdown service {} on circuit {}",
+                        service.service_id, circuit_id
+                    ),
+                    source: Some(err),
+                }
+            })?;
         }
 
         Ok(())
