@@ -17,10 +17,11 @@ use diesel::{
     prelude::*,
 };
 
+use crate::error::{ConstraintViolationError, ConstraintViolationType};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{AssignmentModel, IdentityModel},
-        schema::assignments,
+        schema::{assignments, identities},
     },
     Assignment, RoleBasedAuthorizationStoreError,
 };
@@ -44,6 +45,23 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (identity, roles): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
+            let count = identities::table
+                .filter(
+                    identities::identity
+                        .eq(&identity.identity)
+                        .and(identities::identity_type.eq(identity.identity_type)),
+                )
+                .count()
+                .get_result::<i64>(self.conn)?;
+
+            if count == 0 {
+                return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
+                ));
+            }
+
             delete(assignments::table.filter(assignments::identity.eq(&identity.identity)))
                 .execute(self.conn)?;
 
@@ -66,6 +84,23 @@ impl<'a> RoleBasedAuthorizationStoreUpdateAssignment
     ) -> Result<(), RoleBasedAuthorizationStoreError> {
         let (identity, roles): (IdentityModel, Vec<AssignmentModel>) = assignment.into();
         self.conn.transaction::<_, _, _>(|| {
+            let count = identities::table
+                .filter(
+                    identities::identity
+                        .eq(&identity.identity)
+                        .and(identities::identity_type.eq(identity.identity_type)),
+                )
+                .count()
+                .get_result::<i64>(self.conn)?;
+
+            if count == 0 {
+                return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
+                ));
+            }
+
             delete(assignments::table.filter(assignments::identity.eq(&identity.identity)))
                 .execute(self.conn)?;
 

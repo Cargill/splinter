@@ -1464,8 +1464,10 @@ mod tests {
                 assignments.insert(key, assignment);
                 Ok(())
             } else {
-                Err(RoleBasedAuthorizationStoreError::InvalidState(
-                    InvalidStateError::with_message("No assignment found".into()),
+                Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
                 ))
             }
         }

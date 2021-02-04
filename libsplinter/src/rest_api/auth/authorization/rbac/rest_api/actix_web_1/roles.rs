@@ -1187,12 +1187,21 @@ mod tests {
         }
 
         fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError> {
-            self.roles
+            let mut roles = self
+                .roles
                 .lock()
-                .expect("mem role based authorization store lock was poisoned")
-                .insert(role.id().to_string(), role);
+                .expect("mem role based authorization store lock was poisoned");
 
-            Ok(())
+            if roles.contains_key(role.id()) {
+                roles.insert(role.id().to_string(), role);
+                Ok(())
+            } else {
+                Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
+                ))
+            }
         }
 
         fn remove_role(&self, role_id: &str) -> Result<(), RoleBasedAuthorizationStoreError> {
