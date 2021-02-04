@@ -44,6 +44,8 @@ use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
 use operations::get_proposal::AdminServiceStoreFetchProposalOperation as _;
 use operations::get_service::AdminServiceStoreFetchServiceOperation as _;
 use operations::list_circuits::AdminServiceStoreListCircuitsOperation as _;
+#[cfg(feature = "admin-service-event-store")]
+use operations::list_events_since::AdminServiceStoreListEventsSinceOperation as _;
 use operations::list_nodes::AdminServiceStoreListNodesOperation as _;
 use operations::list_proposals::AdminServiceStoreListProposalsOperation as _;
 use operations::list_services::AdminServiceStoreListServicesOperation as _;
@@ -182,7 +184,7 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
 
     #[cfg(feature = "admin-service-event-store-postgres")]
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
-        unimplemented!()
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
     }
 
     #[cfg(feature = "admin-service-event-store-postgres")]
@@ -293,7 +295,7 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
 
     #[cfg(feature = "admin-service-event-store")]
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
-        unimplemented!()
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
     }
 
     #[cfg(feature = "admin-service-event-store")]
