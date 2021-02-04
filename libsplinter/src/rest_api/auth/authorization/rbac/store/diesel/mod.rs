@@ -417,20 +417,27 @@ impl TryFrom<(models::IdentityModel, Vec<models::AssignmentModel>)> for Assignme
 impl From<diesel::result::Error> for RoleBasedAuthorizationStoreError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
-            diesel::result::Error::DatabaseError(
-                diesel::result::DatabaseErrorKind::UniqueViolation,
-                _,
-            ) => RoleBasedAuthorizationStoreError::ConstraintViolation(
-                ConstraintViolationError::from_source_with_violation_type(
-                    ConstraintViolationType::Unique,
+            diesel::result::Error::DatabaseError(ref kind, _) => match kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    RoleBasedAuthorizationStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    RoleBasedAuthorizationStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
                     Box::new(err),
-                ),
-            ),
-            diesel::result::Error::DatabaseError(_, _) => {
-                RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
-                    Box::new(err),
-                ))
-            }
+                )),
+            },
             _ => RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
                 Box::new(err),
             )),
