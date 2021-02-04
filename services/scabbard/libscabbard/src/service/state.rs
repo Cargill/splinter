@@ -15,7 +15,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
-use std::path::Path;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{
     mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     Arc, RwLock,
@@ -73,21 +74,27 @@ pub struct ScabbardState {
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     batch_history: BatchHistory,
+    state_db_file: PathBuf,
+    receipt_db_file: PathBuf,
 }
 
 impl ScabbardState {
     pub fn new(
-        state_db_path: &Path,
+        state_db_path: &PathBuf,
         state_db_size: usize,
-        receipt_db_path: &Path,
+        receipt_db_path: &PathBuf,
         receipt_db_size: usize,
         admin_keys: Vec<String>,
     ) -> Result<Self, ScabbardStateError> {
         // Initialize the database
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);
+        let state_db_file = state_db_path.to_path_buf();
+        let receipt_db_file = receipt_db_path.to_path_buf();
+        let state_db_path = state_db_path.as_path().with_extension("lmdb");
+        let receipt_db_path = receipt_db_path.as_path().with_extension("lmdb");
         let db = Box::new(LmdbDatabase::new(
-            LmdbContext::new(state_db_path, indexes.len(), Some(state_db_size))?,
+            LmdbContext::new(&state_db_path, indexes.len(), Some(state_db_size))?,
             &indexes,
         )?);
 
@@ -144,13 +151,15 @@ impl ScabbardState {
             current_state_root,
             transaction_receipt_store: Arc::new(RwLock::new(TransactionReceiptStore::new(
                 Box::new(
-                    LmdbOrderedStore::new(receipt_db_path, Some(receipt_db_size))
+                    LmdbOrderedStore::new(&receipt_db_path, Some(receipt_db_size))
                         .map_err(|err| ScabbardStateError(err.to_string()))?,
                 ),
             ))),
             pending_changes: None,
             event_subscribers: vec![],
             batch_history: BatchHistory::new(),
+            state_db_file,
+            receipt_db_file,
         })
     }
 
@@ -356,6 +365,29 @@ impl ScabbardState {
 
     pub fn clear_subscribers(&mut self) {
         self.event_subscribers.clear();
+    }
+
+    /// Computes the files associated with the LMDB state, including lock files.
+    pub fn remove_db_files(&self) -> Result<(), ScabbardStateError> {
+        let state_db_path = self.state_db_file.with_extension("lmdb");
+        let state_db_lock_file_path = self.state_db_file.with_extension("lmdb-lock");
+        let receipt_db_path = self.receipt_db_file.with_extension("lmdb");
+        let receipt_db_lock_file_path = self.receipt_db_file.with_extension("lmdb-lock");
+
+        fs::remove_file(receipt_db_path.as_path()).map_err(|err| {
+            ScabbardStateError(format!("Unable to remove state LMDB file: {}", err))
+        })?;
+        fs::remove_file(receipt_db_lock_file_path.as_path()).map_err(|err| {
+            ScabbardStateError(format!("Unable to remove state LMDB file: {}", err))
+        })?;
+        fs::remove_file(state_db_path.as_path()).map_err(|err| {
+            ScabbardStateError(format!("Unable to remove receipt store LMDB file: {}", err))
+        })?;
+        fs::remove_file(state_db_lock_file_path.as_path()).map_err(|err| {
+            ScabbardStateError(format!("Unable to remove state LMDB file: {}", err))
+        })?;
+
+        Ok(())
     }
 }
 
