@@ -1526,27 +1526,27 @@ paths:
     get:
       tags:
         - Biome
-        description: List all user profiles
-        parameters:
-          - $ref: "#/components/parameters/auth"
-          - $ref: "#/components/parameters/protocol_version"
-        responses:
-          200:
-            description: List of profiles for all users
-            content:
-              application/json:
+      description: List all user profiles
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: List of profiles for all users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BiomeProfile'
+        401:
+          description: The client is unauthorized
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
                 schema:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/BiomeProfile'
-          401:
-            description: The client is unauthorized
-          500:
-            description: Internal server error occurred
-            content:
-              application/json:
-                  schema:
-                    $ref: '#/components/schemas/ErrorBiome' 
+                  $ref: '#/components/schemas/ErrorBiome'
 
   /biome/profiles/{user_id}:
     get:

@@ -150,13 +150,13 @@ pub struct RoleUpdateBuilder {
 }
 
 impl RoleUpdateBuilder {
-    /// Updates the display name for the new role.
+    /// Updates the display name for the updated role.
     pub fn with_display_name(mut self, display_name: String) -> Self {
         self.display_name = Some(display_name);
         self
     }
 
-    /// Updates the permissions for the new role.
+    /// Updates the permissions for the updated role.
     pub fn with_permissions(mut self, permissions: Vec<String>) -> Self {
         self.permissions = permissions;
         self
