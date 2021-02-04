@@ -15,6 +15,8 @@
 //! Provides database operations for the `DieselAdminServiceStore`.
 
 pub(super) mod add_circuit;
+#[cfg(feature = "admin-service-event-store")]
+pub(super) mod add_event;
 pub(super) mod add_proposal;
 pub(super) mod get_circuit;
 pub(super) mod get_node;

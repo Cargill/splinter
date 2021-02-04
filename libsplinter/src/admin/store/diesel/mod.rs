@@ -36,6 +36,8 @@ use crate::admin::store::{
 #[cfg(feature = "admin-service-event-store")]
 use crate::admin::store::{AdminServiceEvent, EventIter};
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
+#[cfg(feature = "admin-service-event-store")]
+use operations::add_event::AdminServiceStoreAddEventOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
 use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
 use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
@@ -175,7 +177,7 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         &self,
         event: messages::AdminServiceEvent,
     ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
-        unimplemented!()
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
     }
 
     #[cfg(feature = "admin-service-event-store-postgres")]
@@ -286,7 +288,7 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         &self,
         event: messages::AdminServiceEvent,
     ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
-        unimplemented!()
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
     }
 
     #[cfg(feature = "admin-service-event-store")]
