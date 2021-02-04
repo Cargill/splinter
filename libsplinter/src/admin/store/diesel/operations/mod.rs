@@ -26,6 +26,8 @@ pub(super) mod list_circuits;
 #[cfg(feature = "admin-service-event-store")]
 pub(super) mod list_events;
 #[cfg(feature = "admin-service-event-store")]
+pub(super) mod list_events_by_management_type_since;
+#[cfg(feature = "admin-service-event-store")]
 pub(super) mod list_events_since;
 pub(super) mod list_nodes;
 pub(super) mod list_proposals;

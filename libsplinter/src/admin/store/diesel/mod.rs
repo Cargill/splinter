@@ -45,6 +45,8 @@ use operations::get_proposal::AdminServiceStoreFetchProposalOperation as _;
 use operations::get_service::AdminServiceStoreFetchServiceOperation as _;
 use operations::list_circuits::AdminServiceStoreListCircuitsOperation as _;
 #[cfg(feature = "admin-service-event-store")]
+use operations::list_events_by_management_type_since::AdminServiceStoreListEventsByManagementTypeSinceOperation as _;
+#[cfg(feature = "admin-service-event-store")]
 use operations::list_events_since::AdminServiceStoreListEventsSinceOperation as _;
 use operations::list_nodes::AdminServiceStoreListNodesOperation as _;
 use operations::list_proposals::AdminServiceStoreListProposalsOperation as _;
@@ -193,7 +195,8 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         management_type: String,
         start: i64,
     ) -> Result<EventIter, AdminServiceStoreError> {
-        unimplemented!()
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?)
+            .list_events_by_management_type_since(management_type, start)
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
@@ -304,7 +307,8 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         management_type: String,
         start: i64,
     ) -> Result<EventIter, AdminServiceStoreError> {
-        unimplemented!()
+        AdminServiceStoreOperations::new(&*self.connection_pool.get()?)
+            .list_events_by_management_type_since(management_type, start)
     }
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore> {
