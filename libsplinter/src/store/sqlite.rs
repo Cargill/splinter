@@ -96,17 +96,6 @@ impl StoreFactory for SqliteStoreFactory {
     fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore> {
         Box::new(crate::biome::DieselUserProfileStore::new(self.pool.clone()))
     }
-
-    #[cfg(feature = "admin-service-event-store")]
-    fn get_admin_service_event_store(
-        &self,
-    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
-        Box::new(
-            crate::admin::store::events::store::diesel::DieselAdminServiceEventStore::new(
-                self.pool.clone(),
-            ),
-        )
-    }
 }
 
 #[derive(Default, Debug)]
