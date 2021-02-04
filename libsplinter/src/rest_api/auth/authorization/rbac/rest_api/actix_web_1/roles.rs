@@ -262,8 +262,11 @@ fn patch_role(
                                 HttpResponse::BadRequest()
                                     .json(ErrorResponse::bad_request(&err.to_string()))
                             }
-                            Err(BlockingError::Error(ConstraintViolation(msg))) => {
+                            Err(BlockingError::Error(NotFound(msg))) => {
                                 HttpResponse::NotFound().json(ErrorResponse::not_found(&msg))
+                            }
+                            Err(BlockingError::Error(ConstraintViolation(msg))) => {
+                                HttpResponse::Conflict().json(ErrorResponse::conflict(&msg))
                             }
                             Err(err) => {
                                 error!("Unable to add role: {}", err);
@@ -308,12 +311,10 @@ fn update_role(
                     .update_role(updated_role)
                     .map_err(SendableRoleBasedAuthorizationStoreError::from)
             } else {
-                Err(
-                    SendableRoleBasedAuthorizationStoreError::ConstraintViolation(format!(
-                        "role {} not found",
-                        role_id
-                    )),
-                )
+                Err(SendableRoleBasedAuthorizationStoreError::NotFound(format!(
+                    "role {} not found",
+                    role_id
+                )))
             }
         })
 }
