@@ -57,7 +57,7 @@ pub use self::circuit_proposal::{
 };
 use self::error::AdminServiceStoreError;
 #[cfg(feature = "admin-service-event-store")]
-pub use self::event::{AdminServiceEvent, EventType};
+pub use self::event::{AdminServiceEvent, AdminServiceEventBuilder, EventType};
 pub use self::proposed_circuit::{ProposedCircuit, ProposedCircuitBuilder};
 pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
 pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};

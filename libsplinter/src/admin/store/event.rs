@@ -53,6 +53,82 @@ impl AdminServiceEvent {
     }
 }
 
+/// Builder to be used to build an `AdminServiceEvent`
+#[derive(Default, Clone)]
+pub struct AdminServiceEventBuilder {
+    event_id: Option<i64>,
+    event_type: Option<EventType>,
+    proposal: Option<CircuitProposal>,
+}
+
+impl AdminServiceEventBuilder {
+    /// Creates a new `AdminServiceEventBuilder`
+    pub fn new() -> Self {
+        AdminServiceEventBuilder::default()
+    }
+
+    /// Sets the event ID
+    ///
+    /// # Arguments
+    ///
+    /// * `event_id` - The ID of the event
+    pub fn with_event_id(mut self, event_id: i64) -> AdminServiceEventBuilder {
+        self.event_id = Some(event_id);
+        self
+    }
+
+    /// Sets the event type
+    ///
+    /// # Arguments
+    ///
+    /// * `event_type` - The type of event
+    pub fn with_event_type(mut self, event_type: &EventType) -> AdminServiceEventBuilder {
+        self.event_type = Some(event_type.clone());
+        self
+    }
+
+    /// Sets the event's circuit proposal
+    ///
+    /// # Arguments
+    ///
+    /// * `proposal` - Circuit proposal associated with the event
+    pub fn with_proposal(mut self, proposal: &CircuitProposal) -> AdminServiceEventBuilder {
+        self.proposal = Some(proposal.clone());
+        self
+    }
+
+    /// Builds an `AdminServiceEvent`
+    ///
+    /// Returns an error if any of the fields are not set.
+    pub fn build(self) -> Result<AdminServiceEvent, InvalidStateError> {
+        let event_id = self.event_id.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `event_id`".to_string(),
+            )
+        })?;
+
+        let event_type = self.event_type.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `event_type`".to_string(),
+            )
+        })?;
+
+        let proposal = self.proposal.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `proposal`".to_string(),
+            )
+        })?;
+
+        let admin_service_event = AdminServiceEvent {
+            event_id,
+            event_type,
+            proposal,
+        };
+
+        Ok(admin_service_event)
+    }
+}
+
 impl TryFrom<(i64, &messages::AdminServiceEvent)> for AdminServiceEvent {
     type Error = InvalidStateError;
 
