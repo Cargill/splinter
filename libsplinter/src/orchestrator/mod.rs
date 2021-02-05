@@ -40,8 +40,8 @@ use crate::service::{
 use crate::transport::Connection;
 
 pub use self::error::{
-    InitializeServiceError, ListServicesError, NewOrchestratorError, OrchestratorError,
-    ShutdownServiceError,
+    AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
+    OrchestratorError, ShutdownServiceError,
 };
 
 // Recv timeout in secs
@@ -330,6 +330,41 @@ impl ServiceOrchestrator {
             })
             .cloned()
             .collect())
+    }
+
+    /// Create a service that has previously been stopped according to the specified definition.
+    /// The arguments provided must match those required to create the service.
+    pub fn add_stopped_service(
+        &self,
+        service_definition: ServiceDefinition,
+        args: HashMap<String, String>,
+    ) -> Result<(), AddServiceError> {
+        // Get the factory that can create this service.
+        let factory = self
+            .service_factories
+            .iter()
+            .find(|factory| {
+                factory
+                    .available_service_types()
+                    .contains(&service_definition.service_type)
+            })
+            .ok_or(AddServiceError::UnknownType)?;
+
+        // Create the previously stopped service.
+        let service = factory.create(
+            service_definition.service_id.clone(),
+            service_definition.service_type.as_str(),
+            service_definition.circuit.as_str(),
+            args,
+        )?;
+
+        // Save the service to `stopped_services`.
+        self.stopped_services
+            .lock()
+            .map_err(|_| AddServiceError::LockPoisoned)?
+            .insert(service_definition, service);
+
+        Ok(())
     }
 
     pub fn supported_service_types(&self) -> &[String] {
