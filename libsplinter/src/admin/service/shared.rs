@@ -25,13 +25,12 @@ use std::time::SystemTime;
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::Message;
 
-#[cfg(any(feature = "circuit-purge", feature = "circuit-disband"))]
-use crate::admin::store::CircuitStatus as StoreCircuitStatus;
 #[cfg(feature = "circuit-purge")]
 use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
     AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
-    CircuitProposal as StoreProposal, ProposalType, ProposedNode, Vote, VoteRecordBuilder,
+    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
+    ProposedNode, Vote, VoteRecordBuilder,
 };
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
@@ -2864,11 +2863,17 @@ impl AdminServiceShared {
         Ok(())
     }
 
+    /// Collect all circuits from the admin store, including `Disbanded` or `Abandoned` circuits
     pub fn get_circuits(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = StoreCircuit>>, AdminSharedError> {
+        let predicates = vec![
+            CircuitPredicate::CircuitStatus(StoreCircuitStatus::Active),
+            CircuitPredicate::CircuitStatus(StoreCircuitStatus::Disbanded),
+            CircuitPredicate::CircuitStatus(StoreCircuitStatus::Abandoned),
+        ];
         self.admin_store
-            .list_circuits(&Vec::new())
+            .list_circuits(&predicates)
             .map_err(AdminSharedError::from)
     }
 

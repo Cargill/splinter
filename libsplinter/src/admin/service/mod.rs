@@ -286,19 +286,33 @@ impl AdminService {
     /// circuits should be initialized using the service orchestrator. This may not include all
     /// services if they are not supported locally. It is expected that some services will be
     /// started externally.
+    /// Furthermore, this adds services from circuits that have previously stopped their services
+    /// to the orchestrator using the `add_stopped_service` which allows for the service data to
+    /// be removed if the inactive circuit is purged. The separate handling of the inactive circuits
+    /// is necessary in order to avoid adding networking functionality to these circuits, as they
+    /// have already had this functionality removed through disbanding or abandoning.
     ///
     /// Also adds peer references for members of the circuits and proposals.
     fn re_initialize_circuits(&self) -> Result<(), ServiceStartError> {
-        let circuits = self
+        let mut active_circuits = vec![];
+        let mut inactive_circuits = vec![];
+        for circuit in self
             .admin_service_shared
             .lock()
             .map_err(|_| {
                 ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .get_circuits()
-            .map_err(|err| ServiceStartError::Internal(format!("Unable to get circuits: {}", err)))?
-            .filter(|circuit| circuit.circuit_status() == &store::CircuitStatus::Active)
-            .collect::<Vec<store::Circuit>>();
+            .map_err(|err| {
+                ServiceStartError::Internal(format!("Unable to get circuits: {}", err))
+            })?
+        {
+            if circuit.circuit_status() == &store::CircuitStatus::Active {
+                active_circuits.push(circuit);
+            } else {
+                inactive_circuits.push(circuit);
+            }
+        }
 
         let nodes = self
             .admin_service_shared
@@ -322,7 +336,7 @@ impl AdminService {
             })?
             .routing_table_writer();
 
-        for circuit in circuits {
+        for circuit in active_circuits {
             let mut routing_members = vec![];
             // restart all peer in the circuit
             for member in circuit.members().iter() {
@@ -405,6 +419,45 @@ impl AdminService {
                 {
                     error!(
                         "Unable to start service {} on circuit {}: {}",
+                        service.service_id(),
+                        circuit.circuit_id(),
+                        err
+                    );
+                }
+            }
+        }
+
+        for circuit in inactive_circuits {
+            // Get all services this node is allowed to run and the orchestrator has a factory for
+            let services = circuit
+                .roster()
+                .iter()
+                .filter(|service| {
+                    service.node_id() == self.node_id
+                        && orchestrator
+                            .supported_service_types()
+                            .contains(&service.service_type().to_string())
+                })
+                .collect::<Vec<_>>();
+            // Add all services from the inactive circuits to the orchestrator
+            for service in services {
+                let service_definition = ServiceDefinition {
+                    circuit: circuit.circuit_id().into(),
+                    service_id: service.service_id().into(),
+                    service_type: service.service_type().into(),
+                };
+
+                let service_arguments = service
+                    .arguments()
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect();
+
+                if let Err(err) =
+                    orchestrator.add_stopped_service(service_definition.clone(), service_arguments)
+                {
+                    error!(
+                        "Unable to add service {} from circuit {}: {}",
                         service.service_id(),
                         circuit.circuit_id(),
                         err
