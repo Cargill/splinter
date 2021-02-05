@@ -185,7 +185,8 @@ message CircuitManagementPayload {
          CIRCUIT_UPDATE_APPLICATION_METADATA_REQUEST = 6;
          CIRCUIT_JOIN_REQUEST = 7;
          CIRCUIT_DISBAND_REQUEST = 8;
-         CIRCUIT_ABANDON = 9;
+         CIRCUIT_PURGE_REQUEST = 9;
+         CIRCUIT_ABANDON = 10;
     }
 
     message Header {
@@ -216,7 +217,8 @@ message CircuitManagementPayload {
         circuit_update_application_metadata_request = 8;
     CircuitJoinRequest circuit_join_request = 9;
     CircuitDisbandRequest circuit_disband_request = 10;
-    CircuitAbandon circuit_abandon = 11;
+    CircuitPurgeRequest circuit_purge_request = 11;
+    CircuitAbandon circuit_abandon = 12;
 }
 
 message CircuitProposalVote {
@@ -289,6 +291,11 @@ message CircuitJoinRequest {
 
 message CircuitDisbandRequest {
     // The unique circuit name
+    string circuit_id = 1;
+}
+
+message CircuitPurgeRequest {
+    // The unique circuit id of the inactive circuit to be purged
     string circuit_id = 1;
 }
 

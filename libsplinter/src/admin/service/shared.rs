@@ -25,7 +25,7 @@ use std::time::SystemTime;
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::Message;
 
-#[cfg(feature = "circuit-disband")]
+#[cfg(any(feature = "circuit-purge", feature = "circuit-disband"))]
 use crate::admin::store::CircuitStatus as StoreCircuitStatus;
 use crate::admin::store::{
     AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
@@ -978,6 +978,24 @@ impl AdminServiceShared {
         )
     }
 
+    #[cfg(feature = "circuit-purge")]
+    fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
+        if let Some(circuit) = self
+            .remove_circuit(circuit_id)
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
+        {
+            debug!("Purged circuit {}", circuit.circuit_id());
+            Ok(())
+        } else {
+            Err(ServiceError::UnableToHandleMessage(Box::new(
+                AdminSharedError::SplinterStateError(format!(
+                    "unable to purge circuit {}",
+                    circuit_id
+                )),
+            )))
+        }
+    }
+
     pub fn send_protocol_request(&mut self, node_id: &str) -> Result<(), ServiceError> {
         if self
             .service_protocols
@@ -1238,6 +1256,23 @@ impl AdminServiceShared {
                     requester_node_id,
                     "local".to_string(),
                 )
+            }
+            #[cfg(feature = "circuit-purge")]
+            CircuitManagementPayload_Action::CIRCUIT_PURGE_REQUEST => {
+                let signer_public_key = header.get_requester();
+                let requester_node_id = header.get_requester_node_id();
+                let circuit_id = payload.get_circuit_purge_request().get_circuit_id();
+                debug!("received purge request for circuit {}", circuit_id);
+
+                self.validate_purge_request(
+                    circuit_id,
+                    signer_public_key,
+                    requester_node_id,
+                    ADMIN_SERVICE_PROTOCOL_VERSION,
+                )
+                .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
+                self.purge_circuit(circuit_id)
             }
             CircuitManagementPayload_Action::ACTION_UNSET => {
                 Err(ServiceError::UnableToHandleMessage(Box::new(
@@ -1714,6 +1749,16 @@ impl AdminServiceShared {
             .add_proposal(StoreProposal::from_proto(circuit_proposal).map_err(|err| {
                 AdminSharedError::SplinterStateError(format!("Unable to add proposal: {}", err))
             })?)?)
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    pub fn remove_circuit(
+        &mut self,
+        circuit_id: &str,
+    ) -> Result<Option<StoreCircuit>, AdminSharedError> {
+        let circuit = self.admin_store.get_circuit(circuit_id)?;
+        self.admin_store.remove_circuit(circuit_id)?;
+        Ok(circuit)
     }
 
     /// Add a circuit definition as an uninitialized circuit. If all members are ready, initialize
@@ -2207,7 +2252,7 @@ impl AdminServiceShared {
             .is_permitted(signer_public_key, PROPOSER_ROLE)
             .map_err(|_| {
                 AdminSharedError::ValidationFailed(format!(
-                    "{} is not permitted to vote for node {}",
+                    "{} is not permitted to disband for node {}",
                     to_hex(signer_public_key),
                     requester_node_id
                 ))
@@ -2248,6 +2293,92 @@ impl AdminServiceShared {
         if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
             return Err(AdminSharedError::ValidationFailed(format!(
                 "Attempting to disband a circuit with version {}, must be {}",
+                stored_circuit.circuit_version(),
+                CIRCUIT_PROTOCOL_VERSION,
+            )));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    fn validate_purge_request(
+        &self,
+        circuit_id: &str,
+        signer_public_key: &[u8],
+        requester_node_id: &str,
+        protocol: u32,
+    ) -> Result<(), AdminSharedError> {
+        if protocol != ADMIN_SERVICE_PROTOCOL_VERSION {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Circuit-Purge is not available for protocol version {}",
+                protocol
+            )));
+        }
+
+        if requester_node_id.is_empty() {
+            return Err(AdminSharedError::ValidationFailed(
+                "requester_node_id is empty".to_string(),
+            ));
+        }
+
+        if requester_node_id != self.node_id {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Unable to purge circuit from node {}: request came from node {}",
+                self.node_id, requester_node_id
+            )));
+        }
+
+        self.validate_key(signer_public_key)?;
+
+        if !self
+            .key_verifier
+            .is_permitted(requester_node_id, signer_public_key)?
+        {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "{} is not registered for the requester node {}",
+                to_hex(signer_public_key),
+                requester_node_id,
+            )));
+        }
+
+        self.key_permission_manager
+            .is_permitted(signer_public_key, PROPOSER_ROLE)
+            .map_err(|_| {
+                AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to propose change for node {}",
+                    to_hex(signer_public_key),
+                    requester_node_id
+                ))
+            })?;
+
+        // Verifying the circuit is `Disbanded` and able to be purged
+        let stored_circuit = self
+            .admin_store
+            .get_circuit(circuit_id)
+            .map_err(|err| {
+                AdminSharedError::ValidationFailed(format!(
+                    "error occurred when trying to get circuit {}",
+                    err
+                ))
+            })?
+            .ok_or_else(|| {
+                AdminSharedError::ValidationFailed(format!(
+                    "Received purged request for a circuit that does not exist: circuit id {}",
+                    circuit_id
+                ))
+            })?;
+
+        if stored_circuit.circuit_status() == &StoreCircuitStatus::Active {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Attempting to purge a circuit that is still active: {}",
+                circuit_id
+            )));
+        }
+
+        if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Attempting to purge a circuit with version {}, must be {}",
                 stored_circuit.circuit_version(),
                 CIRCUIT_PROTOCOL_VERSION,
             )));
@@ -4329,7 +4460,7 @@ mod tests {
             &StoreProposal::from_proto(proposal).expect("Unable to get proposal"),
             "node_a",
         ) {
-            panic!("Should have been invalid because node as already submited a vote");
+            panic!("Should have been invalid because node as already submitted a vote");
         }
         shutdown(mesh, cm, pm);
     }
@@ -4676,7 +4807,7 @@ mod tests {
         shared
             .admin_store
             .add_circuit(
-                store_circuit(CIRCUIT_PROTOCOL_VERSION),
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
                 store_circuit_nodes(),
             )
             .expect("unable to add circuit to store");
@@ -4740,7 +4871,7 @@ mod tests {
         shared
             .admin_store
             .add_circuit(
-                store_circuit(CIRCUIT_PROTOCOL_VERSION),
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
                 store_circuit_nodes(),
             )
             .expect("unable to add circuit to store");
@@ -4799,7 +4930,10 @@ mod tests {
         // Add the v1 circuit to be attempted to disbanded
         admin_shared
             .admin_store
-            .add_circuit(store_circuit(1), store_circuit_nodes())
+            .add_circuit(
+                store_circuit(1, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
             .expect("unable to add circuit to store");
 
         if let Ok(()) = admin_shared.validate_disband_circuit(
@@ -4910,7 +5044,7 @@ mod tests {
         admin_shared
             .admin_store
             .add_circuit(
-                store_circuit(CIRCUIT_PROTOCOL_VERSION),
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
                 store_circuit_nodes(),
             )
             .expect("unable to add circuit to store");
@@ -4970,7 +5104,10 @@ mod tests {
 
         admin_shared
             .admin_store
-            .add_circuit(store_circuit_disbanded(), store_circuit_nodes())
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
             .expect("unable to add circuit to store");
 
         if let Ok(()) = admin_shared.validate_disband_circuit(
@@ -5057,7 +5194,7 @@ mod tests {
         shared
             .admin_store
             .add_circuit(
-                store_circuit(CIRCUIT_PROTOCOL_VERSION),
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
                 store_circuit_nodes(),
             )
             .expect("unable to add circuit to store");
@@ -5121,6 +5258,511 @@ mod tests {
         // We're fully peered and agreed on protocol, so the pending payload is now available
         assert_eq!(0, shared.pending_protocol_payloads.len());
         assert_eq!(1, shared.pending_circuit_payloads.len());
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a circuit being purged is validated correctly
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the disbanded circuit to be purged to the admin store
+    /// 3. Call `validate_purge_request` with a valid circuit and valid requester info
+    /// 4. Validate the call to `validate_purge_request` returns successfully
+    ///
+    /// This test verifies the `validate_purge_request` returns successfully given a valid purge
+    /// request.
+    #[test]
+    fn test_validate_purge_request_valid() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        // Add the disbanded circuit to be purged
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Err(err) = admin_shared.validate_purge_request(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been valid: {}", err);
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a circuit is unable to be purged when an invalid admin service protocol
+    /// version is used. Currently, the purge functionality is not available for
+    /// admin service protocol 1.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the disbanded circuit to be purged to the admin store
+    /// 3. Call `validate_purge_request` with a valid Circuit, valid requester info and protocol
+    ///    version 1.
+    /// 4. Validate the call to `validate_purge_request` returns an error
+    ///
+    /// This test verifies the `validate_purge_request` returns an error when given
+    /// an admin service protocol that is not above 1.
+    #[test]
+    fn test_validate_purge_request_invalid_protocol() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        // Add the circuit to be disbanded
+        shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = shared.validate_purge_request("01234-ABCDE", PUB_KEY, "node_a", 1) {
+            panic!("Should have been invalid because the admin service protocol version is 1");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a circuit purge request is invalid if the circuit to be purged has an
+    /// invalid circuit version. `CircuitPurgeRequest` requires that the circuit being purged is
+    /// not an invalid version and verifies the status of the circuit being purged. As v1 circuits
+    /// are not able to be disbanded, these circuits will always have an `Active` status. Attempting
+    /// to purge a version 1 circuit will be invalid for two reasons: (1) The circuit being purged
+    /// does not have a valid `circuit_version` and (2) the circuit being purged is `Active`.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a v1 circuit to the admin store
+    /// 3. Call `validate_purge_request` with a version 1 Circuit and valid requester info
+    /// 4. Validate the call to `validate_purge_request` returns an error
+    ///
+    /// This test verifies the `validate_purge_request` returns an error when given
+    /// a version 1 circuit as disband and purge functionality is not supported by version 1
+    /// circuits.
+    #[test]
+    fn test_validate_purge_request_invalid_circuit_version() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        // Add the v1 circuit to be attempted to purge
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(1, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_purge_request(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit being disbanded is version 1");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a purge request is invalid if the circuit to be purged does not exist in the
+    /// admin store, indicating an invalid purge request.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Call `validate_purge_request` with a valid circuit and valid requester info
+    /// 3. Validate the call to `validate_purge_request` returns an error
+    ///
+    /// This test verifies the `validate_purge_request` returns an error when given
+    /// a circuit that does not already exist in the admin store.
+    #[test]
+    fn test_validate_purge_request_no_circuit() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        if let Ok(()) = admin_shared.validate_purge_request(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit being disbanded does not exist");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a purge request is invalid if the requester is not permitted for the node.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the disbanded circuit to be purged to the admin store
+    /// 3. Call `validate_purge_request` with a valid circuit and valid requester info
+    /// 4. Validate the call to `validate_purge_request` returns an error
+    ///
+    /// This test verifies the `validate_purge_request` returns an error when given a signer
+    /// key that is not permitted on the node.
+    #[test]
+    fn test_validate_purge_request_not_permitted() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::new(false)),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        // Add the circuit to be purged
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_purge_request(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the requester is not authorized");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a purge request is invalid if the request doesn't come from the admin service's
+    /// own node. The `CircuitPurgeRequest` is a local operation, other nodes should not be able
+    /// to submit a purge request.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the disbanded circuit to be purged to the admin store
+    /// 3. Call `validate_purge_request` with a valid circuit and requester info for "node_b"
+    /// 4. Validate the call to `validate_purge_request` returns an error
+    ///
+    /// This test verifies the `validate_purge_request` returns as expected when the purge request
+    /// does not come from the local node.
+    #[test]
+    fn test_validate_purge_request_invalid_requester() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        // Add the disbanded circuit to be purged
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_purge_request(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_b",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid as requester does not belong to the `node_a`");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a circuit purge request is invalid if the circuit to be purged is still `Active`
+    /// in the admin store. The `CircuitPurgeRequest` is only valid for circuits that have already
+    /// been disbanded, a `circuit_status` of `Disbanded`.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the circuit to be purged to the admin store, with a `circuit_status` of `Active`
+    /// 3. Call `validate_purge_request` with a valid circuit and valid requester info
+    /// 4. Validate the call to `validate_purge_request` returns an error
+    ///
+    /// This test verifies the `validate_purge_request` returns an error when the circuit
+    /// attempted to be purged has a status of `Active`. The purge action is only valid for
+    /// currently `Disbanded` circuits.
+    #[test]
+    fn test_validate_purge_request_active_circuit() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_purge_request(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid due to circuit still being `Active`");
+        }
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Tests that a circuit is able to be purged using the `CircuitPurgeRequest`.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the disbanded circuit to be purged to the admin store
+    /// 3. Create `CircuitPurgeRequest` for the circuit previously added to the admin store, and
+    ///    payload for the request
+    /// 4. Validate the call to `submit` returns successfully
+    /// 5. Validate the circuit has been purged from the admin store
+    ///
+    /// This test verifies a `CircuitPurgeRequest` submitted to the admin service is validated
+    /// correctly and successfully removes the circuit from the admin store.
+    #[test]
+    fn test_purge_request() {
+        let store = setup_admin_service_store();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let pub_key = context
+            .get_public_key(&private_key)
+            .expect("Unable to get corresponding public key");
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        #[cfg(feature = "admin-service-event-store")]
+        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+
+        let mut admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            memory_event_store,
+        )
+        .unwrap();
+
+        // Add the disbanded circuit to be purged
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+        // Make `CircuitPurgeRequest` and corresponding payload
+        let mut request = admin::CircuitPurgeRequest::new();
+        request.set_circuit_id("01234-ABCDE".to_string());
+
+        let mut header = admin::CircuitManagementPayload_Header::new();
+        header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_PURGE_REQUEST);
+        header.set_requester(pub_key.into_bytes());
+        header.set_requester_node_id("node_a".to_string());
+
+        let mut payload = admin::CircuitManagementPayload::new();
+        payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
+        payload.set_circuit_purge_request(request);
+        // Submit `CircuitPurgeRequest` payload
+        if let Err(err) = admin_shared.submit(payload) {
+            panic!("Should have been valid: {}", err);
+        }
+        // Validate the corresponding circuit has been removed from the admin store
+        if let Some(_) = admin_shared
+            .admin_store
+            .get_circuit(&"01234-ABCDE".to_string())
+            .expect("Unable to get circuit")
+        {
+            panic!("Circuit should have been purged");
+        }
+
         shutdown(mesh, cm, pm);
     }
 
@@ -5324,8 +5966,8 @@ mod tests {
         service
     }
 
-    #[cfg(feature = "circuit-disband")]
-    fn store_circuit(version: i32) -> StoreCircuit {
+    #[cfg(any(feature = "circuit-disband", feature = "circuit-purge"))]
+    fn store_circuit(version: i32, status: StoreCircuitStatus) -> StoreCircuit {
         store::CircuitBuilder::new()
             .with_circuit_id("01234-ABCDE")
             .with_roster(&vec![
@@ -5350,12 +5992,12 @@ mod tests {
             .with_circuit_management_type("test_circuit")
             .with_display_name("test_display")
             .with_circuit_version(version)
-            .with_circuit_status(&store::CircuitStatus::Active)
+            .with_circuit_status(&status)
             .build()
             .expect("unable to build store Circuit")
     }
 
-    #[cfg(feature = "circuit-disband")]
+    #[cfg(any(feature = "circuit-disband", feature = "circuit-purge"))]
     fn store_circuit_nodes() -> Vec<CircuitNode> {
         vec![
             store::CircuitNodeBuilder::new()
@@ -5369,37 +6011,6 @@ mod tests {
                 .build()
                 .expect("unable to build store CircuitNode"),
         ]
-    }
-
-    #[cfg(feature = "circuit-disband")]
-    fn store_circuit_disbanded() -> StoreCircuit {
-        store::CircuitBuilder::new()
-            .with_circuit_id("01234-ABCDE")
-            .with_roster(&vec![
-                store::ServiceBuilder::new()
-                    .with_service_id("0123")
-                    .with_service_type("type_a")
-                    .with_node_id("node_a")
-                    .build()
-                    .expect("unable to build admin store Service"),
-                store::ServiceBuilder::new()
-                    .with_service_id("ABCD")
-                    .with_service_type("type_a")
-                    .with_node_id("node_b")
-                    .build()
-                    .expect("unable to build admin store Service"),
-            ])
-            .with_members(vec!["node_a".to_string(), "node_b".to_string()].as_slice())
-            .with_authorization_type(&store::AuthorizationType::Trust)
-            .with_persistence(&store::PersistenceType::Any)
-            .with_durability(&store::DurabilityType::NoDurability)
-            .with_routes(&store::RouteType::Any)
-            .with_circuit_management_type("test_circuit")
-            .with_display_name("test_display")
-            .with_circuit_version(CIRCUIT_PROTOCOL_VERSION)
-            .with_circuit_status(&store::CircuitStatus::Disbanded)
-            .build()
-            .expect("unable to build store Circuit")
     }
 
     struct MockConnectingTransport {

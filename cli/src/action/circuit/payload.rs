@@ -18,6 +18,8 @@ use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
 #[cfg(feature = "circuit-disband")]
 use splinter::protos::admin::CircuitDisbandRequest;
+#[cfg(feature = "circuit-purge")]
+use splinter::protos::admin::CircuitPurgeRequest;
 use splinter::protos::admin::{
     CircuitCreateRequest, CircuitManagementPayload, CircuitManagementPayload_Action as Action,
     CircuitManagementPayload_Header as Header, CircuitProposalVote, CircuitProposalVote_Vote,
@@ -27,6 +29,8 @@ use crate::error::CliError;
 
 #[cfg(feature = "circuit-disband")]
 use super::CircuitDisband;
+#[cfg(feature = "circuit-purge")]
+use super::CircuitPurge;
 use super::{CircuitVote, Vote};
 
 /// A circuit action that has a type and can be converted into a protobuf-serializable struct.
@@ -161,5 +165,25 @@ impl CircuitAction<CircuitDisbandRequest> for CircuitDisband {
 impl ApplyToEnvelope for CircuitDisbandRequest {
     fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
         circuit_management_payload.set_circuit_disband_request(self);
+    }
+}
+
+#[cfg(feature = "circuit-purge")]
+impl CircuitAction<CircuitPurgeRequest> for CircuitPurge {
+    fn action_type(&self) -> Action {
+        Action::CIRCUIT_PURGE_REQUEST
+    }
+
+    fn into_proto(self) -> Result<CircuitPurgeRequest, CliError> {
+        let mut purge_request = CircuitPurgeRequest::new();
+        purge_request.set_circuit_id(self.circuit_id);
+        Ok(purge_request)
+    }
+}
+
+#[cfg(feature = "circuit-purge")]
+impl ApplyToEnvelope for CircuitPurgeRequest {
+    fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
+        circuit_management_payload.set_circuit_purge_request(self);
     }
 }

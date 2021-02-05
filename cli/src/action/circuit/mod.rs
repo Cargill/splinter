@@ -680,6 +680,69 @@ fn propose_circuit_disband(url: &str, key: Option<&str>, circuit_id: &str) -> Re
     }
 }
 
+#[cfg(feature = "circuit-purge")]
+struct CircuitPurge {
+    circuit_id: String,
+}
+
+#[cfg(feature = "circuit-purge")]
+pub struct CircuitPurgeAction;
+
+#[cfg(feature = "circuit-purge")]
+impl Action for CircuitPurgeAction {
+    fn run<'a>(&mut self, arg_matches: Option<&ArgMatches<'a>>) -> Result<(), CliError> {
+        let args = arg_matches.ok_or(CliError::RequiresArgs)?;
+        let url = args
+            .value_of("url")
+            .map(ToOwned::to_owned)
+            .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
+            .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
+        let key = args.value_of("private_key_file");
+
+        let circuit_id = args
+            .value_of("circuit_id")
+            .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
+
+        request_purge_circuit(&url, key, circuit_id)
+    }
+}
+
+#[cfg(feature = "circuit-purge")]
+fn request_purge_circuit(url: &str, key: Option<&str>, circuit_id: &str) -> Result<(), CliError> {
+    let client = SplinterRestClientBuilder::new()
+        .with_url(url.to_string())
+        .with_auth(create_cylinder_jwt_auth(key)?)
+        .build()?;
+
+    let private_key_hex = read_private_key(key.unwrap_or("splinter"))?;
+
+    let requester_node = client.get_node_status()?.node_id;
+    let circuit = client.fetch_circuit(circuit_id)?;
+
+    if let Some(circuit) = circuit {
+        // Check if the fetched circuit has a `circuit_status` or if the `circuit_status` is `Active`
+        // to verify the `CircuitPurgeRequest` is valid.
+        if circuit.circuit_status.is_none() || circuit.circuit_status == Some(CircuitStatus::Active)
+        {
+            return Err(CliError::ActionError(format!(
+                "Circuit '{}' is active",
+                circuit_id
+            )));
+        }
+        let circuit_purge_request = CircuitPurge {
+            circuit_id: circuit_id.into(),
+        };
+        let signed_payload =
+            make_signed_payload(&requester_node, &private_key_hex, circuit_purge_request)?;
+        client.submit_admin_payload(signed_payload)
+    } else {
+        Err(CliError::ActionError(format!(
+            "Circuit '{}' does not exist",
+            circuit_id
+        )))
+    }
+}
+
 pub struct CircuitListAction;
 
 impl Action for CircuitListAction {

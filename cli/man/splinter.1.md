@@ -85,9 +85,11 @@ Many `splinter` subcommands accept the following environment variable:
 SEE ALSO
 ========
 | `splinter-cert-generate(1)`
+| `splinter-circuit-disband(1)`
 | `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
 | `splinter-circuit-propose(1)`
+| `splinter-circuit-purge(1)`
 | `splinter-circuit-show(1)`
 | `splinter-circuit-template-arguments(1)`
 | `splinter-circuit-template-list(1)`

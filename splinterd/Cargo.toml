@@ -87,6 +87,7 @@ experimental = [
     "authorization-handler-rbac",
     "biome-profile",
     "circuit-disband",
+    "circuit-purge",
     "health",
     "https-bind",
     "oauth",
@@ -118,6 +119,7 @@ biome-credentials = ["database", "splinter/biome-credentials"]
 biome-key-management = ["database", "splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile"]
 circuit-disband = ["splinter/circuit-disband"]
+circuit-purge = ["splinter/circuit-purge", "circuit-disband"]
 database = ["splinter/postgres", "splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
 oauth = [

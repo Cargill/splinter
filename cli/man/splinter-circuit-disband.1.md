@@ -90,5 +90,6 @@ SEE ALSO
 | `splinter-circuit-list(1)`
 | `splinter-circuit-proposals(1)`
 | `splinter-circuit-show(1)`
+| `splinter-circuit-purge(1)`
 |
 | Splinter documentation: https://www.splinter.dev/docs/0.5/
