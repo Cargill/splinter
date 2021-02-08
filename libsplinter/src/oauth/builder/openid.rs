@@ -172,6 +172,8 @@ impl OpenIdOAuthClientBuilder {
             .with_token_url(discovery_document_response.token_endpoint)
             .with_scopes(DEFAULT_SCOPES.iter().map(ToString::to_string).collect())
             .with_subject_provider(Box::new(OpenIdSubjectProvider::new(
+                // clone is required if biome-profile is enabled
+                #[allow(clippy::redundant_clone)]
                 userinfo_endpoint.clone(),
             )));
 
