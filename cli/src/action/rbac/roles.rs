@@ -16,13 +16,13 @@ use std::collections::BTreeSet;
 
 use clap::ArgMatches;
 
+use crate::action::{
+    api::{RoleBuilder, RoleUpdateBuilder, SplinterRestClient},
+    print_table, Action,
+};
 use crate::error::CliError;
 
-use super::{
-    api::{RoleBuilder, RoleUpdateBuilder, SplinterRestClient, SplinterRestClientBuilder},
-    create_cylinder_jwt_auth, print_table, Action, DEFAULT_SPLINTER_REST_API_URL,
-    SPLINTER_REST_API_URL_ENV,
-};
+use super::new_client;
 
 pub struct ListRolesAction;
 
@@ -247,19 +247,4 @@ impl Action for DeleteRoleAction {
 
         new_client(&arg_matches)?.delete_role(role_id)
     }
-}
-
-fn new_client(arg_matches: &Option<&ArgMatches<'_>>) -> Result<SplinterRestClient, CliError> {
-    let url = arg_matches
-        .and_then(|args| args.value_of("url"))
-        .map(ToOwned::to_owned)
-        .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
-        .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-
-    let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
-
-    SplinterRestClientBuilder::new()
-        .with_url(url)
-        .with_auth(create_cylinder_jwt_auth(key)?)
-        .build()
 }
