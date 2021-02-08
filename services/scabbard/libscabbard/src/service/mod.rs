@@ -101,9 +101,9 @@ impl Scabbard {
         let (state_db_path, receipt_db_path) =
             compute_db_paths(&service_id, circuit_id, state_db_dir, receipt_db_dir)?;
         let state = ScabbardState::new(
-            state_db_path.as_path(),
+            &state_db_path,
             state_db_size,
-            receipt_db_path.as_path(),
+            &receipt_db_path,
             receipt_db_size,
             admin_keys,
         )
@@ -309,6 +309,11 @@ impl Service for Scabbard {
         {
             Err(ServiceDestroyError::NotStopped)
         } else {
+            self.state
+                .lock()
+                .map_err(|_| ServiceDestroyError::PoisonedLock("consensus lock poisoned".into()))?
+                .remove_db_files()
+                .map_err(|err| ServiceDestroyError::Internal(Box::new(err)))?;
             Ok(())
         }
     }
@@ -375,8 +380,8 @@ fn compute_db_paths(
     )
     .map(|digest| to_hex(&*digest))
     .map_err(|err| ScabbardError::InitializationFailed(Box::new(err)))?;
-    let state_db_path = state_db_dir.join(format!("{}-state.lmdb", hash));
-    let receipt_db_path = receipt_db_dir.join(format!("{}-receipts.lmdb", hash));
+    let state_db_path = state_db_dir.join(format!("{}-state", hash));
+    let receipt_db_path = receipt_db_dir.join(format!("{}-receipts", hash));
     Ok((state_db_path, receipt_db_path))
 }
 

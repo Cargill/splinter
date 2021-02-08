@@ -25,11 +25,12 @@ use std::time::SystemTime;
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::Message;
 
-#[cfg(any(feature = "circuit-purge", feature = "circuit-disband"))]
-use crate::admin::store::CircuitStatus as StoreCircuitStatus;
+#[cfg(feature = "circuit-purge")]
+use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
     AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
-    CircuitProposal as StoreProposal, ProposalType, ProposedNode, Vote, VoteRecordBuilder,
+    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
+    ProposedNode, Vote, VoteRecordBuilder,
 };
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
@@ -980,6 +981,27 @@ impl AdminServiceShared {
 
     #[cfg(feature = "circuit-purge")]
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
+        // Verifying the circuit is able to be purged
+        let stored_circuit = self
+            .admin_store
+            .get_circuit(circuit_id)
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!("error occurred when trying to get circuit {}", err),
+                )))
+            })?
+            .ok_or_else(|| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!(
+                        "Received purged request for a circuit that does not exist: circuit id {}",
+                        circuit_id
+                    ),
+                )))
+            })?;
+
+        self.destroy_services(circuit_id, &stored_circuit.roster())
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
         if let Some(circuit) = self
             .remove_circuit(circuit_id)
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?
@@ -2644,10 +2666,10 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
-    /// Shutdown all services that this node was running on the disbanded circuit using the service
+    /// Stops all services that this node was running on the disbanded circuit using the service
     /// orchestrator. This may not include all services if they are not supported locally. It is
     /// expected that some services will be stopped externally.
-    pub fn shutdown_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
+    pub fn stop_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
         let orchestrator =
             self.orchestrator
                 .lock()
@@ -2670,7 +2692,7 @@ impl AdminServiceShared {
 
         // Shutdown all services the orchestrator has a factory for
         for service in services {
-            debug!("Removing service: {}", service.service_id.clone());
+            debug!("Stopping service: {}", service.service_id.clone());
             let service_definition = ServiceDefinition {
                 circuit: circuit.circuit_id.clone(),
                 service_id: service.service_id.clone(),
@@ -2678,7 +2700,7 @@ impl AdminServiceShared {
             };
 
             orchestrator
-                .shutdown_service(&service_definition)
+                .stop_service(&service_definition)
                 .map_err(|err| AdminSharedError::ServiceShutdownFailed {
                     context: format!(
                         "Unable to shutdown service {} on circuit {}",
@@ -2686,6 +2708,59 @@ impl AdminServiceShared {
                     ),
                     source: Some(err),
                 })?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "circuit-purge")]
+    /// Destroys all services that this node was running on the disbanded circuit using the service
+    /// orchestrator. Destroying a service will also remove the service's state LMDB files.
+    pub fn destroy_services(
+        &mut self,
+        circuit_id: &str,
+        services: &[StoreService],
+    ) -> Result<(), AdminSharedError> {
+        let orchestrator =
+            self.orchestrator
+                .lock()
+                .map_err(|_| AdminSharedError::ServiceShutdownFailed {
+                    context: "ServiceOrchestrator lock poisoned".into(),
+                    source: None,
+                })?;
+
+        // Get all services this node is allowed to run
+        let services = services
+            .iter()
+            .filter_map(|service| {
+                if service.node_id() == self.node_id
+                    && orchestrator
+                        .supported_service_types()
+                        .contains(&service.service_type().to_string())
+                {
+                    return Some(ServiceDefinition {
+                        circuit: circuit_id.to_string(),
+                        service_id: service.service_id().to_string(),
+                        service_type: service.service_type().to_string(),
+                    });
+                }
+                None
+            })
+            .collect::<Vec<ServiceDefinition>>();
+
+        // Shutdown all services the orchestrator has a factory for
+        for service in services {
+            debug!("Destroying service: {}", service.service_id.clone());
+
+            orchestrator.destroy_service(&service).map_err(|err| {
+                AdminSharedError::ServiceShutdownFailed {
+                    context: format!(
+                        "Unable to shutdown service {} on circuit {}",
+                        service.service_id, circuit_id
+                    ),
+                    source: Some(err),
+                }
+            })?;
         }
 
         Ok(())
@@ -2769,7 +2844,7 @@ impl AdminServiceShared {
             // Circuit has been disbanded: all associated services will be shut
             // down, the circuit removed from the routing table, and peer refs
             // for this circuit will be removed.
-            self.shutdown_services(circuit_proposal.get_circuit_proposal())?;
+            self.stop_services(circuit_proposal.get_circuit_proposal())?;
             // Removing the circuit from the routing table
             self.routing_table_writer
                 .remove_circuit(circuit_proposal.get_circuit_id())
@@ -2788,11 +2863,17 @@ impl AdminServiceShared {
         Ok(())
     }
 
+    /// Collect all circuits from the admin store, including `Disbanded` or `Abandoned` circuits
     pub fn get_circuits(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = StoreCircuit>>, AdminSharedError> {
+        let predicates = vec![
+            CircuitPredicate::CircuitStatus(StoreCircuitStatus::Active),
+            CircuitPredicate::CircuitStatus(StoreCircuitStatus::Disbanded),
+            CircuitPredicate::CircuitStatus(StoreCircuitStatus::Abandoned),
+        ];
         self.admin_store
-            .list_circuits(&Vec::new())
+            .list_circuits(&predicates)
             .map_err(AdminSharedError::from)
     }
 

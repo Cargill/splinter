@@ -95,6 +95,41 @@ impl From<FactoryCreateError> for InitializeServiceError {
 }
 
 #[derive(Debug)]
+pub enum AddServiceError {
+    LockPoisoned,
+    UnknownType,
+    FactoryCreateError(Box<dyn Error + Send>),
+}
+
+impl Error for AddServiceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            AddServiceError::LockPoisoned => None,
+            AddServiceError::UnknownType => None,
+            AddServiceError::FactoryCreateError(err) => Some(&**err),
+        }
+    }
+}
+
+impl std::fmt::Display for AddServiceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AddServiceError::LockPoisoned => write!(f, "internal lock poisoned"),
+            AddServiceError::UnknownType => write!(f, "service type unknown"),
+            AddServiceError::FactoryCreateError(err) => {
+                write!(f, "failed to create service factory: {}", err)
+            }
+        }
+    }
+}
+
+impl From<FactoryCreateError> for AddServiceError {
+    fn from(err: FactoryCreateError) -> Self {
+        AddServiceError::FactoryCreateError(Box::new(err))
+    }
+}
+
+#[derive(Debug)]
 pub enum ShutdownServiceError {
     LockPoisoned,
     ShutdownFailed((ServiceDefinition, Box<dyn Error + Send>)),
