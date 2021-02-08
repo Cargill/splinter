@@ -88,9 +88,10 @@ tls_rest_api_key = "/etc/splinter/node_012/certs/rest_api.key"
 # (default [{network_endpoints}])
 advertised_endpoints = ["tcps://127.0.0.1:8044"]
 
-# Endpoint used for database communication
-# (default "127.0.0.1:5432")
-database = "127.0.0.1:5432"
+# Endpoint used for database communication, either a PostgreSQL URI or SQLite
+# connection string
+# (default "/var/lib/splinter_state.db")
+database = "/var/lib/splinter_state.db"
 
 # Read-only registry files
 # (default []; empty list)
