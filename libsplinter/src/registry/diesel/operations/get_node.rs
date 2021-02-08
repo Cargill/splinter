@@ -30,7 +30,7 @@ use crate::registry::{
 use super::RegistryOperations;
 
 pub(in crate::registry::diesel) trait RegistryFetchNodeOperation {
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
 }
 
 impl<'a, C> RegistryFetchNodeOperation for RegistryOperations<'a, C>
@@ -38,7 +38,7 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         let node = splinter_nodes::table
             .find(identity)
             .first::<NodesModel>(self.conn)

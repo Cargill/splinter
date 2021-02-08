@@ -18,7 +18,7 @@ use diesel::{dsl::delete, prelude::*};
 
 use crate::registry::{diesel::schema::splinter_nodes, Node, RegistryError};
 
-use super::{fetch_node::RegistryFetchNodeOperation, RegistryOperations};
+use super::{get_node::RegistryFetchNodeOperation, RegistryOperations};
 
 pub(in crate::registry::diesel) trait RegistryDeleteNodeOperation {
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
@@ -31,7 +31,7 @@ where
 {
     fn delete_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         self.conn.transaction(|| {
-            self.fetch_node(identity).and_then(|node| {
+            self.get_node(identity).and_then(|node| {
                 delete(splinter_nodes::table.find(identity)).execute(self.conn)?;
                 Ok(node)
             })

@@ -242,7 +242,7 @@ pub trait RegistryReader: Send + Sync {
     /// # Arguments
     ///
     ///  * `identity` - The identity of the node.
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
 
     /// Determines whether or not the node exists in the registry.
     ///
@@ -250,7 +250,7 @@ pub trait RegistryReader: Send + Sync {
     ///
     ///  * `identity` - The identity of the node.
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
-        self.fetch_node(identity).map(|opt| opt.is_some())
+        self.get_node(identity).map(|opt| opt.is_some())
     }
 }
 
@@ -323,8 +323,8 @@ where
         (**self).count_nodes(predicates)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        (**self).fetch_node(identity)
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+        (**self).get_node(identity)
     }
 
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
