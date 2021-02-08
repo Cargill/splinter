@@ -44,6 +44,7 @@ rest_api_endpoint = "127.0.0.1:8080"
 # (default []; empty list)
 peers = []
 
+# Deprecated, use `database` instead
 # The type of storage that should be used to store circuit state. Option are
 # currently "yaml" or "memory".
 # (default "yaml")
