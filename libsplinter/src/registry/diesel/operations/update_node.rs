@@ -15,7 +15,7 @@
 //! Provides the "update node" operation for the `DieselRegistry`.
 
 use diesel::{
-    dsl::{delete, insert_into, update},
+    dsl::{delete, insert_into, not, update},
     prelude::*,
 };
 
@@ -55,6 +55,7 @@ impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
 
             let duplicate_endpoint = splinter_nodes_endpoints::table
                 .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
+                .filter(not(splinter_nodes_endpoints::identity.eq(&node.identity)))
                 .first::<NodeEndpointsModel>(self.conn)
                 .optional()?;
 
@@ -145,6 +146,7 @@ impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::sqlite::
 
             let duplicate_endpoint = splinter_nodes_endpoints::table
                 .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
+                .filter(not(splinter_nodes_endpoints::identity.eq(&node.identity)))
                 .first::<NodeEndpointsModel>(self.conn)
                 .optional()?;
 

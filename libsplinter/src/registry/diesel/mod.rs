@@ -237,6 +237,54 @@ pub mod tests {
         assert_eq!(node, get_node_1());
     }
 
+    /// Verifies that `update_node` properly updates a node
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1
+    /// 3. Verify updating node 1 works (with no updates)
+    /// 4. Insert node 2
+    /// 5. Verify updating node 2 with one of node 1 endpoints fails
+    #[test]
+    fn test_update_node() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .add_node(get_node_1())
+            .expect("Unable to insert node");
+
+        let mut node = registry
+            .get_node(&get_node_1().identity)
+            .expect("Failed to fetch node")
+            .expect("Node not found");
+
+        assert_eq!(node, get_node_1());
+
+        node.display_name = "Changed Name".to_string();
+
+        registry
+            .update_node(node.clone())
+            .expect("Unable to update node 1");
+
+        let updated_node = registry
+            .get_node(&get_node_1().identity)
+            .expect("Failed to fetch node")
+            .expect("Node not found");
+
+        assert_eq!(updated_node, node);
+
+        registry
+            .add_node(get_node_2())
+            .expect("Unable to insert node 2");
+
+        let mut node = get_node_2();
+        // add node 1 endpoint
+        node.endpoints.push("tcps://12.0.0.123:8431".to_string());
+
+        // This should fail becasue the added endpoint already belongs to node 1
+        assert!(registry.update_node(node).is_err());
+    }
+
     ///  Test that a new node can be inserted into the registry and fetched
     ///
     /// 1. Setup sqlite database
