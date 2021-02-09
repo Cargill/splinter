@@ -19,6 +19,7 @@ use diesel::{
     prelude::*,
 };
 
+use crate::error::InvalidStateError;
 use crate::registry::{
     check_node_required_fields_are_not_empty,
     diesel::{
@@ -27,7 +28,7 @@ use crate::registry::{
             splinter_nodes, splinter_nodes_endpoints, splinter_nodes_keys, splinter_nodes_metadata,
         },
     },
-    InvalidNodeError, Node, RegistryError,
+    Node, RegistryError,
 };
 
 use super::RegistryOperations;
@@ -40,7 +41,9 @@ pub(in crate::registry::diesel) trait RegistryInsertNodeOperation {
 impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgConnection> {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
         // Verify that the node's required fields are non-empty
-        check_node_required_fields_are_not_empty(&node)?;
+        check_node_required_fields_are_not_empty(&node).map_err(|err| {
+            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
+        })?;
 
         self.conn.transaction::<(), _, _>(|| {
             // Verify that the node's endpoints are unique.
@@ -53,121 +56,64 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
             let duplicate_endpoint = splinter_nodes_endpoints::table
                 .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
                 .first::<NodeEndpointsModel>(self.conn)
-                .optional()
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to check for duplicate endpoints",
-                        Box::new(err),
-                    )
-                })?;
+                .optional()?;
 
             if let Some(endpoint) = duplicate_endpoint {
-                return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
-                    endpoint.endpoint,
-                )));
+                return Err(RegistryError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "another node with endpoint {} exists",
+                        endpoint.endpoint
+                    )),
+                ));
             }
 
             // Check if the node already exists to determine if this is a new node or an updated one
             let existing_node = splinter_nodes::table
                 .find(&node.identity)
                 .first::<NodesModel>(self.conn)
-                .optional()
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to check if node already exists",
-                        Box::new(err),
-                    )
-                })?;
+                .optional()?;
 
             if existing_node.is_none() {
                 // Add new node
                 insert_into(splinter_nodes::table)
                     .values(NodesModel::from(&node))
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to insert node",
-                            Box::new(err),
-                        )
-                    })?;
+                    .execute(self.conn)?;
             } else {
                 // Update existing node
                 update(splinter_nodes::table.find(&node.identity))
                     .set(splinter_nodes::display_name.eq(&node.display_name))
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to update node",
-                            Box::new(err),
-                        )
-                    })?;
+                    .execute(self.conn)?;
                 // Remove old endpoints, keys, and metadata for the node
                 delete(
                     splinter_nodes_endpoints::table
                         .filter(splinter_nodes_endpoints::identity.eq(&node.identity)),
                 )
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to remove old endpoints",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
                 delete(
                     splinter_nodes_keys::table
                         .filter(splinter_nodes_keys::identity.eq(&node.identity)),
                 )
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to remove old keys",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
                 delete(
                     splinter_nodes_metadata::table
                         .filter(splinter_nodes_metadata::identity.eq(&node.identity)),
                 )
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to remove old metadata",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
             }
 
             // Add endpoints, keys, and metadata for the node
             let endpoints: Vec<NodeEndpointsModel> = Vec::from(&node);
             insert_into(splinter_nodes_endpoints::table)
                 .values(&endpoints)
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to insert node endpoints",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
             let keys: Vec<NodeKeysModel> = Vec::from(&node);
             insert_into(splinter_nodes_keys::table)
                 .values(&keys)
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to insert node keys",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
             let metadata: Vec<NodeMetadataModel> = Vec::from(&node);
             insert_into(splinter_nodes_metadata::table)
                 .values(&metadata)
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to insert node metadata",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
 
             Ok(())
         })
@@ -178,7 +124,9 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
 impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::sqlite::SqliteConnection> {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
         // Verify that the node's required fields are non-empty
-        check_node_required_fields_are_not_empty(&node)?;
+        check_node_required_fields_are_not_empty(&node).map_err(|err| {
+            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
+        })?;
 
         self.conn.transaction::<(), _, _>(|| {
             // Verify that the node's endpoints are unique.
@@ -191,121 +139,64 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::sqlite::
             let duplicate_endpoint = splinter_nodes_endpoints::table
                 .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
                 .first::<NodeEndpointsModel>(self.conn)
-                .optional()
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to check for duplicate endpoints",
-                        Box::new(err),
-                    )
-                })?;
+                .optional()?;
 
             if let Some(endpoint) = duplicate_endpoint {
-                return Err(RegistryError::from(InvalidNodeError::DuplicateEndpoint(
-                    endpoint.endpoint,
-                )));
+                return Err(RegistryError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "another node with endpoint {} exists",
+                        endpoint.endpoint
+                    )),
+                ));
             }
 
             // Check if the node already exists to determine if this is a new node or an updated one
             let existing_node = splinter_nodes::table
                 .find(&node.identity)
                 .first::<NodesModel>(self.conn)
-                .optional()
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to check if node already exists",
-                        Box::new(err),
-                    )
-                })?;
+                .optional()?;
 
             if existing_node.is_none() {
                 // Add new node
                 insert_into(splinter_nodes::table)
                     .values(NodesModel::from(&node))
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to insert node",
-                            Box::new(err),
-                        )
-                    })?;
+                    .execute(self.conn)?;
             } else {
                 // Update existing node
                 update(splinter_nodes::table.find(&node.identity))
                     .set(splinter_nodes::display_name.eq(&node.display_name))
-                    .execute(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to update node",
-                            Box::new(err),
-                        )
-                    })?;
+                    .execute(self.conn)?;
                 // Remove old endpoints, keys, and metadata for the node
                 delete(
                     splinter_nodes_endpoints::table
                         .filter(splinter_nodes_endpoints::identity.eq(&node.identity)),
                 )
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to remove old endpoints",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
                 delete(
                     splinter_nodes_keys::table
                         .filter(splinter_nodes_keys::identity.eq(&node.identity)),
                 )
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to remove old keys",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
                 delete(
                     splinter_nodes_metadata::table
                         .filter(splinter_nodes_metadata::identity.eq(&node.identity)),
                 )
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to remove old metadata",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
             }
 
             // Add endpoints, keys, and metadata for the node
             let endpoints: Vec<NodeEndpointsModel> = Vec::from(&node);
             insert_into(splinter_nodes_endpoints::table)
                 .values(&endpoints)
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to insert node endpoints",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
             let keys: Vec<NodeKeysModel> = Vec::from(&node);
             insert_into(splinter_nodes_keys::table)
                 .values(&keys)
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to insert node keys",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
             let metadata: Vec<NodeMetadataModel> = Vec::from(&node);
             insert_into(splinter_nodes_metadata::table)
                 .values(&metadata)
-                .execute(self.conn)
-                .map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to insert node metadata",
-                        Box::new(err),
-                    )
-                })?;
+                .execute(self.conn)?;
 
             Ok(())
         })

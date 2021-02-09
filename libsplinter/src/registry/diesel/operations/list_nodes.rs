@@ -16,6 +16,7 @@
 
 use diesel::prelude::*;
 
+use crate::error::InvalidStateError;
 use crate::registry::{
     diesel::{
         models::{NodeEndpointsModel, NodeKeysModel, NodeMetadataModel, NodesModel},
@@ -41,12 +42,7 @@ where
         self.conn.transaction::<_, _, _>(|| {
             let nodes: Vec<NodesModel> = if predicates.is_empty() {
                 // No predicates were specified, just get all nodes
-                splinter_nodes::table.load(self.conn).map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to get all nodes",
-                        Box::new(err),
-                    )
-                })?
+                splinter_nodes::table.load(self.conn)?
             } else {
                 // With predicates
                 let mut query = splinter_nodes::table
@@ -54,12 +50,7 @@ where
                     .select(splinter_nodes::all_columns);
 
                 query = apply_predicate_filters(query, predicates);
-                query.load(self.conn).map_err(|err| {
-                    RegistryError::general_error_with_source(
-                        "Failed to get nodes matching metadata predicates",
-                        Box::new(err),
-                    )
-                })?
+                query.load(self.conn)?
             };
 
             // Checking if there are any nodes here serves two purposes: 1) It saves time by
@@ -74,33 +65,15 @@ where
 
                 let endpoints = splinter_nodes_endpoints::table
                     .filter(splinter_nodes_endpoints::identity.eq_any(&identities))
-                    .load::<NodeEndpointsModel>(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to get node endpoints",
-                            Box::new(err),
-                        )
-                    })?
+                    .load::<NodeEndpointsModel>(self.conn)?
                     .grouped_by(&nodes);
                 let keys = splinter_nodes_keys::table
                     .filter(splinter_nodes_keys::identity.eq_any(&identities))
-                    .load::<NodeKeysModel>(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to get node keys",
-                            Box::new(err),
-                        )
-                    })?
+                    .load::<NodeKeysModel>(self.conn)?
                     .grouped_by(&nodes);
                 let metadata = splinter_nodes_metadata::table
                     .filter(splinter_nodes_metadata::identity.eq_any(identities))
-                    .load::<NodeMetadataModel>(self.conn)
-                    .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            "Failed to get node metadata",
-                            Box::new(err),
-                        )
-                    })?
+                    .load::<NodeMetadataModel>(self.conn)?
                     .grouped_by(&nodes);
 
                 // Build the `Node`s and return them
@@ -125,7 +98,11 @@ where
                             builder = builder.with_metadata(entry.key, entry.value);
                         }
 
-                        builder.build().map_err(RegistryError::from)
+                        builder.build().map_err(|err| {
+                            RegistryError::InvalidStateError(InvalidStateError::with_message(
+                                err.to_string(),
+                            ))
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()
             }

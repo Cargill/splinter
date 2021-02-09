@@ -239,7 +239,7 @@ mod test {
     use std::sync::{Arc, Mutex};
 
     use super::*;
-    use crate::registry::InvalidNodeError;
+    use crate::error::InvalidStateError;
 
     fn new_node(id: &str, endpoint: &str, metadata: &[(&str, &str)]) -> Node {
         let mut builder = Node::builder(id).with_endpoint(endpoint).with_key("abcd");
@@ -721,11 +721,11 @@ mod test {
                 inner.insert(node.identity.clone(), node);
                 Ok(())
             } else {
-                Err(RegistryError::InvalidNode(
-                    InvalidNodeError::InvalidIdentity(
-                        node.identity,
-                        "Node does not exist in the registry".to_string(),
-                    ),
+                Err(RegistryError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "Node does not exist in the registry: {}",
+                        node.identity
+                    )),
                 ))
             }
         }

@@ -33,16 +33,10 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
-        splinter_nodes::table
+        Ok(splinter_nodes::table
             .find(identity)
             .first::<NodesModel>(self.conn)
             .optional()
-            .map(|opt| opt.is_some())
-            .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to check if node exists",
-                    Box::new(err),
-                )
-            })
+            .map(|opt| opt.is_some())?)
     }
 }

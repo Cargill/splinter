@@ -22,11 +22,12 @@ use std::collections::HashMap;
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
+use crate::registry::rest_api::error::RegistryRestApiError;
 #[cfg(feature = "authorization")]
 use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
     rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
-    MetadataPredicate, Node, RegistryError, RegistryReader, RegistryWriter, RwRegistry,
+    MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry,
 };
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
@@ -167,7 +168,9 @@ fn query_list_nodes(
     limit: Option<usize>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
-        let nodes = registry.list_nodes(&filters)?;
+        let nodes = registry
+            .list_nodes(&filters)
+            .map_err(RegistryRestApiError::from)?;
         let offset_value = offset.unwrap_or(0);
         let total = nodes.len();
         let limit_value = limit.unwrap_or_else(|| total as usize);
@@ -179,18 +182,20 @@ fn query_list_nodes(
 
         Ok((nodes, link, limit, offset, total as usize))
     })
-    .then(|res: Result<_, BlockingError<RegistryError>>| match res {
-        Ok((nodes, link, limit, offset, total_count)) => {
-            Ok(HttpResponse::Ok().json(ListNodesResponse {
-                data: nodes.iter().map(NodeResponse::from).collect(),
-                paging: get_response_paging_info(limit, offset, &link, total_count),
-            }))
-        }
-        Err(err) => {
-            error!("Unable to list nodes: {}", err);
-            Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
-        }
-    })
+    .then(
+        |res: Result<_, BlockingError<RegistryRestApiError>>| match res {
+            Ok((nodes, link, limit, offset, total_count)) => {
+                Ok(HttpResponse::Ok().json(ListNodesResponse {
+                    data: nodes.iter().map(NodeResponse::from).collect(),
+                    paging: get_response_paging_info(limit, offset, &link, total_count),
+                }))
+            }
+            Err(err) => {
+                error!("Unable to list nodes: {}", err);
+                Ok(HttpResponse::InternalServerError().json(ErrorResponse::internal_error()))
+            }
+        },
+    )
 }
 
 fn to_predicates(filters: Option<Filter>) -> Result<Vec<MetadataPredicate>, String> {
@@ -224,23 +229,25 @@ fn add_node(
             })
             .into_future()
             .and_then(move |body| match serde_json::from_slice::<Node>(&body) {
-                Ok(node) => {
-                    Box::new(web::block(move || registry.add_node(node)).then(|res| {
-                        Ok(match res {
-                            Ok(_) => HttpResponse::Ok().finish(),
-                            Err(BlockingError::Error(RegistryError::InvalidNode(err))) => {
-                                HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                Ok(node) => Box::new(
+                    web::block(move || registry.add_node(node).map_err(RegistryRestApiError::from))
+                        .then(|res| {
+                            Ok(match res {
+                                Ok(_) => HttpResponse::Ok().finish(),
+                                Err(BlockingError::Error(
+                                    RegistryRestApiError::InvalidStateError(err),
+                                )) => HttpResponse::BadRequest().json(ErrorResponse::bad_request(
                                     &format!("Invalid node: {}", err),
-                                ))
-                            }
-                            Err(err) => {
-                                error!("Unable to add node: {}", err);
-                                HttpResponse::InternalServerError()
-                                    .json(ErrorResponse::internal_error())
-                            }
-                        })
-                    })) as Box<dyn Future<Item = HttpResponse, Error = Error>>
-                }
+                                )),
+                                Err(err) => {
+                                    error!("Unable to add node: {}", err);
+                                    HttpResponse::InternalServerError()
+                                        .json(ErrorResponse::internal_error())
+                                }
+                            })
+                        }),
+                )
+                    as Box<dyn Future<Item = HttpResponse, Error = Error>>,
                 Err(err) => Box::new(
                     HttpResponse::BadRequest()
                         .json(ErrorResponse::bad_request(&format!(
@@ -262,7 +269,8 @@ mod tests {
     use reqwest::{blocking::Client, StatusCode, Url};
     use serde_json::{to_value, Value as JsonValue};
 
-    use crate::registry::{InvalidNodeError, NodeIter};
+    use crate::error::InvalidStateError;
+    use crate::registry::{error::RegistryError, NodeIter};
     use crate::rest_api::{
         actix_web_1::{RestApiBuilder, RestApiShutdownHandle},
         paging::Paging,
@@ -586,11 +594,11 @@ mod tests {
                 inner.insert(node.identity.clone(), node);
                 Ok(())
             } else {
-                Err(RegistryError::InvalidNode(
-                    InvalidNodeError::InvalidIdentity(
-                        node.identity,
-                        "Node does not exist in the registry".to_string(),
-                    ),
+                Err(RegistryError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "Node does not exist in the registry: {}",
+                        node.identity
+                    )),
                 ))
             }
         }

@@ -19,13 +19,15 @@
 //! * `DELETE /registry/nodes/{identity}` for deleting a node from the registry
 
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use crate::error::InvalidStateError;
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
+use crate::registry::rest_api::error::RegistryRestApiError;
 #[cfg(feature = "authorization")]
 use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
-    rest_api::resources::nodes_identity::NodeResponse, InvalidNodeError, Node, RegistryError,
-    RegistryReader, RegistryWriter, RwRegistry,
+    rest_api::resources::nodes_identity::NodeResponse, Node, RegistryReader, RegistryWriter,
+    RwRegistry,
 };
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
@@ -79,7 +81,12 @@ fn fetch_node(
         .unwrap_or("")
         .to_string();
     Box::new(
-        web::block(move || registry.fetch_node(&identity)).then(|res| {
+        web::block(move || {
+            registry
+                .fetch_node(&identity)
+                .map_err(RegistryRestApiError::from)
+        })
+        .then(|res| {
             Ok(match res {
                 Ok(Some(node)) => HttpResponse::Ok().json(NodeResponse::from(&node)),
                 Ok(None) => {
@@ -116,24 +123,26 @@ fn put_node(
                 Ok(node) => Box::new(
                     web::block(move || {
                         if node.identity != path_identity {
-                            Err(RegistryError::InvalidNode(
-                                InvalidNodeError::InvalidIdentity(
-                                    node.identity,
-                                    "Node identity cannot be changed".into(),
-                                ),
+                            Err(RegistryRestApiError::InvalidStateError(
+                                InvalidStateError::with_message(format!(
+                                    "Node identity cannot be changed: {}",
+                                    node.identity
+                                )),
                             ))
                         } else {
-                            registry.update_node(node)
+                            registry
+                                .update_node(node)
+                                .map_err(RegistryRestApiError::from)
                         }
                     })
                     .then(|res| {
                         Ok(match res {
                             Ok(_) => HttpResponse::Ok().finish(),
-                            Err(BlockingError::Error(RegistryError::InvalidNode(err))) => {
-                                HttpResponse::BadRequest().json(ErrorResponse::bad_request(
-                                    &format!("Invalid node: {}", err),
-                                ))
-                            }
+                            Err(BlockingError::Error(RegistryRestApiError::InvalidStateError(
+                                err,
+                            ))) => HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                                &format!("Invalid node: {}", err),
+                            )),
                             Err(err) => {
                                 error!("Unable to put node: {}", err);
                                 HttpResponse::InternalServerError()
@@ -165,7 +174,12 @@ fn delete_node(
         .unwrap_or("")
         .to_string();
     Box::new(
-        web::block(move || registry.delete_node(&identity)).then(|res| {
+        web::block(move || {
+            registry
+                .delete_node(&identity)
+                .map_err(RegistryRestApiError::from)
+        })
+        .then(|res| {
             Ok(match res {
                 Ok(Some(_)) => HttpResponse::Ok().finish(),
                 Ok(None) => {
@@ -189,7 +203,8 @@ mod tests {
 
     use reqwest::{blocking::Client, StatusCode, Url};
 
-    use crate::registry::{MetadataPredicate, NodeIter};
+    use crate::error::InvalidStateError;
+    use crate::registry::{error::RegistryError, MetadataPredicate, NodeIter};
     use crate::rest_api::actix_web_1::{RestApiBuilder, RestApiShutdownHandle};
 
     #[test]
@@ -502,11 +517,11 @@ mod tests {
                 inner.insert(node.identity.clone(), node);
                 Ok(())
             } else {
-                Err(RegistryError::InvalidNode(
-                    InvalidNodeError::InvalidIdentity(
-                        node.identity,
-                        "Node does not exist in the registry".to_string(),
-                    ),
+                Err(RegistryError::InvalidStateError(
+                    InvalidStateError::with_message(format!(
+                        "Node does not exist in the registry: {}",
+                        node.identity
+                    )),
                 ))
             }
         }

@@ -30,6 +30,7 @@ use std::time::{Duration, Instant};
 
 use openssl::hash::{hash, MessageDigest};
 
+use crate::error::{InternalError, InvalidStateError};
 use crate::hex::to_hex;
 use crate::registry::{
     validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
@@ -118,13 +119,13 @@ impl RemoteYamlRegistry {
                         )
                     })
                     .map_err(|err| {
-                        RegistryError::general_error_with_source(
-                            &format!(
+                        RegistryError::InternalError(InternalError::from_source_with_message(
+                            Box::new(err),
+                            format!(
                                 "Failed to spawn automatic refresh thread for remote registry '{}'",
                                 url
                             ),
-                            Box::new(err),
-                        )
+                        ))
                     })?;
                 Ok(running)
             })
@@ -146,7 +147,11 @@ impl RemoteYamlRegistry {
     fn get_nodes(&self) -> Result<Vec<Node>, RegistryError> {
         self.internal
             .lock()
-            .map_err(|_| RegistryError::general_error("Internal lock poisoned"))?
+            .map_err(|_| {
+                RegistryError::InternalError(InternalError::with_message(
+                    "Internal lock poisoned".into(),
+                ))
+            })?
             .get_nodes()
     }
 }
@@ -233,10 +238,11 @@ impl Internal {
                     .forced_refresh_period
                     .map(|duration| {
                         Instant::now().checked_add(duration).ok_or_else(|| {
-                            RegistryError::general_error(
+                            RegistryError::InternalError(InternalError::with_message(
                                 "Forced refresh time could not be determined; \
-                                 forced_refresh_period may be too large",
-                            )
+                                 forced_refresh_period may be too large"
+                                    .into(),
+                            ))
                         })
                     })
                     .transpose()?;
@@ -284,11 +290,12 @@ fn compute_cache_filename(url: &str, cache_dir: &str) -> Result<String, Registry
     let hash = hash(MessageDigest::sha256(), url.as_bytes())
         .map(|digest| to_hex(&*digest))
         .map_err(|err| {
-            RegistryError::general_error_with_source(
-                "Failed to hash URL for cache file",
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                "Failed to hash URL for cache file".into(),
+            ))
         })?;
+
     let filename = format!("remote_registry_{}.yaml", hash);
     Ok(Path::new(cache_dir)
         .join(filename)
@@ -302,25 +309,27 @@ fn fetch_nodes_from_remote(url: &str) -> Result<Vec<Node>, RegistryError> {
     let bytes = reqwest::blocking::get(url)
         .and_then(|response| response.error_for_status())
         .map_err(|err| {
-            RegistryError::general_error_with_source(
-                &format!("Failed to fetch remote registry file from {}", url),
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                format!("Failed to fetch remote registry file from {}", url),
+            ))
         })?
         .bytes()
         .map_err(|err| {
-            RegistryError::general_error_with_source(
-                "Failed to get bytes from remote registry file HTTP response",
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                "Failed to get bytes from remote registry file HTTP response".into(),
+            ))
         })?;
     let nodes: Vec<Node> = serde_yaml::from_slice(&bytes).map_err(|_| {
-        RegistryError::general_error(
-            "Failed to deserialize remote registry file: Not a valid YAML sequence of nodes",
-        )
+        RegistryError::InternalError(InternalError::with_message(
+            "Failed to deserialize remote registry file: Not a valid YAML sequence of nodes".into(),
+        ))
     })?;
 
-    validate_nodes(&nodes)?;
+    validate_nodes(&nodes).map_err(|err| {
+        RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
+    })?;
 
     Ok(nodes)
 }

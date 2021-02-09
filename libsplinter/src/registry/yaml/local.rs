@@ -27,9 +27,11 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::registry::{
-    validate_nodes, InvalidNodeError, MetadataPredicate, Node, NodeIter, RegistryError,
-    RegistryReader, RegistryWriter, RwRegistry,
+    validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
+    RegistryWriter, RwRegistry,
 };
+
+use crate::error::{InternalError, InvalidStateError};
 
 /// A local, read/write registry.
 ///
@@ -72,7 +74,11 @@ impl LocalYamlRegistry {
         Ok(self
             .internal
             .lock()
-            .map_err(|_| RegistryError::general_error("YAML registry's internal lock poisoned"))?
+            .map_err(|_| {
+                RegistryError::InternalError(InternalError::with_message(
+                    "YAML registry's internal lock poisoned".into(),
+                ))
+            })?
             .get_nodes())
     }
 
@@ -80,7 +86,11 @@ impl LocalYamlRegistry {
     pub(super) fn write_nodes(&self, nodes: Vec<Node>) -> Result<(), RegistryError> {
         self.internal
             .lock()
-            .map_err(|_| RegistryError::general_error("YAML registry's internal lock poisoned"))?
+            .map_err(|_| {
+                RegistryError::InternalError(InternalError::with_message(
+                    "YAML registry's internal lock poisoned".into(),
+                ))
+            })?
             .write_nodes(nodes)
     }
 }
@@ -141,11 +151,11 @@ impl RegistryWriter for LocalYamlRegistry {
             nodes.push(node);
             self.write_nodes(nodes)
         } else {
-            Err(RegistryError::InvalidNode(
-                InvalidNodeError::InvalidIdentity(
-                    node.identity,
-                    "Node does not exist in the registry".to_string(),
-                ),
+            Err(RegistryError::InvalidStateError(
+                InvalidStateError::with_message(format!(
+                    "Node does not exist in the registry: {}",
+                    node.identity
+                )),
             ))
         }
     }
@@ -212,10 +222,10 @@ impl Internal {
         let file_read_result = std::fs::metadata(&self.file_path)
             .and_then(|metadata| metadata.modified())
             .map_err(|err| {
-                RegistryError::general_error_with_source(
-                    "Failed to read YAML registry file's last modification time",
+                RegistryError::InternalError(InternalError::from_source_with_message(
                     Box::new(err),
-                )
+                    "Failed to read YAML registry file's last modification time".into(),
+                ))
             })
             .and_then(|last_modified| {
                 if last_modified > self.last_read {
@@ -240,19 +250,21 @@ impl Internal {
     /// Read the backing file, verify that it's valid, and cache its contents.
     fn read_nodes(&mut self) -> Result<(), RegistryError> {
         let file = File::open(&self.file_path).map_err(|err| {
-            RegistryError::general_error_with_source(
-                "Failed to open YAML registry file",
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                "Failed to open YAML registry file".into(),
+            ))
         })?;
         let nodes: Vec<Node> = serde_yaml::from_reader(&file).map_err(|err| {
-            RegistryError::general_error_with_source(
-                "Failed to read YAML registry file",
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                "Failed to read YAML registry file".into(),
+            ))
         })?;
 
-        validate_nodes(&nodes)?;
+        validate_nodes(&nodes).map_err(|err| {
+            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
+        })?;
 
         self.cached_nodes = nodes;
         self.last_read = SystemTime::now();
@@ -263,30 +275,37 @@ impl Internal {
     /// Verify that the given nodes represent a valid registry, write them to the backing file, and
     /// update the in-memory cache.
     fn write_nodes(&mut self, nodes: Vec<Node>) -> Result<(), RegistryError> {
-        validate_nodes(&nodes)?;
+        validate_nodes(&nodes).map_err(|err| {
+            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
+        })?;
 
         let output = serde_yaml::to_vec(&nodes).map_err(|err| {
-            RegistryError::general_error_with_source("Failed to write nodes to YAML", Box::new(err))
+            RegistryError::InternalError(InternalError::from_source_with_message(
+                Box::new(err),
+                "Failed to write nodes to YAML".into(),
+            ))
         })?;
 
         let mut file = File::create(&self.file_path).map_err(|err| {
-            RegistryError::general_error_with_source(
-                &format!("Failed to open YAML registry file '{}'", self.file_path),
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                format!("Failed to open YAML registry file '{}'", self.file_path),
+            ))
         })?;
+
         file.write_all(&output).map_err(|err| {
-            RegistryError::general_error_with_source(
-                &format!("Failed to write to YAML registry file '{}'", self.file_path),
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                format!("Failed to write to YAML registry file '{}'", self.file_path),
+            ))
         })?;
+
         // Append newline to file
         writeln!(file).map_err(|err| {
-            RegistryError::general_error_with_source(
-                &format!("Failed to write to YAML registry file '{}'", self.file_path),
+            RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
-            )
+                format!("Failed to write to YAML registry file '{}'", self.file_path),
+            ))
         })?;
 
         self.cached_nodes = nodes;
@@ -303,8 +322,6 @@ mod test {
     use std::fs::{remove_file, File};
 
     use tempdir::TempDir;
-
-    use crate::registry::InvalidNodeError;
 
     ///
     /// Verifies that reading from a YAML file that contains two nodes with the same identity
@@ -330,11 +347,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Two nodes with same identity in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateIdentity(id))) => {
-                assert_eq!(id, node1.identity)
-            }
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::DuplicateIdentity but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -364,11 +379,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Two nodes with same endpoint in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
-                assert!(node1.endpoints.contains(&endpoint))
-            }
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -397,9 +410,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Node with empty identity in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -428,9 +441,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Node with empty endpoint in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -459,9 +472,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Node with empty display_name in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -490,9 +503,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Node with empty key in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyKey but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -521,9 +534,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Node with no endpoint in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -552,9 +565,9 @@ mod test {
         let result = LocalYamlRegistry::new(&path);
         match result {
             Ok(_) => panic!("Node with no keys in YAML file. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::MissingKeys but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -880,11 +893,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
-                assert!(node1.endpoints.contains(&endpoint))
-            }
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -916,9 +927,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node identity is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -950,9 +961,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node endpoint is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -984,9 +995,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node display_name is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+            Err(RegistryError::InvalidStateError(_)) => (),
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1018,9 +1029,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node key is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyKey but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1052,9 +1063,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node endpoints is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1086,9 +1097,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node keys is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::MissingKeys but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1121,11 +1132,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
-                assert!(node1.endpoints.contains(&endpoint))
-            }
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1156,9 +1165,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node identity is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyIdentity)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyIdentity but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1189,9 +1198,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node endpoint is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyEndpoint)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1222,9 +1231,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node display_name is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyDisplayName)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyDisplayName but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1255,9 +1264,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node key is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::EmptyKey)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::EmptyKey but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1288,9 +1297,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node endpoints is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::MissingEndpoints)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::MissingEndpoints but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1321,9 +1330,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node keys is empty. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::MissingKeys)) => {}
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::MissingKeys but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
@@ -1391,11 +1400,9 @@ mod test {
 
         match result {
             Ok(_) => panic!("Node with endpoint already exists. Error should be returned"),
-            Err(RegistryError::InvalidNode(InvalidNodeError::DuplicateEndpoint(endpoint))) => {
-                assert!(node1.endpoints.contains(&endpoint))
-            }
+            Err(RegistryError::InvalidStateError(_)) => {}
             Err(err) => panic!(
-                "Should have gotten InvalidNodeError::DuplicateEndpoint but got {}",
+                "Should have gotten RegistryError::InvalidStateError but got {}",
                 err
             ),
         }
