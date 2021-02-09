@@ -21,7 +21,6 @@ use diesel::{
 
 use crate::error::InvalidStateError;
 use crate::registry::{
-    check_node_required_fields_are_not_empty,
     diesel::{
         models::{NodeEndpointsModel, NodeKeysModel, NodeMetadataModel, NodesModel},
         schema::{
@@ -40,11 +39,6 @@ pub(in crate::registry::diesel) trait RegistryInsertNodeOperation {
 #[cfg(feature = "postgres")]
 impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgConnection> {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-        // Verify that the node's required fields are non-empty
-        check_node_required_fields_are_not_empty(&node).map_err(|err| {
-            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
-        })?;
-
         self.conn.transaction::<(), _, _>(|| {
             // Verify that the node's endpoints are unique.
             let filters = node
@@ -123,11 +117,6 @@ impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
 #[cfg(feature = "sqlite")]
 impl<'a> RegistryInsertNodeOperation for RegistryOperations<'a, diesel::sqlite::SqliteConnection> {
     fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-        // Verify that the node's required fields are non-empty
-        check_node_required_fields_are_not_empty(&node).map_err(|err| {
-            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
-        })?;
-
         self.conn.transaction::<(), _, _>(|| {
             // Verify that the node's endpoints are unique.
             let filters = node
