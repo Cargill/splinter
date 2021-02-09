@@ -39,40 +39,44 @@ where
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
     fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        let node = splinter_nodes::table
-            .find(identity)
-            .first::<NodesModel>(self.conn)
-            .optional()?;
+        self.conn.transaction(|| {
+            let node = splinter_nodes::table
+                .find(identity)
+                .first::<NodesModel>(self.conn)
+                .optional()?;
 
-        if let Some(node) = node {
-            let endpoints = splinter_nodes_endpoints::table
-                .filter(splinter_nodes_endpoints::identity.eq(identity))
-                .load::<NodeEndpointsModel>(self.conn)?
-                .into_iter()
-                .map(|endpoint| endpoint.endpoint)
-                .collect::<Vec<_>>();
-            let keys = splinter_nodes_keys::table
-                .filter(splinter_nodes_keys::identity.eq(identity))
-                .load::<NodeKeysModel>(self.conn)?
-                .into_iter()
-                .map(|key| key.key)
-                .collect::<Vec<_>>();
-            let metadata = splinter_nodes_metadata::table
-                .filter(splinter_nodes_metadata::identity.eq(identity))
-                .load::<NodeMetadataModel>(self.conn)?;
+            if let Some(node) = node {
+                let endpoints = splinter_nodes_endpoints::table
+                    .filter(splinter_nodes_endpoints::identity.eq(identity))
+                    .load::<NodeEndpointsModel>(self.conn)?
+                    .into_iter()
+                    .map(|endpoint| endpoint.endpoint)
+                    .collect::<Vec<_>>();
+                let keys = splinter_nodes_keys::table
+                    .filter(splinter_nodes_keys::identity.eq(identity))
+                    .load::<NodeKeysModel>(self.conn)?
+                    .into_iter()
+                    .map(|key| key.key)
+                    .collect::<Vec<_>>();
+                let metadata = splinter_nodes_metadata::table
+                    .filter(splinter_nodes_metadata::identity.eq(identity))
+                    .load::<NodeMetadataModel>(self.conn)?;
 
-            let mut builder = NodeBuilder::new(identity)
-                .with_display_name(node.display_name)
-                .with_endpoints(endpoints)
-                .with_keys(keys);
-            for entry in metadata {
-                builder = builder.with_metadata(entry.key, entry.value);
+                let mut builder = NodeBuilder::new(identity)
+                    .with_display_name(node.display_name)
+                    .with_endpoints(endpoints)
+                    .with_keys(keys);
+                for entry in metadata {
+                    builder = builder.with_metadata(entry.key, entry.value);
+                }
+                Ok(Some(builder.build().map_err(|err| {
+                    RegistryError::InvalidStateError(InvalidStateError::with_message(
+                        err.to_string(),
+                    ))
+                })?))
+            } else {
+                Ok(None)
             }
-            Ok(Some(builder.build().map_err(|err| {
-                RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
-            })?))
-        } else {
-            Ok(None)
-        }
+        })
     }
 }
