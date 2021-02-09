@@ -1183,10 +1183,11 @@ mod tests {
         );
         #[cfg(feature = "database")]
         // The `DefaultPartialConfigBuilder` is the only config with a value for `database` (source
-        // should be `Default`).
+        // should be `Default`). Should have default state file name with `EnvPartialConfigBuilder`
+        // value for `state_dir`.
         assert_eq!(
             (final_config.database(), final_config.database_source()),
-            ("127.0.0.1:5432", &ConfigSource::Default)
+            ("test/state/splinter_state.db", &ConfigSource::Default)
         );
         // The `DefaultPartialConfigBuilder` is the only config with a value for
         // `registry_auto_refresh` (source should be `Default`).
