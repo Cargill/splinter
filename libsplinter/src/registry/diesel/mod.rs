@@ -209,6 +209,7 @@ pub mod tests {
 
         assert_eq!(node, get_node_1());
 
+        #[allow(deprecated)]
         if registry.insert_node(get_node_1()).is_ok() {
             panic!("Should have returned an error because of duplicate endpoint")
         }
