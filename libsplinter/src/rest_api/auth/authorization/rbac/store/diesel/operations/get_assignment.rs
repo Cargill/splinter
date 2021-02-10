@@ -18,7 +18,7 @@ use diesel::prelude::*;
 
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
-        models::{AssignmentModel, IdentityModel},
+        models::{AssignmentModel, IdentityModel, IdentityModelType, IdentityModelTypeMapping},
         schema::identities,
     },
     Assignment, Identity, RoleBasedAuthorizationStoreError,
@@ -39,6 +39,8 @@ where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<IdentityModelTypeMapping>,
+    IdentityModelType: diesel::deserialize::FromSql<IdentityModelTypeMapping, C::Backend>,
 {
     fn get_assignment(
         &self,
