@@ -772,9 +772,17 @@ impl Service for AdminService {
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
             }
             #[cfg(feature = "circuit-abandon")]
-            AdminMessage_Type::ABANDONED_CIRCUIT => Err(ServiceError::UnableToHandleMessage(
-                Box::new(AdminError::MessageTypeUnset),
-            )),
+            AdminMessage_Type::ABANDONED_CIRCUIT => {
+                let abandoned_circuit = admin_message.get_abandoned_circuit();
+                let circuit_id = abandoned_circuit.get_circuit_id();
+                let member_node_id = abandoned_circuit.get_member_node_id();
+
+                debug!(
+                    "Member {} has abandoned circuit {}",
+                    member_node_id, circuit_id
+                );
+                Ok(())
+            }
             AdminMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 AdminError::MessageTypeUnset,
             ))),
