@@ -83,6 +83,7 @@ stable = [
     "cylinder-jwt",
     "default",
     "events",
+    "memory",
     "oauth",
     "postgres",
     "registry",
@@ -141,6 +142,7 @@ circuit-template = ["admin-service", "glob"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
+memory = ["sqlite"]
 oauth = ["biome", "oauth2", "reqwest", "rest-api"]
 oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 postgres = ["diesel/postgres", "diesel_migrations"]

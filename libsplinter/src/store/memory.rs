@@ -14,7 +14,6 @@
 
 //! Implementation of a `StoreFactory` for in memory
 
-#[cfg(feature = "sqlite")]
 use diesel::{
     r2d2::{ConnectionManager, Pool},
     sqlite::SqliteConnection,
@@ -114,7 +113,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(self.biome_oauth_user_session_store.clone())
     }
 
-    #[cfg(all(feature = "admin-service", feature = "sqlite"))]
+    #[cfg(feature = "admin-service")]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
@@ -132,11 +131,6 @@ impl StoreFactory for MemoryStoreFactory {
         ))
     }
 
-    #[cfg(all(feature = "admin-service", not(feature = "sqlite")))]
-    fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
-        unimplemented!()
-    }
-
     #[cfg(feature = "oauth")]
     fn get_oauth_inflight_request_store(
         &self,
@@ -144,7 +138,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(self.inflight_request_store.clone())
     }
 
-    #[cfg(all(feature = "registry-database", feature = "sqlite"))]
+    #[cfg(feature = "registry-database")]
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
@@ -160,12 +154,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(crate::registry::DieselRegistry::new(pool))
     }
 
-    #[cfg(all(feature = "registry-database", not(feature = "sqlite")))]
-    fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
-        unimplemented!()
-    }
-
-    #[cfg(all(feature = "authorization", feature = "sqlite"))]
+    #[cfg(feature = "authorization")]
     fn get_role_based_authorization_store(
         &self,
     ) -> Box<dyn crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStore>
@@ -182,13 +171,6 @@ impl StoreFactory for MemoryStoreFactory {
         .expect("Failed to run migrations");
 
         Box::new(crate::rest_api::auth::authorization::rbac::store::DieselRoleBasedAuthorizationStore::new(pool))
-    }
-
-    #[cfg(all(feature = "authorization", not(feature = "sqlite")))]
-    fn get_role_based_authorization_store(
-        &self,
-    ) -> Box<dyn crate::rest_api::auth::roles::store::RoleBasedAuthorizationStore> {
-        unimplemented!()
     }
 
     #[cfg(feature = "biome-profile")]
