@@ -131,10 +131,11 @@ impl AdminKeyVerifier for dyn RegistryReader {
     /// registry and the node has the given key. Otherwise, the key is not permitted.
     fn is_permitted(&self, node_id: &str, key: &[u8]) -> Result<bool, AdminKeyVerifierError> {
         let node_opt = self.fetch_node(node_id).map_err(|err| {
-            AdminKeyVerifierError::new_with_source(
-                &format!("Failed to lookup node '{}' in registry", node_id),
-                Box::new(err),
-            )
+            AdminKeyVerifierError::new(&format!(
+                "Failed to lookup node '{}' in registry: {}",
+                node_id,
+                err.to_string()
+            ))
         })?;
         Ok(match node_opt {
             Some(node) => node.has_key(&to_hex(key)),

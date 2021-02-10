@@ -16,6 +16,7 @@
 
 #[cfg(feature = "rest-api-actix")]
 mod actix;
+mod error;
 mod resources;
 
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};

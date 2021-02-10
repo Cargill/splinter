@@ -15,47 +15,33 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "registry-database")]
+use crate::error::ConstraintViolationType;
+use crate::error::{
+    ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
+};
+
 /// Represents errors that occur with node registry operations
 #[derive(Debug)]
 pub enum RegistryError {
-    /// A node was found to be invalid
-    InvalidNode(InvalidNodeError),
-    /// A general error occurred in the node registry
-    GeneralError {
-        context: String,
-        source: Option<Box<dyn Error + Send>>,
-    },
-}
-
-impl RegistryError {
-    /// Create a new `NodeRegistryError::GeneralError` with just a context string (no source error).
-    pub fn general_error(context: &str) -> Self {
-        RegistryError::GeneralError {
-            context: context.into(),
-            source: None,
-        }
-    }
-
-    /// Create a new `NodeRegistryError::GeneralError` with a context string and a source error.
-    pub fn general_error_with_source(context: &str, err: Box<dyn Error + Send>) -> Self {
-        RegistryError::GeneralError {
-            context: context.into(),
-            source: Some(err),
-        }
-    }
+    /// Represents errors internal to the function.
+    InternalError(InternalError),
+    /// Represents constraint violations on the database's definition
+    ConstraintViolationError(ConstraintViolationError),
+    /// Represents when the underlying resource is unavailable
+    ResourceTemporarilyUnavailableError(ResourceTemporarilyUnavailableError),
+    /// Represents when an operation cannot be completed because the state of the underlying
+    /// struct is inconsistent.
+    InvalidStateError(InvalidStateError),
 }
 
 impl Error for RegistryError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            RegistryError::InvalidNode(err) => Some(err),
-            RegistryError::GeneralError { source, .. } => {
-                if let Some(ref err) = source {
-                    Some(&**err)
-                } else {
-                    None
-                }
-            }
+            RegistryError::InternalError(err) => Some(err),
+            RegistryError::ConstraintViolationError(err) => Some(err),
+            RegistryError::ResourceTemporarilyUnavailableError(err) => Some(err),
+            RegistryError::InvalidStateError(err) => Some(err),
         }
     }
 }
@@ -63,14 +49,12 @@ impl Error for RegistryError {
 impl fmt::Display for RegistryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RegistryError::InvalidNode(err) => write!(f, "Invalid node detected: {}", err),
-            RegistryError::GeneralError { context, source } => {
-                if let Some(ref err) = source {
-                    write!(f, "{}: {}", context, err)
-                } else {
-                    f.write_str(&context)
-                }
+            RegistryError::InternalError(err) => write!(f, "{}", err),
+            RegistryError::ConstraintViolationError(err) => write!(f, "{}", err),
+            RegistryError::ResourceTemporarilyUnavailableError(err) => {
+                write!(f, "{}", err)
             }
+            RegistryError::InvalidStateError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -78,20 +62,9 @@ impl fmt::Display for RegistryError {
 #[cfg(feature = "registry-database")]
 impl From<diesel::r2d2::PoolError> for RegistryError {
     fn from(err: diesel::r2d2::PoolError) -> Self {
-        Self::general_error_with_source("Failed to establish database connection", Box::new(err))
-    }
-}
-
-#[cfg(feature = "registry-database")]
-impl From<diesel::result::Error> for RegistryError {
-    fn from(err: diesel::result::Error) -> Self {
-        Self::general_error_with_source("A diesel error occurred", Box::new(err))
-    }
-}
-
-impl From<InvalidNodeError> for RegistryError {
-    fn from(err: InvalidNodeError) -> Self {
-        RegistryError::InvalidNode(err)
+        RegistryError::ResourceTemporarilyUnavailableError(
+            ResourceTemporarilyUnavailableError::from_source(Box::new(err)),
+        )
     }
 }
 
@@ -154,6 +127,34 @@ impl fmt::Display for InvalidNodeError {
             }
             InvalidNodeError::MissingEndpoints => write!(f, "node must have one or more endpoints"),
             InvalidNodeError::MissingKeys => write!(f, "node must have one or more keys"),
+        }
+    }
+}
+
+#[cfg(feature = "registry-database")]
+impl From<diesel::result::Error> for RegistryError {
+    fn from(err: diesel::result::Error) -> Self {
+        match err {
+            diesel::result::Error::DatabaseError(db_err_kind, _) => match db_err_kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    RegistryError::ConstraintViolationError(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    RegistryError::ConstraintViolationError(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => RegistryError::InternalError(InternalError::from_source(Box::new(err))),
+            },
+            _ => RegistryError::InternalError(InternalError::from_source(Box::new(err))),
         }
     }
 }
