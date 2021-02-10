@@ -505,7 +505,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
     #[cfg(feature = "circuit-purge")]
     let circuit_command = circuit_command.subcommand(
         SubCommand::with_name("purge")
-            .about("Purge an existing disbanded circuit")
+            .about("Purge an existing inactive circuit")
             .arg(
                 Arg::with_name("url")
                     .short("U")
@@ -527,6 +527,34 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                     .takes_value(true)
                     .required(true)
                     .help("ID of the circuit to be purged"),
+            ),
+    );
+
+    #[cfg(feature = "circuit-abandon")]
+    let circuit_command = circuit_command.subcommand(
+        SubCommand::with_name("abandon")
+            .about("Abandon an existing circuit")
+            .arg(
+                Arg::with_name("url")
+                    .short("U")
+                    .long("url")
+                    .takes_value(true)
+                    .help("URL of Splinter Daemon"),
+            )
+            .arg(
+                Arg::with_name("private_key_file")
+                    .value_name("private-key-file")
+                    .short("k")
+                    .long("key")
+                    .takes_value(true)
+                    .help("Path to private key file"),
+            )
+            .arg(
+                Arg::with_name("circuit_id")
+                    .value_name("circuit-id")
+                    .takes_value(true)
+                    .required(true)
+                    .help("ID of the circuit to be abandoned"),
             ),
     );
 
@@ -1486,6 +1514,9 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
 
     #[cfg(feature = "circuit-purge")]
     let circuit_command = circuit_command.with_command("purge", circuit::CircuitPurgeAction);
+
+    #[cfg(feature = "circuit-abandon")]
+    let circuit_command = circuit_command.with_command("abandon", circuit::CircuitAbandonAction);
 
     #[cfg(feature = "circuit-template")]
     let circuit_command = circuit_command.with_command(
