@@ -771,10 +771,14 @@ impl Service for AdminService {
                     .add_member_ready_to_disband(circuit_id, member_node_id)
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
             }
+            #[cfg(feature = "circuit-abandon")]
+            AdminMessage_Type::ABANDONED_CIRCUIT => Err(ServiceError::UnableToHandleMessage(
+                Box::new(AdminError::MessageTypeUnset),
+            )),
             AdminMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 AdminError::MessageTypeUnset,
             ))),
-            #[cfg(not(feature = "circuit-disband"))]
+            #[cfg(any(not(feature = "circuit-disband"), not(feature = "circuit-abandon")))]
             _ => Err(ServiceError::UnableToHandleMessage(Box::new(
                 AdminError::MessageTypeUnhandled,
             ))),
