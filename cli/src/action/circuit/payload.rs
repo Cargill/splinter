@@ -16,6 +16,8 @@ use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey};
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
+#[cfg(feature = "circuit-abandon")]
+use splinter::protos::admin::CircuitAbandon;
 #[cfg(feature = "circuit-disband")]
 use splinter::protos::admin::CircuitDisbandRequest;
 #[cfg(feature = "circuit-purge")]
@@ -27,6 +29,8 @@ use splinter::protos::admin::{
 
 use crate::error::CliError;
 
+#[cfg(feature = "circuit-abandon")]
+use super::AbandonedCircuit;
 #[cfg(feature = "circuit-disband")]
 use super::CircuitDisband;
 #[cfg(feature = "circuit-purge")]
@@ -185,5 +189,25 @@ impl CircuitAction<CircuitPurgeRequest> for CircuitPurge {
 impl ApplyToEnvelope for CircuitPurgeRequest {
     fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
         circuit_management_payload.set_circuit_purge_request(self);
+    }
+}
+
+#[cfg(feature = "circuit-abandon")]
+impl CircuitAction<CircuitAbandon> for AbandonedCircuit {
+    fn action_type(&self) -> Action {
+        Action::CIRCUIT_ABANDON
+    }
+
+    fn into_proto(self) -> Result<CircuitAbandon, CliError> {
+        let mut abandon = CircuitAbandon::new();
+        abandon.set_circuit_id(self.circuit_id);
+        Ok(abandon)
+    }
+}
+
+#[cfg(feature = "circuit-abandon")]
+impl ApplyToEnvelope for CircuitAbandon {
+    fn apply(self, circuit_management_payload: &mut CircuitManagementPayload) {
+        circuit_management_payload.set_circuit_abandon(self);
     }
 }
