@@ -70,8 +70,6 @@ pub struct Config {
     state_dir: (String, ConfigSource),
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
     #[cfg(feature = "oauth")]
@@ -210,11 +208,6 @@ impl Config {
 
     pub fn no_tls(&self) -> bool {
         self.no_tls.0
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    pub fn enable_biome(&self) -> bool {
-        self.enable_biome.0
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -411,11 +404,6 @@ impl Config {
 
     fn no_tls_source(&self) -> &ConfigSource {
         &self.no_tls.1
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    fn enable_biome_source(&self) -> &ConfigSource {
-        &self.enable_biome.1
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -626,12 +614,6 @@ impl Config {
             self.no_tls(),
             self.no_tls_source()
         );
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        debug!(
-            "Config: enable_biome: {:?} (source: {:?})",
-            self.enable_biome(),
-            self.enable_biome_source()
-        );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
         #[cfg(feature = "oauth")]
@@ -801,8 +783,7 @@ mod tests {
         (@arg tls_client_key:  --("tls-client-key") +takes_value)
         (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
         (@arg tls_insecure: --("tls-insecure"))
-        (@arg no_tls: --("no-tls"))
-        (@arg enable_biome: --("enable-biome")))
+        (@arg no_tls: --("no-tls")))
         .get_matches_from(args)
     }
 
@@ -912,7 +893,6 @@ mod tests {
             EXAMPLE_SERVER_KEY,
             "--tls-insecure",
             "--no-tls",
-            "--enable-biome",
         ];
         // Create an example `ArgMatches` object to initialize the `ClapPartialConfigBuilder`.
         let matches = create_arg_matches(args);

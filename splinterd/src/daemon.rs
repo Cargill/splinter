@@ -117,8 +117,6 @@ pub struct SplinterDaemon {
     rest_api_ssl_settings: Option<(String, String)>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    enable_biome: bool,
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
@@ -635,10 +633,10 @@ impl SplinterDaemon {
             verifier: Secp256k1Context::new().new_verifier(),
         });
 
-        // Add Biome as an auth provider if the `biome-credentials` feature is enabled and Biome
-        // is configured. This informs the REST API that Biome is providing auth.
+        // Add Biome as an auth provider if the `biome-credentials` feature is enabled. This informs
+        // the REST API that Biome is providing auth.
         #[cfg(feature = "biome-credentials")]
-        if self.enable_biome {
+        {
             let biome_resource_manager = build_biome_routes(&*store_factory)?;
             auth_configs.push(AuthConfig::Biome {
                 biome_resource_manager,
@@ -725,7 +723,7 @@ impl SplinterDaemon {
         // If `biome-key-management` is enabled but `biome-credentials` isn't then the Biome
         // endpoints weren't added as an auth provider, so add them now
         #[cfg(all(feature = "biome-key-management", not(feature = "biome-credentials")))]
-        if self.enable_biome {
+        {
             let biome_resources = build_biome_routes(&*store_factory)?;
             rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
         }
@@ -1044,8 +1042,6 @@ pub struct SplinterDaemonBuilder {
     rest_api_server_key: Option<String>,
     #[cfg(feature = "database")]
     db_url: Option<String>,
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    enable_biome: bool,
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
     registry_forced_refresh: Option<u64>,
@@ -1138,12 +1134,6 @@ impl SplinterDaemonBuilder {
     #[cfg(feature = "database")]
     pub fn with_db_url(mut self, value: Option<String>) -> Self {
         self.db_url = value;
-        self
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    pub fn enable_biome(mut self, enabled: bool) -> Self {
-        self.enable_biome = enabled;
         self
     }
 
@@ -1291,7 +1281,7 @@ impl SplinterDaemonBuilder {
 
         #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
         {
-            if self.enable_biome && db_url.is_none() {
+            if db_url.is_none() {
                 return Err(CreateError::MissingRequiredField(
                     "db_url is required to enable biome features.".to_string(),
                 ));
@@ -1329,8 +1319,6 @@ impl SplinterDaemonBuilder {
             rest_api_ssl_settings,
             #[cfg(feature = "database")]
             db_url,
-            #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-            enable_biome: self.enable_biome,
             registries: self.registries,
             registry_auto_refresh,
             registry_forced_refresh,

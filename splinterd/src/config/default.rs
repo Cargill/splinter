@@ -91,10 +91,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             partial_config =
                 partial_config.with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
         }
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        {
-            partial_config = partial_config.with_enable_biome(Some(false));
-        }
 
         #[cfg(feature = "database")]
         {
@@ -169,8 +165,6 @@ mod tests {
         assert_eq!(config.state_dir(), Some(String::from(STATE_DIR)));
         assert_eq!(config.tls_insecure(), Some(false));
         assert_eq!(config.no_tls(), Some(false));
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        assert_eq!(config.enable_biome(), Some(false));
         // Assert the source is correctly identified for this `PartialConfig` object.
         assert_eq!(config.source(), ConfigSource::Default);
     }

@@ -336,15 +336,6 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
-            #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-            enable_biome: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.enable_biome() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("enable_biome".to_string()))?,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self
                 .partial_configs

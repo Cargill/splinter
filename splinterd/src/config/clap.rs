@@ -107,16 +107,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
                 .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
         }
 
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        {
-            partial_config =
-                partial_config.with_enable_biome(if self.matches.is_present("enable_biome") {
-                    Some(true)
-                } else {
-                    None
-                });
-        }
-
         #[cfg(feature = "database")]
         {
             partial_config =

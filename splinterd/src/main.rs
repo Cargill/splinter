@@ -307,6 +307,12 @@ fn main() {
                 .help("Storage type used for the node; defaults to yaml")
                 .hidden(true)
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("enable_biome")
+                .long("enable-biome")
+                .long_help("Enable the biome subsystem")
+                .hidden(true),
         );
 
     #[cfg(feature = "database")]
@@ -315,13 +321,6 @@ fn main() {
             .long("database")
             .long_help("DB connection URL")
             .takes_value(true),
-    );
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    let app = app.arg(
-        Arg::with_name("enable_biome")
-            .long("enable-biome")
-            .long_help("Enable the biome subsystem"),
     );
 
     #[cfg(feature = "https-bind")]
@@ -526,11 +525,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "database")]
     {
         daemon_builder = daemon_builder.with_db_url(Some(String::from(db_url)));
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    {
-        daemon_builder = daemon_builder.enable_biome(config.enable_biome());
     }
 
     #[cfg(feature = "rest-api-cors")]

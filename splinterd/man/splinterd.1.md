@@ -63,11 +63,6 @@ information, see `--config-dir`, `--tls-cert-dir`, and
 FLAGS
 =====
 
-`--enable-biome`
-: Enable the Biome subsystem, which provides user management functions for
-  Splinter applications. The `--database` option is required when this flag is
-  used.
-
 `-h`, `--help`
 : Prints help information.
 
@@ -340,9 +335,6 @@ signing algorithms provided by the Cylinder library. This includes secp256k1
 which is currently used for signing transactions and Splinter administrative
 payloads. This allows the same signing key to be used as an authorization
 identity.
-
-Biome credentials for the splinter REST API can be enabled using the
-`--enable-biome` flag.
 
 The Splinter daemon provides 5 options for configuring OAuth for the REST API:
 
