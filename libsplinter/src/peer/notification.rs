@@ -16,7 +16,7 @@
 //!
 //! The public interface includes the enum [`PeerManagerNotification`]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{Receiver, TryRecvError};
 
 use super::error::PeerManagerError;
@@ -73,35 +73,70 @@ pub(super) type Subscriber =
 
 /// Responsible for broadcasting peer manager notifications.
 pub(super) struct SubscriberMap {
+    queue: VecDeque<PeerManagerNotification>,
+    queue_limit: usize,
     subscribers: HashMap<SubscriberId, Subscriber>,
     next_id: SubscriberId,
 }
 
 impl SubscriberMap {
     pub fn new() -> Self {
+        Self::new_with_queue_limit(std::u16::MAX as usize)
+    }
+
+    /// Construct a new SubscriberMap with a limit to the size of its pending message queue.
+    ///
+    /// This queue is used for messages that arrive before any subscribers have been added to the
+    /// map, such that no message is lost.
+    pub fn new_with_queue_limit(limit: usize) -> Self {
         Self {
+            queue: VecDeque::new(),
+            queue_limit: limit,
             subscribers: HashMap::new(),
             next_id: 0,
         }
     }
 
     pub fn broadcast(&mut self, notification: PeerManagerNotification) {
-        let mut failures = vec![];
-        for (id, callback) in self.subscribers.iter() {
-            if let Err(err) = (*callback)(notification.clone()) {
-                failures.push(*id);
-                debug!("Dropping subscriber ({}): {}", id, err);
-            }
+        self.queue.push_back(notification);
+        if self.queue.len() > self.queue_limit {
+            // drop the oldest notification
+            self.queue.pop_front();
         }
 
-        for id in failures {
-            self.subscribers.remove(&id);
+        if self.subscribers.is_empty() {
+            return;
+        }
+
+        while let Some(notification) = self.queue.pop_front() {
+            let mut failures = vec![];
+            for (id, callback) in self.subscribers.iter() {
+                if let Err(err) = (*callback)(notification.clone()) {
+                    failures.push(*id);
+                    debug!("Dropping subscriber ({}): {}", id, err);
+                }
+            }
+
+            for id in failures {
+                self.subscribers.remove(&id);
+            }
         }
     }
 
     pub fn add_subscriber(&mut self, subscriber: Subscriber) -> SubscriberId {
         let subscriber_id = self.next_id;
         self.next_id += 1;
+
+        if self.subscribers.is_empty() {
+            // this is the first subscriber, so move all of the messages to the callback.
+            while let Some(notification) = self.queue.pop_front() {
+                if let Err(err) = (*subscriber)(notification) {
+                    debug!("Dropping subscriber on add ({}): {}", subscriber_id, err);
+                    return subscriber_id;
+                }
+            }
+        }
+
         self.subscribers.insert(subscriber_id, subscriber);
 
         subscriber_id
@@ -162,5 +197,141 @@ pub mod tests {
         assert_eq!(notifications_sent, 5);
 
         join_handle.join().unwrap();
+    }
+
+    /// Tests that a subscriber map queues message until there is at least one subscriber.
+    ///
+    /// Procedure:
+    ///
+    /// 1. Create a SubscriberMap
+    /// 2. Broadcast three messages.
+    /// 3. Add a subscriber to the map
+    /// 4. Verify that it receives the three messages
+    /// 5. Add a second subscriber
+    /// 6. Send a new message
+    /// 7. Verify that they both receive the message, and the new subscriber only receives the
+    ///    newest message.
+    #[test]
+    fn test_broadcast_queue() {
+        let mut subscriber_map = SubscriberMap::new();
+
+        for i in 0..3 {
+            subscriber_map.broadcast(PeerManagerNotification::Connected {
+                peer: format!("test_peer_{}", i),
+            })
+        }
+
+        let (tx, sub1) = channel();
+        let _sub1_id = subscriber_map.add_subscriber(Box::new(move |notification| {
+            tx.send(notification).map_err(Box::from)
+        }));
+
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_0".into()
+            }
+        );
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_1".into()
+            }
+        );
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_2".into()
+            }
+        );
+
+        assert!(matches!(
+            sub1.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
+
+        let (tx, sub2) = channel();
+        let _sub2_id = subscriber_map.add_subscriber(Box::new(move |notification| {
+            tx.send(notification).map_err(Box::from)
+        }));
+
+        subscriber_map.broadcast(PeerManagerNotification::Connected {
+            peer: "test_peer_3".into(),
+        });
+
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_3".into()
+            }
+        );
+        assert_eq!(
+            sub2.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_3".into()
+            }
+        );
+    }
+
+    /// Test that the subscriber map obeys its queue limit for messages, until there is at least
+    /// one subscriber.
+    ///
+    /// Procedure:
+    ///
+    /// 1. Create a SubscriberMap with a queue limit of 1
+    /// 2. Broadcast three messages.
+    /// 3. Add a subscriber to the map
+    /// 4. Verify that it receives the third message only
+    /// 5. Send two new messages
+    /// 6. Verify that the subscriber still receives both messages
+    #[test]
+    fn test_broadcast_queue_limit() {
+        let mut subscriber_map = SubscriberMap::new_with_queue_limit(1);
+
+        for i in 0..3 {
+            subscriber_map.broadcast(PeerManagerNotification::Connected {
+                peer: format!("test_peer_{}", i),
+            })
+        }
+
+        let (tx, sub1) = channel();
+        let _sub1_id = subscriber_map.add_subscriber(Box::new(move |notification| {
+            tx.send(notification).map_err(Box::from)
+        }));
+
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_2".into()
+            }
+        );
+        assert!(matches!(
+            sub1.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
+
+        subscriber_map.broadcast(PeerManagerNotification::Connected {
+            peer: "test_peer_3".into(),
+        });
+        subscriber_map.broadcast(PeerManagerNotification::Connected {
+            peer: "test_peer_4".into(),
+        });
+
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_3".into()
+            }
+        );
+        assert_eq!(
+            sub1.try_recv().expect("Unable to receive value"),
+            PeerManagerNotification::Connected {
+                peer: "test_peer_4".into()
+            }
+        );
+        assert!(matches!(
+            sub1.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
     }
 }
