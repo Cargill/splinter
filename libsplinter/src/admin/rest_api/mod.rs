@@ -16,6 +16,8 @@
 
 #[cfg(feature = "rest-api-actix")]
 mod actix;
+#[cfg(feature = "rest-api-actix-web-3")]
+pub(crate) mod actix_web_3;
 #[cfg(feature = "rest-api-actix")]
 mod error;
 mod resources;
