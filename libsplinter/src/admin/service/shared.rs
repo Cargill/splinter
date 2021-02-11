@@ -1901,7 +1901,7 @@ impl AdminServiceShared {
                 // verify that the circuit version is supported
                 if circuit.get_circuit_version() > CIRCUIT_PROTOCOL_VERSION {
                     return Err(AdminSharedError::ValidationFailed(format!(
-                        "Proposed circuit's version is unsupported: {}",
+                        "Proposed circuit's schema version is unsupported: {}",
                         circuit.get_circuit_version()
                     )));
                 }
@@ -1925,7 +1925,8 @@ impl AdminServiceShared {
                     0 => (),
                     _ => {
                         return Err(AdminSharedError::ValidationFailed(
-                            "Proposed circuit version is not supported by protocol 1".to_string(),
+                            "Proposed circuit schema version is not supported by protocol 1"
+                                .to_string(),
                         ))
                     }
                 }
@@ -2314,7 +2315,7 @@ impl AdminServiceShared {
 
         if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
             return Err(AdminSharedError::ValidationFailed(format!(
-                "Attempting to disband a circuit with version {}, must be {}",
+                "Attempting to disband a circuit with schema version {}, must be {}",
                 stored_circuit.circuit_version(),
                 CIRCUIT_PROTOCOL_VERSION,
             )));
@@ -2400,7 +2401,7 @@ impl AdminServiceShared {
 
         if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
             return Err(AdminSharedError::ValidationFailed(format!(
-                "Attempting to purge a circuit with version {}, must be {}",
+                "Attempting to purge a circuit with schema version {}, must be {}",
                 stored_circuit.circuit_version(),
                 CIRCUIT_PROTOCOL_VERSION,
             )));
@@ -4960,7 +4961,9 @@ mod tests {
         if let Ok(()) =
             shared.validate_disband_circuit(&setup_v1_test_circuit(), PUB_KEY, "node_a", 1)
         {
-            panic!("Should have been invalid because the admin service protocol version is 1");
+            panic!(
+                "Should have been invalid because the admin service protocol schema version is 1"
+            );
         }
 
         shutdown(mesh, cm, pm);
@@ -5023,7 +5026,9 @@ mod tests {
             "node_a",
             ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
-            panic!("Should have been invalid because the circuit being disbanded is version 1");
+            panic!(
+                "Should have been invalid because the circuit being disbanded is schema version 1"
+            );
         }
 
         shutdown(mesh, cm, pm);
@@ -5455,7 +5460,9 @@ mod tests {
             .expect("unable to add circuit to store");
 
         if let Ok(()) = shared.validate_purge_request("01234-ABCDE", PUB_KEY, "node_a", 1) {
-            panic!("Should have been invalid because the admin service protocol version is 1");
+            panic!(
+                "Should have been invalid because the admin service protocol schema version is 1"
+            );
         }
 
         shutdown(mesh, cm, pm);
@@ -5522,7 +5529,9 @@ mod tests {
             "node_a",
             ADMIN_SERVICE_PROTOCOL_VERSION,
         ) {
-            panic!("Should have been invalid because the circuit being disbanded is version 1");
+            panic!(
+                "Should have been invalid because the circuit being disbanded is schema version 1"
+            );
         }
 
         shutdown(mesh, cm, pm);

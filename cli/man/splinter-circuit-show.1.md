@@ -84,7 +84,7 @@ $ splinter circuit show 01234-ABCDE \
 Proposal to create: 01234-ABCDE
     Display Name: -
     Circuit Status: Active
-    Version: 2
+    Schema Version: 2
     Management Type: mgmt001
 
     alpha-001 (tcps://splinterd-node-alpha001:8044)
@@ -119,7 +119,7 @@ $ splinter circuit show 01234-ABCDE \
 Proposal to disband: 56789-ABCDE
     Display Name: Circuit1
     Circuit Status: Disbanded
-    Version: 2
+    Schema Version: 2
     Management Type: mgmt001
 
     alpha-001 (tcps://splinterd-node-alpha001:8044)
