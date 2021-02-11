@@ -30,7 +30,7 @@ pub enum AdminServiceError {
 
     GeneralError {
         context: String,
-        source: Option<Box<dyn Error + Send>>,
+        source: Option<Box<dyn Error>>,
     },
 }
 
@@ -42,7 +42,7 @@ impl AdminServiceError {
         }
     }
 
-    pub fn general_error_with_source(context: &str, err: Box<dyn Error + Send>) -> Self {
+    pub fn general_error_with_source(context: &str, err: Box<dyn Error>) -> Self {
         AdminServiceError::GeneralError {
             context: context.into(),
             source: Some(err),
@@ -108,7 +108,7 @@ impl fmt::Display for AdminSubscriberError {
 #[derive(Debug)]
 pub struct AdminKeyVerifierError {
     context: String,
-    source: Option<Box<dyn Error + Send>>,
+    source: Option<Box<dyn Error>>,
 }
 
 impl AdminKeyVerifierError {
@@ -119,7 +119,7 @@ impl AdminKeyVerifierError {
         }
     }
 
-    pub fn new_with_source(context: &str, err: Box<dyn Error + Send>) -> Self {
+    pub fn new_with_source(context: &str, err: Box<dyn Error>) -> Self {
         Self {
             context: context.into(),
             source: Some(err),
