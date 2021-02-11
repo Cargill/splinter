@@ -115,6 +115,7 @@ experimental = [
     "role-based-authorization-store-postgres",
     "service-arg-validation",
     "service-network",
+    "shutdown",
     "ws-transport",
     "zmq-transport",
 ]
@@ -161,6 +162,7 @@ rest-api-cors = []
 role-based-authorization-store-postgres = ["authorization", "postgres"]
 service-arg-validation = []
 service-network = []
+shutdown = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
 store-factory = []
 ws-transport = ["tungstenite"]
