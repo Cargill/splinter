@@ -407,7 +407,7 @@ impl AdminServiceShared {
                     .clone();
 
                 match self.check_approved(&circuit_proposal) {
-                    Ok(CircuitProposalStatus::Accepted) => {
+                    CircuitProposalStatus::Accepted => {
                         let status = circuit_proposal.get_circuit_proposal().get_circuit_status();
                         // Verifying if the circuit proposal is associated with a disband request.
                         // If the status is set to `DISBANDED`, the proposal is associated with
@@ -569,7 +569,7 @@ impl AdminServiceShared {
                         }
                         Ok(())
                     }
-                    Ok(CircuitProposalStatus::Pending) => {
+                    CircuitProposalStatus::Pending => {
                         self.add_proposal(circuit_proposal.clone())?;
 
                         match action {
@@ -628,7 +628,7 @@ impl AdminServiceShared {
                             ))),
                         }
                     }
-                    Ok(CircuitProposalStatus::Rejected) => {
+                    CircuitProposalStatus::Rejected => {
                         // remove circuit
                         let proposal = self.remove_proposal(&circuit_id)?;
                         if let Some(proposal) = proposal {
@@ -648,7 +648,6 @@ impl AdminServiceShared {
                         info!("circuit proposal for {} has been rejected", circuit_id);
                         Ok(())
                     }
-                    Err(err) => Err(err),
                 }
             }
             None => Err(AdminSharedError::NoPendingChanges),
@@ -2447,14 +2446,11 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    fn check_approved(
-        &self,
-        proposal: &CircuitProposal,
-    ) -> Result<CircuitProposalStatus, AdminSharedError> {
+    fn check_approved(&self, proposal: &CircuitProposal) -> CircuitProposalStatus {
         let mut received_votes = HashSet::new();
         for vote in proposal.get_votes() {
             if vote.get_vote() == CircuitProposalVote_Vote::REJECT {
-                return Ok(CircuitProposalStatus::Rejected);
+                return CircuitProposalStatus::Rejected;
             }
             received_votes.insert(vote.get_voter_node_id().to_string());
         }
@@ -2470,9 +2466,9 @@ impl AdminServiceShared {
         required_votes.remove(proposal.get_requester_node_id());
 
         if required_votes == received_votes {
-            Ok(CircuitProposalStatus::Accepted)
+            CircuitProposalStatus::Accepted
         } else {
-            Ok(CircuitProposalStatus::Pending)
+            CircuitProposalStatus::Pending
         }
     }
 
