@@ -69,7 +69,8 @@ features = [
 default = [
     "biome-credentials",
     "biome-key-management",
-    "database"
+    "database-postgres",
+    "database-sqlite",
 ]
 
 stable = [
@@ -116,19 +117,20 @@ authorization-handler-rbac = [
     "splinter/authorization-handler-rbac",
     "splinter/role-based-authorization-store-postgres",
 ]
-biome-credentials = ["database", "splinter/biome-credentials"]
-biome-key-management = ["database", "splinter/biome-key-management"]
+biome-credentials = ["splinter/biome-credentials"]
+biome-key-management = ["splinter/biome-key-management"]
 biome-profile = ["splinter/biome-profile"]
 circuit-disband = ["splinter/circuit-disband"]
 circuit-purge = ["splinter/circuit-purge", "circuit-disband"]
-database = ["splinter/postgres", "splinter/sqlite"]
+database-postgres = ["splinter/postgres"]
+database-sqlite = ["splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
 oauth = [
     "splinter/biome-oauth-user-store-postgres",
     "splinter/oauth-inflight-request-store-postgres",
     "splinter/oauth"
 ]
-registry-database = ["database", "splinter/registry-database"]
+registry-database = ["splinter/registry-database"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
     "scabbard/service-arg-validation",

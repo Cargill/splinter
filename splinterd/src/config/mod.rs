@@ -60,7 +60,6 @@ pub struct Config {
     node_id: Option<(String, ConfigSource)>,
     display_name: Option<(String, ConfigSource)>,
     rest_api_endpoint: (String, ConfigSource),
-    #[cfg(feature = "database")]
     database: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
     registry_auto_refresh: (u64, ConfigSource),
@@ -173,7 +172,6 @@ impl Config {
         &self.rest_api_endpoint.0
     }
 
-    #[cfg(feature = "database")]
     pub fn database(&self) -> &str {
         &self.database.0
     }
@@ -369,7 +367,6 @@ impl Config {
         &self.rest_api_endpoint.1
     }
 
-    #[cfg(feature = "database")]
     fn database_source(&self) -> &ConfigSource {
         &self.database.1
     }
@@ -598,7 +595,6 @@ impl Config {
             self.admin_timeout(),
             self.admin_timeout_source()
         );
-        #[cfg(feature = "database")]
         debug!(
             "database: {} (source: {:?})",
             self.database(),
@@ -1161,7 +1157,6 @@ mod tests {
             ),
             ("127.0.0.1:8080", &ConfigSource::Default)
         );
-        #[cfg(feature = "database")]
         // The `DefaultPartialConfigBuilder` is the only config with a value for `database` (source
         // should be `Default`). Should have default state file name with `EnvPartialConfigBuilder`
         // value for `state_dir`.

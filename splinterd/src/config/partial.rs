@@ -53,7 +53,6 @@ pub struct PartialConfig {
     node_id: Option<String>,
     display_name: Option<String>,
     rest_api_endpoint: Option<String>,
-    #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
     registry_auto_refresh: Option<u64>,
@@ -107,7 +106,6 @@ impl PartialConfig {
             node_id: None,
             display_name: None,
             rest_api_endpoint: None,
-            #[cfg(feature = "database")]
             database: None,
             registries: None,
             registry_auto_refresh: None,
@@ -212,7 +210,6 @@ impl PartialConfig {
         self.rest_api_endpoint.clone()
     }
 
-    #[cfg(feature = "database")]
     pub fn database(&self) -> Option<String> {
         self.database.clone()
     }
@@ -486,7 +483,6 @@ impl PartialConfig {
         self
     }
 
-    #[cfg(feature = "database")]
     /// Adds a `database` value to the `PartialConfig` object, when the `database`
     /// feature flag is used.
     ///

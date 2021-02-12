@@ -115,8 +115,7 @@ pub struct SplinterDaemon {
     rest_api_endpoint: String,
     #[cfg(feature = "https-bind")]
     rest_api_ssl_settings: Option<(String, String)>,
-    #[cfg(feature = "database")]
-    db_url: Option<String>,
+    db_url: String,
     registries: Vec<String>,
     registry_auto_refresh: u64,
     registry_forced_refresh: u64,
@@ -150,32 +149,7 @@ impl SplinterDaemon {
         let mut service_transport = InprocTransport::default();
         transport.add_transport(Box::new(service_transport.clone()));
 
-        #[cfg(feature = "database")]
-        let db_url = self.db_url.clone().ok_or_else(|| {
-            StartError::StorageError(
-                "biome was enabled but the builder failed to require the db URL".into(),
-            )
-        })?;
-
-        // Default to memory, as stores are still in use, but there is no compiled code to persist
-        // the information.
-        #[cfg(all(
-            not(feature = "database"),
-            any(
-                feature = "oauth",
-                feature = "biome-credentials",
-                feature = "biome-key-management",
-            )
-        ))]
-        let db_url = "memory".to_string();
-
-        #[cfg(any(
-            feature = "database",
-            feature = "oauth",
-            feature = "biome-credentials",
-            feature = "biome-key-management",
-        ))]
-        let store_factory = create_store_factory(&db_url)?;
+        let store_factory = create_store_factory(&self.db_url)?;
 
         let admin_service_store = {
             if let Some(storage) = &self.storage_type {
@@ -226,16 +200,7 @@ impl SplinterDaemon {
                     }
                 }
             } else {
-                #[cfg(feature = "database")]
-                {
-                    store_factory.get_admin_service_store()
-                }
-                #[cfg(not(feature = "database"))]
-                {
-                    return Err(StartError::StorageError(
-                        "No supported state configuration provided".to_string(),
-                    ));
-                }
+                store_factory.get_admin_service_store()
             }
         };
 
@@ -1040,7 +1005,6 @@ pub struct SplinterDaemonBuilder {
     rest_api_server_cert: Option<String>,
     #[cfg(feature = "https-bind")]
     rest_api_server_key: Option<String>,
-    #[cfg(feature = "database")]
     db_url: Option<String>,
     registries: Vec<String>,
     registry_auto_refresh: Option<u64>,
@@ -1131,9 +1095,8 @@ impl SplinterDaemonBuilder {
         self
     }
 
-    #[cfg(feature = "database")]
-    pub fn with_db_url(mut self, value: Option<String>) -> Self {
-        self.db_url = value;
+    pub fn with_db_url(mut self, value: String) -> Self {
+        self.db_url = Some(value);
         self
     }
 
@@ -1276,17 +1239,9 @@ impl SplinterDaemonBuilder {
             (None, None) => None,
         };
 
-        #[cfg(feature = "database")]
-        let db_url = self.db_url;
-
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        {
-            if db_url.is_none() {
-                return Err(CreateError::MissingRequiredField(
-                    "db_url is required to enable biome features.".to_string(),
-                ));
-            }
-        }
+        let db_url = self.db_url.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: db_url".to_string())
+        })?;
 
         let registry_auto_refresh = self.registry_auto_refresh.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: registry_auto_refresh".to_string())
@@ -1317,7 +1272,6 @@ impl SplinterDaemonBuilder {
             rest_api_endpoint,
             #[cfg(feature = "https-bind")]
             rest_api_ssl_settings,
-            #[cfg(feature = "database")]
             db_url,
             registries: self.registries,
             registry_auto_refresh,
