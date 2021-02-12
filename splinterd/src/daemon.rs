@@ -1421,6 +1421,9 @@ fn create_local_registry(state_dir: &str) -> Result<Box<dyn RwRegistry>, StartEr
     ))
 }
 
+// This allow is necessary when the registry-database feature is off, and
+// should be removed when registry-database is the default/only approach.
+#[allow(clippy::unnecessary_wraps)]
 fn create_registry(
     state_dir: &str,
     registries: &[String],

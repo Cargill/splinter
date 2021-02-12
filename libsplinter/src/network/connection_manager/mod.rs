@@ -430,7 +430,10 @@ struct ConnectionMetadata {
 
 impl ConnectionMetadata {
     fn is_outbound(&self) -> bool {
-        matches!(self.extended_metadata, ConnectionMetadataExt::Outbound { .. })
+        matches!(
+            self.extended_metadata,
+            ConnectionMetadataExt::Outbound { .. }
+        )
     }
 
     fn connection_id(&self) -> &str {

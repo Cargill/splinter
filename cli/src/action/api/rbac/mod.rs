@@ -67,7 +67,7 @@ where
         PagingIter {
             url: base_url,
             auth,
-            current_page: load_page(base_url, auth, initial_link, T::label()),
+            current_page: Some(load_page(base_url, auth, initial_link, T::label())),
             consumed: false,
         }
     }
@@ -107,7 +107,7 @@ where
                     let paging = &current_page.paging;
                     if paging.has_next() {
                         self.current_page =
-                            load_page(self.url, self.auth, &paging.next, T::label());
+                            Some(load_page(self.url, self.auth, &paging.next, T::label()));
                     } else {
                         self.consumed = true;
                     }
@@ -131,16 +131,11 @@ where
     }
 }
 
-fn load_page<T>(
-    base_url: &str,
-    auth: &str,
-    link: &str,
-    label: &str,
-) -> Option<Result<Page<T>, CliError>>
+fn load_page<T>(base_url: &str, auth: &str, link: &str, label: &str) -> Result<Page<T>, CliError>
 where
     T: DeserializeOwned,
 {
-    let result = Client::new()
+    Client::new()
         .get(&format!("{}{}", base_url, link))
         .header("SplinterProtocolVersion", RBAC_PROTOCOL_VERSION)
         .header("Authorization", auth)
@@ -171,7 +166,5 @@ where
                     label, message
                 )))
             }
-        });
-
-    Some(result)
+        })
 }

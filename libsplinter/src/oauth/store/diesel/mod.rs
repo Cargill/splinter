@@ -143,19 +143,17 @@ impl From<diesel::r2d2::PoolError> for InflightOAuthRequestStoreError {
 impl From<result::Error> for InflightOAuthRequestStoreError {
     fn from(err: result::Error) -> Self {
         match err {
-            result::Error::DatabaseError(ref kind, _) => match kind {
-                result::DatabaseErrorKind::UniqueViolation => {
-                    InflightOAuthRequestStoreError::ConstraintViolation(
-                        ConstraintViolationError::from_source_with_violation_type(
-                            ConstraintViolationType::Unique,
-                            Box::new(err),
-                        ),
-                    )
-                }
-                _ => InflightOAuthRequestStoreError::InternalError(InternalError::from_source(
-                    Box::new(err),
-                )),
-            },
+            result::Error::DatabaseError(result::DatabaseErrorKind::UniqueViolation, _) => {
+                InflightOAuthRequestStoreError::ConstraintViolation(
+                    ConstraintViolationError::from_source_with_violation_type(
+                        ConstraintViolationType::Unique,
+                        Box::new(err),
+                    ),
+                )
+            }
+            result::Error::DatabaseError(_, _) => InflightOAuthRequestStoreError::InternalError(
+                InternalError::from_source(Box::new(err)),
+            ),
             _ => InflightOAuthRequestStoreError::InternalError(InternalError::from_source(
                 Box::new(err),
             )),

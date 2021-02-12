@@ -448,14 +448,14 @@ fn handle_request(
         }
         PeerManagerRequest::AddUnidentified { endpoint, sender } => {
             if sender
-                .send(add_unidentified(
+                .send(Ok(add_unidentified(
                     endpoint,
                     connector,
                     unreferenced_peers,
                     peer_remover,
                     peers,
                     ref_map,
-                ))
+                )))
                 .is_err()
             {
                 warn!("Connector dropped before receiving result of adding unidentified peer");
@@ -741,12 +741,12 @@ fn add_unidentified(
     peer_remover: &PeerRemover,
     peers: &PeerMap,
     ref_map: &mut RefMap,
-) -> Result<EndpointPeerRef, PeerUnknownAddError> {
+) -> EndpointPeerRef {
     info!("Attempting to peer with peer by endpoint {}", endpoint);
     if let Some(peer_metadata) = peers.get_peer_from_endpoint(&endpoint) {
         // if there is peer in the peer_map, there is reference in the ref map
         ref_map.add_ref(peer_metadata.id.to_string());
-        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
+        EndpointPeerRef::new(endpoint, peer_remover.clone())
     } else {
         let connection_id = format!("{}", Uuid::new_v4());
         match connector.request_connection(&endpoint, &connection_id) {
@@ -758,7 +758,7 @@ fn add_unidentified(
         unreferenced_peers
             .requested_endpoints
             .push(endpoint.to_string());
-        Ok(EndpointPeerRef::new(endpoint, peer_remover.clone()))
+        EndpointPeerRef::new(endpoint, peer_remover.clone())
     }
 }
 

@@ -420,7 +420,7 @@ impl ServiceConnectionAgent {
         loop {
             match self.receiver.recv() {
                 Ok(AgentMessage::ConnectionNotification(notification)) => {
-                    self.handle_notification(notification)?;
+                    self.handle_notification(notification);
                 }
                 Ok(AgentMessage::ListServices { reply_sender }) => {
                     self.list_services(reply_sender)?;
@@ -508,10 +508,7 @@ impl ServiceConnectionAgent {
         )
     }
 
-    fn handle_notification(
-        &mut self,
-        notification: ConnectionManagerNotification,
-    ) -> Result<(), ServiceConnectionAgentError> {
+    fn handle_notification(&mut self, notification: ConnectionManagerNotification) {
         match notification {
             ConnectionManagerNotification::InboundConnection {
                 endpoint,
@@ -570,8 +567,6 @@ impl ServiceConnectionAgent {
                 }
             }
         }
-
-        Ok(())
     }
 }
 
