@@ -112,7 +112,7 @@ message Circuit {
     // Human-readable display name for the circuit
     string display_name = 11;
 
-    // The version of the circuit
+    // The schema version of the circuit
     int32 circuit_version = 12;
 
     // The status of the circuit

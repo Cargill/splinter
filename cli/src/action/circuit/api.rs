@@ -266,7 +266,7 @@ impl fmt::Display for CircuitSlice {
         }
 
         display_string += &format!(
-            "Version: {}\n    Management Type: {}\n",
+            "Schema Version: {}\n    Management Type: {}\n",
             self.circuit_version, self.management_type
         );
 
@@ -351,7 +351,7 @@ impl fmt::Display for ProposalSlice {
         }
 
         display_string += &format!(
-            "Version: {}\n    Management Type: {}\n",
+            "Schema Version: {}\n    Management Type: {}\n",
             self.circuit.circuit_version, self.circuit.management_type
         );
 
