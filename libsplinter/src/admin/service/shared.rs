@@ -263,13 +263,13 @@ impl AdminServiceShared {
         #[cfg(feature = "admin-service-event-store")] admin_service_event_store: Box<
             dyn AdminServiceStore,
         >,
-    ) -> Result<Self, ServiceError> {
+    ) -> Self {
         #[cfg(not(feature = "admin-service-event-store"))]
         let event_mailbox = Mailbox::new(DurableBTreeSet::new_boxed_with_bound(
             std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
         ));
 
-        Ok(AdminServiceShared {
+        AdminServiceShared {
             node_id,
             network_sender: None,
             uninitialized_circuits: Default::default(),
@@ -299,7 +299,7 @@ impl AdminServiceShared {
             event_store: admin_service_event_store,
             #[cfg(feature = "circuit-disband")]
             pending_consensus_disbanded_circuits: HashMap::new(),
-        })
+        }
     }
 
     pub fn node_id(&self) -> &str {
@@ -2994,8 +2994,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let service_sender = MockServiceNetworkSender::new();
         shared.set_network_sender(Some(Box::new(service_sender.clone())));
@@ -3128,8 +3127,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let service_sender = MockServiceNetworkSender::new();
         shared.set_network_sender(Some(Box::new(service_sender.clone())));
@@ -3229,8 +3227,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
 
         if let Err(err) = admin_shared.validate_create_circuit(
@@ -3275,8 +3272,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
 
         if let Ok(()) = admin_shared.validate_create_circuit(&circuit, PUB_KEY, "node_a", 1) {
@@ -3315,8 +3311,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
 
         if let Ok(_) = admin_shared.validate_create_circuit(
@@ -3359,8 +3354,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
 
         let pub_key = (0u8..50).collect::<Vec<_>>();
@@ -3414,8 +3408,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut service_bad = SplinterService::new();
@@ -3464,8 +3457,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut service_bad = SplinterService::new();
@@ -3517,8 +3509,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut service_ = SplinterService::new();
@@ -3567,8 +3558,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut service_ = SplinterService::new();
@@ -3617,8 +3607,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut service_a = SplinterService::new();
@@ -3672,8 +3661,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
         circuit.set_roster(RepeatedField::from_vec(vec![]));
 
@@ -3716,8 +3704,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_members(RepeatedField::from_vec(vec![]));
@@ -3762,8 +3749,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut node_b = SplinterNode::new();
@@ -3812,8 +3798,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut node_a = SplinterNode::new();
@@ -3869,8 +3854,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut node_a = SplinterNode::new();
@@ -3926,8 +3910,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_circuit_id("".to_string());
@@ -3971,8 +3954,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_circuit_id("invalid_circuit_id".to_string());
@@ -4016,8 +3998,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut node_a = SplinterNode::new();
@@ -4069,8 +4050,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut node_a = SplinterNode::new();
@@ -4122,8 +4102,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         let mut node_a = SplinterNode::new();
@@ -4175,8 +4154,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_authorization_type(Circuit_AuthorizationType::UNSET_AUTHORIZATION_TYPE);
@@ -4220,8 +4198,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_persistence(Circuit_PersistenceType::UNSET_PERSISTENCE_TYPE);
@@ -4265,8 +4242,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_durability(Circuit_DurabilityType::UNSET_DURABILITY_TYPE);
@@ -4310,8 +4286,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_routes(Circuit_RouteType::UNSET_ROUTE_TYPE);
@@ -4355,8 +4330,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let mut circuit = setup_test_circuit();
 
         circuit.set_circuit_management_type("".to_string());
@@ -4399,8 +4373,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
@@ -4445,8 +4418,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
@@ -4490,8 +4462,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let proposal = setup_test_proposal(&circuit);
@@ -4535,8 +4506,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let mut proposal = setup_test_proposal(&circuit);
@@ -4588,8 +4558,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
         let circuit = setup_test_circuit();
         let vote = setup_test_vote(&circuit);
         let mut proposal = setup_test_proposal(&circuit);
@@ -4639,8 +4608,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let circuit = setup_test_circuit();
 
@@ -4701,8 +4669,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let circuit = setup_test_circuit();
 
@@ -4764,8 +4731,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let circuit = setup_test_circuit();
 
@@ -4829,8 +4795,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let circuit = setup_test_circuit();
 
@@ -4899,8 +4864,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the circuit to be disbanded
         shared
@@ -4963,8 +4927,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the circuit to be disbanded
         shared
@@ -5025,8 +4988,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the v1 circuit to be attempted to disbanded
         admin_shared
@@ -5088,8 +5050,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         if let Ok(()) = admin_shared.validate_disband_circuit(
             &setup_test_circuit(),
@@ -5141,8 +5102,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the circuit to be disbanded
         admin_shared
@@ -5204,8 +5164,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         admin_shared
             .admin_store
@@ -5290,8 +5249,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         let service_sender = MockServiceNetworkSender::new();
         shared.set_network_sender(Some(Box::new(service_sender.clone())));
@@ -5403,8 +5361,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the disbanded circuit to be purged
         admin_shared
@@ -5467,8 +5424,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the circuit to be disbanded
         shared
@@ -5531,8 +5487,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the v1 circuit to be attempted to purge
         admin_shared
@@ -5594,8 +5549,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         if let Ok(()) = admin_shared.validate_purge_request(
             "01234-ABCDE",
@@ -5646,8 +5600,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the circuit to be purged
         admin_shared
@@ -5709,8 +5662,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the disbanded circuit to be purged
         admin_shared
@@ -5773,8 +5725,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         admin_shared
             .admin_store
@@ -5840,8 +5791,7 @@ mod tests {
             writer,
             #[cfg(feature = "admin-service-event-store")]
             event_store,
-        )
-        .unwrap();
+        );
 
         // Add the disbanded circuit to be purged
         admin_shared

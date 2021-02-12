@@ -230,7 +230,7 @@ impl AdminService {
                 routing_table_writer,
                 #[cfg(feature = "admin-service-event-store")]
                 event_store,
-            )?)),
+            ))),
             orchestrator,
             coordinator_timeout,
             consensus: None,
