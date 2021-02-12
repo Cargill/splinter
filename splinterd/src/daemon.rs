@@ -493,7 +493,7 @@ impl SplinterDaemon {
             &*store_factory,
         )?;
 
-        let (admin_service, admin_notification_join) = AdminService::new(
+        let admin_service = AdminService::new(
             &self.node_id,
             orchestrator,
             #[cfg(feature = "service-arg-validation")]
@@ -795,9 +795,6 @@ impl SplinterDaemon {
         let _ = orchestator_join_handles.join_all();
         peer_manager_shutdown.shutdown();
         peer_manager.await_shutdown();
-        debug!("Shutting down admin service's peer manager notification receiver...");
-        let _ = admin_notification_join.join();
-        debug!("Shutting down admin service's peer manager notification receiver (complete)");
         connection_manager_shutdown.shutdown();
         connection_manager.await_shutdown();
         self.mesh.shutdown_signaler().shutdown();

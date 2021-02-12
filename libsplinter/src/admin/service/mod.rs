@@ -24,7 +24,7 @@ use std::any::Any;
 #[cfg(feature = "service-arg-validation")]
 use std::collections::HashMap;
 use std::sync::{mpsc::channel, Arc, Mutex};
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 #[cfg(not(feature = "admin-service-event-store"))]
 use std::time::SystemTime;
@@ -186,6 +186,8 @@ pub struct AdminService {
     coordinator_timeout: Duration,
     consensus: Option<AdminConsensusManager>,
     peer_connector: PeerManagerConnector,
+
+    peer_notification_run_state: Option<(usize, JoinHandle<()>)>,
 }
 
 impl AdminService {
@@ -207,14 +209,10 @@ impl AdminService {
         coordinator_timeout: Option<Duration>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
         #[cfg(feature = "admin-service-event-store")] event_store: Box<dyn AdminServiceStore>,
-    ) -> Result<(Self, thread::JoinHandle<()>), ServiceError> {
+    ) -> Result<Self, ServiceError> {
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
         let orchestrator = Arc::new(Mutex::new(orchestrator));
-        let (sender, receiver) = channel();
-        peer_connector
-            .subscribe_sender(sender)
-            .map_err(|err| ServiceError::UnableToCreate(Box::new(err)))?;
 
         let new_service = Self {
             service_id: admin_service_id(node_id),
@@ -237,35 +235,10 @@ impl AdminService {
             coordinator_timeout,
             consensus: None,
             peer_connector,
+            peer_notification_run_state: None,
         };
 
-        let peer_admin_shared = new_service.admin_service_shared.clone();
-
-        debug!("Starting admin service's peer manager notification receiver");
-        let notification_join_handle = thread::Builder::new()
-            .name("PeerManagerNotification Receiver".into())
-            .spawn(move || loop {
-                let notification = match receiver.recv() {
-                    Ok(notification) => notification,
-                    Err(_) => {
-                        warn!(
-                            "Admin service received an error while listening to peer manager \
-                            notifications, indicating remote thread has shutdown"
-                        );
-                        break;
-                    }
-                };
-
-                if let Ok(mut admin_shared) = peer_admin_shared.lock() {
-                    handle_peer_manager_notification(notification, &mut *admin_shared);
-                } else {
-                    error!("the admin shared lock was poisoned");
-                    break;
-                }
-            })
-            .map_err(|err| ServiceError::UnableToCreate(Box::new(err)))?;
-
-        Ok((new_service, notification_join_handle))
+        Ok(new_service)
     }
 
     pub fn commands(&self) -> impl AdminCommands + Clone {
@@ -517,6 +490,40 @@ impl Service for AdminService {
             return Err(ServiceStartError::AlreadyStarted);
         }
 
+        let (sender, receiver) = channel();
+        let peer_subscriber_id = self
+            .peer_connector
+            .subscribe_sender(sender)
+            .map_err(|err| ServiceStartError::Internal(err.to_string()))?;
+
+        let peer_admin_shared = self.admin_service_shared.clone();
+
+        debug!("Starting admin service's peer manager notification receiver");
+        let notification_join_handle = thread::Builder::new()
+            .name("PeerManagerNotification Receiver".into())
+            .spawn(move || loop {
+                let notification = match receiver.recv() {
+                    Ok(notification) => notification,
+                    Err(_) => {
+                        warn!(
+                            "Admin service received an error while listening to peer manager \
+                            notifications, indicating remote thread has shutdown"
+                        );
+                        break;
+                    }
+                };
+
+                if let Ok(mut admin_shared) = peer_admin_shared.lock() {
+                    handle_peer_manager_notification(notification, &mut *admin_shared);
+                } else {
+                    error!("the admin shared lock was poisoned");
+                    break;
+                }
+            })
+            .map_err(|err| ServiceStartError::Internal(err.to_string()))?;
+
+        self.peer_notification_run_state = Some((peer_subscriber_id, notification_join_handle));
+
         let network_sender = service_registry.connect(&self.service_id)?;
 
         {
@@ -608,6 +615,21 @@ impl Service for AdminService {
                 ServiceStopError::PoisonedLock("the admin shared lock was poisoned".into())
             })?
             .change_status();
+
+        if let Some((peer_subscriber_id, peer_notfication_join_handle)) =
+            self.peer_notification_run_state.take()
+        {
+            if let Err(err) = self.peer_connector.unsubscribe(peer_subscriber_id) {
+                warn!(
+                    "Unable to unsubscribe from peer manager notifications: {:?}",
+                    err
+                );
+            }
+
+            if let Err(err) = peer_notfication_join_handle.join() {
+                error!("Failed to join peer notification thread: {:?}", err);
+            }
+        }
 
         info!("Admin service stopped and disconnected");
 
@@ -1006,7 +1028,7 @@ mod tests {
         #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
-        let (mut admin_service, _) = AdminService::new(
+        let mut admin_service = AdminService::new(
             "test-node".into(),
             orchestrator,
             #[cfg(feature = "service-arg-validation")]
