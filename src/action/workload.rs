@@ -93,10 +93,13 @@ impl Action for WorkloadAction {
 
         match workload {
             "smallbank" => {
-                let seed = match args.value_of("seed").map(str::parse).unwrap_or_else(|| {
-                    let mut rng = rand::thread_rng();
-                    Ok(rng.gen::<u64>())
-                }) {
+                let seed = match args
+                    .value_of("smallbank_seed")
+                    .map(str::parse)
+                    .unwrap_or_else(|| {
+                        let mut rng = rand::thread_rng();
+                        Ok(rng.gen::<u64>())
+                    }) {
                     Ok(seed) => seed,
                     Err(_) => {
                         return Err(CliError::ActionError(
@@ -106,7 +109,7 @@ impl Action for WorkloadAction {
                 };
 
                 let num_accounts: usize = args
-                    .value_of("smallbank_num_account")
+                    .value_of("smallbank_num_accounts")
                     .unwrap_or("100")
                     .parse()
                     .map_err(|_| {
