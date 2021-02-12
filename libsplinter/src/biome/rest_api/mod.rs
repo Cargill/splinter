@@ -43,9 +43,6 @@ use self::actix::key_management::{
 #[cfg(feature = "biome-key-management")]
 use super::key_management::store::KeyStore;
 
-#[cfg(feature = "biome-profile")]
-use super::profile::store::UserProfileStore;
-
 #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
 use crate::rest_api::secrets::AutoSecretManager;
 use crate::rest_api::secrets::SecretManager;
@@ -55,12 +52,6 @@ pub use error::BiomeRestResourceManagerBuilderError;
 
 #[cfg(all(feature = "rest-api-actix", feature = "biome-credentials"))]
 use self::actix::logout::make_logout_route;
-#[cfg(all(feature = "rest-api-actix", feature = "biome-profile"))]
-use self::actix::profile::make_profile_route;
-#[cfg(all(feature = "rest-api-actix", feature = "biome-profile"))]
-use self::actix::profiles::make_profiles_list_route;
-#[cfg(all(feature = "rest-api-actix", feature = "biome-profile"))]
-use self::actix::profiles_identity::make_profiles_routes;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
 use self::actix::register::make_register_route;
 #[cfg(all(feature = "biome-credentials", feature = "rest-api-actix"))]
@@ -106,9 +97,6 @@ const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check {
 ///    `public key`
 /// * `POST /biome/login` - Login enpoint for getting access tokens and refresh tokens
 /// * `PATCH /biome/logout` - Login endpoint for removing refresh tokens
-/// * `GET /biome/profile` - Get the profile information of the authenticated user
-/// * `GET /biome/profiles` - Get a list of all user profiles
-/// * `GET /biome/profiles/{id}` - Retrieve profile with specified id
 /// * `POST /biome/register - Creates credentials for a user
 /// * `POST /biome/token` - Creates a new access token for the authorized user
 /// * `POST /biome/verify` - Verify a users password
@@ -130,8 +118,6 @@ pub struct BiomeRestResourceManager {
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Arc<dyn CredentialsStore>,
-    #[cfg(feature = "biome-profile")]
-    profile_store: Arc<dyn UserProfileStore>,
 }
 
 impl BiomeRestResourceManager {
@@ -203,13 +189,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
             ));
         }
 
-        #[cfg(all(feature = "biome-profile", feature = "rest-api-actix",))]
-        {
-            resources.push(make_profiles_list_route(self.profile_store.clone()));
-            resources.push(make_profiles_routes(self.profile_store.clone()));
-            resources.push(make_profile_route(self.profile_store.clone()));
-        }
-
         #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
         {
             resources.push(make_key_management_route(self.key_store.clone()));
@@ -234,8 +213,6 @@ pub struct BiomeRestResourceManagerBuilder {
     refresh_token_store: Option<Arc<dyn RefreshTokenStore>>,
     #[cfg(feature = "biome-credentials")]
     credentials_store: Option<Arc<dyn CredentialsStore>>,
-    #[cfg(feature = "biome-profile")]
-    profile_store: Option<Arc<dyn UserProfileStore>>,
 }
 
 impl BiomeRestResourceManagerBuilder {
@@ -274,20 +251,6 @@ impl BiomeRestResourceManagerBuilder {
         store: impl CredentialsStore + 'static,
     ) -> BiomeRestResourceManagerBuilder {
         self.credentials_store = Some(Arc::new(store));
-        self
-    }
-
-    #[cfg(feature = "biome-profile")]
-    /// Sets a UserProfileStore for the BiomeRestResourceManager
-    ///
-    /// # Arguments
-    ///
-    /// * `pool`: ConnectionPool to database that will serve as backend for UserProfileStore
-    pub fn with_profile_store(
-        mut self,
-        store: impl UserProfileStore + 'static,
-    ) -> BiomeRestResourceManagerBuilder {
-        self.profile_store = Some(Arc::new(store));
         self
     }
 
@@ -380,13 +343,6 @@ impl BiomeRestResourceManagerBuilder {
             )
         })?;
 
-        #[cfg(feature = "biome-profile")]
-        let profile_store = self.profile_store.ok_or_else(|| {
-            BiomeRestResourceManagerBuilderError::MissingRequiredField(
-                "Missing profile store".to_string(),
-            )
-        })?;
-
         Ok(BiomeRestResourceManager {
             #[cfg(feature = "biome-key-management")]
             key_store,
@@ -400,8 +356,6 @@ impl BiomeRestResourceManagerBuilder {
             refresh_token_store,
             #[cfg(feature = "biome-credentials")]
             credentials_store,
-            #[cfg(feature = "biome-profile")]
-            profile_store,
         })
     }
 }
@@ -415,8 +369,6 @@ mod tests {
 
     use reqwest::blocking::Client;
 
-    #[cfg(feature = "biome-profile")]
-    use crate::biome::MemoryUserProfileStore;
     use crate::biome::{MemoryCredentialsStore, MemoryKeyStore, MemoryRefreshTokenStore};
     #[cfg(feature = "authorization")]
     use crate::error::InternalError;
@@ -525,8 +477,6 @@ mod tests {
         let refresh_token_store = MemoryRefreshTokenStore::new();
         let cred_store = MemoryCredentialsStore::new();
         let key_store = MemoryKeyStore::new(cred_store.clone());
-        #[cfg(feature = "biome-profile")]
-        let profile_store = MemoryUserProfileStore::new();
         let config = BiomeRestConfigBuilder::default()
             .with_password_encryption_cost("low")
             .build()
@@ -537,9 +487,6 @@ mod tests {
             .with_credentials_store(cred_store)
             .with_key_store(key_store)
             .with_rest_config(config);
-
-        #[cfg(feature = "biome-profile")]
-        let resource_manager = resource_manager.with_profile_store(profile_store);
 
         let resource_manager = resource_manager.build().unwrap();
 

@@ -14,9 +14,7 @@
 
 use std::sync::Arc;
 
-use super::authorize::get_authorized_user;
 use crate::actix_web::HttpResponse;
-#[cfg(feature = "biome-profile")]
 use crate::biome::profile::store::UserProfileStore;
 use crate::futures::IntoFuture;
 use crate::protocol;
@@ -24,6 +22,7 @@ use crate::protocol;
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
+    auth::identity::Identity,
     ErrorResponse,
 };
 
@@ -52,9 +51,15 @@ fn handle_get(profile_store: Arc<dyn UserProfileStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let profile_store = profile_store.clone();
 
-        let user = match get_authorized_user(&request) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
         };
 
         match profile_store.get_profile(&user) {

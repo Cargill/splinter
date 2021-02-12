@@ -12,8 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Biome functionality to support user profiles.
+#[cfg(feature = "rest-api-actix")]
+mod actix_web_1;
 
-#[cfg(feature = "rest-api")]
-pub mod rest_api;
-pub mod store;
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+use crate::rest_api::auth::authorization::Permission;
+
+#[cfg(feature = "rest-api-actix")]
+pub use actix_web_1::BiomeProfileRestResourceProvider;
+
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const BIOME_PROFILE_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "biome.profile.read",
+    permission_display_name: "Biome profile read",
+    permission_description: "Allows the client to view all Biome user profiles",
+};
