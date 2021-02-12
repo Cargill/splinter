@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod builder;
 mod consensus;
 pub(crate) mod error;
 #[cfg(not(feature = "admin-service-event-store"))]
@@ -58,6 +59,7 @@ use self::error::{AdminError, Sha256Error};
 use self::proposal_store::{AdminServiceProposals, ProposalStore};
 use self::shared::AdminServiceShared;
 
+pub use self::builder::AdminServiceBuilder;
 pub use self::error::AdminKeyVerifierError;
 pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
