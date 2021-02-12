@@ -40,21 +40,16 @@ use super::{AuthorizationHandler, AuthorizationHandlerResult};
 /// The list of keys in the file are cached in-memory by the authorization handler; this means that
 /// the handler will not have to read from the file every time permissions are checked. Instead,
 /// each time the handler checks for permissions, it will check the backing file for any changes
-/// since the last read, refreshing the internal cache if necessary. If the backing file is removed
-/// or becomes unavailable, the authorization handler will treat the list of keys as empty (all
-/// permission checks will receive a [`AuthorizationHandlerResult::Continue`] result).
-///
-/// On initializaion, the authorization handler will check if its backing file already exists. If
-/// the backing file already exists, the handler will attempt to read and cache the keys listed in
-/// it. If the backing file does not already exist, the handler will attempt to create it.
+/// since the last read, refreshing the internal cache if necessary. If the backing file does not
+/// exist, is removed, or becomes unavailable, the authorization handler will treat the list of keys
+/// as empty (all permission checks will receive a [`AuthorizationHandlerResult::Continue`] result).
 #[derive(Clone)]
 pub struct AllowKeysAuthorizationHandler {
     internal: Arc<Mutex<Internal>>,
 }
 
 impl AllowKeysAuthorizationHandler {
-    /// Constructs a new `AllowKeysAuthorizationHandler`. If the backing file already exists, it
-    /// will be loaded and cached; if the backing file doesn't already exist, it will be created.
+    /// Constructs a new `AllowKeysAuthorizationHandler`.
     ///
     /// # Arguments
     ///
@@ -111,16 +106,10 @@ impl Internal {
             last_read: SystemTime::UNIX_EPOCH,
         };
 
-        // If file already exists, read it; otherwise create it.
+        // Read the file if it exists; otherwise just set the read the time.
         if PathBuf::from(file_path).is_file() {
             internal.read_keys()?;
         } else {
-            File::create(file_path).map_err(|err| {
-                InternalError::from_source_with_message(
-                    Box::new(err),
-                    "failed to create allow keys file".into(),
-                )
-            })?;
             internal.last_read = SystemTime::now();
         }
 
@@ -292,33 +281,6 @@ mod tests {
         ));
     }
 
-    /// Verifies that the `AllowKeysAuthorizationHandler` creates the backing file if it does not
-    /// exist.
-    ///
-    /// 1. Create a temp directory and a path for the backing file
-    /// 2. Create a new `AllowKeysAuthorizationHandler`
-    /// 3. Verify that the backing file was created and is empty
-    #[test]
-    fn create_file() {
-        let temp_dir = TempDir::new("create_file").expect("Failed to create temp dir");
-        let path = temp_dir
-            .path()
-            .join("allow_keys")
-            .to_str()
-            .expect("Failed to get path")
-            .to_string();
-
-        AllowKeysAuthorizationHandler::new(&path).expect("Failed to create handler");
-
-        assert_eq!(
-            File::open(&path)
-                .expect("Failed to open file")
-                .bytes()
-                .count(),
-            0
-        );
-    }
-
     /// Verifies that the `AllowKeysAuthorizationHandler` reloads the keys from the backing file if
     /// it was modified since the last read.
     ///
@@ -405,5 +367,43 @@ mod tests {
         for key in keys {
             writeln!(file, "{}", key).expect("Failed to write key to file");
         }
+    }
+
+    /// Verifies that the `AllowKeysAuthorizationHandler` is able to start without an existing file
+    /// and load the file once it's created.
+    ///
+    /// 1. Create a new temp directory
+    /// 2. Create a new `AllowKeysAuthorizationHandler` backed by a non-existent file in the temp
+    ///    directory
+    /// 3. Verify that `has_permission` returns `Continue`
+    /// 3. Create the backing file with a key
+    /// 4. Call `has_permission` with the key in the file and verify that `Allow` is returned
+    #[test]
+    fn load_after_file_created() {
+        let temp_dir = TempDir::new("load_after_file_created").expect("Failed to create temp dir");
+        let path = temp_dir
+            .path()
+            .join("allow_keys")
+            .to_str()
+            .expect("Failed to get path")
+            .to_string();
+
+        let handler = AllowKeysAuthorizationHandler::new(&path).expect("Failed to create handler");
+
+        assert!(matches!(
+            handler.has_permission(&Identity::Key(KEY1.into()), "permission"),
+            Ok(AuthorizationHandlerResult::Continue),
+        ));
+
+        // Allow some time before writing the file to make sure the last read time is earlier than
+        // the write time; the sytem clock may not be very precise.
+        sleep(Duration::from_secs(1));
+
+        write_to_file(&[KEY1], &path);
+
+        assert!(matches!(
+            handler.has_permission(&Identity::Key(KEY1.into()), "permission"),
+            Ok(AuthorizationHandlerResult::Allow),
+        ));
     }
 }

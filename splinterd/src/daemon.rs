@@ -101,6 +101,8 @@ const HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::ServiceProcessorError>>;
 
 pub struct SplinterDaemon {
+    #[cfg(feature = "authorization-handler-allow-keys")]
+    config_dir: String,
     state_dir: String,
     #[cfg(feature = "service-endpoint")]
     service_endpoint: String,
@@ -549,7 +551,7 @@ impl SplinterDaemon {
             #[allow(unused_mut)]
             let mut authorization_handlers = vec![];
             #[cfg(feature = "authorization-handler-allow-keys")]
-            authorization_handlers.push(create_allow_keys_authorization_handler(&self.state_dir)?);
+            authorization_handlers.push(create_allow_keys_authorization_handler(&self.config_dir)?);
 
             #[cfg(feature = "authorization-handler-rbac")]
             let rbac_store = store_factory.get_role_based_authorization_store();
@@ -1027,6 +1029,8 @@ fn build_biome_routes(
 
 #[derive(Default)]
 pub struct SplinterDaemonBuilder {
+    #[cfg(feature = "authorization-handler-allow-keys")]
+    config_dir: Option<String>,
     state_dir: Option<String>,
     #[cfg(feature = "service-endpoint")]
     service_endpoint: Option<String>,
@@ -1072,6 +1076,12 @@ pub struct SplinterDaemonBuilder {
 impl SplinterDaemonBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    #[cfg(feature = "authorization-handler-allow-keys")]
+    pub fn with_config_dir(mut self, value: String) -> Self {
+        self.config_dir = Some(value);
+        self
     }
 
     pub fn with_state_dir(mut self, value: String) -> Self {
@@ -1233,6 +1243,11 @@ impl SplinterDaemonBuilder {
 
         let mesh = Mesh::new(512, 128);
 
+        #[cfg(feature = "authorization-handler-allow-keys")]
+        let config_dir = self.config_dir.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: config_dir".to_string())
+        })?;
+
         let state_dir = self.state_dir.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: state_dir".to_string())
         })?;
@@ -1300,6 +1315,8 @@ impl SplinterDaemonBuilder {
         })?;
 
         Ok(SplinterDaemon {
+            #[cfg(feature = "authorization-handler-allow-keys")]
+            config_dir,
             state_dir,
             #[cfg(feature = "service-endpoint")]
             service_endpoint,
@@ -1542,9 +1559,9 @@ impl RegistryShutdownHandle {
 
 #[cfg(feature = "authorization-handler-allow-keys")]
 fn create_allow_keys_authorization_handler(
-    state_dir: &str,
+    config_dir: &str,
 ) -> Result<Box<dyn AuthorizationHandler>, StartError> {
-    let allow_keys_path = Path::new(state_dir)
+    let allow_keys_path = Path::new(config_dir)
         .join("allow_keys")
         .to_str()
         .expect("path built from &str cannot be invalid")

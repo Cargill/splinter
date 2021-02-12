@@ -496,6 +496,11 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_admin_timeout(admin_timeout)
         .with_strict_ref_counts(config.strict_ref_counts());
 
+    #[cfg(feature = "authorization-handler-allow-keys")]
+    {
+        daemon_builder = daemon_builder.with_config_dir(config.config_dir().to_string());
+    }
+
     #[cfg(feature = "https-bind")]
     {
         daemon_builder = daemon_builder
