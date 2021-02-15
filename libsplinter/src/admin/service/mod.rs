@@ -65,8 +65,6 @@ pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
 pub use self::shared::AdminServiceStatus;
 
-const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
-
 pub trait AdminServiceEventSubscriber: Send {
     #[cfg(not(feature = "admin-service-event-store"))]
     fn handle_event(
@@ -194,6 +192,7 @@ pub struct AdminService {
 
 impl AdminService {
     #![allow(clippy::too_many_arguments)]
+    #[deprecated(since = "0.5.1", note = "please use `AdminServiceBuilder` instead")]
     pub fn new(
         node_id: &str,
         orchestrator: ServiceOrchestrator,
@@ -212,35 +211,33 @@ impl AdminService {
         routing_table_writer: Box<dyn RoutingTableWriter>,
         #[cfg(feature = "admin-service-event-store")] event_store: Box<dyn AdminServiceStore>,
     ) -> Result<Self, ServiceError> {
-        let coordinator_timeout =
-            coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
-        let orchestrator = Arc::new(Mutex::new(orchestrator));
+        let mut builder = builder::AdminServiceBuilder::new()
+            .with_node_id(node_id.to_string())
+            .with_service_orchestrator(orchestrator)
+            .with_peer_manager_connector(peer_connector)
+            .with_admin_service_store(admin_store)
+            .with_signature_verifier(signature_verifier)
+            .with_admin_key_verifier(key_verifier)
+            .with_key_permission_manager(key_permission_manager)
+            .with_routing_table_writer(routing_table_writer);
 
-        let new_service = Self {
-            service_id: admin_service_id(node_id),
-            node_id: node_id.to_string(),
-            admin_service_shared: Arc::new(Mutex::new(AdminServiceShared::new(
-                node_id.to_string(),
-                orchestrator.clone(),
-                #[cfg(feature = "service-arg-validation")]
-                service_arg_validators,
-                peer_connector.clone(),
-                admin_store,
-                signature_verifier,
-                key_verifier,
-                key_permission_manager,
-                routing_table_writer,
-                #[cfg(feature = "admin-service-event-store")]
-                event_store,
-            ))),
-            orchestrator,
-            coordinator_timeout,
-            consensus: None,
-            peer_connector,
-            peer_notification_run_state: None,
-        };
+        if let Some(coordinator_timeout) = coordinator_timeout {
+            builder = builder.with_coordinator_timeout(coordinator_timeout);
+        }
 
-        Ok(new_service)
+        #[cfg(feature = "service-arg-validation")]
+        {
+            builder = builder.with_service_arg_validators(service_arg_validators);
+        }
+
+        #[cfg(feature = "admin-service-event-store")]
+        {
+            builder = builder.with_admin_event_store(event_store);
+        }
+
+        builder
+            .build()
+            .map_err(|e| ServiceError::UnableToCreate(Box::new(e)))
     }
 
     pub fn commands(&self) -> impl AdminCommands + Clone {
