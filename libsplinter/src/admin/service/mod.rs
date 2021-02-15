@@ -1027,22 +1027,26 @@ mod tests {
         #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
-        let mut admin_service = AdminService::new(
-            "test-node".into(),
-            orchestrator,
-            #[cfg(feature = "service-arg-validation")]
-            HashMap::new(),
-            peer_connector,
-            store,
-            signature_verifier,
-            Box::new(MockAdminKeyVerifier),
-            Box::new(AllowAllKeyPermissionManager),
-            None,
-            writer,
-            #[cfg(feature = "admin-service-event-store")]
-            event_store,
-        )
-        .expect("Service should have been created correctly");
+        let mut admin_service_builder = AdminServiceBuilder::new();
+
+        admin_service_builder = admin_service_builder
+            .with_node_id("test-node".into())
+            .with_service_orchestrator(orchestrator)
+            .with_peer_manager_connector(peer_connector)
+            .with_admin_service_store(store)
+            .with_signature_verifier(signature_verifier)
+            .with_admin_key_verifier(Box::new(MockAdminKeyVerifier))
+            .with_key_permission_manager(Box::new(AllowAllKeyPermissionManager))
+            .with_routing_table_writer(writer);
+
+        #[cfg(feature = "admin-service-event-store")]
+        {
+            admin_service_builder = admin_service_builder.with_admin_event_store(event_store);
+        }
+
+        let mut admin_service = admin_service_builder
+            .build()
+            .expect("Service should have been created correctly");
 
         let (tx, rx) = channel();
         admin_service

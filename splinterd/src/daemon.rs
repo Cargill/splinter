@@ -29,7 +29,7 @@ use health::HealthService;
 use scabbard::service::ScabbardArgValidator;
 use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
-use splinter::admin::service::{admin_service_id, AdminService};
+use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
 use splinter::admin::store::yaml::YamlAdminServiceStore;
 #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
 use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
@@ -240,9 +240,6 @@ impl SplinterDaemon {
                 }
             }
         };
-
-        #[cfg(feature = "admin-service-event-store")]
-        let event_store = store_factory.get_admin_service_store();
 
         let table = RoutingTable::default();
         let routing_reader: Box<dyn RoutingTableReader> = Box::new(table.clone());
@@ -493,27 +490,35 @@ impl SplinterDaemon {
             &*store_factory,
         )?;
 
-        let admin_service = AdminService::new(
-            &self.node_id,
-            orchestrator,
-            #[cfg(feature = "service-arg-validation")]
-            {
-                let mut validators: HashMap<String, Box<dyn ServiceArgValidator + Send>> =
-                    HashMap::new();
-                validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
-                validators
-            },
-            peer_connector,
-            admin_service_store.clone(),
-            admin_service_verifier,
-            Box::new(registry.clone_box_as_reader()),
-            Box::new(AllowAllKeyPermissionManager),
-            Some(self.admin_timeout),
-            routing_writer.clone(),
-            #[cfg(feature = "admin-service-event-store")]
-            event_store,
-        )
-        .map_err(|err| {
+        let mut admin_service_builder = AdminServiceBuilder::new();
+
+        admin_service_builder = admin_service_builder
+            .with_node_id(self.node_id.clone())
+            .with_service_orchestrator(orchestrator)
+            .with_peer_manager_connector(peer_connector)
+            .with_admin_service_store(admin_service_store.clone())
+            .with_signature_verifier(admin_service_verifier)
+            .with_admin_key_verifier(Box::new(registry.clone_box_as_reader()))
+            .with_key_permission_manager(Box::new(AllowAllKeyPermissionManager))
+            .with_coordinator_timeout(self.admin_timeout)
+            .with_routing_table_writer(routing_writer.clone());
+
+        #[cfg(feature = "service-arg-validation")]
+        {
+            let mut validators: HashMap<String, Box<dyn ServiceArgValidator + Send>> =
+                HashMap::new();
+            validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
+
+            admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
+        }
+
+        #[cfg(feature = "admin-service-event-store")]
+        {
+            admin_service_builder = admin_service_builder
+                .with_admin_event_store(store_factory.get_admin_service_store());
+        }
+
+        let admin_service = admin_service_builder.build().map_err(|err| {
             StartError::AdminServiceError(format!("unable to create admin service: {}", err))
         })?;
 
