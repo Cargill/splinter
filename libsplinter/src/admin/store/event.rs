@@ -12,18 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Defines an `AdminServiceEvent`, stored and returned by the `AdminServiceEventStore`.
-//!
-//! The public interface includes the struct [`AdminServiceEvent`].
-//!
-//! [`AdminServiceEvent`]: struct.AdminServiceEvent.html
-
-pub mod store;
+//! Structs for events associated with the admin store
 
 use std::convert::TryFrom;
 
+use super::CircuitProposal;
 use crate::admin::service::messages;
-use crate::admin::store as admin_store;
 use crate::error::InvalidStateError;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -31,7 +25,7 @@ use crate::error::InvalidStateError;
 pub struct AdminServiceEvent {
     event_id: i64,
     event_type: EventType,
-    proposal: admin_store::CircuitProposal,
+    proposal: CircuitProposal,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -54,8 +48,84 @@ impl AdminServiceEvent {
         &self.event_type
     }
 
-    pub fn proposal(&self) -> &admin_store::CircuitProposal {
+    pub fn proposal(&self) -> &CircuitProposal {
         &self.proposal
+    }
+}
+
+/// Builder to be used to build an `AdminServiceEvent`
+#[derive(Default, Clone)]
+pub struct AdminServiceEventBuilder {
+    event_id: Option<i64>,
+    event_type: Option<EventType>,
+    proposal: Option<CircuitProposal>,
+}
+
+impl AdminServiceEventBuilder {
+    /// Creates a new `AdminServiceEventBuilder`
+    pub fn new() -> Self {
+        AdminServiceEventBuilder::default()
+    }
+
+    /// Sets the event ID
+    ///
+    /// # Arguments
+    ///
+    /// * `event_id` - The ID of the event
+    pub fn with_event_id(mut self, event_id: i64) -> AdminServiceEventBuilder {
+        self.event_id = Some(event_id);
+        self
+    }
+
+    /// Sets the event type
+    ///
+    /// # Arguments
+    ///
+    /// * `event_type` - The type of event
+    pub fn with_event_type(mut self, event_type: &EventType) -> AdminServiceEventBuilder {
+        self.event_type = Some(event_type.clone());
+        self
+    }
+
+    /// Sets the event's circuit proposal
+    ///
+    /// # Arguments
+    ///
+    /// * `proposal` - Circuit proposal associated with the event
+    pub fn with_proposal(mut self, proposal: &CircuitProposal) -> AdminServiceEventBuilder {
+        self.proposal = Some(proposal.clone());
+        self
+    }
+
+    /// Builds an `AdminServiceEvent`
+    ///
+    /// Returns an error if any of the fields are not set.
+    pub fn build(self) -> Result<AdminServiceEvent, InvalidStateError> {
+        let event_id = self.event_id.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `event_id`".to_string(),
+            )
+        })?;
+
+        let event_type = self.event_type.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `event_type`".to_string(),
+            )
+        })?;
+
+        let proposal = self.proposal.ok_or_else(|| {
+            InvalidStateError::with_message(
+                "unable to build, missing field: `proposal`".to_string(),
+            )
+        })?;
+
+        let admin_service_event = AdminServiceEvent {
+            event_id,
+            event_type,
+            proposal,
+        };
+
+        Ok(admin_service_event)
     }
 }
 
@@ -65,7 +135,7 @@ impl TryFrom<(i64, &messages::AdminServiceEvent)> for AdminServiceEvent {
     fn try_from(
         (event_id, event): (i64, &messages::AdminServiceEvent),
     ) -> Result<Self, Self::Error> {
-        let proposal = admin_store::CircuitProposal::try_from(event.proposal())?;
+        let proposal = CircuitProposal::try_from(event.proposal())?;
         match event {
             messages::AdminServiceEvent::ProposalSubmitted(_) => Ok(AdminServiceEvent {
                 event_id,

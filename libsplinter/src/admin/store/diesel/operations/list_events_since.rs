@@ -12,25 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides the "list events since" operation for the `DieselAdminServiceEventStore`.
+//! Provides the "list events since" operation for the `DieselAdminServiceStore`.
 
 use diesel::{prelude::*, types::HasSqlType};
 
-use super::{
-    list_events::AdminServiceEventStoreListEventsOperation, AdminServiceEventStoreOperations,
-};
+use super::{list_events::AdminServiceStoreListEventsOperation, AdminServiceStoreOperations};
 
-use crate::admin::store::events::store::{
-    diesel::schema::admin_service_event, AdminServiceEventStoreError, EventIter,
-};
+use crate::admin::store::{diesel::schema::admin_service_event, AdminServiceStoreError, EventIter};
 
-pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreListEventsSinceOperation
-{
-    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceEventStoreError>;
+pub(in crate::admin::store::diesel) trait AdminServiceStoreListEventsSinceOperation {
+    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError>;
 }
 
-impl<'a, C> AdminServiceEventStoreListEventsSinceOperation
-    for AdminServiceEventStoreOperations<'a, C>
+impl<'a, C> AdminServiceStoreListEventsSinceOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
     C::Backend: HasSqlType<diesel::sql_types::BigInt>,
@@ -40,13 +34,13 @@ where
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
 {
-    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceEventStoreError> {
+    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
         self.conn.transaction::<EventIter, _, _>(|| {
             let event_ids: Vec<i64> = admin_service_event::table
                 .filter(admin_service_event::id.gt(start))
                 .select(admin_service_event::id)
                 .load(self.conn)?;
-            AdminServiceEventStoreOperations::new(self.conn).list_events(event_ids)
+            AdminServiceStoreOperations::new(self.conn).list_events(event_ids)
         })
     }
 }

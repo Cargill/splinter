@@ -25,6 +25,8 @@ use std::time::SystemTime;
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::Message;
 
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::store;
 #[cfg(feature = "circuit-purge")]
 use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
@@ -69,8 +71,6 @@ use super::{
     admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, AdminSubscriberError,
     Events,
 };
-#[cfg(feature = "admin-service-event-store")]
-use crate::admin::store::events::{self, store::AdminServiceEventStore};
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
@@ -156,7 +156,7 @@ impl SubscriberMap {
     }
 
     #[cfg(feature = "admin-service-event-store")]
-    fn broadcast_by_type(&self, event_type: &str, admin_service_event: &events::AdminServiceEvent) {
+    fn broadcast_by_type(&self, event_type: &str, admin_service_event: &store::AdminServiceEvent) {
         let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
         if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
             subscribers.retain(
@@ -237,9 +237,9 @@ pub struct AdminServiceShared {
 
     admin_service_status: AdminServiceStatus,
     routing_table_writer: Box<dyn RoutingTableWriter>,
-
+    // Mailbox of AdminServiceEvent values
     #[cfg(feature = "admin-service-event-store")]
-    admin_event_store: Box<dyn AdminServiceEventStore>,
+    event_store: Box<dyn AdminServiceStore>,
     #[cfg(feature = "circuit-disband")]
     // List of circuits to be completely disbanded once all nodes have agreed
     pending_consensus_disbanded_circuits: HashMap<String, PendingDisbandedCircuit>,
@@ -260,8 +260,8 @@ impl AdminServiceShared {
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
-        #[cfg(feature = "admin-service-event-store")] admin_event_store: Box<
-            dyn AdminServiceEventStore,
+        #[cfg(feature = "admin-service-event-store")] admin_service_event_store: Box<
+            dyn AdminServiceStore,
         >,
     ) -> Result<Self, ServiceError> {
         #[cfg(not(feature = "admin-service-event-store"))]
@@ -296,7 +296,7 @@ impl AdminServiceShared {
             admin_service_status: AdminServiceStatus::NotRunning,
             routing_table_writer,
             #[cfg(feature = "admin-service-event-store")]
-            admin_event_store,
+            event_store: admin_service_event_store,
             #[cfg(feature = "circuit-disband")]
             pending_consensus_disbanded_circuits: HashMap::new(),
         })
@@ -1491,7 +1491,7 @@ impl AdminServiceShared {
         circuit_management_type: &str,
     ) -> Result<Events, AdminSharedError> {
         let events = self
-            .admin_event_store
+            .event_store
             .list_events_by_management_type_since(
                 circuit_management_type.to_string(),
                 *since_event_id,
@@ -1537,7 +1537,7 @@ impl AdminServiceShared {
         circuit_management_type: &str,
         event: messages::AdminServiceEvent,
     ) {
-        let admin_event = match self.admin_event_store.add_event(event) {
+        let admin_event = match self.event_store.add_event(event) {
             Ok(admin_event) => admin_event,
             Err(err) => {
                 error!("Unable to store admin event: {}", err);
@@ -2915,9 +2915,6 @@ mod tests {
         sqlite::SqliteConnection,
     };
 
-    #[cfg(feature = "admin-service-event-store")]
-    use crate::admin::service::events::store::memory::MemoryAdminServiceEventStore;
-
     use crate::admin::service::AdminKeyVerifierError;
     #[cfg(feature = "circuit-disband")]
     use crate::admin::store;
@@ -2976,14 +2973,13 @@ mod tests {
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
@@ -2997,7 +2993,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -3111,14 +3107,13 @@ mod tests {
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let mut shared = AdminServiceShared::new(
             "test-node".into(),
@@ -3132,7 +3127,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -3210,6 +3205,9 @@ mod tests {
     // test that a valid circuit is validated correctly
     fn test_validate_circuit_valid() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3217,9 +3215,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3233,7 +3228,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3256,6 +3251,9 @@ mod tests {
     // included in the protobuf.
     fn test_validate_invalid_protocol_display_name() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3263,9 +3261,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3279,7 +3274,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3296,6 +3291,9 @@ mod tests {
     // invalid
     fn test_validate_circuit_signer_not_permitted() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3303,9 +3301,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3319,7 +3314,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3340,6 +3335,9 @@ mod tests {
     // invalid
     fn test_validate_circuit_signer_key_invalid() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3347,9 +3345,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3363,7 +3358,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -3395,6 +3390,9 @@ mod tests {
     // members an error is returned
     fn test_validate_circuit_bad_node() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3402,8 +3400,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3417,7 +3413,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3444,6 +3440,9 @@ mod tests {
     // test that if a circuit has a service in its roster with too many allowed nodes
     fn test_validate_circuit_too_many_allowed_nodes() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3451,8 +3450,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3466,7 +3463,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3496,6 +3493,9 @@ mod tests {
     // test that if a circuit has a service with "" for a service id an error is returned
     fn test_validate_circuit_empty_service_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3503,8 +3503,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3518,7 +3516,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3545,6 +3543,9 @@ mod tests {
     // test that if a circuit has a service with an invalid service id an error is returned
     fn test_validate_circuit_invalid_service_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3552,9 +3553,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3568,7 +3566,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3595,6 +3593,9 @@ mod tests {
     // test that if a circuit has a service with duplicate service ids an error is returned
     fn test_validate_circuit_duplicate_service_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3602,8 +3603,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3617,7 +3616,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3649,6 +3648,9 @@ mod tests {
     // test that if a circuit does not have any services in its roster an error is returned
     fn test_validate_circuit_empty_roster() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3656,9 +3658,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3672,7 +3671,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3693,6 +3692,9 @@ mod tests {
     // test that if a circuit does not have any nodes in its members an error is returned
     fn test_validate_circuit_empty_members() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3700,8 +3702,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3715,7 +3715,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3738,6 +3738,9 @@ mod tests {
     // returned
     fn test_validate_circuit_missing_local_node() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3745,8 +3748,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3760,7 +3761,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3787,6 +3788,9 @@ mod tests {
     // returned
     fn test_validate_circuit_empty_node_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3794,8 +3798,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3809,7 +3811,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3843,6 +3845,9 @@ mod tests {
     // test that if a circuit has duplicate members an error is returned
     fn test_validate_circuit_duplicate_members() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3850,8 +3855,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3865,7 +3868,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3899,6 +3902,9 @@ mod tests {
     // test that if a circuit has an empty circuit id an error is returned
     fn test_validate_circuit_empty_circuit_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3906,8 +3912,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3921,7 +3925,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3943,6 +3947,9 @@ mod tests {
     // test that if a circuit has an invalid circuit id an error is returned
     fn test_validate_circuit_invalid_circuit_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3950,8 +3957,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -3965,7 +3970,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -3987,6 +3992,9 @@ mod tests {
     // test that if a circuit has a member with no endpoints an error is returned
     fn test_validate_circuit_no_endpoints() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -3994,8 +4002,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4009,7 +4015,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4039,6 +4045,9 @@ mod tests {
     // test that if a circuit has a member with an empty endpoint an error is returned
     fn test_validate_circuit_empty_endpoint() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4046,8 +4055,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4061,7 +4068,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4091,6 +4098,9 @@ mod tests {
     // test that if a circuit has a member with a duplicate endpoint an error is returned
     fn test_validate_circuit_duplicate_endpoint() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4098,8 +4108,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4113,7 +4121,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4143,6 +4151,9 @@ mod tests {
     // test that if a circuit does not have authorization set an error is returned
     fn test_validate_circuit_no_authorization() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4150,8 +4161,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4165,7 +4174,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4187,6 +4196,9 @@ mod tests {
     // test that if a circuit does not have persistence set an error is returned
     fn test_validate_circuit_no_persitance() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4194,8 +4206,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4209,7 +4219,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4231,6 +4241,9 @@ mod tests {
     // test that if a circuit does not have durability set an error is returned
     fn test_validate_circuit_unset_durability() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4238,8 +4251,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4253,7 +4264,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4275,6 +4286,9 @@ mod tests {
     // test that if a circuit does not have route type set an error is returned
     fn test_validate_circuit_no_routes() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4282,8 +4296,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4297,7 +4309,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4319,6 +4331,9 @@ mod tests {
     // test that if a circuit does not have circuit_management_type set an error is returned
     fn test_validate_circuit_no_management_type() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4326,8 +4341,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4341,7 +4354,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let mut circuit = setup_test_circuit();
@@ -4363,6 +4376,8 @@ mod tests {
     // test that a valid circuit proposal vote comes back as valid
     fn test_validate_proposal_vote_valid() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4370,8 +4385,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4385,7 +4398,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -4408,6 +4421,9 @@ mod tests {
     // invalid
     fn test_validate_proposal_vote_not_permitted() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4415,8 +4431,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4430,7 +4444,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -4452,6 +4466,9 @@ mod tests {
     // test if the voter is the original requester node the vote is invalid
     fn test_validate_proposal_vote_requester() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4459,8 +4476,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4474,7 +4489,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -4496,6 +4511,9 @@ mod tests {
     // test if a voter has already voted on a proposal the new vote is invalid
     fn test_validate_proposal_vote_duplicate_vote() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4503,8 +4521,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4518,7 +4534,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -4548,6 +4564,9 @@ mod tests {
     // the vote, the vote is invalid
     fn test_validate_proposal_vote_circuit_hash_mismatch() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4555,8 +4574,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4570,7 +4587,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
         let circuit = setup_test_circuit();
@@ -4595,6 +4612,9 @@ mod tests {
     // signature is empty.
     fn test_validate_circuit_management_payload_signature() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4605,8 +4625,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4620,7 +4638,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -4656,6 +4674,9 @@ mod tests {
     // header is empty.
     fn test_validate_circuit_management_payload_header() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4666,8 +4687,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4681,7 +4700,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -4718,6 +4737,9 @@ mod tests {
     // requester field is empty.
     fn test_validate_circuit_management_header_requester() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4728,8 +4750,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4743,7 +4763,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -4782,6 +4802,9 @@ mod tests {
     // field is empty.
     fn test_validate_circuit_management_header_requester_node_id() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4792,8 +4815,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4807,7 +4828,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -4854,6 +4875,9 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_valid() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4861,9 +4885,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4877,7 +4898,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -4918,6 +4939,9 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_invalid_protocol() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4925,9 +4949,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -4941,7 +4962,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -4980,6 +5001,9 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_invalid_circuit_version() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -4987,9 +5011,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5003,7 +5024,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5043,6 +5064,9 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_no_circuit() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5050,9 +5074,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5066,7 +5087,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5096,6 +5117,9 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_not_permitted() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5103,8 +5127,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5118,7 +5140,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5158,6 +5180,9 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_already_disbanded() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5165,8 +5190,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5180,7 +5203,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5246,13 +5269,13 @@ mod tests {
         let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
             .expect("failed to create orchestrator");
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let signature_verifier = Secp256k1Context::new().new_verifier();
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let mut shared = AdminServiceShared::new(
             "my_peer_id".into(),
@@ -5266,7 +5289,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5356,6 +5379,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_valid() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5363,8 +5389,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5378,7 +5402,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5419,6 +5443,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_invalid_protocol() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5426,9 +5453,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5442,7 +5466,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5483,6 +5507,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_invalid_circuit_version() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5490,9 +5517,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5506,7 +5530,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5546,6 +5570,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_no_circuit() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5553,9 +5580,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5569,7 +5593,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5598,6 +5622,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_not_permitted() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5605,8 +5632,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5620,7 +5645,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5660,6 +5685,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_invalid_requester() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5667,8 +5695,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5682,7 +5708,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5723,6 +5749,9 @@ mod tests {
     #[test]
     fn test_validate_purge_request_active_circuit() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5730,8 +5759,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5745,7 +5772,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 
@@ -5783,6 +5810,9 @@ mod tests {
     #[test]
     fn test_purge_request() {
         let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
 
@@ -5796,8 +5826,6 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
-        #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
 
         let mut admin_shared = AdminServiceShared::new(
             "node_a".into(),
@@ -5811,7 +5839,7 @@ mod tests {
             Box::new(AllowAllKeyPermissionManager),
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .unwrap();
 

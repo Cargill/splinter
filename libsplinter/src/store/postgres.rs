@@ -122,25 +122,4 @@ impl StoreFactory for PgStoreFactory {
     fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore> {
         Box::new(crate::biome::DieselUserProfileStore::new(self.pool.clone()))
     }
-
-    #[cfg(feature = "admin-service-event-store-postgres")]
-    fn get_admin_service_event_store(
-        &self,
-    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
-        Box::new(
-            crate::admin::store::events::store::diesel::DieselAdminServiceEventStore::new(
-                self.pool.clone(),
-            ),
-        )
-    }
-
-    #[cfg(all(
-        feature = "admin-service-event-store",
-        not(feature = "admin-service-event-store-postgres")
-    ))]
-    fn get_admin_service_event_store(
-        &self,
-    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore> {
-        unimplemented!()
-    }
 }

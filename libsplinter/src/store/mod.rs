@@ -68,11 +68,6 @@ pub trait StoreFactory {
 
     #[cfg(feature = "biome-profile")]
     fn get_biome_user_profile_store(&self) -> Box<dyn crate::biome::UserProfileStore>;
-
-    #[cfg(feature = "admin-service-event-store")]
-    fn get_admin_service_event_store(
-        &self,
-    ) -> Box<dyn crate::admin::store::events::store::AdminServiceEventStore>;
 }
 
 /// Creates a `StoreFactory` backed by the given connection

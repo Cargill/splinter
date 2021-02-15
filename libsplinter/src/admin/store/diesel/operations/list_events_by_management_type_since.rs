@@ -12,29 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides the "list events by management type" operation for the `DieselAdminServiceEventStore`.
+//! Provides the "list events by management type" operation for the `DieselAdminServiceStore`.
 
 use diesel::{prelude::*, types::HasSqlType};
 
-use super::{
-    list_events::AdminServiceEventStoreListEventsOperation, AdminServiceEventStoreOperations,
+use super::{list_events::AdminServiceStoreListEventsOperation, AdminServiceStoreOperations};
+
+use crate::admin::store::{
+    diesel::schema::admin_event_proposed_circuit, AdminServiceStoreError, EventIter,
 };
 
-use crate::admin::store::events::store::{
-    diesel::schema::admin_event_proposed_circuit, AdminServiceEventStoreError, EventIter,
-};
-
-pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreListEventsByManagementTypeSinceOperation
+pub(in crate::admin::store::diesel) trait AdminServiceStoreListEventsByManagementTypeSinceOperation
 {
     fn list_events_by_management_type_since(
         &self,
         management_type: String,
         start: i64,
-    ) -> Result<EventIter, AdminServiceEventStoreError>;
+    ) -> Result<EventIter, AdminServiceStoreError>;
 }
 
-impl<'a, C> AdminServiceEventStoreListEventsByManagementTypeSinceOperation
-    for AdminServiceEventStoreOperations<'a, C>
+impl<'a, C> AdminServiceStoreListEventsByManagementTypeSinceOperation
+    for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
     C::Backend: HasSqlType<diesel::sql_types::BigInt>,
@@ -48,14 +46,14 @@ where
         &self,
         management_type: String,
         start: i64,
-    ) -> Result<EventIter, AdminServiceEventStoreError> {
+    ) -> Result<EventIter, AdminServiceStoreError> {
         self.conn.transaction::<EventIter, _, _>(|| {
             let event_ids: Vec<i64> = admin_event_proposed_circuit::table
                 .filter(admin_event_proposed_circuit::event_id.gt(start))
                 .filter(admin_event_proposed_circuit::circuit_management_type.eq(management_type))
                 .select(admin_event_proposed_circuit::event_id)
                 .load(self.conn)?;
-            AdminServiceEventStoreOperations::new(self.conn).list_events(event_ids)
+            AdminServiceStoreOperations::new(self.conn).list_events(event_ids)
         })
     }
 }

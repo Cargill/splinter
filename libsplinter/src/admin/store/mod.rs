@@ -34,7 +34,7 @@ mod circuit_proposal;
 pub mod diesel;
 pub mod error;
 #[cfg(feature = "admin-service-event-store")]
-pub mod events;
+mod event;
 mod proposed_circuit;
 mod proposed_node;
 mod proposed_service;
@@ -43,6 +43,9 @@ pub mod yaml;
 
 use std::cmp::Ordering;
 use std::fmt;
+
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::service::messages;
 
 pub use self::circuit::{
     AuthorizationType, Circuit, CircuitBuilder, CircuitStatus, DurabilityType, PersistenceType,
@@ -53,6 +56,8 @@ pub use self::circuit_proposal::{
     CircuitProposal, CircuitProposalBuilder, ProposalType, Vote, VoteRecord, VoteRecordBuilder,
 };
 use self::error::AdminServiceStoreError;
+#[cfg(feature = "admin-service-event-store")]
+pub use self::event::{AdminServiceEvent, AdminServiceEventBuilder, EventType};
 pub use self::proposed_circuit::{ProposedCircuit, ProposedCircuitBuilder};
 pub use self::proposed_node::{ProposedNode, ProposedNodeBuilder};
 pub use self::proposed_service::{ProposedService, ProposedServiceBuilder};
@@ -175,6 +180,10 @@ impl CircuitPredicate {
         }
     }
 }
+
+#[cfg(feature = "admin-service-event-store")]
+/// Return type of the admin store's `list_events_*` methods.
+pub type EventIter = Box<dyn ExactSizeIterator<Item = AdminServiceEvent> + Send>;
 
 /// Interface for performing CRUD operations on circuits, proposals, nodes, and services
 pub trait AdminServiceStore: Send + Sync {
@@ -311,6 +320,40 @@ pub trait AdminServiceStore: Send + Sync {
         &self,
         circuit_id: &str,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Service>>, AdminServiceStoreError>;
+
+    #[cfg(feature = "admin-service-event-store")]
+    /// Add an event to the `AdminServiceEventStore`.  Returns the recorded event index and
+    /// a copy of the event.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - the `AdminServiceEvent` to be added to the store
+    fn add_event(
+        &self,
+        event: messages::AdminServiceEvent,
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError>;
+
+    #[cfg(feature = "admin-service-event-store")]
+    /// List `AdminServiceEvent`s that have been added to the store since the provided index.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - index used to filter events
+    fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError>;
+
+    #[cfg(feature = "admin-service-event-store")]
+    /// List `AdminServiceEvent`s, with a corresponding `CircuitProposal` that has the specified
+    /// `circuit_management_type`, that have been added to the store since the provided index.
+    ///
+    /// # Arguments
+    ///
+    /// * `management_type` - management type used to filter `CircuitProposal`s
+    /// * `start` - index used to filter events
+    fn list_events_by_management_type_since(
+        &self,
+        management_type: String,
+        start: i64,
+    ) -> Result<EventIter, AdminServiceStoreError>;
 
     fn clone_boxed(&self) -> Box<dyn AdminServiceStore>;
 }

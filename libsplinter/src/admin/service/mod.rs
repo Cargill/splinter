@@ -33,8 +33,6 @@ use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::{self, Message};
 
-#[cfg(feature = "admin-service-event-store")]
-use crate::admin::store::events::{self, store::AdminServiceEventStore};
 use crate::admin::store::{self, AdminServiceStore};
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::Proposal;
@@ -78,7 +76,7 @@ pub trait AdminServiceEventSubscriber: Send {
     #[cfg(feature = "admin-service-event-store")]
     fn handle_event(
         &self,
-        admin_service_event: &events::AdminServiceEvent,
+        admin_service_event: &store::AdminServiceEvent,
     ) -> Result<(), AdminSubscriberError>;
 }
 
@@ -167,12 +165,12 @@ impl Iterator for Events {
 
 #[cfg(feature = "admin-service-event-store")]
 pub struct Events {
-    inner: Box<dyn ExactSizeIterator<Item = events::AdminServiceEvent> + Send>,
+    inner: Box<dyn ExactSizeIterator<Item = store::AdminServiceEvent> + Send>,
 }
 
 #[cfg(feature = "admin-service-event-store")]
 impl Iterator for Events {
-    type Item = events::AdminServiceEvent;
+    type Item = store::AdminServiceEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
@@ -208,9 +206,7 @@ impl AdminService {
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
-        #[cfg(feature = "admin-service-event-store")] admin_event_store: Box<
-            dyn AdminServiceEventStore,
-        >,
+        #[cfg(feature = "admin-service-event-store")] event_store: Box<dyn AdminServiceStore>,
     ) -> Result<(Self, thread::JoinHandle<()>), ServiceError> {
         let coordinator_timeout =
             coordinator_timeout.unwrap_or_else(|| Duration::from_secs(DEFAULT_COORDINATOR_TIMEOUT));
@@ -235,7 +231,7 @@ impl AdminService {
                 key_permission_manager,
                 routing_table_writer,
                 #[cfg(feature = "admin-service-event-store")]
-                admin_event_store,
+                event_store,
             )?)),
             orchestrator,
             coordinator_timeout,
@@ -922,8 +918,6 @@ mod tests {
     };
 
     use crate::admin::store::diesel::DieselAdminServiceStore;
-    #[cfg(feature = "admin-service-event-store")]
-    use crate::admin::store::events::store::memory::MemoryAdminServiceEventStore;
     use crate::circuit::routing::memory::RoutingTable;
     use crate::keys::insecure::AllowAllKeyPermissionManager;
     use crate::mesh::Mesh;
@@ -1008,8 +1002,9 @@ mod tests {
 
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+        let store = Box::new(DieselAdminServiceStore::new(pool));
         #[cfg(feature = "admin-service-event-store")]
-        let memory_event_store = MemoryAdminServiceEventStore::new_boxed();
+        let event_store = store.clone_boxed();
 
         let (mut admin_service, _) = AdminService::new(
             "test-node".into(),
@@ -1017,14 +1012,14 @@ mod tests {
             #[cfg(feature = "service-arg-validation")]
             HashMap::new(),
             peer_connector,
-            Box::new(DieselAdminServiceStore::new(pool)),
+            store,
             signature_verifier,
             Box::new(MockAdminKeyVerifier),
             Box::new(AllowAllKeyPermissionManager),
             None,
             writer,
             #[cfg(feature = "admin-service-event-store")]
-            memory_event_store,
+            event_store,
         )
         .expect("Service should have been created correctly");
 

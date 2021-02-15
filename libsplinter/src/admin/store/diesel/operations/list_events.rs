@@ -20,39 +20,32 @@ use std::convert::TryFrom;
 
 use diesel::{prelude::*, types::HasSqlType};
 
-use super::AdminServiceEventStoreOperations;
+use super::AdminServiceStoreOperations;
 
-use crate::admin::store::events::{
-    store::{
-        diesel::{
-            models::{
-                AdminEventCircuitProposalModel, AdminEventProposedCircuitModel,
-                AdminEventProposedNodeEndpointModel, AdminEventProposedNodeModel,
-                AdminEventProposedServiceArgumentModel, AdminEventProposedServiceModel,
-                AdminEventVoteRecordModel, AdminServiceEventModel,
-            },
-            schema::{
-                admin_event_circuit_proposal, admin_event_proposed_circuit,
-                admin_event_proposed_node, admin_event_proposed_node_endpoint,
-                admin_event_proposed_service, admin_event_proposed_service_argument,
-                admin_event_vote_record, admin_service_event,
-            },
-        },
-        AdminServiceEventStoreError, EventIter,
-    },
-    AdminServiceEvent,
-};
 use crate::admin::store::{
-    AuthorizationType, CircuitProposalBuilder, DurabilityType, PersistenceType, ProposalType,
-    ProposedCircuitBuilder, ProposedNode, ProposedNodeBuilder, ProposedService,
-    ProposedServiceBuilder, RouteType, VoteRecord,
+    diesel::{
+        models::{
+            AdminEventCircuitProposalModel, AdminEventProposedCircuitModel,
+            AdminEventProposedNodeEndpointModel, AdminEventProposedNodeModel,
+            AdminEventProposedServiceArgumentModel, AdminEventProposedServiceModel,
+            AdminEventVoteRecordModel, AdminServiceEventModel,
+        },
+        schema::{
+            admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
+            admin_event_proposed_node_endpoint, admin_event_proposed_service,
+            admin_event_proposed_service_argument, admin_event_vote_record, admin_service_event,
+        },
+    },
+    AdminServiceEvent, AdminServiceStoreError, AuthorizationType, CircuitProposalBuilder,
+    DurabilityType, EventIter, PersistenceType, ProposalType, ProposedCircuitBuilder, ProposedNode,
+    ProposedNodeBuilder, ProposedService, ProposedServiceBuilder, RouteType, VoteRecord,
 };
 
-pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreListEventsOperation {
-    fn list_events(&self, events_id: Vec<i64>) -> Result<EventIter, AdminServiceEventStoreError>;
+pub(in crate::admin::store::diesel) trait AdminServiceStoreListEventsOperation {
+    fn list_events(&self, events_id: Vec<i64>) -> Result<EventIter, AdminServiceStoreError>;
 }
 
-impl<'a, C> AdminServiceEventStoreListEventsOperation for AdminServiceEventStoreOperations<'a, C>
+impl<'a, C> AdminServiceStoreListEventsOperation for AdminServiceStoreOperations<'a, C>
 where
     C: diesel::Connection,
     C::Backend: HasSqlType<diesel::sql_types::BigInt>,
@@ -62,7 +55,7 @@ where
     Vec<u8>: diesel::deserialize::FromSql<diesel::sql_types::Binary, C::Backend>,
     i16: diesel::deserialize::FromSql<diesel::sql_types::SmallInt, C::Backend>,
 {
-    fn list_events(&self, event_ids: Vec<i64>) -> Result<EventIter, AdminServiceEventStoreError> {
+    fn list_events(&self, event_ids: Vec<i64>) -> Result<EventIter, AdminServiceStoreError> {
         self.conn.transaction::<EventIter, _, _>(|| {
             // List of the events, and the one-to-one models present in the database
             let event_models: Vec<(
@@ -142,7 +135,7 @@ where
                         ))
                     },
                 )
-                .collect::<Result<HashMap<i64, (_, _, _)>, AdminServiceEventStoreError>>()?;
+                .collect::<Result<HashMap<i64, (_, _, _)>, AdminServiceStoreError>>()?;
 
             // Collect `ProposedServices` to apply to the `ProposedCircuit`
             // Create HashMap of (`event_id`, `service_id`) to a `IndexedServiceBuilder`
@@ -214,7 +207,7 @@ where
                 let proposed_service = indexed_service
                     .builder
                     .build()
-                    .map_err(AdminServiceEventStoreError::InvalidStateError)?;
+                    .map_err(AdminServiceStoreError::InvalidStateError)?;
 
                 if let Some(service_list) = built_proposed_services.get_mut(&event_id) {
                     service_list.push(proposed_service);
@@ -284,7 +277,7 @@ where
                             .builder
                             .with_endpoints(&endpoints)
                             .build()
-                            .map_err(AdminServiceEventStoreError::InvalidStateError)?,
+                            .map_err(AdminServiceStoreError::InvalidStateError)?,
                     )
                 } else {
                     proposed_node
@@ -302,7 +295,7 @@ where
                             .builder
                             .with_endpoints(&endpoints)
                             .build()
-                            .map_err(AdminServiceEventStoreError::InvalidStateError)?],
+                            .map_err(AdminServiceStoreError::InvalidStateError)?],
                     );
                 }
             }
@@ -318,13 +311,13 @@ where
                 if let Some(votes) = vote_records.get_mut(&vote.event_id) {
                     votes.push(
                         VoteRecord::try_from(&vote)
-                            .map_err(AdminServiceEventStoreError::InvalidStateError)?,
+                            .map_err(AdminServiceStoreError::InvalidStateError)?,
                     );
                 } else {
                     vote_records.insert(
                         vote.event_id,
                         vec![VoteRecord::try_from(&vote)
-                            .map_err(AdminServiceEventStoreError::InvalidStateError)?],
+                            .map_err(AdminServiceStoreError::InvalidStateError)?],
                     );
                 }
             }
@@ -346,14 +339,14 @@ where
                     .with_circuit(
                         &proposed_circuit_builder
                             .build()
-                            .map_err(AdminServiceEventStoreError::InvalidStateError)?,
+                            .map_err(AdminServiceStoreError::InvalidStateError)?,
                     )
                     .build()
-                    .map_err(AdminServiceEventStoreError::InvalidStateError)?;
+                    .map_err(AdminServiceStoreError::InvalidStateError)?;
                 events.push(AdminServiceEvent::try_from((event_model, proposal))?)
             }
             // Ensure the events are returned in a deterministic order, ascending by event ID
-            events.sort_by_key(|a| a.event_id);
+            events.sort_by_key(|a| *a.event_id());
 
             Ok(Box::new(events.into_iter()))
         })

@@ -151,3 +151,106 @@ allow_tables_to_appear_in_same_query!(
     circuit_member,
     node_endpoint
 );
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_service_event (id) {
+        id -> Int8,
+        event_type -> Text,
+        data -> Nullable<Binary>,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_circuit_proposal (event_id) {
+        event_id -> Int8,
+        proposal_type -> Text,
+        circuit_id -> Text,
+        circuit_hash -> Text,
+        requester -> Binary,
+        requester_node_id -> Text,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_proposed_circuit (event_id) {
+        event_id -> Int8,
+        circuit_id -> Text,
+        authorization_type -> Text,
+        persistence -> Text,
+        durability -> Text,
+        routes -> Text,
+        circuit_management_type -> Text,
+        application_metadata -> Nullable<Binary>,
+        comments -> Nullable<Text>,
+        display_name -> Nullable<Text>,
+        circuit_version -> Integer,
+        circuit_status -> SmallInt,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_vote_record (event_id, voter_node_id) {
+        event_id -> Int8,
+        public_key -> Binary,
+        vote -> Text,
+        voter_node_id -> Text,
+        position -> Integer,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_proposed_node (event_id, node_id) {
+        event_id -> Int8,
+        node_id -> Text,
+        position -> Integer,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_proposed_node_endpoint (event_id, node_id, endpoint) {
+        event_id -> Int8,
+        node_id -> Text,
+        endpoint -> Text,
+        position -> Integer,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_proposed_service (event_id, service_id) {
+        event_id -> Int8,
+        service_id -> Text,
+        service_type -> Text,
+        node_id -> Text,
+        position -> Integer,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+table! {
+    admin_event_proposed_service_argument (event_id, service_id, key) {
+        event_id -> Int8,
+        service_id -> Text,
+        key -> Text,
+        value -> Text,
+        position -> Integer,
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+allow_tables_to_appear_in_same_query!(
+    admin_service_event,
+    admin_event_proposed_circuit,
+    admin_event_proposed_node,
+    admin_event_proposed_node_endpoint,
+    admin_event_proposed_service,
+    admin_event_proposed_service_argument,
+    admin_event_vote_record,
+    admin_event_circuit_proposal,
+);

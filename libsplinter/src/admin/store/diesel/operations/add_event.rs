@@ -12,53 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides the "add event" operation for the `DieselAdminServiceEventStore`.
+//! Provides the "add event" operation for the `DieselAdminServiceStore`.
 
 use std::convert::TryFrom;
 
 use diesel::{dsl::insert_into, prelude::*};
 
-use super::AdminServiceEventStoreOperations;
+use super::AdminServiceStoreOperations;
 
 use crate::admin::service::messages;
-use crate::admin::store::events::{
-    store::{
-        diesel::{
-            models::{
-                AdminEventCircuitProposalModel, AdminEventProposedCircuitModel,
-                AdminEventProposedNodeEndpointModel, AdminEventProposedNodeModel,
-                AdminEventProposedServiceArgumentModel, AdminEventProposedServiceModel,
-                AdminEventVoteRecordModel, AdminServiceEventModel, NewAdminServiceEventModel,
-            },
-            schema::{
-                admin_event_circuit_proposal, admin_event_proposed_circuit,
-                admin_event_proposed_node, admin_event_proposed_node_endpoint,
-                admin_event_proposed_service, admin_event_proposed_service_argument,
-                admin_event_vote_record, admin_service_event,
-            },
+use crate::admin::store::{
+    diesel::{
+        models::{
+            AdminEventCircuitProposalModel, AdminEventProposedCircuitModel,
+            AdminEventProposedNodeEndpointModel, AdminEventProposedNodeModel,
+            AdminEventProposedServiceArgumentModel, AdminEventProposedServiceModel,
+            AdminEventVoteRecordModel, AdminServiceEventModel, NewAdminServiceEventModel,
         },
-        AdminServiceEventStoreError,
+        schema::{
+            admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
+            admin_event_proposed_node_endpoint, admin_event_proposed_service,
+            admin_event_proposed_service_argument, admin_event_vote_record, admin_service_event,
+        },
     },
-    AdminServiceEvent,
+    AdminServiceEvent, AdminServiceStoreError,
 };
 
 use crate::error::{ConstraintViolationError, ConstraintViolationType};
 
-pub(in crate::admin::store::events::store::diesel) trait AdminServiceEventStoreAddEventOperation {
+pub(in crate::admin::store::diesel) trait AdminServiceStoreAddEventOperation {
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
-    ) -> Result<AdminServiceEvent, AdminServiceEventStoreError>;
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError>;
 }
 
 #[cfg(feature = "admin-service-event-store-postgres")]
-impl<'a> AdminServiceEventStoreAddEventOperation
-    for AdminServiceEventStoreOperations<'a, diesel::pg::PgConnection>
+impl<'a> AdminServiceStoreAddEventOperation
+    for AdminServiceStoreOperations<'a, diesel::pg::PgConnection>
 {
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
-    ) -> Result<AdminServiceEvent, AdminServiceEventStoreError> {
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
         self.conn.transaction::<AdminServiceEvent, _, _>(|| {
             // Create a `NewAdminServiceEventModel` from the event
             let new_event: NewAdminServiceEventModel = NewAdminServiceEventModel::from(&event);
@@ -78,7 +74,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
                 .optional()?
                 .is_some()
             {
-                return Err(AdminServiceEventStoreError::ConstraintViolationError(
+                return Err(AdminServiceStoreError::ConstraintViolationError(
                     ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
                 ));
             }
@@ -133,19 +129,19 @@ impl<'a> AdminServiceEventStoreAddEventOperation
                 .execute(self.conn)?;
 
             AdminServiceEvent::try_from((event_id, &event))
-                .map_err(AdminServiceEventStoreError::InvalidStateError)
+                .map_err(AdminServiceStoreError::InvalidStateError)
         })
     }
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> AdminServiceEventStoreAddEventOperation
-    for AdminServiceEventStoreOperations<'a, diesel::sqlite::SqliteConnection>
+impl<'a> AdminServiceStoreAddEventOperation
+    for AdminServiceStoreOperations<'a, diesel::sqlite::SqliteConnection>
 {
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
-    ) -> Result<AdminServiceEvent, AdminServiceEventStoreError> {
+    ) -> Result<AdminServiceEvent, AdminServiceStoreError> {
         self.conn.transaction::<AdminServiceEvent, _, _>(|| {
             // Create a `NewAdminServiceEventModel` from the event
             let new_event: NewAdminServiceEventModel = NewAdminServiceEventModel::from(&event);
@@ -171,7 +167,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
                 .optional()?
                 .is_some()
             {
-                return Err(AdminServiceEventStoreError::ConstraintViolationError(
+                return Err(AdminServiceStoreError::ConstraintViolationError(
                     ConstraintViolationError::with_violation_type(ConstraintViolationType::Unique),
                 ));
             }
@@ -226,7 +222,7 @@ impl<'a> AdminServiceEventStoreAddEventOperation
                 .execute(self.conn)?;
 
             AdminServiceEvent::try_from((event_id, &event))
-                .map_err(AdminServiceEventStoreError::InvalidStateError)
+                .map_err(AdminServiceStoreError::InvalidStateError)
         })
     }
 }

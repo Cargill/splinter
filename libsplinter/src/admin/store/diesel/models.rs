@@ -27,12 +27,22 @@ use diesel::{
     sql_types::SmallInt,
 };
 
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::service::messages::{self, CreateCircuit};
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::store::diesel::schema::{
+    admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
+    admin_event_proposed_node_endpoint, admin_event_proposed_service,
+    admin_event_proposed_service_argument, admin_event_vote_record, admin_service_event,
+};
 use crate::admin::store::diesel::schema::{
     circuit, circuit_member, circuit_proposal, node_endpoint, proposed_circuit, proposed_node,
     proposed_node_endpoint, proposed_service, proposed_service_argument, service, service_argument,
     vote_record,
 };
 use crate::admin::store::error::AdminServiceStoreError;
+#[cfg(feature = "admin-service-event-store")]
+use crate::admin::store::{AdminServiceEvent, AdminServiceEventBuilder, EventType};
 use crate::admin::store::{
     AuthorizationType, CircuitStatus, DurabilityType, PersistenceType, ProposalType, RouteType,
     Vote, VoteRecord, VoteRecordBuilder,
@@ -466,6 +476,443 @@ pub struct NodeEndpointModel {
     pub endpoint: String,
 }
 
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of an `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_service_event"]
+#[primary_key(id)]
+pub struct AdminServiceEventModel {
+    pub id: i64,
+    pub event_type: String,
+    pub data: Option<Vec<u8>>,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+#[derive(AsChangeset, Insertable, PartialEq, Debug)]
+#[table_name = "admin_service_event"]
+pub struct NewAdminServiceEventModel<'a> {
+    pub event_type: &'a str,
+    pub data: Option<&'a [u8]>,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of a `CircuitProposal` from an `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_circuit_proposal"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id)]
+pub struct AdminEventCircuitProposalModel {
+    pub event_id: i64,
+    pub proposal_type: String,
+    pub circuit_id: String,
+    pub circuit_hash: String,
+    pub requester: Vec<u8>,
+    pub requester_node_id: String,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl From<(i64, &messages::CircuitProposal)> for AdminEventCircuitProposalModel {
+    fn from((event_id, proposal): (i64, &messages::CircuitProposal)) -> Self {
+        AdminEventCircuitProposalModel {
+            event_id,
+            proposal_type: String::from(&proposal.proposal_type),
+            circuit_id: proposal.circuit_id.to_string(),
+            circuit_hash: proposal.circuit_hash.to_string(),
+            requester: proposal.requester.to_vec(),
+            requester_node_id: proposal.requester_node_id.to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of a `CreateCircuit` from an `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_proposed_circuit"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id)]
+pub struct AdminEventProposedCircuitModel {
+    pub event_id: i64,
+    pub circuit_id: String,
+    pub authorization_type: String,
+    pub persistence: String,
+    pub durability: String,
+    pub routes: String,
+    pub circuit_management_type: String,
+    pub application_metadata: Option<Vec<u8>>,
+    pub comments: Option<String>,
+    pub display_name: Option<String>,
+    pub circuit_version: i32,
+    pub circuit_status: CircuitStatusModel,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
+    fn from((event_id, create_circuit): (i64, &CreateCircuit)) -> Self {
+        let application_metadata = if create_circuit.application_metadata.is_empty() {
+            None
+        } else {
+            Some(create_circuit.application_metadata.to_vec())
+        };
+
+        AdminEventProposedCircuitModel {
+            event_id,
+            circuit_id: create_circuit.circuit_id.to_string(),
+            authorization_type: String::from(&create_circuit.authorization_type),
+            persistence: String::from(&create_circuit.persistence),
+            durability: String::from(&create_circuit.durability),
+            routes: String::from(&create_circuit.routes),
+            circuit_management_type: create_circuit.circuit_management_type.to_string(),
+            application_metadata,
+            comments: create_circuit.comments.clone(),
+            display_name: create_circuit.display_name.clone(),
+            circuit_version: create_circuit.circuit_version,
+            circuit_status: CircuitStatusModel::from(&create_circuit.circuit_status),
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of a `VoteRecord` from an `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_vote_record"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id, voter_node_id)]
+pub struct AdminEventVoteRecordModel {
+    pub event_id: i64,
+    pub public_key: Vec<u8>,
+    pub vote: String,
+    pub voter_node_id: String,
+    pub position: i32,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl AdminEventVoteRecordModel {
+    // Creates a list of `AdminEventVoteRecordModel` from a `CircuitProposal` associated with
+    // an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Result<Vec<AdminEventVoteRecordModel>, AdminServiceStoreError> {
+        proposal
+            .votes
+            .iter()
+            .enumerate()
+            .map(|(idx, vote)| {
+                Ok(AdminEventVoteRecordModel {
+                    event_id,
+                    public_key: vote.public_key.to_vec(),
+                    vote: String::from(&vote.vote),
+                    voter_node_id: vote.voter_node_id.to_string(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
+            })
+            .collect()
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
+    type Error = InvalidStateError;
+    fn try_from(
+        admin_event_vote_record_model: &AdminEventVoteRecordModel,
+    ) -> Result<Self, Self::Error> {
+        VoteRecordBuilder::new()
+            .with_public_key(&admin_event_vote_record_model.public_key)
+            .with_vote(
+                &Vote::try_from(admin_event_vote_record_model.vote.clone()).map_err(|_| {
+                    InvalidStateError::with_message("Unable to convert string to Vote".into())
+                })?,
+            )
+            .with_voter_node_id(&admin_event_vote_record_model.voter_node_id)
+            .build()
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of a `AdminEventProposedNode` from an `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_proposed_node"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id, node_id)]
+pub struct AdminEventProposedNodeModel {
+    pub event_id: i64,
+    pub node_id: String,
+    pub position: i32,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl AdminEventProposedNodeModel {
+    // Creates a list of `AdminEventProposedNodeModel` from a `CircuitProposal` associated with
+    // an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Result<Vec<AdminEventProposedNodeModel>, AdminServiceStoreError> {
+        proposal
+            .circuit
+            .members
+            .iter()
+            .enumerate()
+            .map(|(idx, node)| {
+                Ok(AdminEventProposedNodeModel {
+                    event_id,
+                    node_id: node.node_id.to_string(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
+            })
+            .collect()
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of the endpoint values associated with a `ProposedNode` from an
+/// `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_proposed_node_endpoint"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id, node_id, endpoint)]
+pub struct AdminEventProposedNodeEndpointModel {
+    pub event_id: i64,
+    pub node_id: String,
+    pub endpoint: String,
+    pub position: i32,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl AdminEventProposedNodeEndpointModel {
+    // Creates a list of `AdminEventProposedNodeEndpointModel` from a `CircuitProposal` associated
+    // with an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Result<Vec<AdminEventProposedNodeEndpointModel>, AdminServiceStoreError> {
+        let mut endpoint_models = Vec::new();
+        for node in &proposal.circuit.members {
+            endpoint_models.extend(
+                node.endpoints
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, endpoint)| Ok(AdminEventProposedNodeEndpointModel {
+                        event_id,
+                        node_id: node.node_id.to_string(),
+                        endpoint: endpoint.to_string(),
+                        position: i32::try_from(idx).map_err(|_| {
+                            AdminServiceStoreError::InternalError(InternalError::with_message(
+                                "Unable to convert index into i32".to_string(),
+                            ))
+                        })?,
+                    }))
+                    .collect::<Result<
+                        Vec<AdminEventProposedNodeEndpointModel>, AdminServiceStoreError>
+                    >()?,
+            );
+        }
+        Ok(endpoint_models)
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of a `ProposedService` from an `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_proposed_service"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id, service_id)]
+pub struct AdminEventProposedServiceModel {
+    pub event_id: i64,
+    pub service_id: String,
+    pub service_type: String,
+    pub node_id: String,
+    pub position: i32,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl AdminEventProposedServiceModel {
+    // Creates a list of `AdminEventProposedServiceModel` from a `CircuitProposal` associated
+    // with an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Result<Vec<AdminEventProposedServiceModel>, AdminServiceStoreError> {
+        proposal
+            .circuit
+            .roster
+            .iter()
+            .enumerate()
+            .map(|(idx, service)| {
+                Ok(AdminEventProposedServiceModel {
+                    event_id,
+                    service_id: service.service_id.to_string(),
+                    service_type: service.service_type.to_string(),
+                    node_id: service
+                        .allowed_nodes
+                        .get(0)
+                        .ok_or_else(|| {
+                            AdminServiceStoreError::InvalidStateError(
+                                InvalidStateError::with_message(
+                                    "Must contain 1 node ID".to_string(),
+                                ),
+                            )
+                        })?
+                        .to_string(),
+                    position: i32::try_from(idx).map_err(|_| {
+                        AdminServiceStoreError::InternalError(InternalError::with_message(
+                            "Unable to convert index into i32".to_string(),
+                        ))
+                    })?,
+                })
+            })
+            .collect::<Result<Vec<AdminEventProposedServiceModel>, AdminServiceStoreError>>()
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+/// Database model representation of the arguments associated with a `ProposedService` from an
+/// `AdminServiceEvent`
+#[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
+#[table_name = "admin_event_proposed_service_argument"]
+#[belongs_to(AdminServiceEventModel, foreign_key = "event_id")]
+#[primary_key(event_id, service_id, key)]
+pub struct AdminEventProposedServiceArgumentModel {
+    pub event_id: i64,
+    pub service_id: String,
+    pub key: String,
+    pub value: String,
+    pub position: i32,
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl AdminEventProposedServiceArgumentModel {
+    // Creates a list of `AdminEventProposedServiceArgumentModel` from a `CircuitProposal` associated
+    // with an `AdminServiceEvent`
+    pub(super) fn list_from_proposal_with_id(
+        event_id: i64,
+        proposal: &messages::CircuitProposal,
+    ) -> Result<Vec<AdminEventProposedServiceArgumentModel>, AdminServiceStoreError> {
+        let mut service_arguments = Vec::new();
+        for service in &proposal.circuit.roster {
+            service_arguments.extend(
+                service
+                    .arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, (key, value))| {
+                        Ok(AdminEventProposedServiceArgumentModel {
+                            event_id,
+                            service_id: service.service_id.to_string(),
+                            key: key.into(),
+                            value: value.into(),
+                            position: i32::try_from(idx).map_err(|_| {
+                                AdminServiceStoreError::InternalError(
+                                    InternalError::with_message(
+                                        "Unable to convert index into i32".to_string(),
+                                    ),
+                                )
+                            })?,
+                        })
+                    })
+                    .collect::<Result<
+                        Vec<AdminEventProposedServiceArgumentModel>,
+                        AdminServiceStoreError,
+                    >>()?,
+            );
+        }
+        Ok(service_arguments)
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl<'a> From<&'a messages::AdminServiceEvent> for NewAdminServiceEventModel<'a> {
+    fn from(event: &'a messages::AdminServiceEvent) -> Self {
+        match event {
+            messages::AdminServiceEvent::ProposalSubmitted(_) => NewAdminServiceEventModel {
+                event_type: "ProposalSubmitted",
+                data: None,
+            },
+            messages::AdminServiceEvent::ProposalVote((_, data)) => NewAdminServiceEventModel {
+                event_type: "ProposalVote",
+                data: Some(data),
+            },
+            messages::AdminServiceEvent::ProposalAccepted((_, data)) => NewAdminServiceEventModel {
+                event_type: "ProposalAccepted",
+                data: Some(data),
+            },
+            messages::AdminServiceEvent::ProposalRejected((_, data)) => NewAdminServiceEventModel {
+                event_type: "ProposalRejected",
+                data: Some(data),
+            },
+            messages::AdminServiceEvent::CircuitReady(_) => NewAdminServiceEventModel {
+                event_type: "CircuitReady",
+                data: None,
+            },
+            messages::AdminServiceEvent::CircuitDisbanded(_) => NewAdminServiceEventModel {
+                event_type: "CircuitDisbanded",
+                data: None,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl TryFrom<(AdminServiceEventModel, CircuitProposal)> for AdminServiceEvent {
+    type Error = AdminServiceStoreError;
+
+    fn try_from(
+        (event_model, proposal): (AdminServiceEventModel, CircuitProposal),
+    ) -> Result<Self, Self::Error> {
+        match (event_model.event_type.as_ref(), event_model.data) {
+            ("ProposalSubmitted", None) => AdminServiceEventBuilder::new()
+                .with_event_id(event_model.id)
+                .with_event_type(&EventType::ProposalSubmitted)
+                .with_proposal(&proposal)
+                .build()
+                .map_err(AdminServiceStoreError::InvalidStateError),
+            ("ProposalVote", Some(requester)) => AdminServiceEventBuilder::new()
+                .with_event_id(event_model.id)
+                .with_event_type(&EventType::ProposalVote { requester })
+                .with_proposal(&proposal)
+                .build()
+                .map_err(AdminServiceStoreError::InvalidStateError),
+            ("ProposalAccepted", Some(requester)) => AdminServiceEventBuilder::new()
+                .with_event_id(event_model.id)
+                .with_event_type(&EventType::ProposalAccepted { requester })
+                .with_proposal(&proposal)
+                .build()
+                .map_err(AdminServiceStoreError::InvalidStateError),
+            ("ProposalRejected", Some(requester)) => AdminServiceEventBuilder::new()
+                .with_event_id(event_model.id)
+                .with_event_type(&EventType::ProposalRejected { requester })
+                .with_proposal(&proposal)
+                .build()
+                .map_err(AdminServiceStoreError::InvalidStateError),
+            ("CircuitReady", None) => AdminServiceEventBuilder::new()
+                .with_event_id(event_model.id)
+                .with_event_type(&EventType::CircuitReady)
+                .with_proposal(&proposal)
+                .build()
+                .map_err(AdminServiceStoreError::InvalidStateError),
+            ("CircuitDisbanded", None) => AdminServiceEventBuilder::new()
+                .with_event_id(event_model.id)
+                .with_event_type(&EventType::CircuitDisbanded)
+                .with_proposal(&proposal)
+                .build()
+                .map_err(AdminServiceStoreError::InvalidStateError),
+            _ => Err(AdminServiceStoreError::InvalidStateError(
+                InvalidStateError::with_message(
+                    "Unable to convert AdminServiceEventModel to AdminServiceEvent".into(),
+                ),
+            )),
+        }
+    }
+}
+
 // All enums associated with the above structs have TryFrom and From implemented in order to
 // translate the enums to a `Text` representation to be stored in the database.
 
@@ -487,6 +934,16 @@ impl From<&Vote> for String {
         match variant {
             Vote::Accept => String::from("Accept"),
             Vote::Reject => String::from("Reject"),
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::Vote> for String {
+    fn from(variant: &messages::Vote) -> Self {
+        match variant {
+            messages::Vote::Accept => String::from("Accept"),
+            messages::Vote::Reject => String::from("Reject"),
         }
     }
 }
@@ -519,6 +976,19 @@ impl From<&ProposalType> for String {
     }
 }
 
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::ProposalType> for String {
+    fn from(variant: &messages::ProposalType) -> Self {
+        match variant {
+            messages::ProposalType::Create => String::from("Create"),
+            messages::ProposalType::UpdateRoster => String::from("UpdateRoster"),
+            messages::ProposalType::AddNode => String::from("AddNode"),
+            messages::ProposalType::RemoveNode => String::from("RemoveNode"),
+            messages::ProposalType::Disband => String::from("Disband"),
+        }
+    }
+}
+
 impl TryFrom<String> for AuthorizationType {
     type Error = AdminServiceStoreError;
     fn try_from(variant: String) -> Result<Self, Self::Error> {
@@ -537,6 +1007,15 @@ impl From<&AuthorizationType> for String {
     fn from(variant: &AuthorizationType) -> Self {
         match variant {
             AuthorizationType::Trust => String::from("Trust"),
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::AuthorizationType> for String {
+    fn from(variant: &messages::AuthorizationType) -> Self {
+        match variant {
+            messages::AuthorizationType::Trust => String::from("Trust"),
         }
     }
 }
@@ -563,6 +1042,15 @@ impl From<&PersistenceType> for String {
     }
 }
 
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::PersistenceType> for String {
+    fn from(variant: &messages::PersistenceType) -> Self {
+        match variant {
+            messages::PersistenceType::Any => String::from("Any"),
+        }
+    }
+}
+
 impl TryFrom<String> for DurabilityType {
     type Error = AdminServiceStoreError;
     fn try_from(variant: String) -> Result<Self, Self::Error> {
@@ -581,6 +1069,15 @@ impl From<&DurabilityType> for String {
     fn from(variant: &DurabilityType) -> Self {
         match variant {
             DurabilityType::NoDurability => String::from("NoDurability"),
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::DurabilityType> for String {
+    fn from(variant: &messages::DurabilityType) -> Self {
+        match variant {
+            messages::DurabilityType::NoDurability => String::from("NoDurability"),
         }
     }
 }
@@ -605,6 +1102,15 @@ impl From<&RouteType> for String {
     }
 }
 
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::RouteType> for String {
+    fn from(variant: &messages::RouteType) -> Self {
+        match variant {
+            messages::RouteType::Any => String::from("Any"),
+        }
+    }
+}
+
 #[repr(i16)]
 #[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
 pub enum CircuitStatusModel {
@@ -623,12 +1129,34 @@ impl From<&CircuitStatus> for CircuitStatusModel {
     }
 }
 
+#[cfg(feature = "admin-service-event-store")]
+impl From<&messages::CircuitStatus> for CircuitStatusModel {
+    fn from(messages_status: &messages::CircuitStatus) -> Self {
+        match *messages_status {
+            messages::CircuitStatus::Active => CircuitStatusModel::Active,
+            messages::CircuitStatus::Disbanded => CircuitStatusModel::Disbanded,
+            messages::CircuitStatus::Abandoned => CircuitStatusModel::Abandoned,
+        }
+    }
+}
+
 impl From<&CircuitStatusModel> for CircuitStatus {
     fn from(status_model: &CircuitStatusModel) -> Self {
         match *status_model {
             CircuitStatusModel::Active => CircuitStatus::Active,
             CircuitStatusModel::Disbanded => CircuitStatus::Disbanded,
             CircuitStatusModel::Abandoned => CircuitStatus::Abandoned,
+        }
+    }
+}
+
+#[cfg(feature = "admin-service-event-store")]
+impl From<&CircuitStatusModel> for messages::CircuitStatus {
+    fn from(status_model: &CircuitStatusModel) -> Self {
+        match *status_model {
+            CircuitStatusModel::Active => messages::CircuitStatus::Active,
+            CircuitStatusModel::Disbanded => messages::CircuitStatus::Disbanded,
+            CircuitStatusModel::Abandoned => messages::CircuitStatus::Abandoned,
         }
     }
 }
