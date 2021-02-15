@@ -15,13 +15,12 @@
 //! Provides the "update node" operation for the `DieselRegistry`.
 
 use diesel::{
-    dsl::{delete, insert_into, update},
+    dsl::{delete, insert_into, not, update},
     prelude::*,
 };
 
 use crate::error::InvalidStateError;
 use crate::registry::{
-    check_node_required_fields_are_not_empty,
     diesel::{
         models::{NodeEndpointsModel, NodeKeysModel, NodeMetadataModel, NodesModel},
         schema::{
@@ -40,11 +39,6 @@ pub(in crate::registry::diesel) trait RegistryUpdateNodeOperation {
 #[cfg(feature = "postgres")]
 impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::pg::PgConnection> {
     fn update_node(&self, node: Node) -> Result<(), RegistryError> {
-        // Verify that the node's required fields are non-empty
-        check_node_required_fields_are_not_empty(&node).map_err(|err| {
-            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
-        })?;
-
         self.conn.transaction::<(), _, _>(|| {
             // Verify that the node's endpoints are unique.
             let filters = node
@@ -55,6 +49,7 @@ impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
 
             let duplicate_endpoint = splinter_nodes_endpoints::table
                 .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
+                .filter(not(splinter_nodes_endpoints::identity.eq(&node.identity)))
                 .first::<NodeEndpointsModel>(self.conn)
                 .optional()?;
 
@@ -130,11 +125,6 @@ impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::pg::PgCo
 #[cfg(feature = "sqlite")]
 impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::sqlite::SqliteConnection> {
     fn update_node(&self, node: Node) -> Result<(), RegistryError> {
-        // Verify that the node's required fields are non-empty
-        check_node_required_fields_are_not_empty(&node).map_err(|err| {
-            RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
-        })?;
-
         self.conn.transaction::<(), _, _>(|| {
             // Verify that the node's endpoints are unique.
             let filters = node
@@ -145,6 +135,7 @@ impl<'a> RegistryUpdateNodeOperation for RegistryOperations<'a, diesel::sqlite::
 
             let duplicate_endpoint = splinter_nodes_endpoints::table
                 .filter(splinter_nodes_endpoints::endpoint.eq_any(filters))
+                .filter(not(splinter_nodes_endpoints::identity.eq(&node.identity)))
                 .first::<NodeEndpointsModel>(self.conn)
                 .optional()?;
 

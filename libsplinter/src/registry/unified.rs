@@ -141,18 +141,18 @@ impl RegistryReader for UnifiedRegistry {
         self.list_nodes(predicates).map(|iter| iter.count() as u32)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         // Get node from all read-only sources
         Ok(self
             .external_sources
             .iter()
-            .map(|registry| registry.fetch_node(identity))
+            .map(|registry| registry.get_node(identity))
             // Reverse the sources, so lowest precedence is first
             .rev()
             // Get node from the internal source and add it to the end, since it has highest
             // precedence
-            .chain(std::iter::once(self.internal_source.fetch_node(identity)))
-            // Log any errors from the `fetch_node` calls and ignore the failing registries
+            .chain(std::iter::once(self.internal_source.get_node(identity)))
+            // Log any errors from the `get_node` calls and ignore the failing registries
             .filter_map(|res| {
                 res.map_err(|err| debug!("Failed to fetch node from source registry: {}", err))
                     .ok()
@@ -320,7 +320,7 @@ mod test {
 
     /// Verify that a node is fetched from a read-only source if it only exists there.
     #[test]
-    fn fetch_node_read_only() {
+    fn get_node_read_only() {
         let node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
 
         let readable = MemRegistry::default();
@@ -332,7 +332,7 @@ mod test {
             UnifiedRegistry::new(Box::new(MemRegistry::default()), vec![Box::new(readable)]);
 
         let retreived_node = unified
-            .fetch_node("node1")
+            .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
@@ -341,7 +341,7 @@ mod test {
 
     /// Verify that a node is fetched from the internal source if it only exists there.
     #[test]
-    fn fetch_node_internal() {
+    fn get_node_internal() {
         let node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
 
         let writable = MemRegistry::default();
@@ -353,7 +353,7 @@ mod test {
             UnifiedRegistry::new(Box::new(writable), vec![Box::new(MemRegistry::default())]);
 
         let retreived_node = unified
-            .fetch_node("node1")
+            .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
@@ -369,7 +369,7 @@ mod test {
     /// 3. Fetch the node and verify that it has the correct data (endpoint from highest-precedence
     ///    registry, metadata merged from all registries).
     #[test]
-    fn fetch_node_read_only_precedence() {
+    fn get_node_read_only_precedence() {
         let high_precedence_node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
         let med_precedence_node = new_node("node1", "endpoint2", &[("meta_b", "val_b")]);
         let low_precedence_node = new_node("node1", "endpoint3", &[("meta_a", "val_c")]);
@@ -404,7 +404,7 @@ mod test {
         );
 
         let retreived_node = unified
-            .fetch_node("node1")
+            .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
@@ -420,7 +420,7 @@ mod test {
     /// 3. Fetch the node and verify that it has the correct data (endpoints from internal registry,
     ///    metadata merged from all sources).
     #[test]
-    fn fetch_node_internal_precedence() {
+    fn get_node_internal_precedence() {
         let high_precedence_node = new_node("node1", "endpoint1", &[("meta_a", "val_a")]);
         let med_precedence_node = new_node("node1", "endpoint2", &[("meta_b", "val_b")]);
         let low_precedence_node = new_node("node1", "endpoint3", &[("meta_a", "val_c")]);
@@ -454,7 +454,7 @@ mod test {
         );
 
         let retreived_node = unified
-            .fetch_node("node1")
+            .get_node("node1")
             .expect("Unable to fetch node")
             .expect("Node not found");
 
@@ -687,7 +687,7 @@ mod test {
             self.list_nodes(predicates).map(|iter| iter.count() as u32)
         }
 
-        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+        fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()

@@ -33,7 +33,7 @@ use super::{
 use operations::add_node::RegistryAddNodeOperation as _;
 use operations::count_nodes::RegistryCountNodesOperation as _;
 use operations::delete_node::RegistryDeleteNodeOperation as _;
-use operations::fetch_node::RegistryFetchNodeOperation as _;
+use operations::get_node::RegistryFetchNodeOperation as _;
 use operations::has_node::RegistryHasNodeOperation as _;
 use operations::insert_node::RegistryInsertNodeOperation as _;
 use operations::list_nodes::RegistryListNodesOperation as _;
@@ -93,8 +93,8 @@ where
         RegistryOperations::new(&*self.connection_pool.get()?).count_nodes(predicates)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).fetch_node(identity)
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+        RegistryOperations::new(&*self.connection_pool.get()?).get_node(identity)
     }
 
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
@@ -203,7 +203,7 @@ pub mod tests {
             .insert_node(get_node_1())
             .expect("Unable to insert node");
         let node = registry
-            .fetch_node(&get_node_1().identity)
+            .get_node(&get_node_1().identity)
             .expect("Failed to fetch node")
             .expect("Node not found");
 
@@ -230,20 +230,68 @@ pub mod tests {
             .add_node(get_node_1())
             .expect("Unable to insert node");
         let node = registry
-            .fetch_node(&get_node_1().identity)
+            .get_node(&get_node_1().identity)
             .expect("Failed to fetch node")
             .expect("Node not found");
 
         assert_eq!(node, get_node_1());
     }
 
+    /// Verifies that `update_node` properly updates a node
+    ///
+    /// 1. Setup sqlite database
+    /// 2. Insert node 1
+    /// 3. Verify updating node 1 works (with no updates)
+    /// 4. Insert node 2
+    /// 5. Verify updating node 2 with one of node 1 endpoints fails
+    #[test]
+    fn test_update_node() {
+        let pool = create_connection_pool_and_migrate();
+        let registry = DieselRegistry::new(pool);
+
+        registry
+            .add_node(get_node_1())
+            .expect("Unable to insert node");
+
+        let mut node = registry
+            .get_node(&get_node_1().identity)
+            .expect("Failed to fetch node")
+            .expect("Node not found");
+
+        assert_eq!(node, get_node_1());
+
+        node.display_name = "Changed Name".to_string();
+
+        registry
+            .update_node(node.clone())
+            .expect("Unable to update node 1");
+
+        let updated_node = registry
+            .get_node(&get_node_1().identity)
+            .expect("Failed to fetch node")
+            .expect("Node not found");
+
+        assert_eq!(updated_node, node);
+
+        registry
+            .add_node(get_node_2())
+            .expect("Unable to insert node 2");
+
+        let mut node = get_node_2();
+        // add node 1 endpoint
+        node.endpoints.push("tcps://12.0.0.123:8431".to_string());
+
+        // This should fail becasue the added endpoint already belongs to node 1
+        assert!(registry.update_node(node).is_err());
+    }
+
     ///  Test that a new node can be inserted into the registry and fetched
     ///
     /// 1. Setup sqlite database
     /// 2. Insert node 1 and 2
-    /// 3. Try to fetch that does not exist
+    /// 3. Try to get that does not exist
     #[test]
-    fn test_fetch_node_not_found() {
+    fn test_get_node_not_found() {
         let pool = create_connection_pool_and_migrate();
         let registry = DieselRegistry::new(pool);
 
@@ -256,7 +304,7 @@ pub mod tests {
 
         assert_eq!(
             registry
-                .fetch_node("DoesNotExist")
+                .get_node("DoesNotExist")
                 .expect("Failed to fetch node"),
             None
         )

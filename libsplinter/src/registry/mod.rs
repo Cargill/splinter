@@ -47,17 +47,17 @@ pub use yaml::{RemoteYamlRegistry, RemoteYamlShutdownHandle};
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Node {
     /// The Splinter identity of the node; must be non-empty and unique in the registry.
-    pub identity: String,
+    identity: String,
     /// The endpoints the node can be reached at; at least one endpoint must be provided, and each
     /// endpoint must be non-empty and unique in the registry.
-    pub endpoints: Vec<String>,
+    endpoints: Vec<String>,
     /// A human-readable name for the node; must be non-empty.
-    pub display_name: String,
+    display_name: String,
     /// The list of public keys that are permitted to act on behalf of the node; at least one key
     /// must be provided, and each key must be non-empty.
-    pub keys: Vec<String>,
+    keys: Vec<String>,
     /// A map with node metadata.
-    pub metadata: HashMap<String, String>,
+    metadata: HashMap<String, String>,
 }
 
 impl Node {
@@ -69,6 +69,31 @@ impl Node {
     /// Returns `true` if the given key is listed for the node; returns `false` otherwise.
     pub fn has_key(&self, key: &str) -> bool {
         self.keys.iter().any(|node_key| node_key == key)
+    }
+
+    /// The Splinter identity of the node;
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    /// The endpoints the node can be reached at
+    pub fn endpoints(&self) -> &[String] {
+        &self.endpoints
+    }
+
+    /// A human-readable name for the node
+    pub fn display_name(&self) -> &str {
+        &self.display_name
+    }
+
+    /// The list of public keys that are permitted to act on behalf of the node
+    pub fn keys(&self) -> &[String] {
+        &self.keys
+    }
+
+    /// A map with node metadata.
+    pub fn metadata(&self) -> &HashMap<String, String> {
+        &self.metadata
     }
 }
 
@@ -242,7 +267,7 @@ pub trait RegistryReader: Send + Sync {
     /// # Arguments
     ///
     ///  * `identity` - The identity of the node.
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError>;
 
     /// Determines whether or not the node exists in the registry.
     ///
@@ -250,7 +275,7 @@ pub trait RegistryReader: Send + Sync {
     ///
     ///  * `identity` - The identity of the node.
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {
-        self.fetch_node(identity).map(|opt| opt.is_some())
+        self.get_node(identity).map(|opt| opt.is_some())
     }
 }
 
@@ -323,8 +348,8 @@ where
         (**self).count_nodes(predicates)
     }
 
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
-        (**self).fetch_node(identity)
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+        (**self).get_node(identity)
     }
 
     fn has_node(&self, identity: &str) -> Result<bool, RegistryError> {

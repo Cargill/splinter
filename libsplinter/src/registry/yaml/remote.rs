@@ -157,7 +157,7 @@ impl RemoteYamlRegistry {
 }
 
 impl RegistryReader for RemoteYamlRegistry {
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         Ok(self
             .get_nodes()?
             .into_iter()
@@ -576,7 +576,7 @@ mod tests {
 
         let expected_node = mock_registry().pop().expect("Failed to get expected node");
         let node = remote_registry
-            .fetch_node(&expected_node.identity)
+            .get_node(&expected_node.identity)
             .expect("Failed to fetch node")
             .expect("Node not found");
         assert_eq!(node, expected_node);
@@ -595,7 +595,7 @@ mod tests {
                 .expect("Failed to create registry");
 
         assert!(remote_registry
-            .fetch_node("NodeNotInRegistry")
+            .get_node("NodeNotInRegistry")
             .expect("Failed to fetch node")
             .is_none());
 

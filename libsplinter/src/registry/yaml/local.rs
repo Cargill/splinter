@@ -96,7 +96,7 @@ impl LocalYamlRegistry {
 }
 
 impl RegistryReader for LocalYamlRegistry {
-    fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+    fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
         Ok(self
             .get_nodes()?
             .iter()
@@ -574,11 +574,11 @@ mod test {
     }
 
     ///
-    /// Verifies that fetch_node with a valid identity, returns the correct node.
+    /// Verifies that get_node with a valid identity, returns the correct node.
     ///
     #[test]
-    fn test_fetch_node_ok() {
-        let temp_dir = TempDir::new("test_fetch_node_ok").expect("Failed to create temp dir");
+    fn test_get_node_ok() {
+        let temp_dir = TempDir::new("test_get_node_ok").expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -591,19 +591,18 @@ mod test {
         let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
 
         let node = registry
-            .fetch_node(&get_node_1().identity)
+            .get_node(&get_node_1().identity)
             .expect("Failed to fetch node")
             .expect("Node not found");
         assert_eq!(node, get_node_1());
     }
 
     ///
-    /// Verifies that fetch_node with an invalid identity returns Ok(None)
+    /// Verifies that get_node with an invalid identity returns Ok(None)
     ///
     #[test]
-    fn test_fetch_node_not_found() {
-        let temp_dir =
-            TempDir::new("test_fetch_node_not_found").expect("Failed to create temp dir");
+    fn test_get_node_not_found() {
+        let temp_dir = TempDir::new("test_get_node_not_found").expect("Failed to create temp dir");
         let path = temp_dir
             .path()
             .join("registry.yaml")
@@ -615,7 +614,7 @@ mod test {
 
         let registry = LocalYamlRegistry::new(&path).expect("Failed to create LocalYamlRegistry");
 
-        let result = registry.fetch_node("NodeNotInRegistry");
+        let result = registry.get_node("NodeNotInRegistry");
         match result {
             Ok(None) => {}
             res => panic!("Should have gotten Ok(None) but got {:?}", res),

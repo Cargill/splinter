@@ -82,64 +82,57 @@ impl Action for RegistryGenerateAction {
             .values_of("key_files")
             .ok_or_else(|| CliError::ActionError("One or more key files must be specified".into()))?
             .map(|key_file| read_private_key(key_file))
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<Vec<String>, _>>()?;
 
-        let metadata = if let Some(metadata) = args.values_of("metadata") {
-            metadata
-                .map(|kv| {
-                    let mut kv_iter = kv.splitn(2, '=');
+        let mut node_builder = Node::builder(node_status.node_id.clone())
+            .with_keys(keys)
+            .with_endpoints(node_status.advertised_endpoints)
+            .with_display_name(node_status.display_name);
 
-                    let key = kv_iter
-                        .next()
-                        .expect("str::split cannot return an empty iterator")
-                        .to_string();
-                    if key.is_empty() {
-                        return Err(CliError::ActionError(
-                            "Empty '--metadata' argument detected".into(),
-                        ));
-                    }
+        if let Some(metadata) = args.values_of("metadata") {
+            for kv in metadata {
+                let mut kv_iter = kv.splitn(2, '=');
 
-                    let value = kv_iter
-                        .next()
-                        .ok_or_else(|| {
-                            CliError::ActionError(format!(
-                                "Missing value for metadata key '{}'",
-                                key
-                            ))
-                        })?
-                        .to_string();
-                    if value.is_empty() {
-                        return Err(CliError::ActionError(format!(
-                            "Empty value detected for metadata key '{}'",
-                            key
-                        )));
-                    }
+                let key = kv_iter
+                    .next()
+                    .expect("str::split cannot return an empty iterator")
+                    .to_string();
+                if key.is_empty() {
+                    return Err(CliError::ActionError(
+                        "Empty '--metadata' argument detected".into(),
+                    ));
+                }
 
-                    Ok((key, value))
-                })
-                .collect::<Result<_, _>>()?
-        } else {
-            Default::default()
-        };
+                let value = kv_iter
+                    .next()
+                    .ok_or_else(|| {
+                        CliError::ActionError(format!("Missing value for metadata key '{}'", key))
+                    })?
+                    .to_string();
+                if value.is_empty() {
+                    return Err(CliError::ActionError(format!(
+                        "Empty value detected for metadata key '{}'",
+                        key
+                    )));
+                }
+                node_builder = node_builder.with_metadata(key, value);
+            }
+        }
 
-        let node = Node {
-            identity: node_status.node_id.clone(),
-            endpoints: node_status.advertised_endpoints,
-            display_name: node_status.display_name,
-            keys,
-            metadata,
-        };
+        let node = node_builder
+            .build()
+            .map_err(|err| CliError::ActionError(format!("Unable to build node: {}", err)))?;
 
         if let Some(idx) = nodes
             .iter()
-            .position(|existing_node| existing_node.identity == node.identity)
+            .position(|existing_node| existing_node.identity() == node.identity())
         {
             if args.is_present("force") {
                 nodes.remove(idx);
             } else {
                 return Err(CliError::EnvironmentError(format!(
                     "Node '{}' already exists; must use '--force' to overwrite an existing node",
-                    node.identity
+                    node.identity()
                 )));
             }
         }

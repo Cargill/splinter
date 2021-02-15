@@ -560,7 +560,7 @@ mod tests {
             self.list_nodes(predicates).map(|iter| iter.count() as u32)
         }
 
-        fn fetch_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
+        fn get_node(&self, identity: &str) -> Result<Option<Node>, RegistryError> {
             Ok(self
                 .nodes
                 .lock()
