@@ -14,7 +14,7 @@
 
 //! Contains a `StoreFactory` trait, which is an abstract factory for building stores
 //! backed by a single storage mechanism (e.g. database)
-
+#[cfg(feature = "memory")]
 pub mod memory;
 #[cfg(feature = "postgres")]
 pub mod postgres;
@@ -85,6 +85,7 @@ pub fn create_store_factory(
     connection_uri: ConnectionUri,
 ) -> Result<Box<dyn StoreFactory>, InternalError> {
     match connection_uri {
+        #[cfg(feature = "memory")]
         ConnectionUri::Memory => Ok(Box::new(memory::MemoryStoreFactory::new())),
         #[cfg(feature = "postgres")]
         ConnectionUri::Postgres(url) => {
@@ -122,6 +123,7 @@ pub fn create_store_factory(
 
 /// The possible connection types and identifiers for a `StoreFactory`
 pub enum ConnectionUri {
+    #[cfg(feature = "memory")]
     Memory,
     #[cfg(feature = "postgres")]
     Postgres(String),
@@ -134,6 +136,7 @@ impl FromStr for ConnectionUri {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            #[cfg(feature = "memory")]
             "memory" => Ok(ConnectionUri::Memory),
             #[cfg(feature = "postgres")]
             _ if s.starts_with("postgres://") => Ok(ConnectionUri::Postgres(s.into())),

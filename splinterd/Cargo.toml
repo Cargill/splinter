@@ -57,6 +57,7 @@ path = "../libsplinter"
 features = [
   "admin-service",
   "cylinder-jwt",
+  "memory",
   "registry",
   "registry-remote",
   "rest-api",
