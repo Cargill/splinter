@@ -90,7 +90,7 @@ pub mod service;
 pub mod sets;
 #[cfg(feature = "store-factory")]
 pub mod store;
-mod threading;
+pub mod threading;
 pub mod transport;
 
 #[cfg(feature = "rest-api")]
