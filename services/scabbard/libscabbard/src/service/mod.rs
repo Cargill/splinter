@@ -309,13 +309,18 @@ impl Service for Scabbard {
         {
             Err(ServiceDestroyError::NotStopped)
         } else {
-            self.state
-                .lock()
-                .map_err(|_| ServiceDestroyError::PoisonedLock("consensus lock poisoned".into()))?
-                .remove_db_files()
-                .map_err(|err| ServiceDestroyError::Internal(Box::new(err)))?;
             Ok(())
         }
+    }
+
+    fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
+        self.state
+            .lock()
+            .map_err(|_| {
+                splinter::error::InternalError::with_message("consensus lock poisoned".into())
+            })?
+            .remove_db_files()
+            .map_err(|err| splinter::error::InternalError::from_source(Box::new(err)))
     }
 
     fn handle_message(

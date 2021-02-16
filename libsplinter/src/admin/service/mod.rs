@@ -622,6 +622,10 @@ impl Service for AdminService {
         }
     }
 
+    fn purge(&mut self) -> Result<(), crate::error::InternalError> {
+        Ok(())
+    }
+
     fn handle_message(
         &self,
         message_bytes: &[u8],

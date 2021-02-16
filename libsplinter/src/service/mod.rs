@@ -47,6 +47,8 @@ pub mod validation;
 
 use std::any::Any;
 
+use crate::error::InternalError;
+
 pub use factory::ServiceFactory;
 pub use processor::registry::StandardServiceNetworkRegistry;
 pub use processor::JoinHandles;
@@ -138,6 +140,9 @@ pub trait Service: Send {
     /// Consumes the service (which, given the use of dyn traits,
     /// this must take a boxed Service instance).
     fn destroy(self: Box<Self>) -> Result<(), ServiceDestroyError>;
+
+    /// Purge any persistent state maintained by this service.
+    fn purge(&mut self) -> Result<(), InternalError>;
 
     /// Handle any incoming message intended for this service instance.
     ///
