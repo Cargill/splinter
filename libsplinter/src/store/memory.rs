@@ -149,7 +149,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(crate::registry::DieselRegistry::new(pool))
     }
 
-    #[cfg(feature = "authorization")]
+    #[cfg(feature = "authorization-handler-rbac")]
     fn get_role_based_authorization_store(
         &self,
     ) -> Box<dyn crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStore>

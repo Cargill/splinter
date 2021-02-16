@@ -108,7 +108,7 @@ impl StoreFactory for PgStoreFactory {
     }
 
     #[cfg(all(
-        feature = "authorization",
+        feature = "authorization-handler-rbac",
         not(feature = "role-based-authorization-store-postgres")
     ))]
     fn get_role_based_authorization_store(
