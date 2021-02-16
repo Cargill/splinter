@@ -1569,8 +1569,6 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
                 $ref: '#/components/schemas/BiomeProfile'
         401:
           description: The client is unauthorized
@@ -1591,27 +1589,25 @@ paths:
     get:
       tags:
         - Biome
-        description: Get the profile of the authenticated user
-        parameters:
-          - $ref: "#/components/parameters/auth"
-          - $ref: "#/components/parameters/protocol_version"
-        responses:
-          200:
-            description: User's profile
-            content:
-              application/json:
+      description: Get the profile of the authenticated user
+      parameters:
+        - $ref: "#/components/parameters/auth"
+        - $ref: "#/components/parameters/protocol_version"
+      responses:
+        200:
+          description: User's profile
+          content:
+            application/json:
                 schema:
-                  type: object
-                    properties:
-                    $ref: '#/components/schemas/BiomeProfile'
-          401:
-            description: The client is unauthorized
-          500:
-            description: Internal server error occurred
-            content:
-              application/json:
-                  schema:
-                    $ref: '#/components/schemas/ErrorBiome'
+                  $ref: '#/components/schemas/BiomeProfile'
+        401:
+          description: The client is unauthorized
+        500:
+          description: Internal server error occurred
+          content:
+            application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorBiome'
 
   /biome/keys:
     get:
