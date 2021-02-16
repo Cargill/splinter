@@ -47,7 +47,6 @@ struct TomlConfig {
     node_id: Option<String>,
     display_name: Option<String>,
     rest_api_endpoint: Option<String>,
-    #[cfg(feature = "database")]
     database: Option<String>,
     registries: Option<Vec<String>>,
     registry_auto_refresh: Option<u64>,
@@ -146,6 +145,7 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
             .with_node_id(self.toml_config.node_id)
             .with_display_name(self.toml_config.display_name)
             .with_rest_api_endpoint(self.toml_config.rest_api_endpoint)
+            .with_database(self.toml_config.database)
             .with_registries(self.toml_config.registries)
             .with_registry_auto_refresh(self.toml_config.registry_auto_refresh)
             .with_registry_forced_refresh(self.toml_config.registry_forced_refresh)
@@ -162,11 +162,6 @@ impl PartialConfigBuilder for TomlPartialConfigBuilder {
         #[cfg(feature = "service-endpoint")]
         {
             partial_config = partial_config.with_service_endpoint(self.toml_config.service_endpoint)
-        }
-
-        #[cfg(feature = "database")]
-        {
-            partial_config = partial_config.with_database(self.toml_config.database);
         }
 
         #[cfg(feature = "rest-api-cors")]
@@ -411,7 +406,6 @@ mod tests {
             Some(EXAMPLE_DISPLAY_NAME.to_string())
         );
         assert_eq!(config.rest_api_endpoint(), None);
-        #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
         assert_eq!(config.registry_auto_refresh(), None);
@@ -462,7 +456,6 @@ mod tests {
         assert_eq!(config.node_id(), None);
         assert_eq!(config.display_name(), None);
         assert_eq!(config.rest_api_endpoint(), None);
-        #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
         assert_eq!(config.heartbeat(), Some(20));

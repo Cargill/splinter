@@ -37,7 +37,6 @@ const REST_API_ENDPOINT: &str = "127.0.0.1:8443";
 #[cfg(feature = "service-endpoint")]
 const SERVICE_ENDPOINT: &str = "tcp://127.0.0.1:8043";
 const NETWORK_ENDPOINT: &str = "tcps://127.0.0.1:8044";
-#[cfg(feature = "database")]
 const DATABASE: &str = "splinter_state.db";
 
 const REGISTRY_AUTO_REFRESH: u64 = 600; // 600 seconds = 10 minutes
@@ -69,6 +68,7 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
             .with_network_endpoints(Some(vec![String::from(NETWORK_ENDPOINT)]))
             .with_peers(Some(vec![]))
             .with_rest_api_endpoint(Some(String::from(REST_API_ENDPOINT)))
+            .with_database(Some(String::from(DATABASE)))
             .with_registries(Some(vec![]))
             .with_registry_auto_refresh(Some(REGISTRY_AUTO_REFRESH))
             .with_registry_forced_refresh(Some(REGISTRY_FORCED_REFRESH))
@@ -90,15 +90,6 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
         {
             partial_config =
                 partial_config.with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
-        }
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        {
-            partial_config = partial_config.with_enable_biome(Some(false));
-        }
-
-        #[cfg(feature = "database")]
-        {
-            partial_config = partial_config.with_database(Some(String::from(DATABASE)));
         }
 
         Ok(partial_config)
@@ -153,7 +144,6 @@ mod tests {
             config.rest_api_endpoint(),
             Some(String::from(REST_API_ENDPOINT))
         );
-        #[cfg(feature = "database")]
         assert_eq!(config.database(), Some(String::from(DATABASE)));
         assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.registry_auto_refresh(), Some(REGISTRY_AUTO_REFRESH));
@@ -169,8 +159,6 @@ mod tests {
         assert_eq!(config.state_dir(), Some(String::from(STATE_DIR)));
         assert_eq!(config.tls_insecure(), Some(false));
         assert_eq!(config.no_tls(), Some(false));
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        assert_eq!(config.enable_biome(), Some(false));
         // Assert the source is correctly identified for this `PartialConfig` object.
         assert_eq!(config.source(), ConfigSource::Default);
     }

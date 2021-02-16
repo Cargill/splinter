@@ -223,8 +223,7 @@ services:
               --advertised-endpoints tcps://splinterd-node-acme:8044 \
               --rest-api-endpoint 0.0.0.0:8085 \
               --registries http://registry-server:80/registry.yaml \
-              --tls-insecure \
-              --enable-biome
+              --tls-insecure
         "
 
     splinterd-db-acme:
@@ -368,8 +367,7 @@ services:
               --advertised-endpoints tcps://splinterd-node-bubba:8044 \
               --rest-api-endpoint 0.0.0.0:8085 \
               --registries http://registry-server:80/registry.yaml \
-              --tls-insecure \
-              --enable-biome
+              --tls-insecure
         "
 
     splinterd-db-bubba:

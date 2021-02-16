@@ -47,7 +47,6 @@ fn get_tls_file_path(cert_dir: &str, file: &str) -> String {
     }
 }
 
-#[cfg(feature = "database")]
 fn get_database_path(state_dir: &str, database_file: &str) -> String {
     if database_file.starts_with("postgres://") {
         database_file.to_string()
@@ -197,7 +196,6 @@ impl ConfigBuilder {
             })
             .ok_or_else(|| ConfigError::MissingValue("state directory".to_string()))?;
 
-        #[cfg(feature = "database")]
         let database = self
             .partial_configs
             .iter()
@@ -271,7 +269,6 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("rest api endpoint".to_string()))?,
-            #[cfg(feature = "database")]
             database,
             registries: self
                 .partial_configs
@@ -336,15 +333,6 @@ impl ConfigBuilder {
                     None => None,
                 })
                 .ok_or_else(|| ConfigError::MissingValue("no tls".to_string()))?,
-            #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-            enable_biome: self
-                .partial_configs
-                .iter()
-                .find_map(|p| match p.enable_biome() {
-                    Some(v) => Some((v, p.source())),
-                    None => None,
-                })
-                .ok_or_else(|| ConfigError::MissingValue("enable_biome".to_string()))?,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self
                 .partial_configs
@@ -490,7 +478,6 @@ mod tests {
             Some(EXAMPLE_DISPLAY_NAME.to_string())
         );
         assert_eq!(config.rest_api_endpoint(), None);
-        #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), Some(vec![]));
         assert_eq!(config.heartbeat(), None);

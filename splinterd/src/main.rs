@@ -46,6 +46,11 @@ use std::thread;
 use error::UserError;
 use transport::build_transport;
 
+#[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
+compile_error!(
+    "At least one database backend feature must be enabled: 'database-postgres', 'database-sqlite'"
+);
+
 fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Config, UserError> {
     let mut builder = ConfigBuilder::new();
 
@@ -302,27 +307,24 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("database")
+                .long("database")
+                .long_help("DB connection URL")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("storage")
                 .long("storage")
                 .help("Storage type used for the node; defaults to yaml")
                 .hidden(true)
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("enable_biome")
+                .long("enable-biome")
+                .long_help("Enable the biome subsystem")
+                .hidden(true),
         );
-
-    #[cfg(feature = "database")]
-    let app = app.arg(
-        Arg::with_name("database")
-            .long("database")
-            .long_help("DB connection URL")
-            .takes_value(true),
-    );
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    let app = app.arg(
-        Arg::with_name("enable_biome")
-            .long("enable-biome")
-            .long_help("Enable the biome subsystem"),
-    );
 
     #[cfg(feature = "https-bind")]
     let app = app.arg(
@@ -465,9 +467,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
 
     let rest_api_endpoint = config.rest_api_endpoint();
 
-    #[cfg(feature = "database")]
-    let db_url = config.database();
-
     let admin_timeout = config.admin_timeout();
 
     config.log_as_debug();
@@ -489,6 +488,7 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
         .with_display_name(display_name)
         .with_rest_api_endpoint(String::from(rest_api_endpoint))
         .with_storage_type(config.storage().map(String::from))
+        .with_db_url(config.database().to_string())
         .with_registries(config.registries().to_vec())
         .with_registry_auto_refresh(config.registry_auto_refresh())
         .with_registry_forced_refresh(config.registry_forced_refresh())
@@ -521,16 +521,6 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
                 splinterd with the features \"service-endpoint\" enabled"
             );
         }
-    }
-
-    #[cfg(feature = "database")]
-    {
-        daemon_builder = daemon_builder.with_db_url(Some(String::from(db_url)));
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    {
-        daemon_builder = daemon_builder.enable_biome(config.enable_biome());
     }
 
     #[cfg(feature = "rest-api-cors")]

@@ -60,7 +60,6 @@ pub struct Config {
     node_id: Option<(String, ConfigSource)>,
     display_name: Option<(String, ConfigSource)>,
     rest_api_endpoint: (String, ConfigSource),
-    #[cfg(feature = "database")]
     database: (String, ConfigSource),
     registries: (Vec<String>, ConfigSource),
     registry_auto_refresh: (u64, ConfigSource),
@@ -70,8 +69,6 @@ pub struct Config {
     state_dir: (String, ConfigSource),
     tls_insecure: (bool, ConfigSource),
     no_tls: (bool, ConfigSource),
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    enable_biome: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
     #[cfg(feature = "oauth")]
@@ -175,7 +172,6 @@ impl Config {
         &self.rest_api_endpoint.0
     }
 
-    #[cfg(feature = "database")]
     pub fn database(&self) -> &str {
         &self.database.0
     }
@@ -210,11 +206,6 @@ impl Config {
 
     pub fn no_tls(&self) -> bool {
         self.no_tls.0
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    pub fn enable_biome(&self) -> bool {
-        self.enable_biome.0
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -376,7 +367,6 @@ impl Config {
         &self.rest_api_endpoint.1
     }
 
-    #[cfg(feature = "database")]
     fn database_source(&self) -> &ConfigSource {
         &self.database.1
     }
@@ -411,11 +401,6 @@ impl Config {
 
     fn no_tls_source(&self) -> &ConfigSource {
         &self.no_tls.1
-    }
-
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    fn enable_biome_source(&self) -> &ConfigSource {
-        &self.enable_biome.1
     }
 
     #[cfg(feature = "rest-api-cors")]
@@ -610,7 +595,6 @@ impl Config {
             self.admin_timeout(),
             self.admin_timeout_source()
         );
-        #[cfg(feature = "database")]
         debug!(
             "database: {} (source: {:?})",
             self.database(),
@@ -625,12 +609,6 @@ impl Config {
             "Config: no_tls: {:?} (source: {:?})",
             self.no_tls(),
             self.no_tls_source()
-        );
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        debug!(
-            "Config: enable_biome: {:?} (source: {:?})",
-            self.enable_biome(),
-            self.enable_biome_source()
         );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
@@ -801,8 +779,7 @@ mod tests {
         (@arg tls_client_key:  --("tls-client-key") +takes_value)
         (@arg rest_api_endpoint: --("rest-api-endpoint") +takes_value)
         (@arg tls_insecure: --("tls-insecure"))
-        (@arg no_tls: --("no-tls"))
-        (@arg enable_biome: --("enable-biome")))
+        (@arg no_tls: --("no-tls")))
         .get_matches_from(args)
     }
 
@@ -912,7 +889,6 @@ mod tests {
             EXAMPLE_SERVER_KEY,
             "--tls-insecure",
             "--no-tls",
-            "--enable-biome",
         ];
         // Create an example `ArgMatches` object to initialize the `ClapPartialConfigBuilder`.
         let matches = create_arg_matches(args);
@@ -1181,7 +1157,6 @@ mod tests {
             ),
             ("127.0.0.1:8080", &ConfigSource::Default)
         );
-        #[cfg(feature = "database")]
         // The `DefaultPartialConfigBuilder` is the only config with a value for `database` (source
         // should be `Default`). Should have default state file name with `EnvPartialConfigBuilder`
         // value for `state_dir`.

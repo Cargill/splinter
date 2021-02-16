@@ -72,6 +72,7 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             .with_node_id(self.matches.value_of("node_id").map(String::from))
             .with_display_name(self.matches.value_of("display_name").map(String::from))
             .with_rest_api_endpoint(self.matches.value_of("rest_api_endpoint").map(String::from))
+            .with_database(self.matches.value_of("database").map(String::from))
             .with_registries(
                 self.matches
                     .values_of("registries")
@@ -105,22 +106,6 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
         {
             partial_config = partial_config
                 .with_service_endpoint(self.matches.value_of("service_endpoint").map(String::from))
-        }
-
-        #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-        {
-            partial_config =
-                partial_config.with_enable_biome(if self.matches.is_present("enable_biome") {
-                    Some(true)
-                } else {
-                    None
-                });
-        }
-
-        #[cfg(feature = "database")]
-        {
-            partial_config =
-                partial_config.with_database(self.matches.value_of("database").map(String::from))
         }
 
         #[cfg(feature = "rest-api-cors")]
@@ -259,7 +244,6 @@ mod tests {
             Some(EXAMPLE_DISPLAY_NAME.to_string())
         );
         assert_eq!(config.rest_api_endpoint(), None);
-        #[cfg(feature = "database")]
         assert_eq!(config.database(), None);
         assert_eq!(config.registries(), None);
         assert_eq!(config.registry_auto_refresh(), None);
