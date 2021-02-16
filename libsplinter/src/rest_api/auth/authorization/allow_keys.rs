@@ -184,7 +184,7 @@ mod tests {
     use super::*;
 
     use std::fs::remove_file;
-    use std::io::{Read, Write};
+    use std::io::Write;
     use std::thread::sleep;
     use std::time::Duration;
 
