@@ -18,7 +18,7 @@ use std::error::Error;
 use std::fmt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc::channel, Arc};
 use std::thread;
 use std::time::Duration;
 
@@ -720,27 +720,33 @@ impl SplinterDaemon {
         let (admin_shutdown_handle, service_processor_join_handle) =
             Self::start_admin_service(admin_connection, admin_service, Arc::clone(&running))?;
 
-        // Allowing possibly redundant clone of `running` since it will be needed again if the
-        // `health` feature is enabled
-        #[allow(clippy::redundant_clone)]
-        let r = running.clone();
+        let (shutdown_tx, shutdown_rx) = channel();
         ctrlc::set_handler(move || {
-            info!("Received Shutdown");
-            r.store(false, Ordering::SeqCst);
-
-            if let Err(err) = admin_shutdown_handle.shutdown() {
-                error!("Unable to cleanly shut down Admin service: {}", err);
+            if shutdown_tx.send(()).is_err() {
+                // This was the second ctrl-c (as the receiver is dropped after the first one).
+                std::process::exit(0);
             }
-
-            if let Err(err) = rest_api_shutdown_handle.shutdown() {
-                error!("Unable to cleanly shut down REST API server: {}", err);
-            }
-            circuit_dispatcher_shutdown.shutdown();
-            network_dispatcher_shutdown.shutdown();
-            registry_shutdown.shutdown();
-            interconnect_shutdown.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
+
+        // recv that value, ignoring the result.
+        let _ = shutdown_rx.recv();
+        drop(shutdown_rx);
+        info!("Initiating graceful shutdown (press Ctrl+C again to force)");
+
+        running.store(false, Ordering::SeqCst);
+
+        if let Err(err) = admin_shutdown_handle.shutdown() {
+            error!("Unable to cleanly shut down Admin service: {}", err);
+        }
+
+        if let Err(err) = rest_api_shutdown_handle.shutdown() {
+            error!("Unable to cleanly shut down REST API server: {}", err);
+        }
+        circuit_dispatcher_shutdown.shutdown();
+        network_dispatcher_shutdown.shutdown();
+        registry_shutdown.shutdown();
+        interconnect_shutdown.shutdown();
 
         #[cfg(feature = "health")]
         {
