@@ -46,11 +46,6 @@ use std::thread;
 use error::UserError;
 use transport::build_transport;
 
-#[cfg(not(any(feature = "database-postgres", feature = "database-sqlite")))]
-compile_error!(
-    "At least one database backend feature must be enabled: 'database-postgres', 'database-sqlite'"
-);
-
 fn create_config(_toml_path: Option<&str>, _matches: ArgMatches) -> Result<Config, UserError> {
     let mut builder = ConfigBuilder::new();
 
