@@ -77,6 +77,11 @@ impl Service for HealthService {
         Ok(())
     }
 
+    fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
+        info!("Purging health service");
+        Ok(())
+    }
+
     fn handle_message(
         &self,
         _message_bytes: &[u8],

@@ -843,6 +843,10 @@ pub mod tests {
             unimplemented!()
         }
 
+        fn purge(&mut self) -> Result<(), crate::error::InternalError> {
+            unimplemented!()
+        }
+
         fn handle_message(
             &self,
             message_bytes: &[u8],
@@ -927,6 +931,10 @@ pub mod tests {
         /// Consumes the service (which, given the use of dyn traits,
         /// this must take a boxed Service instance).
         fn destroy(self: Box<Self>) -> Result<(), ServiceDestroyError> {
+            unimplemented!()
+        }
+
+        fn purge(&mut self) -> Result<(), crate::error::InternalError> {
             unimplemented!()
         }
 

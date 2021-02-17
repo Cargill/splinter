@@ -998,7 +998,7 @@ impl AdminServiceShared {
                 )))
             })?;
 
-        self.destroy_services(circuit_id, &stored_circuit.roster())
+        self.purge_services(circuit_id, &stored_circuit.roster())
             .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
         if let Some(circuit) = self
@@ -2711,9 +2711,9 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
-    /// Destroys all services that this node was running on the disbanded circuit using the service
+    /// Purges all services that this node was running on the disbanded circuit using the service
     /// orchestrator. Destroying a service will also remove the service's state LMDB files.
-    pub fn destroy_services(
+    pub fn purge_services(
         &mut self,
         circuit_id: &str,
         services: &[StoreService],
@@ -2727,7 +2727,7 @@ impl AdminServiceShared {
                 })?;
 
         // Get all services this node is allowed to run
-        let services = services
+        let purge_results = services
             .iter()
             .filter_map(|service| {
                 if service.node_id() == self.node_id
@@ -2743,21 +2743,25 @@ impl AdminServiceShared {
                 }
                 None
             })
-            .collect::<Vec<ServiceDefinition>>();
+            .map(|service| {
+                debug!(
+                    "Purging service: {}::{} ({})",
+                    &service.circuit, &service.service_id, &service.service_type,
+                );
 
-        // Shutdown all services the orchestrator has a factory for
-        for service in services {
-            debug!("Destroying service: {}", service.service_id.clone());
+                let res = orchestrator.purge_service(&service);
+                (service, res)
+            })
+            .filter(|(_, res)| res.is_err())
+            .collect::<Vec<_>>();
 
-            orchestrator.destroy_service(&service).map_err(|err| {
-                AdminSharedError::ServiceShutdownFailed {
-                    context: format!(
-                        "Unable to shutdown service {} on circuit {}",
-                        service.service_id, circuit_id
-                    ),
-                    source: Some(err),
-                }
-            })?;
+        for (service_def, res) in purge_results {
+            if let Err(err) = res {
+                error!(
+                    "Service {}::{} ({}) failed to purge: {}",
+                    service_def.circuit, service_def.service_id, service_def.service_type, err
+                );
+            }
         }
 
         Ok(())

@@ -27,6 +27,7 @@ use protobuf::Message;
 use uuid::Uuid;
 
 use crate::channel;
+use crate::error::InternalError;
 use crate::mesh::{Envelope, Mesh, RecvTimeoutError as MeshRecvTimeoutError};
 use crate::network::reply::InboundRouter;
 use crate::protos::circuit::{
@@ -262,24 +263,23 @@ impl ServiceOrchestrator {
         Ok(())
     }
 
-    /// Destroy the specified service. This action will also remove the LMDB files used by the
-    /// service state.
-    pub fn destroy_service(
+    /// Purge the specified service state, based on its service implementation.
+    pub fn purge_service(
         &self,
         service_definition: &ServiceDefinition,
-    ) -> Result<(), ShutdownServiceError> {
-        let service = self
+    ) -> Result<(), InternalError> {
+        if let Some(mut service) = self
             .stopped_services
             .lock()
-            .map_err(|_| ShutdownServiceError::LockPoisoned)?
+            .map_err(|_| {
+                InternalError::with_message("Orchestrator stopped service lock was poisoned".into())
+            })?
             .remove(service_definition)
-            .ok_or(ShutdownServiceError::UnknownService)?;
-
-        service.destroy().map_err(|err| {
-            ShutdownServiceError::ShutdownFailed((service_definition.clone(), Box::new(err)))
-        })?;
-
-        Ok(())
+        {
+            service.purge()
+        } else {
+            Ok(())
+        }
     }
 
     /// Shut down (stop and destroy) all services managed by this `ServiceOrchestrator` and single
