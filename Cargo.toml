@@ -16,7 +16,6 @@
 
 members = [
     "cli",
-    "client",
     "libsplinter",
     "splinterd",
     "examples/gameroom/cli",

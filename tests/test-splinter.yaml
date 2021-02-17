@@ -30,7 +30,6 @@ services:
             cargo test && \
             echo \"Running stable feature tests...\" && \
             (cd cli && cargo test --features stable) &&
-            (cd client && cargo test --features stable) &&
             (cd examples/gameroom/cli && cargo test --features stable) &&
             (cd examples/gameroom/daemon && cargo test --features stable) &&
             (cd examples/gameroom/database && cargo test --features stable) &&
@@ -41,7 +40,6 @@ services:
             (cd splinterd && cargo test --features stable) &&
             echo \"Running experimental feature tests...\" && \
             (cd cli && cargo test --features experimental) &&
-            (cd client && cargo test --features experimental) &&
             (cd examples/gameroom/cli && cargo test --features experimental) &&
             (cd examples/gameroom/daemon && cargo test --features experimental) &&
             (cd examples/gameroom/database && cargo test --features experimental) &&

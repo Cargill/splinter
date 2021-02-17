@@ -23,9 +23,6 @@
 /messaging/target
 /messaging/Cargo.lock
 
-/client/target
-/client/Cargo.lock
-
 /cli/target
 /cli/Cargo.lock
 /cli/packaging/man/*.1

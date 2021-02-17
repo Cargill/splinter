@@ -14,14 +14,13 @@
 
 # -------------=== splinterd docker build ===-------------
 
-FROM splintercommunity/splinter-dev:v5 as BUILDER
+FROM splintercommunity/splinter-dev:v6 as BUILDER
 
 ENV SPLINTER_FORCE_PANDOC=true
 
 # Copy over splinter files
 COPY Cargo.toml /build/Cargo.toml
 COPY cli/Cargo.toml /build/cli/Cargo.toml
-COPY client/Cargo.toml /build/client/Cargo.toml
 COPY libsplinter/build.rs /build/libsplinter/build.rs
 COPY libsplinter/Cargo.toml /build/libsplinter/Cargo.toml
 COPY libsplinter/protos /build/libsplinter/protos

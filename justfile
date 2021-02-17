@@ -16,7 +16,6 @@ crates := '\
     libsplinter \
     splinterd \
     cli \
-    client \
     services/scabbard/cli \
     services/scabbard/libscabbard \
     services/health \
