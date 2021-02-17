@@ -64,23 +64,13 @@ impl StoreFactory for PgStoreFactory {
         ))
     }
 
-    #[cfg(feature = "oauth-inflight-request-store-postgres")]
+    #[cfg(feature = "oauth")]
     fn get_oauth_inflight_request_store(
         &self,
     ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
         Box::new(crate::oauth::store::DieselInflightOAuthRequestStore::new(
             self.pool.clone(),
         ))
-    }
-
-    #[cfg(all(
-        feature = "oauth",
-        not(feature = "oauth-inflight-request-store-postgres")
-    ))]
-    fn get_oauth_inflight_request_store(
-        &self,
-    ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
-        unimplemented!()
     }
 
     #[cfg(feature = "registry-database")]

@@ -14,14 +14,14 @@
 
 //! Defines an API to manage in-flight OAuth2 requests.
 
-#[cfg(any(feature = "oauth-inflight-request-store-postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 mod diesel;
 mod error;
 mod memory;
 
 use super::PendingAuthorization;
 
-#[cfg(any(feature = "oauth-inflight-request-store-postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 pub use self::diesel::DieselInflightOAuthRequestStore;
 pub use error::InflightOAuthRequestStoreError;
 pub use memory::MemoryInflightOAuthRequestStore;
