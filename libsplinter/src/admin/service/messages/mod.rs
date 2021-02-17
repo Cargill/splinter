@@ -717,13 +717,16 @@ pub enum Vote {
     Reject,
 }
 
+/// Represents the `requester`'s public key associated with an `AdminServiceEvent`
+pub type PublicKey = Vec<u8>;
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "eventType", content = "message")]
 pub enum AdminServiceEvent {
     ProposalSubmitted(CircuitProposal),
-    ProposalVote((CircuitProposal, Vec<u8>)),
-    ProposalAccepted((CircuitProposal, Vec<u8>)),
-    ProposalRejected((CircuitProposal, Vec<u8>)),
+    ProposalVote((CircuitProposal, PublicKey)),
+    ProposalAccepted((CircuitProposal, PublicKey)),
+    ProposalRejected((CircuitProposal, PublicKey)),
     CircuitReady(CircuitProposal),
     CircuitDisbanded(CircuitProposal),
 }
