@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "admin-service-client")]
+pub mod client;
 pub mod error;
 pub mod messages;
 #[cfg(feature = "rest-api")]
