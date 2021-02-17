@@ -100,7 +100,6 @@ const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check {
 /// * `POST /biome/register - Creates credentials for a user
 /// * `POST /biome/token` - Creates a new access token for the authorized user
 /// * `POST /biome/verify` - Verify a users password
-/// * `POST /biome/users` - Create new user
 /// * `GET /biome/user` - Get a list of all users in biome
 /// * `PUT /biome/user/{id}` - Update user with specified ID
 /// * `GET /biome/user/{id}` - Retrieve user with specified ID
