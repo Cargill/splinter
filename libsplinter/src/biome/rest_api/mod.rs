@@ -35,11 +35,6 @@ use crate::rest_api::{
     auth::identity::biome::BiomeUserIdentityProvider, sessions::default_validation,
 };
 
-#[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
-use self::actix::key_management::{
-    make_key_management_route, make_key_management_route_with_public_key,
-};
-
 #[cfg(feature = "biome-key-management")]
 use super::key_management::store::KeyStore;
 
@@ -87,14 +82,6 @@ const BIOME_USER_WRITE_PERMISSION: Permission = Permission::Check {
 ///
 /// The following endponts are provided
 ///
-/// * `GET /biome/keys` - Get all keys for authorized user
-/// * `POST /biome/keys` - Create a new key for authorized user
-/// * `PATCH /biome/keys` - Update the display name associated with a key for
-///    an authorized user.
-/// * `GET /biome/keys/{public_key}` - Retrieve a key for an authroized user that has
-///    `public_key`
-/// * `DELETE /biome/keys/{public_key}` - delete a  key for an authorized user that has
-///    `public key`
 /// * `POST /biome/login` - Login enpoint for getting access tokens and refresh tokens
 /// * `PATCH /biome/logout` - Login endpoint for removing refresh tokens
 /// * `POST /biome/register - Creates credentials for a user
@@ -188,13 +175,6 @@ impl RestResourceProvider for BiomeRestResourceManager {
             ));
         }
 
-        #[cfg(all(feature = "biome-key-management", feature = "rest-api-actix",))]
-        {
-            resources.push(make_key_management_route(self.key_store.clone()));
-            resources.push(make_key_management_route_with_public_key(
-                self.key_store.clone(),
-            ));
-        }
         resources
     }
 }

@@ -12,17 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(feature = "biome-key-management", feature = "biome-credentials"))]
-pub(crate) mod authorize;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod login;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod logout;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod register;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod token;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod user;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod verify;
+#[cfg(feature = "rest-api-actix")]
+mod actix_web_1;
+mod resources;
+
+#[cfg(feature = "rest-api-actix")]
+pub use actix_web_1::BiomeKeyManagementRestResourceProvider;

@@ -14,19 +14,19 @@
 
 use std::sync::Arc;
 
-use super::authorize::get_authorized_user;
 use crate::actix_web::HttpResponse;
 use crate::biome::key_management::{
+    rest_api::resources::{NewKey, ResponseKey, UpdatedKey},
     store::{KeyStore, KeyStoreError},
     Key,
 };
-use crate::biome::rest_api::resources::key_management::{NewKey, ResponseKey, UpdatedKey};
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 #[cfg(feature = "authorization")]
 use crate::rest_api::auth::authorization::Permission;
 use crate::rest_api::{
     actix_web_1::{into_bytes, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource},
+    auth::identity::Identity,
     ErrorResponse,
 };
 
@@ -70,9 +70,15 @@ fn handle_post(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
 
-        let user = match get_authorized_user(&request) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -124,9 +130,15 @@ fn handle_get(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, _| {
         let key_store = key_store.clone();
 
-        let user = match get_authorized_user(&request) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
         };
 
         match key_store.list_keys(Some(&user)) {
@@ -157,9 +169,15 @@ fn handle_get(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
 fn handle_patch(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
     Box::new(move |request, payload| {
         let key_store = key_store.clone();
-        let user = match get_authorized_user(&request) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
         };
 
         Box::new(into_bytes(payload).and_then(move |bytes| {
@@ -249,9 +267,15 @@ fn handle_fetch(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
             }
         };
 
-        let user = match get_authorized_user(&request) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
         };
 
         match key_store.fetch_key(&public_key, &user) {
@@ -301,9 +325,15 @@ fn handle_delete(key_store: Arc<dyn KeyStore>) -> HandlerFunction {
             }
         };
 
-        let user = match get_authorized_user(&request) {
-            Ok(user) => user,
-            Err(response) => return response,
+        let user = match request.extensions().get::<Identity>() {
+            Some(Identity::User(user)) => user.clone(),
+            _ => {
+                return Box::new(
+                    HttpResponse::Unauthorized()
+                        .json(ErrorResponse::unauthorized())
+                        .into_future(),
+                )
+            }
         };
 
         match key_store.remove_key(&public_key, &user) {
