@@ -126,7 +126,6 @@ database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 https-bind = ["splinter/https-bind"]
 oauth = [
-    "splinter/biome-oauth-user-store-postgres",
     "splinter/oauth-inflight-request-store-postgres",
     "splinter/oauth"
 ]

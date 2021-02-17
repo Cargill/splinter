@@ -19,7 +19,7 @@
 //! * It provides a correlation between an OAuth subject identifier and a Biome user ID
 //! * It stores tokens and other data for an OAuth user's sessions
 
-#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 pub(in crate::biome) mod diesel;
 mod error;
 pub(in crate::biome) mod memory;

@@ -17,7 +17,7 @@
 use std::error::Error;
 use std::fmt;
 
-#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 use crate::error::ConstraintViolationType;
 use crate::error::{
     ConstraintViolationError, InternalError, InvalidArgumentError, InvalidStateError,
@@ -54,14 +54,14 @@ impl fmt::Display for OAuthUserSessionStoreError {
     }
 }
 
-#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 impl From<diesel::r2d2::PoolError> for OAuthUserSessionStoreError {
     fn from(err: diesel::r2d2::PoolError) -> Self {
         OAuthUserSessionStoreError::Internal(InternalError::from_source(Box::new(err)))
     }
 }
 
-#[cfg(any(feature = "biome-oauth-user-store-postgres", feature = "sqlite"))]
+#[cfg(feature = "diesel")]
 impl From<diesel::result::Error> for OAuthUserSessionStoreError {
     fn from(err: diesel::result::Error) -> Self {
         match err {

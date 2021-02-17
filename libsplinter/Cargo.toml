@@ -106,7 +106,6 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-notifications",
-    "biome-oauth-user-store-postgres",
     "biome-profile",
     "circuit-disband",
     "circuit-purge",
@@ -135,7 +134,6 @@ biome = []
 biome-credentials = ["bcrypt", "biome"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
-biome-oauth-user-store-postgres = ["oauth", "postgres"]
 biome-profile = ["biome"]
 circuit-disband = []
 circuit-purge = ["circuit-disband"]
