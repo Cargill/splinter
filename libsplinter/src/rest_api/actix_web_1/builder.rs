@@ -131,12 +131,13 @@ impl RestApiBuilder {
                 match auth_config {
                     #[cfg(feature = "biome-credentials")]
                     AuthConfig::Biome {
-                        biome_resource_manager,
+                        biome_credentials_resource_provider,
                     } => {
-                        identity_providers
-                            .push(Box::new(biome_resource_manager.get_identity_provider()));
+                        identity_providers.push(Box::new(
+                            biome_credentials_resource_provider.get_identity_provider(),
+                        ));
                         self.resources
-                            .append(&mut biome_resource_manager.resources());
+                            .append(&mut biome_credentials_resource_provider.resources());
                     }
                     #[cfg(feature = "cylinder-jwt")]
                     AuthConfig::Cylinder { verifier } => {

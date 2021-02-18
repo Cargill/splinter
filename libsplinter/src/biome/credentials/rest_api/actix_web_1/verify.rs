@@ -26,8 +26,8 @@ use crate::rest_api::{
     ErrorResponse,
 };
 
+use crate::biome::credentials::rest_api::actix_web_1::config::BiomeCredentialsRestConfig;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
-use crate::biome::rest_api::config::BiomeRestConfig;
 
 use super::super::resources::authorize::AuthorizationResult;
 use super::super::resources::credentials::UsernamePassword;
@@ -42,7 +42,7 @@ use super::authorize::authorize_user;
 ///   }
 pub fn make_verify_route(
     credentials_store: Arc<dyn CredentialsStore>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
     secret_manager: Arc<dyn SecretManager>,
 ) -> Resource {
     let resource =

@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(feature = "biome-key-management", feature = "biome-credentials"))]
-pub(crate) mod authorize;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod login;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod logout;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod register;
-#[cfg(feature = "biome-credentials")]
+//! Defines credentials used to register and authenticate users.
+
+pub(super) mod authorize;
+pub(super) mod credentials;
+#[cfg(feature = "biome-key-management")]
+pub(super) mod key_management;
 pub(super) mod token;
-#[cfg(feature = "biome-credentials")]
 pub(super) mod user;
-#[cfg(feature = "biome-credentials")]
-pub(super) mod verify;

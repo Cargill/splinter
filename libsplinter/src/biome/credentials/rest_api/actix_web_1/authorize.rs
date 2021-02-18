@@ -19,7 +19,7 @@ use jsonwebtoken::{decode, Validation};
 
 use crate::actix_web::HttpRequest;
 #[cfg(feature = "biome-credentials")]
-use crate::biome::rest_api::resources::authorize::AuthorizationResult;
+use crate::biome::credentials::rest_api::resources::authorize::AuthorizationResult;
 use crate::rest_api::secrets::SecretManager;
 #[cfg(feature = "biome-credentials")]
 use crate::rest_api::{actix_web_1::get_authorization_token, sessions::Claims};
