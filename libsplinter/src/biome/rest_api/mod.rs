@@ -20,13 +20,13 @@
 #[cfg(feature = "rest-api-actix")]
 mod actix;
 mod config;
-mod error;
 mod resources;
 
 use std::sync::Arc;
 
 #[cfg(feature = "biome-credentials")]
 use crate::biome::refresh_tokens::store::RefreshTokenStore;
+use crate::error::InvalidStateError;
 use crate::rest_api::actix_web_1::{Resource, RestResourceProvider};
 #[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
 use crate::rest_api::auth::authorization::Permission;
@@ -43,7 +43,6 @@ use crate::rest_api::secrets::AutoSecretManager;
 use crate::rest_api::secrets::SecretManager;
 
 pub use config::{BiomeRestConfig, BiomeRestConfigBuilder};
-pub use error::BiomeRestResourceManagerBuilderError;
 
 #[cfg(all(feature = "rest-api-actix", feature = "biome-credentials"))]
 use self::actix::logout::make_logout_route;
@@ -279,13 +278,11 @@ impl BiomeRestResourceManagerBuilder {
     }
 
     /// Consumes the builder and returns a BiomeRestResourceManager
-    pub fn build(self) -> Result<BiomeRestResourceManager, BiomeRestResourceManagerBuilderError> {
+    pub fn build(self) -> Result<BiomeRestResourceManager, InvalidStateError> {
         #[cfg(feature = "biome-key-management")]
-        let key_store = self.key_store.ok_or_else(|| {
-            BiomeRestResourceManagerBuilderError::MissingRequiredField(
-                "Missing key store".to_string(),
-            )
-        })?;
+        let key_store = self
+            .key_store
+            .ok_or_else(|| InvalidStateError::with_message("Missing key store".to_string()))?;
         #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
         let rest_config = match self.rest_config {
             Some(config) => config,
@@ -309,17 +306,13 @@ impl BiomeRestResourceManagerBuilder {
 
         #[cfg(feature = "biome-credentials")]
         let refresh_token_store = self.refresh_token_store.ok_or_else(|| {
-            BiomeRestResourceManagerBuilderError::MissingRequiredField(
-                "Missing refresh token store".to_string(),
-            )
+            InvalidStateError::with_message("Missing refresh token store".to_string())
         })?;
 
         #[cfg(feature = "biome-credentials")]
         #[cfg(any(feature = "biome-key-management", feature = "biome-credentials",))]
         let credentials_store = self.credentials_store.ok_or_else(|| {
-            BiomeRestResourceManagerBuilderError::MissingRequiredField(
-                "Missing credentials store".to_string(),
-            )
+            InvalidStateError::with_message("Missing credentials store".to_string())
         })?;
 
         Ok(BiomeRestResourceManager {

@@ -14,9 +14,9 @@
 
 use std::time::Duration;
 
-use super::error::BiomeRestConfigBuilderError;
 #[cfg(feature = "biome-credentials")]
 use crate::biome::credentials::store::PasswordEncryptionCost;
+use crate::error::InvalidStateError;
 
 const DEFAULT_ISSUER: &str = "self-issued";
 const DEFAULT_DURATION: u64 = 5400; // in seconds = 90 minutes
@@ -130,7 +130,7 @@ impl BiomeRestConfigBuilder {
     }
 
     /// Creates a new BiomeRestConfig.
-    pub fn build(self) -> Result<BiomeRestConfig, BiomeRestConfigBuilderError> {
+    pub fn build(self) -> Result<BiomeRestConfig, InvalidStateError> {
         let issuer = self.issuer.unwrap_or_else(|| {
             debug!("Using default value for issuer");
             DEFAULT_ISSUER.to_string()
@@ -150,7 +150,12 @@ impl BiomeRestConfigBuilder {
             .password_encryption_cost
             .unwrap_or_else(|| "high".to_string())
             .parse()
-            .map_err(BiomeRestConfigBuilderError::InvalidValue)?;
+            .map_err(|err| {
+                InvalidStateError::with_message(format!(
+                    "Invalid password encryption cost: {}",
+                    err
+                ))
+            })?;
 
         Ok(BiomeRestConfig {
             issuer,
