@@ -104,19 +104,10 @@ RUN find ./*/ -name 'Cargo.toml' -exec \
     sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --no-default-features ' \;
 
 # Clean up built files
-RUN rm \
-    target/release/gameroom-database* \
-    target/release/gameroomd* \
-    target/release/health* \
-    target/release/libsplinter* \
-    target/release/scabbard* \
-    target/release/splinter* \
-    target/release/deps/gameroom_database* \
-    target/release/deps/gameroomd* \
-    target/release/deps/health* \
-    target/release/deps/libsplinter* \
-    target/release/deps/scabbard* \
-    target/release/deps/splinter*
+RUN find target/release/ -name '*gameroom*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release/ -name '*health*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release/ -name '*scabbard*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release/ -name '*splinter*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
 
 # Clean up leftover files
 RUN find . -name 'Cargo.toml' -exec \
