@@ -19,9 +19,7 @@ DESCRIPTION
 Request to disband a circuit by specifying the circuit ID of the circuit to be
 disbanded. Disbanding a circuit removes a circuit's networking functionality.
 Once all members of the circuit have accepted the request to disband the
-circuit, the circuit is only available offline. This functionality is currently
-behind the experimental `circuit-disband` feature and must be enabled to use
-this command.
+circuit, the circuit is only available offline.
 
 The `disband` command creates a new circuit proposal to reflect the disbanded
 state, with the proposed circuit's `circuit_status` field set to `Disbanded`.
@@ -75,8 +73,8 @@ EXAMPLES
 The following command displays a member node requesting to disband the circuit:
 ```
 $ splinter circuit disband \
-  --key PROPOSED-MEMBER-NODE-PRIVATE-KEY-FILE \
-  --url URL-of-proposed-member-node-splinterd-REST-API \
+  --key MEMBER-NODE-PRIVATE-KEY-FILE \
+  --url URL-of-member-node-splinterd-REST-API \
   1234-ABCDE \
 ```
 
