@@ -96,6 +96,7 @@ experimental = [
     "oauth",
     "service-arg-validation",
     "service-endpoint",
+    "shutdown",
     "ws-transport",
 ]
 
@@ -135,6 +136,7 @@ service-arg-validation = [
     "splinter/service-arg-validation",
 ]
 service-endpoint = []
+shutdown = ["splinter/shutdown"]
 ws-transport = ["splinter/ws-transport"]
 
 [package.metadata.deb]
