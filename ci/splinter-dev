@@ -91,8 +91,17 @@ COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
 
 # Do release builds for each Cargo.toml
-RUN find . -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; cargo build --release --manifest-path "$x" ' \;
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=experimental ' \;
+
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=stable ' \;
+
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=default ' \;
+
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --no-default-features ' \;
 
 # Clean up built files
 RUN rm \
