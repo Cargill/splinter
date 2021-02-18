@@ -18,7 +18,7 @@ use std::fmt;
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
 use crate::orchestrator::InitializeServiceError;
-#[cfg(feature = "circuit-disband")]
+#[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
 use crate::orchestrator::ShutdownServiceError;
 use crate::service::error::{ServiceError, ServiceSendError};
 
@@ -163,7 +163,7 @@ pub enum AdminSharedError {
         context: String,
         source: Option<InitializeServiceError>,
     },
-    #[cfg(feature = "circuit-disband")]
+    #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
     ServiceShutdownFailed {
         context: String,
         source: Option<ShutdownServiceError>,
@@ -193,7 +193,7 @@ impl Error for AdminSharedError {
                     None
                 }
             }
-            #[cfg(feature = "circuit-disband")]
+            #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
             AdminSharedError::ServiceShutdownFailed { source, .. } => {
                 if let Some(ref err) = source {
                     Some(err)
@@ -228,7 +228,7 @@ impl fmt::Display for AdminSharedError {
                     f.write_str(&context)
                 }
             }
-            #[cfg(feature = "circuit-disband")]
+            #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
             AdminSharedError::ServiceShutdownFailed { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
@@ -298,7 +298,7 @@ impl std::fmt::Display for AdminConsensusManagerError {
 pub enum AdminError {
     ConsensusFailed(AdminConsensusManagerError),
     MessageTypeUnset,
-    #[cfg(not(feature = "circuit-disband"))]
+    #[cfg(any(not(feature = "circuit-disband"), not(feature = "circuit-abandon")))]
     MessageTypeUnhandled,
 }
 
@@ -307,7 +307,7 @@ impl Error for AdminError {
         match self {
             AdminError::ConsensusFailed(err) => Some(err),
             AdminError::MessageTypeUnset => None,
-            #[cfg(not(feature = "circuit-disband"))]
+            #[cfg(any(not(feature = "circuit-disband"), not(feature = "circuit-abandon")))]
             AdminError::MessageTypeUnhandled => None,
         }
     }
@@ -318,7 +318,7 @@ impl std::fmt::Display for AdminError {
         match self {
             AdminError::ConsensusFailed(err) => write!(f, "admin consensus failed: {}", err),
             AdminError::MessageTypeUnset => write!(f, "received message with unset type"),
-            #[cfg(not(feature = "circuit-disband"))]
+            #[cfg(any(not(feature = "circuit-disband"), not(feature = "circuit-abandon")))]
             AdminError::MessageTypeUnhandled => write!(f, "unable to handle the message"),
         }
     }

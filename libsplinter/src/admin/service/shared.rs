@@ -24,9 +24,13 @@ use std::time::SystemTime;
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::Message;
+#[cfg(feature = "circuit-abandon")]
+use protobuf::RepeatedField;
 
 #[cfg(feature = "admin-service-event-store")]
 use crate::admin::store;
+#[cfg(feature = "circuit-abandon")]
+use crate::admin::store::CircuitBuilder as StoreCircuitBuilder;
 #[cfg(feature = "circuit-purge")]
 use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
@@ -43,9 +47,11 @@ use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
+#[cfg(feature = "circuit-abandon")]
+use crate::protos::admin::AbandonedCircuit;
 #[cfg(feature = "circuit-disband")]
 use crate::protos::admin::DisbandedCircuit;
-#[cfg(feature = "service-arg-validation")]
+#[cfg(any(feature = "service-arg-validation", feature = "circuit-abandon"))]
 use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
     AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
@@ -1017,6 +1023,84 @@ impl AdminServiceShared {
         }
     }
 
+    #[cfg(feature = "circuit-abandon")]
+    fn abandon_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
+        // Verifying the circuit is able to be abandoned
+        let stored_circuit = self
+            .admin_store
+            .get_circuit(circuit_id)
+            .map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!("error occurred when trying to get circuit {}", err),
+                )))
+            })?
+            .ok_or_else(|| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!(
+                        "Received abandon request for a circuit that does not exist: circuit id {}",
+                        circuit_id
+                    ),
+                )))
+            })?;
+
+        // send ABANDONED_CIRCUIT message to all other members' admin services
+        if let Some(ref network_sender) = self.network_sender {
+            let mut abandoned_circuit = AbandonedCircuit::new();
+            abandoned_circuit.set_circuit_id(circuit_id.to_string());
+            abandoned_circuit.set_member_node_id(self.node_id.clone());
+            let mut msg = AdminMessage::new();
+            msg.set_message_type(AdminMessage_Type::ABANDONED_CIRCUIT);
+            msg.set_abandoned_circuit(abandoned_circuit);
+
+            let envelope_bytes = msg.write_to_bytes().map_err(|err| {
+                ServiceError::UnableToHandleMessage(Box::new(MarshallingError::ProtobufError(err)))
+            })?;
+            for member in stored_circuit.members().iter() {
+                if member != &self.node_id {
+                    network_sender.send(&admin_service_id(member), &envelope_bytes)?;
+                }
+            }
+        }
+
+        let (abandoned_proto_circuit, abandoned_store_circuit) = self
+            .make_abandoned_circuit(&stored_circuit)
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+        // Updating the corresponding `active` circuit from the admin store to have the
+        // `Abandoned` `circuit_status`
+        self.admin_store
+            .update_circuit(abandoned_store_circuit)
+            .map_err(|_| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!("Unable to update circuit {}", circuit_id),
+                )))
+            })?;
+
+        // The circuit is able to be abandoned, so we will proceed with removing the circuit's
+        // networking functionality for this node.
+        // Circuit has been abandoned: all associated services will be shut
+        // down, the circuit removed from the routing table, and peer refs
+        // for this circuit will be removed.
+        self.stop_services(&abandoned_proto_circuit)
+            .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+        // Removing the circuit from the routing table
+        self.routing_table_writer
+            .remove_circuit(stored_circuit.circuit_id())
+            .map_err(|_| {
+                ServiceError::UnableToHandleMessage(Box::new(AdminSharedError::SplinterStateError(
+                    format!(
+                        "Unable to remove circuit from routing table: {}",
+                        circuit_id
+                    ),
+                )))
+            })?;
+        // Removing the circuit's peer refs
+        for member in stored_circuit.members() {
+            self.remove_peer_ref(member);
+        }
+
+        Ok(())
+    }
+
     pub fn send_protocol_request(&mut self, node_id: &str) -> Result<(), ServiceError> {
         if self
             .service_protocols
@@ -1294,6 +1378,23 @@ impl AdminServiceShared {
                 .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
 
                 self.purge_circuit(circuit_id)
+            }
+            #[cfg(feature = "circuit-abandon")]
+            CircuitManagementPayload_Action::CIRCUIT_ABANDON => {
+                let signer_public_key = header.get_requester();
+                let requester_node_id = header.get_requester_node_id();
+                let circuit_id = payload.get_circuit_abandon().get_circuit_id();
+                debug!("received abandon request for circuit {}", circuit_id);
+
+                self.validate_abandon_circuit(
+                    circuit_id,
+                    signer_public_key,
+                    requester_node_id,
+                    ADMIN_SERVICE_PROTOCOL_VERSION,
+                )
+                .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))?;
+
+                self.abandon_circuit(circuit_id)
             }
             CircuitManagementPayload_Action::ACTION_UNSET => {
                 Err(ServiceError::UnableToHandleMessage(Box::new(
@@ -2409,6 +2510,92 @@ impl AdminServiceShared {
         Ok(())
     }
 
+    #[cfg(feature = "circuit-abandon")]
+    fn validate_abandon_circuit(
+        &self,
+        circuit_id: &str,
+        signer_public_key: &[u8],
+        requester_node_id: &str,
+        protocol: u32,
+    ) -> Result<(), AdminSharedError> {
+        if protocol != ADMIN_SERVICE_PROTOCOL_VERSION {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Circuit-Abandon is not available for protocol version {}",
+                protocol
+            )));
+        }
+
+        if requester_node_id.is_empty() {
+            return Err(AdminSharedError::ValidationFailed(
+                "requester_node_id is empty".to_string(),
+            ));
+        }
+
+        if requester_node_id != self.node_id {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Unable to abandon circuit from node {}: request came from node {}",
+                self.node_id, requester_node_id
+            )));
+        }
+
+        self.validate_key(signer_public_key)?;
+
+        if !self
+            .key_verifier
+            .is_permitted(requester_node_id, signer_public_key)?
+        {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "{} is not registered for the requester node {}",
+                to_hex(signer_public_key),
+                requester_node_id,
+            )));
+        }
+
+        self.key_permission_manager
+            .is_permitted(signer_public_key, PROPOSER_ROLE)
+            .map_err(|_| {
+                AdminSharedError::ValidationFailed(format!(
+                    "{} is not permitted to propose change for node {}",
+                    to_hex(signer_public_key),
+                    requester_node_id
+                ))
+            })?;
+
+        // Verifying the circuit is available in the admin store, `Active`, and able to be abandoned
+        let stored_circuit = self
+            .admin_store
+            .get_circuit(circuit_id)
+            .map_err(|err| {
+                AdminSharedError::ValidationFailed(format!(
+                    "error occurred when trying to get circuit {}",
+                    err
+                ))
+            })?
+            .ok_or_else(|| {
+                AdminSharedError::ValidationFailed(format!(
+                    "Received abandon request for a circuit that does not exist: circuit id {}",
+                    circuit_id
+                ))
+            })?;
+
+        if stored_circuit.circuit_status() != &StoreCircuitStatus::Active {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Attempting to abandon a circuit that is not active: {}",
+                circuit_id
+            )));
+        }
+
+        if stored_circuit.circuit_version() < CIRCUIT_PROTOCOL_VERSION {
+            return Err(AdminSharedError::ValidationFailed(format!(
+                "Attempting to abandon a circuit with version {}, must be {}",
+                stored_circuit.circuit_version(),
+                CIRCUIT_PROTOCOL_VERSION,
+            )));
+        }
+
+        Ok(())
+    }
+
     fn validate_circuit_management_payload(
         &self,
         payload: &CircuitManagementPayload,
@@ -2579,6 +2766,90 @@ impl AdminServiceShared {
         Ok(circuit_proposal)
     }
 
+    #[cfg(feature = "circuit-abandon")]
+    fn make_abandoned_circuit(
+        &self,
+        store_circuit: &StoreCircuit,
+    ) -> Result<(Circuit, StoreCircuit), AdminSharedError> {
+        // Collecting the endpoints of the nodes apart of the circuit being abandoned
+        let node_ids = store_circuit.members().to_vec();
+        let circuit_members = self
+            .admin_store
+            .list_nodes()
+            .map_err(|err| {
+                AdminSharedError::SplinterStateError(format!(
+                    "error occurred when trying to get circuit {}",
+                    err
+                ))
+            })?
+            .filter_map(|circuit_node| {
+                if node_ids.contains(&circuit_node.node_id().to_string()) {
+                    let mut node = SplinterNode::new();
+                    node.set_node_id(circuit_node.node_id().to_string());
+                    node.set_endpoints(RepeatedField::from_vec(circuit_node.endpoints().to_vec()));
+                    return Some(node);
+                }
+                None
+            })
+            .collect::<Vec<SplinterNode>>();
+
+        let services: Vec<SplinterService> = store_circuit
+            .roster()
+            .iter()
+            .map(|store_service| {
+                let mut service = SplinterService::new();
+                service.set_service_id(store_service.service_id().to_string());
+                service.set_service_type(store_service.service_type().to_string());
+                service.set_allowed_nodes(RepeatedField::from_vec(vec![store_service
+                    .node_id()
+                    .to_string()]));
+                service
+            })
+            .collect::<Vec<SplinterService>>();
+        let mut circuit = Circuit::new();
+        circuit.set_circuit_id(store_circuit.circuit_id().to_string());
+        circuit.set_roster(RepeatedField::from_vec(services));
+        circuit.set_members(RepeatedField::from_vec(circuit_members));
+        circuit.set_authorization_type(Circuit_AuthorizationType::from(
+            store_circuit.authorization_type(),
+        ));
+        circuit.set_persistence(Circuit_PersistenceType::from(store_circuit.persistence()));
+        circuit.set_durability(Circuit_DurabilityType::from(store_circuit.durability()));
+        circuit.set_routes(Circuit_RouteType::from(store_circuit.routes()));
+        circuit.set_circuit_management_type(store_circuit.circuit_management_type().to_string());
+        if let Some(display) = store_circuit.display_name() {
+            circuit.set_display_name(display.to_string());
+        }
+        circuit.set_circuit_version(store_circuit.circuit_version());
+        circuit.set_circuit_status(Circuit_CircuitStatus::from(store_circuit.circuit_status()));
+
+        // Creating the `Abandoned` StoreCircuit
+        let mut store_circuit = StoreCircuitBuilder::new()
+            .with_circuit_id(store_circuit.circuit_id())
+            .with_roster(store_circuit.roster())
+            .with_members(store_circuit.members())
+            .with_authorization_type(store_circuit.authorization_type())
+            .with_persistence(store_circuit.persistence())
+            .with_durability(store_circuit.durability())
+            .with_routes(store_circuit.routes())
+            .with_circuit_management_type(store_circuit.circuit_management_type())
+            .with_circuit_version(store_circuit.circuit_version())
+            .with_circuit_status(&StoreCircuitStatus::Abandoned);
+        if let Some(display_name) = store_circuit.display_name() {
+            store_circuit = store_circuit.with_display_name(&display_name);
+        }
+
+        Ok((
+            circuit,
+            store_circuit.build().map_err(|err| {
+                AdminSharedError::SplinterStateError(format!(
+                    "error occurred when trying to build circuit {}",
+                    err
+                ))
+            })?,
+        ))
+    }
+
     /// Initialize all services that this node should run on the created circuit using the service
     /// orchestrator. This may not include all services if they are not supported locally. It is
     /// expected that some services will be started externally.
@@ -2662,10 +2933,10 @@ impl AdminServiceShared {
         self.cleanup_disbanded_circuit_if_members_ready(&circuit_id)
     }
 
-    #[cfg(feature = "circuit-disband")]
-    /// Stops all services that this node was running on the disbanded circuit using the service
-    /// orchestrator. This may not include all services if they are not supported locally. It is
-    /// expected that some services will be stopped externally.
+    #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
+    /// Stops all services that this node was running on the disbanded or abandoned circuit using
+    /// the service orchestrator. This may not include all services if they are not supported
+    /// locally. It is expected that some services will be stopped externally.
     pub fn stop_services(&mut self, circuit: &Circuit) -> Result<(), AdminSharedError> {
         let orchestrator =
             self.orchestrator
@@ -5830,6 +6101,473 @@ mod tests {
         {
             panic!("Circuit should have been purged");
         }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a circuit being abandoned is validated correctly
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add the active circuit to be abandoned to the admin store
+    /// 3. Call `validate_abandon_circuit` with a valid circuit and valid requester info
+    /// 4. Validate the call to `validate_abandon_circuit` returns successfully
+    ///
+    /// This test verifies the `validate_abandon_circuit` returns successfully given a valid
+    /// abandon request.
+    #[test]
+    fn test_validate_abandon_circuit_valid() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Err(err) = admin_shared.validate_abandon_circuit(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been valid: {}", err);
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the circuit does not exist.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Call `validate_abandon_circuit` with a circuit and valid requester info
+    /// 3. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_validate_abandon_circuit_no_circuit() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        if let Ok(()) = admin_shared.validate_abandon_circuit(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit does not exist");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the circuit is not active.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a `Disbanded` circuit to the admin store.
+    /// 3. Call `validate_abandon_circuit` with the circuit and valid requester info
+    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_validate_abandon_circuit_invalid_circuit() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Disbanded),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_abandon_circuit(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit is not active");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the circuit is active, but
+    /// has a circuit version less than the `CIRCUIT_PROTOCOL_VERSION`.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a `Active` circuit with `circuit_version` of 1 to the admin store.
+    /// 3. Call `validate_abandon_circuit` with the circuit and valid requester info
+    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_validate_abandon_circuit_invalid_circuit_version() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(1, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_abandon_circuit(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the circuit has an invalid version");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the request does not come
+    /// from the local node.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a `Active` circuit to the admin store.
+    /// 3. Call `validate_abandon_circuit` with the circuit and requester info, specifying "node_b"
+    ///    `requester_node_id`
+    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_validate_abandon_circuit_invalid_node_id() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_abandon_circuit(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_b",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid because the request came from a remote node");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the admin service used has
+    /// an invalid protocol version.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a `Active` circuit to the admin store
+    /// 3. Call `validate_abandon_circuit` with the circuit and requester info
+    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_validate_abandon_circuit_invalid_protocol() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_abandon_circuit("01234-ABCDE", PUB_KEY, "node_a", 1) {
+            panic!("Should have been invalid because the protocol version is invalid");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the requester is not
+    /// permitted for the admin service.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a `Active` circuit to the admin store
+    /// 3. Call `validate_abandon_circuit` with the circuit and requester info
+    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_validate_abandon_circuit_not_permitted() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let signature_verifier = Secp256k1Context::new().new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::new(false)),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+
+        if let Ok(()) = admin_shared.validate_abandon_circuit(
+            "01234-ABCDE",
+            PUB_KEY,
+            "node_a",
+            ADMIN_SERVICE_PROTOCOL_VERSION,
+        ) {
+            panic!("Should have been invalid due to requester node not being registered");
+        }
+
+        shutdown(mesh, cm, pm);
+    }
+
+    #[cfg(feature = "circuit-abandon")]
+    /// Tests that a request to abandon a circuit returns an error if the requester is not
+    /// permitted for the admin service.
+    ///
+    /// 1. Set up `AdminServiceShared`
+    /// 2. Add a `Active` circuit to the admin store
+    /// 3. Call `validate_abandon_circuit` with the circuit and requester info
+    /// 4. Validate the call to `validate_abandon_circuit` returns an error
+    #[test]
+    fn test_abandon_circuit() {
+        let store = setup_admin_service_store();
+        #[cfg(feature = "admin-service-event-store")]
+        let event_store = store.clone_boxed();
+        let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
+        let orchestrator = setup_orchestrator();
+
+        let context = Secp256k1Context::new();
+        let private_key = context.new_random_private_key();
+        let pub_key = context
+            .get_public_key(&private_key)
+            .expect("Unable to get corresponding public key");
+        let signer = context.new_signer(private_key);
+        let signature_verifier = context.new_verifier();
+
+        let table = RoutingTable::default();
+        let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
+
+        let mut admin_shared = AdminServiceShared::new(
+            "node_a".into(),
+            Arc::new(Mutex::new(orchestrator)),
+            #[cfg(feature = "service-arg-validation")]
+            HashMap::new(),
+            peer_connector,
+            store,
+            signature_verifier,
+            Box::new(MockAdminKeyVerifier::default()),
+            Box::new(AllowAllKeyPermissionManager),
+            writer,
+            #[cfg(feature = "admin-service-event-store")]
+            event_store,
+        );
+
+        // Add the circuit to be abandoned
+        admin_shared
+            .admin_store
+            .add_circuit(
+                store_circuit(CIRCUIT_PROTOCOL_VERSION, StoreCircuitStatus::Active),
+                store_circuit_nodes(),
+            )
+            .expect("unable to add circuit to store");
+        // Make `CircuitAbandon` and corresponding payload
+        let mut abandon = admin::CircuitAbandon::new();
+        abandon.set_circuit_id("01234-ABCDE".to_string());
+
+        let mut header = admin::CircuitManagementPayload_Header::new();
+        header.set_action(admin::CircuitManagementPayload_Action::CIRCUIT_ABANDON);
+        header.set_requester(pub_key.into_bytes());
+        header.set_requester_node_id("node_a".to_string());
+
+        let mut payload = admin::CircuitManagementPayload::new();
+        payload.set_header(protobuf::Message::write_to_bytes(&header).unwrap());
+        payload.set_signature(signer.sign(&payload.header).unwrap().take_bytes());
+        payload.set_circuit_abandon(abandon);
+
+        // Submit `CircuitAbandon` payload
+        if let Err(err) = admin_shared.submit(payload) {
+            panic!("Should have been valid: {}", err);
+        }
+
+        let abandoned_circuit = admin_shared
+            .admin_store
+            .get_circuit(&"01234-ABCDE".to_string())
+            .expect("Unable to get circuit")
+            .unwrap();
+        assert_eq!(
+            &StoreCircuitStatus::Abandoned,
+            abandoned_circuit.circuit_status()
+        );
 
         shutdown(mesh, cm, pm);
     }

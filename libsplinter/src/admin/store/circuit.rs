@@ -172,6 +172,14 @@ impl TryFrom<&admin::Circuit_AuthorizationType> for AuthorizationType {
     }
 }
 
+impl From<&AuthorizationType> for admin::Circuit_AuthorizationType {
+    fn from(auth: &AuthorizationType) -> Self {
+        match *auth {
+            AuthorizationType::Trust => admin::Circuit_AuthorizationType::TRUST_AUTHORIZATION,
+        }
+    }
+}
+
 /// A circuits message persistence strategy
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PersistenceType {
@@ -205,6 +213,14 @@ impl TryFrom<&admin::Circuit_PersistenceType> for PersistenceType {
     }
 }
 
+impl From<&PersistenceType> for admin::Circuit_PersistenceType {
+    fn from(persistence: &PersistenceType) -> Self {
+        match *persistence {
+            PersistenceType::Any => admin::Circuit_PersistenceType::ANY_PERSISTENCE,
+        }
+    }
+}
+
 /// A circuits durability requirement
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DurabilityType {
@@ -228,6 +244,14 @@ impl TryFrom<&admin::Circuit_DurabilityType> for DurabilityType {
             admin::Circuit_DurabilityType::UNSET_DURABILITY_TYPE => Err(
                 InvalidStateError::with_message("DurabilityType is unset".to_string()),
             ),
+        }
+    }
+}
+
+impl From<&DurabilityType> for admin::Circuit_DurabilityType {
+    fn from(durability: &DurabilityType) -> Self {
+        match *durability {
+            DurabilityType::NoDurability => admin::Circuit_DurabilityType::NO_DURABILITY,
         }
     }
 }
@@ -261,6 +285,14 @@ impl TryFrom<&admin::Circuit_RouteType> for RouteType {
             admin::Circuit_RouteType::UNSET_ROUTE_TYPE => Err(InvalidStateError::with_message(
                 "RouteType is unset".to_string(),
             )),
+        }
+    }
+}
+
+impl From<&RouteType> for admin::Circuit_RouteType {
+    fn from(route: &RouteType) -> Self {
+        match *route {
+            RouteType::Any => admin::Circuit_RouteType::ANY_ROUTE,
         }
     }
 }
@@ -301,6 +333,16 @@ impl TryFrom<&admin::Circuit_CircuitStatus> for CircuitStatus {
                 debug!("Defaulting `UNSET_CIRCUIT_STATUS` of proposed circuit to `Active`");
                 Ok(CircuitStatus::Active)
             }
+        }
+    }
+}
+
+impl From<&CircuitStatus> for admin::Circuit_CircuitStatus {
+    fn from(status: &CircuitStatus) -> Self {
+        match *status {
+            CircuitStatus::Active => admin::Circuit_CircuitStatus::ACTIVE,
+            CircuitStatus::Disbanded => admin::Circuit_CircuitStatus::DISBANDED,
+            CircuitStatus::Abandoned => admin::Circuit_CircuitStatus::ABANDONED,
         }
     }
 }
