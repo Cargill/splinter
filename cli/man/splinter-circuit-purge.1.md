@@ -17,17 +17,25 @@ SYNOPSIS
 DESCRIPTION
 ===========
 Request to purge a circuit by specifying the circuit ID of the circuit to be
-removed from the node's storage. A circuit is only available to be purged
-if it has already been disbanded and are only available locally. Disbanding a
-circuit removes a circuit's networking functionality.
+removed from the node's storage. Internal service data associated with the
+circuit is also purged. A circuit is only able to be purged if it has already
+been deactivated and no longer supports networking. Disbanding a circuit
+removes a circuit's networking functionality, allowing for a circuit to be
+purged. A circuit may also be abandoned, causing the circuit's networking
+capability to be disabled for the abandoning node, so the abandoning node
+is able to purge the deactivated circuit.
 
-The generated ID of the existing disbanded circuit can be viewed using the
-`splinter-circuit-list`, with the `--circuit-status` option of `disbanded`.
+The generated ID of an existing deactivated circuit can be viewed using the
+`splinter-circuit-list`, with the `--circuit-status` option of either
+`disbanded` and/or `abandoned`.
 
-The purge request is only available for members of the node, as the circuit is
-only available to the node locally. If the circuit has not been disbanded, it
-is not able to be purged. Once a circuit has been purged, it is removed from
-the node's storage and is no longer viewable.
+The purge request only works for local circuits that have been deactivated. If
+the circuit is still considered active, it is not able to be purged. Once a
+circuit has been purged, the circuit is removed from the node's admin store and
+any internal Splinter service data will also be removed. If a circuit is using
+the Scabbard service, for example, the state LMDB files associated with the
+circuit are deleted. After purging, the circuit and internal service data are
+no longer available as this state has been deleted.
 
 FLAGS
 =====
@@ -61,7 +69,7 @@ ARGUMENTS
 
 EXAMPLES
 ========
-* The existing disbanded circuit has ID `1234-ABCDE`.
+* The existing inactive circuit has ID `1234-ABCDE`.
 
 The following command displays a member node requesting to purge the circuit:
 ```
