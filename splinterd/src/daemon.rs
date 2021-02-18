@@ -23,7 +23,7 @@ use std::thread;
 use std::time::Duration;
 
 use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
 use scabbard::service::ScabbardArgValidator;
@@ -91,11 +91,11 @@ const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 
 type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::ServiceProcessorError>>;
@@ -237,7 +237,7 @@ impl SplinterDaemon {
         let mut internal_service_listeners = vec![];
         internal_service_listeners.push(transport.listen("inproc://admin-service")?);
         internal_service_listeners.push(transport.listen("inproc://orchestator")?);
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         internal_service_listeners.push(transport.listen("inproc://health_service")?);
 
         info!("Starting SpinterNode with ID {}", self.node_id);
@@ -259,7 +259,7 @@ impl SplinterDaemon {
             ),
         ];
 
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         inproc_ids.push((
             "inproc://health-service".to_string(),
             format!("health::{}", &self.node_id),
@@ -324,7 +324,7 @@ impl SplinterDaemon {
                 ))
             })?;
 
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         let health_connection = service_transport
             .connect("inproc://health_service")
             .map_err(|err| {
@@ -698,7 +698,7 @@ impl SplinterDaemon {
         }
 
         let mut health_service_processor_join_handle: Option<_> = None;
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         {
             let health_service = HealthService::new(&self.node_id);
             rest_api_builder = rest_api_builder.add_resources(health_service.resources());
@@ -710,7 +710,7 @@ impl SplinterDaemon {
             )?);
         }
 
-        #[cfg(not(feature = "health"))]
+        #[cfg(not(feature = "health-service"))]
         {
             health_service_processor_join_handle.replace(());
         }
@@ -748,7 +748,7 @@ impl SplinterDaemon {
         registry_shutdown.shutdown();
         interconnect_shutdown.shutdown();
 
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         {
             let _ = health_service_processor_join_handle
                 .expect(
@@ -757,7 +757,7 @@ impl SplinterDaemon {
                 )
                 .join_all();
         }
-        #[cfg(not(feature = "health"))]
+        #[cfg(not(feature = "health-service"))]
         {
             let _ = health_service_processor_join_handle.take();
         }
@@ -902,7 +902,7 @@ impl SplinterDaemon {
     }
 }
 
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 fn start_health_service(
     connection: Box<dyn Connection>,
     health_service: HealthService,
@@ -1522,7 +1522,7 @@ pub enum StartError {
     ProtocolError(String),
     RestApiError(String),
     AdminServiceError(String),
-    #[cfg(feature = "health")]
+    #[cfg(feature = "health-service")]
     HealthServiceError(String),
     OrchestratorError(String),
 }
@@ -1540,7 +1540,7 @@ impl fmt::Display for StartError {
             StartError::AdminServiceError(msg) => {
                 write!(f, "the admin service encountered an error: {}", msg)
             }
-            #[cfg(feature = "health")]
+            #[cfg(feature = "health-service")]
             StartError::HealthServiceError(msg) => {
                 write!(f, "the health service encountered an error: {}", msg)
             }

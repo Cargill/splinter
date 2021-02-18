@@ -91,7 +91,7 @@ experimental = [
     "circuit-abandon",
     "circuit-disband",
     "circuit-purge",
-    "health",
+    "health-service",
     "https-bind",
     "oauth",
     "service-arg-validation",
@@ -126,6 +126,7 @@ circuit-disband = ["splinter/circuit-disband"]
 circuit-purge = ["splinter/circuit-purge"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
+health-service = ["health", "splinter/shutdown"]
 https-bind = ["splinter/https-bind"]
 oauth = [
     "splinter/oauth"
