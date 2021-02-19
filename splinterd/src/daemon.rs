@@ -127,6 +127,8 @@ pub struct SplinterDaemon {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "biome-credentials")]
+    enable_biome_credentials: bool,
     #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
     #[cfg(feature = "oauth")]
@@ -607,10 +609,9 @@ impl SplinterDaemon {
             verifier: Secp256k1Context::new().new_verifier(),
         });
 
-        // Add Biome as an auth provider if the `biome-credentials` feature is enabled. This informs
-        // the REST API that Biome is providing auth.
+        // Add Biome credentials as an auth provider if it's enabled
         #[cfg(feature = "biome-credentials")]
-        {
+        if self.enable_biome_credentials {
             let mut biome_credentials_builder: BiomeCredentialsRestResourceProviderBuilder =
                 Default::default();
 
@@ -1021,6 +1022,8 @@ pub struct SplinterDaemonBuilder {
     admin_timeout: Duration,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "biome-credentials")]
+    enable_biome_credentials: Option<bool>,
     #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
     #[cfg(feature = "oauth")]
@@ -1143,6 +1146,12 @@ impl SplinterDaemonBuilder {
         self
     }
 
+    #[cfg(feature = "biome-credentials")]
+    pub fn with_enable_biome_credentials(mut self, value: bool) -> Self {
+        self.enable_biome_credentials = Some(value);
+        self
+    }
+
     #[cfg(feature = "oauth")]
     pub fn with_oauth_provider(mut self, value: Option<String>) -> Self {
         self.oauth_provider = value;
@@ -1260,6 +1269,11 @@ impl SplinterDaemonBuilder {
 
         let storage_type = self.storage_type;
 
+        #[cfg(feature = "biome-credentials")]
+        let enable_biome_credentials = self.enable_biome_credentials.ok_or_else(|| {
+            CreateError::MissingRequiredField("Missing field: enable_biome_credentials".to_string())
+        })?;
+
         let strict_ref_counts = self.strict_ref_counts.ok_or_else(|| {
             CreateError::MissingRequiredField("Missing field: strict_ref_counts".to_string())
         })?;
@@ -1287,6 +1301,8 @@ impl SplinterDaemonBuilder {
             admin_timeout: self.admin_timeout,
             #[cfg(feature = "rest-api-cors")]
             whitelist: self.whitelist,
+            #[cfg(feature = "biome-credentials")]
+            enable_biome_credentials,
             #[cfg(feature = "oauth")]
             oauth_provider: self.oauth_provider,
             #[cfg(feature = "oauth")]

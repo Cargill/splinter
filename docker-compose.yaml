@@ -45,6 +45,7 @@ services:
             -c ./configs/splinterd-node-0-docker.toml \
             --registries file://./registries/registry.yaml \
             --tls-insecure \
+            --enable-biome-credentials \
             --database postgres://splinter_admin:splinter_test@splinter-db:5432/splinter \
             $SPLINTERD_ARGS \
             -vv

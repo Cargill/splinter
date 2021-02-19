@@ -122,7 +122,8 @@ services:
               --service-endpoint 0.0.0.0:8043 \
               --network-endpoint 0.0.0.0:8044 \
               --rest-api-endpoint 0.0.0.0:8085 \
-              --tls-insecure
+              --tls-insecure \
+              --enable-biome-credentials
       "
 
   splinterd-db-node:

@@ -71,6 +71,8 @@ pub struct Config {
     no_tls: (bool, ConfigSource),
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<(Vec<String>, ConfigSource)>,
+    #[cfg(feature = "biome-credentials")]
+    enable_biome_credentials: (bool, ConfigSource),
     #[cfg(feature = "oauth")]
     oauth_provider: Option<(String, ConfigSource)>,
     #[cfg(feature = "oauth")]
@@ -215,6 +217,11 @@ impl Config {
         } else {
             None
         }
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    pub fn enable_biome_credentials(&self) -> bool {
+        self.enable_biome_credentials.0
     }
 
     #[cfg(feature = "oauth")]
@@ -410,6 +417,11 @@ impl Config {
         } else {
             None
         }
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    pub fn enable_biome_credentials_source(&self) -> &ConfigSource {
+        &self.enable_biome_credentials.1
     }
 
     #[cfg(feature = "oauth")]
@@ -612,6 +624,12 @@ impl Config {
         );
         #[cfg(feature = "rest-api-cors")]
         self.log_whitelist();
+        #[cfg(feature = "biome-credentials")]
+        debug!(
+            "Config: enable_biome_credentials: {:?} (source: {:?})",
+            self.enable_biome_credentials(),
+            self.enable_biome_credentials_source()
+        );
         #[cfg(feature = "oauth")]
         {
             if let (Some(provider), Some(source)) =

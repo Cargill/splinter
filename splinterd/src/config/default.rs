@@ -92,6 +92,11 @@ impl PartialConfigBuilder for DefaultPartialConfigBuilder {
                 partial_config.with_service_endpoint(Some(String::from(SERVICE_ENDPOINT)))
         }
 
+        #[cfg(feature = "biome-credentials")]
+        {
+            partial_config = partial_config.with_enable_biome_credentials(Some(false))
+        }
+
         Ok(partial_config)
     }
 }
