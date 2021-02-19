@@ -21,7 +21,7 @@ use rand::Rng;
 use transact::families::smallbank::workload::{
     playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
 };
-use transact::workload::WorkloadRunner;
+use transact::workload::{WorkloadRunner, DEFAULT_LOG_TIME_SECS};
 
 use crate::error::CliError;
 
@@ -85,7 +85,7 @@ impl Action for WorkloadAction {
 
         let update: u32 = args
             .value_of("update")
-            .unwrap_or("30")
+            .unwrap_or(&DEFAULT_LOG_TIME_SECS.to_string())
             .parse()
             .map_err(|_| CliError::ActionError("Unable to parse provided update time".into()))?;
 
