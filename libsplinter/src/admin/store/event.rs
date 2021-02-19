@@ -20,6 +20,9 @@ use super::CircuitProposal;
 use crate::admin::service::messages;
 use crate::error::InvalidStateError;
 
+/// Represents the `requester`'s public key associated with an `AdminServiceEvent`
+pub type PublicKey = Vec<u8>;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 /// Representation of an `AdminServiceEvent` defined by the admin messages
 pub struct AdminServiceEvent {
@@ -32,9 +35,9 @@ pub struct AdminServiceEvent {
 /// Native representation of the `AdminServiceEvent` enum variants
 pub enum EventType {
     ProposalSubmitted,
-    ProposalVote { requester: Vec<u8> },
-    ProposalAccepted { requester: Vec<u8> },
-    ProposalRejected { requester: Vec<u8> },
+    ProposalVote { requester: PublicKey },
+    ProposalAccepted { requester: PublicKey },
+    ProposalRejected { requester: PublicKey },
     CircuitReady,
     CircuitDisbanded,
 }
