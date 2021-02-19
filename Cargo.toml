@@ -53,9 +53,11 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "playlist",
     "workload"
 ]
 
+playlist = ["cylinder"]
 workload = ["ctrlc", "cylinder", "rand"]
 
 [package.metadata.docs.rs]

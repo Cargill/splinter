@@ -13,15 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "playlist")]
+pub mod playlist;
 #[cfg(feature = "workload")]
 pub mod workload;
 
 use std::collections::HashMap;
-#[cfg(feature = "workload")]
+#[cfg(any(feature = "workload", feature = "playlist"))]
 use std::path::Path;
 
 use clap::ArgMatches;
-#[cfg(feature = "workload")]
+#[cfg(any(feature = "workload", feature = "playlist"))]
 use cylinder::{
     current_user_search_path, jwt::JsonWebTokenBuilder, load_key, load_key_from_path,
     secp256k1::Secp256k1Context, Context, Signer,
@@ -43,12 +45,12 @@ pub struct SubcommandActions<'a> {
     actions: HashMap<String, Box<dyn Action + 'a>>,
 }
 
-#[cfg(feature = "workload")]
 impl<'a> SubcommandActions<'a> {
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[cfg(any(feature = "playlist", feature = "workload"))]
     pub fn with_command<'action: 'a, A: Action + 'action>(
         mut self,
         command: &str,
@@ -74,7 +76,7 @@ impl<'s> Action for SubcommandActions<'s> {
     }
 }
 
-#[cfg(feature = "workload")]
+#[cfg(any(feature = "playlist", feature = "workload"))]
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth_signer_key(
     key_name: &str,
@@ -107,4 +109,31 @@ fn create_cylinder_jwt_auth_signer_key(
         .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;
 
     Ok((format!("Bearer Cylinder:{}", encoded_token), signer))
+}
+
+#[cfg(feature = "playlist")]
+// load signing key from key file
+fn load_cylinder_signer_key(key_name: &str) -> Result<Box<dyn Signer>, CliError> {
+    let private_key = if key_name.contains('/') {
+        load_key_from_path(Path::new(key_name))
+            .map_err(|err| CliError::ActionError(err.to_string()))?
+    } else {
+        let path = &current_user_search_path();
+        load_key(key_name, path)
+            .map_err(|err| CliError::ActionError(err.to_string()))?
+            .ok_or_else(|| {
+                CliError::ActionError({
+                    format!(
+                        "No signing key found in {}. Specify the --key argument",
+                        path.iter()
+                            .map(|path| path.as_path().display().to_string())
+                            .collect::<Vec<String>>()
+                            .join(":")
+                    )
+                })
+            })?
+    };
+
+    let context = Secp256k1Context::new();
+    Ok(context.new_signer(private_key))
 }
