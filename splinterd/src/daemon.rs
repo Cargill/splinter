@@ -31,8 +31,12 @@ use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::{admin_service_id, AdminService, AdminServiceBuilder};
 use splinter::admin::store::yaml::YamlAdminServiceStore;
-#[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-use splinter::biome::rest_api::{BiomeRestResourceManager, BiomeRestResourceManagerBuilder};
+#[cfg(feature = "biome-credentials")]
+use splinter::biome::credentials::rest_api::BiomeCredentialsRestResourceProviderBuilder;
+#[cfg(feature = "biome-key-management")]
+use splinter::biome::key_management::rest_api::BiomeKeyManagementRestResourceProvider;
+#[cfg(feature = "biome-profile")]
+use splinter::biome::profile::rest_api::BiomeProfileRestResourceProvider;
 use splinter::circuit::handlers::{
     AdminDirectMessageHandler, CircuitDirectMessageHandler, CircuitErrorHandler,
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
@@ -607,9 +611,29 @@ impl SplinterDaemon {
         // the REST API that Biome is providing auth.
         #[cfg(feature = "biome-credentials")]
         {
-            let biome_resource_manager = build_biome_routes(&*store_factory)?;
+            let mut biome_credentials_builder: BiomeCredentialsRestResourceProviderBuilder =
+                Default::default();
+
+            biome_credentials_builder = biome_credentials_builder
+                .with_refresh_token_store(store_factory.get_biome_refresh_token_store())
+                .with_credentials_store(store_factory.get_biome_credentials_store());
+
+            #[cfg(feature = "biome-key-management")]
+            {
+                biome_credentials_builder =
+                    biome_credentials_builder.with_key_store(store_factory.get_biome_key_store())
+            }
+
+            let biome_credentials_resource_provider =
+                biome_credentials_builder.build().map_err(|err| {
+                    StartError::RestApiError(format!(
+                        "Unable to build Biome credentials REST routes: {}",
+                        err
+                    ))
+                })?;
+
             auth_configs.push(AuthConfig::Biome {
-                biome_resource_manager,
+                biome_credentials_resource_provider,
             });
         }
 
@@ -690,12 +714,24 @@ impl SplinterDaemon {
 
         rest_api_builder = rest_api_builder.with_auth_configs(auth_configs);
 
-        // If `biome-key-management` is enabled but `biome-credentials` isn't then the Biome
-        // endpoints weren't added as an auth provider, so add them now
-        #[cfg(all(feature = "biome-key-management", not(feature = "biome-credentials")))]
+        #[cfg(feature = "biome-key-management")]
         {
-            let biome_resources = build_biome_routes(&*store_factory)?;
-            rest_api_builder = rest_api_builder.add_resources(biome_resources.resources());
+            rest_api_builder = rest_api_builder.add_resources(
+                BiomeKeyManagementRestResourceProvider::new(Arc::new(
+                    store_factory.get_biome_key_store(),
+                ))
+                .resources(),
+            );
+        }
+
+        #[cfg(feature = "biome-profile")]
+        {
+            rest_api_builder = rest_api_builder.add_resources(
+                BiomeProfileRestResourceProvider::new(Arc::new(
+                    store_factory.get_biome_user_profile_store(),
+                ))
+                .resources(),
+            );
         }
 
         let mut health_service_processor_join_handle: Option<_> = None;
@@ -957,37 +993,6 @@ fn create_store_factory(
     splinter::store::create_store_factory(connection_uri).map_err(|err| {
         StartError::StorageError(format!("Failed to initialize store factory: {}", err))
     })
-}
-
-#[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-fn build_biome_routes(
-    store_factory: &dyn splinter::store::StoreFactory,
-) -> Result<BiomeRestResourceManager, StartError> {
-    info!("Adding biome routes");
-    #[cfg(any(feature = "biome-credentials", feature = "biome-key-management"))]
-    let mut biome_rest_provider_builder: BiomeRestResourceManagerBuilder = Default::default();
-    #[cfg(feature = "biome-credentials")]
-    {
-        biome_rest_provider_builder = biome_rest_provider_builder
-            .with_refresh_token_store(store_factory.get_biome_refresh_token_store());
-        biome_rest_provider_builder = biome_rest_provider_builder
-            .with_credentials_store(store_factory.get_biome_credentials_store());
-    }
-    #[cfg(feature = "biome-key-management")]
-    {
-        biome_rest_provider_builder =
-            biome_rest_provider_builder.with_key_store(store_factory.get_biome_key_store())
-    }
-    #[cfg(feature = "biome-profile")]
-    {
-        biome_rest_provider_builder = biome_rest_provider_builder
-            .with_profile_store(store_factory.get_biome_user_profile_store());
-    }
-    let biome_rest_provider = biome_rest_provider_builder.build().map_err(|err| {
-        StartError::RestApiError(format!("Unable to build Biome REST routes: {}", err))
-    })?;
-
-    Ok(biome_rest_provider)
 }
 
 #[derive(Default)]
