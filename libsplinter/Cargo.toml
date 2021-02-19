@@ -99,6 +99,7 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
+    "admin-service-client",
     "admin-service-event-store",
     "admin-service-event-store-postgres",
     "authorization",
@@ -111,6 +112,7 @@ experimental = [
     "circuit-abandon",
     "circuit-disband",
     "circuit-purge",
+    "client-reqwest",
     "https-bind",
     "oauth-inflight-request-store-postgres",
     "registry-database",
@@ -126,6 +128,7 @@ experimental = [
 benchmark = []
 
 admin-service = []
+admin-service-client = []
 admin-service-event-store = ["admin-service"]
 admin-service-event-store-postgres = ["postgres", "admin-service-event-store"]
 authorization-handler-allow-keys = ["authorization"]
@@ -142,6 +145,7 @@ circuit-abandon = []
 circuit-disband = []
 circuit-purge = []
 circuit-template = ["admin-service", "glob"]
+client-reqwest = ["reqwest"]
 cylinder-jwt = ["cylinder/jwt", "rest-api"]
 events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
