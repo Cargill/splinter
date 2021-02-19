@@ -494,14 +494,6 @@ mod tests {
     }
 
     impl RegistryWriter for MemRegistry {
-        fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-            self.nodes
-                .lock()
-                .expect("mem registry lock was poisoned")
-                .insert(node.identity.clone(), node);
-            Ok(())
-        }
-
         fn add_node(&self, node: Node) -> Result<(), RegistryError> {
             self.nodes
                 .lock()

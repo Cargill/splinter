@@ -35,7 +35,6 @@ use operations::count_nodes::RegistryCountNodesOperation as _;
 use operations::delete_node::RegistryDeleteNodeOperation as _;
 use operations::get_node::RegistryFetchNodeOperation as _;
 use operations::has_node::RegistryHasNodeOperation as _;
-use operations::insert_node::RegistryInsertNodeOperation as _;
 use operations::list_nodes::RegistryListNodesOperation as _;
 use operations::update_node::RegistryUpdateNodeOperation as _;
 use operations::RegistryOperations;
@@ -104,10 +103,6 @@ where
 
 #[cfg(feature = "postgres")]
 impl RegistryWriter for DieselRegistry<diesel::pg::PgConnection> {
-    fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).insert_node(node)
-    }
-
     fn add_node(&self, node: Node) -> Result<(), RegistryError> {
         RegistryOperations::new(&*self.connection_pool.get()?).add_node(node)
     }
@@ -123,10 +118,6 @@ impl RegistryWriter for DieselRegistry<diesel::pg::PgConnection> {
 
 #[cfg(feature = "sqlite")]
 impl RegistryWriter for DieselRegistry<diesel::sqlite::SqliteConnection> {
-    fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-        RegistryOperations::new(&*self.connection_pool.get()?).insert_node(node)
-    }
-
     fn add_node(&self, node: Node) -> Result<(), RegistryError> {
         RegistryOperations::new(&*self.connection_pool.get()?).add_node(node)
     }
@@ -186,34 +177,6 @@ pub mod tests {
         r2d2::{ConnectionManager, Pool},
         sqlite::SqliteConnection,
     };
-
-    ///  Test that a new node can be inserted into the registry and fetched
-    ///
-    /// 1. Setup sqlite database
-    /// 2. Insert node 1
-    /// 3. Validate that the node can be fetched correctly from state
-    /// 4. Try to insert the node again with same endpoints, should fail
-    #[test]
-    fn test_insert_nodes() {
-        let pool = create_connection_pool_and_migrate();
-        let registry = DieselRegistry::new(pool);
-
-        #[allow(deprecated)]
-        registry
-            .insert_node(get_node_1())
-            .expect("Unable to insert node");
-        let node = registry
-            .get_node(&get_node_1().identity)
-            .expect("Failed to fetch node")
-            .expect("Node not found");
-
-        assert_eq!(node, get_node_1());
-
-        #[allow(deprecated)]
-        if registry.insert_node(get_node_1()).is_ok() {
-            panic!("Should have returned an error because of duplicate endpoint")
-        }
-    }
 
     ///  Test that a new node can be add to the registry and fetched
     ///
