@@ -27,30 +27,7 @@ services:
     image: lint-splinter:${ISOLATION_ID}
     volumes:
       - ../../:/project/splinter
-    command: run_lint_rust
-
-  clippy-splinter:
-    build:
-      context: ../
-      dockerfile: ./lint
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
-    image: clippy-splinter:${ISOLATION_ID}
-    volumes:
-      - ../../:/project/splinter
-    entrypoint: |
-      bash -c "
-         echo \"Running clippy on default features...\" && \
-         cargo clippy -- -D warnings && \
-         echo \"Running clippy on experimental features...\" && \
-         (cd libsplinter && cargo clippy --features experimental -- -D warnings) && \
-         (cd splinterd && cargo clippy --features experimental -- -D warnings) && \
-         (cd cli && cargo clippy --features experimental -- -D warnings) && \
-         (cd services/scabbard/cli && cargo clippy --features experimental -- -D warnings) && \
-         (cd services/scabbard/libscabbard && cargo clippy --features experimental -- -D warnings)
-      "
+    command: just lint
 
   lint-gameroom-client:
     build:
