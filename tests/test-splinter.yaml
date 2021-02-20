@@ -22,6 +22,8 @@ services:
       context: ../
       dockerfile: tests/Dockerfile
     image: test-splinter:${ISOLATION_ID}
+    environment:
+      - TEST_MODE=--verbose --release
     command: |
         bash -c "
             just test

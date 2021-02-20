@@ -38,7 +38,7 @@ build:
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $feature"
+            cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
@@ -97,7 +97,7 @@ test: build
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo test --manifest-path=$crate/Cargo.toml $feature"
+            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
