@@ -12,10 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v6
+FROM splintercommunity/splinter-dev:v7
 
 RUN apt-get update \
  && apt-get install -y \
  postgresql-client
 
-WORKDIR /project/splinter/
+COPY Cargo.toml /build/Cargo.toml
+COPY libsplinter /build/libsplinter
+COPY splinterd /build/splinterd
+COPY cli /build/cli
+COPY services/scabbard/cli /build/services/scabbard/cli
+COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
+COPY services/health /build/services/health
+COPY examples/gameroom/database /build/examples/gameroom/database
+COPY examples/gameroom/daemon /build/examples/gameroom/daemon
+COPY examples/gameroom/cli /build/examples/gameroom/cli
+
+COPY justfile /build
+
+WORKDIR /build
