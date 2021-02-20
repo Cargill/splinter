@@ -64,6 +64,12 @@ lint:
     done
     echo "\n\033[92mLint Success\033[0m\n"
 
+lint-client:
+    #!/usr/bin/env sh
+    set -e
+    cd examples/gameroom/gameroom-app
+    npm run lint
+
 test: build
     #!/usr/bin/env sh
     set -e
