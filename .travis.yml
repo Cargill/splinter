@@ -20,6 +20,7 @@ env:
     - ISOLATION_ID=$TRAVIS_BUILD_ID
     - NAMESPACE="splintercommunity/"
     - VERSION=AUTO_STRICT
+    - BUILD_MODE="--verbose --release"
 
 git:
   depth: false
@@ -39,25 +40,22 @@ jobs:
   include:
     - stage: Lint Gameroom Client
       script:
-        - docker-compose -f docker/compose/run-lint.yaml up --abort-on-container-exit lint-gameroom-client
+        - just lint-client-ci
 
     - stage: Run Lint/Clippy on Splinter
       script:
-        - docker-compose -f docker/compose/run-lint.yaml up --abort-on-container-exit lint-splinter
-    - stage: Run Lint/Clippy on Splinter
-      script:
-        - docker-compose -f docker/compose/run-lint.yaml up --abort-on-container-exit clippy-splinter
+        - just lint-splinter-ci
 
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
       script:
-        - docker-compose -f tests/test-splinter.yaml up --abort-on-container-exit unit-test-splinter
+        - just test-ci
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
       script:
-        - docker-compose -f examples/gameroom/tests/docker-compose.yaml up --abort-on-container-exit
+        - just test-gameroom-ci
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
