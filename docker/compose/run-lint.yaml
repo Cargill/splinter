@@ -31,9 +31,7 @@ services:
 
   lint-gameroom-client:
     build:
-      context: ../../examples/gameroom/gameroom-app
-      dockerfile: ../../../docker/lint-client
+      context: ../../
+      dockerfile: ./docker/lint-client
     image: lint-gameroom-client:${ISOLATION_ID}
-    volumes:
-      - ../../:/project/splinter/examples/gameroom/gameroom-app
-    command: npm run lint
+    command: just lint-client
