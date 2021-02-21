@@ -90,7 +90,7 @@ lint-splinter-ci:
     docker-compose -f docker/compose/run-lint.yaml up \
       --abort-on-container-exit lint-splinter
 
-test: build
+test:
     #!/usr/bin/env sh
     set -e
     for feature in $(echo {{features}})
