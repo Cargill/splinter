@@ -48,7 +48,7 @@ use splinter::network::dispatch::{
     dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
 };
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
+use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
 use splinter::peer::PeerManager;
@@ -82,10 +82,6 @@ use splinter::transport::{
 };
 
 use crate::routes;
-
-const ORCHESTRATOR_INCOMING_CAPACITY: usize = 8;
-const ORCHESTRATOR_OUTGOING_CAPACITY: usize = 8;
-const ORCHESTRATOR_CHANNEL_CAPACITY: usize = 8;
 
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
@@ -430,20 +426,37 @@ impl SplinterDaemon {
         let signing_context = Secp256k1Context::new();
         let admin_service_verifier = signing_context.new_verifier();
 
-        let (orchestrator, orchestator_join_handles) = ServiceOrchestrator::new(
-            vec![Box::new(ScabbardFactory::new(
+        let mut orchestrator = ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .with_service_factory(Box::new(ScabbardFactory::new(
                 None,
                 None,
                 None,
                 None,
                 Box::new(signing_context),
-            ))],
-            orchestrator_connection,
-            ORCHESTRATOR_INCOMING_CAPACITY,
-            ORCHESTRATOR_OUTGOING_CAPACITY,
-            ORCHESTRATOR_CHANNEL_CAPACITY,
-        )?;
+            )))
+            .build()
+            .map_err(|err| {
+                StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
+            })?
+            .run()
+            .map_err(|err| {
+                StartError::OrchestratorError(format!("failed to start orchestrator: {}", err))
+            })?;
+
         let orchestrator_resources = orchestrator.resources();
+        #[cfg(not(feature = "shutdown"))]
+        let orchestator_join_handles = orchestrator.take_join_handles().ok_or_else(|| {
+            StartError::OrchestratorError(
+                "Orchestrator join handles were taken more than once".into(),
+            )
+        })?;
+        #[cfg(feature = "shutdown")]
+        let orchestator_shutdown_handle = orchestrator.take_shutdown_handle().ok_or_else(|| {
+            StartError::OrchestratorError(
+                "Orchestrator shutdown handle was taken more than once".into(),
+            )
+        })?;
 
         let (registry, registry_shutdown) = create_registry(
             &self.state_dir,
@@ -733,6 +746,7 @@ impl SplinterDaemon {
         #[cfg(feature = "shutdown")]
         if let Err(err) = splinter::threading::shutdown::shutdown(vec![
             admin_shutdown_handle,
+            orchestator_shutdown_handle,
             #[cfg(feature = "health-service")]
             health_service_shutdown_handle,
         ]) {
@@ -756,6 +770,7 @@ impl SplinterDaemon {
         let _ = rest_api_join_handle.join();
         #[cfg(not(feature = "shutdown"))]
         let _ = service_processor_join_handle.join_all();
+        #[cfg(not(feature = "shutdown"))]
         let _ = orchestator_join_handles.join_all();
         peer_manager_shutdown.shutdown();
         peer_manager.await_shutdown();
@@ -1583,11 +1598,5 @@ impl From<ConnectError> for StartError {
 impl From<protobuf::ProtobufError> for StartError {
     fn from(err: protobuf::ProtobufError) -> Self {
         StartError::ProtocolError(err.to_string())
-    }
-}
-
-impl From<NewOrchestratorError> for StartError {
-    fn from(err: NewOrchestratorError) -> Self {
-        StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
     }
 }

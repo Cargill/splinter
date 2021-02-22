@@ -962,6 +962,7 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
+    use crate::orchestrator::ServiceOrchestratorBuilder;
     use crate::peer::PeerManager;
     use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
@@ -1029,8 +1030,12 @@ mod tests {
         let orchestrator_connection = orchestrator_transport
             .connect("inproc://orchestator")
             .expect("failed to create connection");
-        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
-            .expect("failed to create orchestrator");
+        let orchestrator = ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .build()
+            .expect("failed to create orchestrator")
+            .run()
+            .expect("failed to start orchestrator");
 
         let context = Secp256k1Context::new();
         let private_key = context.new_random_private_key();

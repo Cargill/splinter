@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod builder;
 mod error;
 #[cfg(feature = "rest-api")]
 mod rest_api;
+mod runnable;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,7 +26,6 @@ use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender};
 use protobuf::Message;
-use uuid::Uuid;
 
 use crate::channel;
 use crate::error::InternalError;
@@ -38,12 +39,16 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::{
     Service, ServiceFactory, ServiceMessageContext, StandardServiceNetworkRegistry,
 };
+#[cfg(feature = "shutdown")]
+use crate::threading::shutdown::ShutdownHandle;
 use crate::transport::Connection;
 
+pub use self::builder::ServiceOrchestratorBuilder;
 pub use self::error::{
     AddServiceError, InitializeServiceError, ListServicesError, NewOrchestratorError,
     OrchestratorError, ShutdownServiceError,
 };
+pub use self::runnable::RunnableServiceOrchestrator;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
@@ -54,6 +59,16 @@ pub struct ServiceDefinition {
     pub circuit: String,
     pub service_id: String,
     pub service_type: String,
+}
+
+impl std::fmt::Display for ServiceDefinition {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}::{} ({})",
+            self.circuit, self.service_id, self.service_type
+        )
+    }
 }
 
 /// Stores a service and other structures that are used to manage it
@@ -72,122 +87,59 @@ pub struct ServiceOrchestrator {
     /// `network_sender` and `inbound_router` are used to create services' senders.
     network_sender: Sender<Vec<u8>>,
     inbound_router: InboundRouter<CircuitMessageType>,
-    /// `running` and `join_handles` are used to shutdown the orchestrator's background threads
-    running: Arc<AtomicBool>,
     /// A (ServiceDefinition, ManagedService) map of services that have been stopped, but yet to
     /// be completely destroyed
     stopped_services: Arc<Mutex<HashMap<ServiceDefinition, Box<dyn Service>>>>,
+
+    /// `running` and `join_handles` are used to shutdown the orchestrator's background threads
+    running: Arc<AtomicBool>,
+    join_handles: Option<JoinHandles<Result<(), OrchestratorError>>>,
 }
 
 impl ServiceOrchestrator {
     /// Create a new `ServiceOrchestrator`. This starts up 3 threads for relaying messages to and
     /// from services. Returns the `ServiceOrchestrator` and the threads `JoinHandles`
+    #[deprecated(
+        since = "0.5.1",
+        note = "please use `ServiceOrchestratorBuilder` instead"
+    )]
     pub fn new(
         service_factories: Vec<Box<dyn ServiceFactory>>,
         connection: Box<dyn Connection>,
         incoming_capacity: usize,
         outgoing_capacity: usize,
         channel_capacity: usize,
-    ) -> Result<(Self, JoinHandles<Result<(), OrchestratorError>>), NewOrchestratorError> {
-        let services = Arc::new(Mutex::new(HashMap::new()));
-        let stopped_services = Arc::new(Mutex::new(HashMap::new()));
-        let mesh = Mesh::new(incoming_capacity, outgoing_capacity);
-        let mesh_id = format!("{}", Uuid::new_v4());
-        mesh.add(connection, mesh_id.to_string())
-            .map_err(|err| NewOrchestratorError(Box::new(err)))?;
-        let (network_sender, network_receiver) = crossbeam_channel::bounded(channel_capacity);
-        let (inbound_sender, inbound_receiver) = crossbeam_channel::bounded(channel_capacity);
-        let inbound_router = InboundRouter::new(Box::new(inbound_sender));
-        let running = Arc::new(AtomicBool::new(true));
+    ) -> Result<Self, NewOrchestratorError> {
+        let mut builder = builder::ServiceOrchestratorBuilder::new()
+            .with_connection(connection)
+            .with_incoming_capacity(incoming_capacity)
+            .with_outgoing_capacity(outgoing_capacity)
+            .with_channel_capacity(channel_capacity);
 
-        debug!("Orchestrator authorized");
-
-        // Start thread that handles incoming messages from a splinter node.
-        let incoming_mesh = mesh.clone();
-        let incoming_running = running.clone();
-        let incoming_router = inbound_router.clone();
-        let incoming_join_handle = thread::Builder::new()
-            .name("Orchestrator Incoming".into())
-            .spawn(move || {
-                if let Err(err) =
-                    run_incoming_loop(incoming_mesh, incoming_running, incoming_router)
-                {
-                    error!(
-                        "Terminating orchestrator incoming thread due to error: {}",
-                        err
-                    );
-                    Err(err)
-                } else {
-                    Ok(())
-                }
-            })
-            .map_err(|err| NewOrchestratorError(Box::new(err)))?;
-
-        // Start thread that handles messages that do not have a matching correlation id.
-        let inbound_services = services.clone();
-        let inbound_running = running.clone();
-        let inbound_join_handle = thread::Builder::new()
-            .name("Orchestrator Inbound".into())
-            .spawn(move || {
-                if let Err(err) =
-                    run_inbound_loop(inbound_services, inbound_receiver, inbound_running)
-                {
-                    error!(
-                        "Terminating orchestrator inbound thread due to error: {}",
-                        err
-                    );
-                    Err(err)
-                } else {
-                    Ok(())
-                }
-            })
-            .map_err(|err| NewOrchestratorError(Box::new(err)))?;
-
-        // Start thread that handles outgoing messages that need to be sent to the splinter node.
-        let outgoing_running = running.clone();
-        let outgoing_join_handle = thread::Builder::new()
-            .name("Orchestrator Outgoing".into())
-            .spawn(move || {
-                if let Err(err) =
-                    run_outgoing_loop(mesh, outgoing_running, network_receiver, mesh_id)
-                {
-                    error!(
-                        "Terminating orchestrator outgoing thread due to error: {}",
-                        err
-                    );
-                    Err(err)
-                } else {
-                    Ok(())
-                }
-            })
-            .map_err(|err| NewOrchestratorError(Box::new(err)))?;
-
-        let supported_service_types_vec = service_factories
-            .iter()
-            .map(|factory| factory.available_service_types().to_vec())
-            .collect::<Vec<Vec<String>>>();
-
-        let mut supported_service_types = vec![];
-        for mut service_types in supported_service_types_vec {
-            supported_service_types.append(&mut service_types);
+        for service_factory in service_factories.into_iter() {
+            builder = builder.with_service_factory(service_factory);
         }
 
-        Ok((
-            Self {
-                services,
-                service_factories,
-                supported_service_types,
-                network_sender,
-                inbound_router,
-                running,
-                stopped_services,
-            },
-            JoinHandles::new(vec![
-                incoming_join_handle,
-                inbound_join_handle,
-                outgoing_join_handle,
-            ]),
-        ))
+        builder
+            .build()
+            .map_err(|e| NewOrchestratorError(Box::new(e)))?
+            .run()
+            .map_err(|e| NewOrchestratorError(Box::new(e)))
+    }
+
+    #[cfg(not(feature = "shutdown"))]
+    pub fn take_join_handles(&mut self) -> Option<JoinHandles<Result<(), OrchestratorError>>> {
+        self.join_handles.take()
+    }
+
+    #[cfg(feature = "shutdown")]
+    pub fn take_shutdown_handle(&mut self) -> Option<Box<dyn ShutdownHandle>> {
+        let join_handles = self.join_handles.take()?;
+        Some(Box::new(ServiceOrchestratorShutdownHandle {
+            services: Arc::clone(&self.services),
+            join_handles: Some(join_handles),
+            running: Arc::clone(&self.running),
+        }) as Box<dyn ShutdownHandle>)
     }
 
     /// Initialize (create and start) a service according to the specified definition. The
@@ -392,7 +344,63 @@ impl<T> JoinHandles<T> {
     }
 }
 
-pub fn run_incoming_loop(
+#[cfg(feature = "shutdown")]
+struct ServiceOrchestratorShutdownHandle {
+    services: Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>>,
+    join_handles: Option<JoinHandles<Result<(), OrchestratorError>>>,
+    running: Arc<AtomicBool>,
+}
+
+#[cfg(feature = "shutdown")]
+impl ShutdownHandle for ServiceOrchestratorShutdownHandle {
+    fn signal_shutdown(&mut self) {
+        match self.services.lock() {
+            Ok(mut services) => {
+                for (service_definition, managed_service) in services.drain() {
+                    let ManagedService {
+                        mut service,
+                        registry,
+                    } = managed_service;
+                    if let Err(err) = service.stop(&registry) {
+                        error!("Unable to stop service {}: {}", service_definition, err);
+                    }
+                    if let Err(err) = service.destroy() {
+                        error!("Unable to destroy service {}: {}", service_definition, err);
+                    }
+                }
+            }
+            Err(_) => {
+                error!("Service orchestrator service lock was poisoned; unable to cleanly shutdown")
+            }
+        }
+        self.running.store(false, Ordering::SeqCst);
+    }
+
+    fn wait_for_shutdown(&mut self, _timeout: Duration) -> Result<(), InternalError> {
+        if let Some(join_handles) = self.join_handles.take() {
+            match join_handles.join_all() {
+                Ok(results) => {
+                    results
+                        .into_iter()
+                        .filter(Result::is_err)
+                        .map(Result::unwrap_err)
+                        .for_each(|err| {
+                            error!("{}", err);
+                        });
+                }
+                Err(_) => {
+                    return Err(crate::error::InternalError::with_message(
+                        "Unable to join service processor threads".into(),
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn run_incoming_loop(
     incoming_mesh: Mesh,
     incoming_running: Arc<AtomicBool>,
     mut inbound_router: InboundRouter<CircuitMessageType>,

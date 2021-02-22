@@ -3201,6 +3201,7 @@ mod tests {
     use crate::network::auth::AuthorizationManager;
     use crate::network::connection_manager::authorizers::{Authorizers, InprocAuthorizer};
     use crate::network::connection_manager::ConnectionManager;
+    use crate::orchestrator::ServiceOrchestratorBuilder;
     use crate::peer::{PeerManager, PeerManagerConnector};
     use crate::protocol::authorization::{
         AuthorizationMessage, AuthorizationType, Authorized, ConnectRequest, ConnectResponse,
@@ -3245,8 +3246,12 @@ mod tests {
         let orchestrator_connection = orchestrator_transport
             .connect("inproc://orchestator")
             .expect("failed to create connection");
-        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
-            .expect("failed to create orchestrator");
+        let orchestrator = ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .build()
+            .expect("failed to create orchestrator")
+            .run()
+            .expect("failed to start orchestrator");
         let store = setup_admin_service_store();
         #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
@@ -3378,8 +3383,12 @@ mod tests {
         let orchestrator_connection = orchestrator_transport
             .connect("inproc://admin-service")
             .expect("failed to create connection");
-        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
-            .expect("failed to create orchestrator");
+        let orchestrator = ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .build()
+            .expect("failed to create orchestrator")
+            .run()
+            .expect("failed to start orchestrator");
         let store = setup_admin_service_store();
         #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
@@ -5500,8 +5509,12 @@ mod tests {
         let orchestrator_connection = orchestrator_transport
             .connect("inproc://orchestator")
             .expect("failed to create connection");
-        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
-            .expect("failed to create orchestrator");
+        let orchestrator = ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .build()
+            .expect("failed to create orchestrator")
+            .run()
+            .expect("failed to start orchestrator");
         let store = setup_admin_service_store();
         #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
@@ -6753,9 +6766,13 @@ mod tests {
         let orchestrator_connection = transport
             .connect("inproc://orchestator-service")
             .expect("failed to create connection");
-        let (orchestrator, _) = ServiceOrchestrator::new(vec![], orchestrator_connection, 1, 1, 1)
-            .expect("failed to create orchestrator");
-        orchestrator
+
+        ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .build()
+            .expect("failed to create orchestrator")
+            .run()
+            .expect("failed to start orchestrator")
     }
 
     fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {
