@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod builder;
 pub(crate) mod registry;
 mod sender;
 
@@ -42,6 +43,8 @@ use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
 
 use self::registry::StandardServiceNetworkRegistry;
 use self::sender::{ProcessorMessage, ServiceMessage};
+
+pub use builder::ServiceProcessorBuilder;
 
 // Recv timeout in secs
 const TIMEOUT_SEC: u64 = 2;
