@@ -50,18 +50,11 @@ impl StoreFactory for PgStoreFactory {
         ))
     }
 
-    #[cfg(feature = "biome-oauth-user-store-postgres")]
+    #[cfg(feature = "oauth")]
     fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore> {
         Box::new(crate::biome::DieselOAuthUserSessionStore::new(
             self.pool.clone(),
         ))
-    }
-
-    #[cfg(all(feature = "oauth", not(feature = "biome-oauth-user-store-postgres")))]
-    fn get_biome_oauth_user_session_store(&self) -> Box<dyn crate::biome::OAuthUserSessionStore> {
-        // This configuration cannot be reached within this implementation as the whole struct is
-        // guarded by "postgres". It merely satisfies the compiler.
-        unreachable!()
     }
 
     #[cfg(feature = "admin-service")]
@@ -71,23 +64,13 @@ impl StoreFactory for PgStoreFactory {
         ))
     }
 
-    #[cfg(feature = "oauth-inflight-request-store-postgres")]
+    #[cfg(feature = "oauth")]
     fn get_oauth_inflight_request_store(
         &self,
     ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
         Box::new(crate::oauth::store::DieselInflightOAuthRequestStore::new(
             self.pool.clone(),
         ))
-    }
-
-    #[cfg(all(
-        feature = "oauth",
-        not(feature = "oauth-inflight-request-store-postgres")
-    ))]
-    fn get_oauth_inflight_request_store(
-        &self,
-    ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore> {
-        unimplemented!()
     }
 
     #[cfg(feature = "registry-database")]

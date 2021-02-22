@@ -89,7 +89,7 @@ impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::sqlite::Sqlit
     }
 }
 
-#[cfg(feature = "biome-oauth-user-store-postgres")]
+#[cfg(feature = "postgres")]
 impl OAuthUserSessionStore for DieselOAuthUserSessionStore<diesel::pg::PgConnection> {
     fn add_session(
         &self,

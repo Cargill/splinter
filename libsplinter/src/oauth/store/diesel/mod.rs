@@ -85,7 +85,7 @@ impl InflightOAuthRequestStore
     }
 }
 
-#[cfg(feature = "oauth-inflight-request-store-postgres")]
+#[cfg(feature = "postgres")]
 impl InflightOAuthRequestStore for DieselInflightOAuthRequestStore<diesel::pg::PgConnection> {
     fn insert_request(
         &self,

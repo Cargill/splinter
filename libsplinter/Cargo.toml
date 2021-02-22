@@ -107,14 +107,12 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "biome-notifications",
-    "biome-oauth-user-store-postgres",
     "biome-profile",
     "circuit-abandon",
     "circuit-disband",
     "circuit-purge",
     "client-reqwest",
     "https-bind",
-    "oauth-inflight-request-store-postgres",
     "registry-database",
     "role-based-authorization-store-postgres",
     "service-arg-validation",
@@ -139,7 +137,6 @@ biome = []
 biome-credentials = ["bcrypt", "biome"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
-biome-oauth-user-store-postgres = ["oauth", "postgres"]
 biome-profile = ["biome"]
 circuit-abandon = []
 circuit-disband = []
@@ -151,7 +148,6 @@ events = ["actix-http", "futures", "hyper", "tokio", "awc"]
 https-bind = ["actix-web/ssl"]
 memory = ["sqlite"]
 oauth = ["biome", "oauth2", "reqwest", "rest-api"]
-oauth-inflight-request-store-postgres = ["oauth", "postgres"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
 registry-database = ["diesel"]
