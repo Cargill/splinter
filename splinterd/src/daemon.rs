@@ -703,17 +703,16 @@ impl SplinterDaemon {
             let health_service = HealthService::new(&self.node_id);
             rest_api_builder = rest_api_builder.add_resources(health_service.resources());
 
-            start_health_service(health_connection, health_service, Arc::clone(&running))?
+            start_health_service(health_connection, health_service)?
         };
 
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
         #[cfg(not(feature = "shutdown"))]
         let (admin_shutdown_handle, service_processor_join_handle) =
-            Self::start_admin_service(admin_connection, admin_service, Arc::clone(&running))?;
+            Self::start_admin_service(admin_connection, admin_service)?;
         #[cfg(feature = "shutdown")]
-        let admin_shutdown_handle =
-            Self::start_admin_service(admin_connection, admin_service, Arc::clone(&running))?;
+        let admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
         let (shutdown_tx, shutdown_rx) = channel();
         ctrlc::set_handler(move || {
@@ -853,7 +852,6 @@ impl SplinterDaemon {
     fn start_admin_service(
         connection: Box<dyn Connection>,
         admin_service: AdminService,
-        running: Arc<AtomicBool>,
     ) -> Result<(service::ShutdownHandle, ServiceJoinHandle), StartError> {
         let start_admin: std::thread::JoinHandle<
             Result<(service::ShutdownHandle, ServiceJoinHandle), StartError>,
@@ -864,7 +862,6 @@ impl SplinterDaemon {
                 ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY,
                 ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
                 ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-                running,
             )
             .map_err(|err| {
                 StartError::AdminServiceError(format!(
@@ -898,7 +895,6 @@ impl SplinterDaemon {
     fn start_admin_service(
         connection: Box<dyn Connection>,
         admin_service: AdminService,
-        running: Arc<AtomicBool>,
     ) -> Result<Box<dyn splinter::threading::shutdown::ShutdownHandle>, StartError> {
         let mut admin_service_processor = service::ServiceProcessor::new(
             connection,
@@ -906,7 +902,6 @@ impl SplinterDaemon {
             ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY,
             ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
             ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-            running,
         )
         .map_err(|err| {
             StartError::AdminServiceError(format!(
@@ -934,7 +929,6 @@ impl SplinterDaemon {
 fn start_health_service(
     connection: Box<dyn Connection>,
     health_service: HealthService,
-    running: Arc<AtomicBool>,
 ) -> Result<Box<dyn splinter::threading::shutdown::ShutdownHandle>, StartError> {
     let mut health_service_processor = service::ServiceProcessor::new(
         connection,
@@ -942,7 +936,6 @@ fn start_health_service(
         HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY,
         HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
         HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-        running,
     )
     .map_err(|err| {
         StartError::HealthServiceError(format!(

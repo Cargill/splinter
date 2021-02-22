@@ -86,7 +86,6 @@ pub struct ServiceProcessor {
     node_mesh_id: String,
     network_sender: Sender<Vec<u8>>,
     network_receiver: Receiver<Vec<u8>>,
-    running: Arc<AtomicBool>,
     inbound_router: InboundRouter<CircuitMessageType>,
     inbound_receiver: Receiver<Result<(CircuitMessageType, Vec<u8>), channel::RecvError>>,
     channel_capacity: usize,
@@ -99,7 +98,6 @@ impl ServiceProcessor {
         incoming_capacity: usize,
         outgoing_capacity: usize,
         channel_capacity: usize,
-        running: Arc<AtomicBool>,
     ) -> Result<Self, ServiceProcessorError> {
         let mesh = Mesh::new(incoming_capacity, outgoing_capacity);
         let node_mesh_id = format!("{}", Uuid::new_v4());
@@ -117,7 +115,6 @@ impl ServiceProcessor {
             node_mesh_id,
             network_sender,
             network_receiver,
-            running,
             inbound_router: InboundRouter::new(Box::new(inbound_sender)),
             inbound_receiver,
             channel_capacity,
@@ -185,6 +182,7 @@ impl ServiceProcessor {
         ),
         ServiceProcessorError,
     > {
+        let running = Arc::new(AtomicBool::new(true));
         let mut join_handles = vec![];
         for service in self.services.into_iter() {
             let mut shared_state = rwlock_write_unwrap!(self.shared_state);
@@ -213,7 +211,7 @@ impl ServiceProcessor {
 
         let incoming_mesh = self.mesh.clone();
         let shared_state = self.shared_state.clone();
-        let incoming_running = self.running.clone();
+        let incoming_running = running.clone();
         let mut inbound_router = self.inbound_router.clone();
         // Thread to handle incoming messages from a splinter node.
         let incoming_join_handle: JoinHandle<Result<(), ServiceProcessorError>> =
@@ -250,7 +248,7 @@ impl ServiceProcessor {
                 })?;
 
         let inbound_receiver = self.inbound_receiver;
-        let inbound_running = self.running.clone();
+        let inbound_running = running.clone();
         // Thread that handles messages that do not have a matching correlation id
         let inbound_join_handle: JoinHandle<Result<(), ServiceProcessorError>> =
             thread::Builder::new()
@@ -274,11 +272,12 @@ impl ServiceProcessor {
                             error!("Unable to process inbound message: {}", err);
                         }
                     }
+
                     Ok(())
                 })?;
 
         let outgoing_mesh = self.mesh;
-        let outgoing_running = self.running.clone();
+        let outgoing_running = running.clone();
         let outgoing_receiver = self.network_receiver;
         let node_mesh_id = self.node_mesh_id.to_string();
 
@@ -313,7 +312,6 @@ impl ServiceProcessor {
                     Ok(())
                 })?;
 
-        let service_running = self.running.clone();
         let service_shutdown_join_handle: JoinHandle<Result<(), ServiceProcessorError>> =
             thread::Builder::new()
                 .name("ServiceProcessorShutdownMonitor".into())
@@ -329,7 +327,7 @@ impl ServiceProcessor {
                             }
                         }
                     }
-                    service_running.store(false, Ordering::SeqCst);
+                    running.store(false, Ordering::SeqCst);
                     Ok(())
                 })?;
 
@@ -703,8 +701,6 @@ pub mod tests {
     fn standard_direct_message() {
         let mut transport = InprocTransport::default();
         let mut inproc_listener = transport.listen("internal").unwrap();
-        let running = Arc::new(AtomicBool::new(true));
-        let r = running.clone();
 
         let mesh = Mesh::new(512, 128);
         let mesh_sender = mesh.get_sender();
@@ -716,8 +712,7 @@ pub mod tests {
             .spawn(move || {
                 let connection = transport.connect("internal").unwrap();
                 let mut processor =
-                    ServiceProcessor::new(connection, "alpha".to_string(), 3, 3, 3, running)
-                        .unwrap();
+                    ServiceProcessor::new(connection, "alpha".to_string(), 3, 3, 3).unwrap();
 
                 // Add MockService to the processor and start the processor.
                 let service = MockService::new();
@@ -839,8 +834,6 @@ pub mod tests {
     fn test_admin_direct_message() {
         let mut transport = InprocTransport::default();
         let mut inproc_listener = transport.listen("internal").unwrap();
-        let running = Arc::new(AtomicBool::new(true));
-        let r = running.clone();
 
         let mesh = Mesh::new(512, 128);
         let mesh_sender = mesh.get_sender();
@@ -851,7 +844,7 @@ pub mod tests {
             .spawn(move || {
                 let connection = transport.connect("internal").unwrap();
                 let mut processor =
-                    ServiceProcessor::new(connection, "admin".to_string(), 3, 3, 3, r).unwrap();
+                    ServiceProcessor::new(connection, "admin".to_string(), 3, 3, 3).unwrap();
 
                 // Add MockService to the processor and start the processor.
                 let service = MockAdminService::new();
