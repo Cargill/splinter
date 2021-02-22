@@ -15,6 +15,7 @@
 pub mod builders;
 
 use protobuf::{self, RepeatedField};
+use std::convert::TryInto;
 
 use crate::admin::store;
 #[cfg(feature = "admin-service-event-store")]
@@ -212,8 +213,12 @@ impl CreateCircuit {
 
         Ok(create_request)
     }
+}
 
-    pub fn into_circuit_proto(self) -> Result<admin::Circuit, MarshallingError> {
+impl TryInto<admin::Circuit> for CreateCircuit {
+    type Error = MarshallingError;
+
+    fn try_into(self) -> Result<admin::Circuit, Self::Error> {
         let mut circuit = admin::Circuit::new();
 
         circuit.set_circuit_id(self.circuit_id);

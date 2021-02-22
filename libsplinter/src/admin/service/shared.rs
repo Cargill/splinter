@@ -15,7 +15,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 #[cfg(feature = "circuit-disband")]
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -2739,7 +2739,7 @@ impl AdminServiceShared {
             create_circuit_builder = create_circuit_builder.with_display_name(&display_name);
         }
 
-        let proposed_circuit = create_circuit_builder
+        let proposed_circuit: Circuit = create_circuit_builder
             .build()
             .map_err(|err| {
                 AdminSharedError::ValidationFailed(format!(
@@ -2747,7 +2747,7 @@ impl AdminServiceShared {
                     err
                 ))
             })?
-            .into_circuit_proto()
+            .try_into()
             .map_err(|err| {
                 AdminSharedError::ValidationFailed(format!(
                     "error occurred when trying to create proto circuit {}",
