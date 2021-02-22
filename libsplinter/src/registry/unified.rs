@@ -200,11 +200,6 @@ impl RegistryReader for UnifiedRegistry {
 }
 
 impl RegistryWriter for UnifiedRegistry {
-    fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-        #[allow(deprecated)]
-        self.internal_source.insert_node(node)
-    }
-
     fn add_node(&self, node: Node) -> Result<(), RegistryError> {
         self.internal_source.add_node(node)
     }
@@ -698,14 +693,6 @@ mod test {
     }
 
     impl RegistryWriter for MemRegistry {
-        fn insert_node(&self, node: Node) -> Result<(), RegistryError> {
-            self.nodes
-                .lock()
-                .expect("mem registry lock was poisoned")
-                .insert(node.identity.clone(), node);
-            Ok(())
-        }
-
         fn add_node(&self, node: Node) -> Result<(), RegistryError> {
             self.nodes
                 .lock()
