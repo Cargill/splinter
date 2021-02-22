@@ -53,7 +53,6 @@ const TIMEOUT_SEC: u64 = 2;
 /// Includes the service senders and join_handles for the service threads.
 struct SharedState {
     pub services: HashMap<String, Sender<ProcessorMessage>>,
-    pub join_handles: Vec<JoinHandle<Result<(), ServiceProcessorError>>>,
 }
 
 /// Helper macro for generating ServiceProcessorError::ProcessError
@@ -111,7 +110,6 @@ impl ServiceProcessor {
         Ok(ServiceProcessor {
             shared_state: Arc::new(RwLock::new(SharedState {
                 services: HashMap::new(),
-                join_handles: vec![],
             })),
             services: vec![],
             mesh,
@@ -187,6 +185,7 @@ impl ServiceProcessor {
         ),
         ServiceProcessorError,
     > {
+        let mut join_handles = vec![];
         for service in self.services.into_iter() {
             let mut shared_state = rwlock_write_unwrap!(self.shared_state);
             let service_id = service.service_id().to_string();
@@ -208,7 +207,7 @@ impl ServiceProcessor {
                         Ok(())
                     }
                 })?;
-            shared_state.join_handles.push(join_handle);
+            join_handles.push(join_handle);
             shared_state.services.insert(service_id.to_string(), send);
         }
 
@@ -310,6 +309,27 @@ impl ServiceProcessor {
                             continue;
                         }
                     }
+
+                    Ok(())
+                })?;
+
+        let service_running = self.running.clone();
+        let service_shutdown_join_handle: JoinHandle<Result<(), ServiceProcessorError>> =
+            thread::Builder::new()
+                .name("ServiceProcessorShutdownMonitor".into())
+                .spawn(move || {
+                    while let Some(join_handle) = join_handles.pop() {
+                        match join_handle.join() {
+                            Ok(Ok(_)) => (),
+                            Ok(Err(err)) => {
+                                error!("A service thread exited with an error: {}", err);
+                            }
+                            Err(err) => {
+                                error!("A service thread had panicked: {:?}", err);
+                            }
+                        }
+                    }
+                    service_running.store(false, Ordering::SeqCst);
                     Ok(())
                 })?;
 
@@ -318,7 +338,7 @@ impl ServiceProcessor {
         // Service processor
         let do_shutdown = Box::new(move || {
             debug!("Shutting down service processor");
-            let mut shared_state = rwlock_write_unwrap!(shutdown_shared_state);
+            let shared_state = rwlock_write_unwrap!(shutdown_shared_state);
             // send shutdown to the services and wait for join
             for (service_id, service_sender) in shared_state.services.iter() {
                 info!("Shutting down {}", service_id);
@@ -332,20 +352,15 @@ impl ServiceProcessor {
                     })?;
             }
 
-            while let Some(join_handle) = shared_state.join_handles.pop() {
-                join_handle.join().map_err(|err| {
-                    ServiceProcessorError::ShutdownError(format!(
-                        "unable to cleanly join a Service thread: {:?}",
-                        err
-                    ))
-                })??;
-            }
             Ok(())
         });
 
         Ok((
             do_shutdown,
             JoinHandles::new(vec![
+                // order matters here -> when this thread completes, it will have signaled the
+                // remaining threads to also shutdown.
+                service_shutdown_join_handle,
                 incoming_join_handle,
                 outgoing_join_handle,
                 inbound_join_handle,
@@ -660,12 +675,16 @@ pub mod tests {
     use super::*;
 
     use std::any::Any;
+    use std::sync::mpsc::channel;
     use std::thread;
 
     use protobuf::Message;
 
     use crate::mesh::Mesh;
-    use crate::protos::circuit::{ServiceConnectRequest, ServiceConnectResponse_Status};
+    use crate::protos::circuit::{
+        ServiceConnectRequest, ServiceConnectResponse_Status, ServiceDisconnectRequest,
+        ServiceDisconnectResponse_Status,
+    };
     use crate::service::error::{
         ServiceDestroyError, ServiceError, ServiceStartError, ServiceStopError,
     };
@@ -690,7 +709,9 @@ pub mod tests {
         let mesh = Mesh::new(512, 128);
         let mesh_sender = mesh.get_sender();
 
-        thread::Builder::new()
+        let (tx, rx) = channel();
+
+        let jh = thread::Builder::new()
             .name("standard_direct_message".to_string())
             .spawn(move || {
                 let connection = transport.connect("internal").unwrap();
@@ -701,7 +722,31 @@ pub mod tests {
                 // Add MockService to the processor and start the processor.
                 let service = MockService::new();
                 processor.add_service(Box::new(service)).unwrap();
-                let _ = processor.start().unwrap();
+
+                #[cfg(feature = "shutdown")]
+                let mut shutdown_handle = processor.start().unwrap();
+                #[cfg(not(feature = "shutdown"))]
+                let (shutdown_handle, join_handles) = processor.start().unwrap();
+
+                let _ = rx.recv().unwrap();
+
+                #[cfg(feature = "shutdown")]
+                shutdown_handle.signal_shutdown();
+                #[cfg(not(feature = "shutdown"))]
+                shutdown_handle
+                    .shutdown()
+                    .expect("unable to signal shutdown");
+
+                let _ = rx.recv().unwrap();
+
+                #[cfg(feature = "shutdown")]
+                shutdown_handle
+                    .wait_for_shutdown(Duration::from_secs(10))
+                    .expect("Unable to cleanly shutdown");
+                #[cfg(not(feature = "shutdown"))]
+                join_handles
+                    .join_all()
+                    .expect("Unable to join all the threads");
             })
             .unwrap();
 
@@ -769,7 +814,25 @@ pub mod tests {
         assert_eq!(reply_response.get_payload(), b"reply response");
         assert_eq!(reply_response.get_correlation_id(), "reply_correlation_id");
 
-        r.store(false, Ordering::SeqCst);
+        tx.send("signal-shutdown").unwrap();
+
+        let mut disconnect_req = get_service_disconnect(mesh.recv().unwrap().payload().to_vec());
+        assert_eq!(disconnect_req.get_service_id(), "mock_service");
+        assert_eq!(disconnect_req.get_circuit(), "alpha");
+
+        mesh_sender
+            .send(
+                "service_processor".to_string(),
+                create_service_disconnect_response(
+                    disconnect_req.take_correlation_id(),
+                    "alpha".to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        tx.send("wait-for-shutdown").unwrap();
+        jh.join().unwrap();
     }
 
     #[test]
@@ -782,18 +845,41 @@ pub mod tests {
         let mesh = Mesh::new(512, 128);
         let mesh_sender = mesh.get_sender();
 
-        thread::Builder::new()
+        let (tx, rx) = channel();
+        let jh = thread::Builder::new()
             .name("test_admin_direct_message".to_string())
             .spawn(move || {
                 let connection = transport.connect("internal").unwrap();
                 let mut processor =
-                    ServiceProcessor::new(connection, "admin".to_string(), 3, 3, 3, running)
-                        .unwrap();
+                    ServiceProcessor::new(connection, "admin".to_string(), 3, 3, 3, r).unwrap();
 
                 // Add MockService to the processor and start the processor.
                 let service = MockAdminService::new();
                 processor.add_service(Box::new(service)).unwrap();
-                let _ = processor.start().unwrap();
+
+                #[cfg(feature = "shutdown")]
+                let mut shutdown_handle = processor.start().unwrap();
+                #[cfg(not(feature = "shutdown"))]
+                let (shutdown_handle, join_handles) = processor.start().unwrap();
+
+                let _ = rx.recv().unwrap();
+                #[cfg(feature = "shutdown")]
+                shutdown_handle.signal_shutdown();
+                #[cfg(not(feature = "shutdown"))]
+                shutdown_handle
+                    .shutdown()
+                    .expect("unable to signal shutdown");
+
+                let _ = rx.recv().unwrap();
+
+                #[cfg(feature = "shutdown")]
+                shutdown_handle
+                    .wait_for_shutdown(Duration::from_secs(10))
+                    .expect("Unable to cleanly shutdown");
+                #[cfg(not(feature = "shutdown"))]
+                join_handles
+                    .join_all()
+                    .expect("Unable to join all the threads");
             })
             .unwrap();
 
@@ -861,7 +947,26 @@ pub mod tests {
         assert_eq!(reply_response.get_payload(), b"reply response");
         assert_eq!(reply_response.get_correlation_id(), "reply_correlation_id");
 
-        r.store(false, Ordering::SeqCst);
+        tx.send("signal-shutdown").unwrap();
+
+        let mut disconnect_req = get_service_disconnect(mesh.recv().unwrap().payload().to_vec());
+        assert_eq!(disconnect_req.get_service_id(), "mock_service");
+        assert_eq!(disconnect_req.get_circuit(), "admin");
+
+        mesh_sender
+            .send(
+                "service_processor".to_string(),
+                create_service_disconnect_response(
+                    disconnect_req.take_correlation_id(),
+                    "admin".to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        tx.send("wait-for-shutdown").unwrap();
+
+        jh.join().unwrap();
     }
 
     // Service that can be used for testing a standard service's functionality
@@ -915,7 +1020,7 @@ pub mod tests {
         /// Consumes the service (which, given the use of dyn traits,
         /// this must take a boxed Service instance).
         fn destroy(self: Box<Self>) -> Result<(), ServiceDestroyError> {
-            unimplemented!()
+            Ok(())
         }
 
         fn purge(&mut self) -> Result<(), crate::error::InternalError> {
@@ -1006,7 +1111,7 @@ pub mod tests {
         /// Consumes the service (which, given the use of dyn traits,
         /// this must take a boxed Service instance).
         fn destroy(self: Box<Self>) -> Result<(), ServiceDestroyError> {
-            unimplemented!()
+            Ok(())
         }
 
         fn purge(&mut self) -> Result<(), crate::error::InternalError> {
@@ -1123,11 +1228,35 @@ pub mod tests {
         Ok(msg)
     }
 
+    fn create_service_disconnect_response(
+        correlation_id: String,
+        circuit: String,
+    ) -> Result<Vec<u8>, protobuf::ProtobufError> {
+        let mut response = ServiceDisconnectResponse::new();
+        response.set_circuit(circuit);
+        response.set_service_id("mock_service".to_string());
+        response.set_status(ServiceDisconnectResponse_Status::OK);
+        response.set_correlation_id(correlation_id);
+        let bytes = response.write_to_bytes().unwrap();
+
+        let msg = create_message(bytes, CircuitMessageType::SERVICE_DISCONNECT_RESPONSE)?;
+        Ok(msg)
+    }
+
     fn get_service_connect(network_msg_bytes: Vec<u8>) -> ServiceConnectRequest {
         let network_msg: NetworkMessage = Message::parse_from_bytes(&network_msg_bytes).unwrap();
         let circuit_msg: CircuitMessage =
             Message::parse_from_bytes(network_msg.get_payload()).unwrap();
         let request: ServiceConnectRequest =
+            Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
+        request
+    }
+
+    fn get_service_disconnect(network_msg_bytes: Vec<u8>) -> ServiceDisconnectRequest {
+        let network_msg: NetworkMessage = Message::parse_from_bytes(&network_msg_bytes).unwrap();
+        let circuit_msg: CircuitMessage =
+            Message::parse_from_bytes(network_msg.get_payload()).unwrap();
+        let request: ServiceDisconnectRequest =
             Message::parse_from_bytes(circuit_msg.get_payload()).unwrap();
         request
     }
