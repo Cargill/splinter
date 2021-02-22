@@ -117,7 +117,6 @@ experimental = [
     "circuit-purge",
     "client-reqwest",
     "https-bind",
-    "registry-database",
     "rest-api-actix-web-3",
     "role-based-authorization-store-postgres",
     "run",
@@ -156,7 +155,6 @@ memory = ["sqlite"]
 oauth = ["biome", "oauth2", "reqwest", "rest-api"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
-registry-database = ["diesel"]
 registry-remote = ["reqwest", "registry"]
 rest-api = [
     "actix",

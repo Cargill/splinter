@@ -73,7 +73,7 @@ impl StoreFactory for PgStoreFactory {
         ))
     }
 
-    #[cfg(feature = "registry-database")]
+    #[cfg(feature = "registry")]
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
         Box::new(crate::registry::DieselRegistry::new(self.pool.clone()))
     }

@@ -24,7 +24,7 @@
 //! [`RegistryWriter`]: trait.RegistryWriter.html
 //! [`RwRegistry`]: trait.RwRegistry.html
 
-#[cfg(feature = "registry-database")]
+#[cfg(feature = "diesel")]
 mod diesel;
 mod error;
 #[cfg(feature = "rest-api")]
@@ -35,7 +35,7 @@ mod yaml;
 use std::collections::HashMap;
 use std::iter::ExactSizeIterator;
 
-#[cfg(feature = "registry-database")]
+#[cfg(feature = "diesel")]
 pub use self::diesel::DieselRegistry;
 pub use error::{InvalidNodeError, RegistryError};
 pub use unified::UnifiedRegistry;

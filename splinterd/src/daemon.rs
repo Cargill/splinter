@@ -449,9 +449,8 @@ impl SplinterDaemon {
             &self.registries,
             self.registry_auto_refresh,
             self.registry_forced_refresh,
-            #[cfg(feature = "registry-database")]
             &*store_factory,
-        )?;
+        );
 
         let mut admin_service_builder = AdminServiceBuilder::new();
 
@@ -1357,45 +1356,15 @@ fn set_up_circuit_dispatcher(
     dispatcher
 }
 
-#[cfg(not(feature = "registry-database"))]
-fn create_local_registry(state_dir: &str) -> Result<Box<dyn RwRegistry>, StartError> {
-    let local_registry_path = Path::new(state_dir)
-        .join("local_registry.yaml")
-        .to_str()
-        .expect("path built from &str cannot be invalid")
-        .to_string();
-
-    debug!(
-        "Creating local registry with registry file: {:?}",
-        local_registry_path
-    );
-
-    Ok(Box::new(
-        LocalYamlRegistry::new(&local_registry_path).map_err(|err| {
-            StartError::RegistryError(format!(
-                "Failed to initialize local LocalYamlRegistry: {}",
-                err
-            ))
-        })?,
-    ))
-}
-
-// This allow is necessary when the registry-database feature is off, and
-// should be removed when registry-database is the default/only approach.
-#[allow(clippy::unnecessary_wraps)]
 fn create_registry(
     state_dir: &str,
     registries: &[String],
     auto_refresh_interval: u64,
     forced_refresh_interval: u64,
-    #[cfg(feature = "registry-database")] store_factory: &dyn splinter::store::StoreFactory,
-) -> Result<(Box<dyn RwRegistry>, RegistryShutdownHandle), StartError> {
+    store_factory: &dyn splinter::store::StoreFactory,
+) -> (Box<dyn RwRegistry>, RegistryShutdownHandle) {
     let mut registry_shutdown_handle = RegistryShutdownHandle::new();
 
-    #[cfg(not(feature = "registry-database"))]
-    let local_registry = create_local_registry(state_dir)?;
-
-    #[cfg(feature = "registry-database")]
     let local_registry = store_factory.get_registry_store();
 
     let read_only_registries = registries
@@ -1466,7 +1435,7 @@ fn create_registry(
 
     let unified_registry = Box::new(UnifiedRegistry::new(local_registry, read_only_registries));
 
-    Ok((unified_registry, registry_shutdown_handle))
+    (unified_registry, registry_shutdown_handle)
 }
 
 fn parse_registry_arg(registry: &str) -> Result<(&str, &str), &str> {
@@ -1546,8 +1515,6 @@ pub enum StartError {
     StorageError(String),
     ProtocolError(String),
     RestApiError(String),
-    #[cfg(not(feature = "registry-database"))]
-    RegistryError(String),
     AdminServiceError(String),
     #[cfg(feature = "health")]
     HealthServiceError(String),
@@ -1564,8 +1531,6 @@ impl fmt::Display for StartError {
             StartError::StorageError(msg) => write!(f, "unable to set up storage: {}", msg),
             StartError::ProtocolError(msg) => write!(f, "unable to parse protocol: {}", msg),
             StartError::RestApiError(msg) => write!(f, "REST API encountered an error: {}", msg),
-            #[cfg(not(feature = "registry-database"))]
-            StartError::RegistryError(msg) => write!(f, "unable to setup registry: {}", msg),
             StartError::AdminServiceError(msg) => {
                 write!(f, "the admin service encountered an error: {}", msg)
             }

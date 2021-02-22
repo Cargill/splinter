@@ -133,7 +133,7 @@ impl StoreFactory for MemoryStoreFactory {
         Box::new(self.inflight_request_store.clone())
     }
 
-    #[cfg(feature = "registry-database")]
+    #[cfg(feature = "registry")]
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
