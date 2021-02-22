@@ -555,6 +555,12 @@ impl SplinterDaemon {
             {
                 authorization_handlers
                     .push(Box::new(RoleBasedAuthorizationHandler::new(rbac_store)));
+                rest_api_builder = rest_api_builder.add_resources(
+                    RoleBasedAuthorizationResourceProvider::new(
+                        store_factory.get_role_based_authorization_store(),
+                    )
+                    .resources(),
+                );
             }
 
             rest_api_builder = rest_api_builder
@@ -577,13 +583,7 @@ impl SplinterDaemon {
                             advertised_endpoints.clone(),
                         )
                     },
-                ))
-                .add_resources(
-                    RoleBasedAuthorizationResourceProvider::new(
-                        store_factory.get_role_based_authorization_store(),
-                    )
-                    .resources(),
-                );
+                ));
         }
         #[cfg(not(feature = "authorization"))]
         {
