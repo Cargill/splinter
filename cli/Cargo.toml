@@ -71,6 +71,7 @@ experimental = [
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
     "circuit-auth-type",
+    "circuit-abandon",
     "circuit-disband",
     "circuit-purge",
     "health",
@@ -82,6 +83,7 @@ experimental = [
 authorization-handler-maintenance = []
 authorization-handler-rbac = []
 circuit-auth-type = []
+circuit-abandon = ["splinter/circuit-abandon"]
 circuit-disband = ["splinter/circuit-disband"]
 circuit-purge = ["splinter/circuit-purge"]
 circuit-template = ["splinter/circuit-template"]
