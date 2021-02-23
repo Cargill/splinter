@@ -50,7 +50,7 @@ jobs:
       before_script:
         - set -e
       script:
-        - just ci-test
+        - travis_wait 120 just ci-test
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
