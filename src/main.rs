@@ -267,7 +267,7 @@ fn run<I: IntoIterator<Item = T>, T: Into<OsString> + Clone>(args: I) -> Result<
                                 .long("target")
                                 .takes_value(true)
                                 .required(true)
-                                .help("Node URLS to submit batches to, combine mulitple with ;"),
+                                .help("Node URLS to submit batches to, combine multiple with ;"),
                         )
                         .arg(
                             Arg::with_name("rate")
