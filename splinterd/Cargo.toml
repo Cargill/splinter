@@ -94,7 +94,6 @@ experimental = [
     "health",
     "https-bind",
     "oauth",
-    "registry-database",
     "service-arg-validation",
     "service-endpoint",
     "ws-transport",
@@ -130,7 +129,6 @@ https-bind = ["splinter/https-bind"]
 oauth = [
     "splinter/oauth"
 ]
-registry-database = ["splinter/registry-database"]
 rest-api-cors = ["splinter/rest-api-cors"]
 service-arg-validation = [
     "scabbard/service-arg-validation",

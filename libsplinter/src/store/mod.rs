@@ -58,7 +58,7 @@ pub trait StoreFactory {
         &self,
     ) -> Box<dyn crate::oauth::store::InflightOAuthRequestStore>;
 
-    #[cfg(feature = "registry-database")]
+    #[cfg(feature = "registry")]
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry>;
 
     #[cfg(feature = "authorization-handler-rbac")]

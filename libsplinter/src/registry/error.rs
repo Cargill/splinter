@@ -15,7 +15,7 @@
 use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "registry-database")]
+#[cfg(feature = "diesel")]
 use crate::error::ConstraintViolationType;
 use crate::error::{
     ConstraintViolationError, InternalError, InvalidStateError, ResourceTemporarilyUnavailableError,
@@ -59,7 +59,7 @@ impl fmt::Display for RegistryError {
     }
 }
 
-#[cfg(feature = "registry-database")]
+#[cfg(feature = "diesel")]
 impl From<diesel::r2d2::PoolError> for RegistryError {
     fn from(err: diesel::r2d2::PoolError) -> Self {
         RegistryError::ResourceTemporarilyUnavailableError(
@@ -131,7 +131,7 @@ impl fmt::Display for InvalidNodeError {
     }
 }
 
-#[cfg(feature = "registry-database")]
+#[cfg(feature = "diesel")]
 impl From<diesel::result::Error> for RegistryError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
