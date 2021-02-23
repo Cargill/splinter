@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM splintercommunity/splinter-dev:v6 as BUILDER
+FROM splintercommunity/splinter-dev:v7 as BUILDER
 
 ENV SPLINTER_FORCE_PANDOC=true
 
