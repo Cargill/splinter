@@ -50,6 +50,9 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/proto
     && unzip -o protoc-3.7.1-linux-x86_64.zip -d /usr/local \
     && rm protoc-3.7.1-linux-x86_64.zip
 
+# Install just
+RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
 # Create empty cargo projects for top-level projects
 WORKDIR /build
 RUN USER=root cargo new --bin cli
@@ -88,23 +91,23 @@ COPY examples/gameroom/database/Cargo.toml \
      /build/examples/gameroom/database/Cargo.toml
 
 # Do release builds for each Cargo.toml
-RUN find . -name 'Cargo.toml' -exec \
-    sh -c 'x="{}"; cargo build --release --manifest-path "$x" ' \;
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=experimental ' \;
+
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=stable ' \;
+
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --features=default ' \;
+
+RUN find ./*/ -name 'Cargo.toml' -exec \
+    sh -c 'x="{}"; echo "Building $x"; cargo build --tests --release --manifest-path "$x" --no-default-features ' \;
 
 # Clean up built files
-RUN rm \
-    target/release/gameroom-database* \
-    target/release/gameroomd* \
-    target/release/health* \
-    target/release/libsplinter* \
-    target/release/scabbard* \
-    target/release/splinter* \
-    target/release/deps/gameroom_database* \
-    target/release/deps/gameroomd* \
-    target/release/deps/health* \
-    target/release/deps/libsplinter* \
-    target/release/deps/scabbard* \
-    target/release/deps/splinter*
+RUN find target/release/ -name '*gameroom*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release/ -name '*health*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release/ -name '*scabbard*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
+RUN find target/release/ -name '*splinter*' -prune -exec sh -c 'x="{}"; echo "Removing $x"; rm -rf $x' \;
 
 # Clean up leftover files
 RUN find . -name 'Cargo.toml' -exec \
