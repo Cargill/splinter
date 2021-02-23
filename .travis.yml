@@ -40,22 +40,22 @@ jobs:
   include:
     - stage: Lint Gameroom Client
       script:
-        - just lint-client-ci
+        - just ci-lint-client
 
     - stage: Run Lint/Clippy on Splinter
       script:
-        - just lint-splinter-ci
+        - just ci-lint-splinter
 
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
       script:
-        - just test-ci
+        - just ci-test
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
       script:
-        - just test-gameroom-ci
+        - just ci-test-gameroom
     - stage: Run Splinter/Gameroom Unit Tests
       before_script:
         - set -e
