@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: This is an old implementation of the 2PC algorithm intended to be used temporarily by the
+// admin service until it can be updated to account for changes to the main 2PC implementation
+// (which is located at `libsplinter::consensus::two_phase`).
+
 //! A simple n-party, two-phase commit (2PC) consensus algorithm implemented as a
 //! `ConsensusEngine`. This is a bully algorithm where the coordinator for a proposal is determined
 //! as the node with the lowest ID in the set of verifiers. Only one proposal is considered at a
