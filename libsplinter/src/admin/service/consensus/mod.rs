@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod two_phase;
+
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::sync::mpsc::{channel, Sender};
@@ -21,7 +23,6 @@ use std::time::Duration;
 
 use protobuf::{Message, RepeatedField};
 
-use crate::consensus::two_phase::TwoPhaseEngine;
 use crate::consensus::{
     error::{ConsensusSendError, ProposalManagerError},
     ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId, ProposalManager,
@@ -36,6 +37,8 @@ use crate::service::ServiceError;
 use super::error::AdminConsensusManagerError;
 use super::shared::AdminServiceShared;
 use super::{admin_service_id, sha256};
+
+use self::two_phase::TwoPhaseEngine;
 
 /// Component used by the service to manage and interact with consensus
 pub struct AdminConsensusManager {
