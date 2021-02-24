@@ -15,30 +15,24 @@
 //! Version 2 of the two-phase commit (2PC) consensus algorithm
 //!
 //! This is a bully algorithm where the coordinator for a proposal is determined as the node with
-//! the lowest ID in the set of verifiers. Only one proposal is considered at a time. A proposal
-//! manager can define its own set of required verifiers by setting this information in the
-//! consensus data.
+//! the lowest ID in the set of verifiers (peers). Only one proposal is considered at a time.
 //!
 //! # Known limitations of this 2PC implementation
 //!
-//! There is a potential race condition in two-phase commit where two different proposals are in
-//! flight:
+//! A limitation of this implementation is that it is not fully resilient to crashes; for instance,
+//! if the coordinator commits a proposal but crashes before it is able to send the `APPLY` message
+//! to the other nodes, the network will be out of sync because the coordinator does not know to
+//! send the message when it restarts. This limitation will be solved by re-implementing 2PC as a
+//! stateless algorithm.
 //!
-//! - The two proposals have different coordinators
-//! - Both proposals have two or more verifiers in common
-//! - One of the common verifiers evaluates the 1st proposal; the other evaluates the 2nd proposal
-//! - Neither proposal will be completed, since only a single proposal can be evaluated by a
-//!   verifier at a time
+//! # Differences from previous version
 //!
-//! The solution to this limitation would require 2PC to have more sophisticated knowledge about
-//! the proposals available to it, and be able to process multiple non-overlapping proposals at the
-//! same time.
+//! This version of the 2PC implementation differs from the previous version in the following ways:
 //!
-//! Another limitation of this implementation is that it is not fully resilient to crashes; for
-//! instance, if the coordinator commits a proposal but crashes before it is able to send the
-//! `APPLY` message to the other nodes, the network will be out of sync because the coordinator
-//! does not know to send the message when it restarts. This limitation will be solved by
-//! re-implementing 2PC as a stateless algorithm.
+//! * A custom list of verifiers may no longer be provided by the proposal manager; the verifiers
+//!   for each proposal will be the list of all peers + the local node. This means that there is
+//!   only one coordinator for all proposals, which solves one of the known limitations of version
+//!   1.
 
 mod timing;
 
@@ -53,8 +47,8 @@ use crate::consensus::{
     Proposal, ProposalId, ProposalManager, ProposalUpdate, StartupState,
 };
 use crate::protos::two_phase::{
-    RequiredVerifiers, TwoPhaseMessage, TwoPhaseMessage_ProposalResult,
-    TwoPhaseMessage_ProposalVerificationResponse, TwoPhaseMessage_Type,
+    TwoPhaseMessage, TwoPhaseMessage_ProposalResult, TwoPhaseMessage_ProposalVerificationResponse,
+    TwoPhaseMessage_Type,
 };
 
 use self::timing::Timeout;
@@ -73,22 +67,14 @@ enum State {
 #[derive(Debug)]
 struct TwoPhaseProposal {
     proposal_id: ProposalId,
-    coordinator_id: PeerId,
     peers_verified: HashSet<PeerId>,
-    required_verifiers: HashSet<PeerId>,
 }
 
 impl TwoPhaseProposal {
-    fn new(
-        proposal_id: ProposalId,
-        coordinator_id: PeerId,
-        required_verifiers: HashSet<PeerId>,
-    ) -> Self {
+    fn new(proposal_id: ProposalId) -> Self {
         TwoPhaseProposal {
             proposal_id,
-            coordinator_id,
             peers_verified: HashSet::new(),
-            required_verifiers,
         }
     }
 
@@ -96,16 +82,8 @@ impl TwoPhaseProposal {
         &self.proposal_id
     }
 
-    fn coordinator_id(&self) -> &PeerId {
-        &self.coordinator_id
-    }
-
     fn peers_verified(&self) -> &HashSet<PeerId> {
         &self.peers_verified
-    }
-
-    fn required_verifiers(&self) -> &HashSet<PeerId> {
-        &self.required_verifiers
     }
 
     fn add_verified_peer(&mut self, id: PeerId) {
@@ -115,7 +93,7 @@ impl TwoPhaseProposal {
 
 pub struct TwoPhaseEngine {
     id: PeerId,
-    peers: HashSet<PeerId>,
+    verifiers: HashSet<PeerId>,
     state: State,
     coordinator_timeout: Timeout,
     proposal_backlog: VecDeque<TwoPhaseProposal>,
@@ -126,12 +104,26 @@ impl TwoPhaseEngine {
     pub fn new(coordinator_timeout_duration: Duration) -> Self {
         TwoPhaseEngine {
             id: PeerId::default(),
-            peers: HashSet::new(),
+            verifiers: HashSet::new(),
             state: State::Idle,
             coordinator_timeout: Timeout::new(coordinator_timeout_duration),
             proposal_backlog: VecDeque::new(),
             verification_request_backlog: VecDeque::new(),
         }
+    }
+
+    /// Determines if this node is the coordinator.
+    fn is_coordinator(&self) -> bool {
+        &self.id == self.coordinator_id()
+    }
+
+    /// Gets the ID of the coordinator. The coordinator is the node with the lowest ID in the set of
+    /// verifiers.
+    fn coordinator_id(&self) -> &PeerId {
+        self.verifiers
+            .iter()
+            .min()
+            .expect("2PC always has at least one verifier (self)")
     }
 
     fn handle_consensus_msg(
@@ -202,7 +194,7 @@ impl TwoPhaseEngine {
                         if let State::EvaluatingProposal(tpc_proposal) = &mut self.state {
                             tpc_proposal.add_verified_peer(consensus_msg.origin_id);
 
-                            if tpc_proposal.peers_verified() == tpc_proposal.required_verifiers() {
+                            if tpc_proposal.peers_verified() == &self.verifiers {
                                 debug!(
                                     "All verifiers have approved; accepting proposal {}",
                                     proposal_id
@@ -278,6 +270,7 @@ impl TwoPhaseEngine {
         network_sender: &dyn ConsensusNetworkSender,
         proposal_manager: &dyn ProposalManager,
     ) -> Result<(), ConsensusEngineError> {
+        let is_coordinator = self.is_coordinator();
         match update {
             ProposalUpdate::ProposalCreated(None) => {
                 if let State::AwaitingProposal = self.state {
@@ -298,7 +291,7 @@ impl TwoPhaseEngine {
                 {
                     debug!("Proposal valid: {}", proposal_id);
 
-                    if &self.id == tpc_proposal.coordinator_id() {
+                    if is_coordinator {
                         tpc_proposal.add_verified_peer(self.id.clone());
 
                         debug!("Requesting verification of proposal {}", proposal_id);
@@ -321,7 +314,7 @@ impl TwoPhaseEngine {
                         );
 
                         network_sender
-                            .send_to(tpc_proposal.coordinator_id(), response.write_to_bytes()?)?;
+                            .send_to(self.coordinator_id(), response.write_to_bytes()?)?;
                     }
                 }
                 _ => warn!("Got valid message for unknown proposal: {}", proposal_id),
@@ -332,7 +325,7 @@ impl TwoPhaseEngine {
                 {
                     debug!("Proposal invalid: {}", proposal_id);
 
-                    if &self.id == tpc_proposal.coordinator_id() {
+                    if is_coordinator {
                         debug!("Rejecting proposal {}", proposal_id);
                         self.complete_coordination(
                             proposal_id,
@@ -352,7 +345,7 @@ impl TwoPhaseEngine {
                         );
 
                         network_sender
-                            .send_to(tpc_proposal.coordinator_id(), response.write_to_bytes()?)?;
+                            .send_to(self.coordinator_id(), response.write_to_bytes()?)?;
                     }
                 }
                 _ => warn!("Got invalid message for unknown proposal: {}", proposal_id),
@@ -468,39 +461,7 @@ impl TwoPhaseEngine {
             return Ok(());
         }
 
-        // Determine which peers must verify the proposal for it to be committed. If the proposal
-        // manager provides a list in the consensus data field, those peers are used; otherwise,
-        // the list will be all peers.
-        let verifiers = if !proposal.consensus_data.is_empty() {
-            let required_verifiers: RequiredVerifiers =
-                Message::parse_from_bytes(&proposal.consensus_data)?;
-            required_verifiers
-                .verifiers
-                .into_iter()
-                .map(PeerId::from)
-                .collect::<HashSet<PeerId>>()
-        } else {
-            let mut verifiers = self.peers.clone();
-            verifiers.insert(self.id.clone());
-            verifiers
-        };
-
-        // Determines which verifier is the coordinator; the coordinator is the verifier with the
-        // lowest peer ID (bully algorithm).
-        let coordinator = match verifiers.iter().min() {
-            Some(coordinator) => coordinator.clone(),
-            None => {
-                error!(
-                    "Rejecting proposal; no verifiers specified: {}",
-                    proposal.id
-                );
-                proposal_manager.reject_proposal(&proposal.id)?;
-                self.state = State::Idle;
-                return Ok(());
-            }
-        };
-
-        let tpc_proposal = TwoPhaseProposal::new(proposal.id, coordinator, verifiers);
+        let tpc_proposal = TwoPhaseProposal::new(proposal.id);
 
         if let State::EvaluatingProposal(ref current_proposal) = self.state {
             if tpc_proposal.proposal_id() == current_proposal.proposal_id() {
@@ -515,7 +476,7 @@ impl TwoPhaseEngine {
                 );
                 self.proposal_backlog.push_back(tpc_proposal);
             }
-        } else if &self.id == tpc_proposal.coordinator_id() {
+        } else if self.is_coordinator() {
             debug!(
                 "Starting coordination for proposal {}",
                 tpc_proposal.proposal_id()
@@ -590,20 +551,17 @@ impl TwoPhaseEngine {
         Ok(())
     }
 
-    /// If not doing anything, try to get the next proposal. First check if there's one that this
-    /// node is the coordinator for in the local backlog; if not, ask the proposal manager.
+    /// If not doing anything, try to get the next proposal. First check if this node is the
+    /// coordinator and if there is a proposal in the local backlog; if not, ask the proposal
+    /// manager.
     fn get_next_proposal(
         &mut self,
         network_sender: &dyn ConsensusNetworkSender,
         proposal_manager: &dyn ProposalManager,
     ) {
         if let State::Idle = self.state {
-            if let Some(idx) = self
-                .proposal_backlog
-                .iter()
-                .position(|tpc_proposal| tpc_proposal.coordinator_id() == &self.id)
-            {
-                let tpc_proposal = self.proposal_backlog.remove(idx).unwrap();
+            if self.is_coordinator() && !self.proposal_backlog.is_empty() {
+                let tpc_proposal = self.proposal_backlog.pop_front().unwrap();
                 debug!(
                     "Starting coordination for backlogged proposal {}",
                     tpc_proposal.proposal_id()
@@ -648,9 +606,10 @@ impl ConsensusEngine for TwoPhaseEngine {
         let proposal_timeout = Duration::from_millis(PROPOSAL_RECV_TIMEOUT_MILLIS);
 
         self.id = startup_state.id;
+        self.verifiers.insert(self.id.clone()); // This node is a verifier
 
         for id in startup_state.peer_ids {
-            self.peers.insert(id);
+            self.verifiers.insert(id);
         }
 
         loop {
@@ -712,9 +671,8 @@ impl ConsensusEngine for TwoPhaseEngine {
 pub mod tests {
     use super::*;
 
+    use std::iter::FromIterator;
     use std::sync::mpsc::channel;
-
-    use protobuf::RepeatedField;
 
     use crate::consensus::tests::{MockConsensusNetworkSender, MockProposalManager};
     use crate::consensus::Proposal;
@@ -754,12 +712,40 @@ pub mod tests {
         thread.join().expect("failed to join engine thread");
     }
 
+    /// Verify the `coordinator_id` and `is_coordinator` methods work correctly.
+    #[test]
+    fn test_coordinator_check() {
+        let peer_ids: Vec<PeerId> = vec![vec![0].into(), vec![1].into(), vec![2].into()];
+        let peer_ids_hashset = HashSet::from_iter(peer_ids.iter().cloned());
+
+        let coordinator = TwoPhaseEngine {
+            id: peer_ids[0].clone(),
+            verifiers: peer_ids_hashset.clone(),
+            state: State::Idle,
+            coordinator_timeout: Timeout::new(Duration::from_millis(COORDINATOR_TIMEOUT_MILLIS)),
+            proposal_backlog: VecDeque::new(),
+            verification_request_backlog: VecDeque::new(),
+        };
+        assert_eq!(coordinator.coordinator_id(), &peer_ids[0]);
+        assert!(coordinator.is_coordinator());
+
+        let other_node = TwoPhaseEngine {
+            id: peer_ids[1].clone(),
+            verifiers: peer_ids_hashset,
+            state: State::Idle,
+            coordinator_timeout: Timeout::new(Duration::from_millis(COORDINATOR_TIMEOUT_MILLIS)),
+            proposal_backlog: VecDeque::new(),
+            verification_request_backlog: VecDeque::new(),
+        };
+        assert_eq!(other_node.coordinator_id(), &peer_ids[0]);
+        assert!(!other_node.is_coordinator());
+    }
+
     /// Test the coordinator (leader) of a 3 node network by simulating the flow of a valid
     /// proposal (both participants verify the proposal) and a failed proposal (one participant
-    /// fails the proposal). This test uses default peers for which nodes need to verify the
-    /// proposal. The peers are defined in the startup state.
+    /// fails the proposal).
     #[test]
-    fn test_coordinator_default_peers() {
+    fn test_coordinator() {
         let (update_tx, update_rx) = channel();
         let (consensus_msg_tx, consensus_msg_rx) = channel();
 
@@ -768,181 +754,6 @@ pub mod tests {
         let startup_state = StartupState {
             id: vec![0].into(),
             peer_ids: vec![vec![1].into(), vec![2].into()],
-            last_proposal: None,
-        };
-
-        let mut engine = TwoPhaseEngine::new(Duration::from_millis(COORDINATOR_TIMEOUT_MILLIS));
-        let network_clone = network.clone();
-        let manager_clone = manager.clone();
-        let thread = std::thread::spawn(move || {
-            engine
-                .run(
-                    consensus_msg_rx,
-                    update_rx,
-                    Box::new(network_clone),
-                    Box::new(manager_clone),
-                    startup_state,
-                )
-                .expect("engine failed")
-        });
-
-        // Check that verification request is sent for the first proposal
-        loop {
-            if let Some(msg) = network.broadcast_messages().get(0) {
-                let msg: TwoPhaseMessage =
-                    Message::parse_from_bytes(msg).expect("failed to parse message");
-                assert_eq!(
-                    msg.get_message_type(),
-                    TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
-                );
-                assert_eq!(msg.get_proposal_id(), vec![1].as_slice());
-                break;
-            }
-        }
-
-        // Receive the verification responses
-        let mut response = TwoPhaseMessage::new();
-        response.set_message_type(TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_RESPONSE);
-        response.set_proposal_id(vec![1]);
-        response.set_proposal_verification_response(
-            TwoPhaseMessage_ProposalVerificationResponse::VERIFIED,
-        );
-        let message_bytes = response
-            .write_to_bytes()
-            .expect("failed to write failed response to bytes");
-
-        consensus_msg_tx
-            .send(ConsensusMessage::new(message_bytes.clone(), vec![1].into()))
-            .expect("failed to send 1st response");
-        consensus_msg_tx
-            .send(ConsensusMessage::new(message_bytes, vec![2].into()))
-            .expect("failed to send 2nd response");
-
-        // Verify the Apply message is sent for the proposal
-        loop {
-            if let Some(msg) = network.broadcast_messages().get(1) {
-                let msg: TwoPhaseMessage =
-                    Message::parse_from_bytes(msg).expect("failed to parse message");
-                assert_eq!(
-                    msg.get_message_type(),
-                    TwoPhaseMessage_Type::PROPOSAL_RESULT
-                );
-                assert_eq!(
-                    msg.get_proposal_result(),
-                    TwoPhaseMessage_ProposalResult::APPLY
-                );
-                assert_eq!(msg.get_proposal_id(), vec![1].as_slice());
-                break;
-            }
-        }
-
-        // Verify the proposal was accepted
-        loop {
-            if let Some((id, _)) = manager.accepted_proposals().get(0) {
-                assert_eq!(id, &vec![1].into());
-                break;
-            }
-        }
-
-        // Check that verification request is sent for the second proposal
-        loop {
-            if let Some(msg) = network.broadcast_messages().get(2) {
-                let msg: TwoPhaseMessage =
-                    Message::parse_from_bytes(msg).expect("failed to parse message");
-                assert_eq!(
-                    msg.get_message_type(),
-                    TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST
-                );
-                assert_eq!(msg.get_proposal_id(), vec![2].as_slice());
-                break;
-            }
-        }
-
-        // Receive the verification responses
-        let mut response = TwoPhaseMessage::new();
-        response.set_message_type(TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_RESPONSE);
-        response.set_proposal_id(vec![2]);
-        response.set_proposal_verification_response(
-            TwoPhaseMessage_ProposalVerificationResponse::VERIFIED,
-        );
-        let message_bytes = response
-            .write_to_bytes()
-            .expect("failed to write failed response to bytes");
-
-        consensus_msg_tx
-            .send(ConsensusMessage::new(message_bytes, vec![1].into()))
-            .expect("failed to send 1st response");
-
-        let mut response = TwoPhaseMessage::new();
-        response.set_message_type(TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_RESPONSE);
-        response.set_proposal_id(vec![2]);
-        response.set_proposal_verification_response(
-            TwoPhaseMessage_ProposalVerificationResponse::FAILED,
-        );
-        let message_bytes = response
-            .write_to_bytes()
-            .expect("failed to write failed response to bytes");
-
-        consensus_msg_tx
-            .send(ConsensusMessage::new(message_bytes, vec![2].into()))
-            .expect("failed to send 2nd response");
-
-        // Verify the Reject message is sent for the proposal
-        loop {
-            if let Some(msg) = network.broadcast_messages().get(3) {
-                let msg: TwoPhaseMessage =
-                    Message::parse_from_bytes(msg).expect("failed to parse message");
-                assert_eq!(
-                    msg.get_message_type(),
-                    TwoPhaseMessage_Type::PROPOSAL_RESULT
-                );
-                assert_eq!(
-                    msg.get_proposal_result(),
-                    TwoPhaseMessage_ProposalResult::REJECT
-                );
-                assert_eq!(msg.get_proposal_id(), vec![2].as_slice());
-                break;
-            }
-        }
-
-        // Verify the proposal was rejected
-        loop {
-            if let Some(id) = manager.rejected_proposals().get(0) {
-                assert_eq!(id, &vec![2].into());
-                break;
-            }
-        }
-
-        update_tx
-            .send(ProposalUpdate::Shutdown)
-            .expect("failed to send shutdown");
-        thread.join().expect("failed to join engine thread");
-    }
-
-    /// Test the coordinator (leader) of a 3 node network by simulating the flow of a valid
-    /// proposal (both participants verify the proposal) and a failed proposal (one participant
-    /// fails the proposal). This test uses dynamic peers for which nodes need to verify the
-    /// proposal. The peers are defined in the consensus data on the proposal.
-    #[test]
-    fn test_coordinator_dynamic_peers() {
-        let (update_tx, update_rx) = channel();
-        let (consensus_msg_tx, consensus_msg_rx) = channel();
-
-        let mut manager = MockProposalManager::new(update_tx.clone());
-        let network = MockConsensusNetworkSender::new();
-
-        let mut required_verifiers = RequiredVerifiers::new();
-        required_verifiers.set_verifiers(RepeatedField::from_vec(vec![
-            vec![0].into(),
-            vec![1].into(),
-            vec![2].into(),
-        ]));
-        let data = required_verifiers.write_to_bytes().unwrap();
-        manager.set_consensus_data(Some(data));
-
-        let startup_state = StartupState {
-            id: vec![0].into(),
-            peer_ids: vec![],
             last_proposal: None,
         };
 
