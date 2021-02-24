@@ -54,6 +54,23 @@ enum State {
     EvaluatingProposal(TwoPhaseProposal),
 }
 
+impl State {
+    pub fn is_idle(&self) -> bool {
+        matches!(self, Self::Idle)
+    }
+
+    pub fn is_awaiting_proposal(&self) -> bool {
+        matches!(self, Self::AwaitingProposal)
+    }
+
+    pub fn is_evaluating_proposal_with_id(&self, proposal_id: &ProposalId) -> bool {
+        matches!(
+            self,
+            Self::EvaluatingProposal(tpc_proposal) if tpc_proposal.proposal_id() == proposal_id,
+        )
+    }
+}
+
 /// Contains information about a proposal that two phase consensus needs to keep track of
 #[derive(Debug)]
 struct TwoPhaseProposal {
@@ -130,44 +147,39 @@ impl TwoPhaseEngine {
             TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_REQUEST => {
                 debug!("Proposal verification request received: {}", proposal_id);
 
-                match self.state {
-                    State::EvaluatingProposal(ref tpc_proposal)
-                        if tpc_proposal.proposal_id() != &proposal_id =>
+                if self.state.is_evaluating_proposal_with_id(&proposal_id) {
+                    debug!(
+                        "Proposal already in progress, backlogging verification request: {}",
+                        proposal_id
+                    );
+                    self.verification_request_backlog.push_back(proposal_id);
+                } else {
+                    // Try to find the proposal in the backlog
+                    match self
+                        .proposal_backlog
+                        .iter()
+                        .position(|tpc_proposal| tpc_proposal.proposal_id() == &proposal_id)
                     {
-                        debug!(
-                            "Proposal already in progress, backlogging verification request: {}",
-                            proposal_id
-                        );
-                        self.verification_request_backlog.push_back(proposal_id);
-                    }
-                    _ => {
-                        // Try to find the proposal in the backlog
-                        match self
-                            .proposal_backlog
-                            .iter()
-                            .position(|tpc_proposal| tpc_proposal.proposal_id() == &proposal_id)
-                        {
-                            Some(idx) => {
-                                debug!("Checking proposal {}", proposal_id);
-                                proposal_manager.check_proposal(&proposal_id)?;
-                                self.state = State::EvaluatingProposal(
-                                    self.proposal_backlog.remove(idx).unwrap(),
-                                );
-                            }
-                            None => {
-                                debug!(
-                                    "Proposal not yet received, backlogging verification request: \
-                                     {}",
-                                    proposal_id
-                                );
-                                self.verification_request_backlog.push_back(proposal_id);
-                            }
+                        Some(idx) => {
+                            debug!("Checking proposal {}", proposal_id);
+                            proposal_manager.check_proposal(&proposal_id)?;
+                            self.state = State::EvaluatingProposal(
+                                self.proposal_backlog.remove(idx).unwrap(),
+                            );
+                        }
+                        None => {
+                            debug!(
+                                "Proposal not yet received, backlogging verification request: \
+                                 {}",
+                                proposal_id
+                            );
+                            self.verification_request_backlog.push_back(proposal_id);
                         }
                     }
                 }
             }
             TwoPhaseMessage_Type::PROPOSAL_VERIFICATION_RESPONSE => {
-                if !self.evaluating_proposal(&proposal_id) {
+                if !self.state.is_evaluating_proposal_with_id(&proposal_id) {
                     warn!(
                         "Received unexpected verification response for proposal {}",
                         proposal_id
@@ -181,7 +193,7 @@ impl TwoPhaseEngine {
                             "Proposal {} verified by peer {}",
                             proposal_id, consensus_msg.origin_id
                         );
-                        // Already checked state above in self.evaluating_proposal()
+                        // Already checked state above in self.state.is_evaluating_proposal_with_id
                         if let State::EvaluatingProposal(tpc_proposal) = &mut self.state {
                             tpc_proposal.add_verified_peer(consensus_msg.origin_id);
 
@@ -221,7 +233,7 @@ impl TwoPhaseEngine {
             }
             TwoPhaseMessage_Type::PROPOSAL_RESULT => match two_phase_msg.get_proposal_result() {
                 TwoPhaseMessage_ProposalResult::APPLY => {
-                    if self.evaluating_proposal(&proposal_id) {
+                    if self.state.is_evaluating_proposal_with_id(&proposal_id) {
                         debug!("Accepting proposal {}", proposal_id);
                         proposal_manager.accept_proposal(&proposal_id, None)?;
                         self.state = State::Idle;
@@ -237,7 +249,7 @@ impl TwoPhaseEngine {
                     proposal_manager.reject_proposal(&proposal_id)?;
 
                     // Only update state if this was the currently evaluating proposal
-                    if self.evaluating_proposal(&proposal_id) {
+                    if self.state.is_evaluating_proposal_with_id(&proposal_id) {
                         self.state = State::Idle;
                     }
                 }
@@ -264,7 +276,7 @@ impl TwoPhaseEngine {
         let is_coordinator = self.is_coordinator();
         match update {
             ProposalUpdate::ProposalCreated(None) => {
-                if let State::AwaitingProposal = self.state {
+                if self.state.is_awaiting_proposal() {
                     self.state = State::Idle;
                 }
             }
@@ -310,10 +322,8 @@ impl TwoPhaseEngine {
                 }
                 _ => warn!("Got valid message for unknown proposal: {}", proposal_id),
             },
-            ProposalUpdate::ProposalInvalid(proposal_id) => match self.state {
-                State::EvaluatingProposal(ref tpc_proposal)
-                    if tpc_proposal.proposal_id() == &proposal_id =>
-                {
+            ProposalUpdate::ProposalInvalid(proposal_id) => {
+                if self.state.is_evaluating_proposal_with_id(&proposal_id) {
                     debug!("Proposal invalid: {}", proposal_id);
 
                     if is_coordinator {
@@ -338,9 +348,10 @@ impl TwoPhaseEngine {
                         network_sender
                             .send_to(self.coordinator_id(), response.write_to_bytes()?)?;
                     }
+                } else {
+                    warn!("Got invalid message for unknown proposal: {}", proposal_id);
                 }
-                _ => warn!("Got invalid message for unknown proposal: {}", proposal_id),
-            },
+            }
             ProposalUpdate::ProposalAccepted(proposal_id) => {
                 info!("proposal accepted: {}", proposal_id);
             }
@@ -356,17 +367,6 @@ impl TwoPhaseEngine {
         }
 
         Ok(())
-    }
-
-    fn evaluating_proposal(&self, proposal_id: &ProposalId) -> bool {
-        match self.state {
-            State::EvaluatingProposal(ref proposal_status)
-                if proposal_status.proposal_id() == proposal_id =>
-            {
-                true
-            }
-            _ => false,
-        }
     }
 
     fn start_coordination(
@@ -454,19 +454,20 @@ impl TwoPhaseEngine {
 
         let tpc_proposal = TwoPhaseProposal::new(proposal.id);
 
-        if let State::EvaluatingProposal(ref current_proposal) = self.state {
-            if tpc_proposal.proposal_id() == current_proposal.proposal_id() {
-                debug!(
-                    "This proposal is already being evaluated; ignoring: {}",
-                    tpc_proposal.proposal_id()
-                );
-            } else {
-                debug!(
-                    "Another proposal is already in progress; backlogging proposal {}",
-                    tpc_proposal.proposal_id()
-                );
-                self.proposal_backlog.push_back(tpc_proposal);
-            }
+        if self
+            .state
+            .is_evaluating_proposal_with_id(tpc_proposal.proposal_id())
+        {
+            debug!(
+                "This proposal is already being evaluated; ignoring: {}",
+                tpc_proposal.proposal_id()
+            );
+        } else if self.state.is_evaluating_proposal() {
+            debug!(
+                "Another proposal is already in progress; backlogging proposal {}",
+                tpc_proposal.proposal_id()
+            );
+            self.proposal_backlog.push_back(tpc_proposal);
         } else if self.is_coordinator() {
             debug!(
                 "Starting coordination for proposal {}",
@@ -515,7 +516,7 @@ impl TwoPhaseEngine {
         &mut self,
         proposal_manager: &dyn ProposalManager,
     ) -> Result<(), ConsensusEngineError> {
-        if let State::Idle = self.state {
+        if self.state.is_idle() {
             if let Some(idx) = self
                 .verification_request_backlog
                 .iter()
@@ -550,7 +551,7 @@ impl TwoPhaseEngine {
         network_sender: &dyn ConsensusNetworkSender,
         proposal_manager: &dyn ProposalManager,
     ) {
-        if let State::Idle = self.state {
+        if self.state.is_idle() {
             if self.is_coordinator() && !self.proposal_backlog.is_empty() {
                 let tpc_proposal = self.proposal_backlog.pop_front().unwrap();
                 debug!(
