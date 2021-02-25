@@ -19,6 +19,7 @@ message ScabbardMessage {
         UNSET = 0;
         CONSENSUS_MESSAGE = 1;
         PROPOSED_BATCH = 2;
+        NEW_BATCH = 3;
     }
 
     Type message_type = 1;
@@ -28,6 +29,9 @@ message ScabbardMessage {
 
     // Set if type is PROPOSED_BATCH
     ProposedBatch proposed_batch = 3;
+
+    // Set if type is NEW_BATCH
+    bytes new_batch = 4;
 }
 
 message ProposedBatch {
