@@ -119,7 +119,13 @@ impl Scabbard {
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
     ) -> Result<Self, ScabbardError> {
-        let shared = ScabbardShared::new(VecDeque::new(), None, peer_services, signature_verifier);
+        let shared = ScabbardShared::new(
+            VecDeque::new(),
+            None,
+            peer_services,
+            service_id.clone(),
+            signature_verifier,
+        );
 
         let (state_db_path, receipt_db_path) =
             compute_db_paths(&service_id, circuit_id, state_db_dir, receipt_db_dir)?;

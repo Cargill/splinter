@@ -406,20 +406,21 @@ mod tests {
     fn network_sender() {
         let service_sender = MockServiceNetworkSender::new();
         let mut peer_services = HashSet::new();
-        peer_services.insert("1".to_string());
-        peer_services.insert("2".to_string());
+        peer_services.insert("svc1".to_string());
+        peer_services.insert("svc2".to_string());
 
         let shared = Arc::new(Mutex::new(ScabbardShared::new(
             VecDeque::new(),
             Some(Box::new(service_sender.clone())),
             peer_services.clone(),
+            "svc0".to_string(),
             Secp256k1Context::new().new_verifier(),
         )));
-        let consensus_sender = ScabbardConsensusNetworkSender::new("0".into(), shared);
+        let consensus_sender = ScabbardConsensusNetworkSender::new("svc0".into(), shared);
 
         // Test send_to
         consensus_sender
-            .send_to(&"1".as_bytes().into(), vec![0])
+            .send_to(&"svc1".as_bytes().into(), vec![0])
             .expect("failed to send");
 
         let (recipient, message) = service_sender
@@ -429,7 +430,7 @@ mod tests {
             .get(0)
             .expect("1st message not sent")
             .clone();
-        assert_eq!(recipient, "1".to_string());
+        assert_eq!(recipient, "svc1".to_string());
 
         let scabbard_message: ScabbardMessage =
             Message::parse_from_bytes(&message).expect("failed to parse 1st scabbard message");
@@ -442,7 +443,7 @@ mod tests {
             ConsensusMessage::try_from(scabbard_message.get_consensus_message())
                 .expect("failed to parse 1st consensus message");
         assert_eq!(consensus_message.message, vec![0]);
-        assert_eq!(consensus_message.origin_id, "0".as_bytes().into());
+        assert_eq!(consensus_message.origin_id, "svc0".as_bytes().into());
 
         // Test broadcast
         consensus_sender.broadcast(vec![1]).expect("failed to send");
@@ -468,7 +469,7 @@ mod tests {
             ConsensusMessage::try_from(scabbard_message.get_consensus_message())
                 .expect("failed to parse 2nd consensus message");
         assert_eq!(consensus_message.message, vec![1]);
-        assert_eq!(consensus_message.origin_id, "0".as_bytes().into());
+        assert_eq!(consensus_message.origin_id, "svc0".as_bytes().into());
 
         // Second broadcast message
         let (recipient, message) = service_sender
@@ -491,7 +492,7 @@ mod tests {
             ConsensusMessage::try_from(scabbard_message.get_consensus_message())
                 .expect("failed to parse 3rd consensus message");
         assert_eq!(consensus_message.message, vec![1]);
-        assert_eq!(consensus_message.origin_id, "0".as_bytes().into());
+        assert_eq!(consensus_message.origin_id, "svc0".as_bytes().into());
     }
 
     #[derive(Clone, Debug)]
