@@ -41,7 +41,10 @@ use splinter::{
         ServiceStartError, ServiceStopError,
     },
 };
-use transact::{protocol::batch::BatchPair, protos::FromBytes};
+use transact::{
+    protocol::batch::BatchPair,
+    protos::{FromBytes, IntoBytes},
+};
 
 use super::hex::to_hex;
 use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
@@ -203,7 +206,32 @@ impl Scabbard {
                     .add_batch(&batch.batch().header_signature());
 
                 link.push_str(&format!("{},", batch.batch().header_signature()));
-                shared.add_batch_to_queue(batch);
+
+                match self.version {
+                    ScabbardVersion::V1 => shared.add_batch_to_queue(batch),
+                    ScabbardVersion::V2 => {
+                        if shared.is_coordinator() {
+                            shared.add_batch_to_queue(batch);
+                        } else {
+                            let batch_bytes = batch
+                                .into_bytes()
+                                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+
+                            let mut msg = ScabbardMessage::new();
+                            msg.set_message_type(ScabbardMessage_Type::NEW_BATCH);
+                            msg.set_new_batch(batch_bytes);
+                            let msg_bytes = msg
+                                .write_to_bytes()
+                                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+
+                            shared
+                                .network_sender()
+                                .ok_or(ScabbardError::NotConnected)?
+                                .send(shared.coordinator_service_id(), msg_bytes.as_slice())
+                                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+                        }
+                    }
+                }
             }
 
             // Remove trailing comma
@@ -392,6 +420,30 @@ impl Service for Scabbard {
                         proposed_batch.get_service_id().as_bytes().into(),
                     ))
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
+            }
+            ScabbardMessage_Type::NEW_BATCH => {
+                match self.version {
+                    ScabbardVersion::V1 => {
+                        warn!("Scabbard V1 does not accept NEW_BATCH messages");
+                    }
+                    ScabbardVersion::V2 => {
+                        let mut shared = self.shared.lock().map_err(|_| {
+                            ServiceError::PoisonedLock("shared lock poisoned".into())
+                        })?;
+
+                        if shared.is_coordinator() {
+                            let batch =
+                                BatchPair::from_bytes(message.get_new_batch()).map_err(|err| {
+                                    ServiceError::UnableToHandleMessage(Box::new(err))
+                                })?;
+                            shared.add_batch_to_queue(batch);
+                        } else {
+                            warn!("Ignoring new batch; this service is not the coordinator");
+                        }
+                    }
+                }
+
+                Ok(())
             }
             ScabbardMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 ScabbardError::MessageTypeUnset,
