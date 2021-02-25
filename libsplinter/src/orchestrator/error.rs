@@ -19,7 +19,7 @@ use crate::service::FactoryCreateError;
 use super::ServiceDefinition;
 
 #[derive(Debug)]
-pub struct NewOrchestratorError(pub Box<dyn Error + Send>);
+pub struct NewOrchestratorError(pub Box<dyn Error>);
 
 impl Error for NewOrchestratorError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {

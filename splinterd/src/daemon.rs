@@ -18,12 +18,12 @@ use std::error::Error;
 use std::fmt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc::channel, Arc};
 use std::thread;
 use std::time::Duration;
 
 use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 use health::HealthService;
 #[cfg(feature = "service-arg-validation")]
 use scabbard::service::ScabbardArgValidator;
@@ -52,7 +52,7 @@ use splinter::network::dispatch::{
     dispatch_channel, DispatchLoopBuilder, DispatchMessageSender, Dispatcher,
 };
 use splinter::network::handlers::{NetworkEchoHandler, NetworkHeartbeatHandler};
-use splinter::orchestrator::{NewOrchestratorError, ServiceOrchestrator};
+use splinter::orchestrator::ServiceOrchestratorBuilder;
 use splinter::peer::interconnect::NetworkMessageSender;
 use splinter::peer::interconnect::PeerInterconnectBuilder;
 use splinter::peer::PeerManager;
@@ -77,9 +77,9 @@ use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{
     AuthConfig, Method, Resource, RestApiBuilder, RestApiServerError, RestResourceProvider,
 };
+use splinter::service;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
-use splinter::service::{self, ServiceProcessor, ShutdownHandle};
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
     Incoming, ListenError, Listener, Transport,
@@ -87,21 +87,18 @@ use splinter::transport::{
 
 use crate::routes;
 
-const ORCHESTRATOR_INCOMING_CAPACITY: usize = 8;
-const ORCHESTRATOR_OUTGOING_CAPACITY: usize = 8;
-const ORCHESTRATOR_CHANNEL_CAPACITY: usize = 8;
-
 const ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
 const ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
-#[cfg(feature = "health")]
+#[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
 
+#[cfg(not(feature = "shutdown"))]
 type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::ServiceProcessorError>>;
 
 pub struct SplinterDaemon {
@@ -243,7 +240,7 @@ impl SplinterDaemon {
         let mut internal_service_listeners = vec![];
         internal_service_listeners.push(transport.listen("inproc://admin-service")?);
         internal_service_listeners.push(transport.listen("inproc://orchestator")?);
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         internal_service_listeners.push(transport.listen("inproc://health_service")?);
 
         info!("Starting SpinterNode with ID {}", self.node_id);
@@ -265,7 +262,7 @@ impl SplinterDaemon {
             ),
         ];
 
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         inproc_ids.push((
             "inproc://health-service".to_string(),
             format!("health::{}", &self.node_id),
@@ -330,7 +327,7 @@ impl SplinterDaemon {
                 ))
             })?;
 
-        #[cfg(feature = "health")]
+        #[cfg(feature = "health-service")]
         let health_connection = service_transport
             .connect("inproc://health_service")
             .map_err(|err| {
@@ -435,20 +432,37 @@ impl SplinterDaemon {
         let signing_context = Secp256k1Context::new();
         let admin_service_verifier = signing_context.new_verifier();
 
-        let (orchestrator, orchestator_join_handles) = ServiceOrchestrator::new(
-            vec![Box::new(ScabbardFactory::new(
+        let mut orchestrator = ServiceOrchestratorBuilder::new()
+            .with_connection(orchestrator_connection)
+            .with_service_factory(Box::new(ScabbardFactory::new(
                 None,
                 None,
                 None,
                 None,
                 Box::new(signing_context),
-            ))],
-            orchestrator_connection,
-            ORCHESTRATOR_INCOMING_CAPACITY,
-            ORCHESTRATOR_OUTGOING_CAPACITY,
-            ORCHESTRATOR_CHANNEL_CAPACITY,
-        )?;
+            )))
+            .build()
+            .map_err(|err| {
+                StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
+            })?
+            .run()
+            .map_err(|err| {
+                StartError::OrchestratorError(format!("failed to start orchestrator: {}", err))
+            })?;
+
         let orchestrator_resources = orchestrator.resources();
+        #[cfg(not(feature = "shutdown"))]
+        let orchestator_join_handles = orchestrator.take_join_handles().ok_or_else(|| {
+            StartError::OrchestratorError(
+                "Orchestrator join handles were taken more than once".into(),
+            )
+        })?;
+        #[cfg(feature = "shutdown")]
+        let orchestator_shutdown_handle = orchestrator.take_shutdown_handle().ok_or_else(|| {
+            StartError::OrchestratorError(
+                "Orchestrator shutdown handle was taken more than once".into(),
+            )
+        })?;
 
         let (registry, registry_shutdown) = create_registry(
             &self.state_dir,
@@ -734,68 +748,66 @@ impl SplinterDaemon {
             );
         }
 
-        let mut health_service_processor_join_handle: Option<_> = None;
-        #[cfg(feature = "health")]
-        {
+        #[cfg(feature = "health-service")]
+        let health_service_shutdown_handle = {
             let health_service = HealthService::new(&self.node_id);
             rest_api_builder = rest_api_builder.add_resources(health_service.resources());
 
-            health_service_processor_join_handle.replace(start_health_service(
-                health_connection,
-                health_service,
-                Arc::clone(&running),
-            )?);
-        }
-
-        #[cfg(not(feature = "health"))]
-        {
-            health_service_processor_join_handle.replace(());
-        }
+            start_health_service(health_connection, health_service)?
+        };
 
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
+        #[cfg(not(feature = "shutdown"))]
         let (admin_shutdown_handle, service_processor_join_handle) =
-            Self::start_admin_service(admin_connection, admin_service, Arc::clone(&running))?;
+            Self::start_admin_service(admin_connection, admin_service)?;
+        #[cfg(feature = "shutdown")]
+        let admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
-        // Allowing possibly redundant clone of `running` since it will be needed again if the
-        // `health` feature is enabled
-        #[allow(clippy::redundant_clone)]
-        let r = running.clone();
+        let (shutdown_tx, shutdown_rx) = channel();
         ctrlc::set_handler(move || {
-            info!("Received Shutdown");
-            r.store(false, Ordering::SeqCst);
-
-            if let Err(err) = admin_shutdown_handle.shutdown() {
-                error!("Unable to cleanly shut down Admin service: {}", err);
+            if shutdown_tx.send(()).is_err() {
+                // This was the second ctrl-c (as the receiver is dropped after the first one).
+                std::process::exit(0);
             }
-
-            if let Err(err) = rest_api_shutdown_handle.shutdown() {
-                error!("Unable to cleanly shut down REST API server: {}", err);
-            }
-            circuit_dispatcher_shutdown.shutdown();
-            network_dispatcher_shutdown.shutdown();
-            registry_shutdown.shutdown();
-            interconnect_shutdown.shutdown();
         })
         .expect("Error setting Ctrl-C handler");
 
-        #[cfg(feature = "health")]
-        {
-            let _ = health_service_processor_join_handle
-                .expect(
-                    "The join handle was not configured correctly, which indicates a feature \
-                    compile error",
-                )
-                .join_all();
+        // recv that value, ignoring the result.
+        let _ = shutdown_rx.recv();
+        drop(shutdown_rx);
+        info!("Initiating graceful shutdown (press Ctrl+C again to force)");
+
+        running.store(false, Ordering::SeqCst);
+
+        #[cfg(feature = "shutdown")]
+        if let Err(err) = splinter::threading::shutdown::shutdown(vec![
+            admin_shutdown_handle,
+            orchestator_shutdown_handle,
+            #[cfg(feature = "health-service")]
+            health_service_shutdown_handle,
+        ]) {
+            error!("Unable to cleanly shut down components: {}", err);
         }
-        #[cfg(not(feature = "health"))]
-        {
-            let _ = health_service_processor_join_handle.take();
+
+        #[cfg(not(feature = "shutdown"))]
+        if let Err(err) = admin_shutdown_handle.shutdown() {
+            error!("Unable to cleanly shut down Admin service: {}", err);
         }
+
+        if let Err(err) = rest_api_shutdown_handle.shutdown() {
+            error!("Unable to cleanly shut down REST API server: {}", err);
+        }
+        circuit_dispatcher_shutdown.shutdown();
+        network_dispatcher_shutdown.shutdown();
+        registry_shutdown.shutdown();
+        interconnect_shutdown.shutdown();
 
         // Join threads and shutdown network components
         let _ = rest_api_join_handle.join();
+        #[cfg(not(feature = "shutdown"))]
         let _ = service_processor_join_handle.join_all();
+        #[cfg(not(feature = "shutdown"))]
         let _ = orchestator_join_handles.join_all();
         peer_manager_shutdown.shutdown();
         peer_manager.await_shutdown();
@@ -888,21 +900,20 @@ impl SplinterDaemon {
         });
     }
 
+    #[cfg(not(feature = "shutdown"))]
     fn start_admin_service(
         connection: Box<dyn Connection>,
         admin_service: AdminService,
-        running: Arc<AtomicBool>,
-    ) -> Result<(ShutdownHandle, ServiceJoinHandle), StartError> {
+    ) -> Result<(service::ShutdownHandle, ServiceJoinHandle), StartError> {
         let start_admin: std::thread::JoinHandle<
-            Result<(ShutdownHandle, ServiceJoinHandle), StartError>,
+            Result<(service::ShutdownHandle, ServiceJoinHandle), StartError>,
         > = thread::spawn(move || {
-            let mut admin_service_processor = ServiceProcessor::new(
+            let mut admin_service_processor = service::ServiceProcessor::new(
                 connection,
                 "admin".into(),
                 ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY,
                 ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
                 ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-                running,
             )
             .map_err(|err| {
                 StartError::AdminServiceError(format!(
@@ -931,57 +942,72 @@ impl SplinterDaemon {
             )
         })?
     }
-}
 
-#[cfg(feature = "health")]
-fn start_health_service(
-    connection: Box<dyn Connection>,
-    health_service: HealthService,
-    running: Arc<AtomicBool>,
-) -> Result<service::JoinHandles<Result<(), service::error::ServiceProcessorError>>, StartError> {
-    let start_health_service: std::thread::JoinHandle<
-        Result<service::JoinHandles<Result<(), service::error::ServiceProcessorError>>, StartError>,
-    > = thread::spawn(move || {
-        let mut health_service_processor = ServiceProcessor::new(
+    #[cfg(feature = "shutdown")]
+    fn start_admin_service(
+        connection: Box<dyn Connection>,
+        admin_service: AdminService,
+    ) -> Result<Box<dyn splinter::threading::shutdown::ShutdownHandle>, StartError> {
+        let mut admin_service_processor = service::ServiceProcessor::new(
             connection,
-            "health".into(),
-            HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY,
-            HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
-            HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-            running,
+            "admin".into(),
+            ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY,
+            ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
+            ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
         )
         .map_err(|err| {
-            StartError::HealthServiceError(format!(
-                "unable to create health service processor: {}",
+            StartError::AdminServiceError(format!(
+                "unable to create admin service processor: {}",
                 err
             ))
         })?;
 
-        health_service_processor
-            .add_service(Box::new(health_service))
+        admin_service_processor
+            .add_service(Box::new(admin_service))
             .map_err(|err| {
-                StartError::HealthServiceError(format!(
-                    "unable to add health service to processor: {}",
+                StartError::AdminServiceError(format!(
+                    "unable to add admin service to processor: {}",
                     err
                 ))
             })?;
 
-        health_service_processor
-            .start()
-            .map(|(_, join_handles)| join_handles)
-            .map_err(|err| {
-                StartError::HealthServiceError(format!(
-                    "unable to health service processor: {}",
-                    err
-                ))
-            })
-    });
+        admin_service_processor.start().map_err(|err| {
+            StartError::AdminServiceError(format!("unable to start service processor: {}", err))
+        })
+    }
+}
 
-    start_health_service.join().map_err(|_| {
-        StartError::HealthServiceError(
-            "unable to start health service, due to thread join error".into(),
-        )
-    })?
+#[cfg(feature = "health-service")]
+fn start_health_service(
+    connection: Box<dyn Connection>,
+    health_service: HealthService,
+) -> Result<Box<dyn splinter::threading::shutdown::ShutdownHandle>, StartError> {
+    let mut health_service_processor = service::ServiceProcessor::new(
+        connection,
+        "health".into(),
+        HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY,
+        HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
+        HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
+    )
+    .map_err(|err| {
+        StartError::HealthServiceError(format!(
+            "unable to create health service processor: {}",
+            err
+        ))
+    })?;
+
+    health_service_processor
+        .add_service(Box::new(health_service))
+        .map_err(|err| {
+            StartError::HealthServiceError(format!(
+                "unable to add health service to processor: {}",
+                err
+            ))
+        })?;
+
+    health_service_processor.start().map_err(|err| {
+        StartError::HealthServiceError(format!("unable to health service processor: {}", err))
+    })
 }
 
 fn create_store_factory(
@@ -1537,7 +1563,7 @@ pub enum StartError {
     ProtocolError(String),
     RestApiError(String),
     AdminServiceError(String),
-    #[cfg(feature = "health")]
+    #[cfg(feature = "health-service")]
     HealthServiceError(String),
     OrchestratorError(String),
 }
@@ -1555,7 +1581,7 @@ impl fmt::Display for StartError {
             StartError::AdminServiceError(msg) => {
                 write!(f, "the admin service encountered an error: {}", msg)
             }
-            #[cfg(feature = "health")]
+            #[cfg(feature = "health-service")]
             StartError::HealthServiceError(msg) => {
                 write!(f, "the health service encountered an error: {}", msg)
             }
@@ -1593,11 +1619,5 @@ impl From<ConnectError> for StartError {
 impl From<protobuf::ProtobufError> for StartError {
     fn from(err: protobuf::ProtobufError) -> Self {
         StartError::ProtocolError(err.to_string())
-    }
-}
-
-impl From<NewOrchestratorError> for StartError {
-    fn from(err: NewOrchestratorError) -> Self {
-        StartError::OrchestratorError(format!("failed to create new orchestrator: {}", err))
     }
 }
