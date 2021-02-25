@@ -396,6 +396,7 @@ mod tests {
             VecDeque::new(),
             Some(Box::new(service_sender.clone())),
             peer_services.clone(),
+            "0".to_string(),
             Secp256k1Context::new().new_verifier(),
         )));
         let consensus_sender = ScabbardConsensusNetworkSender::new("0".into(), shared);
