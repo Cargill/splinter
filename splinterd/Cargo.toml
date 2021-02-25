@@ -97,6 +97,7 @@ experimental = [
     "circuit-purge",
     "health-service",
     "https-bind",
+    "node",
     "oauth",
     "service-arg-validation",
     "service-endpoint",
@@ -132,6 +133,12 @@ database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
 health-service = ["health", "splinter/shutdown"]
 https-bind = ["splinter/https-bind"]
+node = [
+    "splinter/admin-service-client",
+    "splinter/client-reqwest",
+    "splinter/rest-api-actix-web-3",
+    "splinter/shutdown",
+]
 oauth = [
     "splinter/oauth"
 ]

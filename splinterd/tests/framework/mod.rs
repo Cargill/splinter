@@ -12,5 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A framework for running a network of Splinter nodes in a single process for
+//! integration testing purposes.
+
 #[cfg(feature = "node")]
-pub mod node;
+mod network;

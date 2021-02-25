@@ -86,8 +86,6 @@ pub mod protos;
 pub mod registry;
 #[cfg(feature = "rest-api")]
 pub mod rest_api;
-#[cfg(feature = "run")]
-pub mod run;
 pub mod service;
 pub mod sets;
 #[cfg(feature = "store-factory")]

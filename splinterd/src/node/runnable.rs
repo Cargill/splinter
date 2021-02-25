@@ -16,9 +16,9 @@
 
 use std::net::{Ipv4Addr, SocketAddr};
 
-use crate::error::InternalError;
-use crate::rest_api::actix_web_1::RestApi;
-use crate::rest_api::actix_web_3::RunnableRestApi;
+use splinter::error::InternalError;
+use splinter::rest_api::actix_web_1::RestApi;
+use splinter::rest_api::actix_web_3::RunnableRestApi;
 
 use super::{Node, NodeRestApiVariant};
 
