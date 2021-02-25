@@ -279,11 +279,7 @@ impl TwoPhaseEngine {
             }
             ProposalUpdate::ProposalCreated(Some(proposal)) => {
                 debug!("Proposal created, starting coordination: {}", proposal.id);
-                self.start_coordination(
-                    TwoPhaseProposal::new(proposal.id),
-                    network_sender,
-                    proposal_manager,
-                )?;
+                self.start_coordination(proposal.id, network_sender, proposal_manager)?;
             }
             ProposalUpdate::ProposalReceived(_, peer_id) if &peer_id != self.coordinator_id() => {
                 warn!(
@@ -378,24 +374,23 @@ impl TwoPhaseEngine {
 
     fn start_coordination(
         &mut self,
-        tpc_proposal: TwoPhaseProposal,
+        proposal_id: ProposalId,
         network_sender: &dyn ConsensusNetworkSender,
         proposal_manager: &dyn ProposalManager,
     ) -> Result<(), ConsensusEngineError> {
-        debug!("Checking proposal {}", tpc_proposal.proposal_id());
-        match proposal_manager.check_proposal(tpc_proposal.proposal_id()) {
+        debug!("Checking proposal {}", proposal_id);
+        match proposal_manager.check_proposal(&proposal_id) {
             Ok(_) => {
-                self.state = State::EvaluatingProposal(tpc_proposal);
+                self.state = State::EvaluatingProposal(TwoPhaseProposal::new(proposal_id));
                 self.coordinator_timeout.start();
             }
             Err(err) => {
                 debug!(
                     "Rejecting proposal {}; failed to check proposal due to err: {}",
-                    tpc_proposal.proposal_id(),
-                    err
+                    proposal_id, err
                 );
                 self.complete_coordination(
-                    tpc_proposal.proposal_id().clone(),
+                    proposal_id,
                     TwoPhaseMessage_ProposalResult::REJECT,
                     network_sender,
                     proposal_manager,
