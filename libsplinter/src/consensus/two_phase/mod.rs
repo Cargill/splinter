@@ -35,7 +35,7 @@ use protobuf::Message;
 
 use crate::consensus::{
     ConsensusEngine, ConsensusEngineError, ConsensusMessage, ConsensusNetworkSender, PeerId,
-    Proposal, ProposalId, ProposalManager, ProposalUpdate, StartupState,
+    ProposalId, ProposalManager, ProposalUpdate, StartupState,
 };
 use crate::protos::two_phase::{
     TwoPhaseMessage, TwoPhaseMessage_ProposalResult, TwoPhaseMessage_ProposalVerificationResponse,
@@ -104,7 +104,7 @@ pub struct TwoPhaseEngine {
     verifiers: HashSet<PeerId>,
     state: State,
     coordinator_timeout: Timeout,
-    proposal_backlog: VecDeque<TwoPhaseProposal>,
+    proposals_received: HashSet<ProposalId>,
     verification_request_backlog: VecDeque<ProposalId>,
 }
 
@@ -115,7 +115,7 @@ impl TwoPhaseEngine {
             verifiers: HashSet::new(),
             state: State::Idle,
             coordinator_timeout: Timeout::new(coordinator_timeout_duration),
-            proposal_backlog: VecDeque::new(),
+            proposals_received: HashSet::new(),
             verification_request_backlog: VecDeque::new(),
         }
     }
@@ -154,27 +154,18 @@ impl TwoPhaseEngine {
                     );
                     self.verification_request_backlog.push_back(proposal_id);
                 } else {
-                    // Try to find the proposal in the backlog
-                    match self
-                        .proposal_backlog
-                        .iter()
-                        .position(|tpc_proposal| tpc_proposal.proposal_id() == &proposal_id)
-                    {
-                        Some(idx) => {
-                            debug!("Checking proposal {}", proposal_id);
-                            proposal_manager.check_proposal(&proposal_id)?;
-                            self.state = State::EvaluatingProposal(
-                                self.proposal_backlog.remove(idx).unwrap(),
-                            );
-                        }
-                        None => {
-                            debug!(
-                                "Proposal not yet received, backlogging verification request: \
-                                 {}",
-                                proposal_id
-                            );
-                            self.verification_request_backlog.push_back(proposal_id);
-                        }
+                    // Try to get the proposal from the backlog
+                    if self.proposals_received.remove(&proposal_id) {
+                        debug!("Checking proposal {}", proposal_id);
+                        proposal_manager.check_proposal(&proposal_id)?;
+                        self.state = State::EvaluatingProposal(TwoPhaseProposal::new(proposal_id));
+                    } else {
+                        debug!(
+                            "Proposal not yet received, backlogging verification request: \
+                             {}",
+                            proposal_id
+                        );
+                        self.verification_request_backlog.push_back(proposal_id);
                     }
                 }
             }
@@ -275,18 +266,34 @@ impl TwoPhaseEngine {
     ) -> Result<(), ConsensusEngineError> {
         let is_coordinator = self.is_coordinator();
         match update {
+            ProposalUpdate::ProposalCreated(_) if !self.is_coordinator() => {
+                warn!("Received ProposalCreated message, but this node is not the coordinator");
+            }
+            ProposalUpdate::ProposalCreated(_) if !self.state.is_awaiting_proposal() => {
+                warn!("Received unexpected ProposalCreated message");
+            }
             ProposalUpdate::ProposalCreated(None) => {
                 if self.state.is_awaiting_proposal() {
                     self.state = State::Idle;
                 }
             }
             ProposalUpdate::ProposalCreated(Some(proposal)) => {
-                debug!("Proposal created: {}", proposal.id);
-                self.handle_proposal(proposal, network_sender, proposal_manager)?;
+                debug!("Proposal created, starting coordination: {}", proposal.id);
+                self.start_coordination(
+                    TwoPhaseProposal::new(proposal.id),
+                    network_sender,
+                    proposal_manager,
+                )?;
+            }
+            ProposalUpdate::ProposalReceived(_, peer_id) if &peer_id != self.coordinator_id() => {
+                warn!(
+                    "Received proposal from a node that is not the coordinator: {}",
+                    peer_id
+                );
             }
             ProposalUpdate::ProposalReceived(proposal, _) => {
                 debug!("Proposal received: {}", proposal.id);
-                self.handle_proposal(proposal, network_sender, proposal_manager)?;
+                self.proposals_received.insert(proposal.id);
             }
             ProposalUpdate::ProposalValid(proposal_id) => match &mut self.state {
                 State::EvaluatingProposal(tpc_proposal)
@@ -434,57 +441,6 @@ impl TwoPhaseEngine {
         Ok(())
     }
 
-    fn handle_proposal(
-        &mut self,
-        proposal: Proposal,
-        network_sender: &dyn ConsensusNetworkSender,
-        proposal_manager: &dyn ProposalManager,
-    ) -> Result<(), ConsensusEngineError> {
-        let proposal_in_backlog = self
-            .proposal_backlog
-            .iter()
-            .any(|tpc_proposal| tpc_proposal.proposal_id() == &proposal.id);
-        if proposal_in_backlog {
-            debug!(
-                "Proposal already received and backlogged; ignoring: {}",
-                proposal.id
-            );
-            return Ok(());
-        }
-
-        let tpc_proposal = TwoPhaseProposal::new(proposal.id);
-
-        if self
-            .state
-            .is_evaluating_proposal_with_id(tpc_proposal.proposal_id())
-        {
-            debug!(
-                "This proposal is already being evaluated; ignoring: {}",
-                tpc_proposal.proposal_id()
-            );
-        } else if self.state.is_evaluating_proposal() {
-            debug!(
-                "Another proposal is already in progress; backlogging proposal {}",
-                tpc_proposal.proposal_id()
-            );
-            self.proposal_backlog.push_back(tpc_proposal);
-        } else if self.is_coordinator() {
-            debug!(
-                "Starting coordination for proposal {}",
-                tpc_proposal.proposal_id()
-            );
-            self.start_coordination(tpc_proposal, network_sender, proposal_manager)?;
-        } else {
-            debug!(
-                "Not coordinator, backlogging proposal {}",
-                tpc_proposal.proposal_id()
-            );
-            self.proposal_backlog.push_back(tpc_proposal);
-        }
-
-        Ok(())
-    }
-
     /// If the coordinator timeout has expired, abort the current proposal.
     fn abort_proposal_if_timed_out(
         &mut self,
@@ -520,54 +476,26 @@ impl TwoPhaseEngine {
             if let Some(idx) = self
                 .verification_request_backlog
                 .iter()
-                .position(|proposal_id| {
-                    self.proposal_backlog
-                        .iter()
-                        .any(|tpc_proposal| tpc_proposal.proposal_id() == proposal_id)
-                })
+                .position(|proposal_id| self.proposals_received.contains(proposal_id))
             {
                 let proposal_id = self.verification_request_backlog.remove(idx).unwrap();
-                let proposal_idx = self
-                    .proposal_backlog
-                    .iter()
-                    .position(|tpc_proposal| tpc_proposal.proposal_id() == &proposal_id)
-                    .unwrap();
-                let tpc_proposal = self.proposal_backlog.remove(proposal_idx).unwrap();
+                self.proposals_received.remove(&proposal_id);
 
                 debug!("Checking proposal from backlog: {}", proposal_id);
                 proposal_manager.check_proposal(&proposal_id)?;
-                self.state = State::EvaluatingProposal(tpc_proposal);
+                self.state = State::EvaluatingProposal(TwoPhaseProposal::new(proposal_id));
             }
         }
 
         Ok(())
     }
 
-    /// If not doing anything, try to get the next proposal. First check if this node is the
-    /// coordinator and if there is a proposal in the local backlog; if not, ask the proposal
-    /// manager.
-    fn get_next_proposal(
-        &mut self,
-        network_sender: &dyn ConsensusNetworkSender,
-        proposal_manager: &dyn ProposalManager,
-    ) {
-        if self.state.is_idle() {
-            if self.is_coordinator() && !self.proposal_backlog.is_empty() {
-                let tpc_proposal = self.proposal_backlog.pop_front().unwrap();
-                debug!(
-                    "Starting coordination for backlogged proposal {}",
-                    tpc_proposal.proposal_id()
-                );
-                if let Err(err) =
-                    self.start_coordination(tpc_proposal, network_sender, proposal_manager)
-                {
-                    error!("Failed to start coordination for proposal: {}", err);
-                }
-            } else {
-                match proposal_manager.create_proposal(None, vec![]) {
-                    Ok(()) => self.state = State::AwaitingProposal,
-                    Err(err) => error!("Error while creating proposal: {}", err),
-                }
+    /// If this node is the coordinator and it's not doing anything, try to get the next proposal.
+    fn get_next_proposal(&mut self, proposal_manager: &dyn ProposalManager) {
+        if self.is_coordinator() && self.state.is_idle() {
+            match proposal_manager.create_proposal(None, vec![]) {
+                Ok(()) => self.state = State::AwaitingProposal,
+                Err(err) => error!("Error while creating proposal: {}", err),
             }
         }
     }
@@ -614,7 +542,7 @@ impl ConsensusEngine for TwoPhaseEngine {
                 error!("Failed to handle backlogged verification request: {}", err);
             }
 
-            self.get_next_proposal(&*network_sender, &*proposal_manager);
+            self.get_next_proposal(&*proposal_manager);
 
             // Get and handle a consensus message if there is one
             match consensus_messages.recv_timeout(message_timeout) {
@@ -715,7 +643,7 @@ pub mod tests {
             verifiers: peer_ids_hashset.clone(),
             state: State::Idle,
             coordinator_timeout: Timeout::new(Duration::from_millis(COORDINATOR_TIMEOUT_MILLIS)),
-            proposal_backlog: VecDeque::new(),
+            proposals_received: HashSet::new(),
             verification_request_backlog: VecDeque::new(),
         };
         assert_eq!(coordinator.coordinator_id(), &peer_ids[0]);
@@ -726,7 +654,7 @@ pub mod tests {
             verifiers: peer_ids_hashset,
             state: State::Idle,
             coordinator_timeout: Timeout::new(Duration::from_millis(COORDINATOR_TIMEOUT_MILLIS)),
-            proposal_backlog: VecDeque::new(),
+            proposals_received: HashSet::new(),
             verification_request_backlog: VecDeque::new(),
         };
         assert_eq!(other_node.coordinator_id(), &peer_ids[0]);
