@@ -59,10 +59,6 @@ impl Network {
             )),
         }
     }
-
-    pub fn shutdown(self: Network) -> Result<(), InternalError> {
-        Ok(())
-    }
 }
 
 impl ShutdownHandle for Network {
