@@ -37,7 +37,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 pub trait ShutdownHandle {
     /// Instructs the component to begin shutting down.
     ///
-    /// For components with treads, this should break out of any loops and ready the threads for
+    /// For components with threads, this should break out of any loops and ready the threads for
     /// being joined.
     fn signal_shutdown(&mut self);
 
