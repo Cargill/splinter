@@ -15,8 +15,8 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
+use crate::biome::credentials::rest_api::actix_web_1::config::BiomeCredentialsRestConfig;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
-use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 use crate::rest_api::{
@@ -31,9 +31,13 @@ use crate::biome::key_management::{
 };
 
 #[cfg(feature = "biome-key-management")]
-use crate::biome::rest_api::resources::{key_management::ResponseKey, user::ModifyUser};
+use crate::biome::credentials::rest_api::resources::{
+    key_management::ResponseKey, user::ModifyUser,
+};
 #[cfg(feature = "authorization")]
-use crate::biome::rest_api::{BIOME_USER_READ_PERMISSION, BIOME_USER_WRITE_PERMISSION};
+use crate::biome::credentials::rest_api::{
+    BIOME_USER_READ_PERMISSION, BIOME_USER_WRITE_PERMISSION,
+};
 
 /// Defines a REST endpoint to list users from the db
 pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource {
@@ -77,7 +81,7 @@ pub fn make_list_route(credentials_store: Arc<dyn CredentialsStore>) -> Resource
 #[cfg(feature = "biome-key-management")]
 /// Defines the `/biome/users/{id}` REST resource for managing users
 pub fn make_user_routes(
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
     credentials_store: Arc<dyn CredentialsStore>,
     key_store: Arc<dyn KeyStore>,
 ) -> Resource {
@@ -176,7 +180,7 @@ fn add_fetch_user_method(credentials_store: Arc<dyn CredentialsStore>) -> Handle
 ///   }
 fn add_modify_user_method(
     credentials_store: Arc<dyn CredentialsStore>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
     key_store: Arc<dyn KeyStore>,
 ) -> HandlerFunction {
     let encryption_cost = rest_config.password_encryption_cost();

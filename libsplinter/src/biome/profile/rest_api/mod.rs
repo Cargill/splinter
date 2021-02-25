@@ -12,15 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Provides structures for the REST resources.
+#[cfg(feature = "rest-api-actix")]
+mod actix_web_1;
 
-#[cfg(feature = "biome-credentials")]
-pub(in crate::biome::rest_api) mod authorize;
-#[cfg(feature = "biome-credentials")]
-pub(in crate::biome::rest_api) mod credentials;
-#[cfg(feature = "biome-key-management")]
-pub(in crate::biome::rest_api) mod key_management;
-#[cfg(feature = "biome-credentials")]
-pub(in crate::biome::rest_api) mod token;
-#[cfg(all(feature = "biome-key-management", feature = "biome-credentials"))]
-pub(in crate::biome::rest_api) mod user;
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+use crate::rest_api::auth::authorization::Permission;
+
+#[cfg(feature = "rest-api-actix")]
+pub use actix_web_1::BiomeProfileRestResourceProvider;
+
+#[cfg(all(feature = "authorization", feature = "rest-api-actix"))]
+const BIOME_PROFILE_READ_PERMISSION: Permission = Permission::Check {
+    permission_id: "biome.profile.read",
+    permission_display_name: "Biome profile read",
+    permission_description: "Allows the client to view all Biome user profiles",
+};

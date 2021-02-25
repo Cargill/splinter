@@ -17,7 +17,7 @@ use actix_web::HttpRequest;
 use cylinder::Verifier;
 
 #[cfg(feature = "biome-credentials")]
-use crate::biome::rest_api::BiomeRestResourceManager;
+use crate::biome::credentials::rest_api::BiomeCredentialsRestResourceProvider;
 #[cfg(feature = "oauth")]
 use crate::biome::OAuthUserSessionStore;
 #[cfg(all(feature = "oauth", feature = "biome-profile"))]
@@ -33,8 +33,9 @@ pub enum AuthConfig {
     /// Biome credentials authentication
     #[cfg(feature = "biome-credentials")]
     Biome {
-        /// The resource provider that defines all Biome-related endpoints for the Splinter REST API
-        biome_resource_manager: BiomeRestResourceManager,
+        /// The resource provider that defines the Biome credentials endpoints for the Splinter REST
+        /// API
+        biome_credentials_resource_provider: BiomeCredentialsRestResourceProvider,
     },
     /// Cylinder JWT authentication
     #[cfg(feature = "cylinder-jwt")]

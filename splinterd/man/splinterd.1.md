@@ -63,6 +63,9 @@ information, see `--config-dir`, `--tls-cert-dir`, and
 FLAGS
 =====
 
+`--enable-biome-credentials`
+: Enables Biome credentials for REST API authentication.
+
 `-h`, `--help`
 : Prints help information.
 
@@ -335,6 +338,8 @@ signing algorithms provided by the Cylinder library. This includes secp256k1
 which is currently used for signing transactions and Splinter administrative
 payloads. This allows the same signing key to be used as an authorization
 identity.
+
+Biome credentials can be enabled using the `--enable-biome-credentials` flag.
 
 The Splinter daemon provides 5 options for configuring OAuth for the REST API:
 

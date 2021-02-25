@@ -117,6 +117,13 @@ impl<'a> PartialConfigBuilder for ClapPartialConfigBuilder<'_> {
             )
         }
 
+        #[cfg(feature = "biome-credentials")]
+        {
+            partial_config = partial_config.with_enable_biome_credentials(Some(
+                self.matches.is_present("enable_biome_credentials"),
+            ))
+        }
+
         #[cfg(feature = "oauth")]
         {
             partial_config = partial_config

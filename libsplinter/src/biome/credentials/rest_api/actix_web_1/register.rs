@@ -16,11 +16,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::actix_web::HttpResponse;
+use crate::biome::credentials::rest_api::actix_web_1::BiomeCredentialsRestConfig;
+use crate::biome::credentials::rest_api::resources::credentials::{NewUser, UsernamePassword};
 use crate::biome::credentials::store::{
     CredentialsBuilder, CredentialsStore, CredentialsStoreError,
 };
-use crate::biome::rest_api::resources::credentials::{NewUser, UsernamePassword};
-use crate::biome::rest_api::BiomeRestConfig;
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
 #[cfg(feature = "authorization")]
@@ -45,7 +45,7 @@ const UUID_NAMESPACE: Uuid = Uuid::from_u128(14089989335388799460785985118069586
 ///   }
 pub fn make_register_route(
     credentials_store: Arc<dyn CredentialsStore>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
     let resource =
         Resource::build("/biome/register").add_request_guard(ProtocolVersionRangeGuard::new(

@@ -14,6 +14,8 @@
 
 //! Provides an API for storing key pairs and associating them with users.
 
+#[cfg(feature = "rest-api")]
+pub mod rest_api;
 pub mod store;
 
 #[cfg(feature = "diesel")]

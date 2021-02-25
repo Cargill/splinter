@@ -17,13 +17,12 @@ use std::sync::Arc;
 #[cfg(feature = "biome-credentials")]
 use jsonwebtoken::{decode, Validation};
 
-use crate::actix_web::{Error as ActixError, HttpRequest, HttpResponse};
+use crate::actix_web::HttpRequest;
 #[cfg(feature = "biome-credentials")]
-use crate::biome::rest_api::resources::authorize::AuthorizationResult;
-use crate::futures::{Future, IntoFuture};
+use crate::biome::credentials::rest_api::resources::authorize::AuthorizationResult;
+use crate::rest_api::secrets::SecretManager;
 #[cfg(feature = "biome-credentials")]
 use crate::rest_api::{actix_web_1::get_authorization_token, sessions::Claims};
-use crate::rest_api::{auth::identity::Identity, secrets::SecretManager, ErrorResponse};
 
 /// Verifies the user has the correct permissions
 #[cfg(feature = "biome-credentials")]
@@ -69,18 +68,5 @@ pub(crate) fn validate_claims(
             debug!("Invalid token: {}", err);
             AuthorizationResult::Unauthorized
         }
-    }
-}
-
-pub(crate) fn get_authorized_user(
-    request: &HttpRequest,
-) -> Result<String, Box<dyn Future<Item = HttpResponse, Error = ActixError>>> {
-    match request.extensions().get::<Identity>() {
-        Some(Identity::User(id)) => Ok(id.into()),
-        _ => Err(Box::new(
-            HttpResponse::Unauthorized()
-                .json(ErrorResponse::unauthorized())
-                .into_future(),
-        )),
     }
 }

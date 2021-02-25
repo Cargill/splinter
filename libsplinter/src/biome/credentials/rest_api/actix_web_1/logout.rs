@@ -15,11 +15,11 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
-use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
-use crate::biome::rest_api::{
-    actix::authorize::authorize_user, config::BiomeRestConfig,
+use crate::biome::credentials::rest_api::{
+    actix_web_1::{authorize::authorize_user, config::BiomeCredentialsRestConfig},
     resources::authorize::AuthorizationResult,
 };
+use crate::biome::refresh_tokens::store::{RefreshTokenError, RefreshTokenStore};
 use crate::futures::IntoFuture;
 use crate::protocol;
 #[cfg(feature = "authorization")]
@@ -36,7 +36,7 @@ use crate::rest_api::{
 pub fn make_logout_route(
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     secret_manager: Arc<dyn SecretManager>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
     let resource =
         Resource::build("/biome/logout").add_request_guard(ProtocolVersionRangeGuard::new(
@@ -63,7 +63,7 @@ pub fn make_logout_route(
 pub fn add_logout_route(
     refresh_token_store: Arc<dyn RefreshTokenStore>,
     secret_manager: Arc<dyn SecretManager>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> HandlerFunction {
     Box::new(move |request, _| {
         let rest_config = rest_config.clone();

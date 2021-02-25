@@ -15,15 +15,12 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
+#[cfg(feature = "authorization")]
+use crate::biome::profile::rest_api::BIOME_PROFILE_READ_PERMISSION;
+use crate::biome::profile::store::UserProfileStore;
 use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{ErrorResponse, Method, ProtocolVersionRangeGuard, Resource};
-
-#[cfg(feature = "biome-profile")]
-use crate::biome::profile::store::UserProfileStore;
-
-#[cfg(feature = "authorization")]
-use crate::biome::rest_api::BIOME_USER_READ_PERMISSION;
 
 /// Defines a REST endpoint to list profiles from the database
 pub fn make_profiles_list_route(profile_store: Arc<dyn UserProfileStore>) -> Resource {
@@ -34,7 +31,7 @@ pub fn make_profiles_list_route(profile_store: Arc<dyn UserProfileStore>) -> Res
         ));
     #[cfg(feature = "authorization")]
     {
-        resource.add_method(Method::Get, BIOME_USER_READ_PERMISSION, move |_, _| {
+        resource.add_method(Method::Get, BIOME_PROFILE_READ_PERMISSION, move |_, _| {
             let profile_store = profile_store.clone();
             Box::new(match profile_store.list_profiles() {
                 Ok(profiles) => Box::new(HttpResponse::Ok().json(profiles).into_future()),

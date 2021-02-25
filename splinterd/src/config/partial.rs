@@ -64,6 +64,8 @@ pub struct PartialConfig {
     no_tls: Option<bool>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
+    #[cfg(feature = "biome-credentials")]
+    enable_biome_credentials: Option<bool>,
     #[cfg(feature = "oauth")]
     oauth_provider: Option<String>,
     #[cfg(feature = "oauth")]
@@ -117,6 +119,8 @@ impl PartialConfig {
             no_tls: None,
             #[cfg(feature = "rest-api-cors")]
             whitelist: None,
+            #[cfg(feature = "biome-credentials")]
+            enable_biome_credentials: None,
             #[cfg(feature = "oauth")]
             oauth_provider: None,
             #[cfg(feature = "oauth")]
@@ -249,6 +253,11 @@ impl PartialConfig {
     #[cfg(feature = "rest-api-cors")]
     pub fn whitelist(&self) -> Option<Vec<String>> {
         self.whitelist.clone()
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    pub fn enable_biome_credentials(&self) -> Option<bool> {
+        self.enable_biome_credentials
     }
 
     #[cfg(feature = "oauth")]
@@ -598,6 +607,18 @@ impl PartialConfig {
     ///
     pub fn with_whitelist(mut self, whitelist: Option<Vec<String>>) -> Self {
         self.whitelist = whitelist;
+        self
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    /// Adds an `enable_biome_credentials` value to the `PartialConfig` object.
+    ///
+    /// # Arguments
+    ///
+    /// * `enable_biome_credentials` - Enable Biome credentials for REST API authentication
+    ///
+    pub fn with_enable_biome_credentials(mut self, enable_biome_credentials: Option<bool>) -> Self {
+        self.enable_biome_credentials = enable_biome_credentials;
         self
     }
 

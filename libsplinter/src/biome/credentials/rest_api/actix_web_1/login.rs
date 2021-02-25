@@ -25,9 +25,9 @@ use crate::rest_api::{
     ErrorResponse,
 };
 
+use crate::biome::credentials::rest_api::actix_web_1::BiomeCredentialsRestConfig;
+use crate::biome::credentials::rest_api::resources::credentials::UsernamePassword;
 use crate::biome::credentials::store::{CredentialsStore, CredentialsStoreError};
-use crate::biome::rest_api::resources::credentials::UsernamePassword;
-use crate::biome::rest_api::BiomeRestConfig;
 use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 
 /// Defines a REST endpoint for login
@@ -40,7 +40,7 @@ use crate::rest_api::sessions::{AccessTokenIssuer, ClaimsBuilder, TokenIssuer};
 pub fn make_login_route(
     credentials_store: Arc<dyn CredentialsStore>,
     refresh_token_store: Arc<dyn RefreshTokenStore>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
     token_issuer: Arc<AccessTokenIssuer>,
 ) -> Resource {
     let resource =

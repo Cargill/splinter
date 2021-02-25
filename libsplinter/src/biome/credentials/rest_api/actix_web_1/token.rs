@@ -16,12 +16,14 @@ use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
 use crate::biome::{
-    refresh_tokens::store::{RefreshTokenError, RefreshTokenStore},
-    rest_api::{
-        actix::authorize::{authorize_user, validate_claims},
-        config::BiomeRestConfig,
+    credentials::rest_api::{
+        actix_web_1::{
+            authorize::{authorize_user, validate_claims},
+            config::BiomeCredentialsRestConfig,
+        },
         resources::{authorize::AuthorizationResult, token::RefreshToken},
     },
+    refresh_tokens::store::{RefreshTokenError, RefreshTokenStore},
 };
 use crate::futures::{Future, IntoFuture};
 use crate::protocol;
@@ -52,7 +54,7 @@ pub fn make_token_route(
     secret_manager: Arc<dyn SecretManager>,
     refresh_token_secret_manager: Arc<dyn SecretManager>,
     token_issuer: Arc<AccessTokenIssuer>,
-    rest_config: Arc<BiomeRestConfig>,
+    rest_config: Arc<BiomeCredentialsRestConfig>,
 ) -> Resource {
     let resource =
         Resource::build("/biome/token").add_request_guard(ProtocolVersionRangeGuard::new(

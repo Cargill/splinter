@@ -15,17 +15,14 @@
 use std::sync::Arc;
 
 use crate::actix_web::HttpResponse;
+#[cfg(feature = "authorization")]
+use crate::biome::profile::rest_api::BIOME_PROFILE_READ_PERMISSION;
+use crate::biome::profile::store::{UserProfileStore, UserProfileStoreError};
 use crate::futures::IntoFuture;
 use crate::protocol;
 use crate::rest_api::{
     ErrorResponse, HandlerFunction, Method, ProtocolVersionRangeGuard, Resource,
 };
-
-#[cfg(feature = "biome-profile")]
-use crate::biome::profile::store::{UserProfileStore, UserProfileStoreError};
-
-#[cfg(feature = "authorization")]
-use crate::biome::rest_api::BIOME_USER_READ_PERMISSION;
 
 pub fn make_profiles_routes(profile_store: Arc<dyn UserProfileStore>) -> Resource {
     let resource =
@@ -37,7 +34,7 @@ pub fn make_profiles_routes(profile_store: Arc<dyn UserProfileStore>) -> Resourc
     {
         resource.add_method(
             Method::Get,
-            BIOME_USER_READ_PERMISSION,
+            BIOME_PROFILE_READ_PERMISSION,
             add_fetch_profile_method(profile_store.clone()),
         )
     }

@@ -349,6 +349,13 @@ fn main() {
             .help("Whitelisted domains"),
     );
 
+    #[cfg(feature = "biome-credentials")]
+    let app = app.arg(
+        Arg::with_name("enable_biome_credentials")
+            .long("enable-biome-credentials")
+            .long_help("Enable the Biome credentials for REST API authentication"),
+    );
+
     #[cfg(feature = "oauth")]
     let app = app
         .arg(
@@ -521,6 +528,12 @@ fn start_daemon(matches: ArgMatches) -> Result<(), UserError> {
     #[cfg(feature = "rest-api-cors")]
     {
         daemon_builder = daemon_builder.with_whitelist(config.whitelist().map(ToOwned::to_owned));
+    }
+
+    #[cfg(feature = "biome-credentials")]
+    {
+        daemon_builder =
+            daemon_builder.with_enable_biome_credentials(config.enable_biome_credentials());
     }
 
     #[cfg(feature = "oauth")]
