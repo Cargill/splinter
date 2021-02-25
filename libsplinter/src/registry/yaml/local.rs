@@ -20,6 +20,7 @@
 //! [`LocalYamlRegistry`]: struct.LocalYamlRegistry.html
 //! [`RwRegistry`]: ../../trait.RwRegistry.html
 
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -27,11 +28,13 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use crate::registry::{
-    validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
-    RegistryWriter, RwRegistry,
+    error::InvalidNodeError, validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError,
+    RegistryReader, RegistryWriter, RwRegistry,
 };
 
 use crate::error::{InternalError, InvalidStateError};
+
+use super::YamlNode;
 
 /// A local, read/write registry.
 ///
@@ -247,12 +250,24 @@ impl Internal {
                 "Failed to open YAML registry file".into(),
             ))
         })?;
-        let nodes: Vec<Node> = serde_yaml::from_reader(&file).map_err(|err| {
+
+        let yaml_nodes: Vec<YamlNode> = serde_yaml::from_reader(&file).map_err(|err| {
             RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
                 "Failed to read YAML registry file".into(),
             ))
         })?;
+
+        let nodes: Vec<Node> = yaml_nodes
+            .into_iter()
+            .map(Node::try_from)
+            .collect::<Result<Vec<Node>, InvalidNodeError>>()
+            .map_err(|err| {
+                RegistryError::InvalidStateError(InvalidStateError::with_message(format!(
+                    "Unable to get node list: {}",
+                    err
+                )))
+            })?;
 
         validate_nodes(&nodes).map_err(|err| {
             RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
@@ -271,7 +286,12 @@ impl Internal {
             RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
         })?;
 
-        let output = serde_yaml::to_vec(&nodes).map_err(|err| {
+        let yaml_nodes: Vec<YamlNode> = nodes
+            .iter()
+            .map(|node| YamlNode::from(node.clone()))
+            .collect::<Vec<YamlNode>>();
+
+        let output = serde_yaml::to_vec(&yaml_nodes).map_err(|err| {
             RegistryError::InternalError(InternalError::from_source_with_message(
                 Box::new(err),
                 "Failed to write nodes to YAML".into(),
@@ -1175,7 +1195,7 @@ mod test {
 
         // Verify that the file exists and is empty
         let file = File::open(&path).expect("Failed to open file");
-        let file_contents: Vec<Node> =
+        let file_contents: Vec<YamlNode> =
             serde_yaml::from_reader(file).expect("Failed to deserialize file");
         assert!(file_contents.is_empty());
     }
@@ -1278,7 +1298,11 @@ mod test {
     }
 
     fn write_to_file(data: &[Node], file_path: &str) {
+        let yaml_data: Vec<YamlNode> = data
+            .iter()
+            .map(|node| YamlNode::from(node.clone()))
+            .collect();
         let file = File::create(file_path).expect("Error creating test yaml file.");
-        serde_yaml::to_writer(file, data).expect("Error writing nodes to file.");
+        serde_yaml::to_writer(file, &yaml_data).expect("Error writing nodes to file.");
     }
 }

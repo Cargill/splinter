@@ -39,12 +39,12 @@ use std::iter::ExactSizeIterator;
 pub use self::diesel::DieselRegistry;
 pub use error::{InvalidNodeError, RegistryError};
 pub use unified::UnifiedRegistry;
-pub use yaml::LocalYamlRegistry;
+pub use yaml::{LocalYamlRegistry, YamlNode};
 #[cfg(feature = "registry-remote")]
 pub use yaml::{RemoteYamlRegistry, RemoteYamlShutdownHandle};
 
 /// Native representation of a node in a registry.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     /// The Splinter identity of the node; must be non-empty and unique in the registry.
     identity: String,

@@ -18,15 +18,17 @@
 //! * `POST /registry/nodes` for adding a node to the registry
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
+use crate::error::InvalidStateError;
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
 use crate::protocol;
 use crate::registry::rest_api::error::RegistryRestApiError;
 #[cfg(feature = "authorization")]
 use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
-    rest_api::resources::nodes::{ListNodesResponse, NodeResponse},
+    rest_api::resources::nodes::{ListNodesResponse, NewNode, NodeResponse},
     MetadataPredicate, Node, RegistryReader, RegistryWriter, RwRegistry,
 };
 use crate::rest_api::{
@@ -228,24 +230,36 @@ fn add_node(
                 Ok::<_, Error>(body)
             })
             .into_future()
-            .and_then(move |body| match serde_json::from_slice::<Node>(&body) {
+            .and_then(move |body| match serde_json::from_slice::<NewNode>(&body) {
                 Ok(node) => Box::new(
-                    web::block(move || registry.add_node(node).map_err(RegistryRestApiError::from))
-                        .then(|res| {
-                            Ok(match res {
-                                Ok(_) => HttpResponse::Ok().finish(),
-                                Err(BlockingError::Error(
-                                    RegistryRestApiError::InvalidStateError(err),
-                                )) => HttpResponse::BadRequest().json(ErrorResponse::bad_request(
-                                    &format!("Invalid node: {}", err),
+                    web::block(move || {
+                        let new_node = Node::try_from(node).map_err(|err| {
+                            RegistryRestApiError::InvalidStateError(
+                                InvalidStateError::with_message(format!(
+                                    "Failed to add node, node is invalid: {}",
+                                    err
                                 )),
-                                Err(err) => {
-                                    error!("Unable to add node: {}", err);
-                                    HttpResponse::InternalServerError()
-                                        .json(ErrorResponse::internal_error())
-                                }
-                            })
-                        }),
+                            )
+                        })?;
+                        registry
+                            .add_node(new_node)
+                            .map_err(RegistryRestApiError::from)
+                    })
+                    .then(|res| {
+                        Ok(match res {
+                            Ok(_) => HttpResponse::Ok().finish(),
+                            Err(BlockingError::Error(RegistryRestApiError::InvalidStateError(
+                                err,
+                            ))) => HttpResponse::BadRequest().json(ErrorResponse::bad_request(
+                                &format!("Invalid node: {}", err),
+                            )),
+                            Err(err) => {
+                                error!("Unable to add node: {}", err);
+                                HttpResponse::InternalServerError()
+                                    .json(ErrorResponse::internal_error())
+                            }
+                        })
+                    }),
                 )
                     as Box<dyn Future<Item = HttpResponse, Error = Error>>,
                 Err(err) => Box::new(
@@ -442,7 +456,7 @@ mod tests {
                 "SplinterProtocolVersion",
                 protocol::REGISTRY_PROTOCOL_VERSION,
             )
-            .json(&get_node_1())
+            .json(&get_new_node_1())
             .send()
             .expect("Failed to perform request");
 
@@ -513,6 +527,19 @@ mod tests {
             .with_metadata("company", "Bitwise IO")
             .build()
             .expect("Failed to build node1")
+    }
+
+    fn get_new_node_1() -> NewNode {
+        let mut metadata = HashMap::new();
+        metadata.insert("company".into(), "Bitwise IO".into());
+
+        NewNode {
+            identity: "Node-123".into(),
+            endpoints: vec!["12.0.0.123:8431".into()],
+            display_name: "Bitwise IO - Node 1".into(),
+            keys: vec!["0123".into()],
+            metadata,
+        }
     }
 
     fn get_node_2() -> Node {
