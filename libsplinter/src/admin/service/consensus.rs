@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use protobuf::{Message, RepeatedField};
 
-use crate::consensus::two_phase::TwoPhaseEngine;
+use crate::consensus::two_phase::v1::TwoPhaseEngine;
 use crate::consensus::{
     error::{ConsensusSendError, ProposalManagerError},
     ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId, ProposalManager,
