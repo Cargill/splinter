@@ -18,6 +18,8 @@
 //! * `PUT /registry/nodes/{identity}` for replacing a node in the registry
 //! * `DELETE /registry/nodes/{identity}` for deleting a node from the registry
 
+use std::convert::TryFrom;
+
 use crate::actix_web::{error::BlockingError, web, Error, HttpRequest, HttpResponse};
 use crate::error::InvalidStateError;
 use crate::futures::{future::IntoFuture, stream::Stream, Future};
@@ -26,8 +28,8 @@ use crate::registry::rest_api::error::RegistryRestApiError;
 #[cfg(feature = "authorization")]
 use crate::registry::rest_api::{REGISTRY_READ_PERMISSION, REGISTRY_WRITE_PERMISSION};
 use crate::registry::{
-    rest_api::resources::nodes_identity::NodeResponse, Node, RegistryReader, RegistryWriter,
-    RwRegistry,
+    rest_api::resources::nodes_identity::{NewNode, NodeResponse},
+    Node, RegistryReader, RegistryWriter, RwRegistry,
 };
 use crate::rest_api::{
     actix_web_1::{Method, ProtocolVersionRangeGuard, Resource},
@@ -119,19 +121,28 @@ fn put_node(
                 Ok::<_, Error>(body)
             })
             .into_future()
-            .and_then(move |body| match serde_json::from_slice::<Node>(&body) {
+            .and_then(move |body| match serde_json::from_slice::<NewNode>(&body) {
                 Ok(node) => Box::new(
                     web::block(move || {
-                        if node.identity != path_identity {
+                        let update_node = Node::try_from(node).map_err(|err| {
+                            RegistryRestApiError::InvalidStateError(
+                                InvalidStateError::with_message(format!(
+                                    "Failed to update node, node is invalid: {}",
+                                    err
+                                )),
+                            )
+                        })?;
+
+                        if update_node.identity != path_identity {
                             Err(RegistryRestApiError::InvalidStateError(
                                 InvalidStateError::with_message(format!(
                                     "Node identity cannot be changed: {}",
-                                    node.identity
+                                    update_node.identity
                                 )),
                             ))
                         } else {
                             registry
-                                .update_node(node)
+                                .update_node(update_node)
                                 .map_err(RegistryRestApiError::from)
                         }
                     })
@@ -231,8 +242,11 @@ mod tests {
             .expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
-        let node: Node = resp.json().expect("Failed to deserialize body");
-        assert_eq!(node, get_node_1());
+        let node: TestNode = resp.json().expect("Failed to deserialize body");
+        assert_eq!(
+            Node::try_from(node).expect("Unable to build node"),
+            get_node_1()
+        );
 
         shutdown_handle
             .shutdown()
@@ -299,7 +313,7 @@ mod tests {
 
         // Verify that updating an existing node gets an OK response and the fetched node has
         // the updated values
-        let mut node = get_node_1();
+        let mut node = get_new_node_1();
         node.endpoints = vec!["12.0.0.123:8432".to_string()];
         node.metadata
             .insert("location".to_string(), "Minneapolis".to_string());
@@ -331,7 +345,7 @@ mod tests {
             .expect("Failed to perform request");
 
         assert_eq!(resp.status(), StatusCode::OK);
-        let updated_node: Node = resp.json().expect("Failed to deserialize body");
+        let updated_node: NewNode = resp.json().expect("Failed to deserialize body");
         assert_eq!(updated_node, node);
 
         // Verify that attempting to change the node identity gets a FORBIDDEN response
@@ -438,6 +452,19 @@ mod tests {
             .expect("Failed to build node1")
     }
 
+    fn get_new_node_1() -> NewNode {
+        let mut metadata = HashMap::new();
+        metadata.insert("company".into(), "Bitwise IO".into());
+
+        NewNode {
+            identity: "Node-123".into(),
+            endpoints: vec!["12.0.0.123:8431".into()],
+            display_name: "Bitwise IO - Node 1".into(),
+            keys: vec!["0123".into()],
+            metadata,
+        }
+    }
+
     fn get_node_2() -> Node {
         Node::builder("Node-456")
             .with_endpoint("13.0.0.123:8434")
@@ -446,6 +473,33 @@ mod tests {
             .with_metadata("company", "Cargill")
             .build()
             .expect("Failed to build node2")
+    }
+
+    /// Test representation of a node in a registry.
+    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+    struct TestNode {
+        identity: String,
+        endpoints: Vec<String>,
+        display_name: String,
+        keys: Vec<String>,
+        metadata: HashMap<String, String>,
+    }
+
+    impl TryFrom<TestNode> for Node {
+        type Error = String;
+
+        fn try_from(node: TestNode) -> Result<Self, Self::Error> {
+            let mut builder = Node::builder(node.identity)
+                .with_endpoints(node.endpoints)
+                .with_display_name(node.display_name)
+                .with_keys(node.keys);
+
+            for (k, v) in node.metadata {
+                builder = builder.with_metadata(k, v);
+            }
+
+            builder.build().map_err(|err| err.to_string())
+        }
     }
 
     #[derive(Clone, Default)]

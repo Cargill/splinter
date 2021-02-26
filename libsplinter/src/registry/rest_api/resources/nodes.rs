@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
-use crate::registry::Node;
+use crate::registry::{error::InvalidNodeError, Node};
 use crate::rest_api::paging::Paging;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -41,5 +42,39 @@ impl<'a> From<&'a Node> for NodeResponse<'a> {
             keys: &node.keys,
             metadata: &node.metadata,
         }
+    }
+}
+
+/// Used to deserialize add and update requests
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct NewNode {
+    /// The Splinter identity of the node; must be non-empty and unique in the registry.
+    pub identity: String,
+    /// The endpoints the node can be reached at; at least one endpoint must be provided, and each
+    /// endpoint must be non-empty and unique in the registry.
+    pub endpoints: Vec<String>,
+    /// A human-readable name for the node; must be non-empty.
+    pub display_name: String,
+    /// The list of public keys that are permitted to act on behalf of the node; at least one key
+    /// must be provided, and each key must be non-empty.
+    pub keys: Vec<String>,
+    /// A map with node metadata.
+    pub metadata: HashMap<String, String>,
+}
+
+impl TryFrom<NewNode> for Node {
+    type Error = InvalidNodeError;
+
+    fn try_from(node: NewNode) -> Result<Self, Self::Error> {
+        let mut builder = Node::builder(node.identity)
+            .with_endpoints(node.endpoints)
+            .with_display_name(node.display_name)
+            .with_keys(node.keys);
+
+        for (k, v) in node.metadata {
+            builder = builder.with_metadata(k, v);
+        }
+
+        builder.build()
     }
 }

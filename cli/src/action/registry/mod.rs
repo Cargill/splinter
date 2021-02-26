@@ -16,7 +16,7 @@
 mod api;
 
 use clap::ArgMatches;
-use splinter::registry::Node;
+use splinter::registry::{Node, YamlNode};
 #[cfg(feature = "registry")]
 use std::collections::HashMap;
 use std::fs::File;
@@ -45,7 +45,7 @@ impl Action for RegistryGenerateAction {
 
         let output_file = args.value_of("file").unwrap_or(DEFAULT_OUTPUT_FILE);
 
-        let mut nodes: Vec<Node> = if Path::new(output_file).exists() {
+        let mut nodes: Vec<YamlNode> = if Path::new(output_file).exists() {
             let file = File::open(output_file).map_err(|err| {
                 CliError::ActionError(format!(
                     "Failed to open '{}': {}",
@@ -137,7 +137,7 @@ impl Action for RegistryGenerateAction {
             }
         }
 
-        nodes.push(node);
+        nodes.push(YamlNode::from(node));
 
         let yaml = serde_yaml::to_vec(&nodes).map_err(|err| {
             CliError::ActionError(format!("Cannot format node list into yaml: {}", err))

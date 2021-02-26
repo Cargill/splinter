@@ -20,6 +20,7 @@
 //! [`RemoteYamlRegistry`]: struct.RemoteYamlRegistry.html
 //! [`RegistryReader`]: ../../trait.RegistryReader.html
 
+use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -33,10 +34,11 @@ use openssl::hash::{hash, MessageDigest};
 use crate::error::{InternalError, InvalidStateError};
 use crate::hex::to_hex;
 use crate::registry::{
-    validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError, RegistryReader,
+    error::InvalidNodeError, validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError,
+    RegistryReader,
 };
 
-use super::LocalYamlRegistry;
+use super::{LocalYamlRegistry, YamlNode};
 
 /// A remote, read-only registry.
 ///
@@ -321,11 +323,22 @@ fn fetch_nodes_from_remote(url: &str) -> Result<Vec<Node>, RegistryError> {
                 "Failed to get bytes from remote registry file HTTP response".into(),
             ))
         })?;
-    let nodes: Vec<Node> = serde_yaml::from_slice(&bytes).map_err(|_| {
+    let yaml_nodes: Vec<YamlNode> = serde_yaml::from_slice(&bytes).map_err(|_| {
         RegistryError::InternalError(InternalError::with_message(
             "Failed to deserialize remote registry file: Not a valid YAML sequence of nodes".into(),
         ))
     })?;
+
+    let nodes: Vec<Node> = yaml_nodes
+        .into_iter()
+        .map(Node::try_from)
+        .collect::<Result<Vec<Node>, InvalidNodeError>>()
+        .map_err(|err| {
+            RegistryError::InvalidStateError(InvalidStateError::with_message(format!(
+                "Unable to get node list: {}",
+                err
+            )))
+        })?;
 
     validate_nodes(&nodes).map_err(|err| {
         RegistryError::InvalidStateError(InvalidStateError::with_message(err.to_string()))
@@ -1006,9 +1019,14 @@ mod tests {
         let filename = compute_cache_filename(test_config.url(), test_config.path())
             .expect("Failed to compute cache filename");
         let file = File::open(filename).expect("Failed to open cache file");
-        let file_contents: Vec<Node> =
+        let file_contents: Vec<YamlNode> =
             serde_yaml::from_reader(file).expect("Failed to deserialize cache file");
-        assert_eq!(file_contents, expected_registry);
+
+        let file_contents_nodes: Vec<Node> = file_contents
+            .into_iter()
+            .map(|node| Node::try_from(node).expect("Unable to build node"))
+            .collect();
+        assert_eq!(file_contents_nodes, expected_registry);
     }
 
     /// Simplifies tests by handling some of the setup and tear down.
@@ -1090,12 +1108,18 @@ mod tests {
                 Permission::AllowUnauthenticated,
                 move |_, _| {
                     Box::new(match &*registry.lock().expect("Registry lock poisoned") {
-                        Some(registry) => HttpResponse::Ok()
-                            .body(
-                                serde_yaml::to_vec(&registry)
-                                    .expect("Failed to serialize registry file"),
-                            )
-                            .into_future(),
+                        Some(registry) => {
+                            let yaml_registry: Vec<YamlNode> = registry
+                                .iter()
+                                .map(|node| YamlNode::from(node.clone()))
+                                .collect();
+                            HttpResponse::Ok()
+                                .body(
+                                    serde_yaml::to_vec(&yaml_registry)
+                                        .expect("Failed to serialize registry file"),
+                                )
+                                .into_future()
+                        }
                         None => HttpResponse::NotFound().finish().into_future(),
                     })
                 },
@@ -1105,12 +1129,18 @@ mod tests {
         {
             resource = resource.add_method(Method::Get, move |_, _| {
                 Box::new(match &*registry.lock().expect("Registry lock poisoned") {
-                    Some(registry) => HttpResponse::Ok()
-                        .body(
-                            serde_yaml::to_vec(&registry)
-                                .expect("Failed to serialize registry file"),
-                        )
-                        .into_future(),
+                    Some(registry) => {
+                        let yaml_registry: Vec<YamlNode> = registry
+                            .iter()
+                            .map(|node| YamlNode::from(node.clone()))
+                            .collect();
+                        HttpResponse::Ok()
+                            .body(
+                                serde_yaml::to_vec(&yaml_registry)
+                                    .expect("Failed to serialize registry file"),
+                            )
+                            .into_future()
+                    }
                     None => HttpResponse::NotFound().finish().into_future(),
                 })
             })
