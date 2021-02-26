@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::path::Path;
 use std::time::Duration;
 
@@ -24,7 +25,7 @@ use splinter::service::{FactoryCreateError, Service, ServiceFactory};
 #[cfg(feature = "service-arg-validation")]
 use crate::hex::parse_hex;
 
-use super::{Scabbard, SERVICE_TYPE};
+use super::{Scabbard, ScabbardVersion, SERVICE_TYPE};
 
 const DEFAULT_STATE_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
@@ -115,6 +116,7 @@ impl ServiceFactory for ScabbardFactory {
     /// - `coordinator_timeout`: the length of time (in milliseconds) that the network has to
     ///   commit a proposal before the coordinator rejects it (if not provided, default is 30
     ///   seconds)
+    /// - `version`: the protocol version for scabbard (possible values: "1") (default: "1")
     fn create(
         &self,
         service_id: String,
@@ -156,10 +158,13 @@ impl ServiceFactory for ScabbardFactory {
                 ))),
             })
             .transpose()?;
+        let version = ScabbardVersion::try_from(args.get("version").map(String::as_str))
+            .map_err(FactoryCreateError::InvalidArguments)?;
 
         let service = Scabbard::new(
             service_id,
             circuit_id,
+            version,
             peer_services,
             &state_db_dir,
             self.state_db_size,

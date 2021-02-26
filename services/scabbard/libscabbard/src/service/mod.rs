@@ -61,11 +61,30 @@ const SERVICE_TYPE: &str = "scabbard";
 
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
+/// Specifies the version of scabbard to use.
+#[derive(Clone)]
+pub enum ScabbardVersion {
+    V1,
+}
+
+impl TryFrom<Option<&str>> for ScabbardVersion {
+    type Error = String;
+
+    fn try_from(str_opt: Option<&str>) -> Result<Self, Self::Error> {
+        match str_opt {
+            Some("1") => Ok(Self::V1),
+            Some(v) => Err(format!("Unsupported scabbard version: {}", v)),
+            None => Ok(Self::V1),
+        }
+    }
+}
+
 /// A service for running Sawtooth Sabre smart contracts with two-phase commit consensus.
 #[derive(Clone)]
 pub struct Scabbard {
     circuit_id: String,
     service_id: String,
+    version: ScabbardVersion,
     shared: Arc<Mutex<ScabbardShared>>,
     state: Arc<Mutex<ScabbardState>>,
     /// The coordinator timeout for the two-phase commit consensus engine
@@ -79,6 +98,8 @@ impl Scabbard {
     pub fn new(
         service_id: String,
         circuit_id: &str,
+        // The protocol version for scabbard
+        version: ScabbardVersion,
         // List of other scabbard services on the same circuit that this service shares state with
         peer_services: HashSet<String>,
         // The directory in which to create sabre's LMDB database
@@ -115,6 +136,7 @@ impl Scabbard {
         Ok(Scabbard {
             circuit_id: circuit_id.to_string(),
             service_id,
+            version,
             shared: Arc::new(Mutex::new(shared)),
             state: Arc::new(Mutex::new(state)),
             coordinator_timeout,
@@ -408,6 +430,7 @@ pub mod tests {
         let service = Scabbard::new(
             "new_scabbard".into(),
             "test_circuit",
+            ScabbardVersion::V1,
             HashSet::new(),
             Path::new("/tmp"),
             1024 * 1024,
@@ -429,6 +452,7 @@ pub mod tests {
         let mut service = Scabbard::new(
             "thread_cleanup".into(),
             "test_circuit",
+            ScabbardVersion::V1,
             HashSet::new(),
             Path::new("/tmp"),
             1024 * 1024,
@@ -450,6 +474,7 @@ pub mod tests {
         let mut service = Scabbard::new(
             "connect_and_disconnect".into(),
             "test_circuit",
+            ScabbardVersion::V1,
             HashSet::new(),
             Path::new("/tmp"),
             1024 * 1024,
