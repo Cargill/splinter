@@ -21,7 +21,8 @@ use std::time::Duration;
 use protobuf::Message;
 use splinter::consensus::{
     error::{ConsensusSendError, ProposalManagerError},
-    two_phase::v1::TwoPhaseEngine,
+    two_phase::v1::TwoPhaseEngine as TwoPhaseEngineV1,
+    two_phase::v2::TwoPhaseEngine as TwoPhaseEngineV2,
     ConsensusEngine, ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId,
     ProposalManager, ProposalUpdate, StartupState,
 };
@@ -32,6 +33,7 @@ use crate::protos::scabbard::{ProposedBatch, ScabbardMessage, ScabbardMessage_Ty
 use super::error::{ScabbardConsensusManagerError, ScabbardError};
 use super::shared::ScabbardShared;
 use super::state::ScabbardState;
+use super::ScabbardVersion;
 
 /// Component used by the service to manage and interact with consenus
 pub struct ScabbardConsensusManager {
@@ -45,6 +47,7 @@ impl ScabbardConsensusManager {
     /// consensus, and start consensus in a separate thread.
     pub fn new(
         service_id: String,
+        version: ScabbardVersion,
         shared: Arc<Mutex<ScabbardShared>>,
         state: Arc<Mutex<ScabbardState>>,
         // The coordinator timeout for the two-phase commit consensus engine
@@ -77,16 +80,30 @@ impl ScabbardConsensusManager {
 
         let thread_handle = Builder::new()
             .name(format!("consensus-{}", service_id))
-            .spawn(move || {
-                let mut two_phase_engine = TwoPhaseEngine::new(coordinator_timeout);
-                if let Err(err) = two_phase_engine.run(
-                    consensus_msg_rx,
-                    proposal_update_rx,
-                    Box::new(consensus_network_sender),
-                    Box::new(proposal_manager),
-                    startup_state,
-                ) {
-                    error!("two phase consensus exited with an error: {}", err)
+            .spawn(move || match version {
+                ScabbardVersion::V1 => {
+                    let mut two_phase_engine = TwoPhaseEngineV1::new(coordinator_timeout);
+                    if let Err(err) = two_phase_engine.run(
+                        consensus_msg_rx,
+                        proposal_update_rx,
+                        Box::new(consensus_network_sender),
+                        Box::new(proposal_manager),
+                        startup_state,
+                    ) {
+                        error!("two phase consensus exited with an error: {}", err)
+                    }
+                }
+                ScabbardVersion::V2 => {
+                    let mut two_phase_engine = TwoPhaseEngineV2::new(coordinator_timeout);
+                    if let Err(err) = two_phase_engine.run(
+                        consensus_msg_rx,
+                        proposal_update_rx,
+                        Box::new(consensus_network_sender),
+                        Box::new(proposal_manager),
+                        startup_state,
+                    ) {
+                        error!("two phase consensus exited with an error: {}", err)
+                    }
                 }
             })
             .map_err(|err| ScabbardConsensusManagerError(Box::new(err)))?;

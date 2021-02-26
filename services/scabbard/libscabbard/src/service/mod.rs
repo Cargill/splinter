@@ -281,6 +281,7 @@ impl Service for Scabbard {
         consensus.replace(
             ScabbardConsensusManager::new(
                 self.service_id().into(),
+                self.version.clone(),
                 self.shared.clone(),
                 self.state.clone(),
                 self.coordinator_timeout,
