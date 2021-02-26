@@ -65,6 +65,7 @@ const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 #[derive(Clone)]
 pub enum ScabbardVersion {
     V1,
+    V2,
 }
 
 impl TryFrom<Option<&str>> for ScabbardVersion {
@@ -73,6 +74,7 @@ impl TryFrom<Option<&str>> for ScabbardVersion {
     fn try_from(str_opt: Option<&str>) -> Result<Self, Self::Error> {
         match str_opt {
             Some("1") => Ok(Self::V1),
+            Some("2") => Ok(Self::V2),
             Some(v) => Err(format!("Unsupported scabbard version: {}", v)),
             None => Ok(Self::V1),
         }

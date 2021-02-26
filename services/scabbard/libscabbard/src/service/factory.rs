@@ -116,7 +116,7 @@ impl ServiceFactory for ScabbardFactory {
     /// - `coordinator_timeout`: the length of time (in milliseconds) that the network has to
     ///   commit a proposal before the coordinator rejects it (if not provided, default is 30
     ///   seconds)
-    /// - `version`: the protocol version for scabbard (possible values: "1") (default: "1")
+    /// - `version`: the protocol version for scabbard (possible values: "1", "2") (default: "1")
     fn create(
         &self,
         service_id: String,
