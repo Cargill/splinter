@@ -15,3 +15,4 @@
 //! A simple n-party, two-phase commit (2PC) consensus algorithm implemented as a `ConsensusEngine`
 
 pub mod v1;
+pub mod v2;
