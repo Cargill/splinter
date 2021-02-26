@@ -777,7 +777,7 @@ impl Service for AdminService {
                 let circuit_id = abandoned_circuit.get_circuit_id();
                 let member_node_id = abandoned_circuit.get_member_node_id();
 
-                debug!(
+                warn!(
                     "Member {} has abandoned circuit {}",
                     member_node_id, circuit_id
                 );
