@@ -15,7 +15,6 @@
 //! Contains the implementation of `Node`.
 
 use std::thread::JoinHandle;
-use std::time::Duration;
 
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
@@ -57,7 +56,7 @@ impl ShutdownHandle for Node {
         }
     }
 
-    fn wait_for_shutdown(&mut self, timeout: Duration) -> Result<(), InternalError> {
+    fn wait_for_shutdown(&mut self) -> Result<(), InternalError> {
         match self.rest_api_variant.take() {
             Some(NodeRestApiVariant::ActixWeb1(shutdown_handle, join_handle)) => {
                 shutdown_handle
@@ -71,7 +70,7 @@ impl ShutdownHandle for Node {
                 Ok(())
             }
             Some(NodeRestApiVariant::ActixWeb3(mut rest_api)) => {
-                rest_api.wait_for_shutdown(timeout)?;
+                rest_api.wait_for_shutdown()?;
                 Ok(())
             }
             None => Err(InternalError::with_message(

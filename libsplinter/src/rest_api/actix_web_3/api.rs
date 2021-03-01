@@ -20,7 +20,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
 
 use actix_0_10::System as ActixSystem;
 use actix_web_3::{dev::Server, middleware, App, HttpServer};
@@ -157,7 +156,7 @@ impl ShutdownHandle for RestApi {
         self.shutdown_future = Some(Box::pin(self.server.stop(true)));
     }
 
-    fn wait_for_shutdown(&mut self, _timeout: Duration) -> Result<(), InternalError> {
+    fn wait_for_shutdown(&mut self) -> Result<(), InternalError> {
         match (self.shutdown_future.take(), self.join_handle.take()) {
             (Some(f), Some(join_handle)) => {
                 block_on(f);

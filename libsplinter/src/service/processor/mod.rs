@@ -534,7 +534,7 @@ impl ShutdownHandle for ServiceProcessorShutdownHandle {
         }
     }
 
-    fn wait_for_shutdown(&mut self, _: Duration) -> Result<(), crate::error::InternalError> {
+    fn wait_for_shutdown(&mut self) -> Result<(), crate::error::InternalError> {
         if let Some(join_handles) = self.join_handles.take() {
             match join_handles.join_all() {
                 Ok(results) => {
@@ -736,7 +736,7 @@ pub mod tests {
 
                 #[cfg(feature = "shutdown")]
                 shutdown_handle
-                    .wait_for_shutdown(Duration::from_secs(10))
+                    .wait_for_shutdown()
                     .expect("Unable to cleanly shutdown");
                 #[cfg(not(feature = "shutdown"))]
                 join_handles
@@ -867,7 +867,7 @@ pub mod tests {
 
                 #[cfg(feature = "shutdown")]
                 shutdown_handle
-                    .wait_for_shutdown(Duration::from_secs(10))
+                    .wait_for_shutdown()
                     .expect("Unable to cleanly shutdown");
                 #[cfg(not(feature = "shutdown"))]
                 join_handles
