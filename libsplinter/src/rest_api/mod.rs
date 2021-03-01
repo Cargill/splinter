@@ -56,9 +56,9 @@
 //!     .run();
 //! ```
 
-pub(crate) mod actix_web_1;
+pub mod actix_web_1;
 #[cfg(feature = "rest-api-actix-web-3")]
-pub(crate) mod actix_web_3;
+pub mod actix_web_3;
 pub mod auth;
 #[cfg(feature = "rest-api-cors")]
 pub mod cors;

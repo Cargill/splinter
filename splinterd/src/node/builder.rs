@@ -14,15 +14,15 @@
 
 //! Contains the implementation of `NodeBuilder`.
 
-use crate::admin::rest_api::actix_web_3::AdminResourceProvider;
-use crate::error::InternalError;
-use crate::rest_api::actix_web_1::{AuthConfig, RestApiBuilder as RestApiBuilder1};
-use crate::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
-use crate::rest_api::auth::{
+use splinter::admin::rest_api::actix_web_3::AdminResourceProvider;
+use splinter::error::InternalError;
+use splinter::rest_api::actix_web_1::{AuthConfig, RestApiBuilder as RestApiBuilder1};
+use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
+use splinter::rest_api::auth::{
     identity::{Identity, IdentityProvider},
     AuthorizationHeader,
 };
-use crate::rest_api::RestApiBind;
+use splinter::rest_api::RestApiBind;
 
 use super::{RunnableNode, RunnableNodeRestApiVariant};
 

@@ -16,10 +16,9 @@
 
 use std::time::Duration;
 
-use crate::error::{InternalError, InvalidArgumentError};
-use crate::threading::shutdown::ShutdownHandle;
-
-use super::{Node, NodeBuilder, RestApiVariant};
+use splinter::error::{InternalError, InvalidArgumentError};
+use splinter::threading::shutdown::ShutdownHandle;
+use splinterd::node::{Node, NodeBuilder, RestApiVariant};
 
 pub struct Network {
     default_rest_api_variant: RestApiVariant,
@@ -59,10 +58,6 @@ impl Network {
                 "out of range".to_string(),
             )),
         }
-    }
-
-    pub fn shutdown(self: Network) -> Result<(), InternalError> {
-        Ok(())
     }
 }
 

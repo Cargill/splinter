@@ -17,11 +17,11 @@
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crate::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
-use crate::error::InternalError;
-use crate::rest_api::actix_web_1::RestApiShutdownHandle;
-use crate::rest_api::actix_web_3::RestApi;
-use crate::threading::shutdown::ShutdownHandle;
+use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
+use splinter::error::InternalError;
+use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
+use splinter::rest_api::actix_web_3::RestApi;
+use splinter::threading::shutdown::ShutdownHandle;
 
 pub(super) enum NodeRestApiVariant {
     ActixWeb1(RestApiShutdownHandle, JoinHandle<()>),

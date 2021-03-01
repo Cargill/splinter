@@ -18,7 +18,7 @@ use actix_web_3::{web, Resource};
 
 use crate::rest_api::actix_web_3::ResourceProvider;
 
-pub mod get_admin_circuits;
+mod get_admin_circuits;
 
 // An implementation of `ResourceProvider` which returns a list of all the Actix `Resource`s
 // related to admin service endpoints.
