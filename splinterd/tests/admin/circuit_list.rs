@@ -36,6 +36,38 @@ fn single_node_network(rest_api_variant: RestApiVariant) {
     shutdown!(network).unwrap();
 }
 
+/// Creates a multi-node network and confirms that the admin service's REST API is available
+/// by listing circuits (which will be empty).
+fn multi_node_network(rest_api_variant: RestApiVariant) {
+    let mut network = Network::new()
+        .with_default_rest_api_variant(rest_api_variant)
+        .add_nodes_with_defaults(3)
+        .unwrap();
+
+    let client_0 = network.node(0).unwrap().admin_service_client();
+    // make a call to the first node's port
+    let list_slice = client_0
+        .list_circuits(None)
+        .expect("Unable to list circuits from node 0");
+    assert_eq!(list_slice.data, vec![]);
+
+    let client_1 = network.node(1).unwrap().admin_service_client();
+    // make a call to the second node's port
+    let list_slice = client_1
+        .list_circuits(None)
+        .expect("Unable to list circuits from node 1");
+    assert_eq!(list_slice.data, vec![]);
+
+    let client_2 = network.node(2).unwrap().admin_service_client();
+    // make a call to the last node's port
+    let list_slice = client_2
+        .list_circuits(None)
+        .expect("Unable to list circuits from node 2");
+    assert_eq!(list_slice.data, vec![]);
+
+    shutdown!(network).unwrap();
+}
+
 /// Executes the single node network test with Actix Web 1.
 #[test]
 #[ignore]
@@ -48,4 +80,18 @@ fn single_node_network_actix_web_1() {
 #[ignore]
 fn single_node_network_actix_web_3() {
     single_node_network(RestApiVariant::ActixWeb3);
+}
+
+/// Executes the multi node network test with Actix Web 1.
+#[test]
+#[ignore]
+fn multi_node_network_actix_web_1() {
+    multi_node_network(RestApiVariant::ActixWeb1);
+}
+
+/// Executes the multi node network test with Actix Web 3.
+#[test]
+#[ignore]
+fn multi_node_network_actix_web_3() {
+    multi_node_network(RestApiVariant::ActixWeb3);
 }
