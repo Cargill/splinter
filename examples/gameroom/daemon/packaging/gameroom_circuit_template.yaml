@@ -24,6 +24,8 @@ rules:
           value: [$(ADMIN_KEYS)]
         - key: 'peer_services'
           value: '$(ALL_OTHER_SERVICES)'
+        - key: 'version'
+          value: '2'
         first-service: 'a000'
     set-metadata:
         encoding: json
