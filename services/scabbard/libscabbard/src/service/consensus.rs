@@ -21,7 +21,7 @@ use std::time::Duration;
 use protobuf::Message;
 use splinter::consensus::{
     error::{ConsensusSendError, ProposalManagerError},
-    two_phase::TwoPhaseEngine,
+    two_phase::v1::TwoPhaseEngine,
     ConsensusEngine, ConsensusMessage, ConsensusNetworkSender, PeerId, Proposal, ProposalId,
     ProposalManager, ProposalUpdate, StartupState,
 };
