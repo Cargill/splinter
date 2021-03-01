@@ -15,4 +15,6 @@
 //! Admin service integration tests.
 
 #[cfg(feature = "node")]
+mod circuit_lifecycle;
+#[cfg(feature = "node")]
 mod circuit_list;
