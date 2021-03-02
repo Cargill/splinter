@@ -152,7 +152,6 @@ allow_tables_to_appear_in_same_query!(
     node_endpoint
 );
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_service_event (id) {
         id -> Int8,
@@ -161,7 +160,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_circuit_proposal (event_id) {
         event_id -> Int8,
@@ -173,7 +171,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_proposed_circuit (event_id) {
         event_id -> Int8,
@@ -191,7 +188,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_vote_record (event_id, voter_node_id) {
         event_id -> Int8,
@@ -202,7 +198,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_proposed_node (event_id, node_id) {
         event_id -> Int8,
@@ -211,7 +206,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_proposed_node_endpoint (event_id, node_id, endpoint) {
         event_id -> Int8,
@@ -221,7 +215,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_proposed_service (event_id, service_id) {
         event_id -> Int8,
@@ -232,7 +225,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 table! {
     admin_event_proposed_service_argument (event_id, service_id, key) {
         event_id -> Int8,
@@ -243,7 +235,6 @@ table! {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 allow_tables_to_appear_in_same_query!(
     admin_service_event,
     admin_event_proposed_circuit,

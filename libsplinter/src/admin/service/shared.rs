@@ -19,15 +19,12 @@ use std::convert::{TryFrom, TryInto};
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-#[cfg(not(feature = "admin-service-event-store"))]
-use std::time::SystemTime;
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::Message;
 #[cfg(feature = "circuit-abandon")]
 use protobuf::RepeatedField;
 
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::store;
 #[cfg(feature = "circuit-abandon")]
 use crate::admin::store::CircuitBuilder as StoreCircuitBuilder;
@@ -66,12 +63,8 @@ use crate::service::error::ServiceError;
 use crate::service::validation::ServiceArgValidator;
 
 use crate::service::ServiceNetworkSender;
-#[cfg(not(feature = "admin-service-event-store"))]
-use crate::sets::mem::DurableBTreeSet;
 
 use super::error::{AdminSharedError, MarshallingError};
-#[cfg(not(feature = "admin-service-event-store"))]
-use super::mailbox::Mailbox;
 use super::messages;
 use super::{
     admin_service_id, sha256, AdminKeyVerifier, AdminServiceEventSubscriber, AdminSubscriberError,
@@ -80,9 +73,6 @@ use super::{
 
 static VOTER_ROLE: &str = "voter";
 static PROPOSER_ROLE: &str = "proposer";
-
-#[cfg(not(feature = "admin-service-event-store"))]
-const DEFAULT_IN_MEMORY_EVENT_LIMIT: usize = 100;
 
 pub enum PayloadType {
     Circuit(CircuitManagementPayload),
@@ -139,29 +129,6 @@ impl SubscriberMap {
         }
     }
 
-    #[cfg(not(feature = "admin-service-event-store"))]
-    fn broadcast_by_type(
-        &self,
-        event_type: &str,
-        admin_service_event: &messages::AdminServiceEvent,
-        timestamp: &SystemTime,
-    ) {
-        let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
-        if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
-            subscribers.retain(|subscriber| {
-                match subscriber.handle_event(admin_service_event, timestamp) {
-                    Ok(()) => true,
-                    Err(AdminSubscriberError::Unsubscribe) => false,
-                    Err(AdminSubscriberError::UnableToHandleEvent(msg)) => {
-                        error!("Unable to send event: {}", msg);
-                        true
-                    }
-                }
-            });
-        }
-    }
-
-    #[cfg(feature = "admin-service-event-store")]
     fn broadcast_by_type(&self, event_type: &str, admin_service_event: &store::AdminServiceEvent) {
         let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
         if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
@@ -230,9 +197,6 @@ pub struct AdminServiceShared {
     current_consensus_verifiers: Vec<String>,
     // Admin Service Event Subscribers
     event_subscribers: SubscriberMap,
-    // Mailbox of AdminServiceEvent values
-    #[cfg(not(feature = "admin-service-event-store"))]
-    event_mailbox: Mailbox,
     // AdminServiceStore
     admin_store: Box<dyn AdminServiceStore>,
     // signature verifier
@@ -244,7 +208,6 @@ pub struct AdminServiceShared {
     admin_service_status: AdminServiceStatus,
     routing_table_writer: Box<dyn RoutingTableWriter>,
     // Mailbox of AdminServiceEvent values
-    #[cfg(feature = "admin-service-event-store")]
     event_store: Box<dyn AdminServiceStore>,
     #[cfg(feature = "circuit-disband")]
     // List of circuits to be completely disbanded once all nodes have agreed
@@ -266,15 +229,8 @@ impl AdminServiceShared {
         key_verifier: Box<dyn AdminKeyVerifier>,
         key_permission_manager: Box<dyn KeyPermissionManager>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
-        #[cfg(feature = "admin-service-event-store")] admin_service_event_store: Box<
-            dyn AdminServiceStore,
-        >,
+        admin_service_event_store: Box<dyn AdminServiceStore>,
     ) -> Self {
-        #[cfg(not(feature = "admin-service-event-store"))]
-        let event_mailbox = Mailbox::new(DurableBTreeSet::new_boxed_with_bound(
-            std::num::NonZeroUsize::new(DEFAULT_IN_MEMORY_EVENT_LIMIT).unwrap(),
-        ));
-
         AdminServiceShared {
             node_id,
             network_sender: None,
@@ -292,8 +248,6 @@ impl AdminServiceShared {
             pending_changes: None,
             current_consensus_verifiers: Vec::new(),
             event_subscribers: SubscriberMap::new(),
-            #[cfg(not(feature = "admin-service-event-store"))]
-            event_mailbox,
             admin_store,
             signature_verifier,
             key_verifier,
@@ -301,7 +255,6 @@ impl AdminServiceShared {
             proposal_sender: None,
             admin_service_status: AdminServiceStatus::NotRunning,
             routing_table_writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store: admin_service_event_store,
             #[cfg(feature = "circuit-disband")]
             pending_consensus_disbanded_circuits: HashMap::new(),
@@ -1566,26 +1519,6 @@ impl AdminServiceShared {
         }
     }
 
-    #[cfg(not(feature = "admin-service-event-store"))]
-    pub fn get_events_since(
-        &self,
-        since_timestamp: &SystemTime,
-        circuit_management_type: &str,
-    ) -> Result<Events, AdminSharedError> {
-        let events = self
-            .event_mailbox
-            .iter_since(*since_timestamp)
-            .map_err(|err| AdminSharedError::UnableToAddSubscriber(err.to_string()))?;
-
-        let circuit_management_type = circuit_management_type.to_string();
-        Ok(Events {
-            inner: Box::new(events.filter(move |(_, evt)| {
-                evt.proposal().circuit.circuit_management_type == circuit_management_type
-            })),
-        })
-    }
-
-    #[cfg(feature = "admin-service-event-store")]
     pub fn get_events_since(
         &self,
         since_event_id: &i64,
@@ -1614,25 +1547,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(not(feature = "admin-service-event-store"))]
-    pub fn send_event(
-        &mut self,
-        circuit_management_type: &str,
-        event: messages::AdminServiceEvent,
-    ) {
-        let (ts, event) = match self.event_mailbox.add(event) {
-            Ok((ts, event)) => (ts, event),
-            Err(err) => {
-                error!("Unable to store admin event: {}", err);
-                return;
-            }
-        };
-
-        self.event_subscribers
-            .broadcast_by_type(&circuit_management_type, &event, &ts);
-    }
-
-    #[cfg(feature = "admin-service-event-store")]
     pub fn send_event(
         &mut self,
         circuit_management_type: &str,
@@ -3253,7 +3167,7 @@ mod tests {
             .run()
             .expect("failed to start orchestrator");
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
+
         let event_store = store.clone_boxed();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
@@ -3272,7 +3186,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -3390,7 +3303,7 @@ mod tests {
             .run()
             .expect("failed to start orchestrator");
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
+
         let event_store = store.clone_boxed();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
@@ -3409,7 +3322,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -3487,7 +3399,6 @@ mod tests {
     // test that a valid circuit is validated correctly
     fn test_validate_circuit_valid() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3509,7 +3420,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -3532,7 +3442,6 @@ mod tests {
     // included in the protobuf.
     fn test_validate_invalid_protocol_display_name() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3554,7 +3463,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -3571,7 +3479,6 @@ mod tests {
     // invalid
     fn test_validate_circuit_signer_not_permitted() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3593,7 +3500,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -3614,7 +3520,6 @@ mod tests {
     // invalid
     fn test_validate_circuit_signer_key_invalid() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3636,7 +3541,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -3668,7 +3572,6 @@ mod tests {
     // members an error is returned
     fn test_validate_circuit_bad_node() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3690,7 +3593,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -3717,7 +3619,6 @@ mod tests {
     // test that if a circuit has a service in its roster with too many allowed nodes
     fn test_validate_circuit_too_many_allowed_nodes() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3739,7 +3640,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -3769,7 +3669,6 @@ mod tests {
     // test that if a circuit has a service with "" for a service id an error is returned
     fn test_validate_circuit_empty_service_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3791,7 +3690,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -3818,7 +3716,6 @@ mod tests {
     // test that if a circuit has a service with an invalid service id an error is returned
     fn test_validate_circuit_invalid_service_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3840,7 +3737,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -3867,7 +3763,6 @@ mod tests {
     // test that if a circuit has a service with duplicate service ids an error is returned
     fn test_validate_circuit_duplicate_service_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3889,7 +3784,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -3921,7 +3815,6 @@ mod tests {
     // test that if a circuit does not have any services in its roster an error is returned
     fn test_validate_circuit_empty_roster() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3943,7 +3836,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -3964,7 +3856,6 @@ mod tests {
     // test that if a circuit does not have any nodes in its members an error is returned
     fn test_validate_circuit_empty_members() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -3986,7 +3877,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4009,7 +3899,6 @@ mod tests {
     // returned
     fn test_validate_circuit_missing_local_node() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4031,7 +3920,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4058,7 +3946,6 @@ mod tests {
     // returned
     fn test_validate_circuit_empty_node_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4080,7 +3967,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4114,7 +4000,6 @@ mod tests {
     // test that if a circuit has duplicate members an error is returned
     fn test_validate_circuit_duplicate_members() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4136,7 +4021,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4170,7 +4054,6 @@ mod tests {
     // test that if a circuit has an empty circuit id an error is returned
     fn test_validate_circuit_empty_circuit_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4192,7 +4075,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4214,7 +4096,6 @@ mod tests {
     // test that if a circuit has an invalid circuit id an error is returned
     fn test_validate_circuit_invalid_circuit_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4236,7 +4117,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4258,7 +4138,6 @@ mod tests {
     // test that if a circuit has a member with no endpoints an error is returned
     fn test_validate_circuit_no_endpoints() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4280,7 +4159,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4310,7 +4188,6 @@ mod tests {
     // test that if a circuit has a member with an empty endpoint an error is returned
     fn test_validate_circuit_empty_endpoint() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4332,7 +4209,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4362,7 +4238,6 @@ mod tests {
     // test that if a circuit has a member with a duplicate endpoint an error is returned
     fn test_validate_circuit_duplicate_endpoint() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4384,7 +4259,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4414,7 +4288,6 @@ mod tests {
     // test that if a circuit does not have authorization set an error is returned
     fn test_validate_circuit_no_authorization() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4436,7 +4309,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4458,7 +4330,6 @@ mod tests {
     // test that if a circuit does not have persistence set an error is returned
     fn test_validate_circuit_no_persitance() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4480,7 +4351,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4502,7 +4372,6 @@ mod tests {
     // test that if a circuit does not have durability set an error is returned
     fn test_validate_circuit_unset_durability() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4524,7 +4393,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4546,7 +4414,6 @@ mod tests {
     // test that if a circuit does not have route type set an error is returned
     fn test_validate_circuit_no_routes() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4568,7 +4435,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4590,7 +4456,6 @@ mod tests {
     // test that if a circuit does not have circuit_management_type set an error is returned
     fn test_validate_circuit_no_management_type() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4612,7 +4477,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let mut circuit = setup_test_circuit();
@@ -4634,7 +4498,6 @@ mod tests {
     // test that a valid circuit proposal vote comes back as valid
     fn test_validate_proposal_vote_valid() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -4655,7 +4518,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -4678,7 +4540,6 @@ mod tests {
     // invalid
     fn test_validate_proposal_vote_not_permitted() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4700,7 +4561,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -4722,7 +4582,6 @@ mod tests {
     // test if the voter is the original requester node the vote is invalid
     fn test_validate_proposal_vote_requester() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4744,7 +4603,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -4766,7 +4624,6 @@ mod tests {
     // test if a voter has already voted on a proposal the new vote is invalid
     fn test_validate_proposal_vote_duplicate_vote() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4788,7 +4645,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -4818,7 +4674,6 @@ mod tests {
     // the vote, the vote is invalid
     fn test_validate_proposal_vote_circuit_hash_mismatch() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4840,7 +4695,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
         let circuit = setup_test_circuit();
@@ -4865,7 +4719,6 @@ mod tests {
     // signature is empty.
     fn test_validate_circuit_management_payload_signature() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4890,7 +4743,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -4926,7 +4778,6 @@ mod tests {
     // header is empty.
     fn test_validate_circuit_management_payload_header() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -4951,7 +4802,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -4988,7 +4838,6 @@ mod tests {
     // requester field is empty.
     fn test_validate_circuit_management_header_requester() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5013,7 +4862,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5052,7 +4900,6 @@ mod tests {
     // field is empty.
     fn test_validate_circuit_management_header_requester_node_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5077,7 +4924,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5124,7 +4970,6 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_valid() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5146,7 +4991,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5187,7 +5031,6 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_invalid_protocol() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5209,7 +5052,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5248,7 +5090,6 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_invalid_circuit_version() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5270,7 +5111,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5310,7 +5150,6 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_no_circuit() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5332,7 +5171,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5362,7 +5200,6 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_not_permitted() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5384,7 +5221,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5424,7 +5260,6 @@ mod tests {
     #[test]
     fn test_validate_disband_circuit_already_disbanded() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5446,7 +5281,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5516,7 +5350,6 @@ mod tests {
             .run()
             .expect("failed to start orchestrator");
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let signature_verifier = Secp256k1Context::new().new_verifier();
@@ -5535,7 +5368,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5625,7 +5457,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_valid() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5647,7 +5478,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5688,7 +5518,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_invalid_protocol() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5710,7 +5539,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5751,7 +5579,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_invalid_circuit_version() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5773,7 +5600,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5813,7 +5639,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_no_circuit() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5835,7 +5660,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5864,7 +5688,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_not_permitted() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5886,7 +5709,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5926,7 +5748,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_invalid_requester() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -5948,7 +5769,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -5989,7 +5809,6 @@ mod tests {
     #[test]
     fn test_validate_purge_request_active_circuit() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -6011,7 +5830,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6049,7 +5867,6 @@ mod tests {
     #[test]
     fn test_purge_request() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
@@ -6077,7 +5894,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6131,7 +5947,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_valid() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6152,7 +5967,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6186,7 +6000,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_no_circuit() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6207,7 +6020,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6233,7 +6045,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_invalid_circuit() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6254,7 +6065,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6290,7 +6100,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_invalid_circuit_version() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6311,7 +6120,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6348,7 +6156,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_invalid_node_id() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6369,7 +6176,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6405,7 +6211,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_invalid_protocol() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6426,7 +6231,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6457,7 +6261,6 @@ mod tests {
     #[test]
     fn test_validate_abandon_circuit_not_permitted() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6478,7 +6281,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::new(false)),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 
@@ -6514,7 +6316,6 @@ mod tests {
     #[test]
     fn test_abandon_circuit() {
         let store = setup_admin_service_store();
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
         let (mesh, cm, pm, peer_connector) = setup_peer_connector(None);
         let orchestrator = setup_orchestrator();
@@ -6541,7 +6342,6 @@ mod tests {
             Box::new(MockAdminKeyVerifier::default()),
             Box::new(AllowAllKeyPermissionManager),
             writer,
-            #[cfg(feature = "admin-service-event-store")]
             event_store,
         );
 

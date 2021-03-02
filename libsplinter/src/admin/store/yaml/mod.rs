@@ -26,7 +26,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-#[cfg(feature = "admin-service-event-store")]
 use super::{AdminServiceEvent, EventIter};
 use super::{
     AdminServiceStore, AdminServiceStoreError, AuthorizationType, Circuit, CircuitBuilder,
@@ -36,7 +35,6 @@ use super::{
     ProposedServiceBuilder, RouteType, Service, ServiceBuilder, ServiceId, Vote, VoteRecord,
     VoteRecordBuilder,
 };
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::messages;
 
 use crate::error::{
@@ -1007,7 +1005,6 @@ impl AdminServiceStore for YamlAdminServiceStore {
         Ok(Box::new(services.into_iter()))
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     /// Add an event to the `AdminServiceEventStore`.  Returns the recorded event index and
     /// a copy of the event.
     ///
@@ -1021,7 +1018,6 @@ impl AdminServiceStore for YamlAdminServiceStore {
         unimplemented!()
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     /// List `AdminServiceEvent`s that have been added to the store since the provided index.
     ///
     /// # Arguments
@@ -1031,7 +1027,6 @@ impl AdminServiceStore for YamlAdminServiceStore {
         unimplemented!()
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     /// List `AdminServiceEvent`s, with a corresponding `CircuitProposal` that has the specified
     /// `circuit_management_type`, that have been added to the store since the provided index.
     ///

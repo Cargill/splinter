@@ -53,7 +53,6 @@ pub struct AdminServiceBuilder {
     key_permission_manager: Option<Box<dyn KeyPermissionManager>>,
     coordinator_timeout: Option<Duration>,
     routing_table_writer: Option<Box<dyn RoutingTableWriter>>,
-    #[cfg(feature = "admin-service-event-store")]
     event_store: Option<Box<dyn AdminServiceStore>>,
 }
 
@@ -144,7 +143,6 @@ impl AdminServiceBuilder {
         self
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     /// Sets the admin event store instance.
     pub fn with_admin_event_store(mut self, event_store: Box<dyn AdminServiceStore>) -> Self {
         self.event_store = Some(event_store);
@@ -209,7 +207,6 @@ impl AdminServiceBuilder {
             )
         })?;
 
-        #[cfg(feature = "admin-service-event-store")]
         let admin_event_store = self.event_store.ok_or_else(|| {
             InvalidStateError::with_message("An admin service requires an admin_event_store".into())
         })?;
@@ -226,7 +223,6 @@ impl AdminServiceBuilder {
             key_verifier,
             key_permission_manager,
             routing_table_writer,
-            #[cfg(feature = "admin-service-event-store")]
             admin_event_store,
         )));
 
