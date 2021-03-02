@@ -22,6 +22,7 @@ use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::{AuthConfig, RestApiBuilder as RestApiBuilder1};
 use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
 use splinter::rest_api::auth::{
+    authorization::{AuthorizationHandler, AuthorizationHandlerResult},
     identity::{Identity, IdentityProvider},
     AuthorizationHeader,
 };
@@ -133,6 +134,7 @@ impl NodeBuilder {
                     RestApiBuilder1::new()
                         .with_bind(RestApiBind::Insecure(url))
                         .with_auth_configs(vec![auth_config])
+                        .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)])
                         .build()
                         .map_err(|e| InternalError::from_source(Box::new(e)))?,
                 )
@@ -175,5 +177,23 @@ impl IdentityProvider for MockIdentityProvider {
     ///```
     fn clone_box(&self) -> Box<dyn IdentityProvider> {
         Box::new(self.clone())
+    }
+}
+
+struct MockAuthorizationHandler;
+
+impl AuthorizationHandler for MockAuthorizationHandler {
+    fn has_permission(
+        &self,
+        _identity: &Identity,
+        _permission_id: &str,
+    ) -> Result<AuthorizationHandlerResult, InternalError> {
+        Ok(AuthorizationHandlerResult::Allow)
+    }
+
+    /// Clone implementation for `AuthorizationHandler`. The implementation of the `Clone` trait for
+    /// `Box<dyn AuthorizationHandler>` calls this method.
+    fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+        Box::new(MockAuthorizationHandler)
     }
 }
