@@ -197,9 +197,13 @@ impl ProposalManager for ScabbardProposalManager {
 
             // Intentionally leaving out the previous_id and proposal_height fields, since this
             // service and two phase consensus don't use them. This means the proposal ID can just
-            // be the summary.
+            // be the summary (in v1) or batch ID (in v2).
+            let id = match self.version {
+                ScabbardVersion::V1 => expected_hash.as_bytes().into(),
+                ScabbardVersion::V2 => batch.batch().header_signature().as_bytes().into(),
+            };
             let proposal = Proposal {
-                id: expected_hash.as_bytes().into(),
+                id,
                 summary: expected_hash.as_bytes().into(),
                 ..Default::default()
             };
