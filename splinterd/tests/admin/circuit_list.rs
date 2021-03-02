@@ -18,7 +18,7 @@
 use splinter::threading::shutdown::shutdown;
 use splinterd::node::RestApiVariant;
 
-use framework::network::Network;
+use crate::framework::network::Network;
 
 /// Creates a single node network and confirms that the admin service's REST API is available
 /// by listing circuits (which will be empty).
