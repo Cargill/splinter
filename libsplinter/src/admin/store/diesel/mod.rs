@@ -176,7 +176,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
     }
 
-    #[cfg(feature = "admin-service-event-store-postgres")]
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
@@ -184,12 +183,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
     }
 
-    #[cfg(feature = "admin-service-event-store-postgres")]
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
     }
 
-    #[cfg(feature = "admin-service-event-store-postgres")]
     fn list_events_by_management_type_since(
         &self,
         management_type: String,

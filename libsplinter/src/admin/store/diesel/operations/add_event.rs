@@ -47,7 +47,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreAddEventOperation {
     ) -> Result<AdminServiceEvent, AdminServiceStoreError>;
 }
 
-#[cfg(feature = "admin-service-event-store-postgres")]
+#[cfg(feature = "postgres")]
 impl<'a> AdminServiceStoreAddEventOperation
     for AdminServiceStoreOperations<'a, diesel::pg::PgConnection>
 {
