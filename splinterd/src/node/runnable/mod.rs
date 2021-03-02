@@ -14,6 +14,8 @@
 
 //! Contains the implementation of `RunnableNode`.
 
+pub(super) mod admin;
+
 use std::net::{Ipv4Addr, SocketAddr};
 
 use splinter::error::InternalError;
@@ -22,6 +24,8 @@ use splinter::rest_api::actix_web_3::RunnableRestApi;
 
 use super::{Node, NodeRestApiVariant};
 
+use self::admin::RunnableAdminSubsystem;
+
 pub(super) enum RunnableNodeRestApiVariant {
     ActixWeb1(RestApi),
     ActixWeb3(RunnableRestApi),
@@ -29,15 +33,20 @@ pub(super) enum RunnableNodeRestApiVariant {
 
 /// A fully configured and runnable instance of a node.
 pub struct RunnableNode {
+    pub(super) runnable_admin_subsystem: RunnableAdminSubsystem,
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
 }
 
 impl RunnableNode {
     /// Starts up the Node.
     pub fn run(self) -> Result<Node, InternalError> {
+        let mut admin_subsystem = self.runnable_admin_subsystem.run()?;
+
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
+                let admin_resources = admin_subsystem.take_actix1_resources();
                 let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api
+                    .add_resources(admin_resources)
                     .run()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
@@ -100,6 +109,7 @@ impl RunnableNode {
         };
 
         Ok(Node {
+            admin_subsystem,
             rest_api_variant,
             rest_api_port,
         })
