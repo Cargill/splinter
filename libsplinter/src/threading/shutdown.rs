@@ -14,13 +14,7 @@
 
 //! Traits and functions related to shutting down components.
 
-use std::time::Duration;
-
 use crate::error::InternalError;
-
-// The value of this default timeout seemed appropriate for a maximum shutdown duration during
-// tests, but is otherwise arbitrary.
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// `ShutdownHandle` is a trait which defines an interface for shutting down components which have
 /// threads. It may also be used on non-threaded components which require cleanup at the end of
@@ -41,14 +35,11 @@ pub trait ShutdownHandle {
     /// being joined.
     fn signal_shutdown(&mut self);
 
-    /// Waits until the the component has completely shutdown, or until timeout.
+    /// Waits until the the component has completely shutdown.
     ///
     /// For components with threads, the threads should be joined during the call to
     /// `wait_for_shutdown`.
-    ///
-    /// Because of technical limitations in some underlying implementations, the duration of the
-    /// call may take much longer than the `timeout` value provided.
-    fn wait_for_shutdown(&mut self, timeout: Duration) -> Result<(), InternalError>;
+    fn wait_for_shutdown(&mut self) -> Result<(), InternalError>;
 }
 
 /// Calls `signal_shutdown` and `wait_for_shutdown` on the provided `ShutdownHandle`s.
@@ -63,7 +54,7 @@ pub fn shutdown(mut handles: Vec<Box<dyn ShutdownHandle>>) -> Result<(), Interna
 
     let mut errors: Vec<InternalError> = Vec::new();
     for handle in handles.iter_mut() {
-        if let Err(err) = handle.wait_for_shutdown(DEFAULT_TIMEOUT) {
+        if let Err(err) = handle.wait_for_shutdown() {
             errors.push(err);
         }
     }

@@ -376,7 +376,7 @@ impl ShutdownHandle for ServiceOrchestratorShutdownHandle {
         self.running.store(false, Ordering::SeqCst);
     }
 
-    fn wait_for_shutdown(&mut self, _timeout: Duration) -> Result<(), InternalError> {
+    fn wait_for_shutdown(&mut self) -> Result<(), InternalError> {
         if let Some(join_handles) = self.join_handles.take() {
             match join_handles.join_all() {
                 Ok(results) => {
