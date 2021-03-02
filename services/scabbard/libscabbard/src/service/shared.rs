@@ -21,7 +21,7 @@ use transact::protocol::transaction::{HashMethod, TransactionHeader};
 use transact::protos::FromBytes;
 
 use splinter::{
-    consensus::{PeerId, ProposalId},
+    consensus::{PeerId, Proposal, ProposalId},
     service::ServiceNetworkSender,
 };
 
@@ -44,8 +44,9 @@ pub struct ScabbardShared {
     coordinator_service_id: String,
     /// This service's ID
     service_id: String,
-    /// Tracks which batches are currently being evaluated, indexed by corresponding proposal IDs.
-    proposed_batches: HashMap<ProposalId, BatchPair>,
+    /// Tracks which proposals are currently being evaluated along with the batch the proposal is
+    /// for
+    open_proposals: HashMap<ProposalId, (Proposal, BatchPair)>,
     signature_verifier: Box<dyn SignatureVerifier>,
 }
 
@@ -76,7 +77,7 @@ impl ScabbardShared {
             peer_services,
             coordinator_service_id,
             service_id,
-            proposed_batches: HashMap::new(),
+            open_proposals: HashMap::new(),
             signature_verifier,
         }
     }
@@ -115,20 +116,17 @@ impl ScabbardShared {
         &self.peer_services
     }
 
-    pub fn add_proposed_batch(
-        &mut self,
-        proposal_id: ProposalId,
-        batch: BatchPair,
-    ) -> Option<BatchPair> {
-        self.proposed_batches.insert(proposal_id, batch)
+    pub fn add_open_proposal(&mut self, proposal: Proposal, batch: BatchPair) {
+        self.open_proposals
+            .insert(proposal.id.clone(), (proposal, batch));
     }
 
-    pub fn get_proposed_batch(&self, proposal_id: &ProposalId) -> Option<&BatchPair> {
-        self.proposed_batches.get(proposal_id)
+    pub fn get_open_proposal(&self, proposal_id: &ProposalId) -> Option<&(Proposal, BatchPair)> {
+        self.open_proposals.get(proposal_id)
     }
 
-    pub fn remove_proposed_batch(&mut self, proposal_id: &ProposalId) -> Option<BatchPair> {
-        self.proposed_batches.remove(&proposal_id)
+    pub fn remove_open_proposal(&mut self, proposal_id: &ProposalId) {
+        self.open_proposals.remove(proposal_id);
     }
 
     pub fn verify_batches(&self, batches: &[BatchPair]) -> Result<bool, ScabbardError> {

@@ -408,7 +408,7 @@ impl Service for Scabbard {
                 self.shared
                     .lock()
                     .map_err(|_| ServiceError::PoisonedLock("shared lock poisoned".into()))?
-                    .add_proposed_batch(proposal.id.clone(), batch);
+                    .add_open_proposal(proposal.clone(), batch);
 
                 self.consensus
                     .lock()

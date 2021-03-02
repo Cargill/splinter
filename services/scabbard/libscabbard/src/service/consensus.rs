@@ -200,7 +200,7 @@ impl ProposalManager for ScabbardProposalManager {
                 ..Default::default()
             };
 
-            shared.add_proposed_batch(proposal.id.clone(), batch.clone());
+            shared.add_open_proposal(proposal.clone(), batch.clone());
 
             // Send the proposal to the other services
             let mut proposed_batch = ProposedBatch::new();
@@ -245,11 +245,11 @@ impl ProposalManager for ScabbardProposalManager {
     }
 
     fn check_proposal(&self, id: &ProposalId) -> Result<(), ProposalManagerError> {
-        let batch = self
+        let (proposal, batch) = self
             .shared
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?
-            .get_proposed_batch(id)
+            .get_open_proposal(id)
             .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?
             .clone();
 
@@ -260,7 +260,7 @@ impl ProposalManager for ScabbardProposalManager {
             .prepare_change(batch)
             .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
 
-        if hash.as_bytes() != id.as_ref() {
+        if hash.as_bytes() != proposal.summary {
             warn!("Hash mismatch: expected {} but was {}", id, hash);
 
             self.proposal_update_sender
@@ -285,9 +285,7 @@ impl ProposalManager for ScabbardProposalManager {
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?;
 
-        shared
-            .remove_proposed_batch(id)
-            .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?;
+        shared.remove_open_proposal(id);
 
         self.state
             .lock()
@@ -309,9 +307,7 @@ impl ProposalManager for ScabbardProposalManager {
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?;
 
-        shared
-            .remove_proposed_batch(id)
-            .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?;
+        shared.remove_open_proposal(id);
 
         self.state
             .lock()
