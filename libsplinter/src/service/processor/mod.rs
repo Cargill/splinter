@@ -168,7 +168,7 @@ impl ServiceProcessor {
         self.do_start().map(|(do_shutdown, join_handles)| {
             Box::from(ServiceProcessorShutdownHandle {
                 signal_shutdown: do_shutdown,
-                join_handles: Some(join_handles),
+                join_handles,
             }) as Box<dyn ShutdownHandle>
         })
     }
@@ -523,7 +523,7 @@ impl ShutdownHandle {
 #[cfg(feature = "shutdown")]
 struct ServiceProcessorShutdownHandle {
     signal_shutdown: Box<dyn Fn() -> Result<(), ServiceProcessorError> + Send>,
-    join_handles: Option<JoinHandles<Result<(), ServiceProcessorError>>>,
+    join_handles: JoinHandles<Result<(), ServiceProcessorError>>,
 }
 
 #[cfg(feature = "shutdown")]
@@ -534,23 +534,21 @@ impl ShutdownHandle for ServiceProcessorShutdownHandle {
         }
     }
 
-    fn wait_for_shutdown(&mut self) -> Result<(), crate::error::InternalError> {
-        if let Some(join_handles) = self.join_handles.take() {
-            match join_handles.join_all() {
-                Ok(results) => {
-                    results
-                        .into_iter()
-                        .filter(Result::is_err)
-                        .map(Result::unwrap_err)
-                        .for_each(|err| {
-                            error!("{}", err);
-                        });
-                }
-                Err(_) => {
-                    return Err(crate::error::InternalError::with_message(
-                        "Unable to join service processor threads".into(),
-                    ));
-                }
+    fn wait_for_shutdown(self: Box<Self>) -> Result<(), crate::error::InternalError> {
+        match self.join_handles.join_all() {
+            Ok(results) => {
+                results
+                    .into_iter()
+                    .filter(Result::is_err)
+                    .map(Result::unwrap_err)
+                    .for_each(|err| {
+                        error!("{}", err);
+                    });
+            }
+            Err(_) => {
+                return Err(crate::error::InternalError::with_message(
+                    "Unable to join service processor threads".into(),
+                ));
             }
         }
 

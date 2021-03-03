@@ -66,9 +66,9 @@ impl ShutdownHandle for Network {
         }
     }
 
-    fn wait_for_shutdown(&mut self) -> Result<(), InternalError> {
-        for node in self.nodes.iter_mut() {
-            node.wait_for_shutdown()?;
+    fn wait_for_shutdown(self: Box<Self>) -> Result<(), InternalError> {
+        for node in self.nodes.into_iter() {
+            Box::new(node).wait_for_shutdown()?;
         }
 
         Ok(())

@@ -39,7 +39,7 @@ pub trait ShutdownHandle {
     ///
     /// For components with threads, the threads should be joined during the call to
     /// `wait_for_shutdown`.
-    fn wait_for_shutdown(&mut self) -> Result<(), InternalError>;
+    fn wait_for_shutdown(self: Box<Self>) -> Result<(), InternalError>;
 }
 
 /// Calls `signal_shutdown` and `wait_for_shutdown` on the provided `ShutdownHandle`s.
@@ -53,7 +53,7 @@ pub fn shutdown(mut handles: Vec<Box<dyn ShutdownHandle>>) -> Result<(), Interna
     }
 
     let mut errors: Vec<InternalError> = Vec::new();
-    for handle in handles.iter_mut() {
+    for handle in handles.into_iter() {
         if let Err(err) = handle.wait_for_shutdown() {
             errors.push(err);
         }
