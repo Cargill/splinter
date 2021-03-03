@@ -14,8 +14,6 @@
 
 //! Contains the implementation of `Network`.
 
-use std::time::Duration;
-
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::threading::shutdown::ShutdownHandle;
 use splinterd::node::{Node, NodeBuilder, RestApiVariant};
@@ -68,9 +66,9 @@ impl ShutdownHandle for Network {
         }
     }
 
-    fn wait_for_shutdown(&mut self, timeout: Duration) -> Result<(), InternalError> {
+    fn wait_for_shutdown(&mut self) -> Result<(), InternalError> {
         for node in self.nodes.iter_mut() {
-            node.wait_for_shutdown(timeout)?;
+            node.wait_for_shutdown()?;
         }
 
         Ok(())
