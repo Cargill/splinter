@@ -29,6 +29,8 @@ pub use builder::ConnectionManagerBuilder;
 pub use error::{AuthorizerError, ConnectionManagerError};
 pub use notification::ConnectionManagerNotification;
 
+use crate::error::InternalError;
+use crate::threading::lifecycle::ShutdownHandle;
 use crate::threading::pacemaker;
 use crate::transport::matrix::{ConnectionMatrixLifeCycle, ConnectionMatrixSender};
 use crate::transport::{ConnectError, Connection, Transport};
@@ -176,29 +178,6 @@ impl ConnectionManager {
     pub fn connector(&self) -> Connector {
         Connector {
             sender: self.sender.clone(),
-        }
-    }
-
-    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
-        ShutdownSignaler {
-            sender: self.sender.clone(),
-            pacemaker_shutdown_signaler: self.pacemaker.shutdown_signaler(),
-        }
-    }
-
-    /// Blocks until a connection manager has shutdown. This is meant to allow
-    /// a separate process to shutdown the connection manager via the shutdown
-    /// handle while another process waits for that process to complete.
-    pub fn await_shutdown(self) {
-        debug!("Shutting down connection manager pacemaker...");
-        self.pacemaker.await_shutdown();
-        debug!("Shutting down connection manager pacemaker (complete)");
-
-        if let Err(err) = self.join_handle.join() {
-            error!(
-                "Connection manager thread did not shutdown correctly: {:?}",
-                err
-            );
         }
     }
 }
@@ -401,21 +380,26 @@ impl Connector {
     }
 }
 
-/// Sends a shutdown signal to the connection manager.
-#[derive(Clone)]
-pub struct ShutdownSignaler {
-    sender: Sender<CmMessage>,
-    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
-}
-
-impl ShutdownSignaler {
-    /// Signal the connection manager to shutdown.
-    pub fn shutdown(self) {
-        self.pacemaker_shutdown_signaler.shutdown();
+impl ShutdownHandle for ConnectionManager {
+    fn signal_shutdown(&mut self) {
+        self.pacemaker.shutdown_signaler().shutdown();
 
         if self.sender.send(CmMessage::Shutdown).is_err() {
             warn!("Connection manager is no longer running");
         }
+    }
+
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        debug!("Shutting down connection manager pacemaker...");
+        self.pacemaker.await_shutdown();
+        debug!("Shutting down connection manager pacemaker (complete)");
+
+        self.join_handle.join().map_err(|err| {
+            InternalError::with_message(format!(
+                "Connection manager thread did not shutdown correctly: {:?}",
+                err
+            ))
+        })
     }
 }
 
@@ -911,7 +895,7 @@ mod tests {
         transport.listen("inproc://test").unwrap();
         let mesh = Mesh::new(512, 128);
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -919,8 +903,9 @@ mod tests {
             .start()
             .expect("Unable to start Connection Manager");
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     #[test]
@@ -933,7 +918,7 @@ mod tests {
         });
 
         let mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -947,8 +932,9 @@ mod tests {
             .request_connection("inproc://test", "test_id")
             .expect("A connection could not be created");
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     /// Test that adding the same connection twice is an idempotent operation
@@ -962,7 +948,7 @@ mod tests {
         });
 
         let mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -980,8 +966,9 @@ mod tests {
             .request_connection("inproc://test", "test_id")
             .expect("A connection could not be re-requested");
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     /// Test that heartbeats are correctly sent to inproc connections
@@ -997,7 +984,7 @@ mod tests {
             mesh_clone.add(conn, "test_id".to_string()).unwrap();
         });
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1020,8 +1007,9 @@ mod tests {
             NetworkMessageType::NETWORK_HEARTBEAT
         );
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     /// Test that heartbeats are correctly sent to tcp connections
@@ -1058,7 +1046,7 @@ mod tests {
 
         let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1091,8 +1079,9 @@ mod tests {
         // wait for completion
         rx.recv().expect("Did not receive completion signal");
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         auth_mgr.shutdown_and_await();
     }
 
@@ -1119,7 +1108,7 @@ mod tests {
 
         let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1169,8 +1158,9 @@ mod tests {
 
         tx.send(()).expect("Could not send completion signal");
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         auth_mgr.shutdown_and_await();
     }
 
@@ -1179,7 +1169,7 @@ mod tests {
         let transport = Box::new(TcpTransport::default());
         let mesh = Mesh::new(512, 128);
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1194,8 +1184,9 @@ mod tests {
             .expect("Unable to remove connection");
 
         assert_eq!(None, endpoint_removed);
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     /// test_reconnect_raw_tcp
@@ -1256,7 +1247,7 @@ mod tests {
 
         let auth_mgr = AuthorizationManager::new("test_identity".into())
             .expect("Unable to create authorization pool");
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh1.get_life_cycle())
             .with_matrix_sender(mesh1.get_sender())
@@ -1319,8 +1310,9 @@ mod tests {
 
         tx.send(()).expect("Could not send completion signal");
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         auth_mgr.shutdown_and_await();
     }
 
@@ -1349,7 +1341,7 @@ mod tests {
             // block until done
             conn_rx.recv().unwrap();
         });
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_identity")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1392,8 +1384,9 @@ mod tests {
         conn_tx.send(()).unwrap();
         jh.join().unwrap();
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     /// Test that an inbound tcp connection can be add and removed from the network.o
@@ -1429,7 +1422,7 @@ mod tests {
             mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(auth_mgr.authorization_connector()))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1472,8 +1465,9 @@ mod tests {
         conn_tx.send(()).unwrap();
         jh.join().unwrap();
 
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         auth_mgr.shutdown_and_await();
     }
 

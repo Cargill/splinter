@@ -6555,11 +6555,12 @@ mod tests {
         (mesh, cm, pm, peer_connector)
     }
 
-    fn shutdown(mut mesh: Mesh, cm: ConnectionManager, pm: PeerManager) {
+    fn shutdown(mut mesh: Mesh, mut cm: ConnectionManager, pm: PeerManager) {
         pm.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         pm.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }

@@ -944,7 +944,7 @@ mod tests {
         authorizers.add_authorizer("", authorization_manager.authorization_connector());
 
         let mut mesh = Mesh::new(2, 2);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(authorizers))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1132,8 +1132,9 @@ mod tests {
 
         peer_manager.shutdown_signaler().shutdown();
         peer_manager.await_shutdown();
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }

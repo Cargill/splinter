@@ -272,7 +272,7 @@ impl SplinterDaemon {
         authorizers.add_authorizer("inproc", inproc_authorizer);
         authorizers.add_authorizer("", authorization_manager.authorization_connector());
 
-        let connection_manager = ConnectionManager::builder()
+        let mut connection_manager = ConnectionManager::builder()
             .with_authorizer(Box::new(authorizers))
             .with_matrix_life_cycle(self.mesh.get_life_cycle())
             .with_matrix_sender(self.mesh.get_sender())
@@ -283,7 +283,6 @@ impl SplinterDaemon {
                 StartError::NetworkError(format!("Unable to start connection manager: {}", err))
             })?;
         let connection_connector = connection_manager.connector();
-        let connection_manager_shutdown = connection_manager.shutdown_signaler();
 
         let peer_manager = PeerManager::builder()
             .with_connector(connection_connector.clone())
@@ -795,8 +794,12 @@ impl SplinterDaemon {
         let _ = rest_api_join_handle.join();
         peer_manager_shutdown.shutdown();
         peer_manager.await_shutdown();
-        connection_manager_shutdown.shutdown();
-        connection_manager.await_shutdown();
+
+        connection_manager.signal_shutdown();
+        if let Err(err) = connection_manager.wait_for_shutdown() {
+            error!("Unable to cleanly shut down ConnectionManager: {}", err);
+        }
+
         self.mesh.signal_shutdown();
         if let Err(err) = self.mesh.clone().wait_for_shutdown() {
             error!("Unable to cleanly shut down Mesh: {}", err);

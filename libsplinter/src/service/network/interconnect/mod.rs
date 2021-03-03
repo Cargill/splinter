@@ -488,7 +488,7 @@ pub mod tests {
         let mut mesh1 = Mesh::new(512, 128);
         let mut mesh2 = Mesh::new(512, 128);
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test-service")))
             .with_matrix_life_cycle(mesh1.get_life_cycle())
             .with_matrix_sender(mesh1.get_sender())
@@ -581,8 +581,9 @@ pub mod tests {
         join_handle.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         dispatch_shutdown.shutdown();
         mesh1.signal_shutdown();
         mesh1.wait_for_shutdown().expect("Unable to shutdown mesh");
@@ -597,7 +598,7 @@ pub mod tests {
         let transport = Box::new(InprocTransport::default());
         let mut mesh = Mesh::new(512, 128);
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test-service")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -622,8 +623,9 @@ pub mod tests {
             .expect("Unable to build ServiceInterconnect");
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
         interconnect.shutdown_and_wait();

@@ -1510,7 +1510,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1553,9 +1553,10 @@ pub mod tests {
         );
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -1578,7 +1579,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("different_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1629,9 +1630,10 @@ pub mod tests {
             .is_empty());
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -1653,7 +1655,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1702,9 +1704,10 @@ pub mod tests {
         );
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -1724,7 +1727,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -1773,9 +1776,10 @@ pub mod tests {
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -1803,7 +1807,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new_multiple(&[
                 "test_peer",
                 "next_peer",
@@ -1876,9 +1880,10 @@ pub mod tests {
         );
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -1904,7 +1909,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new_multiple(&[
                 "test_peer",
                 "next_peer",
@@ -1974,9 +1979,10 @@ pub mod tests {
         assert!(peers.get_by_key("test_peer").is_some());
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2000,7 +2006,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -2059,9 +2065,10 @@ pub mod tests {
         assert_eq!(peer_list, Vec::<String>::new());
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2089,7 +2096,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -2161,9 +2168,10 @@ pub mod tests {
         assert_eq!(peer_list, Vec::<String>::new());
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2230,7 +2238,7 @@ pub mod tests {
             mesh2.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new_multiple(&[
                 "test_peer",
                 "test_peer",
@@ -2304,9 +2312,10 @@ pub mod tests {
 
         jh.join().unwrap();
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh1.signal_shutdown();
         mesh1.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2317,7 +2326,7 @@ pub mod tests {
         let transport = Box::new(InprocTransport::default());
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -2335,9 +2344,10 @@ pub mod tests {
             .expect("Cannot start peer_manager");
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2353,7 +2363,7 @@ pub mod tests {
         let mut listener = transport.listen("inproc://test").unwrap();
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -2410,9 +2420,10 @@ pub mod tests {
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2425,7 +2436,7 @@ pub mod tests {
         let transport = Box::new(InprocTransport::default());
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -2443,9 +2454,10 @@ pub mod tests {
         peer_manager.start().expect("Cannot start peer_manager");
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
@@ -2465,7 +2477,7 @@ pub mod tests {
         });
 
         let mut mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -2505,9 +2517,10 @@ pub mod tests {
         );
 
         peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
+        cm.signal_shutdown();
         peer_manager.await_shutdown();
-        cm.await_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
