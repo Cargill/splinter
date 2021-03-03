@@ -3129,6 +3129,7 @@ mod tests {
     use crate::protos::network::{NetworkMessage, NetworkMessageType};
     use crate::protos::prelude::*;
     use crate::service::{ServiceMessageContext, ServiceSendError};
+    use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{
         inproc::InprocTransport, ConnectError, Connection, DisconnectError, RecvError, SendError,
         Transport,
@@ -3226,13 +3227,14 @@ mod tests {
 
         // start up thread for other node
         std::thread::spawn(move || {
-            let mesh = Mesh::new(2, 2);
+            let mut mesh = Mesh::new(2, 2);
             let conn = other_listener.accept().unwrap();
             mesh.add(conn, "my_peer_id".to_string()).unwrap();
 
             handle_auth(&mesh, "my_peer_id", "other-node");
 
-            mesh.shutdown_signaler().shutdown();
+            mesh.signal_shutdown();
+            mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
         shared
@@ -5396,13 +5398,14 @@ mod tests {
         payload.set_circuit_disband_request(request);
         // start up thread for other node
         std::thread::spawn(move || {
-            let mesh = Mesh::new(2, 2);
+            let mut mesh = Mesh::new(2, 2);
             let conn = other_listener.accept().unwrap();
             mesh.add(conn, "my_peer_id".to_string()).unwrap();
 
             handle_auth(&mesh, "my_peer_id", "node_b");
 
-            mesh.shutdown_signaler().shutdown();
+            mesh.signal_shutdown();
+            mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
         // Set `node_b` to peered
@@ -6552,12 +6555,13 @@ mod tests {
         (mesh, cm, pm, peer_connector)
     }
 
-    fn shutdown(mesh: Mesh, cm: ConnectionManager, pm: PeerManager) {
+    fn shutdown(mut mesh: Mesh, cm: ConnectionManager, pm: PeerManager) {
         pm.shutdown_signaler().shutdown();
         cm.shutdown_signaler().shutdown();
         pm.await_shutdown();
         cm.await_shutdown();
-        mesh.shutdown_signaler().shutdown();
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
 
     fn setup_orchestrator() -> ServiceOrchestrator {

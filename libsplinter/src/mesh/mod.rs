@@ -62,17 +62,16 @@ use std::io;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use crate::collections::BiHashMap;
+use crate::error::InternalError;
 use crate::mesh::control::Control;
 pub use crate::mesh::control::{AddError, RemoveError};
 use crate::mesh::incoming::Incoming;
-pub use crate::mesh::matrix::{
-    MeshLifeCycle, MeshMatrixReceiver, MeshMatrixSender, MeshMatrixShutdown,
-};
+pub use crate::mesh::matrix::{MeshLifeCycle, MeshMatrixReceiver, MeshMatrixSender};
 use crate::mesh::outgoing::Outgoing;
-pub use crate::transport::matrix::ConnectionMatrixEnvelope as Envelope;
-
-use crate::collections::BiHashMap;
 use crate::mesh::reactor::Reactor;
+use crate::threading::lifecycle::ShutdownHandle;
+pub use crate::transport::matrix::ConnectionMatrixEnvelope as Envelope;
 use crate::transport::Connection;
 
 /// Wrapper around payload to include connection id
@@ -96,17 +95,6 @@ impl MeshState {
     }
 }
 
-#[derive(Clone)]
-pub struct MeshShutdownSignaler {
-    ctrl: Control,
-}
-
-impl MeshShutdownSignaler {
-    pub fn shutdown(&self) {
-        self.ctrl.shutdown();
-    }
-}
-
 /// A Connection reactor
 #[derive(Clone)]
 pub struct Mesh {
@@ -124,12 +112,6 @@ impl Mesh {
             state: Arc::new(RwLock::new(MeshState::new())),
             incoming,
             ctrl,
-        }
-    }
-
-    pub fn shutdown_signaler(&self) -> MeshShutdownSignaler {
-        MeshShutdownSignaler {
-            ctrl: self.ctrl.clone(),
         }
     }
 
@@ -252,10 +234,35 @@ impl Mesh {
         let mesh = self.clone();
         MeshMatrixReceiver::new(mesh)
     }
+}
 
-    /// Creates a MeshMatrixShutdown to shutdown this Mesh instance
-    pub fn get_matrix_shutdown(&self) -> MeshMatrixShutdown {
-        MeshMatrixShutdown::new(self.shutdown_signaler())
+impl ShutdownHandle for Mesh {
+    fn signal_shutdown(&mut self) {
+        self.ctrl.shutdown();
+    }
+
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        debug!("Waiting for Mesh to shutdown");
+        loop {
+            match self.recv() {
+                Ok(_) => debug!("Ignoring message"),
+                Err(err) => match err {
+                    RecvError::Shutdown => {
+                        debug!("Mesh has shutdown");
+                        return Ok(());
+                    }
+                    RecvError::PoisonedLock => {
+                        return Err(InternalError::with_message(
+                            "Mesh lock was poisoned while waiting for shutdown".to_string(),
+                        ))
+                    }
+                    RecvError::Disconnected => {
+                        debug!("Mesh has disconnected");
+                        return Ok(());
+                    }
+                },
+            }
+        }
     }
 }
 
@@ -566,7 +573,7 @@ mod tests {
         let mut listener = assert_ok(transport.listen("127.0.0.1:0"));
         let endpoint = listener.endpoint();
 
-        let mesh = Mesh::new(1, 1);
+        let mut mesh = Mesh::new(1, 1);
 
         let (client_ready_tx, client_ready_rx) = channel();
         let (server_ready_tx, server_ready_rx) = channel();
@@ -608,8 +615,7 @@ mod tests {
             InternalEnvelope::Shutdown => panic!("Should not have received shutdown"),
         }
 
-        let signaler = mesh.shutdown_signaler();
-        signaler.shutdown();
+        mesh.signal_shutdown();
 
         let envelope = assert_ok(incoming.recv());
         match envelope {

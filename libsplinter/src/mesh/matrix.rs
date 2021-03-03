@@ -13,12 +13,10 @@
 // limitations under the License.
 use std::time::Duration;
 
-use crate::mesh::MeshShutdownSignaler;
 use crate::transport::matrix::{
     ConnectionMatrixAddError, ConnectionMatrixEnvelope, ConnectionMatrixLifeCycle,
     ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixRecvTimeoutError,
     ConnectionMatrixRemoveError, ConnectionMatrixSendError, ConnectionMatrixSender,
-    ConnectionMatrixShutdown,
 };
 use crate::transport::Connection;
 
@@ -131,23 +129,5 @@ impl ConnectionMatrixReceiver for MeshMatrixReceiver {
                 RecvTimeoutError::Shutdown => Err(ConnectionMatrixRecvTimeoutError::Shutdown),
             },
         }
-    }
-}
-
-#[derive(Clone)]
-/// Mesh specific implementation of MatrixShutdown
-pub struct MeshMatrixShutdown {
-    shutdown_signaler: MeshShutdownSignaler,
-}
-
-impl MeshMatrixShutdown {
-    pub fn new(shutdown_signaler: MeshShutdownSignaler) -> Self {
-        MeshMatrixShutdown { shutdown_signaler }
-    }
-}
-
-impl ConnectionMatrixShutdown for MeshMatrixShutdown {
-    fn shutdown(&self) {
-        self.shutdown_signaler.shutdown();
     }
 }

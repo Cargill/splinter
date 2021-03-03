@@ -909,6 +909,7 @@ mod tests {
     use crate::peer::PeerManager;
     use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
+    use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Transport};
 
     /// Test that a circuit creation creates the correct connections and sends the appropriate
@@ -942,7 +943,7 @@ mod tests {
         authorizers.add_authorizer("inproc", inproc_authorizer);
         authorizers.add_authorizer("", authorization_manager.authorization_connector());
 
-        let mesh = Mesh::new(2, 2);
+        let mut mesh = Mesh::new(2, 2);
         let cm = ConnectionManager::builder()
             .with_authorizer(Box::new(authorizers))
             .with_matrix_life_cycle(mesh.get_life_cycle())
@@ -1133,7 +1134,8 @@ mod tests {
         peer_manager.await_shutdown();
         cm.shutdown_signaler().shutdown();
         cm.await_shutdown();
-        mesh.shutdown_signaler().shutdown();
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
 
     fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {

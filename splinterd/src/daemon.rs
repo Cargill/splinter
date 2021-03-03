@@ -797,7 +797,10 @@ impl SplinterDaemon {
         peer_manager.await_shutdown();
         connection_manager_shutdown.shutdown();
         connection_manager.await_shutdown();
-        self.mesh.shutdown_signaler().shutdown();
+        self.mesh.signal_shutdown();
+        if let Err(err) = self.mesh.clone().wait_for_shutdown() {
+            error!("Unable to cleanly shut down Mesh: {}", err);
+        }
         Ok(())
     }
 
