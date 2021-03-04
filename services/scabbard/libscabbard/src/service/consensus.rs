@@ -66,6 +66,7 @@ impl ScabbardConsensusManager {
 
         let proposal_manager = ScabbardProposalManager::new(
             service_id.clone(),
+            version,
             proposal_update_tx.clone(),
             shared.clone(),
             state,
@@ -149,6 +150,7 @@ impl ScabbardConsensusManager {
 
 pub struct ScabbardProposalManager {
     service_id: String,
+    version: ScabbardVersion,
     proposal_update_sender: Sender<ProposalUpdate>,
     shared: Arc<Mutex<ScabbardShared>>,
     state: Arc<Mutex<ScabbardState>>,
@@ -157,12 +159,14 @@ pub struct ScabbardProposalManager {
 impl ScabbardProposalManager {
     pub fn new(
         service_id: String,
+        version: ScabbardVersion,
         proposal_update_sender: Sender<ProposalUpdate>,
         shared: Arc<Mutex<ScabbardShared>>,
         state: Arc<Mutex<ScabbardState>>,
     ) -> Self {
         ScabbardProposalManager {
             service_id,
+            version,
             proposal_update_sender,
             shared,
             state,
@@ -193,14 +197,18 @@ impl ProposalManager for ScabbardProposalManager {
 
             // Intentionally leaving out the previous_id and proposal_height fields, since this
             // service and two phase consensus don't use them. This means the proposal ID can just
-            // be the summary.
+            // be the summary (in v1) or batch ID (in v2).
+            let id = match self.version {
+                ScabbardVersion::V1 => expected_hash.as_bytes().into(),
+                ScabbardVersion::V2 => batch.batch().header_signature().as_bytes().into(),
+            };
             let proposal = Proposal {
-                id: expected_hash.as_bytes().into(),
+                id,
                 summary: expected_hash.as_bytes().into(),
                 ..Default::default()
             };
 
-            shared.add_proposed_batch(proposal.id.clone(), batch.clone());
+            shared.add_open_proposal(proposal.clone(), batch.clone());
 
             // Send the proposal to the other services
             let mut proposed_batch = ProposedBatch::new();
@@ -245,11 +253,11 @@ impl ProposalManager for ScabbardProposalManager {
     }
 
     fn check_proposal(&self, id: &ProposalId) -> Result<(), ProposalManagerError> {
-        let batch = self
+        let (proposal, batch) = self
             .shared
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?
-            .get_proposed_batch(id)
+            .get_open_proposal(id)
             .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?
             .clone();
 
@@ -260,7 +268,7 @@ impl ProposalManager for ScabbardProposalManager {
             .prepare_change(batch)
             .map_err(|err| ProposalManagerError::Internal(Box::new(err)))?;
 
-        if hash.as_bytes() != id.as_ref() {
+        if hash.as_bytes() != proposal.summary {
             warn!("Hash mismatch: expected {} but was {}", id, hash);
 
             self.proposal_update_sender
@@ -285,9 +293,7 @@ impl ProposalManager for ScabbardProposalManager {
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?;
 
-        shared
-            .remove_proposed_batch(id)
-            .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?;
+        shared.remove_open_proposal(id);
 
         self.state
             .lock()
@@ -309,9 +315,7 @@ impl ProposalManager for ScabbardProposalManager {
             .lock()
             .map_err(|_| ProposalManagerError::Internal(Box::new(ScabbardError::LockPoisoned)))?;
 
-        shared
-            .remove_proposed_batch(id)
-            .ok_or_else(|| ProposalManagerError::UnknownProposal(id.clone()))?;
+        shared.remove_open_proposal(id);
 
         self.state
             .lock()

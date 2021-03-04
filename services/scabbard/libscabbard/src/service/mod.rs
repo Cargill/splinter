@@ -65,7 +65,7 @@ const SERVICE_TYPE: &str = "scabbard";
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
 /// Specifies the version of scabbard to use.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum ScabbardVersion {
     V1,
     V2,
@@ -315,7 +315,7 @@ impl Service for Scabbard {
         consensus.replace(
             ScabbardConsensusManager::new(
                 self.service_id().into(),
-                self.version.clone(),
+                self.version,
                 self.shared.clone(),
                 self.state.clone(),
                 self.coordinator_timeout,
@@ -408,7 +408,7 @@ impl Service for Scabbard {
                 self.shared
                     .lock()
                     .map_err(|_| ServiceError::PoisonedLock("shared lock poisoned".into()))?
-                    .add_proposed_batch(proposal.id.clone(), batch);
+                    .add_open_proposal(proposal.clone(), batch);
 
                 self.consensus
                     .lock()
