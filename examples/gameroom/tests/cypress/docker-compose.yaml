@@ -111,6 +111,10 @@ services:
         then
           splinter admin keygen cypress -d /keys
         fi && \
+        if [ ! -f /etc/splinter/allow_keys ]
+        then
+          echo $$(cat /keys/cypress.pub) > /etc/splinter/allow_keys
+        fi && \
         until PGPASSWORD=admin psql -h splinterd-db-node -U admin -d splinter -c '\q'; do
           >&2 echo \"Database is unavailable - sleeping\"
           sleep 1
