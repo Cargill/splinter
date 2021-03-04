@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Integration tests for creating a circuit between multiple nodes.
+//! Integration tests for the lifecycle of a circuit between multiple nodes.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -28,8 +28,8 @@ use splinter::admin::messages::{
     RouteType, SplinterNode, SplinterNodeBuilder, SplinterService, SplinterServiceBuilder, Vote,
 };
 use splinter::protos::admin::{
-    CircuitCreateRequest, CircuitManagementPayload, CircuitManagementPayload_Action,
-    CircuitManagementPayload_Header,
+    CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
+    CircuitManagementPayload_Action, CircuitManagementPayload_Header,
 };
 use splinterd::node::RestApiVariant;
 
@@ -122,6 +122,44 @@ fn make_circuit_proposal_vote_payload(
     payload
         .write_to_bytes()
         .expect("Unable to get bytes from CircuitProposalVote payload")
+}
+
+/// Makes the `CircuitManagementPayload` to disband a circuit and returns the bytes of this
+/// payload
+fn make_circuit_disband_payload(circuit_id: &str, requester: &str, signer: &dyn Signer) -> Vec<u8> {
+    let public_key = signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .into_bytes();
+    let mut disband_request = CircuitDisbandRequest::new();
+    disband_request.set_circuit_id(circuit_id.to_string());
+
+    let serialized_action = disband_request
+        .write_to_bytes()
+        .expect("Unable to serialize `CircuitDisbandRequest`");
+    let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)
+        .expect("Unable to hash `CircuitDisbandRequest` bytes");
+
+    let mut header = CircuitManagementPayload_Header::new();
+    header.set_action(CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST);
+    header.set_requester(public_key);
+    header.set_payload_sha512(hashed_bytes.to_vec());
+    header.set_requester_node_id(requester.to_string());
+
+    let mut payload = CircuitManagementPayload::new();
+    payload.set_signature(
+        signer
+            .sign(&payload.header)
+            .expect("Unable to sign `CircuitManagmentPayload` header")
+            .take_bytes(),
+    );
+    payload.set_circuit_disband_request(disband_request);
+    payload
+        .set_header(Message::write_to_bytes(&header).expect("Unable to serialize payload header"));
+    // Return the bytes of the payload
+    payload
+        .write_to_bytes()
+        .expect("Unable to get bytes from `CircuitDisbandRequest` payload")
 }
 
 /// Creates the `CircuitCreateRequest` for the `CircuitManagementPayload` to propose a circuit
