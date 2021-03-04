@@ -27,6 +27,7 @@ pub enum ScabbardError {
     BatchVerificationFailed(Box<dyn Error + Send>),
     ConsensusFailed(ScabbardConsensusManagerError),
     InitializationFailed(Box<dyn Error + Send>),
+    Internal(Box<dyn Error + Send>),
     LockPoisoned,
     MessageTypeUnset,
     NotConnected,
@@ -39,6 +40,7 @@ impl Error for ScabbardError {
             ScabbardError::BatchVerificationFailed(err) => Some(&**err),
             ScabbardError::ConsensusFailed(err) => Some(err),
             ScabbardError::InitializationFailed(err) => Some(&**err),
+            ScabbardError::Internal(err) => Some(&**err),
             ScabbardError::LockPoisoned => None,
             ScabbardError::MessageTypeUnset => None,
             ScabbardError::NotConnected => None,
@@ -56,6 +58,9 @@ impl std::fmt::Display for ScabbardError {
             ScabbardError::ConsensusFailed(err) => write!(f, "scabbard consensus failed: {}", err),
             ScabbardError::InitializationFailed(err) => {
                 write!(f, "failed to initialize scabbard: {}", err)
+            }
+            ScabbardError::Internal(err) => {
+                write!(f, "internal error occurred: {}", err)
             }
             ScabbardError::LockPoisoned => write!(f, "internal lock poisoned"),
             ScabbardError::MessageTypeUnset => write!(f, "received message with unset type"),

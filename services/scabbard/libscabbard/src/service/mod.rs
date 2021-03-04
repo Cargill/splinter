@@ -41,7 +41,10 @@ use splinter::{
         ServiceStartError, ServiceStopError,
     },
 };
-use transact::{protocol::batch::BatchPair, protos::FromBytes};
+use transact::{
+    protocol::batch::BatchPair,
+    protos::{FromBytes, IntoBytes},
+};
 
 use super::hex::to_hex;
 use super::protos::scabbard::{ScabbardMessage, ScabbardMessage_Type};
@@ -61,11 +64,32 @@ const SERVICE_TYPE: &str = "scabbard";
 
 const DEFAULT_COORDINATOR_TIMEOUT: u64 = 30; // 30 seconds
 
+/// Specifies the version of scabbard to use.
+#[derive(Clone)]
+pub enum ScabbardVersion {
+    V1,
+    V2,
+}
+
+impl TryFrom<Option<&str>> for ScabbardVersion {
+    type Error = String;
+
+    fn try_from(str_opt: Option<&str>) -> Result<Self, Self::Error> {
+        match str_opt {
+            Some("1") => Ok(Self::V1),
+            Some("2") => Ok(Self::V2),
+            Some(v) => Err(format!("Unsupported scabbard version: {}", v)),
+            None => Ok(Self::V1),
+        }
+    }
+}
+
 /// A service for running Sawtooth Sabre smart contracts with two-phase commit consensus.
 #[derive(Clone)]
 pub struct Scabbard {
     circuit_id: String,
     service_id: String,
+    version: ScabbardVersion,
     shared: Arc<Mutex<ScabbardShared>>,
     state: Arc<Mutex<ScabbardState>>,
     /// The coordinator timeout for the two-phase commit consensus engine
@@ -79,6 +103,8 @@ impl Scabbard {
     pub fn new(
         service_id: String,
         circuit_id: &str,
+        // The protocol version for scabbard
+        version: ScabbardVersion,
         // List of other scabbard services on the same circuit that this service shares state with
         peer_services: HashSet<String>,
         // The directory in which to create sabre's LMDB database
@@ -96,7 +122,13 @@ impl Scabbard {
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
     ) -> Result<Self, ScabbardError> {
-        let shared = ScabbardShared::new(VecDeque::new(), None, peer_services, signature_verifier);
+        let shared = ScabbardShared::new(
+            VecDeque::new(),
+            None,
+            peer_services,
+            service_id.clone(),
+            signature_verifier,
+        );
 
         let (state_db_path, receipt_db_path) =
             compute_db_paths(&service_id, circuit_id, state_db_dir, receipt_db_dir)?;
@@ -115,6 +147,7 @@ impl Scabbard {
         Ok(Scabbard {
             circuit_id: circuit_id.to_string(),
             service_id,
+            version,
             shared: Arc::new(Mutex::new(shared)),
             state: Arc::new(Mutex::new(state)),
             coordinator_timeout,
@@ -173,7 +206,32 @@ impl Scabbard {
                     .add_batch(&batch.batch().header_signature());
 
                 link.push_str(&format!("{},", batch.batch().header_signature()));
-                shared.add_batch_to_queue(batch);
+
+                match self.version {
+                    ScabbardVersion::V1 => shared.add_batch_to_queue(batch),
+                    ScabbardVersion::V2 => {
+                        if shared.is_coordinator() {
+                            shared.add_batch_to_queue(batch);
+                        } else {
+                            let batch_bytes = batch
+                                .into_bytes()
+                                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+
+                            let mut msg = ScabbardMessage::new();
+                            msg.set_message_type(ScabbardMessage_Type::NEW_BATCH);
+                            msg.set_new_batch(batch_bytes);
+                            let msg_bytes = msg
+                                .write_to_bytes()
+                                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+
+                            shared
+                                .network_sender()
+                                .ok_or(ScabbardError::NotConnected)?
+                                .send(shared.coordinator_service_id(), msg_bytes.as_slice())
+                                .map_err(|err| ScabbardError::Internal(Box::new(err)))?;
+                        }
+                    }
+                }
             }
 
             // Remove trailing comma
@@ -257,6 +315,7 @@ impl Service for Scabbard {
         consensus.replace(
             ScabbardConsensusManager::new(
                 self.service_id().into(),
+                self.version.clone(),
                 self.shared.clone(),
                 self.state.clone(),
                 self.coordinator_timeout,
@@ -362,6 +421,30 @@ impl Service for Scabbard {
                     ))
                     .map_err(|err| ServiceError::UnableToHandleMessage(Box::new(err)))
             }
+            ScabbardMessage_Type::NEW_BATCH => {
+                match self.version {
+                    ScabbardVersion::V1 => {
+                        warn!("Scabbard V1 does not accept NEW_BATCH messages");
+                    }
+                    ScabbardVersion::V2 => {
+                        let mut shared = self.shared.lock().map_err(|_| {
+                            ServiceError::PoisonedLock("shared lock poisoned".into())
+                        })?;
+
+                        if shared.is_coordinator() {
+                            let batch =
+                                BatchPair::from_bytes(message.get_new_batch()).map_err(|err| {
+                                    ServiceError::UnableToHandleMessage(Box::new(err))
+                                })?;
+                            shared.add_batch_to_queue(batch);
+                        } else {
+                            warn!("Ignoring new batch; this service is not the coordinator");
+                        }
+                    }
+                }
+
+                Ok(())
+            }
             ScabbardMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 ScabbardError::MessageTypeUnset,
             ))),
@@ -408,6 +491,7 @@ pub mod tests {
         let service = Scabbard::new(
             "new_scabbard".into(),
             "test_circuit",
+            ScabbardVersion::V1,
             HashSet::new(),
             Path::new("/tmp"),
             1024 * 1024,
@@ -429,6 +513,7 @@ pub mod tests {
         let mut service = Scabbard::new(
             "thread_cleanup".into(),
             "test_circuit",
+            ScabbardVersion::V1,
             HashSet::new(),
             Path::new("/tmp"),
             1024 * 1024,
@@ -450,6 +535,7 @@ pub mod tests {
         let mut service = Scabbard::new(
             "connect_and_disconnect".into(),
             "test_circuit",
+            ScabbardVersion::V1,
             HashSet::new(),
             Path::new("/tmp"),
             1024 * 1024,

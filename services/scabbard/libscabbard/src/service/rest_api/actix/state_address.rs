@@ -105,7 +105,7 @@ mod tests {
         service::Service,
     };
 
-    use crate::service::{compute_db_paths, state::ScabbardState, Scabbard};
+    use crate::service::{compute_db_paths, state::ScabbardState, Scabbard, ScabbardVersion};
 
     const MOCK_CIRCUIT_ID: &str = "abcde-01234";
     const MOCK_SERVICE_ID: &str = "ABCD";
@@ -164,6 +164,7 @@ mod tests {
         let scabbard = Scabbard::new(
             MOCK_SERVICE_ID.into(),
             MOCK_CIRCUIT_ID,
+            ScabbardVersion::V1,
             Default::default(),
             paths.temp_dir.path(),
             TEMP_DB_SIZE,
