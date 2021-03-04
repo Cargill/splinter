@@ -66,6 +66,7 @@ impl ScabbardConsensusManager {
 
         let proposal_manager = ScabbardProposalManager::new(
             service_id.clone(),
+            version,
             proposal_update_tx.clone(),
             shared.clone(),
             state,
@@ -149,6 +150,7 @@ impl ScabbardConsensusManager {
 
 pub struct ScabbardProposalManager {
     service_id: String,
+    version: ScabbardVersion,
     proposal_update_sender: Sender<ProposalUpdate>,
     shared: Arc<Mutex<ScabbardShared>>,
     state: Arc<Mutex<ScabbardState>>,
@@ -157,12 +159,14 @@ pub struct ScabbardProposalManager {
 impl ScabbardProposalManager {
     pub fn new(
         service_id: String,
+        version: ScabbardVersion,
         proposal_update_sender: Sender<ProposalUpdate>,
         shared: Arc<Mutex<ScabbardShared>>,
         state: Arc<Mutex<ScabbardState>>,
     ) -> Self {
         ScabbardProposalManager {
             service_id,
+            version,
             proposal_update_sender,
             shared,
             state,
