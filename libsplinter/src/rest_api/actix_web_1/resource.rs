@@ -93,13 +93,13 @@ struct ResourceMethod {
 
 /// `Resource` represents a RESTful endpoint.
 ///
-/// ```ignore
-/// use splinter::rest_api::{Resource, Method};
+/// ```
 /// use actix_web::HttpResponse;
 /// use futures::IntoFuture;
+/// use splinter::rest_api::{Resource, Method, auth::authorization::Permission};
 ///
 /// Resource::build("/index")
-///     .add_method(Method::Get, |r, p| {
+///     .add_method(Method::Get, Permission::AllowUnauthenticated, |r, p| {
 ///         Box::new(
 ///             HttpResponse::Ok()
 ///                 .body("Hello, World")
@@ -181,10 +181,10 @@ impl Resource {
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// use splinter::rest_api::{Resource, Method, Continuation};
+    /// ```
     /// use actix_web::{HttpRequest, HttpResponse};
     /// use futures::IntoFuture;
+    /// use splinter::rest_api::{Resource, Method, Continuation, auth::authorization::Permission};
     ///
     /// Resource::build("/index")
     ///     .add_request_guard(|r: &HttpRequest| {
@@ -196,7 +196,7 @@ impl Resource {
     ///             Continuation::Continue
     ///         }
     ///     })
-    ///     .add_method(Method::Get, |r, p| {
+    ///     .add_method(Method::Get, Permission::AllowUnauthenticated, |r, p| {
     ///         Box::new(
     ///             HttpResponse::Ok()
     ///                 .body("Hello, World")

@@ -19,10 +19,14 @@
 //! Below is an example of a `struct` that implements `ResouceProvider` and then passes its resources
 //! to a running instance of `RestApi`.
 //!
-//! ```ignore
-//! use splinter::rest_api::{Resource, Method, RestApiBuilder, RestResourceProvider};
+//! ```
 //! use actix_web::HttpResponse;
+//! use cylinder::{VerifierFactory, secp256k1::Secp256k1Context};
 //! use futures::IntoFuture;
+//! use splinter::rest_api::{
+//!     AuthConfig, Resource, Method, RestApiBuilder, RestResourceProvider,
+//!     auth::authorization::Permission,
+//! };
 //!
 //! struct IndexResource {
 //!     pub name: String
@@ -32,12 +36,16 @@
 //!     fn resources(&self) -> Vec<Resource> {
 //!         let name = self.name.clone();
 //!
-//!         vec![Resource::build("/index").add_method(Method::Get, move |r, p| {
-//!             Box::new(
-//!                 HttpResponse::Ok()
-//!                 .body(format!("Hello, I am {}", name))
-//!                 .into_future())
-//!         })]
+//!         vec![Resource::build("/index").add_method(
+//!             Method::Get,
+//!             Permission::AllowUnauthenticated,
+//!             move |r, p| {
+//!                 Box::new(
+//!                     HttpResponse::Ok()
+//!                     .body(format!("Hello, I am {}", name))
+//!                     .into_future())
+//!             },
+//!         )]
 //!     }
 //! }
 //!
@@ -51,6 +59,9 @@
 //! RestApiBuilder::new()
 //!     .add_resources(index_resource.resources())
 //!     .with_bind(bind)
+//!     .with_auth_configs(vec![AuthConfig::Cylinder{
+//!         verifier: Secp256k1Context::new().new_verifier(),
+//!     }])
 //!     .build()
 //!     .unwrap()
 //!     .run();

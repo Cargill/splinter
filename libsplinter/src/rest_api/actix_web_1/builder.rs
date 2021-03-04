@@ -347,14 +347,6 @@ mod test {
 
         /// Clones implementation for `IdentityProvider`. The implementation of the `Clone` trait for
         /// `Box<dyn IdentityProvider>` calls this method.
-        ///
-        /// # Example
-        ///
-        ///```ignore
-        ///  fn clone_box(&self) -> Box<dyn IdentityProvider> {
-        ///     Box::new(self.clone())
-        ///  }
-        ///```
         fn clone_box(&self) -> Box<dyn IdentityProvider> {
             Box::new(self.clone())
         }
