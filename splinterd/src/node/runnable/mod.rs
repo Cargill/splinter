@@ -100,7 +100,7 @@ impl RunnableNode {
         };
 
         Ok(Node {
-            rest_api_variant: Some(rest_api_variant),
+            rest_api_variant,
             rest_api_port,
         })
     }

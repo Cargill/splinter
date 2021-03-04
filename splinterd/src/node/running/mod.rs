@@ -29,7 +29,7 @@ pub(super) enum NodeRestApiVariant {
 
 /// A running instance of a Splinter node.
 pub struct Node {
-    pub(super) rest_api_variant: Option<NodeRestApiVariant>,
+    pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
 }
 
@@ -48,17 +48,14 @@ impl Node {
 
 impl ShutdownHandle for Node {
     fn signal_shutdown(&mut self) {
-        match self.rest_api_variant.as_mut() {
-            Some(NodeRestApiVariant::ActixWeb3(rest_api)) => {
-                rest_api.signal_shutdown();
-            }
-            Some(_) | None => {}
+        if let NodeRestApiVariant::ActixWeb3(ref mut rest_api) = self.rest_api_variant {
+            rest_api.signal_shutdown();
         }
     }
 
-    fn wait_for_shutdown(mut self) -> Result<(), InternalError> {
-        match self.rest_api_variant.take() {
-            Some(NodeRestApiVariant::ActixWeb1(shutdown_handle, join_handle)) => {
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        match self.rest_api_variant {
+            NodeRestApiVariant::ActixWeb1(shutdown_handle, join_handle) => {
                 shutdown_handle
                     .shutdown()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
@@ -69,13 +66,10 @@ impl ShutdownHandle for Node {
                 })?;
                 Ok(())
             }
-            Some(NodeRestApiVariant::ActixWeb3(rest_api)) => {
+            NodeRestApiVariant::ActixWeb3(rest_api) => {
                 rest_api.wait_for_shutdown()?;
                 Ok(())
             }
-            None => Err(InternalError::with_message(
-                "wait_for_shutdown() called on already shutdown Node".to_string(),
-            )),
         }
     }
 }
