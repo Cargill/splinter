@@ -156,7 +156,7 @@ impl ShutdownHandle for RestApi {
         self.shutdown_future = Some(Box::pin(self.server.stop(true)));
     }
 
-    fn wait_for_shutdown(&mut self) -> Result<(), InternalError> {
+    fn wait_for_shutdown(mut self) -> Result<(), InternalError> {
         match (self.shutdown_future.take(), self.join_handle.take()) {
             (Some(f), Some(join_handle)) => {
                 block_on(f);

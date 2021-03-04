@@ -80,6 +80,8 @@ use splinter::rest_api::{
 use splinter::service;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
+#[cfg(feature = "shutdown")]
+use splinter::threading::shutdown::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
     Incoming, ListenError, Listener, Transport,
@@ -458,11 +460,12 @@ impl SplinterDaemon {
             )
         })?;
         #[cfg(feature = "shutdown")]
-        let orchestator_shutdown_handle = orchestrator.take_shutdown_handle().ok_or_else(|| {
-            StartError::OrchestratorError(
-                "Orchestrator shutdown handle was taken more than once".into(),
-            )
-        })?;
+        let mut orchestator_shutdown_handle =
+            orchestrator.take_shutdown_handle().ok_or_else(|| {
+                StartError::OrchestratorError(
+                    "Orchestrator shutdown handle was taken more than once".into(),
+                )
+            })?;
 
         let (registry, registry_shutdown) = create_registry(
             &self.state_dir,
@@ -749,7 +752,7 @@ impl SplinterDaemon {
         }
 
         #[cfg(feature = "health-service")]
-        let health_service_shutdown_handle = {
+        let mut health_service_shutdown_handle = {
             let health_service = HealthService::new(&self.node_id);
             rest_api_builder = rest_api_builder.add_resources(health_service.resources());
 
@@ -762,7 +765,7 @@ impl SplinterDaemon {
         let (admin_shutdown_handle, service_processor_join_handle) =
             Self::start_admin_service(admin_connection, admin_service)?;
         #[cfg(feature = "shutdown")]
-        let admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
+        let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
         let (shutdown_tx, shutdown_rx) = channel();
         ctrlc::set_handler(move || {
@@ -781,13 +784,23 @@ impl SplinterDaemon {
         running.store(false, Ordering::SeqCst);
 
         #[cfg(feature = "shutdown")]
-        if let Err(err) = splinter::threading::shutdown::shutdown(vec![
-            admin_shutdown_handle,
-            orchestator_shutdown_handle,
+        {
+            admin_shutdown_handle.signal_shutdown();
+            orchestator_shutdown_handle.signal_shutdown();
             #[cfg(feature = "health-service")]
-            health_service_shutdown_handle,
-        ]) {
-            error!("Unable to cleanly shut down components: {}", err);
+            health_service_shutdown_handle.signal_shutdown();
+
+            if let Err(err) = admin_shutdown_handle.wait_for_shutdown() {
+                error!("Unable to cleanly shut down Admin service: {}", err);
+            }
+
+            if let Err(err) = orchestator_shutdown_handle.wait_for_shutdown() {
+                error!("Unable to cleanly shut down Orchestrator service: {}", err);
+            }
+            #[cfg(feature = "health-service")]
+            if let Err(err) = health_service_shutdown_handle.wait_for_shutdown() {
+                error!("Unable to cleanly shut down Health service: {}", err);
+            }
         }
 
         #[cfg(not(feature = "shutdown"))]
@@ -947,7 +960,7 @@ impl SplinterDaemon {
     fn start_admin_service(
         connection: Box<dyn Connection>,
         admin_service: AdminService,
-    ) -> Result<Box<dyn splinter::threading::shutdown::ShutdownHandle>, StartError> {
+    ) -> Result<service::ServiceProcessorShutdownHandle, StartError> {
         let mut admin_service_processor = service::ServiceProcessor::new(
             connection,
             "admin".into(),
@@ -981,7 +994,7 @@ impl SplinterDaemon {
 fn start_health_service(
     connection: Box<dyn Connection>,
     health_service: HealthService,
-) -> Result<Box<dyn splinter::threading::shutdown::ShutdownHandle>, StartError> {
+) -> Result<service::ServiceProcessorShutdownHandle, StartError> {
     let mut health_service_processor = service::ServiceProcessor::new(
         connection,
         "health".into(),

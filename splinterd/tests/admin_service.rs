@@ -14,5 +14,8 @@
 
 //! Splinter integration tests.
 
-mod admin;
+// macros_use must come before any modules that make use of the macro
+#[macro_use]
 mod framework;
+
+mod admin;

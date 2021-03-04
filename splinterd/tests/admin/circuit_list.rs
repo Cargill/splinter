@@ -15,7 +15,6 @@
 //! A framework for running a network of Splinter nodes in a single process, usually for
 //! integration testing purposes.
 
-use splinter::threading::shutdown::shutdown;
 use splinterd::node::RestApiVariant;
 
 use crate::framework::network::Network;
@@ -34,7 +33,7 @@ fn single_node_network(rest_api_variant: RestApiVariant) {
     let list_slice = client.list_circuits(None).unwrap();
     assert_eq!(list_slice.data, vec![]);
 
-    shutdown(vec![Box::new(network)]).unwrap();
+    shutdown!(network).unwrap();
 }
 
 /// Executes the single node network test with Actix Web 1.
