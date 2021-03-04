@@ -17,3 +17,6 @@
 
 #[cfg(feature = "node")]
 pub mod network;
+#[macro_use]
+#[cfg(feature = "node")]
+pub mod shutdown;
