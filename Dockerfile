@@ -51,7 +51,7 @@ ARG REPO_VERSION
 ARG CARGO_ARGS
 RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
 RUN sed -i -e "0,/readme.*$/ s/readme.*$/readme\ =\ \"\/build\/README.md\"/" Cargo.toml
-RUN cargo deb
+RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
 
 RUN mv /build/target/debian/transact-cli*.deb /tmp
 
@@ -63,6 +63,9 @@ RUN git rev-parse HEAD > /commit-hash
 # -------------=== transact-cli docker build ===-------------
 
 FROM ubuntu:bionic
+
+ARG CARGO_ARGS
+RUN echo "CARGO_ARGS = '$CARGO_ARGS'" > CARGO_ARGS
 
 COPY --from=builder /tmp/transact-cli*.deb /tmp/
 COPY --from=builder /commit-hash /commit-hash
