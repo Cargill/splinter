@@ -515,7 +515,10 @@ impl SplinterDaemon {
             CircuitResourceProvider::new(self.node_id.to_string(), admin_service_store);
 
         #[cfg(not(feature = "https-bind"))]
-        let bind = &self.rest_api_endpoint;
+        let bind = self
+            .rest_api_endpoint
+            .strip_prefix("http://")
+            .unwrap_or(&self.rest_api_endpoint);
 
         #[cfg(feature = "https-bind")]
         let bind = self.build_rest_api_bind()?;
