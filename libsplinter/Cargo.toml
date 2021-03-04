@@ -36,6 +36,7 @@ actix-web-actors = { version = "1.0", optional = true }
 actix-web-3 = { package = "actix-web", version = "3", optional = true, features = ["openssl"] }
 atomicwrites = "0.2"
 awc = { version = "0.2", optional = true }
+base64 = { version = "0.12", optional = true }
 bcrypt = {version = "0.6", optional = true}
 byteorder = "1"
 crossbeam-channel = "0.3"
@@ -141,7 +142,7 @@ biome = []
 biome-credentials = ["bcrypt", "biome"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
-biome-profile = ["biome"]
+biome-profile = ["biome", "base64"]
 circuit-abandon = []
 circuit-disband = []
 circuit-purge = []

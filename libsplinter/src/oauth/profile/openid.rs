@@ -14,6 +14,7 @@
 
 //! A profile provider that looks up OpenID profile information
 
+use base64::encode;
 use reqwest::{blocking::Client, StatusCode};
 use serde::Deserialize;
 
@@ -55,10 +56,35 @@ impl ProfileProvider for OpenIdProfileProvider {
             }
         }
 
-        let user_profile = response
+        let mut user_profile = response
             .json::<OpenIdProfileResponse>()
             .map_err(|_| InternalError::with_message("Received unexpected response body".into()))?;
 
+        // If azure openid is being used for authentication make a call to the
+        // microsoft graph api endpoint with the access token to retrieve the
+        // binary data for the authenticated user's profile photo
+        if self.userinfo_endpoint.contains("graph.microsoft.com") {
+            let picture_response = match Client::builder()
+                .build()
+                .map_err(|err| InternalError::from_source(err.into()))?
+                .get("https://graph.microsoft.com/beta/me/photo/$value")
+                .header("Authorization", format!("Bearer {}", access_token))
+                .send()
+            {
+                Ok(image) => match image.bytes() {
+                    Ok(image_data) => Some(encode(image_data.to_vec())),
+                    Err(_) => {
+                        warn!("Failed to get bytes from microsoft graph HTTP response");
+                        Some("".into())
+                    }
+                },
+                Err(_) => {
+                    warn!("Failed to get user profile picture from microsoft graph API");
+                    Some("".into())
+                }
+            };
+            user_profile.picture = picture_response;
+        }
         Ok(Some(Profile::from(user_profile)))
     }
 
