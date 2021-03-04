@@ -16,11 +16,24 @@ use std::io::Write;
 
 use diesel::{
     backend::Backend,
-    deserialize::{self, FromSql},
-    expression::{helper_types::AsExprOf, AsExpression},
-    serialize::{self, Output, ToSql},
-    sql_types::SmallInt,
+    deserialize::FromSqlRow,
+    expression::{bound::Bound, AsExpression},
+    query_builder::QueryId,
+    serialize::{self, IsNull, Output, ToSql},
+    sql_types::{HasSqlType, NotNull, Nullable, SingleValue},
+    Queryable,
 };
+
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
+use diesel::{
+    deserialize::{self, FromSql},
+    row::Row,
+};
+
+#[cfg(feature = "postgres")]
+use diesel::pg::Pg;
+#[cfg(feature = "sqlite")]
+use diesel::sqlite::Sqlite;
 
 use super::schema::{assignments, identities, role_permissions, roles};
 
@@ -41,50 +54,155 @@ pub(super) struct RolePermissionModel {
     pub permission: String,
 }
 
-#[repr(i16)]
-#[derive(Debug, Copy, Clone, PartialEq, FromSqlRow)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub(super) enum IdentityModelType {
-    Key = 1,
-    User = 2,
+    Key,
+    User,
 }
 
-impl<DB> ToSql<SmallInt, DB> for IdentityModelType
-where
-    DB: Backend,
-    i16: ToSql<SmallInt, DB>,
-{
+// This has to be pub, due to its use in the table macro execution for IdentityModel
+pub struct IdentityModelTypeMapping;
+
+impl QueryId for IdentityModelTypeMapping {
+    type QueryId = IdentityModelTypeMapping;
+    const HAS_STATIC_QUERY_ID: bool = true;
+}
+
+impl NotNull for IdentityModelTypeMapping {}
+
+impl SingleValue for IdentityModelTypeMapping {}
+
+impl AsExpression<IdentityModelTypeMapping> for IdentityModelType {
+    type Expression = Bound<IdentityModelTypeMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl AsExpression<Nullable<IdentityModelTypeMapping>> for IdentityModelType {
+    type Expression = Bound<Nullable<IdentityModelTypeMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<IdentityModelTypeMapping> for &'a IdentityModelType {
+    type Expression = Bound<IdentityModelTypeMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a> AsExpression<Nullable<IdentityModelTypeMapping>> for &'a IdentityModelType {
+    type Expression = Bound<Nullable<IdentityModelTypeMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<IdentityModelTypeMapping> for &'a &'b IdentityModelType {
+    type Expression = Bound<IdentityModelTypeMapping, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<'a, 'b> AsExpression<Nullable<IdentityModelTypeMapping>> for &'a &'b IdentityModelType {
+    type Expression = Bound<Nullable<IdentityModelTypeMapping>, Self>;
+
+    fn as_expression(self) -> Self::Expression {
+        Bound::new(self)
+    }
+}
+
+impl<DB: Backend> ToSql<IdentityModelTypeMapping, DB> for IdentityModelType {
     fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
-        (*self as i16).to_sql(out)
+        match self {
+            IdentityModelType::Key => out.write_all(b"key")?,
+            IdentityModelType::User => out.write_all(b"user")?,
+        }
+        Ok(IsNull::No)
     }
 }
 
-impl AsExpression<SmallInt> for IdentityModelType {
-    type Expression = AsExprOf<i16, SmallInt>;
-
-    fn as_expression(self) -> Self::Expression {
-        <i16 as AsExpression<SmallInt>>::as_expression(self as i16)
-    }
-}
-
-impl<'a> AsExpression<SmallInt> for &'a IdentityModelType {
-    type Expression = AsExprOf<i16, SmallInt>;
-
-    fn as_expression(self) -> Self::Expression {
-        <i16 as AsExpression<SmallInt>>::as_expression((*self) as i16)
-    }
-}
-
-impl<DB> FromSql<SmallInt, DB> for IdentityModelType
+impl<DB> ToSql<Nullable<IdentityModelTypeMapping>, DB> for IdentityModelType
 where
     DB: Backend,
-    i16: FromSql<SmallInt, DB>,
+    Self: ToSql<IdentityModelTypeMapping, DB>,
 {
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
-        match i16::from_sql(bytes)? {
-            1 => Ok(IdentityModelType::Key),
-            2 => Ok(IdentityModelType::User),
-            int => Err(format!("Invalid identity type {}", int).into()),
+    fn to_sql<W: ::std::io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        ToSql::<IdentityModelTypeMapping, DB>::to_sql(self, out)
+    }
+}
+
+impl<DB> Queryable<IdentityModelTypeMapping, DB> for IdentityModelType
+where
+    DB: Backend + HasSqlType<IdentityModelTypeMapping>,
+    IdentityModelType: FromSql<IdentityModelTypeMapping, DB>,
+{
+    type Row = Self;
+
+    fn build(row: Self::Row) -> Self {
+        row
+    }
+}
+
+impl<DB> FromSqlRow<IdentityModelTypeMapping, DB> for IdentityModelType
+where
+    DB: Backend,
+    IdentityModelType: FromSql<IdentityModelTypeMapping, DB>,
+{
+    fn build_from_row<T: Row<DB>>(row: &mut T) -> deserialize::Result<Self> {
+        FromSql::<IdentityModelTypeMapping, DB>::from_sql(row.take())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl FromSql<IdentityModelTypeMapping, Pg> for IdentityModelType {
+    fn from_sql(bytes: Option<&<Pg as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes {
+            Some(b"key") => Ok(IdentityModelType::Key),
+            Some(b"user") => Ok(IdentityModelType::User),
+            Some(v) => Err(format!(
+                "Unrecognized enum variant: '{}'",
+                String::from_utf8_lossy(v)
+            )
+            .into()),
+            None => Err("Unexpected null for non-null column".into()),
         }
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl HasSqlType<IdentityModelTypeMapping> for Pg {
+    fn metadata(lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        lookup.lookup_type("identity_type")
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl FromSql<IdentityModelTypeMapping, Sqlite> for IdentityModelType {
+    fn from_sql(bytes: Option<&<Sqlite as Backend>::RawValue>) -> deserialize::Result<Self> {
+        match bytes.map(|v| v.read_blob()) {
+            Some(b"key") => Ok(IdentityModelType::Key),
+            Some(b"user") => Ok(IdentityModelType::User),
+            Some(blob) => {
+                Err(format!("Unexpected variant: {}", String::from_utf8_lossy(blob)).into())
+            }
+            None => Err("Unexpected null for non-null column".into()),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl HasSqlType<IdentityModelTypeMapping> for Sqlite {
+    fn metadata(_lookup: &Self::MetadataLookup) -> Self::TypeMetadata {
+        diesel::sqlite::SqliteType::Text
     }
 }
 

@@ -32,7 +32,9 @@ allow_tables_to_appear_in_same_query!(roles, role_permissions);
 table! {
     identities (identity) {
         identity -> Text,
-        identity_type -> SmallInt,
+        identity_type ->
+            // the macro output can't find this type if it isn't fully qualified.
+            crate::rest_api::auth::authorization::rbac::store::diesel::models::IdentityModelTypeMapping,
     }
 }
 

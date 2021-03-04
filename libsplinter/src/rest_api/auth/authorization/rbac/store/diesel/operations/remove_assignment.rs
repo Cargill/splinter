@@ -15,7 +15,10 @@
 use diesel::{dsl::delete, prelude::*};
 
 use crate::rest_api::auth::authorization::rbac::store::{
-    diesel::schema::{assignments, identities},
+    diesel::{
+        models::IdentityModelTypeMapping,
+        schema::{assignments, identities},
+    },
     Identity, RoleBasedAuthorizationStoreError,
 };
 
@@ -33,6 +36,7 @@ impl<'a, C> RoleBasedAuthorizationStoreRemoveAssignment
 where
     C: diesel::Connection,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+    <C as diesel::Connection>::Backend: diesel::types::HasSqlType<IdentityModelTypeMapping>,
 {
     fn remove_assignment(
         &self,
