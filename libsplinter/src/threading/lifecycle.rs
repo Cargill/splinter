@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Traits and functions related to shutting down components.
+//! Traits and functions related to the lifecycle of components.
 
 use crate::error::InternalError;
 

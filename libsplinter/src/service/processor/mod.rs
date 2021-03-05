@@ -37,7 +37,7 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::error::ServiceProcessorError;
 use crate::service::{Service, ServiceMessageContext};
 #[cfg(feature = "shutdown")]
-use crate::threading::shutdown::ShutdownHandle;
+use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
 

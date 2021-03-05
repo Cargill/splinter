@@ -15,7 +15,7 @@
 //! Contains the implementation of `Network`.
 
 use splinter::error::{InternalError, InvalidArgumentError};
-use splinter::threading::shutdown::ShutdownHandle;
+use splinter::threading::lifecycle::ShutdownHandle;
 use splinterd::node::{Node, NodeBuilder, RestApiVariant};
 
 pub struct Network {

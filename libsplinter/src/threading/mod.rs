@@ -15,6 +15,6 @@
 //! This module will contain components that will be used to support different threading models
 
 pub(crate) mod error;
-pub(crate) mod pacemaker;
 #[cfg(feature = "shutdown")]
-pub mod shutdown;
+pub mod lifecycle;
+pub(crate) mod pacemaker;

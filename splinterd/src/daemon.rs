@@ -81,7 +81,7 @@ use splinter::service;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
 #[cfg(feature = "shutdown")]
-use splinter::threading::shutdown::ShutdownHandle;
+use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
     Incoming, ListenError, Listener, Transport,
