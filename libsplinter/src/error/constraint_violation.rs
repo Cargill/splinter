@@ -23,7 +23,7 @@ use std::fmt;
 /// violated. For example, if an operation tries to insert an entry that would
 /// cause a duplicate in a unique column, the ConstraintViolationType::Unique
 /// should be used.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ConstraintViolationType {
     Unique,
     ForeignKey,
@@ -105,6 +105,11 @@ impl ConstraintViolationError {
             violation_type,
             source: Some(source),
         }
+    }
+
+    /// Returns the violation type that triggered the error.
+    pub fn violation_type(&self) -> &ConstraintViolationType {
+        &self.violation_type
     }
 }
 
