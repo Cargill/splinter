@@ -18,7 +18,6 @@ use protobuf::{self, RepeatedField};
 use std::convert::TryInto;
 
 use crate::admin::store;
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::store::EventType;
 use crate::hex::{as_hex, deserialize_hex};
 use crate::protos::admin::{self, CircuitCreateRequest};
@@ -749,7 +748,6 @@ impl AdminServiceEvent {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&store::AdminServiceEvent> for AdminServiceEvent {
     fn from(event_entry: &store::AdminServiceEvent) -> Self {
         let admin_proposal = CircuitProposal::from(event_entry.proposal().clone());

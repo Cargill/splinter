@@ -21,13 +21,15 @@ use diesel::{dsl::insert_into, prelude::*};
 use super::AdminServiceStoreOperations;
 
 use crate::admin::service::messages;
+#[cfg(feature = "sqlite")]
+use crate::admin::store::diesel::models::AdminServiceEventModel;
 use crate::admin::store::{
     diesel::{
         models::{
             AdminEventCircuitProposalModel, AdminEventProposedCircuitModel,
             AdminEventProposedNodeEndpointModel, AdminEventProposedNodeModel,
             AdminEventProposedServiceArgumentModel, AdminEventProposedServiceModel,
-            AdminEventVoteRecordModel, AdminServiceEventModel, NewAdminServiceEventModel,
+            AdminEventVoteRecordModel, NewAdminServiceEventModel,
         },
         schema::{
             admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
@@ -47,7 +49,7 @@ pub(in crate::admin::store::diesel) trait AdminServiceStoreAddEventOperation {
     ) -> Result<AdminServiceEvent, AdminServiceStoreError>;
 }
 
-#[cfg(feature = "admin-service-event-store-postgres")]
+#[cfg(feature = "postgres")]
 impl<'a> AdminServiceStoreAddEventOperation
     for AdminServiceStoreOperations<'a, diesel::pg::PgConnection>
 {

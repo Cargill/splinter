@@ -486,7 +486,8 @@ impl SplinterDaemon {
             .with_admin_key_verifier(Box::new(registry.clone_box_as_reader()))
             .with_key_permission_manager(Box::new(AllowAllKeyPermissionManager))
             .with_coordinator_timeout(self.admin_timeout)
-            .with_routing_table_writer(routing_writer.clone());
+            .with_routing_table_writer(routing_writer.clone())
+            .with_admin_event_store(store_factory.get_admin_service_store());
 
         #[cfg(feature = "service-arg-validation")]
         {
@@ -495,12 +496,6 @@ impl SplinterDaemon {
             validators.insert("scabbard".into(), Box::new(ScabbardArgValidator));
 
             admin_service_builder = admin_service_builder.with_service_arg_validators(validators);
-        }
-
-        #[cfg(feature = "admin-service-event-store")]
-        {
-            admin_service_builder = admin_service_builder
-                .with_admin_event_store(store_factory.get_admin_service_store());
         }
 
         let admin_service = admin_service_builder.build().map_err(|err| {

@@ -104,8 +104,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "admin-service-client",
-    "admin-service-event-store",
-    "admin-service-event-store-postgres",
     "authorization",
     "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
@@ -131,8 +129,6 @@ benchmark = []
 
 admin-service = []
 admin-service-client = []
-admin-service-event-store = ["admin-service"]
-admin-service-event-store-postgres = ["postgres", "admin-service-event-store"]
 authorization-handler-allow-keys = ["authorization"]
 authorization-handler-maintenance = ["authorization"]
 authorization = ["rest-api"]

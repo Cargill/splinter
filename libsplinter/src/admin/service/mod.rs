@@ -15,8 +15,6 @@
 mod builder;
 mod consensus;
 pub(crate) mod error;
-#[cfg(not(feature = "admin-service-event-store"))]
-mod mailbox;
 pub(crate) mod messages;
 pub(super) mod proposal_store;
 mod shared;
@@ -27,8 +25,6 @@ use std::collections::HashMap;
 use std::sync::{mpsc::channel, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
-#[cfg(not(feature = "admin-service-event-store"))]
-use std::time::SystemTime;
 
 use cylinder::Verifier as SignatureVerifier;
 use openssl::hash::{hash, MessageDigest};
@@ -66,14 +62,6 @@ pub use self::error::AdminSubscriberError;
 pub use self::shared::AdminServiceStatus;
 
 pub trait AdminServiceEventSubscriber: Send {
-    #[cfg(not(feature = "admin-service-event-store"))]
-    fn handle_event(
-        &self,
-        admin_service_event: &messages::AdminServiceEvent,
-        timestamp: &SystemTime,
-    ) -> Result<(), AdminSubscriberError>;
-
-    #[cfg(feature = "admin-service-event-store")]
     fn handle_event(
         &self,
         admin_service_event: &store::AdminServiceEvent,
@@ -92,14 +80,6 @@ pub trait AdminCommands: Send + Sync {
         subscriber: Box<dyn AdminServiceEventSubscriber>,
     ) -> Result<(), AdminServiceError>;
 
-    #[cfg(not(feature = "admin-service-event-store"))]
-    fn get_events_since(
-        &self,
-        since_timestamp: &SystemTime,
-        event_type: &str,
-    ) -> Result<Events, AdminServiceError>;
-
-    #[cfg(feature = "admin-service-event-store")]
     fn get_events_since(
         &self,
         since_event_id: &i64,
@@ -148,27 +128,10 @@ impl AdminKeyVerifier for Box<dyn RegistryReader> {
     }
 }
 
-#[cfg(not(feature = "admin-service-event-store"))]
-/// An iterator over AdminServiceEvents and the time that each occurred.
-pub struct Events {
-    inner: Box<dyn Iterator<Item = (SystemTime, messages::AdminServiceEvent)> + Send>,
-}
-
-#[cfg(not(feature = "admin-service-event-store"))]
-impl Iterator for Events {
-    type Item = (SystemTime, messages::AdminServiceEvent);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-#[cfg(feature = "admin-service-event-store")]
 pub struct Events {
     inner: Box<dyn ExactSizeIterator<Item = store::AdminServiceEvent> + Send>,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl Iterator for Events {
     type Item = store::AdminServiceEvent;
 
@@ -209,7 +172,7 @@ impl AdminService {
         // default value will be used (30 seconds).
         coordinator_timeout: Option<Duration>,
         routing_table_writer: Box<dyn RoutingTableWriter>,
-        #[cfg(feature = "admin-service-event-store")] event_store: Box<dyn AdminServiceStore>,
+        event_store: Box<dyn AdminServiceStore>,
     ) -> Result<Self, ServiceError> {
         let mut builder = builder::AdminServiceBuilder::new()
             .with_node_id(node_id.to_string())
@@ -219,7 +182,8 @@ impl AdminService {
             .with_signature_verifier(signature_verifier)
             .with_admin_key_verifier(key_verifier)
             .with_key_permission_manager(key_permission_manager)
-            .with_routing_table_writer(routing_table_writer);
+            .with_routing_table_writer(routing_table_writer)
+            .with_admin_event_store(event_store);
 
         if let Some(coordinator_timeout) = coordinator_timeout {
             builder = builder.with_coordinator_timeout(coordinator_timeout);
@@ -228,11 +192,6 @@ impl AdminService {
         #[cfg(feature = "service-arg-validation")]
         {
             builder = builder.with_service_arg_validators(service_arg_validators);
-        }
-
-        #[cfg(feature = "admin-service-event-store")]
-        {
-            builder = builder.with_admin_event_store(event_store);
         }
 
         builder
@@ -851,22 +810,6 @@ impl AdminCommands for AdminServiceCommands {
             })
     }
 
-    #[cfg(not(feature = "admin-service-event-store"))]
-    fn get_events_since(
-        &self,
-        since_timestamp: &SystemTime,
-        event_type: &str,
-    ) -> Result<Events, AdminServiceError> {
-        self.shared
-            .lock()
-            .map_err(|_| AdminServiceError::general_error("Admin shared lock was lock poisoned"))?
-            .get_events_since(since_timestamp, event_type)
-            .map_err(|err| {
-                AdminServiceError::general_error_with_source("Unable to get events", Box::new(err))
-            })
-    }
-
-    #[cfg(feature = "admin-service-event-store")]
     fn get_events_since(
         &self,
         since_event_id: &i64,
@@ -1045,7 +988,6 @@ mod tests {
         let table = RoutingTable::default();
         let writer: Box<dyn RoutingTableWriter> = Box::new(table.clone());
         let store = Box::new(DieselAdminServiceStore::new(pool));
-        #[cfg(feature = "admin-service-event-store")]
         let event_store = store.clone_boxed();
 
         let mut admin_service_builder = AdminServiceBuilder::new();
@@ -1058,12 +1000,8 @@ mod tests {
             .with_signature_verifier(signature_verifier)
             .with_admin_key_verifier(Box::new(MockAdminKeyVerifier))
             .with_key_permission_manager(Box::new(AllowAllKeyPermissionManager))
-            .with_routing_table_writer(writer);
-
-        #[cfg(feature = "admin-service-event-store")]
-        {
-            admin_service_builder = admin_service_builder.with_admin_event_store(event_store);
-        }
+            .with_routing_table_writer(writer)
+            .with_admin_event_store(event_store);
 
         let mut admin_service = admin_service_builder
             .build()

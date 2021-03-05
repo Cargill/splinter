@@ -27,16 +27,13 @@ mod schema;
 
 use diesel::r2d2::{ConnectionManager, Pool};
 
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::messages;
 use crate::admin::store::{
     error::AdminServiceStoreError, AdminServiceStore, Circuit, CircuitNode, CircuitPredicate,
     CircuitProposal, Service, ServiceId,
 };
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::store::{AdminServiceEvent, EventIter};
 use operations::add_circuit::AdminServiceStoreAddCircuitOperation as _;
-#[cfg(feature = "admin-service-event-store")]
 use operations::add_event::AdminServiceStoreAddEventOperation as _;
 use operations::add_proposal::AdminServiceStoreAddProposalOperation as _;
 use operations::get_circuit::AdminServiceStoreFetchCircuitOperation as _;
@@ -44,9 +41,7 @@ use operations::get_node::AdminServiceStoreFetchNodeOperation as _;
 use operations::get_proposal::AdminServiceStoreFetchProposalOperation as _;
 use operations::get_service::AdminServiceStoreFetchServiceOperation as _;
 use operations::list_circuits::AdminServiceStoreListCircuitsOperation as _;
-#[cfg(feature = "admin-service-event-store")]
 use operations::list_events_by_management_type_since::AdminServiceStoreListEventsByManagementTypeSinceOperation as _;
-#[cfg(feature = "admin-service-event-store")]
 use operations::list_events_since::AdminServiceStoreListEventsSinceOperation as _;
 use operations::list_nodes::AdminServiceStoreListNodesOperation as _;
 use operations::list_proposals::AdminServiceStoreListProposalsOperation as _;
@@ -176,7 +171,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
     }
 
-    #[cfg(feature = "admin-service-event-store-postgres")]
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
@@ -184,12 +178,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::pg::PgConnection> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
     }
 
-    #[cfg(feature = "admin-service-event-store-postgres")]
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
     }
 
-    #[cfg(feature = "admin-service-event-store-postgres")]
     fn list_events_by_management_type_since(
         &self,
         management_type: String,
@@ -288,7 +280,6 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_services(circuit_id)
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn add_event(
         &self,
         event: messages::AdminServiceEvent,
@@ -296,12 +287,10 @@ impl AdminServiceStore for DieselAdminServiceStore<diesel::sqlite::SqliteConnect
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).add_event(event)
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn list_events_since(&self, start: i64) -> Result<EventIter, AdminServiceStoreError> {
         AdminServiceStoreOperations::new(&*self.connection_pool.get()?).list_events_since(start)
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn list_events_by_management_type_since(
         &self,
         management_type: String,
@@ -326,7 +315,6 @@ pub mod tests {
         ServiceBuilder, Vote, VoteRecordBuilder,
     };
 
-    #[cfg(feature = "admin-service-event-store")]
     use crate::admin::store::{AdminServiceEventBuilder, EventType};
     use crate::hex::parse_hex;
     use crate::migrations::run_sqlite_migrations;
@@ -930,7 +918,6 @@ pub mod tests {
         assert!(nodes.next().is_none());
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     #[test]
     /// Verify that an event can be added to the store correctly and then returned by the store
     ///
@@ -958,7 +945,6 @@ pub mod tests {
         assert_eq!(events, vec![create_proposal_submitted_event(1, "test")],);
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     #[test]
     /// Verify that events can be added to the store correctly and then returned by the store
     ///
@@ -995,7 +981,6 @@ pub mod tests {
         );
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     #[test]
     /// Verify that events can be added to the store correctly and then returned by the store
     ///
@@ -1033,7 +1018,6 @@ pub mod tests {
         );
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     #[test]
     /// Verify that events can be added to the store correctly and then returned by the store with
     /// the correct `circuit_management_type`.
@@ -1068,7 +1052,6 @@ pub mod tests {
         assert_eq!(events, vec![create_circuit_ready_event(2, "not-test")],);
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     #[test]
     /// Verify that events can be added to the store correctly and then returned by the store with
     /// the correct `circuit_management_type`.
@@ -1103,7 +1086,6 @@ pub mod tests {
         assert_eq!(events, vec![create_circuit_ready_event(2, "not-test")],);
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     #[test]
     /// Verify that events can be added to the store correctly and then returned by the store with
     /// the correct `circuit_management_type`.
@@ -1370,7 +1352,6 @@ pub mod tests {
             .expect("Unable to build circuit")
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     // Creates a admin store `CircuitProposal` that is equivalent to the type of `CircuitProposal`
     // created from an admin::messages::CircuitProposal. Specifically, the `circuit_version`
     // is set to 1.
@@ -1488,7 +1469,6 @@ pub mod tests {
         ]
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn create_proposal_submitted_event(event_id: i64, management_type: &str) -> AdminServiceEvent {
         AdminServiceEventBuilder::new()
             .with_event_id(event_id)
@@ -1498,7 +1478,6 @@ pub mod tests {
             .expect("Unable to build AdminServiceEvent")
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn create_proposal_submitted_messages_event(
         management_type: &str,
     ) -> messages::AdminServiceEvent {
@@ -1507,7 +1486,6 @@ pub mod tests {
         ))
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn create_circuit_ready_event(event_id: i64, management_type: &str) -> AdminServiceEvent {
         AdminServiceEventBuilder::new()
             .with_event_id(event_id)
@@ -1517,14 +1495,12 @@ pub mod tests {
             .expect("Unable to build AdminServiceEvent")
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn create_circuit_ready_messages_event(management_type: &str) -> messages::AdminServiceEvent {
         messages::AdminServiceEvent::CircuitReady(messages::CircuitProposal::from(
             create_messages_proposal(management_type),
         ))
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn create_proposal_vote_event(event_id: i64, management_type: &str) -> AdminServiceEvent {
         let requester =
             &parse_hex("0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482")
@@ -1539,7 +1515,6 @@ pub mod tests {
             .expect("Unable to build AdminServiceEvent")
     }
 
-    #[cfg(feature = "admin-service-event-store")]
     fn create_proposal_vote_messages_event(management_type: &str) -> messages::AdminServiceEvent {
         let requester =
             &parse_hex("0283a14e0a17cb7f665311e9b5560f4cde2b502f17e2d03223e15d90d9318d7482")

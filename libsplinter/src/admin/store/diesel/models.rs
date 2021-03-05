@@ -27,9 +27,7 @@ use diesel::{
     sql_types::SmallInt,
 };
 
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::service::messages::{self, CreateCircuit};
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::store::diesel::schema::{
     admin_event_circuit_proposal, admin_event_proposed_circuit, admin_event_proposed_node,
     admin_event_proposed_node_endpoint, admin_event_proposed_service,
@@ -41,7 +39,6 @@ use crate::admin::store::diesel::schema::{
     vote_record,
 };
 use crate::admin::store::error::AdminServiceStoreError;
-#[cfg(feature = "admin-service-event-store")]
 use crate::admin::store::{AdminServiceEvent, AdminServiceEventBuilder, EventType};
 use crate::admin::store::{
     AuthorizationType, CircuitStatus, DurabilityType, PersistenceType, ProposalType, RouteType,
@@ -476,7 +473,6 @@ pub struct NodeEndpointModel {
     pub endpoint: String,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "admin_service_event"]
@@ -487,7 +483,6 @@ pub struct AdminServiceEventModel {
     pub data: Option<Vec<u8>>,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 #[derive(AsChangeset, Insertable, PartialEq, Debug)]
 #[table_name = "admin_service_event"]
 pub struct NewAdminServiceEventModel<'a> {
@@ -495,7 +490,6 @@ pub struct NewAdminServiceEventModel<'a> {
     pub data: Option<&'a [u8]>,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of a `CircuitProposal` from an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "admin_event_circuit_proposal"]
@@ -510,7 +504,6 @@ pub struct AdminEventCircuitProposalModel {
     pub requester_node_id: String,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<(i64, &messages::CircuitProposal)> for AdminEventCircuitProposalModel {
     fn from((event_id, proposal): (i64, &messages::CircuitProposal)) -> Self {
         AdminEventCircuitProposalModel {
@@ -524,7 +517,6 @@ impl From<(i64, &messages::CircuitProposal)> for AdminEventCircuitProposalModel 
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of a `CreateCircuit` from an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "admin_event_proposed_circuit"]
@@ -545,7 +537,6 @@ pub struct AdminEventProposedCircuitModel {
     pub circuit_status: CircuitStatusModel,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
     fn from((event_id, create_circuit): (i64, &CreateCircuit)) -> Self {
         let application_metadata = if create_circuit.application_metadata.is_empty() {
@@ -571,7 +562,6 @@ impl From<(i64, &CreateCircuit)> for AdminEventProposedCircuitModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of a `VoteRecord` from an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "admin_event_vote_record"]
@@ -585,7 +575,6 @@ pub struct AdminEventVoteRecordModel {
     pub position: i32,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl AdminEventVoteRecordModel {
     // Creates a list of `AdminEventVoteRecordModel` from a `CircuitProposal` associated with
     // an `AdminServiceEvent`
@@ -614,7 +603,6 @@ impl AdminEventVoteRecordModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
     type Error = InvalidStateError;
     fn try_from(
@@ -632,7 +620,6 @@ impl TryFrom<&AdminEventVoteRecordModel> for VoteRecord {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of a `AdminEventProposedNode` from an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "admin_event_proposed_node"]
@@ -644,7 +631,6 @@ pub struct AdminEventProposedNodeModel {
     pub position: i32,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl AdminEventProposedNodeModel {
     // Creates a list of `AdminEventProposedNodeModel` from a `CircuitProposal` associated with
     // an `AdminServiceEvent`
@@ -672,7 +658,6 @@ impl AdminEventProposedNodeModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of the endpoint values associated with a `ProposedNode` from an
 /// `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -686,7 +671,6 @@ pub struct AdminEventProposedNodeEndpointModel {
     pub position: i32,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl AdminEventProposedNodeEndpointModel {
     // Creates a list of `AdminEventProposedNodeEndpointModel` from a `CircuitProposal` associated
     // with an `AdminServiceEvent`
@@ -719,7 +703,6 @@ impl AdminEventProposedNodeEndpointModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of a `ProposedService` from an `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
 #[table_name = "admin_event_proposed_service"]
@@ -733,7 +716,6 @@ pub struct AdminEventProposedServiceModel {
     pub position: i32,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl AdminEventProposedServiceModel {
     // Creates a list of `AdminEventProposedServiceModel` from a `CircuitProposal` associated
     // with an `AdminServiceEvent`
@@ -773,7 +755,6 @@ impl AdminEventProposedServiceModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 /// Database model representation of the arguments associated with a `ProposedService` from an
 /// `AdminServiceEvent`
 #[derive(Debug, PartialEq, Associations, Identifiable, Insertable, Queryable, QueryableByName)]
@@ -788,7 +769,6 @@ pub struct AdminEventProposedServiceArgumentModel {
     pub position: i32,
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl AdminEventProposedServiceArgumentModel {
     // Creates a list of `AdminEventProposedServiceArgumentModel` from a `CircuitProposal` associated
     // with an `AdminServiceEvent`
@@ -828,7 +808,6 @@ impl AdminEventProposedServiceArgumentModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl<'a> From<&'a messages::AdminServiceEvent> for NewAdminServiceEventModel<'a> {
     fn from(event: &'a messages::AdminServiceEvent) -> Self {
         match event {
@@ -860,7 +839,6 @@ impl<'a> From<&'a messages::AdminServiceEvent> for NewAdminServiceEventModel<'a>
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl TryFrom<(AdminServiceEventModel, CircuitProposal)> for AdminServiceEvent {
     type Error = AdminServiceStoreError;
 
@@ -938,7 +916,6 @@ impl From<&Vote> for String {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::Vote> for String {
     fn from(variant: &messages::Vote) -> Self {
         match variant {
@@ -976,7 +953,6 @@ impl From<&ProposalType> for String {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::ProposalType> for String {
     fn from(variant: &messages::ProposalType) -> Self {
         match variant {
@@ -1011,7 +987,6 @@ impl From<&AuthorizationType> for String {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::AuthorizationType> for String {
     fn from(variant: &messages::AuthorizationType) -> Self {
         match variant {
@@ -1042,7 +1017,6 @@ impl From<&PersistenceType> for String {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::PersistenceType> for String {
     fn from(variant: &messages::PersistenceType) -> Self {
         match variant {
@@ -1073,7 +1047,6 @@ impl From<&DurabilityType> for String {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::DurabilityType> for String {
     fn from(variant: &messages::DurabilityType) -> Self {
         match variant {
@@ -1102,7 +1075,6 @@ impl From<&RouteType> for String {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::RouteType> for String {
     fn from(variant: &messages::RouteType) -> Self {
         match variant {
@@ -1129,7 +1101,6 @@ impl From<&CircuitStatus> for CircuitStatusModel {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&messages::CircuitStatus> for CircuitStatusModel {
     fn from(messages_status: &messages::CircuitStatus) -> Self {
         match *messages_status {
@@ -1150,7 +1121,6 @@ impl From<&CircuitStatusModel> for CircuitStatus {
     }
 }
 
-#[cfg(feature = "admin-service-event-store")]
 impl From<&CircuitStatusModel> for messages::CircuitStatus {
     fn from(status_model: &CircuitStatusModel) -> Self {
         match *status_model {

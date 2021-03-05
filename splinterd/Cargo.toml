@@ -86,7 +86,6 @@ experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "admin-service-event-store",
     "authorization",
     "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
@@ -105,11 +104,6 @@ experimental = [
     "ws-transport",
 ]
 
-admin-service-event-store = [
-  "splinter/admin-service-event-store",
-  "splinter/admin-service",
-  "splinter/admin-service-event-store-postgres",
-]
 authorization = [
     "health/authorization",
     "scabbard/authorization",
