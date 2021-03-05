@@ -119,7 +119,6 @@ experimental = [
     "role-based-authorization-store-postgres",
     "service-arg-validation",
     "service-network",
-    "shutdown",
     "ws-transport",
     "zmq-transport",
 ]
@@ -161,12 +160,11 @@ rest-api = [
     "percent-encoding",
 ]
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
-rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind", "shutdown"]
+rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
 role-based-authorization-store-postgres = ["authorization", "postgres"]
 service-arg-validation = []
 service-network = []
-shutdown = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]
 store-factory = []
 ws-transport = ["tungstenite"]

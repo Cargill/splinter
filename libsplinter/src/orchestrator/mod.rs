@@ -39,7 +39,6 @@ use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::{
     Service, ServiceFactory, ServiceMessageContext, StandardServiceNetworkRegistry,
 };
-#[cfg(feature = "shutdown")]
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 
@@ -127,12 +126,6 @@ impl ServiceOrchestrator {
             .map_err(|e| NewOrchestratorError(Box::new(e)))
     }
 
-    #[cfg(not(feature = "shutdown"))]
-    pub fn take_join_handles(&mut self) -> Option<JoinHandles<Result<(), OrchestratorError>>> {
-        self.join_handles.take()
-    }
-
-    #[cfg(feature = "shutdown")]
     pub fn take_shutdown_handle(&mut self) -> Option<ServiceOrchestratorShutdownHandle> {
         let join_handles = self.join_handles.take()?;
         Some(ServiceOrchestratorShutdownHandle {
@@ -344,14 +337,12 @@ impl<T> JoinHandles<T> {
     }
 }
 
-#[cfg(feature = "shutdown")]
 pub struct ServiceOrchestratorShutdownHandle {
     services: Arc<Mutex<HashMap<ServiceDefinition, ManagedService>>>,
     join_handles: Option<JoinHandles<Result<(), OrchestratorError>>>,
     running: Arc<AtomicBool>,
 }
 
-#[cfg(feature = "shutdown")]
 impl ShutdownHandle for ServiceOrchestratorShutdownHandle {
     fn signal_shutdown(&mut self) {
         match self.services.lock() {

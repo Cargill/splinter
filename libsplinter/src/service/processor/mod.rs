@@ -36,7 +36,6 @@ use crate::protos::circuit::{
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
 use crate::service::error::ServiceProcessorError;
 use crate::service::{Service, ServiceMessageContext};
-#[cfg(feature = "shutdown")]
 use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 use crate::{rwlock_read_unwrap, rwlock_write_unwrap};
@@ -141,25 +140,6 @@ impl ServiceProcessor {
         }
     }
 
-    #[cfg(not(feature = "shutdown"))]
-    /// Once the service processor is started it will handle incoming messages from the splinter
-    /// node and route it to a running service.
-    ///
-    /// Returns a ShutdownHandle and join_handles so the service can be properly shutdown.
-    pub fn start(
-        self,
-    ) -> Result<
-        (
-            ShutdownHandle,
-            JoinHandles<Result<(), ServiceProcessorError>>,
-        ),
-        ServiceProcessorError,
-    > {
-        self.do_start()
-            .map(|(do_shutdown, join_handles)| (ShutdownHandle { do_shutdown }, join_handles))
-    }
-
-    #[cfg(feature = "shutdown")]
     /// Once the service processor is started it will handle incoming messages from the splinter
     /// node and route it to a running service.
     ///
@@ -508,25 +488,11 @@ impl<T> JoinHandles<T> {
     }
 }
 
-#[cfg(not(feature = "shutdown"))]
-pub struct ShutdownHandle {
-    do_shutdown: Box<dyn Fn() -> Result<(), ServiceProcessorError> + Send>,
-}
-
-#[cfg(not(feature = "shutdown"))]
-impl ShutdownHandle {
-    pub fn shutdown(&self) -> Result<(), ServiceProcessorError> {
-        (*self.do_shutdown)()
-    }
-}
-
-#[cfg(feature = "shutdown")]
 pub struct ServiceProcessorShutdownHandle {
     signal_shutdown: Box<dyn Fn() -> Result<(), ServiceProcessorError> + Send>,
     join_handles: Option<JoinHandles<Result<(), ServiceProcessorError>>>,
 }
 
-#[cfg(feature = "shutdown")]
 impl ShutdownHandle for ServiceProcessorShutdownHandle {
     fn signal_shutdown(&mut self) {
         if let Err(err) = (*self.signal_shutdown)() {
@@ -718,30 +684,15 @@ pub mod tests {
                 let service = MockService::new();
                 processor.add_service(Box::new(service)).unwrap();
 
-                #[cfg(feature = "shutdown")]
                 let mut shutdown_handle = processor.start().unwrap();
-                #[cfg(not(feature = "shutdown"))]
-                let (shutdown_handle, join_handles) = processor.start().unwrap();
-
                 let _ = rx.recv().unwrap();
 
-                #[cfg(feature = "shutdown")]
                 shutdown_handle.signal_shutdown();
-                #[cfg(not(feature = "shutdown"))]
-                shutdown_handle
-                    .shutdown()
-                    .expect("unable to signal shutdown");
-
                 let _ = rx.recv().unwrap();
 
-                #[cfg(feature = "shutdown")]
                 shutdown_handle
                     .wait_for_shutdown()
                     .expect("Unable to cleanly shutdown");
-                #[cfg(not(feature = "shutdown"))]
-                join_handles
-                    .join_all()
-                    .expect("Unable to join all the threads");
             })
             .unwrap();
 
@@ -850,29 +801,16 @@ pub mod tests {
                 let service = MockAdminService::new();
                 processor.add_service(Box::new(service)).unwrap();
 
-                #[cfg(feature = "shutdown")]
                 let mut shutdown_handle = processor.start().unwrap();
-                #[cfg(not(feature = "shutdown"))]
-                let (shutdown_handle, join_handles) = processor.start().unwrap();
 
                 let _ = rx.recv().unwrap();
-                #[cfg(feature = "shutdown")]
                 shutdown_handle.signal_shutdown();
-                #[cfg(not(feature = "shutdown"))]
-                shutdown_handle
-                    .shutdown()
-                    .expect("unable to signal shutdown");
 
                 let _ = rx.recv().unwrap();
 
-                #[cfg(feature = "shutdown")]
                 shutdown_handle
                     .wait_for_shutdown()
                     .expect("Unable to cleanly shutdown");
-                #[cfg(not(feature = "shutdown"))]
-                join_handles
-                    .join_all()
-                    .expect("Unable to join all the threads");
             })
             .unwrap();
 

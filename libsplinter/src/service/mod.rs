@@ -54,10 +54,7 @@ pub use processor::registry::StandardServiceNetworkRegistry;
 pub use processor::JoinHandles;
 pub use processor::ServiceProcessor;
 pub use processor::ServiceProcessorBuilder;
-#[cfg(feature = "shutdown")]
 pub use processor::ServiceProcessorShutdownHandle;
-#[cfg(not(feature = "shutdown"))]
-pub use processor::ShutdownHandle;
 
 pub use error::{
     FactoryCreateError, ServiceConnectionError, ServiceDestroyError, ServiceDisconnectionError,
