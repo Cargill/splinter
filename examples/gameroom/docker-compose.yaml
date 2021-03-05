@@ -211,6 +211,10 @@ services:
           then
             splinter admin keygen acme -d /keys
           fi && \
+          if [ ! -f /etc/splinter/allow_keys ]
+          then
+            echo $$(cat /keys/acme.pub) > /etc/splinter/allow_keys
+          fi && \
           until PGPASSWORD=admin psql -h splinterd-db-acme -U admin -d splinter -c '\q'; do
             >&2 echo \"Database is unavailable - sleeping\"
             sleep 1
@@ -355,6 +359,10 @@ services:
           if [ ! -f /keys/bubba.priv ]
           then
             splinter admin keygen bubba -d /keys
+          fi && \
+          if [ ! -f /etc/splinter/allow_keys ]
+          then
+            echo $$(cat /keys/bubba.pub) > /etc/splinter/allow_keys
           fi && \
           until PGPASSWORD=admin psql -h splinterd-db-bubba -U admin -d splinter -c '\q'; do
             >&2 echo \"Database is unavailable - sleeping\"

@@ -145,10 +145,13 @@ mod test {
     };
 
     static SPLINTERD_URL: &str = "http://splinterd-node:8085";
-    static AUTHORIZATION: &str = "Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmRlcitq\
-        d3QifQ==.eyJpc3MiOiIwMjc5YmU2NjdlZjlkY2JiYWM1NWEwNjI5NWNlODcwYjA3MDI5YmZjZGIyZGNlMjhkOTU5Z\
-        jI4MTViMTZmODE3OTgifQ==.71Vw3+m9R4b8iZUzhRHOAtX/hO5WYA9PgMe27/CeZ6NhIXFYkBBzreoIGpHbfJ8UxT\
-        +1MLUgjsQB8TISafneRA==";
+    /// The public key for this JWT is:
+    /// 02091a06cc46c5e0d88e89284936edb16800b03b56a8f1b7ec292f232b7c8385a2
+    static AUTHORIZATION: &str =
+        "Bearer Cylinder:eyJhbGciOiJzZWNwMjU2azEiLCJ0eXAiOiJjeWxpbmRlcitqd\
+        3QifQ==.eyJpc3MiOiIwMjA5MWEwNmNjNDZjNWUwZDg4ZTg5Mjg0OTM2ZWRiMTY4MDBiMDNiNTZhOGYxYjdlYzI5MmY\
+        yMzJiN2M4Mzg1YTIifQ==.tOMakxmebss0WGWcvKCQhYo2AAo3aaMDPS28y9nfVnMXiYq98Be08CdxB0gXCY5qYHZSw\
+        53+kjuIG+8gPhXLBA==";
 
     #[actix_rt::test]
     /// Tests a GET /registry/nodes/{identity} request returns the expected node.
