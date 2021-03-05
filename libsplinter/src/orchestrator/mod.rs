@@ -40,7 +40,7 @@ use crate::service::{
     Service, ServiceFactory, ServiceMessageContext, StandardServiceNetworkRegistry,
 };
 #[cfg(feature = "shutdown")]
-use crate::threading::shutdown::ShutdownHandle;
+use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::Connection;
 
 pub use self::builder::ServiceOrchestratorBuilder;

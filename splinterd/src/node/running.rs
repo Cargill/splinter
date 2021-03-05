@@ -20,7 +20,7 @@ use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::rest_api::actix_web_3::RestApi;
-use splinter::threading::shutdown::ShutdownHandle;
+use splinter::threading::lifecycle::ShutdownHandle;
 
 pub(super) enum NodeRestApiVariant {
     ActixWeb1(RestApiShutdownHandle, JoinHandle<()>),

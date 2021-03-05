@@ -20,7 +20,7 @@ macro_rules! shutdown {
     ($($handle:expr),*) => {
         {
             use splinter::error::InternalError;
-            use splinter::threading::shutdown::ShutdownHandle;
+            use splinter::threading::lifecycle::ShutdownHandle;
            $(
                 $handle.signal_shutdown();
            )*

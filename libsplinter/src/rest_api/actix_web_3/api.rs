@@ -28,7 +28,7 @@ use openssl::ssl::SslAcceptorBuilder;
 
 use crate::error::InternalError;
 use crate::rest_api::RestApiServerError;
-use crate::threading::shutdown::ShutdownHandle;
+use crate::threading::lifecycle::ShutdownHandle;
 
 use super::ResourceProvider;
 
