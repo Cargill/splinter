@@ -27,6 +27,7 @@ use std::fmt;
 pub enum ConstraintViolationType {
     Unique,
     ForeignKey,
+    NotFound,
     Other(String),
 }
 
@@ -35,6 +36,7 @@ impl fmt::Display for ConstraintViolationType {
         match &self {
             ConstraintViolationType::Unique => write!(f, "Unique"),
             ConstraintViolationType::ForeignKey => write!(f, "Foreign Key"),
+            ConstraintViolationType::NotFound => f.write_str("Not Found"),
             ConstraintViolationType::Other(ref msg) => write!(f, "{}", msg),
         }
     }
