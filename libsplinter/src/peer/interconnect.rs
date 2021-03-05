@@ -594,7 +594,7 @@ pub mod tests {
 
         let connector = cm.connector();
 
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -661,9 +661,11 @@ pub mod tests {
         // trigger the thread shutdown
         tx.send(()).unwrap();
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         dispatch_shutdown.shutdown();
@@ -692,7 +694,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -709,9 +711,11 @@ pub mod tests {
             .build()
             .expect("Unable to build PeerInterconnect");
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
 

@@ -953,7 +953,7 @@ mod tests {
             .expect("Unable to start Connection Manager");
         let connector = cm.connector();
 
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("test-node".to_string())
@@ -1130,8 +1130,10 @@ mod tests {
             envelope.take_circuit_create_request().take_circuit()
         );
 
-        peer_manager.shutdown_signaler().shutdown();
-        peer_manager.await_shutdown();
+        peer_manager.signal_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.signal_shutdown();
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");

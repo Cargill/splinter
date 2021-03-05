@@ -40,8 +40,10 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use crate::collections::{BiHashMap, RefMap};
+use crate::error::InternalError;
 use crate::network::connection_manager::ConnectionManagerNotification;
 use crate::network::connection_manager::{ConnectionManagerError, Connector};
+use crate::threading::lifecycle::ShutdownHandle;
 use crate::threading::pacemaker;
 
 pub use self::builder::PeerManagerBuilder;
@@ -129,7 +131,7 @@ pub(crate) enum PeerManagerRequest {
 pub struct PeerManager {
     join_handle: thread::JoinHandle<()>,
     sender: Sender<PeerManagerMessage>,
-    shutdown_signaler: ShutdownSignaler,
+    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
 }
 
 impl PeerManager {
@@ -195,36 +197,6 @@ impl PeerManager {
 
     pub fn connector(&self) -> PeerManagerConnector {
         PeerManagerConnector::new(self.sender.clone())
-    }
-
-    #[deprecated(since = "0.5.1", note = "Please use shutdown_signaler() instead.")]
-    /// Returns a `ShutdownHandle` for this `PeerManager`
-    pub fn shutdown_handle(&self) -> Option<ShutdownHandle> {
-        Some(ShutdownHandle::from(self.shutdown_signaler.clone()))
-    }
-
-    /// Returns a `ShutdownSignaler` for this `PeerManager`
-    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
-        self.shutdown_signaler.clone()
-    }
-
-    /// Waits for the `PeerManager` thread to shutdown
-    pub fn await_shutdown(self) {
-        debug!("Shutting down peer manager...");
-        if let Err(err) = self.join_handle.join() {
-            error!("Peer manager thread did not shutdown correctly: {:?}", err);
-        }
-        debug!("Shutting down peer manager (complete)");
-    }
-
-    #[deprecated(
-        since = "0.5.1",
-        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
-    )]
-    /// Sends a shutdown signal and waits for the `PeerManager` thread to shutdown
-    pub fn shutdown_and_wait(self) {
-        self.shutdown_signaler.shutdown();
-        self.await_shutdown();
     }
 
     /// Private constructor used by the builder to start the peer manager
@@ -354,60 +326,32 @@ impl PeerManager {
                 ))
             })?;
 
-        let shutdown_signaler = ShutdownSignaler {
-            sender: sender.clone(),
-            pacemaker_shutdown_signaler,
-        };
-
         Ok(PeerManager {
-            shutdown_signaler,
+            pacemaker_shutdown_signaler,
             join_handle,
             sender,
         })
     }
 }
 
-/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`.
-/// Deprecated, use ShutdownSignaler instead.
-#[derive(Clone)]
-pub struct ShutdownHandle {
-    sender: Sender<PeerManagerMessage>,
-    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
-}
-
-impl ShutdownHandle {
-    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
-    pub fn shutdown(&self) {
+impl ShutdownHandle for PeerManager {
+    fn signal_shutdown(&mut self) {
         self.pacemaker_shutdown_signaler.shutdown();
         if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
             warn!("PeerManager is no longer running");
         }
     }
-}
 
-impl From<ShutdownSignaler> for ShutdownHandle {
-    fn from(signaler: ShutdownSignaler) -> Self {
-        ShutdownHandle {
-            sender: signaler.sender,
-            pacemaker_shutdown_signaler: signaler.pacemaker_shutdown_signaler,
-        }
-    }
-}
-
-/// Handles sending a shutdown message to the `PeerManager` and the `Pacemaker`
-#[derive(Clone)]
-pub struct ShutdownSignaler {
-    sender: Sender<PeerManagerMessage>,
-    pacemaker_shutdown_signaler: pacemaker::ShutdownSignaler,
-}
-
-impl ShutdownSignaler {
-    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
-    pub fn shutdown(&self) {
-        self.pacemaker_shutdown_signaler.shutdown();
-        if self.sender.send(PeerManagerMessage::Shutdown).is_err() {
-            warn!("PeerManager is no longer running");
-        }
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        debug!("Shutting down peer manager...");
+        self.join_handle.join().map_err(|err| {
+            InternalError::with_message(format!(
+                "Peer manager thread did not shutdown correctly: {:?}",
+                err
+            ))
+        })?;
+        debug!("Shutting down peer manager (complete)");
+        Ok(())
     }
 }
 
@@ -1519,7 +1463,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -1552,9 +1496,11 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -1588,7 +1534,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector.clone())
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -1629,9 +1575,11 @@ pub mod tests {
             .expect("Unable to list connections")
             .is_empty());
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -1664,7 +1612,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -1703,9 +1651,11 @@ pub mod tests {
                 }
         );
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -1736,7 +1686,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -1775,9 +1725,11 @@ pub mod tests {
 
         assert_eq!(peer_ref.peer_id(), "test_peer");
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -1819,7 +1771,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -1879,9 +1831,11 @@ pub mod tests {
             vec!["next_peer".to_string(), "test_peer".to_string()]
         );
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -1921,7 +1875,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -1978,9 +1932,11 @@ pub mod tests {
 
         assert!(peers.get_by_key("test_peer").is_some());
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -2015,7 +1971,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -2064,9 +2020,11 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -2106,7 +2064,7 @@ pub mod tests {
 
         // let (finish_tx, fininsh_rx) = channel();
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -2167,9 +2125,11 @@ pub mod tests {
 
         assert_eq!(peer_list, Vec::<String>::new());
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -2251,7 +2211,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_max_retry_attempts(1)
@@ -2311,9 +2271,11 @@ pub mod tests {
         tx.send(()).unwrap();
 
         jh.join().unwrap();
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh1.signal_shutdown();
@@ -2335,7 +2297,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -2343,9 +2305,11 @@ pub mod tests {
             .start()
             .expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -2386,7 +2350,7 @@ pub mod tests {
             subs_rx.recv().expect("unable to get notification");
         });
 
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -2419,9 +2383,11 @@ pub mod tests {
 
         assert_eq!(peer_list, vec!["test_peer".to_string()]);
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -2453,9 +2419,11 @@ pub mod tests {
         #[allow(deprecated)]
         peer_manager.start().expect("Cannot start peer_manager");
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
@@ -2486,7 +2454,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -2516,9 +2484,11 @@ pub mod tests {
                 })
         );
 
-        peer_manager.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
         cm.signal_shutdown();
-        peer_manager.await_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
         mesh.signal_shutdown();
