@@ -522,7 +522,7 @@ pub fn test_2_party_circuit_creation() {
 
     commit_2_party_circuit(circuit_id, node_a, node_b);
 
-    shutdown!(network).unwrap();
+    shutdown!(network).expect("Unable to shutdown network");
 }
 
 /// Test that a 3-party circuit may be created on a 3-node network.
