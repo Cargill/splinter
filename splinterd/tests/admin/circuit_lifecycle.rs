@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+use cylinder::Signer;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 
@@ -39,7 +39,7 @@ fn make_create_circuit_payload(
     circuit_id: &str,
     requester: &str,
     node_info: HashMap<String, String>,
-    signer: Box<dyn Signer>,
+    signer: &dyn Signer,
 ) -> Vec<u8> {
     // Get the public key to create the `CircuitCreateRequest` and to also set the `requester`
     // field of the `CircuitManagementPayload` header
@@ -79,7 +79,7 @@ fn make_create_circuit_payload(
 fn make_circuit_proposal_vote_payload(
     proposal: ProposalSlice,
     requester: &str,
-    signer: Box<dyn Signer>,
+    signer: &dyn Signer,
     accept: bool,
 ) -> Vec<u8> {
     // Get the public key necessary to set the `requester` field of the payload's header
@@ -200,9 +200,9 @@ fn setup_circuit(
 fn commit_2_party_circuit(
     circuit_id: &str,
     node_a_client: &Box<dyn AdminServiceClient>,
-    node_a_signer: Box<dyn Signer>,
+    node_a_signer: &dyn Signer,
     node_b_client: &Box<dyn AdminServiceClient>,
-    node_b_signer: Box<dyn Signer>,
+    node_b_signer: &dyn Signer,
     node_info: HashMap<String, String>,
 ) {
     let circuit_payload_bytes =
@@ -275,11 +275,11 @@ fn commit_2_party_circuit(
 fn commit_3_party_circuit(
     circuit_id: &str,
     node_a_client: &Box<dyn AdminServiceClient>,
-    node_a_signer: Box<dyn Signer>,
+    node_a_signer: &dyn Signer,
     node_b_client: &Box<dyn AdminServiceClient>,
-    node_b_signer: Box<dyn Signer>,
+    node_b_signer: &dyn Signer,
     node_c_client: &Box<dyn AdminServiceClient>,
-    node_c_signer: Box<dyn Signer>,
+    node_c_signer: &dyn Signer,
     node_info: HashMap<String, String>,
 ) {
     // Create the `CircuitManagementPayload` to be sent to a node
@@ -416,17 +416,16 @@ pub fn test_2_party_circuit_creation() {
         .add_nodes_with_defaults(2)
         .expect("Unable to start 2-node_actixWeb1 network");
     // Create a context in order to produce private keys for the nodes
-    let context = Secp256k1Context::new();
     // Collect the node information to be used to populate the payloads
     let mut node_info = HashMap::new();
     // Get the node and node's client for the first node
     let node_a = network.node(0).expect("Unable to get node_a");
     let node_a_client = node_a.admin_service_client();
-    let node_a_signer = context.new_signer(context.new_random_private_key());
+    let node_a_signer = node_a.admin_signer().clone_box();
     // Get the node and node's client for the second node
     let node_b = network.node(1).expect("Unable to get node_b");
     let node_b_client = node_b.admin_service_client();
-    let node_b_signer = context.new_signer(context.new_random_private_key());
+    let node_b_signer = node_b.admin_signer().clone_box();
     // Using `node_b` here for the second node as a placeholder
     node_info.insert(
         "node_b".to_string(),
@@ -437,9 +436,9 @@ pub fn test_2_party_circuit_creation() {
     commit_2_party_circuit(
         circuit_id,
         &node_a_client,
-        node_a_signer,
+        &*node_a_signer,
         &node_b_client,
-        node_b_signer,
+        &*node_b_signer,
         node_info,
     );
 
@@ -467,14 +466,12 @@ pub fn test_3_party_circuit_creation() {
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
         .expect("Unable to start 3-node_actixWeb1 network");
-    // Create a context in order to produce private keys for the nodes
-    let context = Secp256k1Context::new();
     // Collect the node information to be used to populate the payloads
     let mut node_info = HashMap::new();
     // Get the node and node's client for the first node
     let node_a = network.node(0).expect("Unable to get node_a");
     let node_a_client = node_a.admin_service_client();
-    let node_a_signer = context.new_signer(context.new_random_private_key());
+    let node_a_signer = node_a.admin_signer().clone_box();
     // Using `node_a` here for the first node as a placeholder
     node_info.insert(
         "node_a".to_string(),
@@ -483,7 +480,7 @@ pub fn test_3_party_circuit_creation() {
     // Get the node and node's client for the second node
     let node_b = network.node(1).expect("Unable to get node_b");
     let node_b_client = node_b.admin_service_client();
-    let node_b_signer = context.new_signer(context.new_random_private_key());
+    let node_b_signer = node_b.admin_signer().clone_box();
     // Using `node_b` here for the second node as a placeholder
     node_info.insert(
         "node_b".to_string(),
@@ -492,7 +489,7 @@ pub fn test_3_party_circuit_creation() {
     // Get the node and node's client for the third node
     let node_c = network.node(2).expect("Unable to get node_c");
     let node_c_client = node_c.admin_service_client();
-    let node_c_signer = context.new_signer(context.new_random_private_key());
+    let node_c_signer = node_c.admin_signer().clone_box();
     // Using `node_c` here for the third node as a placeholder
     node_info.insert(
         "node_c".to_string(),
@@ -503,11 +500,11 @@ pub fn test_3_party_circuit_creation() {
     commit_3_party_circuit(
         circuit_id,
         &node_a_client,
-        node_a_signer,
+        &*node_a_signer,
         &node_b_client,
-        node_b_signer,
+        &*node_b_signer,
         &node_c_client,
-        node_c_signer,
+        &*node_c_signer,
         node_info,
     );
 
@@ -532,14 +529,12 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(2)
         .expect("Unable to start 2-node_actixWeb1 network");
-    // Create a context in order to produce private keys for the nodes
-    let context = Secp256k1Context::new();
     // Collect the node information to be used to populate the payloads
     let mut node_info = HashMap::new();
     // Get the node and node's client for the first node
     let node_a = network.node(0).expect("Unable to get node_a");
     let node_a_client = node_a.admin_service_client();
-    let node_a_signer = context.new_signer(context.new_random_private_key());
+    let node_a_signer = node_a.admin_signer().clone_box();
     // Using `node_a` here for the first node as a placeholder
     node_info.insert(
         "node_a".to_string(),
@@ -548,7 +543,7 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     // Get the node and node's client for the second node
     let node_b = network.node(1).expect("Unable to get node_b");
     let node_b_client = node_b.admin_service_client();
-    let node_b_signer = context.new_signer(context.new_random_private_key());
+    let node_b_signer = node_b.admin_signer().clone_box();
     // Using `node_b` here for the second node as a placeholder
     node_info.insert(
         "node_b".to_string(),
@@ -557,7 +552,7 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes =
-        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), node_a_signer);
+        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), &*node_a_signer);
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a_client.submit_admin_payload(circuit_payload_bytes);
     assert!(res.is_ok());
@@ -589,7 +584,7 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
     let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_b", node_b_signer, false);
+        make_circuit_proposal_vote_payload(proposal_a, "node_b", &*node_b_signer, false);
     let res = node_b_client.submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
@@ -640,14 +635,12 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
         .expect("Unable to start 3-node_actixWeb1 network");
-    // Create a context in order to produce private keys for the nodes
-    let context = Secp256k1Context::new();
     // Collect the node information to be used to populate the payloads
     let mut node_info = HashMap::new();
     // Get the node and node's client for the first node
     let node_a = network.node(0).expect("Unable to get node_a");
     let node_a_client = node_a.admin_service_client();
-    let node_a_signer = context.new_signer(context.new_random_private_key());
+    let node_a_signer = node_a.admin_signer().clone_box();
     // Using `node_a` here for the first node as a placeholder
     node_info.insert(
         "node_a".to_string(),
@@ -656,7 +649,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     // Get the node and node's client for the second node
     let node_b = network.node(1).expect("Unable to get node_b");
     let node_b_client = node_b.admin_service_client();
-    let node_b_signer = context.new_signer(context.new_random_private_key());
+    let node_b_signer = node_b.admin_signer().clone_box();
     // Using `node_b` here for the second node as a placeholder
     node_info.insert(
         "node_b".to_string(),
@@ -665,7 +658,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     // Get the node and node's client for the third node
     let node_c = network.node(2).expect("Unable to get node_c");
     let node_c_client = node_c.admin_service_client();
-    let node_c_signer = context.new_signer(context.new_random_private_key());
+    let node_c_signer = node_c.admin_signer().clone_box();
     // Using `node_c` here for the third node as a placeholder
     node_info.insert(
         "node_c".to_string(),
@@ -674,7 +667,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes =
-        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), node_a_signer);
+        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), &*node_a_signer);
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a_client.submit_admin_payload(circuit_payload_bytes);
     assert!(res.is_ok());
@@ -714,7 +707,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
     let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_b", node_b_signer, true);
+        make_circuit_proposal_vote_payload(proposal_a, "node_b", &*node_b_signer, true);
     let res = node_b_client.submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
@@ -751,7 +744,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
     let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_c", node_c_signer, false);
+        make_circuit_proposal_vote_payload(proposal_a, "node_c", &*node_c_signer, false);
     let res = node_c_client.submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 

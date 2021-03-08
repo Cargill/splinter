@@ -18,6 +18,7 @@ pub(super) mod admin;
 
 use std::time::Duration;
 
+use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::{AuthConfig, RestApiBuilder as RestApiBuilder1};
 use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
@@ -46,6 +47,7 @@ pub enum RestApiVariant {
 /// Constructs a `RunnableNode` instance.
 pub struct NodeBuilder {
     admin_subsystem_builder: AdminSubsystemBuilder,
+    admin_signer: Option<Box<dyn Signer>>,
     rest_api_port: Option<u32>,
     rest_api_variant: RestApiVariant,
 }
@@ -61,6 +63,7 @@ impl NodeBuilder {
     pub fn new() -> Self {
         NodeBuilder {
             admin_subsystem_builder: AdminSubsystemBuilder::new(),
+            admin_signer: None,
             rest_api_port: None,
             rest_api_variant: RestApiVariant::ActixWeb1,
         }
@@ -69,6 +72,13 @@ impl NodeBuilder {
     /// Specifies the id for the node. Defaults to a random node id.
     pub fn with_node_id(mut self, node_id: String) -> Self {
         self.admin_subsystem_builder = self.admin_subsystem_builder.with_node_id(node_id);
+        self
+    }
+
+    /// Specifies the private key that will be used for signing admin payloads against the final
+    /// node.
+    pub fn with_admin_signer(mut self, signer: Box<dyn Signer>) -> Self {
+        self.admin_signer = Some(signer);
         self
     }
 
@@ -123,6 +133,12 @@ impl NodeBuilder {
 
         let runnable_admin_subsystem = self.admin_subsystem_builder.build()?;
 
+        let admin_signer = self.admin_signer.take().unwrap_or_else(|| {
+            let context = Secp256k1Context::new();
+            let pk = context.new_random_private_key();
+            context.new_signer(pk)
+        });
+
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => {
                 let auth_config = AuthConfig::Custom {
@@ -148,6 +164,7 @@ impl NodeBuilder {
         };
 
         Ok(RunnableNode {
+            admin_signer,
             runnable_admin_subsystem,
             rest_api_variant,
         })
