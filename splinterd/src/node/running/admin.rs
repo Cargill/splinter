@@ -15,18 +15,19 @@
 //! This module defines the running admin subsystem.
 
 use splinter::error::InternalError;
+use splinter::network::connection_manager::ConnectionManager;
+use splinter::peer::PeerManager;
 use splinter::rest_api::actix_web_1::Resource as Actix1Resource;
 use splinter::service::ServiceProcessor;
 use splinter::threading::lifecycle::ShutdownHandle;
-
-use crate::node::legacy::LegacyShutdownHandle;
 
 /// A running admin subsystem.
 pub struct AdminSubsystem {
     pub(crate) node_id: String,
     pub(crate) _admin_service_processor: ServiceProcessor,
-    pub(crate) legacy_shutdown_handles: Vec<LegacyShutdownHandle>,
     pub(crate) actix1_resources: Vec<Actix1Resource>,
+    pub(crate) connection_manager: ConnectionManager,
+    pub(crate) peer_manager: PeerManager,
 }
 
 impl AdminSubsystem {
@@ -45,17 +46,19 @@ impl AdminSubsystem {
 
 impl ShutdownHandle for AdminSubsystem {
     fn signal_shutdown(&mut self) {
-        for handle in self.legacy_shutdown_handles.iter_mut() {
-            handle.signal_shutdown();
-        }
+        self.peer_manager.signal_shutdown();
+        self.connection_manager.signal_shutdown();
     }
 
     fn wait_for_shutdown(self) -> Result<(), InternalError> {
         let mut errors = vec![];
-        for legacy_handle in self.legacy_shutdown_handles.into_iter() {
-            if let Err(err) = legacy_handle.wait_for_shutdown() {
-                errors.push(err)
-            }
+
+        if let Err(err) = self.peer_manager.wait_for_shutdown() {
+            errors.push(err)
+        }
+
+        if let Err(err) = self.connection_manager.wait_for_shutdown() {
+            errors.push(err)
         }
 
         match errors.len() {

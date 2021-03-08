@@ -33,7 +33,6 @@ use splinter::service::ServiceProcessorBuilder;
 use splinter::store::StoreFactory;
 use splinter::transport::{inproc::InprocTransport, multi::MultiTransport, Listener, Transport};
 
-use crate::node::legacy::LegacyShutdownHandle;
 use crate::node::running::admin::AdminSubsystem;
 
 pub struct RunnableAdminSubsystem {
@@ -56,8 +55,6 @@ impl RunnableAdminSubsystem {
         let mut service_transport = InprocTransport::default();
         transport.add_transport(Box::new(service_transport.clone()));
 
-        let mut legacy_shutdown_handles = vec![];
-
         let _internal_service_listeners = Self::build_internal_service_listeners(&mut transport)?;
 
         let mesh = Mesh::new(512, 128);
@@ -71,27 +68,10 @@ impl RunnableAdminSubsystem {
         )?;
         let connection_connector = connection_manager.connector();
 
-        let shutdown_signaler = connection_manager.shutdown_signaler();
-        legacy_shutdown_handles.push(LegacyShutdownHandle::new(
-            Box::new(move || shutdown_signaler.shutdown()),
-            Box::new(move || {
-                connection_manager.await_shutdown();
-                Ok(())
-            }),
-        ));
-
         let peer_manager =
             Self::build_peer_manager(&node_id, connection_connector, self.strict_ref_counts)?;
 
         let peer_connector = peer_manager.connector();
-        let peer_manager_shutdown = peer_manager.shutdown_signaler();
-        legacy_shutdown_handles.push(LegacyShutdownHandle::new(
-            Box::new(move || peer_manager_shutdown.shutdown()),
-            Box::new(move || {
-                peer_manager.await_shutdown();
-                Ok(())
-            }),
-        ));
 
         let registry = store_factory.get_registry_store();
 
@@ -161,8 +141,9 @@ impl RunnableAdminSubsystem {
         Ok(AdminSubsystem {
             node_id,
             _admin_service_processor: admin_service_processor,
-            legacy_shutdown_handles,
             actix1_resources,
+            peer_manager,
+            connection_manager,
         })
     }
 
