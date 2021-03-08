@@ -14,6 +14,8 @@
 
 //! Contains the implementation of `Node`.
 
+pub mod admin;
+
 use std::thread::JoinHandle;
 
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
@@ -29,11 +31,16 @@ pub(super) enum NodeRestApiVariant {
 
 /// A running instance of a Splinter node.
 pub struct Node {
-    pub(super) rest_api_variant: Option<NodeRestApiVariant>,
+    pub(super) admin_subsystem: admin::AdminSubsystem,
+    pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
 }
 
 impl Node {
+    pub fn node_id(&self) -> &str {
+        self.admin_subsystem.node_id()
+    }
+
     pub fn rest_api_port(self: &Node) -> u16 {
         self.rest_api_port
     }
@@ -48,34 +55,48 @@ impl Node {
 
 impl ShutdownHandle for Node {
     fn signal_shutdown(&mut self) {
-        match self.rest_api_variant.as_mut() {
-            Some(NodeRestApiVariant::ActixWeb3(rest_api)) => {
-                rest_api.signal_shutdown();
-            }
-            Some(_) | None => {}
+        self.admin_subsystem.signal_shutdown();
+        if let NodeRestApiVariant::ActixWeb3(ref mut rest_api) = self.rest_api_variant {
+            rest_api.signal_shutdown();
         }
     }
 
-    fn wait_for_shutdown(mut self) -> Result<(), InternalError> {
-        match self.rest_api_variant.take() {
-            Some(NodeRestApiVariant::ActixWeb1(shutdown_handle, join_handle)) => {
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        let mut errors = vec![];
+
+        match self.rest_api_variant {
+            NodeRestApiVariant::ActixWeb1(shutdown_handle, join_handle) => {
                 shutdown_handle
                     .shutdown()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?;
-                join_handle.join().map_err(|_| {
-                    InternalError::with_message(
+                if join_handle.join().is_err() {
+                    errors.push(InternalError::with_message(
                         "REST API thread panicked, join() failed".to_string(),
-                    )
-                })?;
-                Ok(())
+                    ));
+                }
             }
-            Some(NodeRestApiVariant::ActixWeb3(rest_api)) => {
-                rest_api.wait_for_shutdown()?;
-                Ok(())
+            NodeRestApiVariant::ActixWeb3(rest_api) => {
+                if let Err(err) = rest_api.wait_for_shutdown() {
+                    errors.push(err);
+                }
             }
-            None => Err(InternalError::with_message(
-                "wait_for_shutdown() called on already shutdown Node".to_string(),
-            )),
+        }
+
+        if let Err(err) = self.admin_subsystem.wait_for_shutdown() {
+            errors.push(err);
+        }
+
+        match errors.len() {
+            0 => Ok(()),
+            1 => Err(errors.remove(0)),
+            _ => Err(InternalError::with_message(format!(
+                "Multiple errors occurred during shutdown: {}",
+                errors
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
         }
     }
 }

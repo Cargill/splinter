@@ -32,6 +32,7 @@ fn single_node_network(rest_api_variant: RestApiVariant) {
     // make a call to the port
     let list_slice = client.list_circuits(None).unwrap();
     assert_eq!(list_slice.data, vec![]);
+    assert_eq!(0, list_slice.paging.total);
 
     shutdown!(network).unwrap();
 }
@@ -70,7 +71,6 @@ fn multi_node_network(rest_api_variant: RestApiVariant) {
 
 /// Executes the single node network test with Actix Web 1.
 #[test]
-#[ignore]
 fn single_node_network_actix_web_1() {
     single_node_network(RestApiVariant::ActixWeb1);
 }

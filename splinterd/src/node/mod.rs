@@ -15,6 +15,7 @@
 //! Contains the implementation of `NodeBuilder`, `RunnableNode`, and `Node`.
 
 mod builder;
+mod legacy;
 mod runnable;
 mod running;
 

@@ -14,17 +14,24 @@
 
 //! Contains the implementation of `NodeBuilder`.
 
-use splinter::admin::rest_api::actix_web_3::AdminResourceProvider;
+pub(super) mod admin;
+
+use std::time::Duration;
+
 use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::{AuthConfig, RestApiBuilder as RestApiBuilder1};
 use splinter::rest_api::actix_web_3::RestApiBuilder as RestApiBuilder3;
 use splinter::rest_api::auth::{
+    authorization::{AuthorizationHandler, AuthorizationHandlerResult},
     identity::{Identity, IdentityProvider},
     AuthorizationHeader,
 };
 use splinter::rest_api::RestApiBind;
+use splinter::store::StoreFactory;
 
 use super::{RunnableNode, RunnableNodeRestApiVariant};
+
+use self::admin::AdminSubsystemBuilder;
 
 /// An enumeration of the REST API backend variants.
 #[derive(Clone, Copy, Debug)]
@@ -38,6 +45,7 @@ pub enum RestApiVariant {
 
 /// Constructs a `RunnableNode` instance.
 pub struct NodeBuilder {
+    admin_subsystem_builder: AdminSubsystemBuilder,
     rest_api_port: Option<u32>,
     rest_api_variant: RestApiVariant,
 }
@@ -52,9 +60,49 @@ impl NodeBuilder {
     /// Constructs new `NodeBuilder`.
     pub fn new() -> Self {
         NodeBuilder {
+            admin_subsystem_builder: AdminSubsystemBuilder::new(),
             rest_api_port: None,
             rest_api_variant: RestApiVariant::ActixWeb1,
         }
+    }
+
+    /// Specifies the id for the node. Defaults to a random node id.
+    pub fn with_node_id(mut self, node_id: String) -> Self {
+        self.admin_subsystem_builder = self.admin_subsystem_builder.with_node_id(node_id);
+        self
+    }
+
+    /// Specifies the timeout for admin requests. Defaults to 30 seconds.
+    pub fn with_admin_timeout(mut self, admin_timeout: Duration) -> Self {
+        self.admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_admin_timeout(admin_timeout);
+        self
+    }
+
+    /// Specifies the heartbeat interval between peer connections. Defaults to 30 seconds.
+    pub fn with_heartbeat_interval(mut self, heartbeat_interval: Duration) -> Self {
+        self.admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_heartbeat_interval(heartbeat_interval);
+        self
+    }
+
+    /// Configure whether or not strict reference counts will be used in the peer manager. Defaults
+    /// to false.
+    pub fn with_strict_ref_counts(mut self, strict_ref_counts: bool) -> Self {
+        self.admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_strict_ref_counts(strict_ref_counts);
+        self
+    }
+
+    /// Specifies the store factory to use with the node. Defaults to the MemoryStoreFactory.
+    pub fn with_store_factory(mut self, store_factory: Box<dyn StoreFactory>) -> Self {
+        self.admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_store_factory(store_factory);
+        self
     }
 
     /// Specifies the REST API port which should be used when binding the REST API.
@@ -70,8 +118,10 @@ impl NodeBuilder {
     }
 
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
-    pub fn build(self) -> Result<RunnableNode, InternalError> {
-        let url = format!("127.0.0.1:{}", self.rest_api_port.unwrap_or(0),);
+    pub fn build(mut self) -> Result<RunnableNode, InternalError> {
+        let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);
+
+        let runnable_admin_subsystem = self.admin_subsystem_builder.build()?;
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => {
@@ -84,6 +134,7 @@ impl NodeBuilder {
                     RestApiBuilder1::new()
                         .with_bind(RestApiBind::Insecure(url))
                         .with_auth_configs(vec![auth_config])
+                        .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)])
                         .build()
                         .map_err(|e| InternalError::from_source(Box::new(e)))?,
                 )
@@ -91,13 +142,15 @@ impl NodeBuilder {
             RestApiVariant::ActixWeb3 => RunnableNodeRestApiVariant::ActixWeb3(
                 RestApiBuilder3::new()
                     .with_bind(RestApiBind::Insecure(url))
-                    .add_resource_provider(Box::new(AdminResourceProvider::new()))
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
             ),
         };
 
-        Ok(RunnableNode { rest_api_variant })
+        Ok(RunnableNode {
+            runnable_admin_subsystem,
+            rest_api_variant,
+        })
     }
 }
 
@@ -124,5 +177,23 @@ impl IdentityProvider for MockIdentityProvider {
     ///```
     fn clone_box(&self) -> Box<dyn IdentityProvider> {
         Box::new(self.clone())
+    }
+}
+
+struct MockAuthorizationHandler;
+
+impl AuthorizationHandler for MockAuthorizationHandler {
+    fn has_permission(
+        &self,
+        _identity: &Identity,
+        _permission_id: &str,
+    ) -> Result<AuthorizationHandlerResult, InternalError> {
+        Ok(AuthorizationHandlerResult::Allow)
+    }
+
+    /// Clone implementation for `AuthorizationHandler`. The implementation of the `Clone` trait for
+    /// `Box<dyn AuthorizationHandler>` calls this method.
+    fn clone_box(&self) -> Box<dyn AuthorizationHandler> {
+        Box::new(MockAuthorizationHandler)
     }
 }

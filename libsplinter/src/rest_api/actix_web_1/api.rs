@@ -60,6 +60,18 @@ pub struct RestApi {
 }
 
 impl RestApi {
+    /// An additional Resource may be added before running the RestApi
+    pub fn add_resource(mut self, value: Resource) -> Self {
+        self.resources.push(value);
+        self
+    }
+
+    /// Additional Resources may be added before running the RestApi
+    pub fn add_resources(mut self, mut values: Vec<Resource>) -> Self {
+        self.resources.append(&mut values);
+        self
+    }
+
     pub fn run(
         self,
     ) -> Result<(RestApiShutdownHandle, thread::JoinHandle<()>), RestApiServerError> {
