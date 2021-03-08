@@ -21,6 +21,7 @@ use std::thread::JoinHandle;
 use cylinder::Signer;
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
+use splinter::registry::RegistryWriter;
 use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::rest_api::actix_web_3::RestApi;
 use splinter::threading::lifecycle::ShutdownHandle;
@@ -49,6 +50,10 @@ impl Node {
 
     pub fn admin_signer(&self) -> &dyn Signer {
         &*self.admin_signer
+    }
+
+    pub fn registry_writer(&self) -> &dyn RegistryWriter {
+        self.admin_subsystem.registry_writer()
     }
 
     pub fn admin_service_client(self: &Node) -> Box<dyn AdminServiceClient> {
