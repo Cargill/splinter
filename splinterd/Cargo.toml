@@ -103,7 +103,6 @@ experimental = [
     "oauth",
     "service-arg-validation",
     "service-endpoint",
-    "shutdown",
     "ws-transport",
 ]
 
@@ -128,13 +127,12 @@ circuit-disband = ["splinter/circuit-disband"]
 circuit-purge = ["splinter/circuit-purge"]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]
-health-service = ["health", "splinter/shutdown"]
+health-service = ["health"]
 https-bind = ["splinter/https-bind"]
 node = [
     "splinter/admin-service-client",
     "splinter/client-reqwest",
     "splinter/rest-api-actix-web-3",
-    "splinter/shutdown",
 ]
 oauth = [
     "splinter/oauth"
@@ -145,7 +143,6 @@ service-arg-validation = [
     "splinter/service-arg-validation",
 ]
 service-endpoint = []
-shutdown = ["splinter/shutdown"]
 ws-transport = ["splinter/ws-transport"]
 
 [package.metadata.deb]

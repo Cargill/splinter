@@ -80,7 +80,6 @@ use splinter::rest_api::{
 use splinter::service;
 #[cfg(feature = "service-arg-validation")]
 use splinter::service::validation::ServiceArgValidator;
-#[cfg(feature = "shutdown")]
 use splinter::threading::lifecycle::ShutdownHandle;
 use splinter::transport::{
     inproc::InprocTransport, multi::MultiTransport, AcceptError, ConnectError, Connection,
@@ -99,9 +98,6 @@ const HEALTH_SERVICE_PROCESSOR_INCOMING_CAPACITY: usize = 8;
 const HEALTH_SERVICE_PROCESSOR_OUTGOING_CAPACITY: usize = 8;
 #[cfg(feature = "health-service")]
 const HEALTH_SERVICE_PROCESSOR_CHANNEL_CAPACITY: usize = 8;
-
-#[cfg(not(feature = "shutdown"))]
-type ServiceJoinHandle = service::JoinHandles<Result<(), service::error::ServiceProcessorError>>;
 
 pub struct SplinterDaemon {
     #[cfg(feature = "authorization-handler-allow-keys")]
@@ -453,13 +449,6 @@ impl SplinterDaemon {
             })?;
 
         let orchestrator_resources = orchestrator.resources();
-        #[cfg(not(feature = "shutdown"))]
-        let orchestator_join_handles = orchestrator.take_join_handles().ok_or_else(|| {
-            StartError::OrchestratorError(
-                "Orchestrator join handles were taken more than once".into(),
-            )
-        })?;
-        #[cfg(feature = "shutdown")]
         let mut orchestator_shutdown_handle =
             orchestrator.take_shutdown_handle().ok_or_else(|| {
                 StartError::OrchestratorError(
@@ -759,10 +748,6 @@ impl SplinterDaemon {
 
         let (rest_api_shutdown_handle, rest_api_join_handle) = rest_api_builder.build()?.run()?;
 
-        #[cfg(not(feature = "shutdown"))]
-        let (admin_shutdown_handle, service_processor_join_handle) =
-            Self::start_admin_service(admin_connection, admin_service)?;
-        #[cfg(feature = "shutdown")]
         let mut admin_shutdown_handle = Self::start_admin_service(admin_connection, admin_service)?;
 
         let (shutdown_tx, shutdown_rx) = channel();
@@ -781,29 +766,21 @@ impl SplinterDaemon {
 
         running.store(false, Ordering::SeqCst);
 
-        #[cfg(feature = "shutdown")]
-        {
-            admin_shutdown_handle.signal_shutdown();
-            orchestator_shutdown_handle.signal_shutdown();
-            #[cfg(feature = "health-service")]
-            health_service_shutdown_handle.signal_shutdown();
+        admin_shutdown_handle.signal_shutdown();
+        orchestator_shutdown_handle.signal_shutdown();
+        #[cfg(feature = "health-service")]
+        health_service_shutdown_handle.signal_shutdown();
 
-            if let Err(err) = admin_shutdown_handle.wait_for_shutdown() {
-                error!("Unable to cleanly shut down Admin service: {}", err);
-            }
-
-            if let Err(err) = orchestator_shutdown_handle.wait_for_shutdown() {
-                error!("Unable to cleanly shut down Orchestrator service: {}", err);
-            }
-            #[cfg(feature = "health-service")]
-            if let Err(err) = health_service_shutdown_handle.wait_for_shutdown() {
-                error!("Unable to cleanly shut down Health service: {}", err);
-            }
+        if let Err(err) = admin_shutdown_handle.wait_for_shutdown() {
+            error!("Unable to cleanly shut down Admin service: {}", err);
         }
 
-        #[cfg(not(feature = "shutdown"))]
-        if let Err(err) = admin_shutdown_handle.shutdown() {
-            error!("Unable to cleanly shut down Admin service: {}", err);
+        if let Err(err) = orchestator_shutdown_handle.wait_for_shutdown() {
+            error!("Unable to cleanly shut down Orchestrator service: {}", err);
+        }
+        #[cfg(feature = "health-service")]
+        if let Err(err) = health_service_shutdown_handle.wait_for_shutdown() {
+            error!("Unable to cleanly shut down Health service: {}", err);
         }
 
         if let Err(err) = rest_api_shutdown_handle.shutdown() {
@@ -816,10 +793,6 @@ impl SplinterDaemon {
 
         // Join threads and shutdown network components
         let _ = rest_api_join_handle.join();
-        #[cfg(not(feature = "shutdown"))]
-        let _ = service_processor_join_handle.join_all();
-        #[cfg(not(feature = "shutdown"))]
-        let _ = orchestator_join_handles.join_all();
         peer_manager_shutdown.shutdown();
         peer_manager.await_shutdown();
         connection_manager_shutdown.shutdown();
@@ -911,50 +884,6 @@ impl SplinterDaemon {
         });
     }
 
-    #[cfg(not(feature = "shutdown"))]
-    fn start_admin_service(
-        connection: Box<dyn Connection>,
-        admin_service: AdminService,
-    ) -> Result<(service::ShutdownHandle, ServiceJoinHandle), StartError> {
-        let start_admin: std::thread::JoinHandle<
-            Result<(service::ShutdownHandle, ServiceJoinHandle), StartError>,
-        > = thread::spawn(move || {
-            let mut admin_service_processor = service::ServiceProcessor::new(
-                connection,
-                "admin".into(),
-                ADMIN_SERVICE_PROCESSOR_INCOMING_CAPACITY,
-                ADMIN_SERVICE_PROCESSOR_OUTGOING_CAPACITY,
-                ADMIN_SERVICE_PROCESSOR_CHANNEL_CAPACITY,
-            )
-            .map_err(|err| {
-                StartError::AdminServiceError(format!(
-                    "unable to create admin service processor: {}",
-                    err
-                ))
-            })?;
-
-            admin_service_processor
-                .add_service(Box::new(admin_service))
-                .map_err(|err| {
-                    StartError::AdminServiceError(format!(
-                        "unable to add admin service to processor: {}",
-                        err
-                    ))
-                })?;
-
-            admin_service_processor.start().map_err(|err| {
-                StartError::AdminServiceError(format!("unable to start service processor: {}", err))
-            })
-        });
-
-        start_admin.join().map_err(|_| {
-            StartError::AdminServiceError(
-                "unable to start admin service, due to thread join error".into(),
-            )
-        })?
-    }
-
-    #[cfg(feature = "shutdown")]
     fn start_admin_service(
         connection: Box<dyn Connection>,
         admin_service: AdminService,
