@@ -140,6 +140,7 @@ impl RunnableAdminSubsystem {
 
         Ok(AdminSubsystem {
             node_id,
+            registry_writer: registry.clone_box_as_writer(),
             _admin_service_processor: admin_service_processor,
             actix1_resources,
             peer_manager,

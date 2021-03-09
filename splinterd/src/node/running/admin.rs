@@ -17,6 +17,7 @@
 use splinter::error::InternalError;
 use splinter::network::connection_manager::ConnectionManager;
 use splinter::peer::PeerManager;
+use splinter::registry::RegistryWriter;
 use splinter::rest_api::actix_web_1::Resource as Actix1Resource;
 use splinter::service::ServiceProcessor;
 use splinter::threading::lifecycle::ShutdownHandle;
@@ -24,6 +25,7 @@ use splinter::threading::lifecycle::ShutdownHandle;
 /// A running admin subsystem.
 pub struct AdminSubsystem {
     pub(crate) node_id: String,
+    pub(crate) registry_writer: Box<dyn RegistryWriter>,
     pub(crate) _admin_service_processor: ServiceProcessor,
     pub(crate) actix1_resources: Vec<Actix1Resource>,
     pub(crate) connection_manager: ConnectionManager,
@@ -41,6 +43,10 @@ impl AdminSubsystem {
         let mut replaced = vec![];
         std::mem::swap(&mut self.actix1_resources, &mut replaced);
         replaced
+    }
+
+    pub fn registry_writer(&self) -> &dyn RegistryWriter {
+        &*self.registry_writer
     }
 }
 

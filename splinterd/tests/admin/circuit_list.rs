@@ -84,7 +84,6 @@ fn single_node_network_actix_web_3() {
 
 /// Executes the multi node network test with Actix Web 1.
 #[test]
-#[ignore]
 fn multi_node_network_actix_web_1() {
     multi_node_network(RestApiVariant::ActixWeb1);
 }

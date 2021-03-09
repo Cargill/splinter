@@ -18,8 +18,10 @@ pub mod admin;
 
 use std::thread::JoinHandle;
 
+use cylinder::Signer;
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
+use splinter::registry::RegistryWriter;
 use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::rest_api::actix_web_3::RestApi;
 use splinter::threading::lifecycle::ShutdownHandle;
@@ -31,6 +33,7 @@ pub(super) enum NodeRestApiVariant {
 
 /// A running instance of a Splinter node.
 pub struct Node {
+    pub(super) admin_signer: Box<dyn Signer>,
     pub(super) admin_subsystem: admin::AdminSubsystem,
     pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
@@ -43,6 +46,14 @@ impl Node {
 
     pub fn rest_api_port(self: &Node) -> u16 {
         self.rest_api_port
+    }
+
+    pub fn admin_signer(&self) -> &dyn Signer {
+        &*self.admin_signer
+    }
+
+    pub fn registry_writer(&self) -> &dyn RegistryWriter {
+        self.admin_subsystem.registry_writer()
     }
 
     pub fn admin_service_client(self: &Node) -> Box<dyn AdminServiceClient> {

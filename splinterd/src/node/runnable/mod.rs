@@ -33,6 +33,7 @@ pub(super) enum RunnableNodeRestApiVariant {
 
 /// A fully configured and runnable instance of a node.
 pub struct RunnableNode {
+    pub(super) admin_signer: Box<dyn cylinder::Signer>,
     pub(super) runnable_admin_subsystem: RunnableAdminSubsystem,
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
 }
@@ -109,6 +110,7 @@ impl RunnableNode {
         };
 
         Ok(Node {
+            admin_signer: self.admin_signer,
             admin_subsystem,
             rest_api_variant,
             rest_api_port,
