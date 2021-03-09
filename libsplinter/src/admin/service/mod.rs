@@ -602,6 +602,7 @@ impl Service for AdminService {
         }
     }
 
+    #[cfg(feature = "circuit-purge")]
     fn purge(&mut self) -> Result<(), crate::error::InternalError> {
         Ok(())
     }

@@ -954,6 +954,7 @@ pub mod tests {
             Ok(())
         }
 
+        #[cfg(feature = "circuit-purge")]
         fn purge(&mut self) -> Result<(), crate::error::InternalError> {
             unimplemented!()
         }
@@ -1045,6 +1046,7 @@ pub mod tests {
             Ok(())
         }
 
+        #[cfg(feature = "circuit-purge")]
         fn purge(&mut self) -> Result<(), crate::error::InternalError> {
             unimplemented!()
         }
