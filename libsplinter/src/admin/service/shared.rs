@@ -14,8 +14,9 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::convert::TryFrom;
 #[cfg(feature = "circuit-disband")]
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::iter::ExactSizeIterator;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -46,8 +47,6 @@ use crate::protocol::{
 };
 #[cfg(feature = "circuit-abandon")]
 use crate::protos::admin::AbandonedCircuit;
-#[cfg(feature = "circuit-disband")]
-use crate::protos::admin::DisbandedCircuit;
 #[cfg(any(feature = "service-arg-validation", feature = "circuit-abandon"))]
 use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
@@ -112,12 +111,6 @@ struct UninitializedCircuit {
     pub ready_members: HashSet<String>,
 }
 
-#[cfg(feature = "circuit-disband")]
-struct PendingDisbandedCircuit {
-    pub circuit: Option<CircuitProposal>,
-    pub ready_members: HashSet<String>,
-}
-
 struct SubscriberMap {
     subscribers_by_type: RefCell<HashMap<String, Vec<Box<dyn AdminServiceEventSubscriber>>>>,
 }
@@ -166,7 +159,7 @@ pub struct AdminServiceShared {
     // the node id of the connected splinter node
     node_id: String,
     // the list of circuit that have been committed to splinter state but whose services haven't
-    // been initialized
+    // been initialized or stopped, depending on the proposal type
     uninitialized_circuits: HashMap<String, UninitializedCircuit>,
     orchestrator: Arc<Mutex<ServiceOrchestrator>>,
     // map of service arg validators, by service type
@@ -209,9 +202,6 @@ pub struct AdminServiceShared {
     routing_table_writer: Box<dyn RoutingTableWriter>,
     // Mailbox of AdminServiceEvent values
     event_store: Box<dyn AdminServiceStore>,
-    #[cfg(feature = "circuit-disband")]
-    // List of circuits to be completely disbanded once all nodes have agreed
-    pending_consensus_disbanded_circuits: HashMap<String, PendingDisbandedCircuit>,
 }
 
 impl AdminServiceShared {
@@ -256,8 +246,6 @@ impl AdminServiceShared {
             admin_service_status: AdminServiceStatus::NotRunning,
             routing_table_writer,
             event_store: admin_service_event_store,
-            #[cfg(feature = "circuit-disband")]
-            pending_consensus_disbanded_circuits: HashMap::new(),
         }
     }
 
@@ -417,15 +405,15 @@ impl AdminServiceShared {
                                     circuit_proposal_context.signer_public_key.clone(),
                                 ));
                                 self.send_event(&mgmt_type, event);
-                                // send DISBANDED_CIRCUIT message to all other members' admin
+                                // send MEMBER_READY message to all other members' admin
                                 // services
                                 if let Some(ref network_sender) = self.network_sender {
-                                    let mut disbanded_circuit = DisbandedCircuit::new();
-                                    disbanded_circuit.set_circuit_id(circuit_id.to_string());
-                                    disbanded_circuit.set_member_node_id(self.node_id.clone());
+                                    let mut member_ready = MemberReady::new();
+                                    member_ready.set_circuit_id(circuit_id.to_string());
+                                    member_ready.set_member_node_id(self.node_id.clone());
                                     let mut msg = AdminMessage::new();
-                                    msg.set_message_type(AdminMessage_Type::DISBANDED_CIRCUIT);
-                                    msg.set_disbanded_circuit(disbanded_circuit);
+                                    msg.set_message_type(AdminMessage_Type::MEMBER_READY);
+                                    msg.set_member_ready(member_ready);
 
                                     let envelope_bytes =
                                         msg.write_to_bytes().map_err(MarshallingError::from)?;
@@ -436,7 +424,8 @@ impl AdminServiceShared {
                                         }
                                     }
                                 }
-                                self.add_pending_disbanded_circuit(circuit_proposal.clone())?;
+                                // add circuit as pending further service handling
+                                self.add_uninitialized_circuit(circuit_proposal.clone())?;
                             }
                         }
                         if status == Circuit_CircuitStatus::ACTIVE
@@ -1797,14 +1786,15 @@ impl AdminServiceShared {
         Ok(circuit)
     }
 
-    /// Add a circuit definition as an uninitialized circuit. If all members are ready, initialize
-    /// services.
+    /// Add a circuit definition as an uninitialized circuit. If all members are ready, verify
+    /// the proposal type to check if we are creating a circuit and will initialize the services
+    /// or if the proposal type is to disband a circuit, in which case the services are stopped.
     fn add_uninitialized_circuit(
         &mut self,
         circuit: CircuitProposal,
     ) -> Result<(), AdminSharedError> {
         let circuit_id = circuit.get_circuit_id().to_string();
-
+        let circuit_proposal_type = circuit.get_proposal_type();
         // If uninitialized circuit already exists, add the circuit definition; if not, create the
         // uninitialized circuit.
         match self.uninitialized_circuits.get_mut(&circuit_id) {
@@ -1827,16 +1817,56 @@ impl AdminServiceShared {
             .ready_members
             .insert(self.node_id.clone());
 
-        self.initialize_services_if_members_ready(&circuit_id)
+        // Check if members are ready for the next step of the proposal, based on the proposal's
+        // type. If the proposal has type `CircuitProposal_ProposalType::CREATE`, the proposal
+        // is intended to create a circuit and the associated services need to be initialized.
+        // In this case, the next step is to `initialize_services_if_members_ready`.
+        // If the proposal has type `CircuitProposal_ProposalType::DISBAND`, the proposal is
+        // intended to disband a circuit and the associated services will need to be stopped. In
+        // this case, the next step is to `cleanup_disbanded_circuit_if_members_ready`.
+        if circuit_proposal_type == CircuitProposal_ProposalType::DISBAND {
+            #[cfg(feature = "circuit-disband")]
+            {
+                self.cleanup_disbanded_circuit_if_members_ready(&circuit_id)?;
+            }
+            Ok(())
+        } else {
+            println!(
+                "Going to initialize the services for node {:?}",
+                self.node_id()
+            );
+            self.initialize_services_if_members_ready(&circuit_id)
+        }
     }
 
-    /// Mark member node as ready to initialize services on the given circuit. If all members are
-    /// now ready, initialize services.
+    /// A member may be ready to initialize a circuit or to disband a circuit. The proposal type
+    /// of the proposal associated with the `circuit_id` determines the operation the member
+    /// voted for. If the proposal type is `Create`, the vote submitted pertains to creating a
+    /// circuit so the services must be initialized if all members are now ready. If the proposal
+    /// type is disband, the vote submitted pertains to disbanding a circuit so the services
+    /// must be stopped if all members are now ready if the `circuit-disband` feature is enabled.
     pub fn add_ready_member(
         &mut self,
         circuit_id: &str,
         member_node_id: String,
     ) -> Result<(), AdminSharedError> {
+        // The requesting node will have already updated their state, so the associated proposal
+        // may not be available. In this case, the proposal type must be pulled from the circuit
+        // proposal stored in the `uninitialized_circuits` list.
+        let mut proposal_type = ProposalType::Create;
+        if let Some(proposal) = self.get_proposal(&circuit_id)? {
+            proposal_type = proposal.proposal_type().clone();
+        } else if let Some(uninit_circuit) = self.uninitialized_circuits.get(circuit_id) {
+            if let Some(circuit) = &uninit_circuit.circuit {
+                proposal_type =
+                    ProposalType::try_from(&circuit.get_proposal_type()).map_err(|_| {
+                        AdminSharedError::SplinterStateError(
+                            "CircuitProposal proto's ProposalType is unset".to_string(),
+                        )
+                    })?
+            }
+        }
+
         // If uninitialized circuit does not already exist, create it
         if self.uninitialized_circuits.get(circuit_id).is_none() {
             self.uninitialized_circuits.insert(
@@ -1854,7 +1884,13 @@ impl AdminServiceShared {
             .ready_members
             .insert(member_node_id);
 
-        self.initialize_services_if_members_ready(circuit_id)
+        // Move onto either initializing the services or stopping the services, depending on the
+        // associated circuit proposal's type.
+        match proposal_type {
+            #[cfg(feature = "circuit-disband")]
+            ProposalType::Disband => self.cleanup_disbanded_circuit_if_members_ready(&circuit_id),
+            _ => self.initialize_services_if_members_ready(circuit_id),
+        }
     }
 
     /// If all members of an uninitialized circuit are ready, initialize services. Also send
@@ -2815,38 +2851,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-disband")]
-    fn add_pending_disbanded_circuit(
-        &mut self,
-        circuit: CircuitProposal,
-    ) -> Result<(), AdminSharedError> {
-        let circuit_id = circuit.get_circuit_id().to_string();
-        match self
-            .pending_consensus_disbanded_circuits
-            .get_mut(&circuit_id)
-        {
-            Some(pending_disband_circuit) => pending_disband_circuit.circuit = Some(circuit),
-            None => {
-                self.pending_consensus_disbanded_circuits.insert(
-                    circuit_id.to_string(),
-                    PendingDisbandedCircuit {
-                        circuit: Some(circuit),
-                        ready_members: HashSet::new(),
-                    },
-                );
-            }
-        }
-
-        // Add self as ready
-        self.pending_consensus_disbanded_circuits
-            .get_mut(&circuit_id)
-            .expect("Pending disbanded circuit not set")
-            .ready_members
-            .insert(self.node_id.clone());
-
-        self.cleanup_disbanded_circuit_if_members_ready(&circuit_id)
-    }
-
     #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
     /// Stops all services that this node was running on the disbanded or abandoned circuit using
     /// the service orchestrator. This may not include all services if they are not supported
@@ -2953,35 +2957,6 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
-    pub fn add_member_ready_to_disband(
-        &mut self,
-        circuit_id: &str,
-        member_node_id: &str,
-    ) -> Result<(), AdminSharedError> {
-        // Check if the `DisbandedCircuit` message is associated with a pending disband proposal
-        if self
-            .pending_consensus_disbanded_circuits
-            .get(circuit_id)
-            .is_none()
-        {
-            self.pending_consensus_disbanded_circuits.insert(
-                circuit_id.to_string(),
-                PendingDisbandedCircuit {
-                    circuit: None,
-                    ready_members: HashSet::new(),
-                },
-            );
-        }
-        self.pending_consensus_disbanded_circuits
-            .get_mut(circuit_id)
-            .expect("Pending disband circuit not set")
-            .ready_members
-            .insert(member_node_id.to_string());
-
-        self.cleanup_disbanded_circuit_if_members_ready(circuit_id)
-    }
-
-    #[cfg(feature = "circuit-disband")]
     /// Verify all members are ready before cleaning up after the disbanded circuit, i.e. removing
     /// peer refs, removing the circuit from the routing table, and shutting down the circuit's
     /// associated services.
@@ -2990,9 +2965,7 @@ impl AdminServiceShared {
         circuit_id: &str,
     ) -> Result<(), AdminSharedError> {
         let ready = {
-            if let Some(disbanded_circuit) =
-                self.pending_consensus_disbanded_circuits.get(circuit_id)
-            {
+            if let Some(disbanded_circuit) = self.uninitialized_circuits.get(circuit_id) {
                 if let Some(ref circuit_proposal) = disbanded_circuit.circuit {
                     let all_members = circuit_proposal
                         .get_circuit_proposal()
@@ -3011,7 +2984,7 @@ impl AdminServiceShared {
 
         if ready {
             let circuit_proposal = self
-                .pending_consensus_disbanded_circuits
+                .uninitialized_circuits
                 .remove(circuit_id)
                 .expect("Pending disband circuit not set")
                 .circuit
