@@ -909,6 +909,7 @@ mod tests {
     use crate::peer::PeerManager;
     use crate::protos::admin;
     use crate::service::{error, ServiceNetworkRegistry, ServiceNetworkSender};
+    use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Transport};
 
     /// Test that a circuit creation creates the correct connections and sends the appropriate
@@ -942,8 +943,8 @@ mod tests {
         authorizers.add_authorizer("inproc", inproc_authorizer);
         authorizers.add_authorizer("", authorization_manager.authorization_connector());
 
-        let mesh = Mesh::new(2, 2);
-        let cm = ConnectionManager::builder()
+        let mut mesh = Mesh::new(2, 2);
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(authorizers))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -952,7 +953,7 @@ mod tests {
             .expect("Unable to start Connection Manager");
         let connector = cm.connector();
 
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("test-node".to_string())
@@ -1129,11 +1130,15 @@ mod tests {
             envelope.take_circuit_create_request().take_circuit()
         );
 
-        peer_manager.shutdown_signaler().shutdown();
-        peer_manager.await_shutdown();
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
-        mesh.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
     }
 
     fn splinter_node(node_id: &str, endpoints: &[String]) -> admin::SplinterNode {

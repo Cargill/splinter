@@ -158,9 +158,3 @@ pub trait ConnectionMatrixReceiver: Clone + Send {
         timeout: Duration,
     ) -> Result<ConnectionMatrixEnvelope, ConnectionMatrixRecvTimeoutError>;
 }
-
-/// Defines a function to shutdown the connection matrix
-pub trait ConnectionMatrixShutdown: Clone + Send {
-    /// Notifies the underlying connection matrix to shutdown
-    fn shutdown(&self);
-}

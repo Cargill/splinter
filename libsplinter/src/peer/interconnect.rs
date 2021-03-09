@@ -492,6 +492,7 @@ pub mod tests {
     };
     use crate::peer::{PeerManager, PeerManagerNotification};
     use crate::protos::network::NetworkEcho;
+    use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
     // Verify that the PeerInterconnect properly receives messages from peers, passes them to
@@ -543,8 +544,8 @@ pub mod tests {
         let mut listener = transport
             .listen("inproc://test")
             .expect("Cannot listen for connections");
-        let mesh1 = Mesh::new(512, 128);
-        let mesh2 = Mesh::new(512, 128);
+        let mut mesh1 = Mesh::new(512, 128);
+        let mut mesh2 = Mesh::new(512, 128);
 
         // set up thread for the peer
         let (tx, rx) = mpsc::channel();
@@ -579,10 +580,11 @@ pub mod tests {
 
             rx.recv().unwrap();
 
-            mesh2.shutdown_signaler().shutdown();
+            mesh2.signal_shutdown();
+            mesh2.wait_for_shutdown().expect("Unable to shutdown mesh");
         });
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh1.get_life_cycle())
             .with_matrix_sender(mesh1.get_sender())
@@ -592,7 +594,7 @@ pub mod tests {
 
         let connector = cm.connector();
 
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -659,12 +661,18 @@ pub mod tests {
         // trigger the thread shutdown
         tx.send(()).unwrap();
 
-        peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
-        peer_manager.await_shutdown();
-        cm.await_shutdown();
+        peer_manager.signal_shutdown();
+        cm.signal_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         dispatch_shutdown.shutdown();
-        mesh1.shutdown_signaler().shutdown();
+
+        mesh1.signal_shutdown();
+        mesh1.wait_for_shutdown().expect("Unable to shutdown mesh");
+
         interconnect.shutdown_signaler().shutdown();
         interconnect.await_shutdown();
     }
@@ -675,9 +683,9 @@ pub mod tests {
     #[test]
     fn test_peer_interconnect_shutdown() {
         let transport = Box::new(InprocTransport::default());
-        let mesh = Mesh::new(512, 128);
+        let mut mesh = Mesh::new(512, 128);
 
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("test_peer")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -686,7 +694,7 @@ pub mod tests {
             .expect("Unable to start Connection Manager");
 
         let connector = cm.connector();
-        let peer_manager = PeerManager::builder()
+        let mut peer_manager = PeerManager::builder()
             .with_connector(connector)
             .with_retry_interval(1)
             .with_identity("my_id".to_string())
@@ -703,11 +711,17 @@ pub mod tests {
             .build()
             .expect("Unable to build PeerInterconnect");
 
-        peer_manager.shutdown_signaler().shutdown();
-        cm.shutdown_signaler().shutdown();
-        peer_manager.await_shutdown();
-        cm.await_shutdown();
-        mesh.shutdown_signaler().shutdown();
+        peer_manager.signal_shutdown();
+        cm.signal_shutdown();
+        peer_manager
+            .wait_for_shutdown()
+            .expect("Unable to shutdown peer manager");
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
+
+        mesh.signal_shutdown();
+        mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
+
         interconnect.shutdown_signaler().shutdown();
         interconnect.await_shutdown();
     }

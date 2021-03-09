@@ -643,6 +643,7 @@ mod tests {
     use crate::network::connection_manager::{
         AuthorizationResult, Authorizer, AuthorizerCallback, AuthorizerError, ConnectionManager,
     };
+    use crate::threading::lifecycle::ShutdownHandle;
     use crate::transport::{inproc::InprocTransport, Connection, Transport};
 
     impl ServiceConnectionManager {
@@ -663,7 +664,7 @@ mod tests {
         let mut listener = transport.listen("inproc://test_service_connected").unwrap();
 
         let mesh = Mesh::new(512, 128);
-        let cm = ConnectionManager::builder()
+        let mut cm = ConnectionManager::builder()
             .with_authorizer(Box::new(NoopAuthorizer::new("service-id")))
             .with_matrix_life_cycle(mesh.get_life_cycle())
             .with_matrix_sender(mesh.get_sender())
@@ -735,8 +736,9 @@ mod tests {
         jh.join().unwrap();
 
         service_conn_mgr.shutdown_and_wait();
-        cm.shutdown_signaler().shutdown();
-        cm.await_shutdown();
+        cm.signal_shutdown();
+        cm.wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
     }
 
     struct NoopAuthorizer {
