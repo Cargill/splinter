@@ -20,7 +20,7 @@ mod openid;
 use crate::error::InvalidStateError;
 
 use super::error::OAuthClientBuildError;
-#[cfg(feature = "biome-profile")]
+#[cfg(feature = "oauth-profile")]
 use super::ProfileProvider;
 use super::{new_basic_client, store::InflightOAuthRequestStore, OAuthClient, SubjectProvider};
 
@@ -43,7 +43,7 @@ pub struct OAuthClientBuilder {
     scopes: Vec<String>,
     subject_provider: Option<Box<dyn SubjectProvider>>,
     inflight_request_store: Option<Box<dyn InflightOAuthRequestStore>>,
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     profile_provider: Option<Box<dyn ProfileProvider>>,
 }
 
@@ -96,7 +96,7 @@ impl OAuthClientBuilder {
                     .into(),
             )
         })?;
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         let profile_provider = self.profile_provider.ok_or_else(|| {
             InvalidStateError::with_message(
                 "A profile provider is required to successfully build an OAuthClient".into(),
@@ -108,7 +108,7 @@ impl OAuthClientBuilder {
             self.scopes,
             subject_provider.clone(),
             inflight_request_store,
-            #[cfg(feature = "biome-profile")]
+            #[cfg(feature = "oauth-profile")]
             profile_provider,
         ))
     }
@@ -173,7 +173,7 @@ impl OAuthClientBuilder {
         self
     }
 
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     /// Sets the profile provider to use to request the user's profile details.
     pub fn with_profile_provider(mut self, profile_provider: Box<dyn ProfileProvider>) -> Self {
         self.profile_provider = Some(profile_provider);

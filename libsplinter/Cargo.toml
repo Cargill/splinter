@@ -116,6 +116,7 @@ experimental = [
     "circuit-purge",
     "client-reqwest",
     "https-bind",
+    "oauth-profile",
     "rest-api-actix-web-3",
     "role-based-authorization-store-postgres",
     "service-arg-validation",
@@ -137,7 +138,8 @@ biome = []
 biome-credentials = ["bcrypt", "biome"]
 biome-key-management = ["biome"]
 biome-notifications = ["biome"]
-biome-profile = ["biome", "base64"]
+biome-profile = ["biome"]
+oauth-profile = ["base64"]
 circuit-abandon = []
 circuit-disband = []
 circuit-purge = []

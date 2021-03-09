@@ -194,7 +194,7 @@ mod tests {
     use crate::oauth::{
         store::MemoryInflightOAuthRequestStore, OAuthClientBuilder, SubjectProvider,
     };
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     use crate::oauth::{Profile, ProfileProvider};
 
     const TOKEN_ENDPOINT: &str = "/token";
@@ -461,7 +461,7 @@ mod tests {
             .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
             .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
 
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         let client = client.with_profile_provider(Box::new(RefreshedTokenProfileProvider));
 
         let client = client.build().expect("Failed to build OAuth client");
@@ -537,7 +537,7 @@ mod tests {
             .with_subject_provider(Box::new(RefreshedTokenSubjectProvider))
             .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
 
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         let client = client.with_profile_provider(Box::new(RefreshedTokenProfileProvider));
 
         let client = client.build().expect("Failed to build OAuth client");
@@ -574,7 +574,7 @@ mod tests {
             .with_subject_provider(Box::new(AlwaysSomeSubjectProvider))
             .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
 
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         let client = client.with_profile_provider(Box::new(AlwaysSomeProfileProvider));
 
         let client = client.build().expect("Failed to build OAuth client");
@@ -596,11 +596,11 @@ mod tests {
     }
 
     /// Profile provider that always returns a profile
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct AlwaysSomeProfileProvider;
 
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for AlwaysSomeProfileProvider {
         fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
             let profile = Profile {
@@ -630,7 +630,7 @@ mod tests {
             .with_subject_provider(Box::new(AlwaysNoneSubjectProvider))
             .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
 
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         let client = client.with_profile_provider(Box::new(AlwaysNoneProfileProvider));
 
         let client = client.build().expect("Failed to build OAuth client");
@@ -652,11 +652,11 @@ mod tests {
     }
 
     /// Profile provider that always returns `Ok(None)`
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct AlwaysNoneProfileProvider;
 
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for AlwaysNoneProfileProvider {
         fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
             Ok(None)
@@ -678,7 +678,7 @@ mod tests {
             .with_subject_provider(Box::new(AlwaysErrSubjectProvider))
             .with_inflight_request_store(Box::new(MemoryInflightOAuthRequestStore::new()));
 
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         let client = client.with_profile_provider(Box::new(AlwaysErrProfileProvider));
 
         let client = client.build().expect("Failed to build OAuth client");
@@ -700,11 +700,11 @@ mod tests {
     }
 
     /// Profile provider that always returns `Err`
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct AlwaysErrProfileProvider;
 
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for AlwaysErrProfileProvider {
         fn get_profile(&self, _access_token: &str) -> Result<Option<Profile>, InternalError> {
             Err(InternalError::with_message("error".into()))
@@ -736,11 +736,11 @@ mod tests {
 
     /// Profile provider that returns a profile when the new `NEW_OAUTH_ACCESS_TOKEN` is provided;
     /// returns `Ok(None)` otherwise.
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     #[derive(Clone)]
     struct RefreshedTokenProfileProvider;
 
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     impl ProfileProvider for RefreshedTokenProfileProvider {
         fn get_profile(&self, access_token: &str) -> Result<Option<Profile>, InternalError> {
             if access_token == NEW_OAUTH_ACCESS_TOKEN {

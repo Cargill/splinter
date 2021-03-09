@@ -28,7 +28,7 @@ use crate::biome::{
 };
 #[cfg(feature = "biome-profile")]
 use crate::error::InternalError;
-#[cfg(feature = "biome-profile")]
+#[cfg(feature = "oauth-profile")]
 use crate::oauth::Profile as OauthProfile;
 use crate::oauth::{
     rest_api::resources::callback::{generate_redirect_query, CallbackQuery},
@@ -342,7 +342,7 @@ mod tests {
         PendingAuthorization,
     };
 
-    #[cfg(feature = "biome-profile")]
+    #[cfg(feature = "oauth-profile")]
     use crate::oauth::tests::TestProfileProvider;
 
     const TOKEN_ENDPOINT: &str = "/token";
@@ -398,7 +398,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "biome-profile")]
+            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -507,7 +507,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             Box::new(MemoryInflightOAuthRequestStore::new()),
-            #[cfg(feature = "biome-profile")]
+            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -588,7 +588,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "biome-profile")]
+            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
@@ -671,7 +671,7 @@ mod tests {
             vec![],
             Box::new(TestSubjectProvider),
             request_store.clone(),
-            #[cfg(feature = "biome-profile")]
+            #[cfg(feature = "oauth-profile")]
             Box::new(TestProfileProvider),
         );
 
