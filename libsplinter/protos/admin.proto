@@ -310,8 +310,7 @@ message AdminMessage {
         CONSENSUS_MESSAGE = 1;
         PROPOSED_CIRCUIT = 2;
         MEMBER_READY = 3;
-        DISBANDED_CIRCUIT = 4;
-        ABANDONED_CIRCUIT = 5;
+        ABANDONED_CIRCUIT = 4;
 
         SERVICE_PROTOCOL_VERSION_REQUEST = 100;
         SERVICE_PROTOCOL_VERSION_RESPONSE = 101;
@@ -322,8 +321,7 @@ message AdminMessage {
     bytes consensus_message = 2;
     ProposedCircuit proposed_circuit = 3;
     MemberReady member_ready = 4;
-    DisbandedCircuit disbanded_circuit = 5;
-    AbandonedCircuit abandoned_circuit = 6;
+    AbandonedCircuit abandoned_circuit = 5;
 
     // Messages to agree on protocol version
     ServiceProtocolVersionRequest protocol_request = 100;
@@ -342,12 +340,6 @@ message ProposedCircuit {
 }
 
 message MemberReady {
-    string circuit_id = 1;
-    string member_node_id = 2;
-}
-
-message DisbandedCircuit {
-    // the circuit being disbanded
     string circuit_id = 1;
     string member_node_id = 2;
 }
