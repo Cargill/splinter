@@ -512,6 +512,25 @@ impl From<&messages::ProposalType> for ProposalType {
     }
 }
 
+impl TryFrom<&admin::CircuitProposal_ProposalType> for ProposalType {
+    type Error = InvalidStateError;
+
+    fn try_from(
+        proto_proposal_type: &admin::CircuitProposal_ProposalType,
+    ) -> Result<Self, Self::Error> {
+        match *proto_proposal_type {
+            admin::CircuitProposal_ProposalType::CREATE => Ok(ProposalType::Create),
+            admin::CircuitProposal_ProposalType::UPDATE_ROSTER => Ok(ProposalType::UpdateRoster),
+            admin::CircuitProposal_ProposalType::ADD_NODE => Ok(ProposalType::AddNode),
+            admin::CircuitProposal_ProposalType::REMOVE_NODE => Ok(ProposalType::RemoveNode),
+            admin::CircuitProposal_ProposalType::DISBAND => Ok(ProposalType::Disband),
+            admin::CircuitProposal_ProposalType::UNSET_PROPOSAL_TYPE => Err(
+                InvalidStateError::with_message("ProposalType is unset".to_string()),
+            ),
+        }
+    }
+}
+
 impl From<&messages::VoteRecord> for VoteRecord {
     fn from(admin_vote_record: &messages::VoteRecord) -> Self {
         VoteRecord {
