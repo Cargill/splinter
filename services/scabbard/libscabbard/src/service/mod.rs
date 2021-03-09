@@ -372,6 +372,7 @@ impl Service for Scabbard {
         }
     }
 
+    #[cfg(feature = "circuit-purge")]
     fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
         self.state
             .lock()

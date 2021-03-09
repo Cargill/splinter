@@ -38,6 +38,8 @@ experimental = [
     "stable",
     # The following features are experimental:
     "authorization",
+    "circuit-purge",
 ]
 
 authorization = ["splinter/authorization"]
+circuit-purge = ["splinter/circuit-purge"]
