@@ -15,6 +15,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
+#[cfg(feature = "circuit-purge")]
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{
@@ -74,7 +75,9 @@ pub struct ScabbardState {
     pending_changes: Option<(String, Vec<TransactionReceipt>)>,
     event_subscribers: Vec<Box<dyn StateSubscriber>>,
     batch_history: BatchHistory,
+    #[cfg(feature = "circuit-purge")]
     state_db_file: PathBuf,
+    #[cfg(feature = "circuit-purge")]
     receipt_db_file: PathBuf,
 }
 
@@ -89,7 +92,9 @@ impl ScabbardState {
         // Initialize the database
         let mut indexes = INDEXES.to_vec();
         indexes.push(CURRENT_STATE_ROOT_INDEX);
+        #[cfg(feature = "circuit-purge")]
         let state_db_file = state_db_path.to_path_buf();
+        #[cfg(feature = "circuit-purge")]
         let receipt_db_file = receipt_db_path.to_path_buf();
         let state_db_path = state_db_path.as_path().with_extension("lmdb");
         let receipt_db_path = receipt_db_path.as_path().with_extension("lmdb");
@@ -158,7 +163,9 @@ impl ScabbardState {
             pending_changes: None,
             event_subscribers: vec![],
             batch_history: BatchHistory::new(),
+            #[cfg(feature = "circuit-purge")]
             state_db_file,
+            #[cfg(feature = "circuit-purge")]
             receipt_db_file,
         })
     }
@@ -367,6 +374,7 @@ impl ScabbardState {
         self.event_subscribers.clear();
     }
 
+    #[cfg(feature = "circuit-purge")]
     /// Computes the files associated with the LMDB state, including lock files.
     pub fn remove_db_files(&self) -> Result<(), ScabbardStateError> {
         let state_db_path = self.state_db_file.with_extension("lmdb");

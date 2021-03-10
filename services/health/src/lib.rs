@@ -77,6 +77,7 @@ impl Service for HealthService {
         Ok(())
     }
 
+    #[cfg(feature = "circuit-purge")]
     fn purge(&mut self) -> Result<(), splinter::error::InternalError> {
         info!("Purging health service");
         Ok(())
