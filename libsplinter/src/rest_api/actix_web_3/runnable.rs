@@ -14,14 +14,14 @@
 
 //! Contains the implementation of `RunnableRestApi`.
 
-use crate::rest_api::{RestApiBind, RestApiServerError};
+use crate::rest_api::{BindConfig, RestApiServerError};
 
 use super::{ResourceProvider, RestApi};
 
 /// A configured REST API which may best started with `run` function.
 pub struct RunnableRestApi {
     pub(super) resource_providers: Vec<Box<dyn ResourceProvider>>,
-    pub(super) bind: RestApiBind,
+    pub(super) bind: BindConfig,
 }
 
 impl RunnableRestApi {
@@ -34,7 +34,7 @@ impl RunnableRestApi {
         } = self;
 
         let (bind_url, acceptor_opt) = match bind {
-            RestApiBind::Secure {
+            BindConfig::Secure {
                 bind,
                 cert_path,
                 key_path,
@@ -47,7 +47,7 @@ impl RunnableRestApi {
 
                 (bind, Some(acceptor))
             }
-            RestApiBind::Insecure(url) => (url, None),
+            BindConfig::Insecure(url) => (url, None),
         };
 
         Ok(RestApi::new(bind_url, acceptor_opt, resource_providers)?)

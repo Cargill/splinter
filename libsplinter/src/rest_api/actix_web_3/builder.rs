@@ -14,7 +14,7 @@
 
 //! Contains the implementation of `RestApiBuilder`.
 
-use crate::rest_api::{RestApiBind, RestApiServerError};
+use crate::rest_api::{BindConfig, RestApiServerError};
 
 use super::{ResourceProvider, RunnableRestApi};
 
@@ -23,7 +23,7 @@ use super::{ResourceProvider, RunnableRestApi};
 /// This builder's primary function is to create the runnable REST API in a valid state.
 pub struct RestApiBuilder {
     resource_providers: Vec<Box<dyn ResourceProvider>>,
-    bind: Option<RestApiBind>,
+    bind: Option<BindConfig>,
 }
 
 impl Default for RestApiBuilder {
@@ -42,7 +42,7 @@ impl RestApiBuilder {
     }
 
     /// Sets the bind value, which will be used when binding to one or more ports.
-    pub fn with_bind(mut self, value: RestApiBind) -> Self {
+    pub fn with_bind(mut self, value: BindConfig) -> Self {
         self.bind = Some(value);
         self
     }
@@ -76,7 +76,7 @@ mod test {
     /// is provided.
     #[test]
     fn rest_api_thread_builder_successful() {
-        let builder = RestApiBuilder::new().with_bind(RestApiBind::Insecure("test".into()));
+        let builder = RestApiBuilder::new().with_bind(BindConfig::Insecure("test".into()));
 
         assert!(builder.build().is_ok())
     }

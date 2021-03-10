@@ -25,7 +25,7 @@ use crate::rest_api::auth::authorization::{
 use crate::rest_api::auth::{actix::Authorization, identity::IdentityProvider};
 #[cfg(feature = "rest-api-cors")]
 use crate::rest_api::cors::Cors;
-use crate::rest_api::{RestApiBind, RestApiServerError};
+use crate::rest_api::{BindConfig, RestApiServerError};
 
 use super::Resource;
 #[cfg(feature = "authorization")]
@@ -51,7 +51,7 @@ impl RestApiShutdownHandle {
 /// `RestApi` is used to create an instance of a restful web server.
 pub struct RestApi {
     pub(super) resources: Vec<Resource>,
-    pub(super) bind: RestApiBind,
+    pub(super) bind: BindConfig,
     #[cfg(feature = "rest-api-cors")]
     pub(super) whitelist: Option<Vec<String>>,
     pub(super) identity_providers: Vec<Box<dyn IdentityProvider>>,
@@ -95,7 +95,7 @@ impl RestApi {
 
         #[cfg(feature = "https-bind")]
         let bind_info = match self.bind {
-            RestApiBind::Secure {
+            BindConfig::Secure {
                 bind,
                 cert_path,
                 key_path,
@@ -108,11 +108,11 @@ impl RestApi {
 
                 (bind, Some(acceptor))
             }
-            RestApiBind::Insecure(bind) => (bind, None),
+            BindConfig::Insecure(bind) => (bind, None),
         };
 
         #[cfg(not(feature = "https-bind"))]
-        let RestApiBind::Insecure(bind_info) = self.bind;
+        let BindConfig::Insecure(bind_info) = self.bind;
 
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
@@ -245,13 +245,13 @@ impl RestApi {
 
         #[cfg(feature = "https-bind")]
         let bind_url = match self.bind.clone() {
-            RestApiBind::Secure { bind, .. } => bind,
+            BindConfig::Secure { bind, .. } => bind,
 
-            RestApiBind::Insecure(bind) => bind,
+            BindConfig::Insecure(bind) => bind,
         };
 
         #[cfg(not(feature = "https-bind"))]
-        let RestApiBind::Insecure(bind_url) = self.bind.clone();
+        let BindConfig::Insecure(bind_url) = self.bind.clone();
 
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]

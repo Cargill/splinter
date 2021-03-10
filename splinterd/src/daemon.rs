@@ -810,16 +810,16 @@ impl SplinterDaemon {
     }
 
     #[cfg(feature = "https-bind")]
-    fn build_rest_api_bind(&self) -> Result<splinter::rest_api::RestApiBind, StartError> {
+    fn build_rest_api_bind(&self) -> Result<splinter::rest_api::BindConfig, StartError> {
         match self.rest_api_endpoint.strip_prefix("http://") {
-            Some(insecure_endpoint) => Ok(splinter::rest_api::RestApiBind::Insecure(
+            Some(insecure_endpoint) => Ok(splinter::rest_api::BindConfig::Insecure(
                 insecure_endpoint.into(),
             )),
             None => {
                 if let Some((rest_api_server_cert, rest_api_server_key)) =
                     self.rest_api_ssl_settings.as_ref()
                 {
-                    Ok(splinter::rest_api::RestApiBind::Secure {
+                    Ok(splinter::rest_api::BindConfig::Secure {
                         bind: self
                             .rest_api_endpoint
                             .strip_prefix("https://")

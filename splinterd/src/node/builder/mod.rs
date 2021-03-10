@@ -27,7 +27,7 @@ use splinter::rest_api::auth::{
     identity::{Identity, IdentityProvider},
     AuthorizationHeader,
 };
-use splinter::rest_api::RestApiBind;
+use splinter::rest_api::BindConfig;
 use splinter::store::StoreFactory;
 
 use super::{RunnableNode, RunnableNodeRestApiVariant};
@@ -148,7 +148,7 @@ impl NodeBuilder {
 
                 RunnableNodeRestApiVariant::ActixWeb1(
                     RestApiBuilder1::new()
-                        .with_bind(RestApiBind::Insecure(url))
+                        .with_bind(BindConfig::Insecure(url))
                         .with_auth_configs(vec![auth_config])
                         .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)])
                         .build()
@@ -157,7 +157,7 @@ impl NodeBuilder {
             }
             RestApiVariant::ActixWeb3 => RunnableNodeRestApiVariant::ActixWeb3(
                 RestApiBuilder3::new()
-                    .with_bind(RestApiBind::Insecure(url))
+                    .with_bind(BindConfig::Insecure(url))
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
             ),
