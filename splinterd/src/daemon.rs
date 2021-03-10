@@ -334,7 +334,7 @@ impl SplinterDaemon {
             })?;
 
         let (network_dispatcher_sender, network_dispatch_receiver) = dispatch_channel();
-        let interconnect = PeerInterconnectBuilder::new()
+        let mut interconnect = PeerInterconnectBuilder::new()
             .with_peer_connector(peer_connector.clone())
             .with_message_receiver(self.mesh.get_receiver())
             .with_message_sender(self.mesh.get_sender())
@@ -374,8 +374,6 @@ impl SplinterDaemon {
             .map_err(|err| {
                 StartError::NetworkError(format!("Unable to create network dispatch loop: {}", err))
             })?;
-
-        let interconnect_shutdown = interconnect.shutdown_signaler();
 
         // setup threads to listen on the network ports and add incoming connections to the network
         // these threads will just be dropped on shutdown
@@ -793,7 +791,8 @@ impl SplinterDaemon {
         }
 
         registry_shutdown.shutdown();
-        interconnect_shutdown.shutdown();
+
+        interconnect.signal_shutdown();
 
         // Join threads and shutdown network components
         let _ = rest_api_join_handle.join();
@@ -809,6 +808,9 @@ impl SplinterDaemon {
         }
 
         self.mesh.signal_shutdown();
+        if let Err(err) = interconnect.wait_for_shutdown() {
+            error!("Unable to cleanly shut down peer interconnect: {}", err);
+        }
         if let Err(err) = self.mesh.clone().wait_for_shutdown() {
             error!("Unable to cleanly shut down Mesh: {}", err);
         }
