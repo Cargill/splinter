@@ -17,7 +17,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::error::InvalidStateError;
+use crate::error::{ConstraintViolationType, InvalidStateError};
 use crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStoreError;
 
 #[derive(Debug)]
@@ -25,6 +25,7 @@ pub(crate) enum SendableRoleBasedAuthorizationStoreError {
     ConstraintViolation(String),
     InternalError(String),
     InvalidState(InvalidStateError),
+    NotFound(String),
 }
 
 impl Error for SendableRoleBasedAuthorizationStoreError {
@@ -33,6 +34,7 @@ impl Error for SendableRoleBasedAuthorizationStoreError {
             SendableRoleBasedAuthorizationStoreError::ConstraintViolation(_) => None,
             SendableRoleBasedAuthorizationStoreError::InternalError(_) => None,
             SendableRoleBasedAuthorizationStoreError::InvalidState(err) => err.source(),
+            SendableRoleBasedAuthorizationStoreError::NotFound(_) => None,
         }
     }
 }
@@ -45,6 +47,7 @@ impl fmt::Display for SendableRoleBasedAuthorizationStoreError {
             SendableRoleBasedAuthorizationStoreError::InvalidState(err) => {
                 f.write_str(&err.to_string())
             }
+            SendableRoleBasedAuthorizationStoreError::NotFound(msg) => f.write_str(&msg),
         }
     }
 }
@@ -52,6 +55,11 @@ impl fmt::Display for SendableRoleBasedAuthorizationStoreError {
 impl From<RoleBasedAuthorizationStoreError> for SendableRoleBasedAuthorizationStoreError {
     fn from(err: RoleBasedAuthorizationStoreError) -> Self {
         match err {
+            RoleBasedAuthorizationStoreError::ConstraintViolation(err)
+                if err.violation_type() == &ConstraintViolationType::NotFound =>
+            {
+                SendableRoleBasedAuthorizationStoreError::NotFound(err.to_string())
+            }
             RoleBasedAuthorizationStoreError::ConstraintViolation(err) => {
                 SendableRoleBasedAuthorizationStoreError::ConstraintViolation(err.to_string())
             }

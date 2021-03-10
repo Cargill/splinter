@@ -17,6 +17,7 @@ use diesel::{
     prelude::*,
 };
 
+use crate::error::{ConstraintViolationError, ConstraintViolationType};
 use crate::rest_api::auth::authorization::rbac::store::{
     diesel::{
         models::{RoleModel, RolePermissionModel},
@@ -39,11 +40,19 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
 
         self.conn.transaction::<_, _, _>(|| {
-            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
+            let updated = update(roles::table.find(&role.id))
+                .set(roles::display_name.eq(&role.display_name))
                 .execute(self.conn)?;
 
-            update(roles::table.find(&role.id))
-                .set(roles::display_name.eq(&role.display_name))
+            if updated == 0 {
+                return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
+                ));
+            }
+
+            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
                 .execute(self.conn)?;
 
             insert_into(role_permissions::table)
@@ -63,11 +72,19 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
         let (role, permissions): (RoleModel, Vec<RolePermissionModel>) = role.into();
 
         self.conn.transaction::<_, _, _>(|| {
-            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
+            let updated = update(roles::table.find(&role.id))
+                .set(roles::display_name.eq(&role.display_name))
                 .execute(self.conn)?;
 
-            update(roles::table.find(&role.id))
-                .set(roles::display_name.eq(&role.display_name))
+            if updated == 0 {
+                return Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
+                ));
+            }
+
+            delete(role_permissions::table.filter(role_permissions::role_id.eq(&role.id)))
                 .execute(self.conn)?;
 
             insert_into(role_permissions::table)

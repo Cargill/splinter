@@ -417,20 +417,27 @@ impl TryFrom<(models::IdentityModel, Vec<models::AssignmentModel>)> for Assignme
 impl From<diesel::result::Error> for RoleBasedAuthorizationStoreError {
     fn from(err: diesel::result::Error) -> Self {
         match err {
-            diesel::result::Error::DatabaseError(
-                diesel::result::DatabaseErrorKind::UniqueViolation,
-                _,
-            ) => RoleBasedAuthorizationStoreError::ConstraintViolation(
-                ConstraintViolationError::from_source_with_violation_type(
-                    ConstraintViolationType::Unique,
+            diesel::result::Error::DatabaseError(ref kind, _) => match kind {
+                diesel::result::DatabaseErrorKind::UniqueViolation => {
+                    RoleBasedAuthorizationStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::Unique,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                diesel::result::DatabaseErrorKind::ForeignKeyViolation => {
+                    RoleBasedAuthorizationStoreError::ConstraintViolation(
+                        ConstraintViolationError::from_source_with_violation_type(
+                            ConstraintViolationType::ForeignKey,
+                            Box::new(err),
+                        ),
+                    )
+                }
+                _ => RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
                     Box::new(err),
-                ),
-            ),
-            diesel::result::Error::DatabaseError(_, _) => {
-                RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
-                    Box::new(err),
-                ))
-            }
+                )),
+            },
             _ => RoleBasedAuthorizationStoreError::InternalError(InternalError::from_source(
                 Box::new(err),
             )),
@@ -618,6 +625,29 @@ mod tests {
             &["a".to_string(), "b".to_string()],
             stored_role.permissions()
         );
+    }
+    /// This test verifies the following
+    /// 1. Updating an non-existent role should return false
+    #[test]
+    fn sqlite_update_nonexistent_role() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool);
+
+        let role = RoleBuilder::new()
+            .with_id("test-nonexistent-role".into())
+            .with_display_name("Test Role".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        let res = role_based_auth_store.update_role(role);
+
+        assert!(matches!(
+            res,
+            Err(RoleBasedAuthorizationStoreError::ConstraintViolation(err))
+                if err.violation_type() == &ConstraintViolationType::NotFound
+        ));
     }
 
     /// This tests verifies the following:
@@ -954,6 +984,49 @@ mod tests {
             stored_assignment.identity()
         );
         assert_eq!(&vec!["test-role-2".to_string()], stored_assignment.roles());
+    }
+
+    #[test]
+    fn sqlite_test_update_nonexistent_assignment() {
+        let pool = create_connection_pool_and_migrate();
+
+        let role_based_auth_store = DieselRoleBasedAuthorizationStore::new(pool.clone());
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-1".into())
+            .with_display_name("Test Role 1".into())
+            .with_permissions(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let role = RoleBuilder::new()
+            .with_id("test-role-2".into())
+            .with_display_name("Test Role 2".into())
+            .with_permissions(vec!["x".to_string(), "y".to_string(), "z".to_string()])
+            .build()
+            .expect("Unable to build role");
+
+        role_based_auth_store
+            .add_role(role)
+            .expect("Unable to add role");
+
+        let assignment = AssignmentBuilder::new()
+            .with_identity(Identity::User("some-nonexistent-user-id".into()))
+            .with_roles(vec!["test-role-1".to_string()])
+            .build()
+            .expect("Unable to build assignment");
+
+        let res = role_based_auth_store.update_assignment(assignment);
+
+        assert!(matches!(
+            res,
+            Err(RoleBasedAuthorizationStoreError::ConstraintViolation(err))
+                if err.violation_type() == &ConstraintViolationType::NotFound
+        ));
     }
 
     /// This test verifies the following:

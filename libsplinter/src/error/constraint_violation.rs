@@ -23,10 +23,11 @@ use std::fmt;
 /// violated. For example, if an operation tries to insert an entry that would
 /// cause a duplicate in a unique column, the ConstraintViolationType::Unique
 /// should be used.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ConstraintViolationType {
     Unique,
     ForeignKey,
+    NotFound,
     Other(String),
 }
 
@@ -35,6 +36,7 @@ impl fmt::Display for ConstraintViolationType {
         match &self {
             ConstraintViolationType::Unique => write!(f, "Unique"),
             ConstraintViolationType::ForeignKey => write!(f, "Foreign Key"),
+            ConstraintViolationType::NotFound => f.write_str("Not Found"),
             ConstraintViolationType::Other(ref msg) => write!(f, "{}", msg),
         }
     }
@@ -103,6 +105,11 @@ impl ConstraintViolationError {
             violation_type,
             source: Some(source),
         }
+    }
+
+    /// Returns the violation type that triggered the error.
+    pub fn violation_type(&self) -> &ConstraintViolationType {
+        &self.violation_type
     }
 }
 

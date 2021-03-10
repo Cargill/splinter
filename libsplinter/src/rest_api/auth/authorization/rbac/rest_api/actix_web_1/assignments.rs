@@ -291,8 +291,11 @@ fn patch_assignment(
                                 HttpResponse::BadRequest()
                                     .json(ErrorResponse::bad_request(&err.to_string()))
                             }
-                            Err(BlockingError::Error(ConstraintViolation(msg))) => {
+                            Err(BlockingError::Error(NotFound(msg))) => {
                                 HttpResponse::NotFound().json(ErrorResponse::not_found(&msg))
+                            }
+                            Err(BlockingError::Error(ConstraintViolation(msg))) => {
+                                HttpResponse::Conflict().json(ErrorResponse::conflict(&msg))
                             }
                             Err(err) => {
                                 error!("Unable to update assignment: {}", err);
@@ -326,15 +329,13 @@ fn update_assignment(
                     .update_assignment(updated_assignment)
                     .map_err(SendableRoleBasedAuthorizationStoreError::from)
             } else {
-                Err(
-                    SendableRoleBasedAuthorizationStoreError::ConstraintViolation(format!(
-                        "assignment for {} not found",
-                        match identity {
-                            Identity::Key(key) => key,
-                            Identity::User(user) => user,
-                        }
-                    )),
-                )
+                Err(SendableRoleBasedAuthorizationStoreError::NotFound(format!(
+                    "assignment for {} not found",
+                    match identity {
+                        Identity::Key(key) => key,
+                        Identity::User(user) => user,
+                    }
+                )))
             }
         })
 }
@@ -1464,8 +1465,10 @@ mod tests {
                 assignments.insert(key, assignment);
                 Ok(())
             } else {
-                Err(RoleBasedAuthorizationStoreError::InvalidState(
-                    InvalidStateError::with_message("No assignment found".into()),
+                Err(RoleBasedAuthorizationStoreError::ConstraintViolation(
+                    ConstraintViolationError::with_violation_type(
+                        ConstraintViolationType::NotFound,
+                    ),
                 ))
             }
         }

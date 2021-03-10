@@ -353,7 +353,7 @@ pub trait RoleBasedAuthorizationStore: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns a `InvalidState` error if the role does not exist.
+    /// Returns a `ConstraintViolation` error if the role does not exist.
     fn update_role(&self, role: Role) -> Result<(), RoleBasedAuthorizationStoreError>;
 
     /// Removes a role.
@@ -395,7 +395,7 @@ pub trait RoleBasedAuthorizationStore: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns a `InvalidState` error if the assignment does not exist.
+    /// Returns a `ConstraintViolation` error if the assignment does not exist.
     fn update_assignment(
         &self,
         assignment: Assignment,
