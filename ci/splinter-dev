@@ -58,6 +58,7 @@ WORKDIR /build
 RUN USER=root cargo new --bin cli
 RUN USER=root cargo new --lib libsplinter
 RUN USER=root cargo new --bin splinterd
+RUN cp libsplinter/src/lib.rs splinterd/src/lib.rs
 
 # Create empty Cargo projects for gameroom
 RUN USER=root cargo new --bin examples/gameroom/cli
