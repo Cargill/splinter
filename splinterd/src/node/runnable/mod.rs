@@ -15,6 +15,7 @@
 //! Contains the implementation of `RunnableNode`.
 
 pub(super) mod admin;
+pub(super) mod network;
 
 use std::net::{Ipv4Addr, SocketAddr};
 

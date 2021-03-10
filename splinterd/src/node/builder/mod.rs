@@ -15,6 +15,7 @@
 //! Contains the implementation of `NodeBuilder`.
 
 pub(super) mod admin;
+pub(super) mod network;
 
 use std::time::Duration;
 

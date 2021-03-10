@@ -15,6 +15,7 @@
 //! Contains the implementation of `Node`.
 
 pub mod admin;
+pub mod network;
 
 use std::thread::JoinHandle;
 
