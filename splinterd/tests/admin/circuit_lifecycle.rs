@@ -22,7 +22,7 @@ use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 
 use crate::framework::network::Network;
-use splinter::admin::client::{AdminServiceClient, ProposalSlice};
+use splinter::admin::client::ProposalSlice;
 use splinter::admin::messages::{
     AuthorizationType, CircuitProposalVote, CreateCircuitBuilder, DurabilityType, PersistenceType,
     RouteType, SplinterNode, SplinterNodeBuilder, SplinterService, SplinterServiceBuilder, Vote,
@@ -31,7 +31,7 @@ use splinter::protos::admin::{
     CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header,
 };
-use splinterd::node::RestApiVariant;
+use splinterd::node::{Node, RestApiVariant};
 
 /// Makes the `CircuitManagementPayload` to create a circuit and returns the bytes of this
 /// payload
@@ -176,7 +176,7 @@ fn setup_circuit(
     let mut service_builders: Vec<(String, SplinterServiceBuilder)> = vec![];
     let mut service_ids: Vec<String> = vec![];
     for (idx, node_id) in node_info.keys().enumerate() {
-        let service_id = format!("sc0{}", idx);
+        let service_id = format!("sc{:0>2}", idx);
         service_ids.push(service_id.clone());
         let builder = SplinterServiceBuilder::new()
             .with_service_id(service_id.as_ref())
@@ -208,7 +208,7 @@ fn setup_circuit(
         .iter()
         .map(|(node_id, endpoint)| {
             SplinterNodeBuilder::new()
-                .with_node_id(node_id)
+                .with_node_id(&node_id)
                 .with_endpoints(vec![endpoint.to_string()].as_ref())
                 .build()
                 .expect("Unable to build SplinterNode")
@@ -227,6 +227,7 @@ fn setup_circuit(
         .with_application_metadata(b"test_data")
         .with_comments("test circuit")
         .with_display_name("test_circuit")
+        .with_circuit_version(2)
         .build()
         .expect("Unable to build `CreateCircuit`");
     create_circuit_message
@@ -235,18 +236,31 @@ fn setup_circuit(
 }
 
 /// Commit a 2-party circuit on a network that is already running
-fn commit_2_party_circuit(
-    circuit_id: &str,
-    node_a_client: &Box<dyn AdminServiceClient>,
-    node_a_signer: &dyn Signer,
-    node_b_client: &Box<dyn AdminServiceClient>,
-    node_b_signer: &dyn Signer,
-    node_info: HashMap<String, String>,
-) {
-    let circuit_payload_bytes =
-        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), node_a_signer);
+fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
+    // Create the list of node details needed to build the `CircuitCreateRequest`
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            "tcp://localhost:8000".to_string(),
+        ),
+        (
+            node_b.node_id().to_string(),
+            "tcp://localhost:8001".to_string(),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, String>>();
+
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+    );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a_client.submit_admin_payload(circuit_payload_bytes);
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the second node
@@ -256,7 +270,8 @@ fn commit_2_party_circuit(
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
-        let proposals = node_b_client
+        let proposals = node_b
+            .admin_service_client()
             .list_proposals(None, None)
             .expect("Unable to list proposals from node_b")
             .data;
@@ -269,7 +284,8 @@ fn commit_2_party_circuit(
     }
 
     // Validate the same proposal is available to the first node
-    let proposal_a = node_a_client
+    let proposal_a = node_a
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
         .expect("Unable to fetch proposal from node_a")
         .unwrap();
@@ -277,9 +293,15 @@ fn commit_2_party_circuit(
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
-    let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_b", node_b_signer, true);
-    let res = node_b_client.submit_admin_payload(vote_payload_bytes);
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a,
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the circuit to be committed for the second node
@@ -289,7 +311,8 @@ fn commit_2_party_circuit(
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect circuit in time");
         }
-        let circuits = node_b_client
+        let circuits = node_b
+            .admin_service_client()
             .list_circuits(None)
             .expect("Unable to list circuits from node_b")
             .data;
@@ -302,7 +325,8 @@ fn commit_2_party_circuit(
     }
 
     // Validate the circuit is available to the first node
-    let circuit_a = node_a_client
+    let circuit_a = node_a
+        .admin_service_client()
         .fetch_circuit(&circuit_id)
         .expect("Unable to fetch circuit from node_a")
         .unwrap();
@@ -310,21 +334,36 @@ fn commit_2_party_circuit(
 }
 
 /// Commit a 3-party circuit on a network that is already running
-fn commit_3_party_circuit(
-    circuit_id: &str,
-    node_a_client: &Box<dyn AdminServiceClient>,
-    node_a_signer: &dyn Signer,
-    node_b_client: &Box<dyn AdminServiceClient>,
-    node_b_signer: &dyn Signer,
-    node_c_client: &Box<dyn AdminServiceClient>,
-    node_c_signer: &dyn Signer,
-    node_info: HashMap<String, String>,
-) {
+fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c: &Node) {
+    // Create the list of node details needed to build the `CircuitCreateRequest`
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            "tcp://localhost:8000".to_string(),
+        ),
+        (
+            node_b.node_id().to_string(),
+            "tcp://localhost:8001".to_string(),
+        ),
+        (
+            node_c.node_id().to_string(),
+            "tcp://localhost:8002".to_string(),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, String>>();
+
     // Create the `CircuitManagementPayload` to be sent to a node
-    let circuit_payload_bytes =
-        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), node_a_signer);
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+    );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a_client.submit_admin_payload(circuit_payload_bytes);
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the remote nodes
@@ -335,11 +374,13 @@ fn commit_3_party_circuit(
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
-        let proposals_b = node_b_client
+        let proposals_b = node_b
+            .admin_service_client()
             .list_proposals(None, None)
             .expect("Unable to list proposals from node_b")
             .data;
-        let proposals_c = node_c_client
+        let proposals_c = node_c
+            .admin_service_client()
             .list_proposals(None, None)
             .expect("Unable to list proposals from node_c")
             .data;
@@ -352,7 +393,8 @@ fn commit_3_party_circuit(
         }
     }
     // Validate the same proposal is available to the first node
-    let proposal_a = node_a_client
+    let proposal_a = node_a
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
         .expect("Unable to fetch proposal from node_a")
         .unwrap();
@@ -361,9 +403,15 @@ fn commit_3_party_circuit(
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
-    let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_b", node_b_signer, true);
-    let res = node_b_client.submit_admin_payload(vote_payload_bytes);
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a,
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the vote from this node to appear on the proposal for the remote nodes
@@ -376,11 +424,13 @@ fn commit_3_party_circuit(
         }
         // The proposal should already be available to each of these nodes, so we are able to
         // unwrap the result of the `fetch_proposal` call
-        proposal_a = node_a_client
+        proposal_a = node_a
+            .admin_service_client()
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from node_a")
             .unwrap();
-        proposal_c = node_c_client
+        proposal_c = node_c
+            .admin_service_client()
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from node_c")
             .unwrap();
@@ -389,7 +439,8 @@ fn commit_3_party_circuit(
         }
     }
     // Validate the extra vote records are also available for the voting node
-    let proposal_b = node_b_client
+    let proposal_b = node_b
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
         .expect("Unable to fetch proposal from node_b")
         .unwrap();
@@ -398,9 +449,15 @@ fn commit_3_party_circuit(
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
-    let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_c", node_c_signer, true);
-    let res = node_c_client.submit_admin_payload(vote_payload_bytes);
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a,
+        node_c.node_id(),
+        &*node_c.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_c
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the circuit to be committed for the other nodes
@@ -411,11 +468,13 @@ fn commit_3_party_circuit(
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect circuit in time");
         }
-        let circuits_a = node_a_client
+        let circuits_a = node_a
+            .admin_service_client()
             .list_circuits(None)
             .expect("Unable to list circuits from node_a")
             .data;
-        let circuits_b = node_b_client
+        let circuits_b = node_b
+            .admin_service_client()
             .list_circuits(None)
             .expect("Unable to list circuits from node_b")
             .data;
@@ -429,7 +488,8 @@ fn commit_3_party_circuit(
     }
 
     // Validate the circuit is available to the first node
-    let circuit_c = node_c_client
+    let circuit_c = node_c
+        .admin_service_client()
         .fetch_circuit(&circuit_id)
         .expect("Unable to fetch circuit from node_c")
         .unwrap();
@@ -452,33 +512,15 @@ pub fn test_2_party_circuit_creation() {
     let mut network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(2)
-        .expect("Unable to start 2-node_actixWeb1 network");
-    // Create a context in order to produce private keys for the nodes
-    // Collect the node information to be used to populate the payloads
-    let mut node_info = HashMap::new();
-    // Get the node and node's client for the first node
-    let node_a = network.node(0).expect("Unable to get node_a");
-    let node_a_client = node_a.admin_service_client();
-    let node_a_signer = node_a.admin_signer().clone_box();
-    // Get the node and node's client for the second node
-    let node_b = network.node(1).expect("Unable to get node_b");
-    let node_b_client = node_b.admin_service_client();
-    let node_b_signer = node_b.admin_signer().clone_box();
-    // Using `node_b` here for the second node as a placeholder
-    node_info.insert(
-        "node_b".to_string(),
-        format!("http://localhost:{}", node_b.rest_api_port()),
-    );
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+
     let circuit_id = "ABCDE-01234";
 
-    commit_2_party_circuit(
-        circuit_id,
-        &node_a_client,
-        &*node_a_signer,
-        &node_b_client,
-        &*node_b_signer,
-        node_info,
-    );
+    commit_2_party_circuit(circuit_id, node_a, node_b);
 
     shutdown!(network).unwrap();
 }
@@ -503,48 +545,16 @@ pub fn test_3_party_circuit_creation() {
     let mut network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
-        .expect("Unable to start 3-node_actixWeb1 network");
-    // Collect the node information to be used to populate the payloads
-    let mut node_info = HashMap::new();
-    // Get the node and node's client for the first node
-    let node_a = network.node(0).expect("Unable to get node_a");
-    let node_a_client = node_a.admin_service_client();
-    let node_a_signer = node_a.admin_signer().clone_box();
-    // Using `node_a` here for the first node as a placeholder
-    node_info.insert(
-        "node_a".to_string(),
-        format!("http://localhost:{}", node_a.rest_api_port()),
-    );
-    // Get the node and node's client for the second node
-    let node_b = network.node(1).expect("Unable to get node_b");
-    let node_b_client = node_b.admin_service_client();
-    let node_b_signer = node_b.admin_signer().clone_box();
-    // Using `node_b` here for the second node as a placeholder
-    node_info.insert(
-        "node_b".to_string(),
-        format!("http://localhost:{}", node_b.rest_api_port()),
-    );
-    // Get the node and node's client for the third node
-    let node_c = network.node(2).expect("Unable to get node_c");
-    let node_c_client = node_c.admin_service_client();
-    let node_c_signer = node_c.admin_signer().clone_box();
-    // Using `node_c` here for the third node as a placeholder
-    node_info.insert(
-        "node_c".to_string(),
-        format!("http://localhost:{}", node_c.rest_api_port()),
-    );
-    let circuit_id = "ABCDE-01234";
+        .expect("Unable to start 3-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+    // Get the third node in the network
+    let node_c = network.node(2).expect("Unable to get third node");
 
-    commit_3_party_circuit(
-        circuit_id,
-        &node_a_client,
-        &*node_a_signer,
-        &node_b_client,
-        &*node_b_signer,
-        &node_c_client,
-        &*node_c_signer,
-        node_info,
-    );
+    let circuit_id = "ABCDE-01234";
+    commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
 
     shutdown!(network).expect("Unable to shutdown network");
 }
@@ -566,33 +576,35 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     let mut network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(2)
-        .expect("Unable to start 2-node_actixWeb1 network");
-    // Collect the node information to be used to populate the payloads
-    let mut node_info = HashMap::new();
-    // Get the node and node's client for the first node
+        .expect("Unable to start 2-node ActixWeb1 network");
+    // Get the first node in the network
     let node_a = network.node(0).expect("Unable to get node_a");
-    let node_a_client = node_a.admin_service_client();
-    let node_a_signer = node_a.admin_signer().clone_box();
-    // Using `node_a` here for the first node as a placeholder
-    node_info.insert(
-        "node_a".to_string(),
-        format!("http://localhost:{}", node_a.rest_api_port()),
-    );
-    // Get the node and node's client for the second node
+    // Get the second node from the network
     let node_b = network.node(1).expect("Unable to get node_b");
-    let node_b_client = node_b.admin_service_client();
-    let node_b_signer = node_b.admin_signer().clone_box();
-    // Using `node_b` here for the second node as a placeholder
-    node_info.insert(
-        "node_b".to_string(),
-        format!("http://localhost:{}", node_b.rest_api_port()),
-    );
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            "tcp://localhost:8000".to_string(),
+        ),
+        (
+            node_b.node_id().to_string(),
+            "tcp://localhost:8001".to_string(),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, String>>();
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
-    let circuit_payload_bytes =
-        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), &*node_a_signer);
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+    );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a_client.submit_admin_payload(circuit_payload_bytes);
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the second node
@@ -602,9 +614,10 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
-        let proposals = node_b_client
+        let proposals = node_b
+            .admin_service_client()
             .list_proposals(None, None)
-            .expect("Unable to list proposals from node_b")
+            .expect("Unable to list proposals from second node")
             .data;
         if !proposals.is_empty() {
             // Unwrap the first item in the list as we've already validated this list is not empty
@@ -613,17 +626,24 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         }
     }
     // Validate the same proposal is available to the first node
-    let proposal_a = node_a_client
+    let proposal_a = node_a
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_a")
+        .expect("Unable to fetch proposal from first node")
         .unwrap();
     assert_eq!(proposal_a, proposal_b);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
-    let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_b", &*node_b_signer, false);
-    let res = node_b_client.submit_admin_payload(vote_payload_bytes);
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a,
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        false,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the proposal to be removed for the first node
@@ -632,9 +652,10 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect removed proposal in time");
         }
-        if node_a_client
+        if node_a
+            .admin_service_client()
             .list_proposals(None, None)
-            .expect("Unable to list proposals from node_a")
+            .expect("Unable to list proposals from first node")
             .data
             .is_empty()
         {
@@ -642,9 +663,10 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         }
     }
     // Validate the proposal has been removed for the second node
-    let proposals_slice_b = node_b_client
+    let proposals_slice_b = node_b
+        .admin_service_client()
         .list_proposals(None, None)
-        .expect("Unable to list proposals from node_b");
+        .expect("Unable to list proposals from second node");
     assert!(proposals_slice_b.data.is_empty());
 
     shutdown!(network).expect("Unable to shutdown network");
@@ -672,42 +694,41 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let mut network = Network::new()
         .with_default_rest_api_variant(RestApiVariant::ActixWeb1)
         .add_nodes_with_defaults(3)
-        .expect("Unable to start 3-node_actixWeb1 network");
-    // Collect the node information to be used to populate the payloads
-    let mut node_info = HashMap::new();
-    // Get the node and node's client for the first node
-    let node_a = network.node(0).expect("Unable to get node_a");
-    let node_a_client = node_a.admin_service_client();
-    let node_a_signer = node_a.admin_signer().clone_box();
-    // Using `node_a` here for the first node as a placeholder
-    node_info.insert(
-        "node_a".to_string(),
-        format!("http://localhost:{}", node_a.rest_api_port()),
-    );
-    // Get the node and node's client for the second node
-    let node_b = network.node(1).expect("Unable to get node_b");
-    let node_b_client = node_b.admin_service_client();
-    let node_b_signer = node_b.admin_signer().clone_box();
-    // Using `node_b` here for the second node as a placeholder
-    node_info.insert(
-        "node_b".to_string(),
-        format!("http://localhost:{}", node_b.rest_api_port()),
-    );
-    // Get the node and node's client for the third node
-    let node_c = network.node(2).expect("Unable to get node_c");
-    let node_c_client = node_c.admin_service_client();
-    let node_c_signer = node_c.admin_signer().clone_box();
-    // Using `node_c` here for the third node as a placeholder
-    node_info.insert(
-        "node_c".to_string(),
-        format!("http://localhost:{}", node_c.rest_api_port()),
-    );
+        .expect("Unable to start 3-node ActixWeb1 network");
+    // Get the first node in the network
+    let node_a = network.node(0).expect("Unable to get first node");
+    // Get the second node in the network
+    let node_b = network.node(1).expect("Unable to get second node");
+    // Get the third node in the network
+    let node_c = network.node(2).expect("Unable to get third node");
+    let node_info = vec![
+        (
+            node_a.node_id().to_string(),
+            "tcp://localhost:8000".to_string(),
+        ),
+        (
+            node_b.node_id().to_string(),
+            "tcp://localhost:8001".to_string(),
+        ),
+        (
+            node_c.node_id().to_string(),
+            "tcp://localhost:8002".to_string(),
+        ),
+    ]
+    .into_iter()
+    .collect::<HashMap<String, String>>();
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
-    let circuit_payload_bytes =
-        make_create_circuit_payload(&circuit_id, "node_a", node_info.clone(), &*node_a_signer);
+    let circuit_payload_bytes = make_create_circuit_payload(
+        &circuit_id,
+        node_a.node_id(),
+        node_info,
+        &*node_a.admin_signer().clone_box(),
+    );
     // Submit the `CircuitManagementPayload` to the first node
-    let res = node_a_client.submit_admin_payload(circuit_payload_bytes);
+    let res = node_a
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the remote nodes
@@ -718,13 +739,15 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
-        let proposals_b = node_b_client
+        let proposals_b = node_b
+            .admin_service_client()
             .list_proposals(None, None)
-            .expect("Unable to list proposals from node_b")
+            .expect("Unable to list proposals from second node")
             .data;
-        let proposals_c = node_c_client
+        let proposals_c = node_c
+            .admin_service_client()
             .list_proposals(None, None)
-            .expect("Unable to list proposals from node_c")
+            .expect("Unable to list proposals from third node")
             .data;
         if !(proposals_b.is_empty() && proposals_c.is_empty()) {
             // Unwrap the first element in each list as we've already validated the lists are not
@@ -735,18 +758,25 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         }
     }
     // Validate the same proposal is available to the first node
-    let proposal_a = node_a_client
+    let proposal_a = node_a
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_a")
+        .expect("Unable to fetch proposal from first node")
         .unwrap();
     assert_eq!(proposal_a, proposal_b);
     assert_eq!(proposal_b, proposal_c);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
-    let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_b", &*node_b_signer, true);
-    let res = node_b_client.submit_admin_payload(vote_payload_bytes);
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a,
+        node_b.node_id(),
+        &*node_b.admin_signer().clone_box(),
+        true,
+    );
+    let res = node_b
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the vote from this node to appear on the proposal for the remote nodes
@@ -759,31 +789,40 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         }
         // The proposal should already be available to each of these nodes, so we are able to
         // unwrap the result of the `fetch_proposal` call
-        proposal_a = node_a_client
+        proposal_a = node_a
+            .admin_service_client()
             .fetch_proposal(&circuit_id)
-            .expect("Unable to fetch proposal from node_a")
+            .expect("Unable to fetch proposal from first node")
             .unwrap();
-        proposal_c = node_c_client
+        proposal_c = node_c
+            .admin_service_client()
             .fetch_proposal(&circuit_id)
-            .expect("Unable to fetch proposal from node_c")
+            .expect("Unable to fetch proposal from third node")
             .unwrap();
         if proposal_a.votes.len() == 2 && proposal_c.votes.len() == 2 {
             break;
         }
     }
     // Validate the extra vote records are also available for the voting node
-    let proposal_b = node_b_client
+    let proposal_b = node_b
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_b")
+        .expect("Unable to fetch proposal from second node")
         .unwrap();
     assert_eq!(proposal_a, proposal_b);
     assert_eq!(proposal_b, proposal_c);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
-    let vote_payload_bytes =
-        make_circuit_proposal_vote_payload(proposal_a, "node_c", &*node_c_signer, false);
-    let res = node_c_client.submit_admin_payload(vote_payload_bytes);
+    let vote_payload_bytes = make_circuit_proposal_vote_payload(
+        proposal_a,
+        node_c.node_id(),
+        &*node_c.admin_signer().clone_box(),
+        false,
+    );
+    let res = node_c
+        .admin_service_client()
+        .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
     // Wait for the proposal to be removed for the other nodes
@@ -792,21 +831,24 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect removed proposal in time");
         }
-        if node_a_client
+        if node_a
+            .admin_service_client()
             .fetch_proposal(&circuit_id)
-            .expect("Unable to fetch proposal from node_a")
+            .expect("Unable to fetch proposal from first node")
             .is_none()
-            && node_b_client
+            && node_b
+                .admin_service_client()
                 .fetch_proposal(&circuit_id)
-                .expect("Unable to fetch proposal from node_b")
+                .expect("Unable to fetch proposal from second node")
                 .is_none()
         {
             break;
         }
     }
-    let removed_proposal = node_c_client
+    let removed_proposal = node_c
+        .admin_service_client()
         .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_c");
+        .expect("Unable to fetch proposal from third node");
     assert!(removed_proposal.is_none());
 
     shutdown!(network).expect("Unable to shutdown network");
