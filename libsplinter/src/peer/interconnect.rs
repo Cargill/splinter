@@ -618,14 +618,12 @@ pub mod tests {
         let handler = NetworkTestHandler::new(send);
         dispatcher.set_handler(Box::new(handler));
 
-        let network_dispatch_loop = DispatchLoopBuilder::new()
+        let mut network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(dispatcher)
             .with_thread_name("NetworkDispatchLoop".to_string())
             .with_dispatch_channel((dispatcher_sender, dispatcher_receiver))
             .build()
             .expect("Unable to create network dispatch loop");
-
-        let dispatch_shutdown = network_dispatch_loop.shutdown_signaler();
 
         let (notification_tx, notification_rx): (
             Sender<PeerManagerNotification>,
@@ -668,7 +666,10 @@ pub mod tests {
             .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
-        dispatch_shutdown.shutdown();
+        network_dispatch_loop.signal_shutdown();
+        network_dispatch_loop
+            .wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
 
         mesh1.signal_shutdown();
         mesh1.wait_for_shutdown().expect("Unable to shutdown mesh");

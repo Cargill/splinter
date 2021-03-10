@@ -353,7 +353,7 @@ impl SplinterDaemon {
             routing_reader.clone(),
             routing_writer.clone(),
         );
-        let circuit_dispatch_loop = DispatchLoopBuilder::new()
+        let mut circuit_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(circuit_dispatcher)
             .with_thread_name("CircuitDispatchLoop".to_string())
             .build()
@@ -362,13 +362,11 @@ impl SplinterDaemon {
             })?;
         let circuit_dispatch_sender = circuit_dispatch_loop.new_dispatcher_sender();
 
-        let circuit_dispatcher_shutdown = circuit_dispatch_loop.shutdown_signaler();
-
         // Set up the Network dispatcher
         let network_dispatcher =
             set_up_network_dispatcher(network_sender, &self.node_id, circuit_dispatch_sender);
 
-        let network_dispatch_loop = DispatchLoopBuilder::new()
+        let mut network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(network_dispatcher)
             .with_thread_name("NetworkDispatchLoop".to_string())
             .with_dispatch_channel((network_dispatcher_sender, network_dispatch_receiver))
@@ -376,7 +374,6 @@ impl SplinterDaemon {
             .map_err(|err| {
                 StartError::NetworkError(format!("Unable to create network dispatch loop: {}", err))
             })?;
-        let network_dispatcher_shutdown = network_dispatch_loop.shutdown_signaler();
 
         let interconnect_shutdown = interconnect.shutdown_signaler();
 
@@ -784,8 +781,17 @@ impl SplinterDaemon {
         if let Err(err) = rest_api_shutdown_handle.shutdown() {
             error!("Unable to cleanly shut down REST API server: {}", err);
         }
-        circuit_dispatcher_shutdown.shutdown();
-        network_dispatcher_shutdown.shutdown();
+        circuit_dispatch_loop.signal_shutdown();
+        network_dispatch_loop.signal_shutdown();
+
+        if let Err(err) = circuit_dispatch_loop.wait_for_shutdown() {
+            error!("Unable to cleanly shut down circuit dispatch loop: {}", err);
+        }
+
+        if let Err(err) = network_dispatch_loop.wait_for_shutdown() {
+            error!("Unable to cleanly shut down network dispatch loop: {}", err);
+        }
+
         registry_shutdown.shutdown();
         interconnect_shutdown.shutdown();
 

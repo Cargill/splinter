@@ -28,7 +28,7 @@ use std::hash::Hash;
 pub use context::MessageContext;
 pub use r#loop::{
     dispatch_channel, DispatchLoop, DispatchLoopBuilder, DispatchLoopError,
-    DispatchLoopShutdownSignaler, DispatchMessageReceiver, DispatchMessageSender,
+    DispatchMessageReceiver, DispatchMessageSender,
 };
 
 /// A wrapper for a PeerId.
