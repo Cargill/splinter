@@ -76,7 +76,7 @@ mod test {
     /// is provided.
     #[test]
     fn rest_api_thread_builder_successful() {
-        let builder = RestApiBuilder::new().with_bind(BindConfig::Insecure("test".into()));
+        let builder = RestApiBuilder::new().with_bind(BindConfig::Http("test".into()));
 
         assert!(builder.build().is_ok())
     }

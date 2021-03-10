@@ -148,7 +148,7 @@ impl NodeBuilder {
 
                 RunnableNodeRestApiVariant::ActixWeb1(
                     RestApiBuilder1::new()
-                        .with_bind(BindConfig::Insecure(url))
+                        .with_bind(BindConfig::Http(url))
                         .with_auth_configs(vec![auth_config])
                         .with_authorization_handlers(vec![Box::new(MockAuthorizationHandler)])
                         .build()
@@ -157,7 +157,7 @@ impl NodeBuilder {
             }
             RestApiVariant::ActixWeb3 => RunnableNodeRestApiVariant::ActixWeb3(
                 RestApiBuilder3::new()
-                    .with_bind(BindConfig::Insecure(url))
+                    .with_bind(BindConfig::Http(url))
                     .build()
                     .map_err(|e| InternalError::from_source(Box::new(e)))?,
             ),

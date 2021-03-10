@@ -67,7 +67,7 @@ impl RestApiBuilder {
 
     #[cfg(not(feature = "https-bind"))]
     pub fn with_bind(mut self, value: &str) -> Self {
-        self.bind = Some(BindConfig::Insecure(value.to_string()));
+        self.bind = Some(BindConfig::Http(value.to_string()));
         self
     }
 
@@ -270,8 +270,8 @@ impl RestApiBuilder {
 
         let bind = match bind {
             #[cfg(feature = "https-bind")]
-            BindConfig::Secure { bind, .. } => BindConfig::Insecure(bind),
-            insecure @ BindConfig::Insecure(_) => insecure,
+            BindConfig::Https { bind, .. } => BindConfig::Http(bind),
+            insecure @ BindConfig::Http(_) => insecure,
         };
 
         Ok(RestApi {
@@ -305,7 +305,7 @@ mod test {
         }
         #[cfg(feature = "https-bind")]
         {
-            builder = builder.with_bind(BindConfig::Insecure("test".into()));
+            builder = builder.with_bind(BindConfig::Http("test".into()));
         }
 
         let auth_config = AuthConfig::Custom {
@@ -323,7 +323,7 @@ mod test {
     fn rest_api_builder_no_auth() {
         #[cfg(feature = "https-bind")]
         let result = RestApiBuilder::new()
-            .with_bind(BindConfig::Insecure("test".into()))
+            .with_bind(BindConfig::Http("test".into()))
             .build();
         #[cfg(not(feature = "https-bind"))]
         let result = RestApiBuilder::new().with_bind("test").build();

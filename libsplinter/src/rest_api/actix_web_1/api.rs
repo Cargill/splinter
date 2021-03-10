@@ -95,7 +95,7 @@ impl RestApi {
 
         #[cfg(feature = "https-bind")]
         let bind_info = match self.bind {
-            BindConfig::Secure {
+            BindConfig::Https {
                 bind,
                 cert_path,
                 key_path,
@@ -108,11 +108,11 @@ impl RestApi {
 
                 (bind, Some(acceptor))
             }
-            BindConfig::Insecure(bind) => (bind, None),
+            BindConfig::Http(bind) => (bind, None),
         };
 
         #[cfg(not(feature = "https-bind"))]
-        let BindConfig::Insecure(bind_info) = self.bind;
+        let BindConfig::Http(bind_info) = self.bind;
 
         let join_handle = thread::Builder::new()
             .name("SplinterDRestApi".into())
@@ -245,13 +245,13 @@ impl RestApi {
 
         #[cfg(feature = "https-bind")]
         let bind_url = match self.bind.clone() {
-            BindConfig::Secure { bind, .. } => bind,
+            BindConfig::Https { bind, .. } => bind,
 
-            BindConfig::Insecure(bind) => bind,
+            BindConfig::Http(bind) => bind,
         };
 
         #[cfg(not(feature = "https-bind"))]
-        let BindConfig::Insecure(bind_url) = self.bind.clone();
+        let BindConfig::Http(bind_url) = self.bind.clone();
 
         let resources = self.resources.to_owned();
         #[cfg(feature = "rest-api-cors")]

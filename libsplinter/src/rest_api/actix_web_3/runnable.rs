@@ -34,7 +34,7 @@ impl RunnableRestApi {
         } = self;
 
         let (bind_url, acceptor_opt) = match bind {
-            BindConfig::Secure {
+            BindConfig::Https {
                 bind,
                 cert_path,
                 key_path,
@@ -47,7 +47,7 @@ impl RunnableRestApi {
 
                 (bind, Some(acceptor))
             }
-            BindConfig::Insecure(url) => (url, None),
+            BindConfig::Http(url) => (url, None),
         };
 
         Ok(RestApi::new(bind_url, acceptor_opt, resource_providers)?)
