@@ -78,8 +78,8 @@ impl Network {
         self
     }
 
-    pub fn node(self: &mut Network, n: usize) -> Result<&mut Node, InvalidArgumentError> {
-        match self.nodes.get_mut(n) {
+    pub fn node(&self, n: usize) -> Result<&Node, InvalidArgumentError> {
+        match self.nodes.get(n) {
             Some(node) => Ok(node),
             None => Err(InvalidArgumentError::new(
                 "n".to_string(),
