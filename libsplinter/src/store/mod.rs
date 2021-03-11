@@ -81,7 +81,7 @@ pub fn create_store_factory(
 ) -> Result<Box<dyn StoreFactory>, InternalError> {
     match connection_uri {
         #[cfg(feature = "memory")]
-        ConnectionUri::Memory => Ok(Box::new(memory::MemoryStoreFactory::new())),
+        ConnectionUri::Memory => Ok(Box::new(memory::MemoryStoreFactory::new()?)),
         #[cfg(feature = "postgres")]
         ConnectionUri::Postgres(url) => {
             let connection_manager = ConnectionManager::<diesel::pg::PgConnection>::new(url);

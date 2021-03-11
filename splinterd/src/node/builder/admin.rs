@@ -84,9 +84,10 @@ impl AdminSubsystemBuilder {
 
         let admin_timeout = self.admin_timeout.unwrap_or(DEFAULT_ADMIN_TIMEOUT);
 
-        let store_factory = self
-            .store_factory
-            .unwrap_or_else(|| Box::new(MemoryStoreFactory::new()));
+        let store_factory = match self.store_factory {
+            Some(store_factory) => store_factory,
+            None => Box::new(MemoryStoreFactory::new()?),
+        };
 
         let peer_connector = self.peer_connector.take().ok_or_else(|| {
             InternalError::with_message(
