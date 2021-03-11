@@ -17,6 +17,7 @@
 use std::time::Duration;
 
 use cylinder::Verifier;
+use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::AdminServiceBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
@@ -38,6 +39,7 @@ pub struct RunnableAdminSubsystem {
     pub routing_writer: Box<dyn RoutingTableWriter>,
     pub service_transport: InprocTransport,
     pub admin_service_verifier: Box<dyn Verifier>,
+    pub scabbard_service_factory: Option<ScabbardFactory>,
 }
 
 impl RunnableAdminSubsystem {
@@ -55,8 +57,14 @@ impl RunnableAdminSubsystem {
             .connect("inproc://orchestator")
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        let orchestrator = ServiceOrchestratorBuilder::new()
-            .with_connection(orchestrator_connection)
+        let mut orchestrator_builder =
+            ServiceOrchestratorBuilder::new().with_connection(orchestrator_connection);
+        if let Some(scabbard_service_factory) = self.scabbard_service_factory {
+            orchestrator_builder =
+                orchestrator_builder.with_service_factory(Box::new(scabbard_service_factory));
+        }
+
+        let orchestrator = orchestrator_builder
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?
             .run()

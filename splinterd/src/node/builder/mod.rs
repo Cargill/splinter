@@ -16,6 +16,7 @@
 
 pub(super) mod admin;
 pub(super) mod network;
+pub(super) mod scabbard;
 
 use std::time::Duration;
 
@@ -32,7 +33,7 @@ use splinter::rest_api::auth::{
 use splinter::rest_api::RestApiBind;
 use splinter::store::StoreFactory;
 
-use super::{RunnableNode, RunnableNodeRestApiVariant};
+use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 
 use self::admin::AdminSubsystemBuilder;
 use self::network::NetworkSubsystemBuilder;
@@ -139,6 +140,12 @@ impl NodeBuilder {
         self.network_subsystem_builder = self
             .network_subsystem_builder
             .with_network_endpoints(network_endpoints);
+        self
+    }
+
+    /// Make scabbard services available for circuits.
+    pub fn with_scabbard(mut self, scabbard_config: ScabbardConfig) -> Self {
+        self.admin_subsystem_builder = self.admin_subsystem_builder.with_scabbard(scabbard_config);
         self
     }
 

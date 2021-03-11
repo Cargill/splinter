@@ -16,13 +16,15 @@
 
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, Context};
+use cylinder::{secp256k1::Secp256k1Context, Context, VerifierFactory};
+use scabbard::service::ScabbardFactoryBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::peer::PeerManagerConnector;
 use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
 use splinter::transport::inproc::InprocTransport;
 
+use crate::node::builder::scabbard::ScabbardConfig;
 use crate::node::runnable::admin::RunnableAdminSubsystem;
 
 const DEFAULT_ADMIN_TIMEOUT: Duration = Duration::from_secs(30);
@@ -36,6 +38,7 @@ pub struct AdminSubsystemBuilder {
     routing_writer: Option<Box<dyn RoutingTableWriter>>,
     service_transport: Option<InprocTransport>,
     signing_context: Option<Box<dyn Context>>,
+    scabbard_config: Option<ScabbardConfig>,
 }
 
 impl AdminSubsystemBuilder {
@@ -85,6 +88,12 @@ impl AdminSubsystemBuilder {
         self
     }
 
+    /// Make scabbard services available to circuits created by this admin subsystem.
+    pub fn with_scabbard(mut self, scabbard_config: ScabbardConfig) -> Self {
+        self.scabbard_config = Some(scabbard_config);
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableAdminSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message("Cannot build AdminSubsystem without a node id".to_string())
@@ -121,6 +130,22 @@ impl AdminSubsystemBuilder {
 
         let admin_service_verifier = signing_context.new_verifier();
 
+        let scabbard_service_factory = self
+            .scabbard_config
+            .map(|config| {
+                ScabbardFactoryBuilder::new()
+                    .with_state_db_dir(config.data_dir.to_string_lossy().into())
+                    .with_state_db_size(config.database_size)
+                    .with_receipt_db_dir(config.data_dir.to_string_lossy().into())
+                    .with_receipt_db_size(config.database_size)
+                    .with_signature_verifier_factory(Box::new(VerifierFactoryWrapper(
+                        signing_context,
+                    )))
+                    .build()
+                    .map_err(|e| InternalError::from_source(Box::new(e)))
+            })
+            .transpose()?;
+
         Ok(RunnableAdminSubsystem {
             node_id,
             admin_timeout,
@@ -129,6 +154,15 @@ impl AdminSubsystemBuilder {
             routing_writer,
             service_transport,
             admin_service_verifier,
+            scabbard_service_factory,
         })
+    }
+}
+
+struct VerifierFactoryWrapper(Box<dyn Context>);
+
+impl VerifierFactory for VerifierFactoryWrapper {
+    fn new_verifier(&self) -> Box<dyn cylinder::Verifier> {
+        self.0.new_verifier()
     }
 }

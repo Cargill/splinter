@@ -14,15 +14,19 @@
 
 //! Contains the implementation of `Network`.
 
+use std::collections::HashMap;
+
 use cylinder::{secp256k1::Secp256k1Context, Context};
 use splinter::error::{InternalError, InvalidArgumentError};
 use splinter::registry::Node as RegistryNode;
 use splinter::threading::lifecycle::ShutdownHandle;
-use splinterd::node::{Node, NodeBuilder, RestApiVariant};
+use splinterd::node::{Node, NodeBuilder, RestApiVariant, ScabbardConfigBuilder};
+use tempdir::TempDir;
 
 pub struct Network {
     default_rest_api_variant: RestApiVariant,
     nodes: Vec<Node>,
+    temp_dirs: HashMap<String, TempDir>,
 }
 
 impl Network {
@@ -30,6 +34,7 @@ impl Network {
         Network {
             default_rest_api_variant: RestApiVariant::ActixWeb1,
             nodes: Vec::new(),
+            temp_dirs: HashMap::new(),
         }
     }
 
@@ -41,16 +46,27 @@ impl Network {
             let public_key = signer
                 .public_key()
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
+            let temp_dir = TempDir::new("scabbard_data")
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
             let node = NodeBuilder::new()
                 .with_rest_api_variant(self.default_rest_api_variant)
+                .with_scabbard(
+                    ScabbardConfigBuilder::new()
+                        .with_data_dir(temp_dir.path().to_path_buf())
+                        .build()?,
+                )
                 .with_admin_signer(signer)
                 .build()?
                 .run()?;
+
             registry_info.push((
                 node.node_id().to_string(),
                 public_key,
                 node.network_endpoints().to_vec(),
             ));
+
+            self.temp_dirs.insert(node.node_id().to_string(), temp_dir);
             self.nodes.push(node);
         }
 
