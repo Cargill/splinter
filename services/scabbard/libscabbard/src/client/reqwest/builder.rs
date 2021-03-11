@@ -14,7 +14,8 @@
 
 //! A convenient client for interacting with scabbard services on a Splinter node.
 
-use super::error::ScabbardClientError;
+use crate::client::error::ScabbardClientError;
+
 use super::ScabbardClient;
 
 /// Builder for building a [`ScabbardClient`](crate::client::ScabbardClient).
