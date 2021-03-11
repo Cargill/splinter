@@ -156,13 +156,16 @@ impl NodeBuilder {
 
         let runnable_network_subsystem = network_subsystem_builder.build()?;
 
-        let admin_subsystem_builder = self.admin_subsystem_builder.with_node_id(node_id.clone());
-
+        let context = Secp256k1Context::new();
         let admin_signer = self.admin_signer.take().unwrap_or_else(|| {
-            let context = Secp256k1Context::new();
             let pk = context.new_random_private_key();
             context.new_signer(pk)
         });
+
+        let admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_node_id(node_id.clone())
+            .with_signing_context(Box::new(context));
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => {

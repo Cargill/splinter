@@ -16,6 +16,7 @@
 
 use std::time::Duration;
 
+use cylinder::{secp256k1::Secp256k1Context, Context};
 use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
 use splinter::peer::PeerManagerConnector;
@@ -34,6 +35,7 @@ pub struct AdminSubsystemBuilder {
     peer_connector: Option<PeerManagerConnector>,
     routing_writer: Option<Box<dyn RoutingTableWriter>>,
     service_transport: Option<InprocTransport>,
+    signing_context: Option<Box<dyn Context>>,
 }
 
 impl AdminSubsystemBuilder {
@@ -77,6 +79,12 @@ impl AdminSubsystemBuilder {
         self
     }
 
+    /// Configure a signing context. Defaults to [cylinder::secp256k1::Secp256k1Context].
+    pub fn with_signing_context(mut self, signing_context: Box<dyn Context>) -> Self {
+        self.signing_context = Some(signing_context);
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableAdminSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message("Cannot build AdminSubsystem without a node id".to_string())
@@ -107,6 +115,12 @@ impl AdminSubsystemBuilder {
             )
         })?;
 
+        let signing_context = self
+            .signing_context
+            .unwrap_or_else(|| Box::new(Secp256k1Context::new()));
+
+        let admin_service_verifier = signing_context.new_verifier();
+
         Ok(RunnableAdminSubsystem {
             node_id,
             admin_timeout,
@@ -114,6 +128,7 @@ impl AdminSubsystemBuilder {
             peer_connector,
             routing_writer,
             service_transport,
+            admin_service_verifier,
         })
     }
 }
