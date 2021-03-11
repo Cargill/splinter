@@ -23,9 +23,10 @@ use splinter::error::InternalError;
 use splinter::rest_api::actix_web_1::RestApi;
 use splinter::rest_api::actix_web_3::RunnableRestApi;
 
+use super::builder::admin::AdminSubsystemBuilder;
 use super::{Node, NodeRestApiVariant};
 
-use self::admin::RunnableAdminSubsystem;
+use self::network::RunnableNetworkSubsystem;
 
 pub(super) enum RunnableNodeRestApiVariant {
     ActixWeb1(RestApi),
@@ -35,14 +36,24 @@ pub(super) enum RunnableNodeRestApiVariant {
 /// A fully configured and runnable instance of a node.
 pub struct RunnableNode {
     pub(super) admin_signer: Box<dyn cylinder::Signer>,
-    pub(super) runnable_admin_subsystem: RunnableAdminSubsystem,
+    pub(super) admin_subsystem_builder: AdminSubsystemBuilder,
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
+    pub(super) runnable_network_subsystem: RunnableNetworkSubsystem,
 }
 
 impl RunnableNode {
     /// Starts up the Node.
     pub fn run(self) -> Result<Node, InternalError> {
-        let mut admin_subsystem = self.runnable_admin_subsystem.run()?;
+        let network_subsystem = self.runnable_network_subsystem.run()?;
+
+        let runnable_admin_subsystem = self
+            .admin_subsystem_builder
+            .with_peer_connector(network_subsystem.peer_connector())
+            .with_routing_writer(network_subsystem.routing_table_writer())
+            .with_service_transport(network_subsystem.service_transport())
+            .build()?;
+
+        let mut admin_subsystem = runnable_admin_subsystem.run()?;
 
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
@@ -113,6 +124,7 @@ impl RunnableNode {
         Ok(Node {
             admin_signer: self.admin_signer,
             admin_subsystem,
+            network_subsystem,
             rest_api_variant,
             rest_api_port,
         })

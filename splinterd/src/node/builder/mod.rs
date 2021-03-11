@@ -34,6 +34,7 @@ use splinter::store::StoreFactory;
 use super::{RunnableNode, RunnableNodeRestApiVariant};
 
 use self::admin::AdminSubsystemBuilder;
+use self::network::NetworkSubsystemBuilder;
 
 /// An enumeration of the REST API backend variants.
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +52,7 @@ pub struct NodeBuilder {
     admin_signer: Option<Box<dyn Signer>>,
     rest_api_port: Option<u32>,
     rest_api_variant: RestApiVariant,
+    network_subsystem_builder: NetworkSubsystemBuilder,
 }
 
 impl Default for NodeBuilder {
@@ -67,12 +69,13 @@ impl NodeBuilder {
             admin_signer: None,
             rest_api_port: None,
             rest_api_variant: RestApiVariant::ActixWeb1,
+            network_subsystem_builder: NetworkSubsystemBuilder::new(),
         }
     }
 
     /// Specifies the id for the node. Defaults to a random node id.
     pub fn with_node_id(mut self, node_id: String) -> Self {
-        self.admin_subsystem_builder = self.admin_subsystem_builder.with_node_id(node_id);
+        self.network_subsystem_builder = self.network_subsystem_builder.with_node_id(node_id);
         self
     }
 
@@ -93,8 +96,8 @@ impl NodeBuilder {
 
     /// Specifies the heartbeat interval between peer connections. Defaults to 30 seconds.
     pub fn with_heartbeat_interval(mut self, heartbeat_interval: Duration) -> Self {
-        self.admin_subsystem_builder = self
-            .admin_subsystem_builder
+        self.network_subsystem_builder = self
+            .network_subsystem_builder
             .with_heartbeat_interval(heartbeat_interval);
         self
     }
@@ -102,8 +105,8 @@ impl NodeBuilder {
     /// Configure whether or not strict reference counts will be used in the peer manager. Defaults
     /// to false.
     pub fn with_strict_ref_counts(mut self, strict_ref_counts: bool) -> Self {
-        self.admin_subsystem_builder = self
-            .admin_subsystem_builder
+        self.network_subsystem_builder = self
+            .network_subsystem_builder
             .with_strict_ref_counts(strict_ref_counts);
         self
     }
@@ -128,11 +131,23 @@ impl NodeBuilder {
         self
     }
 
+    /// Specifies the network endpoints for the node
+    pub fn with_network_endpoints(mut self, network_endpoints: Vec<String>) -> Self {
+        self.network_subsystem_builder = self
+            .network_subsystem_builder
+            .with_network_endpoints(network_endpoints);
+        self
+    }
+
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
     pub fn build(mut self) -> Result<RunnableNode, InternalError> {
         let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);
 
-        let runnable_admin_subsystem = self.admin_subsystem_builder.build()?;
+        let runnable_network_subsystem = self.network_subsystem_builder.build()?;
+
+        let admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_node_id(runnable_network_subsystem.node_id.to_string());
 
         let admin_signer = self.admin_signer.take().unwrap_or_else(|| {
             let context = Secp256k1Context::new();
@@ -166,7 +181,8 @@ impl NodeBuilder {
 
         Ok(RunnableNode {
             admin_signer,
-            runnable_admin_subsystem,
+            admin_subsystem_builder,
+            runnable_network_subsystem,
             rest_api_variant,
         })
     }

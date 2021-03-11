@@ -16,23 +16,24 @@
 
 use std::time::Duration;
 
-use rand::{thread_rng, Rng};
+use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
+use splinter::peer::PeerManagerConnector;
 use splinter::store::{memory::MemoryStoreFactory, StoreFactory};
-use splinter::transport::multi::MultiTransport;
+use splinter::transport::inproc::InprocTransport;
 
 use crate::node::runnable::admin::RunnableAdminSubsystem;
 
 const DEFAULT_ADMIN_TIMEOUT: Duration = Duration::from_secs(30);
-const DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Default)]
 pub struct AdminSubsystemBuilder {
     node_id: Option<String>,
     admin_timeout: Option<Duration>,
-    heartbeat_interval: Option<Duration>,
-    strict_ref_counts: bool,
     store_factory: Option<Box<dyn StoreFactory>>,
+    peer_connector: Option<PeerManagerConnector>,
+    routing_writer: Option<Box<dyn RoutingTableWriter>>,
+    service_transport: Option<InprocTransport>,
 }
 
 impl AdminSubsystemBuilder {
@@ -52,50 +53,66 @@ impl AdminSubsystemBuilder {
         self
     }
 
-    /// Specifies the heartbeat interval between peer connections. Defaults to 30 seconds.
-    pub fn with_heartbeat_interval(mut self, heartbeat_interval: Duration) -> Self {
-        self.heartbeat_interval = Some(heartbeat_interval);
-        self
-    }
-
-    /// Configure whether or not strict reference counts will be used in the peer manager. Defaults
-    /// to false.
-    pub fn with_strict_ref_counts(mut self, strict_ref_counts: bool) -> Self {
-        self.strict_ref_counts = strict_ref_counts;
-        self
-    }
-
     /// Specifies the store factory to use with the node. Defaults to the MemoryStoreFactory.
     pub fn with_store_factory(mut self, store_factory: Box<dyn StoreFactory>) -> Self {
         self.store_factory = Some(store_factory);
         self
     }
 
+    /// Specifies the peer connector to use with the node
+    pub fn with_peer_connector(mut self, peer_connector: PeerManagerConnector) -> Self {
+        self.peer_connector = Some(peer_connector);
+        self
+    }
+
+    /// Specifies the routing table writer that will be used by the admin service
+    pub fn with_routing_writer(mut self, routing_writer: Box<dyn RoutingTableWriter>) -> Self {
+        self.routing_writer = Some(routing_writer);
+        self
+    }
+
+    /// Specifies the transport to be used to set up inproc connections
+    pub fn with_service_transport(mut self, service_transport: InprocTransport) -> Self {
+        self.service_transport = Some(service_transport);
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableAdminSubsystem, InternalError> {
-        let node_id = self
-            .node_id
-            .take()
-            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
+        let node_id = self.node_id.take().ok_or_else(|| {
+            InternalError::with_message("Cannot build AdminSubsystem without a node id".to_string())
+        })?;
 
         let admin_timeout = self.admin_timeout.unwrap_or(DEFAULT_ADMIN_TIMEOUT);
-        let heartbeat_interval = self
-            .heartbeat_interval
-            .take()
-            .unwrap_or(DEFAULT_HEARTBEAT_INTERVAL);
 
         let store_factory = self
             .store_factory
             .unwrap_or_else(|| Box::new(MemoryStoreFactory::new()));
 
-        let transport = MultiTransport::new(vec![]);
+        let peer_connector = self.peer_connector.take().ok_or_else(|| {
+            InternalError::with_message(
+                "Cannot build AdminSubsystem without a peer connector".to_string(),
+            )
+        })?;
+
+        let routing_writer = self.routing_writer.take().ok_or_else(|| {
+            InternalError::with_message(
+                "Cannot build AdminSubsystem without a routing writer".to_string(),
+            )
+        })?;
+
+        let service_transport = self.service_transport.take().ok_or_else(|| {
+            InternalError::with_message(
+                "Cannot build AdminSubsystem without a service transport".to_string(),
+            )
+        })?;
 
         Ok(RunnableAdminSubsystem {
             node_id,
-            transport,
             admin_timeout,
-            heartbeat_interval,
             store_factory,
-            strict_ref_counts: self.strict_ref_counts,
+            peer_connector,
+            routing_writer,
+            service_transport,
         })
     }
 }
