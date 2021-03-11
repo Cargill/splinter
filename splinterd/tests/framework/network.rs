@@ -36,7 +36,7 @@ impl Network {
     pub fn add_nodes_with_defaults(mut self, count: i32) -> Result<Network, InternalError> {
         let mut registry_info = vec![];
         let context = Secp256k1Context::new();
-        for i in 0..count {
+        for _ in 0..count {
             let signer = context.new_signer(context.new_random_private_key());
             let public_key = signer
                 .public_key()
