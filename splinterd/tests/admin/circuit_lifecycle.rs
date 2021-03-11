@@ -38,7 +38,7 @@ use splinterd::node::{Node, RestApiVariant};
 fn make_create_circuit_payload(
     circuit_id: &str,
     requester: &str,
-    node_info: HashMap<String, String>,
+    node_info: HashMap<String, Vec<String>>,
     signer: &dyn Signer,
 ) -> Vec<u8> {
     // Get the public key to create the `CircuitCreateRequest` and to also set the `requester`
@@ -165,7 +165,7 @@ fn make_circuit_disband_payload(circuit_id: &str, requester: &str, signer: &dyn 
 /// Creates the `CircuitCreateRequest` for the `CircuitManagementPayload` to propose a circuit
 fn setup_circuit(
     circuit_id: &str,
-    node_info: HashMap<String, String>,
+    node_info: HashMap<String, Vec<String>>,
     public_key: &str,
 ) -> CircuitCreateRequest {
     // The services require the service IDs from its peer services, which will be generated
@@ -206,10 +206,10 @@ fn setup_circuit(
 
     let nodes: Vec<SplinterNode> = node_info
         .iter()
-        .map(|(node_id, endpoint)| {
+        .map(|(node_id, endpoints)| {
             SplinterNodeBuilder::new()
                 .with_node_id(&node_id)
-                .with_endpoints(vec![endpoint.to_string()].as_ref())
+                .with_endpoints(endpoints)
                 .build()
                 .expect("Unable to build SplinterNode")
         })
@@ -241,15 +241,15 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
 
     let circuit_payload_bytes = make_create_circuit_payload(
         &circuit_id,
@@ -339,19 +339,19 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
         (
             node_c.node_id().to_string(),
-            "tcp://localhost:8002".to_string(),
+            node_c.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
 
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -584,15 +584,15 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -704,19 +704,19 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
         (
             node_c.node_id().to_string(),
-            "tcp://localhost:8002".to_string(),
+            node_c.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
