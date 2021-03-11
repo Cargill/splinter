@@ -20,9 +20,9 @@ mod reqwest;
 
 pub use self::error::ScabbardClientError;
 #[cfg(feature = "reqwest")]
-pub use self::reqwest::ScabbardClient;
+pub use self::reqwest::ReqwestScabbardClient as ScabbardClient;
 #[cfg(feature = "reqwest")]
-pub use self::reqwest::ScabbardClientBuilder;
+pub use self::reqwest::ReqwestScabbardClientBuilder as ScabbardClientBuilder;
 
 /// A fully-qualified service ID (circuit and service ID)
 pub struct ServiceId {

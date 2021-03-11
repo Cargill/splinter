@@ -16,19 +16,19 @@
 
 use crate::client::error::ScabbardClientError;
 
-use super::ScabbardClient;
+use super::ReqwestScabbardClient;
 
 /// Builder for building a [`ScabbardClient`](crate::client::ScabbardClient).
 #[derive(Default)]
-pub struct ScabbardClientBuilder {
+pub struct ReqwestScabbardClientBuilder {
     url: Option<String>,
     auth: Option<String>,
 }
 
-impl ScabbardClientBuilder {
+impl ReqwestScabbardClientBuilder {
     /// Creates a new `ScabbardClientBuilder`.
     pub fn new() -> Self {
-        ScabbardClientBuilder::default()
+        Self::default()
     }
 
     /// Sets the `url` field of the `ScabbardClientBuilder`. The url will be used
@@ -60,8 +60,8 @@ impl ScabbardClientBuilder {
     /// Returns an error in any of the following cases:
     /// * Returns an error if url is not set
     /// * Returns an error if auth is not set
-    pub fn build(self) -> Result<ScabbardClient, ScabbardClientError> {
-        Ok(ScabbardClient {
+    pub fn build(self) -> Result<ReqwestScabbardClient, ScabbardClientError> {
+        Ok(ReqwestScabbardClient {
             url: self.url.ok_or_else(|| {
                 ScabbardClientError::new("Failed to build client, url not provided")
             })?,

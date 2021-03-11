@@ -30,15 +30,15 @@ use crate::protocol::SCABBARD_PROTOCOL_VERSION;
 use super::error::ScabbardClientError;
 use super::{StateEntry, ServiceId};
 
-pub use builder::ScabbardClientBuilder;
+pub use builder::ReqwestScabbardClientBuilder;
 
 /// A client that can be used to interact with scabbard services on a Splinter node.
-pub struct ScabbardClient {
+pub struct ReqwestScabbardClient {
     url: String,
     auth: String,
 }
 
-impl ScabbardClient {
+impl ReqwestScabbardClient {
     /// Submit the given `batches` to the scabbard service with the given `service_id`. If a `wait`
     /// time is specified, wait the given amount of time for the batches to commit.
     ///
@@ -494,7 +494,7 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url(&format!("http://{}", bind_url))
             .with_auth(MOCK_AUTH)
             .build()
@@ -513,7 +513,7 @@ mod tests {
             .expect("Failed to submit batches with wait");
 
         // Verify that an invalid URL results in an error being returned
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url("not a valid URL")
             .with_auth(MOCK_AUTH)
             .build()
@@ -553,7 +553,7 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url(&format!("http://{}", bind_url))
             .with_auth(MOCK_AUTH)
             .build()
@@ -573,7 +573,7 @@ mod tests {
         assert_eq!(value, None);
 
         // Verify that an invalid URL results in an error being returned
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url("not a valid URL")
             .with_auth(MOCK_AUTH)
             .build()
@@ -605,7 +605,7 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url(&format!("http://{}", bind_url))
             .with_auth(MOCK_AUTH)
             .build()
@@ -633,7 +633,7 @@ mod tests {
         assert_eq!(entries, vec![]);
 
         // Verify that an invalid URL results in an error being returned
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url("not a valid URL")
             .with_auth(MOCK_AUTH)
             .build()
@@ -663,7 +663,7 @@ mod tests {
         let (shutdown_handle, join_handle, bind_url) =
             run_rest_api_on_open_port(resource_manager.resources());
 
-        let client = ScabbardClientBuilder::new()
+        let client = ReqwestScabbardClientBuilder::new()
             .with_url(&format!("http://{}", bind_url))
             .with_auth(MOCK_AUTH)
             .build()
