@@ -27,6 +27,7 @@ use transact::{protocol::batch::Batch, protos::IntoBytes};
 use crate::hex::parse_hex;
 use crate::protocol::SCABBARD_PROTOCOL_VERSION;
 
+use super::ScabbardClient;
 use super::error::ScabbardClientError;
 use super::{StateEntry, ServiceId};
 
@@ -38,7 +39,7 @@ pub struct ReqwestScabbardClient {
     auth: String,
 }
 
-impl ReqwestScabbardClient {
+impl ScabbardClient for ReqwestScabbardClient {
     /// Submit the given `batches` to the scabbard service with the given `service_id`. If a `wait`
     /// time is specified, wait the given amount of time for the batches to commit.
     ///
@@ -50,7 +51,7 @@ impl ReqwestScabbardClient {
     /// * An internal server error occurred in the scabbard service
     /// * One or more batches were invalid (if `wait` provided)
     /// * The `wait` time has elapsed and the batches have not been committed (if `wait` provided)
-    pub fn submit(
+    fn submit(
         &self,
         service_id: &ServiceId,
         batches: Vec<Batch>,
@@ -96,7 +97,7 @@ impl ReqwestScabbardClient {
     /// * The given address is not a valid hex address
     /// * The REST API request failed
     /// * An internal server error occurred in the scabbard service
-    pub fn get_state_at_address(
+    fn get_state_at_address(
         &self,
         service_id: &ServiceId,
         address: &str,
@@ -154,7 +155,7 @@ impl ReqwestScabbardClient {
     /// * The given `prefix` is not a valid hex address prefix
     /// * The REST API request failed
     /// * An internal server error occurred in the scabbard service
-    pub fn get_state_with_prefix(
+    fn get_state_with_prefix(
         &self,
         service_id: &ServiceId,
         prefix: Option<&str>,
@@ -208,7 +209,7 @@ impl ReqwestScabbardClient {
     }
 
     /// Get the current state root hash of the scabbard instance with the given `service_id`.
-    pub fn get_current_state_root(
+    fn get_current_state_root(
         &self,
         service_id: &ServiceId,
     ) -> Result<String, ScabbardClientError> {

@@ -18,11 +18,15 @@ mod error;
 #[cfg(feature = "reqwest")]
 mod reqwest;
 
+use std::time::Duration;
+
+use transact::protocol::batch::Batch;
+
 pub use self::error::ScabbardClientError;
 #[cfg(feature = "reqwest")]
-pub use self::reqwest::ReqwestScabbardClient as ScabbardClient;
+pub use self::reqwest::ReqwestScabbardClient;
 #[cfg(feature = "reqwest")]
-pub use self::reqwest::ReqwestScabbardClientBuilder as ScabbardClientBuilder;
+pub use self::reqwest::ReqwestScabbardClientBuilder;
 
 /// A fully-qualified service ID (circuit and service ID)
 pub struct ServiceId {
@@ -99,4 +103,62 @@ impl StateEntry {
     pub fn value(&self) -> &[u8] {
         &self.value
     }
+}
+
+pub trait ScabbardClient {
+    /// Submit the given `batches` to the scabbard service with the given `service_id`. If a `wait`
+    /// time is specified, wait the given amount of time for the batches to commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * One or more batches were invalid (if `wait` provided)
+    /// * The `wait` time has elapsed and the batches have not been committed (if `wait` provided)
+    /// * An internal error based on the underlying implementation
+    fn submit(
+        &self,
+        service_id: &ServiceId,
+        batches: Vec<Batch>,
+        wait: Option<Duration>,
+    ) -> Result<(), ScabbardClientError>;
+
+    /// Get the value at the given `address` in state for the scabbard instance with the given
+    /// `service_id`. Returns `None` if there is no entry at the given address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * The given address is not a valid hex address
+    /// * An internal server error occurred in the scabbard service
+    /// * An internal error based on the underlying implementation
+    fn get_state_at_address(
+        &self,
+        service_id: &ServiceId,
+        address: &str,
+    ) -> Result<Option<Vec<u8>>, ScabbardClientError>;
+
+    /// Get all entries under the given address `prefix` in state for the scabbard instance with
+    /// the given `service_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * The given `prefix` is not a valid hex address prefix
+    /// * An internal server error occurred in the scabbard service
+    /// * An internal error based on the underlying implementation
+    fn get_state_with_prefix(
+        &self,
+        service_id: &ServiceId,
+        prefix: Option<&str>,
+    ) -> Result<Vec<StateEntry>, ScabbardClientError>;
+
+    /// Get the current state root hash of the scabbard instance with the given `service_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in any of the following cases:
+    /// * An internal server error occurred in the scabbard service
+    /// * An internal error based on the underlying implementation
+    fn get_current_state_root(&self, service_id: &ServiceId)
+        -> Result<String, ScabbardClientError>;
 }
