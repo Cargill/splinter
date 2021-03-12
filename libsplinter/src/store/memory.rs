@@ -33,6 +33,7 @@ use crate::error::InternalError;
 #[cfg(feature = "oauth")]
 use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
+use super::sqlite::ForeignKeyCustomizer;
 use super::StoreFactory;
 
 /// A `StoryFactory` backed by memory.
@@ -75,6 +76,7 @@ impl MemoryStoreFactory {
         let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
         let pool = Pool::builder()
             .max_size(1)
+            .connection_customizer(Box::new(ForeignKeyCustomizer::default()))
             .build(connection_manager)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
