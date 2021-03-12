@@ -17,10 +17,10 @@
 use reqwest::{blocking::Client, header, StatusCode};
 
 use crate::error::InternalError;
+use crate::protocol::ADMIN_PROTOCOL_VERSION;
 
 use super::{AdminServiceClient, CircuitListSlice, CircuitSlice, ProposalListSlice, ProposalSlice};
 
-const ADMIN_PROTOCOL_VERSION: &str = "1";
 const PAGING_LIMIT: u32 = 100;
 
 #[derive(Deserialize)]

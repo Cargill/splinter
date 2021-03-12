@@ -36,7 +36,7 @@ impl Network {
     pub fn add_nodes_with_defaults(mut self, count: i32) -> Result<Network, InternalError> {
         let mut registry_info = vec![];
         let context = Secp256k1Context::new();
-        for i in 0..count {
+        for _ in 0..count {
             let signer = context.new_signer(context.new_random_private_key());
             let public_key = signer
                 .public_key()
@@ -49,19 +49,19 @@ impl Network {
             registry_info.push((
                 node.node_id().to_string(),
                 public_key,
-                format!("tcp://localhost:8{:0>3}", i),
+                node.network_endpoints().to_vec(),
             ));
             self.nodes.push(node);
         }
 
         for node in &self.nodes {
             let registry_writer = node.registry_writer();
-            for (node_id, pub_key, endpoint) in &registry_info {
+            for (node_id, pub_key, endpoints) in &registry_info {
                 registry_writer
                     .add_node(
                         RegistryNode::builder(node_id)
                             .with_display_name(node_id)
-                            .with_endpoint(endpoint)
+                            .with_endpoints(endpoints.to_vec())
                             .with_key(pub_key.as_hex())
                             .build()
                             .map_err(|e| InternalError::from_source(Box::new(e)))?,

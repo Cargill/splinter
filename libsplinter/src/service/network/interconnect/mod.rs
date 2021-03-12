@@ -564,14 +564,12 @@ pub mod tests {
         let handler = ComponentTestHandler::new(&[b"test_retrieve"]);
         dispatcher.set_handler(Box::new(handler));
 
-        let dispatch_loop = DispatchLoopBuilder::new()
+        let mut dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(dispatcher)
             .with_thread_name("ServiceDispatchLoop".to_string())
             .with_dispatch_channel((dispatcher_sender, dispatcher_receiver))
             .build()
             .expect("Unable to create service dispatch loop");
-
-        let dispatch_shutdown = dispatch_loop.shutdown_signaler();
 
         let conn = listener.accept().expect("Cannot accept connection");
         connector.add_inbound_connection(conn).unwrap();
@@ -584,7 +582,10 @@ pub mod tests {
         cm.signal_shutdown();
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
-        dispatch_shutdown.shutdown();
+        dispatch_loop.signal_shutdown();
+        dispatch_loop
+            .wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
         mesh1.signal_shutdown();
         mesh1.wait_for_shutdown().expect("Unable to shutdown mesh");
         interconnect.shutdown_and_wait();

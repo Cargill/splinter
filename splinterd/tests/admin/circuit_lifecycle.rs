@@ -38,7 +38,7 @@ use splinterd::node::{Node, RestApiVariant};
 fn make_create_circuit_payload(
     circuit_id: &str,
     requester: &str,
-    node_info: HashMap<String, String>,
+    node_info: HashMap<String, Vec<String>>,
     signer: &dyn Signer,
 ) -> Vec<u8> {
     // Get the public key to create the `CircuitCreateRequest` and to also set the `requester`
@@ -165,7 +165,7 @@ fn make_circuit_disband_payload(circuit_id: &str, requester: &str, signer: &dyn 
 /// Creates the `CircuitCreateRequest` for the `CircuitManagementPayload` to propose a circuit
 fn setup_circuit(
     circuit_id: &str,
-    node_info: HashMap<String, String>,
+    node_info: HashMap<String, Vec<String>>,
     public_key: &str,
 ) -> CircuitCreateRequest {
     // The services require the service IDs from its peer services, which will be generated
@@ -206,10 +206,10 @@ fn setup_circuit(
 
     let nodes: Vec<SplinterNode> = node_info
         .iter()
-        .map(|(node_id, endpoint)| {
+        .map(|(node_id, endpoints)| {
             SplinterNodeBuilder::new()
                 .with_node_id(&node_id)
-                .with_endpoints(vec![endpoint.to_string()].as_ref())
+                .with_endpoints(endpoints)
                 .build()
                 .expect("Unable to build SplinterNode")
         })
@@ -241,15 +241,15 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
 
     let circuit_payload_bytes = make_create_circuit_payload(
         &circuit_id,
@@ -264,9 +264,9 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the second node
-    let proposal_b;
+    let mut proposal_b;
     let start = Instant::now();
-    loop {
+    let proposal_a = loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
@@ -275,21 +275,28 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
             .list_proposals(None, None)
             .expect("Unable to list proposals from node_b")
             .data;
-        if !proposals.is_empty() {
-            // Unwrap the first proposal in this list as we've already validated the list is
-            // not empty
-            proposal_b = proposals.get(0).unwrap().clone();
-            break;
-        }
-    }
 
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_a")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
+        if !proposals.is_empty() {
+            // Unwrap the first element in this list as we've already validated that the list
+            // is not empty
+            proposal_b = proposals.get(0).unwrap().clone();
+        } else {
+            continue;
+        }
+
+        // Validate the same proposal is available to the first node
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from node_a")
+        {
+            Some(proposal_a) => proposal_a,
+            None => continue,
+        };
+
+        assert_eq!(proposal_a, proposal_b);
+        break proposal_a;
+    };
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -305,7 +312,7 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
     assert!(res.is_ok());
 
     // Wait for the circuit to be committed for the second node
-    let circuit_b;
+    let mut circuit_b;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -316,21 +323,28 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
             .list_circuits(None)
             .expect("Unable to list circuits from node_b")
             .data;
+
         if !circuits.is_empty() {
             // Unwrap the first element in this list as we've already validated that the list
             // is not empty
             circuit_b = circuits.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
 
-    // Validate the circuit is available to the first node
-    let circuit_a = node_a
-        .admin_service_client()
-        .fetch_circuit(&circuit_id)
-        .expect("Unable to fetch circuit from node_a")
-        .unwrap();
-    assert_eq!(circuit_a, circuit_b);
+        // Validate the circuit is available to the first node
+        let circuit_a = match node_a
+            .admin_service_client()
+            .fetch_circuit(&circuit_id)
+            .expect("Unable to list circuits from node_b")
+        {
+            Some(circuit) => circuit,
+            None => continue,
+        };
+
+        assert_eq!(circuit_a, circuit_b);
+        break;
+    }
 }
 
 /// Commit a 3-party circuit on a network that is already running
@@ -339,19 +353,19 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
         (
             node_c.node_id().to_string(),
-            "tcp://localhost:8002".to_string(),
+            node_c.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
 
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -506,7 +520,6 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
 /// 5. Wait until the circuit is available on the first node, using `list_circuits`
 /// 6. Verify the same circuit is available to each node
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_creation() {
     // Start a 2-node network
     let mut network = Network::new()
@@ -584,15 +597,15 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(
@@ -704,19 +717,19 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     let node_info = vec![
         (
             node_a.node_id().to_string(),
-            "tcp://localhost:8000".to_string(),
+            node_a.network_endpoints().to_vec(),
         ),
         (
             node_b.node_id().to_string(),
-            "tcp://localhost:8001".to_string(),
+            node_b.network_endpoints().to_vec(),
         ),
         (
             node_c.node_id().to_string(),
-            "tcp://localhost:8002".to_string(),
+            node_c.network_endpoints().to_vec(),
         ),
     ]
     .into_iter()
-    .collect::<HashMap<String, String>>();
+    .collect::<HashMap<String, Vec<String>>>();
     let circuit_id = "ABCDE-01234";
     // Create the `CircuitManagementPayload` to be sent to a node
     let circuit_payload_bytes = make_create_circuit_payload(

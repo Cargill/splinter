@@ -21,6 +21,9 @@ use std::sync::mpsc::{channel, Receiver, RecvError, Sender};
 
 use super::{Dispatcher, PeerId};
 
+use crate::error::InternalError;
+use crate::threading::lifecycle::ShutdownHandle;
+
 /// A message to be dispatched.
 ///
 /// This enum contains information about a message that will be passed to a `Dispatcher` instance
@@ -36,25 +39,6 @@ where
         parent_context: Option<Box<dyn Any + Send>>,
     },
     Shutdown,
-}
-
-#[derive(Clone)]
-pub struct DispatchLoopShutdownSignaler<MT, Source = PeerId>
-where
-    MT: Any + Hash + Eq + Debug + Clone,
-{
-    sender: Sender<DispatchMessage<MT, Source>>,
-}
-
-impl<MT, Source> DispatchLoopShutdownSignaler<MT, Source>
-where
-    MT: Any + Hash + Eq + Debug + Clone,
-{
-    pub fn shutdown(&self) {
-        if self.sender.send(DispatchMessage::Shutdown).is_err() {
-            error!("Unable to send shutdown signal to already shutdown dispatch loop");
-        }
-    }
 }
 
 /// Errors that may occur during the operation of the Dispatch Loop.
@@ -198,22 +182,38 @@ impl<MT, Source> DispatchLoop<MT, Source>
 where
     MT: Any + Hash + Eq + Debug + Clone,
 {
-    pub fn wait_for_shutdown(self) {
-        if self.join_handle.join().is_err() {
-            error!("Unable to cleanly wait for dispatch loop shutdown");
-        }
-    }
-
     pub fn new_dispatcher_sender(&self) -> DispatchMessageSender<MT, Source> {
         DispatchMessageSender {
             sender: self.sender.clone(),
         }
     }
+}
 
-    pub fn shutdown_signaler(&self) -> DispatchLoopShutdownSignaler<MT, Source> {
-        DispatchLoopShutdownSignaler {
-            sender: self.sender.clone(),
+impl<MT, Source> ShutdownHandle for DispatchLoop<MT, Source>
+where
+    MT: Any + Hash + Eq + Debug + Clone,
+{
+    /// Instructs the component to begin shutting down.
+    ///
+    /// For components with threads, this should break out of any loops and ready the threads for
+    /// being joined.
+    fn signal_shutdown(&mut self) {
+        if self.sender.send(DispatchMessage::Shutdown).is_err() {
+            error!("Unable to send shutdown signal to already shutdown dispatch loop");
         }
+    }
+
+    /// Waits until the the component has completely shutdown.
+    ///
+    /// For components with threads, the threads should be joined during the call to
+    /// `wait_for_shutdown`.
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        if self.join_handle.join().is_err() {
+            return Err(InternalError::with_message(
+                "Unable to join dispatch loop thread".into(),
+            ));
+        }
+        Ok(())
     }
 }
 

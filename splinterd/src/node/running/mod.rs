@@ -15,6 +15,7 @@
 //! Contains the implementation of `Node`.
 
 pub mod admin;
+pub mod network;
 
 use std::thread::JoinHandle;
 
@@ -37,11 +38,13 @@ pub struct Node {
     pub(super) admin_subsystem: admin::AdminSubsystem,
     pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
+    pub(super) network_subsystem: network::NetworkSubsystem,
+    pub(super) node_id: String,
 }
 
 impl Node {
     pub fn node_id(&self) -> &str {
-        self.admin_subsystem.node_id()
+        &self.node_id
     }
 
     pub fn rest_api_port(self: &Node) -> u16 {
@@ -54,6 +57,10 @@ impl Node {
 
     pub fn registry_writer(&self) -> &dyn RegistryWriter {
         self.admin_subsystem.registry_writer()
+    }
+
+    pub fn network_endpoints(&self) -> &[String] {
+        self.network_subsystem.network_endpoints()
     }
 
     pub fn admin_service_client(self: &Node) -> Box<dyn AdminServiceClient> {
@@ -72,7 +79,7 @@ impl ShutdownHandle for Node {
         }
     }
 
-    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+    fn wait_for_shutdown(mut self) -> Result<(), InternalError> {
         let mut errors = vec![];
 
         match self.rest_api_variant {
@@ -94,6 +101,12 @@ impl ShutdownHandle for Node {
         }
 
         if let Err(err) = self.admin_subsystem.wait_for_shutdown() {
+            errors.push(err);
+        }
+
+        // can't shutdown network until after admin subsystem
+        self.network_subsystem.signal_shutdown();
+        if let Err(err) = self.network_subsystem.wait_for_shutdown() {
             errors.push(err);
         }
 

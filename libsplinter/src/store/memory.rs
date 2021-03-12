@@ -29,13 +29,13 @@ use crate::biome::{
 use crate::biome::{KeyStore, MemoryKeyStore};
 #[cfg(feature = "biome-profile")]
 use crate::biome::{MemoryUserProfileStore, UserProfileStore};
+use crate::error::InternalError;
 #[cfg(feature = "oauth")]
 use crate::oauth::store::MemoryInflightOAuthRequestStore;
 
 use super::StoreFactory;
 
 /// A `StoryFactory` backed by memory.
-#[derive(Default)]
 pub struct MemoryStoreFactory {
     #[cfg(feature = "biome-credentials")]
     biome_credentials_store: MemoryCredentialsStore,
@@ -49,10 +49,12 @@ pub struct MemoryStoreFactory {
     inflight_request_store: MemoryInflightOAuthRequestStore,
     #[cfg(feature = "biome-profile")]
     biome_profile_store: MemoryUserProfileStore,
+    // to be used for sqlite in memory implementations
+    pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl MemoryStoreFactory {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, InternalError> {
         #[cfg(feature = "biome-credentials")]
         let biome_credentials_store = MemoryCredentialsStore::new();
 
@@ -70,7 +72,20 @@ impl MemoryStoreFactory {
         #[cfg(feature = "biome-profile")]
         let biome_profile_store = MemoryUserProfileStore::new();
 
-        Self {
+        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(connection_manager)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        crate::migrations::run_sqlite_migrations(
+            &*pool
+                .get()
+                .map_err(|err| InternalError::from_source(Box::new(err)))?,
+        )
+        .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        Ok(Self {
             #[cfg(feature = "biome-credentials")]
             biome_credentials_store,
             #[cfg(feature = "biome-key-management")]
@@ -83,7 +98,8 @@ impl MemoryStoreFactory {
             inflight_request_store,
             #[cfg(feature = "biome-profile")]
             biome_profile_store,
-        }
+            pool,
+        })
     }
 }
 
@@ -110,19 +126,8 @@ impl StoreFactory for MemoryStoreFactory {
 
     #[cfg(feature = "admin-service")]
     fn get_admin_service_store(&self) -> Box<dyn crate::admin::store::AdminServiceStore> {
-        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-        let pool = Pool::builder()
-            .max_size(1)
-            .build(connection_manager)
-            .expect("Failed to build connection pool");
-
-        crate::migrations::run_sqlite_migrations(
-            &*pool.get().expect("Failed to get connection for migrations"),
-        )
-        .expect("Failed to run migrations");
-
         Box::new(crate::admin::store::diesel::DieselAdminServiceStore::new(
-            pool,
+            self.pool.clone(),
         ))
     }
 
@@ -135,18 +140,7 @@ impl StoreFactory for MemoryStoreFactory {
 
     #[cfg(feature = "registry")]
     fn get_registry_store(&self) -> Box<dyn crate::registry::RwRegistry> {
-        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-        let pool = Pool::builder()
-            .max_size(1)
-            .build(connection_manager)
-            .expect("Failed to build connection pool");
-
-        crate::migrations::run_sqlite_migrations(
-            &*pool.get().expect("Failed to get connection for migrations"),
-        )
-        .expect("Failed to run migrations");
-
-        Box::new(crate::registry::DieselRegistry::new(pool))
+        Box::new(crate::registry::DieselRegistry::new(self.pool.clone()))
     }
 
     #[cfg(feature = "authorization-handler-rbac")]
@@ -154,18 +148,7 @@ impl StoreFactory for MemoryStoreFactory {
         &self,
     ) -> Box<dyn crate::rest_api::auth::authorization::rbac::store::RoleBasedAuthorizationStore>
     {
-        let connection_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-        let pool = Pool::builder()
-            .max_size(1)
-            .build(connection_manager)
-            .expect("Failed to build connection pool");
-
-        crate::migrations::run_sqlite_migrations(
-            &*pool.get().expect("Failed to get connection for migrations"),
-        )
-        .expect("Failed to run migrations");
-
-        Box::new(crate::rest_api::auth::authorization::rbac::store::DieselRoleBasedAuthorizationStore::new(pool))
+        Box::new(crate::rest_api::auth::authorization::rbac::store::DieselRoleBasedAuthorizationStore::new(self.pool.clone()))
     }
 
     #[cfg(feature = "biome-profile")]

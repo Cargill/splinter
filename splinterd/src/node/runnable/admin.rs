@@ -19,29 +19,25 @@ use std::time::Duration;
 use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
 
 use splinter::admin::rest_api::CircuitResourceProvider;
-use splinter::admin::service::{admin_service_id, AdminServiceBuilder};
-use splinter::circuit::routing::{memory::RoutingTable, RoutingTableWriter};
+use splinter::admin::service::AdminServiceBuilder;
+use splinter::circuit::routing::RoutingTableWriter;
 use splinter::error::InternalError;
-use splinter::mesh::Mesh;
-use splinter::network::connection_manager::{
-    authorizers::Authorizers, authorizers::InprocAuthorizer, ConnectionManager, Connector,
-};
 use splinter::orchestrator::ServiceOrchestratorBuilder;
-use splinter::peer::PeerManager;
+use splinter::peer::PeerManagerConnector;
 use splinter::rest_api::actix_web_1::RestResourceProvider as _;
 use splinter::service::ServiceProcessorBuilder;
 use splinter::store::StoreFactory;
-use splinter::transport::{inproc::InprocTransport, multi::MultiTransport, Listener, Transport};
+use splinter::transport::{inproc::InprocTransport, Transport};
 
 use crate::node::running::admin::AdminSubsystem;
 
 pub struct RunnableAdminSubsystem {
     pub node_id: String,
-    pub transport: MultiTransport,
     pub admin_timeout: Duration,
-    pub heartbeat_interval: Duration,
     pub store_factory: Box<dyn StoreFactory>,
-    pub strict_ref_counts: bool,
+    pub peer_connector: PeerManagerConnector,
+    pub routing_writer: Box<dyn RoutingTableWriter>,
+    pub service_transport: InprocTransport,
 }
 
 impl RunnableAdminSubsystem {
@@ -49,34 +45,11 @@ impl RunnableAdminSubsystem {
         let node_id = self.node_id;
         let store_factory = self.store_factory;
         let admin_timeout = self.admin_timeout;
-        let heartbeat_interval = self.heartbeat_interval;
-        let mut transport = self.transport;
-
-        let mut service_transport = InprocTransport::default();
-        transport.add_transport(Box::new(service_transport.clone()));
-
-        let _internal_service_listeners = Self::build_internal_service_listeners(&mut transport)?;
-
-        let mesh = Mesh::new(512, 128);
-
-        // Configure connection manager
-        let connection_manager = Self::build_connection_manager(
-            &node_id,
-            Box::new(transport),
-            &mesh,
-            heartbeat_interval,
-        )?;
-        let connection_connector = connection_manager.connector();
-
-        let peer_manager =
-            Self::build_peer_manager(&node_id, connection_connector, self.strict_ref_counts)?;
-
-        let peer_connector = peer_manager.connector();
+        let peer_connector = self.peer_connector;
+        let mut service_transport = self.service_transport;
+        let routing_writer = self.routing_writer;
 
         let registry = store_factory.get_registry_store();
-
-        let table = RoutingTable::default();
-        let routing_writer: Box<dyn RoutingTableWriter> = Box::new(table);
 
         let orchestrator_connection = service_transport
             .connect("inproc://orchestator")
@@ -109,7 +82,7 @@ impl RunnableAdminSubsystem {
             .with_routing_table_writer(routing_writer);
 
         let circuit_resource_provider =
-            CircuitResourceProvider::new(node_id.clone(), store_factory.get_admin_service_store());
+            CircuitResourceProvider::new(node_id, store_factory.get_admin_service_store());
 
         #[cfg(feature = "admin-service-event-store")]
         {
@@ -138,71 +111,14 @@ impl RunnableAdminSubsystem {
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
+        let admin_service_shutdown = admin_service_processor
+            .start()
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
         Ok(AdminSubsystem {
-            node_id,
             registry_writer: registry.clone_box_as_writer(),
-            _admin_service_processor: admin_service_processor,
+            admin_service_shutdown,
             actix1_resources,
-            peer_manager,
-            connection_manager,
         })
-    }
-
-    fn build_internal_service_listeners(
-        transport: &mut dyn Transport,
-    ) -> Result<Vec<Box<dyn Listener>>, InternalError> {
-        Ok(vec![
-            transport
-                .listen("inproc://admin-service")
-                .map_err(|e| InternalError::from_source(Box::new(e)))?,
-            transport
-                .listen("inproc://orchestator")
-                .map_err(|e| InternalError::from_source(Box::new(e)))?,
-        ])
-    }
-
-    fn build_connection_manager(
-        node_id: &str,
-        transport: Box<dyn Transport + Send>,
-        mesh: &Mesh,
-        heartbeat_interval: Duration,
-    ) -> Result<ConnectionManager, InternalError> {
-        let inproc_ids = vec![
-            (
-                "inproc://orchestator".to_string(),
-                format!("orchestator::{}", node_id),
-            ),
-            (
-                "inproc://admin-service".to_string(),
-                admin_service_id(node_id),
-            ),
-        ];
-
-        let inproc_authorizer = InprocAuthorizer::new(inproc_ids);
-
-        let mut authorizers = Authorizers::new();
-        authorizers.add_authorizer("inproc", inproc_authorizer);
-
-        ConnectionManager::builder()
-            .with_authorizer(Box::new(authorizers))
-            .with_matrix_life_cycle(mesh.get_life_cycle())
-            .with_matrix_sender(mesh.get_sender())
-            .with_transport(transport)
-            .with_heartbeat_interval(heartbeat_interval.as_secs())
-            .start()
-            .map_err(|err| InternalError::from_source(Box::new(err)))
-    }
-
-    fn build_peer_manager(
-        node_id: &str,
-        connection_connector: Connector,
-        strict_ref_counts: bool,
-    ) -> Result<PeerManager, InternalError> {
-        PeerManager::builder()
-            .with_connector(connection_connector)
-            .with_identity(node_id.to_string())
-            .with_strict_ref_counts(strict_ref_counts)
-            .start()
-            .map_err(|err| InternalError::from_source(Box::new(err)))
     }
 }

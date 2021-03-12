@@ -28,8 +28,10 @@ use std::thread;
 
 use protobuf::Message;
 
+use crate::error::InternalError;
 use crate::network::dispatch::DispatchMessageSender;
 use crate::protos::network::{NetworkMessage, NetworkMessageType};
+use crate::threading::lifecycle::ShutdownHandle;
 use crate::transport::matrix::{
     ConnectionMatrixReceiver, ConnectionMatrixRecvError, ConnectionMatrixSender,
 };
@@ -90,7 +92,6 @@ pub struct PeerInterconnect {
     dispatched_sender: Sender<SendRequest>,
     recv_join_handle: thread::JoinHandle<()>,
     send_join_handle: thread::JoinHandle<()>,
-    shutdown_signaler: ShutdownSignaler,
 }
 
 impl PeerInterconnect {
@@ -98,26 +99,30 @@ impl PeerInterconnect {
     pub fn new_network_sender(&self) -> NetworkMessageSender {
         NetworkMessageSender::new(self.dispatched_sender.clone())
     }
+}
 
-    /// Returns a `ShutdownHandle` that can be used to shutdown `PeerInterconnect`
-    #[deprecated(since = "0.5.1", note = "Please use shutdown_signaler() instead.")]
-    pub fn shutdown_handle(&self) -> ShutdownHandle {
-        ShutdownHandle::from(self.shutdown_signaler.clone())
+impl ShutdownHandle for PeerInterconnect {
+    /// Instructs the component to begin shutting down.
+    ///
+    /// For components with threads, this should break out of any loops and ready the threads for
+    /// being joined.
+    fn signal_shutdown(&mut self) {
+        if self.dispatched_sender.send(SendRequest::Shutdown).is_err() {
+            warn!("Peer Interconnect is no longer running");
+        }
     }
 
-    /// Returns a `ShutdownSignaler` for this `PeerManager`
-    pub fn shutdown_signaler(&self) -> ShutdownSignaler {
-        self.shutdown_signaler.clone()
-    }
-
-    /// Waits for the send and receive thread to shutdown
-    pub fn await_shutdown(self) {
+    /// Waits until the the component has completely shutdown.
+    ///
+    /// For components with threads, the threads should be joined during the call to
+    /// `wait_for_shutdown`.
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
         debug!("Shutting down peer interconnect receiver...");
         if let Err(err) = self.send_join_handle.join() {
-            error!(
+            return Err(InternalError::with_message(format!(
                 "Peer interconnect send thread did not shutdown correctly: {:?}",
                 err
-            );
+            )));
         };
         debug!("Shutting down peer interconnect receiver (complete)");
 
@@ -129,17 +134,7 @@ impl PeerInterconnect {
             );
         }
         debug!("Shutting down peer interconnect sender (complete)");
-    }
-
-    #[deprecated(
-        since = "0.5.1",
-        note = "Please use shutdown_signaler().shutdown() and await_shutdown() instead."
-    )]
-    /// Calls shutdown on the shutdown handle and then waits for the `PeerInterconnect` threads to
-    /// finish
-    pub fn shutdown_and_wait(self) {
-        self.shutdown_signaler().shutdown();
-        self.await_shutdown();
+        Ok(())
     }
 }
 
@@ -286,12 +281,9 @@ where
             })?;
 
         Ok(PeerInterconnect {
-            dispatched_sender: dispatched_sender.clone(),
+            dispatched_sender,
             recv_join_handle,
             send_join_handle,
-            shutdown_signaler: ShutdownSignaler {
-                sender: dispatched_sender,
-            },
         })
     }
 }
@@ -433,46 +425,6 @@ where
     }
 }
 
-/// Handle for shutting down the `PeerInterconnect`.
-/// Deprecated, use ShutdownSignaler instead.
-#[derive(Clone)]
-pub struct ShutdownHandle {
-    sender: Sender<SendRequest>,
-}
-
-impl ShutdownHandle {
-    /// Sends a shutdown notification to `PeerInterconnect` and the associated dipatcher thread
-    /// and `ConnectionMatrix`
-    pub fn shutdown(&self) {
-        if self.sender.send(SendRequest::Shutdown).is_err() {
-            warn!("Peer Interconnect is no longer running");
-        }
-    }
-}
-
-impl From<ShutdownSignaler> for ShutdownHandle {
-    fn from(signaler: ShutdownSignaler) -> Self {
-        ShutdownHandle {
-            sender: signaler.sender,
-        }
-    }
-}
-
-/// Handle for shutting down the `PeerInterconnect`
-#[derive(Clone)]
-pub struct ShutdownSignaler {
-    sender: Sender<SendRequest>,
-}
-
-impl ShutdownSignaler {
-    /// Sends a shutdown message to the `PeerManager` and `Pacemaker`
-    pub fn shutdown(&self) {
-        if self.sender.send(SendRequest::Shutdown).is_err() {
-            warn!("Peer Interconnect is no longer running");
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -606,7 +558,7 @@ pub mod tests {
         let (send, recv) = channel();
 
         let (dispatcher_sender, dispatcher_receiver) = dispatch_channel();
-        let interconnect = PeerInterconnectBuilder::new()
+        let mut interconnect = PeerInterconnectBuilder::new()
             .with_peer_connector(peer_connector.clone())
             .with_message_receiver(mesh1.get_receiver())
             .with_message_sender(mesh1.get_sender())
@@ -618,14 +570,12 @@ pub mod tests {
         let handler = NetworkTestHandler::new(send);
         dispatcher.set_handler(Box::new(handler));
 
-        let network_dispatch_loop = DispatchLoopBuilder::new()
+        let mut network_dispatch_loop = DispatchLoopBuilder::new()
             .with_dispatcher(dispatcher)
             .with_thread_name("NetworkDispatchLoop".to_string())
             .with_dispatch_channel((dispatcher_sender, dispatcher_receiver))
             .build()
             .expect("Unable to create network dispatch loop");
-
-        let dispatch_shutdown = network_dispatch_loop.shutdown_signaler();
 
         let (notification_tx, notification_rx): (
             Sender<PeerManagerNotification>,
@@ -668,13 +618,18 @@ pub mod tests {
             .expect("Unable to shutdown peer manager");
         cm.wait_for_shutdown()
             .expect("Unable to shutdown connection manager");
-        dispatch_shutdown.shutdown();
+        network_dispatch_loop.signal_shutdown();
+        network_dispatch_loop
+            .wait_for_shutdown()
+            .expect("Unable to shutdown connection manager");
 
         mesh1.signal_shutdown();
         mesh1.wait_for_shutdown().expect("Unable to shutdown mesh");
 
-        interconnect.shutdown_signaler().shutdown();
-        interconnect.await_shutdown();
+        interconnect.signal_shutdown();
+        interconnect
+            .wait_for_shutdown()
+            .expect("Unable to shutdown interconnect");
     }
 
     // Verify that PeerInterconnect can be shutdown after start but without any messages being
@@ -703,7 +658,7 @@ pub mod tests {
             .expect("Cannot start peer_manager");
         let peer_connector = peer_manager.connector();
         let (dispatcher_sender, _dispatched_receiver) = dispatch_channel();
-        let interconnect = PeerInterconnectBuilder::new()
+        let mut interconnect = PeerInterconnectBuilder::new()
             .with_peer_connector(peer_connector)
             .with_message_receiver(mesh.get_receiver())
             .with_message_sender(mesh.get_sender())
@@ -722,8 +677,10 @@ pub mod tests {
         mesh.signal_shutdown();
         mesh.wait_for_shutdown().expect("Unable to shutdown mesh");
 
-        interconnect.shutdown_signaler().shutdown();
-        interconnect.await_shutdown();
+        interconnect.signal_shutdown();
+        interconnect
+            .wait_for_shutdown()
+            .expect("Unable to shutdown interconnect");
     }
 
     struct Shutdown {}
