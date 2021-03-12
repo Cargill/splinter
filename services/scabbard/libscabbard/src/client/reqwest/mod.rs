@@ -27,9 +27,9 @@ use transact::{protocol::batch::Batch, protos::IntoBytes};
 use crate::hex::parse_hex;
 use crate::protocol::SCABBARD_PROTOCOL_VERSION;
 
-use super::ScabbardClient;
 use super::error::ScabbardClientError;
-use super::{StateEntry, ServiceId};
+use super::ScabbardClient;
+use super::{ServiceId, StateEntry};
 
 pub use builder::ReqwestScabbardClientBuilder;
 
@@ -187,12 +187,15 @@ impl ScabbardClient for ReqwestScabbardClient {
             .map_err(|err| ScabbardClientError::new_with_source("request failed", err.into()))?;
 
         if response.status().is_success() {
-            response.json().map_err(|err| {
-                ScabbardClientError::new_with_source(
-                    "failed to deserialize response body",
-                    err.into(),
-                )
-            })
+            response
+                .json::<Vec<JsonStateEntry>>()
+                .map(|entries| entries.into_iter().map(StateEntry::from).collect())
+                .map_err(|err| {
+                    ScabbardClientError::new_with_source(
+                        "failed to deserialize response body",
+                        err.into(),
+                    )
+                })
         } else {
             let status = response.status();
             let msg: ErrorResponse = response.json().map_err(|err| {
@@ -357,6 +360,19 @@ fn perform_request(request: RequestBuilder) -> Result<Response, ScabbardClientEr
         .map_err(|err| {
             ScabbardClientError::new_with_source("received error status code", err.into())
         })
+}
+
+#[derive(Serialize, Deserialize)]
+struct JsonStateEntry {
+    address: String,
+    value: Vec<u8>,
+}
+
+impl From<JsonStateEntry> for StateEntry {
+    fn from(json: JsonStateEntry) -> Self {
+        let JsonStateEntry { address, value } = json;
+        Self { address, value }
+    }
 }
 
 /// Used for deserializing the batch link provided by the Scabbard REST API.
@@ -617,14 +633,14 @@ mod tests {
         let entries = client
             .get_state_with_prefix(&service_id, None)
             .expect("Failed to get all entries");
-        assert_eq!(entries, vec![mock_state_entry()]);
+        assert_eq!(entries, vec![mock_state_entry().into()]);
 
         // Verify that a request with a prefix that contains an existing entry is successful and
         // returns the right value
         let entries = client
             .get_state_with_prefix(&service_id, Some(&mock_state_entry().address[..2]))
             .expect("Failed to get entries under prefix with existing entry");
-        assert_eq!(entries, vec![mock_state_entry()]);
+        assert_eq!(entries, vec![mock_state_entry().into()]);
 
         // Verify that a request with a prefix that does not contain any existing entries is
         // successful and returns the right value
@@ -1081,8 +1097,8 @@ mod tests {
         }
     }
 
-    fn mock_state_entry() -> StateEntry {
-        StateEntry {
+    fn mock_state_entry() -> JsonStateEntry {
+        JsonStateEntry {
             address: "abcdef".into(),
             value: b"value".to_vec(),
         }

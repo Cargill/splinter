@@ -87,7 +87,7 @@ impl ServiceId {
 }
 
 /// Represents an entry in a Scabbard service's state.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct StateEntry {
     address: String,
     value: Vec<u8>,
