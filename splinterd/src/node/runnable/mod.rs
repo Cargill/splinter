@@ -39,6 +39,7 @@ pub struct RunnableNode {
     pub(super) admin_subsystem_builder: AdminSubsystemBuilder,
     pub(super) rest_api_variant: RunnableNodeRestApiVariant,
     pub(super) runnable_network_subsystem: RunnableNetworkSubsystem,
+    pub(super) node_id: String,
 }
 
 impl RunnableNode {
@@ -54,6 +55,8 @@ impl RunnableNode {
             .build()?;
 
         let mut admin_subsystem = runnable_admin_subsystem.run()?;
+
+        let node_id = self.node_id;
 
         let rest_api_variant = match self.rest_api_variant {
             RunnableNodeRestApiVariant::ActixWeb1(rest_api) => {
@@ -127,6 +130,7 @@ impl RunnableNode {
             network_subsystem,
             rest_api_variant,
             rest_api_port,
+            node_id,
         })
     }
 }

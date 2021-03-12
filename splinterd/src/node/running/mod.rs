@@ -39,11 +39,12 @@ pub struct Node {
     pub(super) rest_api_variant: NodeRestApiVariant,
     pub(super) rest_api_port: u16,
     pub(super) network_subsystem: network::NetworkSubsystem,
+    pub(super) node_id: String,
 }
 
 impl Node {
     pub fn node_id(&self) -> &str {
-        self.network_subsystem.node_id()
+        &self.node_id
     }
 
     pub fn rest_api_port(self: &Node) -> u16 {

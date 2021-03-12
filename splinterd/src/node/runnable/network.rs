@@ -146,7 +146,6 @@ impl RunnableNetworkSubsystem {
         network_listener_joinhandles.push(service_listener_joinhandle);
 
         Ok(NetworkSubsystem {
-            node_id,
             peer_manager,
             connection_manager,
             routing_table,

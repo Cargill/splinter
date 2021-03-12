@@ -16,7 +16,6 @@
 
 use std::time::Duration;
 
-use rand::{thread_rng, Rng};
 use splinter::error::InternalError;
 use splinter::transport::multi::MultiTransport;
 use splinter::transport::socket::TcpTransport;
@@ -64,10 +63,11 @@ impl NetworkSubsystemBuilder {
     }
 
     pub fn build(mut self) -> Result<RunnableNetworkSubsystem, InternalError> {
-        let node_id = self
-            .node_id
-            .take()
-            .unwrap_or_else(|| format!("n{}", thread_rng().gen::<u16>().to_string()));
+        let node_id = self.node_id.take().ok_or_else(|| {
+            InternalError::with_message(
+                "Cannot build NetworkSubsystem without a node id".to_string(),
+            )
+        })?;
 
         // keep as option, if not provided will be set to tcp://127.0.0.1:0
         let network_endpoints = self.network_endpoints;

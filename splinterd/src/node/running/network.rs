@@ -29,7 +29,6 @@ use splinter::transport::inproc::InprocTransport;
 
 /// A running admin subsystem.
 pub struct NetworkSubsystem {
-    pub(crate) node_id: String,
     pub(crate) connection_manager: ConnectionManager,
     pub(crate) peer_manager: PeerManager,
     pub(crate) routing_table: RoutingTable,
@@ -43,11 +42,6 @@ pub struct NetworkSubsystem {
 }
 
 impl NetworkSubsystem {
-    /// Returns the current node ID.
-    pub fn node_id(&self) -> &str {
-        &self.node_id
-    }
-
     /// Returns a peer connector for the node's peer_manager
     pub fn peer_connector(&self) -> PeerManagerConnector {
         self.peer_manager.connector()
