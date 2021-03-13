@@ -529,10 +529,9 @@ impl AdminServiceShared {
                         Ok(())
                     }
                     CircuitProposalStatus::Pending => {
-                        self.add_proposal(circuit_proposal.clone())?;
-
                         match action {
                             CircuitManagementPayload_Action::CIRCUIT_CREATE_REQUEST => {
+                                self.add_proposal(circuit_proposal.clone())?;
                                 // notify registered application authorization handlers of the
                                 // committed circuit proposal
                                 let event = messages::AdminServiceEvent::ProposalSubmitted(
@@ -550,6 +549,7 @@ impl AdminServiceShared {
                             }
 
                             CircuitManagementPayload_Action::CIRCUIT_PROPOSAL_VOTE => {
+                                self.update_proposal(circuit_proposal.clone())?;
                                 // notify registered application authorization handlers of the
                                 // committed circuit proposal
                                 let circuit_proposal_proto =
@@ -566,6 +566,7 @@ impl AdminServiceShared {
                             }
                             #[cfg(feature = "circuit-disband")]
                             CircuitManagementPayload_Action::CIRCUIT_DISBAND_REQUEST => {
+                                self.add_proposal(circuit_proposal.clone())?;
                                 // notify registered application authorization handlers of the
                                 // committed disband circuit proposal
                                 let event = messages::AdminServiceEvent::ProposalSubmitted(
@@ -1785,6 +1786,17 @@ impl AdminServiceShared {
             .add_proposal(StoreProposal::from_proto(circuit_proposal).map_err(|err| {
                 AdminSharedError::SplinterStateError(format!("Unable to add proposal: {}", err))
             })?)?)
+    }
+
+    pub fn update_proposal(
+        &mut self,
+        circuit_proposal: CircuitProposal,
+    ) -> Result<(), AdminSharedError> {
+        Ok(self.admin_store.update_proposal(
+            StoreProposal::from_proto(circuit_proposal).map_err(|err| {
+                AdminSharedError::SplinterStateError(format!("Unable to update proposal: {}", err))
+            })?,
+        )?)
     }
 
     #[cfg(feature = "circuit-purge")]
