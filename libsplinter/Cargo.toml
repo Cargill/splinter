@@ -117,6 +117,8 @@ experimental = [
     "client-reqwest",
     "https-bind",
     "oauth-profile",
+    "registry-client",
+    "registry-client-reqwest",
     "rest-api-actix-web-3",
     "service-arg-validation",
     "service-network",
@@ -151,6 +153,8 @@ memory = ["sqlite"]
 oauth = ["biome", "oauth2", "reqwest", "rest-api"]
 postgres = ["diesel/postgres", "diesel_migrations"]
 registry = []
+registry-client = ["registry"]
+registry-client-reqwest = ["registry-client", "reqwest"]
 registry-remote = ["reqwest", "registry"]
 rest-api = [
     "actix",
