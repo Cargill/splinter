@@ -44,7 +44,7 @@ use sabre_sdk::{
     },
     protos::FromBytes,
 };
-use scabbard::client::{ScabbardClientBuilder, ServiceId};
+use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient, ServiceId};
 use transact::contract::archive::{default_scar_path, SmartContractArchive};
 
 use error::CliError;
@@ -754,7 +754,7 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -809,7 +809,7 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -866,7 +866,7 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -933,7 +933,7 @@ fn run() -> Result<(), CliError> {
                 .ok_or_else(|| CliError::MissingArgument("key".into()))?;
             let signer = key::load_signer(key)?;
 
-            let client = ScabbardClientBuilder::new()
+            let client = ReqwestScabbardClientBuilder::new()
                 .with_url(url)
                 .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                 .build()?;
@@ -997,7 +997,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1042,7 +1042,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1087,7 +1087,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1128,7 +1128,7 @@ fn run() -> Result<(), CliError> {
                 .ok_or_else(|| CliError::MissingArgument("key".into()))?;
             let signer = key::load_signer(key)?;
 
-            let client = ScabbardClientBuilder::new()
+            let client = ReqwestScabbardClientBuilder::new()
                 .with_url(url)
                 .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                 .build()?;
@@ -1185,7 +1185,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1230,7 +1230,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1275,7 +1275,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1317,7 +1317,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1365,7 +1365,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1413,7 +1413,7 @@ fn run() -> Result<(), CliError> {
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
                 let signer = key::load_signer(key)?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
@@ -1444,7 +1444,7 @@ fn run() -> Result<(), CliError> {
                     .value_of("key")
                     .ok_or_else(|| CliError::MissingArgument("key".into()))?;
 
-                let client = ScabbardClientBuilder::new()
+                let client = ReqwestScabbardClientBuilder::new()
                     .with_url(url)
                     .with_auth(&create_cylinder_jwt_auth(Some(key))?)
                     .build()?;
