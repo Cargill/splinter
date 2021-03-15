@@ -70,6 +70,8 @@ impl RunnableAdminSubsystem {
             .run()
             .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
+        let mut orchestrator_resources = orchestrator.resources();
+
         let mut admin_service_builder = AdminServiceBuilder::new();
 
         admin_service_builder = admin_service_builder
@@ -104,6 +106,7 @@ impl RunnableAdminSubsystem {
         actix1_resources.append(&mut admin_service.resources());
         actix1_resources.append(&mut circuit_resource_provider.resources());
         actix1_resources.append(&mut registry.resources());
+        actix1_resources.append(&mut orchestrator_resources);
 
         // set up inproc connections
         let admin_connection = service_transport
