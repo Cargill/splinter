@@ -236,6 +236,8 @@ fn setup_circuit(
 }
 
 /// Commit a 2-party circuit on a network that is already running
+/// This function also validates that a duplicate proposal of the circuit being created is
+/// rejected when submitted.
 fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
     // Create the list of node details needed to build the `CircuitCreateRequest`
     let node_info = vec![
@@ -260,7 +262,7 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
-        .submit_admin_payload(circuit_payload_bytes);
+        .submit_admin_payload(circuit_payload_bytes.clone());
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the second node
@@ -297,6 +299,13 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
         assert_eq!(proposal_a, proposal_b);
         break proposal_a;
     };
+
+    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // to validate this duplicate proposal is rejected
+    let duplicate_res = node_b
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
+    assert!(duplicate_res.is_err());
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -348,6 +357,8 @@ fn commit_2_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node) {
 }
 
 /// Commit a 3-party circuit on a network that is already running
+/// This function also validates that any duplicate proposal of the circuit being created is
+/// rejected when submitted.
 fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c: &Node) {
     // Create the list of node details needed to build the `CircuitCreateRequest`
     let node_info = vec![
@@ -377,7 +388,7 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
-        .submit_admin_payload(circuit_payload_bytes);
+        .submit_admin_payload(circuit_payload_bytes.clone());
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the remote nodes
@@ -421,6 +432,19 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
         assert_eq!(proposal_b, proposal_c);
         break proposal_a;
     };
+
+    // Submit the same `CircuitManagmentPayload` to create the circuit to the second node
+    // to validate this duplicate proposal is rejected
+    let duplicate_res_b = node_b
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes.clone());
+    assert!(duplicate_res_b.is_err());
+    // Submit the same `CircuitManagmentPayload` to create the circuit to the third node
+    // to validate this duplicate proposal is rejected
+    let duplicate_res_c = node_c
+        .admin_service_client()
+        .submit_admin_payload(circuit_payload_bytes);
+    assert!(duplicate_res_c.is_err());
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -531,9 +555,11 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
 /// 1. Create and submit a `CircuitCreateRequest` from the first node
 /// 2. Wait until the proposal is available to the second node, using `list_proposals`
 /// 3. Verify the same proposal is available on each node
-/// 4. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
-/// 5. Wait until the circuit is available on the first node, using `list_circuits`
-/// 6. Verify the same circuit is available to each node
+/// 4. Submit the same `CircuitCreateRequest` created in the first step from the second node
+/// 5. Validate the duplicate proposal submitted in the previous step results in an error
+/// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
+/// 7. Wait until the circuit is available on the first node, using `list_circuits`
+/// 8. Verify the same circuit is available to each node
 #[test]
 pub fn test_2_party_circuit_creation() {
     // Start a 2-node network
@@ -558,14 +584,17 @@ pub fn test_2_party_circuit_creation() {
 /// 1. Create and submit a `CircuitCreateRequest` from the first node
 /// 2. Wait until the proposal is available to one of the other nodes, using `list_proposals`
 /// 3. Verify the same proposal is available on every node
-/// 4. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
-/// 5. Wait until this vote is recorded on the proposal, using `fetch_proposal` and validating
+/// 4. Submit the same `CircuitManagmentPayload` created in the first step from the nodes that did
+///    not submit the original `CircuitCreateRequest`.
+/// 5. Validate the duplicate proposals submitted in the previous step each result in an error
+/// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
+/// 7. Wait until this vote is recorded on the proposal, using `fetch_proposal` and validating
 ///    the `Vote` from the node that voted in the previous step appears on the proposal
-/// 6. Validate the proposal has also been updated and includes the `Vote` submitted in the
+/// 8. Validate the proposal has also been updated and includes the `Vote` submitted in the
 ///    previous steps for every node
-/// 7. Create and submit a `CircuitProposalVote` from the third node to accept the proposal
-/// 8. Wait until the circuit becomes available for one of the other nodes, using `list_circuits`
-/// 9. Validate the circuit is available to every node
+/// 9. Create and submit a `CircuitProposalVote` from the third node to accept the proposal
+/// 10. Wait until the circuit becomes available for one of the other nodes, using `list_circuits`
+/// 11. Validate the circuit is available to every node
 #[test]
 #[ignore]
 pub fn test_3_party_circuit_creation() {
@@ -906,11 +935,13 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
 /// 2. Create and submit a `CircuitDisbandRequest` from the first node
 /// 3. Wait until the disband proposal is available to the second node, using `list_proposals`
 /// 4. Verify the same disband proposal is available on each node
-/// 5. Create and submit a `CircuitProposalVote` from the second node to accept the disband proposal
-/// 6. Wait until the circuit is no longer available as an active circuit on the first node,
+/// 5. Submit the same `CircuitDisbandRequest` from the second step to the second node
+/// 6. Validate this duplicate disband proposal is rejected
+/// 7. Create and submit a `CircuitProposalVote` from the second node to accept the disband proposal
+/// 8. Wait until the circuit is no longer available as an active circuit on the first node,
 ///    using `list_circuits`
-/// 7. Validate the circuit is no longer active on every node
-/// 8. Validate the disbanded circuit is still available to each node, though disbanded, and that
+/// 9. Validate the circuit is no longer active on every node
+/// 10. Validate the disbanded circuit is still available to each node, though disbanded, and that
 ///    the disbanded circuit is the same for each node
 #[test]
 #[ignore]
@@ -937,7 +968,7 @@ pub fn test_2_party_circuit_lifecycle() {
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload);
+        .submit_admin_payload(disband_payload.clone());
     assert!(res.is_ok());
 
     // Wait for the disband proposal to be committed for the second node
@@ -973,6 +1004,12 @@ pub fn test_2_party_circuit_lifecycle() {
         assert_eq!(proposal_a.proposal_type, "Disband");
         break;
     }
+
+    // Submit a duplicate of the disband `CircuitManagementPayload` to the second node
+    let duplicate_res = node_b
+        .admin_service_client()
+        .submit_admin_payload(disband_payload);
+    assert!(duplicate_res.is_err());
 
     // Create `CircuitProposalVote` to accept the disband proposal
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -1164,17 +1201,20 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
 /// 2. Create and submit a `CircuitDisbandRequest` from the first node
 /// 3. Wait until the disband proposal is available to each node, using `list_proposals`
 /// 4. Verify the same disband proposal is present on each node
-/// 5. Create and submit a `CircuitProposalVote` from the second node to accept the disband proposal
-/// 6. Wait until this vote is recorded on the proposal, using `fetch_proposal` and validating
+/// 5. Submit the same `CircuitDisbandRequest` to the nodes that did not originally submit the
+///    proposal
+/// 6. Validate these duplicate proposals are rejected
+/// 7. Create and submit a `CircuitProposalVote` from the second node to accept the disband proposal
+/// 8. Wait until this vote is recorded on the proposal, using `fetch_proposal` and validating
 ///    the `Vote` from the node that voted in the previous step appears on the proposal for each
 ///    remote node
-/// 7. Validate the proposal has been updated and includes the `Vote` submitted in the previous
+/// 9. Validate the proposal has been updated and includes the `Vote` submitted in the previous
 ///    steps for every node
-/// 8. Create and submit a `CircuitProposalVote` from the third node to accept the disband proposal
-/// 9. Wait until the active circuit is no longer available to the remote nodes, using
+/// 10. Create and submit a `CircuitProposalVote` from the third node to accept the disband proposal
+/// 11. Wait until the active circuit is no longer available to the remote nodes, using
 ///    `list_circuits`
-/// 10. Validate the circuit is no longer active on the nodes
-/// 11. Validate the disbanded circuit is still available to each node, though disbanded, and that
+/// 12. Validate the circuit is no longer active on the nodes
+/// 13. Validate the disbanded circuit is still available to each node, though disbanded, and that
 ///    the disbanded circuit is the same for each node
 #[test]
 #[ignore]
@@ -1203,7 +1243,7 @@ pub fn test_3_party_circuit_lifecycle() {
     // Submit the `CircuitManagementPayload` to the first node
     let res = node_a
         .admin_service_client()
-        .submit_admin_payload(disband_payload);
+        .submit_admin_payload(disband_payload.clone());
     assert!(res.is_ok());
 
     // Wait for the disband proposal to be committed for the second and third node
@@ -1247,6 +1287,17 @@ pub fn test_3_party_circuit_lifecycle() {
         assert_eq!(proposal_a.proposal_type, "Disband");
         break;
     }
+
+    // Submit a duplicate of the disband `CircuitManagementPayload` to the second node
+    let duplicate_res = node_b
+        .admin_service_client()
+        .submit_admin_payload(disband_payload.clone());
+    assert!(duplicate_res.is_err());
+    // Submit a duplicate of the disband `CircuitManagementPayload` to the third node
+    let duplicate_res = node_c
+        .admin_service_client()
+        .submit_admin_payload(disband_payload);
+    assert!(duplicate_res.is_err());
 
     // Create `CircuitProposalVote` to accept the disband proposal
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
