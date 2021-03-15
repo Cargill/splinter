@@ -138,6 +138,8 @@ node = [
     "splinter/admin-service-client",
     "splinter/client-reqwest",
     "splinter/rest-api-actix-web-3",
+    "splinter/registry-client",
+    "splinter/registry-client-reqwest",
 ]
 oauth = [
     "splinter/oauth"

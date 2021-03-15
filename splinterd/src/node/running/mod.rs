@@ -23,7 +23,10 @@ use cylinder::Signer;
 use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient};
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
-use splinter::registry::RegistryWriter;
+use splinter::registry::{
+    client::{RegistryClient, ReqwestRegistryClient},
+    RegistryWriter,
+};
 use splinter::rest_api::actix_web_1::RestApiShutdownHandle;
 use splinter::rest_api::actix_web_3::RestApi;
 use splinter::threading::lifecycle::ShutdownHandle;
@@ -78,6 +81,13 @@ impl Node {
                 .with_auth("foo")
                 .build()
                 .map_err(|e| InternalError::from_source(Box::new(e)))?,
+        ))
+    }
+
+    pub fn registry_client(self: &Node) -> Box<dyn RegistryClient> {
+        Box::new(ReqwestRegistryClient::new(
+            format!("http://localhost:{}", self.rest_api_port),
+            "foo".to_string(),
         ))
     }
 }
