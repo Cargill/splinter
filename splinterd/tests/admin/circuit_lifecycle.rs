@@ -381,39 +381,46 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the remote nodes
-    let proposal_b;
-    let proposal_c;
+    let mut proposal_b;
+    let mut proposal_c;
     let start = Instant::now();
-    loop {
+    let proposal_a = loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
         let proposals_b = node_b
             .admin_service_client()
             .list_proposals(None, None)
-            .expect("Unable to list proposals from node_b")
+            .expect("Unable to list proposals from second node")
             .data;
         let proposals_c = node_c
             .admin_service_client()
             .list_proposals(None, None)
-            .expect("Unable to list proposals from node_c")
+            .expect("Unable to list proposals from third node")
             .data;
-        if !(proposals_b.is_empty() && proposals_c.is_empty()) {
+        if !proposals_b.is_empty() && !proposals_c.is_empty() {
             // Unwrap the first elements in each list as we've already validated that both of
             // the lists are not empty
             proposal_b = proposals_b.get(0).unwrap().clone();
             proposal_c = proposals_c.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_a")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
+
+        // Validate the same proposal is available to the first node
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal_a) => proposal_a,
+            None => continue,
+        };
+
+        assert_eq!(proposal_a, proposal_b);
+        assert_eq!(proposal_b, proposal_c);
+        break proposal_a;
+    };
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -430,7 +437,6 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
 
     // Wait for the vote from this node to appear on the proposal for the remote nodes
     let mut proposal_a;
-    let mut proposal_c;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -441,25 +447,28 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
         proposal_a = node_a
             .admin_service_client()
             .fetch_proposal(&circuit_id)
-            .expect("Unable to fetch proposal from node_a")
+            .expect("Unable to fetch proposal from first node")
             .unwrap();
-        proposal_c = node_c
+        let proposal_b = node_b
             .admin_service_client()
             .fetch_proposal(&circuit_id)
-            .expect("Unable to fetch proposal from node_c")
+            .expect("Unable to fetch proposal from second node")
             .unwrap();
-        if proposal_a.votes.len() == 2 && proposal_c.votes.len() == 2 {
+        let proposal_c = node_c
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from third node")
+            .unwrap();
+
+        if proposal_a.votes.len() == 1 && proposal_b.votes.len() == 1 && proposal_c.votes.len() == 1
+        {
+            assert_eq!(proposal_a, proposal_b);
+            assert_eq!(proposal_b, proposal_c);
             break;
+        } else {
+            continue;
         }
     }
-    // Validate the extra vote records are also available for the voting node
-    let proposal_b = node_b
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from node_b")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -475,8 +484,8 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
     assert!(res.is_ok());
 
     // Wait for the circuit to be committed for the other nodes
-    let circuit_a;
-    let circuit_b;
+    let mut circuit_a;
+    let mut circuit_b;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -485,30 +494,36 @@ fn commit_3_party_circuit(circuit_id: &str, node_a: &Node, node_b: &Node, node_c
         let circuits_a = node_a
             .admin_service_client()
             .list_circuits(None)
-            .expect("Unable to list circuits from node_a")
+            .expect("Unable to list circuits from first node")
             .data;
         let circuits_b = node_b
             .admin_service_client()
             .list_circuits(None)
-            .expect("Unable to list circuits from node_b")
+            .expect("Unable to list circuits from third node")
             .data;
-        if !(circuits_a.is_empty() && circuits_b.is_empty()) {
+        if !circuits_a.is_empty() && !circuits_b.is_empty() {
             // Unwrap the first element in each list as we've already validated each of the
             // lists are not empty
             circuit_a = circuits_a.get(0).unwrap().clone();
             circuit_b = circuits_b.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
 
-    // Validate the circuit is available to the first node
-    let circuit_c = node_c
-        .admin_service_client()
-        .fetch_circuit(&circuit_id)
-        .expect("Unable to fetch circuit from node_c")
-        .unwrap();
-    assert_eq!(circuit_a, circuit_b);
-    assert_eq!(circuit_b, circuit_c);
+        // Validate the circuit is available to the first node
+        let circuit_c = match node_c
+            .admin_service_client()
+            .fetch_circuit(&circuit_id)
+            .expect("Unable to fetch circuit from third node")
+        {
+            Some(circuit) => circuit,
+            None => continue,
+        };
+
+        assert_eq!(circuit_a, circuit_b);
+        assert_eq!(circuit_b, circuit_c);
+        break;
+    }
 }
 
 /// Test that a 2-party circuit may be created on a 2-node network.
@@ -580,8 +595,8 @@ pub fn test_3_party_circuit_creation() {
 /// 2. Wait until the proposal is available to the second node, using `list_proposals`
 /// 3. Verify the same proposal is available on each node
 /// 4. Create and submit a `CircuitProposalVote` from the second node to reject the proposal
-/// 5. Wait until the proposal is not available on the first node, using `list_proposals`
-/// 6. Verify the proposal does not exist on the second node
+/// 5. Wait until the proposal is not available on the nodes, using `list_proposals`
+/// 6. Verify the proposal does not exist on each node
 #[test]
 #[ignore]
 pub fn test_2_party_circuit_creation_proposal_rejected() {
@@ -621,9 +636,9 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the second node
-    let proposal_b;
+    let mut proposal_b;
     let start = Instant::now();
-    loop {
+    let proposal_a = loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
@@ -632,19 +647,25 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
             .list_proposals(None, None)
             .expect("Unable to list proposals from second node")
             .data;
+
         if !proposals.is_empty() {
             // Unwrap the first item in the list as we've already validated this list is not empty
             proposal_b = proposals.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from first node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
+        // Validate the same proposal is available to the first node
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal_a) => proposal_a,
+            None => continue,
+        };
+        assert_eq!(proposal_a, proposal_b);
+        break proposal_a;
+    };
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
@@ -665,22 +686,21 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect removed proposal in time");
         }
-        if node_a
+        let proposals_a = node_a
             .admin_service_client()
             .list_proposals(None, None)
             .expect("Unable to list proposals from first node")
-            .data
-            .is_empty()
-        {
+            .data;
+        let proposals_b = node_b
+            .admin_service_client()
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from second node")
+            .data;
+
+        if proposals_a.is_empty() && proposals_b.is_empty() {
             break;
         }
     }
-    // Validate the proposal has been removed for the second node
-    let proposals_slice_b = node_b
-        .admin_service_client()
-        .list_proposals(None, None)
-        .expect("Unable to list proposals from second node");
-    assert!(proposals_slice_b.data.is_empty());
 
     shutdown!(network).expect("Unable to shutdown network");
 }
@@ -698,7 +718,7 @@ pub fn test_2_party_circuit_creation_proposal_rejected() {
 ///    previous steps for every node
 /// 7. Create and submit a `CircuitProposalVote` from the third node to reject the proposal
 /// 8. Wait until the proposal is no longer available to the other remote nodes, using
-///    `fetch_proposal`
+///    `list_proposals`
 /// 9. Validate the proposal is no longer available for the node that voted to reject the proposal
 #[test]
 #[ignore]
@@ -745,10 +765,10 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
     assert!(res.is_ok());
 
     // Wait for the proposal to be committed for the remote nodes
-    let proposal_b;
-    let proposal_c;
+    let mut proposal_b;
+    let mut proposal_c;
     let start = Instant::now();
-    loop {
+    let proposal_a = loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect proposal in time");
         }
@@ -762,22 +782,29 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
             .list_proposals(None, None)
             .expect("Unable to list proposals from third node")
             .data;
-        if !(proposals_b.is_empty() && proposals_c.is_empty()) {
+        if !proposals_b.is_empty() && !proposals_c.is_empty() {
             // Unwrap the first element in each list as we've already validated the lists are not
             // empty
             proposal_b = proposals_b.get(0).unwrap().clone();
             proposal_c = proposals_c.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from first node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
+
+        // Validate the same proposal is available to the first node
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal) => proposal,
+            None => continue,
+        };
+
+        assert_eq!(proposal_a, proposal_b);
+        assert_eq!(proposal_b, proposal_c);
+        break proposal_a;
+    };
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -794,7 +821,6 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
 
     // Wait for the vote from this node to appear on the proposal for the remote nodes
     let mut proposal_a;
-    let mut proposal_c;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -807,23 +833,26 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from first node")
             .unwrap();
-        proposal_c = node_c
+        let proposal_b = node_b
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from second node")
+            .unwrap();
+        let proposal_c = node_c
             .admin_service_client()
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from third node")
             .unwrap();
-        if proposal_a.votes.len() == 2 && proposal_c.votes.len() == 2 {
+        if proposal_a.votes.len() == 1 && proposal_b.votes.len() == 1 && proposal_c.votes.len() == 1
+        {
+            // Validate the same proposal is available to each node
+            assert_eq!(proposal_a, proposal_b);
+            assert_eq!(proposal_b, proposal_c);
             break;
+        } else {
+            continue;
         }
     }
-    // Validate the extra vote records are also available for the voting node
-    let proposal_b = node_b
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from second node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
@@ -838,31 +867,33 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
         .submit_admin_payload(vote_payload_bytes);
     assert!(res.is_ok());
 
-    // Wait for the proposal to be removed for the other nodes
+    // Wait for the proposal to be removed for the nodes
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect removed proposal in time");
         }
-        if node_a
+        let proposals_a = node_a
             .admin_service_client()
-            .fetch_proposal(&circuit_id)
-            .expect("Unable to fetch proposal from first node")
-            .is_none()
-            && node_b
-                .admin_service_client()
-                .fetch_proposal(&circuit_id)
-                .expect("Unable to fetch proposal from second node")
-                .is_none()
-        {
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from first node")
+            .data;
+        let proposals_b = node_b
+            .admin_service_client()
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from second node")
+            .data;
+        let proposals_c = node_c
+            .admin_service_client()
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from third node")
+            .data;
+        if proposals_a.is_empty() && proposals_b.is_empty() && proposals_c.is_empty() {
             break;
+        } else {
+            continue;
         }
     }
-    let removed_proposal = node_c
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from third node");
-    assert!(removed_proposal.is_none());
 
     shutdown!(network).expect("Unable to shutdown network");
 }
@@ -878,7 +909,7 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
 /// 5. Create and submit a `CircuitProposalVote` from the second node to accept the disband proposal
 /// 6. Wait until the circuit is no longer available as an active circuit on the first node,
 ///    using `list_circuits`
-/// 7. Validate the circuit is no longer active on the second node
+/// 7. Validate the circuit is no longer active on every node
 /// 8. Validate the disbanded circuit is still available to each node, though disbanded, and that
 ///    the disbanded circuit is the same for each node
 #[test]
@@ -910,7 +941,7 @@ pub fn test_2_party_circuit_lifecycle() {
     assert!(res.is_ok());
 
     // Wait for the disband proposal to be committed for the second node
-    let proposal_b;
+    let mut proposal_b;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -925,18 +956,23 @@ pub fn test_2_party_circuit_lifecycle() {
             // Unwrap the first proposal in this list as we've already validated the list is
             // not empty
             proposal_b = proposals.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
 
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from first node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_a.proposal_type, "Disband");
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal) => proposal,
+            None => continue,
+        };
+
+        assert_eq!(proposal_a, proposal_b);
+        assert_eq!(proposal_a.proposal_type, "Disband");
+        break;
+    }
 
     // Create `CircuitProposalVote` to accept the disband proposal
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -959,24 +995,23 @@ pub fn test_2_party_circuit_lifecycle() {
         }
         // If the circuit no longer appears in the list of active circuits, the circuit
         // has been successfully disbanded.
-        if node_a
+        let circuits_a = node_a
             .admin_service_client()
             .list_circuits(None)
             .expect("Unable to list circuits from first node")
-            .data
-            .is_empty()
-        {
+            .data;
+        let circuits_b = node_b
+            .admin_service_client()
+            .list_circuits(None)
+            .expect("Unable to list circuits from second node")
+            .data;
+        if circuits_a.is_empty() && circuits_b.is_empty() {
             break;
+        } else {
+            continue;
         }
     }
 
-    // Validate the circuit is no longer active for the second node
-    assert!(node_b
-        .admin_service_client()
-        .list_circuits(None)
-        .expect("Unable to list circuits from second node")
-        .data
-        .is_empty());
     // Validate the disbanded circuit is the same for both nodes
     let disbanded_circuit_a = node_a
         .admin_service_client()
@@ -1004,7 +1039,7 @@ pub fn test_2_party_circuit_lifecycle() {
 /// 5. Create and submit a `CircuitProposalVote` from the second node to reject the disband proposal
 /// 6. Wait until the disband proposal is no longer available to the second node,
 ///    using `list_proposals`
-/// 7. Validate the proposal is no longer available on the second node
+/// 7. Validate the proposal is no longer available on the nodes
 /// 8. Validate the active circuit is still available to each node, using `list_circuits` which
 ///    only returns active circuits
 #[test]
@@ -1036,7 +1071,7 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
     assert!(res.is_ok());
 
     // Wait for the disband proposal to be committed for the second node
-    let proposal_b;
+    let mut proposal_b;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -1051,18 +1086,23 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
             // Unwrap the first proposal in this list as we've already validated the list is
             // not empty
             proposal_b = proposals.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
 
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from first node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_a.proposal_type, "Disband");
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal_a) => proposal_a,
+            None => continue,
+        };
+
+        assert_eq!(proposal_b, proposal_a);
+        assert_eq!(proposal_a.proposal_type, "Disband");
+        break;
+    }
 
     // Create `CircuitProposalVote` to accept the disband proposal
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
@@ -1085,24 +1125,20 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
         }
         // If the proposal no longer appears in the list, the proposal has been removed as it was
         // rejected
-        if node_a
+        let proposals_a = node_a
             .admin_service_client()
             .list_proposals(None, None)
             .expect("Unable to list proposals from first node")
-            .data
-            .is_empty()
-        {
+            .data;
+        let proposals_b = node_b
+            .admin_service_client()
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from second node")
+            .data;
+        if proposals_a.is_empty() && proposals_b.is_empty() {
             break;
         }
     }
-
-    // Validate the proposal is no longer available for the second node
-    assert!(node_b
-        .admin_service_client()
-        .list_proposals(None, None)
-        .expect("Unable to list proposals from second node")
-        .data
-        .is_empty());
 
     // Validate the active circuit is still available to each node
     let active_circuits_a = node_a
@@ -1137,7 +1173,7 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
 /// 8. Create and submit a `CircuitProposalVote` from the third node to accept the disband proposal
 /// 9. Wait until the active circuit is no longer available to the remote nodes, using
 ///    `list_circuits`
-/// 10. Validate the circuit is no longer active on the last node to vote
+/// 10. Validate the circuit is no longer active on the nodes
 /// 11. Validate the disbanded circuit is still available to each node, though disbanded, and that
 ///    the disbanded circuit is the same for each node
 #[test]
@@ -1171,8 +1207,8 @@ pub fn test_3_party_circuit_lifecycle() {
     assert!(res.is_ok());
 
     // Wait for the disband proposal to be committed for the second and third node
-    let proposal_b;
-    let proposal_c;
+    let mut proposal_b;
+    let mut proposal_c;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -1193,19 +1229,24 @@ pub fn test_3_party_circuit_lifecycle() {
             // the lists are not empty
             proposal_b = proposals_b.get(0).unwrap().clone();
             proposal_c = proposals_c.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
 
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from first node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
-    assert_eq!(proposal_a.proposal_type, "Disband");
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal_a) => proposal_a,
+            None => continue,
+        };
+
+        assert_eq!(proposal_a, proposal_b);
+        assert_eq!(proposal_b, proposal_c);
+        assert_eq!(proposal_a.proposal_type, "Disband");
+        break;
+    }
 
     // Create `CircuitProposalVote` to accept the disband proposal
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -1222,7 +1263,6 @@ pub fn test_3_party_circuit_lifecycle() {
 
     // Wait for the vote from this node to appear on the proposal for the remote nodes
     let mut proposal_a;
-    let mut proposal_c;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -1235,24 +1275,25 @@ pub fn test_3_party_circuit_lifecycle() {
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from first node")
             .unwrap();
-        proposal_c = node_c
+        let proposal_b = node_b
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from second node")
+            .unwrap();
+        let proposal_c = node_c
             .admin_service_client()
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from third node")
             .unwrap();
-        if proposal_a.votes.len() == 2 && proposal_c.votes.len() == 2 {
+        if proposal_a.votes.is_empty() && proposal_b.votes.is_empty() && proposal_c.votes.is_empty()
+        {
+            continue;
+        } else {
+            assert_eq!(proposal_a, proposal_b);
+            assert_eq!(proposal_b, proposal_c);
             break;
         }
     }
-
-    // Validate the extra vote records are also available for the voting node
-    let proposal_b = node_b
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from second node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -1273,30 +1314,26 @@ pub fn test_3_party_circuit_lifecycle() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect circuit in time");
         }
-        if node_a
+        let circuits_a = node_a
             .admin_service_client()
             .list_circuits(None)
             .expect("Unable to list circuits from first node")
-            .data
-            .is_empty()
-            && node_b
-                .admin_service_client()
-                .list_circuits(None)
-                .expect("Unable to list circuits from second node")
-                .data
-                .is_empty()
-        {
+            .data;
+        let circuits_b = node_b
+            .admin_service_client()
+            .list_circuits(None)
+            .expect("Unable to list circuits from second node")
+            .data;
+        let circuits_c = node_c
+            .admin_service_client()
+            .list_circuits(None)
+            .expect("Unable to list circuits from third node")
+            .data;
+
+        if circuits_a.is_empty() && circuits_b.is_empty() && circuits_c.is_empty() {
             break;
         }
     }
-
-    // Validate the circuit is no longer active for the third and final node
-    assert!(node_c
-        .admin_service_client()
-        .list_circuits(None)
-        .expect("Unable to list circuits from third node")
-        .data
-        .is_empty());
     // Validate the disbanded circuit is available and the same for each node
     let disbanded_circuit_a = node_a
         .admin_service_client()
@@ -1369,8 +1406,8 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
     assert!(res.is_ok());
 
     // Wait for the disband proposal to be committed for the second node
-    let proposal_b;
-    let proposal_c;
+    let mut proposal_b;
+    let mut proposal_c;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -1386,24 +1423,30 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
             .list_proposals(None, None)
             .expect("Unable to list proposals from third node")
             .data;
-        if !(proposals_b.is_empty() && proposals_c.is_empty()) {
+        if !proposals_b.is_empty() && !proposals_c.is_empty() {
             // Unwrap the first elements in each list as we've already validated that both of
             // the lists are not empty
             proposal_b = proposals_b.get(0).unwrap().clone();
             proposal_c = proposals_c.get(0).unwrap().clone();
-            break;
+        } else {
+            continue;
         }
-    }
 
-    // Validate the same proposal is available to the first node
-    let proposal_a = node_a
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from first node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
-    assert_eq!(proposal_a.proposal_type, "Disband");
+        // Validate the same proposal is available to the first node
+        let proposal_a = match node_a
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from first node")
+        {
+            Some(proposal) => proposal,
+            None => continue,
+        };
+
+        assert_eq!(proposal_a, proposal_b);
+        assert_eq!(proposal_b, proposal_c);
+        assert_eq!(proposal_a.proposal_type, "Disband");
+        break;
+    }
 
     // Create `CircuitProposalVote` to accept the disband proposal
     // Uses `true` for the `accept` argument to create a vote to accept the proposal
@@ -1420,7 +1463,6 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
 
     // Wait for the vote from this node to appear on the proposal for the remote nodes
     let mut proposal_a;
-    let mut proposal_c;
     let start = Instant::now();
     loop {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
@@ -1433,24 +1475,25 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from first node")
             .unwrap();
-        proposal_c = node_c
+        let proposal_b = node_b
+            .admin_service_client()
+            .fetch_proposal(&circuit_id)
+            .expect("Unable to fetch proposal from second node")
+            .unwrap();
+        let proposal_c = node_c
             .admin_service_client()
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from third node")
             .unwrap();
-        if proposal_a.votes.len() == 2 && proposal_c.votes.len() == 2 {
+        if proposal_a.votes.is_empty() && proposal_b.votes.is_empty() && proposal_c.votes.is_empty()
+        {
+            continue;
+        } else {
+            assert_eq!(proposal_a, proposal_b);
+            assert_eq!(proposal_b, proposal_c);
             break;
         }
     }
-
-    // Validate the extra vote records are also available for the voting node
-    let proposal_b = node_b
-        .admin_service_client()
-        .fetch_proposal(&circuit_id)
-        .expect("Unable to fetch proposal from second node")
-        .unwrap();
-    assert_eq!(proposal_a, proposal_b);
-    assert_eq!(proposal_b, proposal_c);
 
     // Create the `CircuitProposalVote` to be sent to a node
     // Uses `false` for the `accept` argument to create a vote to reject the proposal
@@ -1471,30 +1514,25 @@ pub fn test_3_party_circuit_lifecycle_proposal_rejected() {
         if Instant::now().duration_since(start) > Duration::from_secs(60) {
             panic!("Failed to detect circuit in time");
         }
-        if node_a
+        let proposals_a = node_a
             .admin_service_client()
             .list_proposals(None, None)
             .expect("Unable to list proposals from first node")
-            .data
-            .is_empty()
-            && node_b
-                .admin_service_client()
-                .list_proposals(None, None)
-                .expect("Unable to list proposals from second node")
-                .data
-                .is_empty()
-        {
+            .data;
+        let proposals_b = node_b
+            .admin_service_client()
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from second node")
+            .data;
+        let proposals_c = node_c
+            .admin_service_client()
+            .list_proposals(None, None)
+            .expect("Unable to list proposals from third node")
+            .data;
+        if proposals_a.is_empty() && proposals_b.is_empty() && proposals_c.is_empty() {
             break;
         }
     }
-
-    // Validate the disband proposal is no longer active for the third and final node
-    assert!(node_c
-        .admin_service_client()
-        .list_proposals(None, None)
-        .expect("Unable to list proposals from third node")
-        .data
-        .is_empty());
 
     // Validate the active circuit is still available to each node
     let active_circuits_a = node_a
