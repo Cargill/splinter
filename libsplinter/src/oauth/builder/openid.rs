@@ -15,7 +15,7 @@
 use reqwest::blocking::Client;
 
 use crate::error::{InternalError, InvalidStateError};
-#[cfg(feature = "biome-profile")]
+#[cfg(feature = "oauth-profile")]
 use crate::oauth::OpenIdProfileProvider;
 use crate::oauth::{
     builder::OAuthClientBuilder, error::OAuthClientBuildError, store::InflightOAuthRequestStore,
@@ -164,7 +164,7 @@ impl OpenIdOAuthClientBuilder {
         let userinfo_endpoint = discovery_document_response.userinfo_endpoint;
 
         // Allowing unused_mut because inner must be mutable if experimental feature
-        // biome-profile is enabled, if feature is removed unused_mut notation can be removed
+        // oauth-profile is enabled, if feature is removed unused_mut notation can be removed
         #[allow(unused_mut)]
         let mut inner = self
             .inner
@@ -172,12 +172,12 @@ impl OpenIdOAuthClientBuilder {
             .with_token_url(discovery_document_response.token_endpoint)
             .with_scopes(DEFAULT_SCOPES.iter().map(ToString::to_string).collect())
             .with_subject_provider(Box::new(OpenIdSubjectProvider::new(
-                // clone is required if biome-profile is enabled
+                // clone is required if oauth-profile is enabled
                 #[allow(clippy::redundant_clone)]
                 userinfo_endpoint.clone(),
             )));
 
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         {
             inner = inner
                 .with_profile_provider(Box::new(OpenIdProfileProvider::new(userinfo_endpoint)));
@@ -267,7 +267,7 @@ mod tests {
         assert!(builder.inner.auth_url.is_none());
         assert!(builder.inner.token_url.is_none());
         assert!(builder.inner.subject_provider.is_none());
-        #[cfg(feature = "biome-profile")]
+        #[cfg(feature = "oauth-profile")]
         assert!(builder.inner.profile_provider.is_none());
 
         let client = builder
