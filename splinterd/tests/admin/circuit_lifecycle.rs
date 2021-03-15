@@ -596,7 +596,6 @@ pub fn test_2_party_circuit_creation() {
 /// 10. Wait until the circuit becomes available for one of the other nodes, using `list_circuits`
 /// 11. Validate the circuit is available to every node
 #[test]
-#[ignore]
 pub fn test_3_party_circuit_creation() {
     // Start a 3-node network
     let mut network = Network::new()
