@@ -98,6 +98,7 @@ impl RunnableAdminSubsystem {
 
         actix1_resources.append(&mut admin_service.resources());
         actix1_resources.append(&mut circuit_resource_provider.resources());
+        actix1_resources.append(&mut registry.resources());
 
         // set up inproc connections
         let admin_connection = service_transport
