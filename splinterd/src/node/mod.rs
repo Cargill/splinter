@@ -18,6 +18,7 @@ mod builder;
 mod runnable;
 mod running;
 
+pub use builder::scabbard::{ScabbardConfig, ScabbardConfigBuilder};
 pub use builder::{NodeBuilder, RestApiVariant};
 pub use runnable::RunnableNode;
 use runnable::RunnableNodeRestApiVariant;

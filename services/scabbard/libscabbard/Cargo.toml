@@ -65,12 +65,14 @@ experimental = [
   # The following features are experimental:
   "authorization",
   "circuit-purge",
+  "factory-builder",
 ]
 
 authorization = ["splinter/authorization"]
 circuit-purge = ["splinter/circuit-purge"]
 client = ["reqwest"]
 events = ["splinter/events"]
+factory-builder = []
 rest-api = ["futures", "splinter/rest-api"]
 rest-api-actix = ["actix-web", "splinter/rest-api-actix"]
 service-arg-validation = ["splinter/service-arg-validation"]

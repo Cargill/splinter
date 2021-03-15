@@ -16,8 +16,8 @@
 
 use std::time::Duration;
 
-use cylinder::{secp256k1::Secp256k1Context, VerifierFactory};
-
+use cylinder::Verifier;
+use scabbard::service::ScabbardFactory;
 use splinter::admin::rest_api::CircuitResourceProvider;
 use splinter::admin::service::AdminServiceBuilder;
 use splinter::circuit::routing::RoutingTableWriter;
@@ -38,6 +38,8 @@ pub struct RunnableAdminSubsystem {
     pub peer_connector: PeerManagerConnector,
     pub routing_writer: Box<dyn RoutingTableWriter>,
     pub service_transport: InprocTransport,
+    pub admin_service_verifier: Box<dyn Verifier>,
+    pub scabbard_service_factory: Option<ScabbardFactory>,
 }
 
 impl RunnableAdminSubsystem {
@@ -55,8 +57,14 @@ impl RunnableAdminSubsystem {
             .connect("inproc://orchestator")
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-        let orchestrator = ServiceOrchestratorBuilder::new()
-            .with_connection(orchestrator_connection)
+        let mut orchestrator_builder =
+            ServiceOrchestratorBuilder::new().with_connection(orchestrator_connection);
+        if let Some(scabbard_service_factory) = self.scabbard_service_factory {
+            orchestrator_builder =
+                orchestrator_builder.with_service_factory(Box::new(scabbard_service_factory));
+        }
+
+        let orchestrator = orchestrator_builder
             .build()
             .map_err(|e| InternalError::from_source(Box::new(e)))?
             .run()
@@ -64,16 +72,13 @@ impl RunnableAdminSubsystem {
 
         let mut admin_service_builder = AdminServiceBuilder::new();
 
-        let signing_context = Secp256k1Context::new();
-        let admin_service_verifier = signing_context.new_verifier();
-
         admin_service_builder = admin_service_builder
             .with_node_id(node_id.clone())
             .with_service_orchestrator(orchestrator)
             .with_peer_manager_connector(peer_connector)
             .with_admin_service_store(store_factory.get_admin_service_store())
             .with_admin_event_store(store_factory.get_admin_service_store())
-            .with_signature_verifier(admin_service_verifier)
+            .with_signature_verifier(self.admin_service_verifier)
             .with_admin_key_verifier(Box::new(registry.clone_box_as_reader()))
             .with_key_permission_manager(Box::new(
                 splinter::keys::insecure::AllowAllKeyPermissionManager,

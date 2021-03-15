@@ -134,6 +134,7 @@ database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
 node = [
+    "scabbard/factory-builder",
     "splinter/admin-service-client",
     "splinter/client-reqwest",
     "splinter/rest-api-actix-web-3",

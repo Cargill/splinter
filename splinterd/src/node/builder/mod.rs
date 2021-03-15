@@ -16,6 +16,7 @@
 
 pub(super) mod admin;
 pub(super) mod network;
+pub(super) mod scabbard;
 
 use std::time::Duration;
 
@@ -32,7 +33,7 @@ use splinter::rest_api::auth::{
 use splinter::rest_api::RestApiBind;
 use splinter::store::StoreFactory;
 
-use super::{RunnableNode, RunnableNodeRestApiVariant};
+use super::{RunnableNode, RunnableNodeRestApiVariant, ScabbardConfig};
 
 use self::admin::AdminSubsystemBuilder;
 use self::network::NetworkSubsystemBuilder;
@@ -142,6 +143,12 @@ impl NodeBuilder {
         self
     }
 
+    /// Make scabbard services available for circuits.
+    pub fn with_scabbard(mut self, scabbard_config: ScabbardConfig) -> Self {
+        self.admin_subsystem_builder = self.admin_subsystem_builder.with_scabbard(scabbard_config);
+        self
+    }
+
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
     pub fn build(mut self) -> Result<RunnableNode, InternalError> {
         let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);
@@ -156,13 +163,16 @@ impl NodeBuilder {
 
         let runnable_network_subsystem = network_subsystem_builder.build()?;
 
-        let admin_subsystem_builder = self.admin_subsystem_builder.with_node_id(node_id.clone());
-
+        let context = Secp256k1Context::new();
         let admin_signer = self.admin_signer.take().unwrap_or_else(|| {
-            let context = Secp256k1Context::new();
             let pk = context.new_random_private_key();
             context.new_signer(pk)
         });
+
+        let admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_node_id(node_id.clone())
+            .with_signing_context(Box::new(context));
 
         let rest_api_variant = match self.rest_api_variant {
             RestApiVariant::ActixWeb1 => {

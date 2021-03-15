@@ -32,6 +32,85 @@ const DEFAULT_STATE_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 const DEFAULT_RECEIPT_DB_DIR: &str = "/var/lib/splinter";
 const DEFAULT_RECEIPT_DB_SIZE: usize = 1 << 30; // 1024 ** 3
 
+#[cfg(feature = "factory-builder")]
+/// Builds new ScabbardFactory instances.
+#[derive(Default)]
+pub struct ScabbardFactoryBuilder {
+    state_db_dir: Option<String>,
+    state_db_size: Option<usize>,
+    receipt_db_dir: Option<String>,
+    receipt_db_size: Option<usize>,
+    signature_verifier_factory: Option<Box<dyn VerifierFactory>>,
+}
+
+#[cfg(feature = "factory-builder")]
+impl ScabbardFactoryBuilder {
+    /// Constructs a new builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the state db directory to be used by the resulting factory.
+    pub fn with_state_db_dir(mut self, state_db_dir: String) -> Self {
+        self.state_db_dir = Some(state_db_dir);
+        self
+    }
+
+    /// Sets the state db size to be used by the resulting factory.
+    pub fn with_state_db_size(mut self, state_db_size: usize) -> Self {
+        self.state_db_size = Some(state_db_size);
+        self
+    }
+
+    /// Sets the receipt db directory to be used by the resulting factory.
+    pub fn with_receipt_db_dir(mut self, receipt_db_dir: String) -> Self {
+        self.receipt_db_dir = Some(receipt_db_dir);
+        self
+    }
+
+    /// Sets the receipt db size to be used by the resulting factory.
+    pub fn with_receipt_db_size(mut self, receipt_db_size: usize) -> Self {
+        self.receipt_db_size = Some(receipt_db_size);
+        self
+    }
+
+    /// Set the signature verifier factory to be used by the resulting factory.  This is a required
+    /// value, and omitting it will result in an [splinter::error::InvalidStateError] at build-time.
+    pub fn with_signature_verifier_factory(
+        mut self,
+        signature_verifier_factory: Box<dyn VerifierFactory>,
+    ) -> Self {
+        self.signature_verifier_factory = Some(signature_verifier_factory);
+        self
+    }
+
+    /// Build the final [ScabbardFactory] instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an InvalidStateError if a signature_verifier_factory has not been set.
+    pub fn build(self) -> Result<ScabbardFactory, splinter::error::InvalidStateError> {
+        let signature_verifier_factory = self.signature_verifier_factory.ok_or_else(|| {
+            splinter::error::InvalidStateError::with_message(
+                "A scabbard factory requires a signature verifier factory".into(),
+            )
+        })?;
+
+        Ok(ScabbardFactory {
+            service_types: vec![SERVICE_TYPE.into()],
+            state_db_dir: self
+                .state_db_dir
+                .unwrap_or_else(|| DEFAULT_STATE_DB_DIR.into()),
+            state_db_size: self.state_db_size.unwrap_or(DEFAULT_STATE_DB_SIZE),
+            receipt_db_dir: self
+                .receipt_db_dir
+                .unwrap_or_else(|| DEFAULT_RECEIPT_DB_DIR.into()),
+            receipt_db_size: self.receipt_db_size.unwrap_or(DEFAULT_RECEIPT_DB_SIZE),
+            signature_verifier_factory,
+        })
+    }
+}
+
 pub struct ScabbardFactory {
     service_types: Vec<String>,
     state_db_dir: String,
