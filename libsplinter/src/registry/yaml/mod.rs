@@ -27,7 +27,7 @@ use super::Node;
 
 pub use local::LocalYamlRegistry;
 #[cfg(feature = "registry-remote")]
-pub use remote::{RemoteYamlRegistry, ShutdownHandle as RemoteYamlShutdownHandle};
+pub use remote::{RemoteYamlRegistry, RemoteYamlShutdownHandle};
 
 /// Yaml representation of a node in a registry.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

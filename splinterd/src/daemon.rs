@@ -42,6 +42,7 @@ use splinter::circuit::handlers::{
     CircuitMessageHandler, ServiceConnectRequestHandler, ServiceDisconnectRequestHandler,
 };
 use splinter::circuit::routing::{memory::RoutingTable, RoutingTableReader, RoutingTableWriter};
+use splinter::error::InternalError;
 use splinter::keys::insecure::AllowAllKeyPermissionManager;
 use splinter::mesh::Mesh;
 use splinter::network::auth::AuthorizationManager;
@@ -449,7 +450,7 @@ impl SplinterDaemon {
                 )
             })?;
 
-        let (registry, registry_shutdown) = create_registry(
+        let (registry, mut registry_shutdown) = create_registry(
             &self.state_dir,
             &self.registries,
             self.registry_auto_refresh,
@@ -790,7 +791,10 @@ impl SplinterDaemon {
             error!("Unable to cleanly shut down network dispatch loop: {}", err);
         }
 
-        registry_shutdown.shutdown();
+        registry_shutdown.signal_shutdown();
+        if let Err(err) = registry_shutdown.wait_for_shutdown() {
+            error!("Unable to cleanly shut down network dispatch loop: {}", err);
+        }
 
         interconnect.signal_shutdown();
 
@@ -1413,9 +1417,13 @@ fn create_registry(
                     auto_refresh_interval,
                     forced_refresh_interval,
                 ) {
-                    Ok(registry) => {
-                        registry_shutdown_handle
-                            .add_remote_yaml_shutdown_handle(registry.shutdown_handle());
+                    Ok(mut registry) => {
+                        // this should alwasy return some
+                        if let Some(shutdown_handle) = registry.take_shutdown_handle() {
+                            registry_shutdown_handle
+                                .add_remote_yaml_shutdown_handle(shutdown_handle)
+                        }
+
                         Some(Box::new(registry) as Box<dyn RegistryReader>)
                     }
                     Err(err) => {
@@ -1463,11 +1471,35 @@ impl RegistryShutdownHandle {
     fn add_remote_yaml_shutdown_handle(&mut self, handle: RemoteYamlShutdownHandle) {
         self.remote_yaml_shutdown_handles.push(handle);
     }
+}
 
-    fn shutdown(&self) {
+impl ShutdownHandle for RegistryShutdownHandle {
+    fn signal_shutdown(&mut self) {
         self.remote_yaml_shutdown_handles
-            .iter()
-            .for_each(|handle| handle.shutdown());
+            .iter_mut()
+            .for_each(|handle| handle.signal_shutdown());
+    }
+
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        let mut errors = vec![];
+        for handle in self.remote_yaml_shutdown_handles {
+            if let Err(err) = handle.wait_for_shutdown() {
+                errors.push(err);
+            }
+        }
+
+        match errors.len() {
+            0 => Ok(()),
+            1 => Err(errors.remove(0)),
+            _ => Err(InternalError::with_message(format!(
+                "Multiple errors occurred during shutdown: {}",
+                errors
+                    .into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+        }
     }
 }
 
