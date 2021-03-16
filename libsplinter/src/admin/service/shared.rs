@@ -970,6 +970,12 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-abandon")]
+    /// Locally abandon a circuit. The circuit to be abandoned is first fetched from the admin
+    /// store, to validate this circuit is available to be abandoned. Then, an `ABANDONED_CIRCUIT`
+    /// message is sent to the remote circuit members. Finally, the circuit is abandoned by
+    /// stopping the associated services, the peer refs associated with this circuit are removed,
+    /// the circuit is removed from the local routing table, and the circuit's `circuit_status` is
+    /// updated to `Abandoned`.
     fn abandon_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be abandoned
         let stored_circuit = self
@@ -2500,6 +2506,15 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-abandon")]
+    /// Validate a `CircuitAbandon` payload by the following:
+    ///
+    /// - Validate the protocol version used by the submitter node. Currently, abandoning is only
+    ///   available to nodes using `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the requester is authorized to propose a change for the requesting node
+    /// - Validate the signer's public key is authorized for the requesting node
+    /// - Validate the circuit being abandoned has a valid `circuit_version` and `circuit_status`.
+    ///   A circuit must have a `circuit_version` of at least 2 and a `circuit_status` of `Active`
+    ///   in order to be abandoned.
     fn validate_abandon_circuit(
         &self,
         circuit_id: &str,
@@ -2758,6 +2773,8 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-abandon")]
+    /// Makes a `Circuit` and `StoreCircuit` with an `Abandoned` `circuit_status` to be used to
+    /// update circuit state to reflect the abandoning change
     fn make_abandoned_circuit(
         &self,
         store_circuit: &StoreCircuit,
