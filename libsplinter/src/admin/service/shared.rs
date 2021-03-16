@@ -930,6 +930,7 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
+    /// Attempts to purge a circuit and the associated internal Splinter services
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be purged
         let stored_circuit = self
@@ -1795,6 +1796,7 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
+    /// Use the internal `admin_store`'s `remove_circuit` method
     pub fn remove_circuit(
         &mut self,
         circuit_id: &str,
@@ -2403,6 +2405,15 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
+    /// Validates a `CircuitPurgeRequest` using the following:
+    ///
+    /// - Validate the protocol version used by the requesting node. Currently, purging is only
+    ///   available to nodes with `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the requester is authorized to propose a change on the requesting node
+    /// - Validate the signer's public key is authorized for the requesting node
+    /// - Validate the circuit being purged has a valid `circuit_version` and `circuit_status`.
+    ///   A circuit must have a `circuit_version` of at least 2 and a `circuit_status` of
+    ///   `Disbanded` or `Abandoned` in order to be purged.
     fn validate_purge_request(
         &self,
         circuit_id: &str,
