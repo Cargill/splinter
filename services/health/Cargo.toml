@@ -31,13 +31,15 @@ splinter = { path = "../../libsplinter", features = ["rest-api", "rest-api-actix
 [features]
 default = []
 
-stable = ["default"]
+stable = [
+  "authorization",
+  "default"
+]
 
 experimental = [
     # The experimental feature extends stable:
     "stable",
     # The following features are experimental:
-    "authorization",
     "circuit-purge",
 ]
 
