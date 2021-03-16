@@ -81,6 +81,7 @@ default = []
 
 stable = [
     "admin-service",
+    "authorization",
     "biome",
     "biome-credentials",
     "biome-key-management",
@@ -105,7 +106,6 @@ experimental = [
     "stable",
     # The following features are experimental:
     "admin-service-client",
-    "authorization",
     "authorization-handler-allow-keys",
     "authorization-handler-maintenance",
     "authorization-handler-rbac",
