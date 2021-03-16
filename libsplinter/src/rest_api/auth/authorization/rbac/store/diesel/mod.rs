@@ -190,7 +190,7 @@ impl RoleBasedAuthorizationStore
     }
 }
 
-#[cfg(feature = "role-based-authorization-store-postgres")]
+#[cfg(feature = "postgres")]
 impl RoleBasedAuthorizationStore for DieselRoleBasedAuthorizationStore<diesel::pg::PgConnection> {
     /// Returns the role for the given ID, if one exists.
     fn get_role(&self, id: &str) -> Result<Option<Role>, RoleBasedAuthorizationStoreError> {

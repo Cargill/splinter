@@ -118,7 +118,6 @@ experimental = [
     "https-bind",
     "oauth-profile",
     "rest-api-actix-web-3",
-    "role-based-authorization-store-postgres",
     "service-arg-validation",
     "service-network",
     "ws-transport",
@@ -165,7 +164,6 @@ rest-api = [
 rest-api-actix = ["actix", "actix-http", "actix-web", "actix-web-actors"]
 rest-api-actix-web-3 = ["actix-web-3", "futures-0-3", "actix-0-10", "actix-service-1-0", "https-bind"]
 rest-api-cors = []
-role-based-authorization-store-postgres = ["authorization", "postgres"]
 service-arg-validation = []
 service-network = []
 sqlite = ["diesel/sqlite", "diesel_migrations"]

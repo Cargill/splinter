@@ -64,7 +64,7 @@ impl<'a> RoleBasedAuthorizationStoreUpdateRole
     }
 }
 
-#[cfg(feature = "role-based-authorization-store-postgres")]
+#[cfg(feature = "postgres")]
 impl<'a> RoleBasedAuthorizationStoreUpdateRole
     for RoleBasedAuthorizationStoreOperations<'a, diesel::pg::PgConnection>
 {

@@ -117,7 +117,6 @@ authorization-handler-maintenance = [
 ]
 authorization-handler-rbac = [
     "splinter/authorization-handler-rbac",
-    "splinter/role-based-authorization-store-postgres",
 ]
 biome-credentials = ["splinter/biome-credentials"]
 biome-key-management = ["splinter/biome-key-management"]
