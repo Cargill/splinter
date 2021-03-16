@@ -170,7 +170,7 @@ pub struct AdminServiceShared {
     // PeerRef Map, peer_id to PeerRef, these PeerRef should be dropped when the peer is no longer
     // needed
     peer_refs: HashMap<String, Vec<PeerRef>>,
-    // network sender is used to comunicated with other services on the splinter network
+    // network sender is used to communicate with other services on the splinter network
     network_sender: Option<Box<dyn ServiceNetworkSender>>,
     // the CircuitManagementPayloads that are waiting for members to be peered
     unpeered_payloads: Vec<PendingPayload>,
@@ -904,6 +904,8 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
+    /// Once a local `CircuitDisbandRequest` has been validated, the admin service may now proceed
+    /// to communicating with the remote circuit members to propose the disband change.
     pub fn propose_disband(
         &mut self,
         payload: CircuitManagementPayload,
@@ -928,6 +930,7 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
+    /// Attempts to purge a circuit and the associated internal Splinter services
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be purged
         let stored_circuit = self
@@ -967,6 +970,12 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-abandon")]
+    /// Locally abandon a circuit. The circuit to be abandoned is first fetched from the admin
+    /// store, to validate this circuit is available to be abandoned. Then, an `ABANDONED_CIRCUIT`
+    /// message is sent to the remote circuit members. Finally, the circuit is abandoned by
+    /// stopping the associated services, the peer refs associated with this circuit are removed,
+    /// the circuit is removed from the local routing table, and the circuit's `circuit_status` is
+    /// updated to `Abandoned`.
     fn abandon_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be abandoned
         let stored_circuit = self
@@ -1180,6 +1189,10 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
+    /// Verify all members of the circuit to be disbanded are using a valid protocol version.
+    /// If all circuit members have agreed on a protocol version, the disband payload is moved into
+    /// the `pending_circuit_payloads` list for further processing. Otherwise, this payload is
+    /// added to the `pending_protocol_payloads` list to await all nodes' protocol agreement.
     fn check_connected_peers_payload_disband(
         &mut self,
         members: &[SplinterNode],
@@ -1789,6 +1802,7 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
+    /// Use the internal `admin_store`'s `remove_circuit` method
     pub fn remove_circuit(
         &mut self,
         circuit_id: &str,
@@ -2300,6 +2314,16 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
+    /// Validates a `CircuitDisbandRequest` using the following:
+    ///
+    /// - Validate the protocol version used by the submitter node. Currently, disbanding is only
+    ///   available to nodes using `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the requester is authorized to propose a change for the requesting node
+    /// - Validate the signer's public key is authorized for the requesting node
+    /// - Validate a `CircuitProposal` with the same ID is not present
+    /// - Validate the circuit being disbanded has a valid `circuit_version` and `circuit_status`.
+    ///   A circuit must have a `circuit_version` of at least 2 and a `circuit_status` of `Active`
+    ///   in order to be disbanded.
     fn validate_disband_circuit(
         &self,
         circuit: &Circuit,
@@ -2387,6 +2411,15 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-purge")]
+    /// Validates a `CircuitPurgeRequest` using the following:
+    ///
+    /// - Validate the protocol version used by the requesting node. Currently, purging is only
+    ///   available to nodes with `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the requester is authorized to propose a change on the requesting node
+    /// - Validate the signer's public key is authorized for the requesting node
+    /// - Validate the circuit being purged has a valid `circuit_version` and `circuit_status`.
+    ///   A circuit must have a `circuit_version` of at least 2 and a `circuit_status` of
+    ///   `Disbanded` or `Abandoned` in order to be purged.
     fn validate_purge_request(
         &self,
         circuit_id: &str,
@@ -2473,6 +2506,15 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-abandon")]
+    /// Validate a `CircuitAbandon` payload by the following:
+    ///
+    /// - Validate the protocol version used by the submitter node. Currently, abandoning is only
+    ///   available to nodes using `ADMIN_SERVICE_PROTOCOL_VERSION` 2.
+    /// - Validate the requester is authorized to propose a change for the requesting node
+    /// - Validate the signer's public key is authorized for the requesting node
+    /// - Validate the circuit being abandoned has a valid `circuit_version` and `circuit_status`.
+    ///   A circuit must have a `circuit_version` of at least 2 and a `circuit_status` of `Active`
+    ///   in order to be abandoned.
     fn validate_abandon_circuit(
         &self,
         circuit_id: &str,
@@ -2623,6 +2665,8 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-disband")]
+    /// Makes the `CircuitProposal` associated with a `CircuitDisbandRequest` based on information
+    /// gathered from the currently active circuit that is specified in the disband request
     fn make_disband_request_circuit_proposal(
         &self,
         circuit_id: &str,
@@ -2729,6 +2773,8 @@ impl AdminServiceShared {
     }
 
     #[cfg(feature = "circuit-abandon")]
+    /// Makes a `Circuit` and `StoreCircuit` with an `Abandoned` `circuit_status` to be used to
+    /// update circuit state to reflect the abandoning change
     fn make_abandoned_circuit(
         &self,
         store_circuit: &StoreCircuit,
