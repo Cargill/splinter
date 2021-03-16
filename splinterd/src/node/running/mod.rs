@@ -20,6 +20,7 @@ pub mod network;
 use std::thread::JoinHandle;
 
 use cylinder::Signer;
+use scabbard::client::{ReqwestScabbardClientBuilder, ScabbardClient};
 use splinter::admin::client::{AdminServiceClient, ReqwestAdminServiceClient};
 use splinter::error::InternalError;
 use splinter::registry::RegistryWriter;
@@ -67,6 +68,16 @@ impl Node {
         Box::new(ReqwestAdminServiceClient::new(
             format!("http://localhost:{}", self.rest_api_port),
             "foo".to_string(),
+        ))
+    }
+
+    pub fn scabbard_client(&self) -> Result<Box<dyn ScabbardClient>, InternalError> {
+        Ok(Box::new(
+            ReqwestScabbardClientBuilder::new()
+                .with_url(&format!("http://localhost:{}", self.rest_api_port))
+                .with_auth("foo")
+                .build()
+                .map_err(|e| InternalError::from_source(Box::new(e)))?,
         ))
     }
 }
