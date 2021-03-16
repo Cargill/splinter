@@ -70,8 +70,14 @@ use splinter::rest_api::auth::authorization::maintenance::MaintenanceModeAuthori
 use splinter::rest_api::auth::authorization::rbac::{
     rest_api::RoleBasedAuthorizationResourceProvider, RoleBasedAuthorizationHandler,
 };
+#[cfg(any(
+    feature = "authorization-handler-rbac",
+    feature = "authorization-handler-maintenance",
+    feature = "authorization-handler-allow-keys"
+))]
+use splinter::rest_api::auth::authorization::AuthorizationHandler;
 #[cfg(feature = "authorization")]
-use splinter::rest_api::auth::authorization::{AuthorizationHandler, Permission};
+use splinter::rest_api::auth::authorization::Permission;
 #[cfg(feature = "oauth")]
 use splinter::rest_api::OAuthConfig;
 use splinter::rest_api::{
