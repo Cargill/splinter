@@ -170,7 +170,7 @@ pub struct AdminServiceShared {
     // PeerRef Map, peer_id to PeerRef, these PeerRef should be dropped when the peer is no longer
     // needed
     peer_refs: HashMap<String, Vec<PeerRef>>,
-    // network sender is used to comunicated with other services on the splinter network
+    // network sender is used to communicate with other services on the splinter network
     network_sender: Option<Box<dyn ServiceNetworkSender>>,
     // the CircuitManagementPayloads that are waiting for members to be peered
     unpeered_payloads: Vec<PendingPayload>,
