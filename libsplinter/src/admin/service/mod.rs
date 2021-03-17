@@ -448,6 +448,16 @@ impl Service for AdminService {
             return Err(ServiceStartError::AlreadyStarted);
         }
 
+        let network_sender = service_registry.connect(&self.service_id)?;
+
+        {
+            let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
+                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
+            })?;
+
+            admin_service_shared.set_network_sender(Some(network_sender));
+        }
+
         let (sender, receiver) = channel();
         let peer_subscriber_id = self
             .peer_connector
@@ -481,16 +491,6 @@ impl Service for AdminService {
             .map_err(|err| ServiceStartError::Internal(err.to_string()))?;
 
         self.peer_notification_run_state = Some((peer_subscriber_id, notification_join_handle));
-
-        let network_sender = service_registry.connect(&self.service_id)?;
-
-        {
-            let mut admin_service_shared = self.admin_service_shared.lock().map_err(|_| {
-                ServiceStartError::PoisonedLock("the admin shared lock was poisoned".into())
-            })?;
-
-            admin_service_shared.set_network_sender(Some(network_sender));
-        }
 
         // Setup consensus
         let consensus = AdminConsensusManager::new(
