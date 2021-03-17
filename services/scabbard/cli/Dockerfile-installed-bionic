@@ -41,11 +41,13 @@ COPY services/scabbard/cli /build/services/scabbard/cli
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 
 # Build the project
-WORKDIR /build/services/scabbard/cli
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
-RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
+    services/scabbard/cli/Cargo.toml
+RUN cargo build --manifest-path=services/scabbard/cli/Cargo.toml --release $CARGO_ARGS
+RUN (cd services/scabbard/cli && cargo deb --no-build --deb-version $REPO_VERSION \
+    --manifest-path ./Cargo.toml)
 
 # Log the commit hash
 COPY .git/ /tmp/.git/
