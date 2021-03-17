@@ -47,7 +47,7 @@ run `docker-compose -f docker-compose-installed.yaml build splinterd`.
 
 To use Docker to build Splinter with experimental features enabled, set an
 environment variable in your shell before running the build commands. For
-example: `export 'CARGO_ARGS=-- --features experimental'`. To go back to
+example: `export 'CARGO_ARGS= --features experimental'`. To go back to
 building with default features, unset the environment variable:
 `unset CARGO_ARGS`
 
