@@ -1262,7 +1262,7 @@ pub fn test_3_party_circuit_lifecycle() {
             .list_proposals(None, None)
             .expect("Unable to list proposals from third node")
             .data;
-        if !(proposals_b.is_empty() && proposals_c.is_empty()) {
+        if !proposals_b.is_empty() && !proposals_c.is_empty() {
             // Unwrap the first elements in each list as we've already validated that both of
             // the lists are not empty
             proposal_b = proposals_b.get(0).unwrap().clone();
