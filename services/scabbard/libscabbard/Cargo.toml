@@ -52,6 +52,7 @@ glob = "0.2"
 default = []
 
 stable = [
+  "authorization",
   "client",
   "default",
   "events",
@@ -63,7 +64,6 @@ experimental = [
   # The experimental feature extends stable:
   "stable",
   # The following features are experimental:
-  "authorization",
   "circuit-purge",
   "factory-builder",
 ]
