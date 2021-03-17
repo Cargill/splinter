@@ -46,25 +46,29 @@ COPY splinterd /build/splinterd
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 
 # Build the gameroomd package
-WORKDIR /build/examples/gameroom/daemon
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
-RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
+    examples/gameroom/daemon/Cargo.toml
+RUN cargo build --manifest-path=examples/gameroom/daemon/Cargo.toml --release $CARGO_ARGS
+RUN (cd examples/gameroom/daemon && cargo deb --no-build --deb-version $REPO_VERSION \
+    --manifest-path ./Cargo.toml)
 
 # Build the gameroom-cli package
-WORKDIR /build/examples/gameroom/cli
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
-RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" \
+    examples/gameroom/cli/Cargo.toml
+RUN cargo build --manifest-path=examples/gameroom/cli/Cargo.toml --release $CARGO_ARGS
+RUN (cd examples/gameroom/cli && cargo deb --no-build --deb-version $REPO_VERSION \
+    --manifest-path ./Cargo.toml)
 
 # Build splinter-cli
-WORKDIR /build/cli
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
-RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml
+RUN cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
+RUN (cd cli && cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml)
 RUN mv /build/target/debian/splinter-cli*.deb /tmp
 
 # Log the commit hash

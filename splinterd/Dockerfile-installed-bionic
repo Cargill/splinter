@@ -47,20 +47,20 @@ COPY splinterd/ /build/splinterd
 COPY services/scabbard/libscabbard /build/services/scabbard/libscabbard
 
 # Build splinterd
-WORKDIR /build/splinterd
 ARG REPO_VERSION
 ARG CARGO_ARGS
 ARG SPLINTERD_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
-RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" splinterd/Cargo.toml
+RUN cargo build --manifest-path=splinterd/Cargo.toml --release $CARGO_ARGS
+RUN (cd splinterd && cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml)
 RUN mv /build/target/debian/splinter-daemon*.deb /tmp
 
 # Build splinter-cli
-WORKDIR /build/cli
 ARG REPO_VERSION
 ARG CARGO_ARGS
-RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
-RUN cargo deb --deb-version $REPO_VERSION $CARGO_ARGS
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" cli/Cargo.toml
+RUN cargo build --manifest-path=cli/Cargo.toml --release $CARGO_ARGS
+RUN (cd cli && cargo deb --no-build --deb-version $REPO_VERSION --manifest-path ./Cargo.toml)
 RUN mv /build/target/debian/splinter-cli*.deb /tmp
 
 # Log the commit hash
