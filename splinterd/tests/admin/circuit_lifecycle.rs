@@ -943,7 +943,6 @@ pub fn test_3_party_circuit_creation_proposal_rejected() {
 /// 10. Validate the disbanded circuit is still available to each node, though disbanded, and that
 ///    the disbanded circuit is the same for each node
 #[test]
-#[ignore]
 pub fn test_2_party_circuit_lifecycle() {
     // Start a 2-node network
     let mut network = Network::new()
