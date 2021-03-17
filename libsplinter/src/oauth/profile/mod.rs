@@ -30,14 +30,6 @@ pub trait ProfileProvider: Send + Sync {
 
     /// Clone implementation for `ProfileProvider`. The implementation of the `Clone` trait for
     /// `Box<dyn ProfileProvider>` calls this method.
-    ///
-    /// # Example
-    ///
-    ///```ignore
-    ///  fn clone_box(&self) -> Box<dyn ProfileProvider> {
-    ///     Box::new(self.clone())
-    ///  }
-    ///```
     fn clone_box(&self) -> Box<dyn ProfileProvider>;
 }
 
