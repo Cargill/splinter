@@ -54,6 +54,7 @@ default = []
 stable = [
   "authorization",
   "client",
+  "client-reqwest",
   "default",
   "events",
   "rest-api",
@@ -70,7 +71,8 @@ experimental = [
 
 authorization = ["splinter/authorization"]
 circuit-purge = ["splinter/circuit-purge"]
-client = ["reqwest"]
+client = []
+client-reqwest = ["client", "reqwest"]
 events = ["splinter/events"]
 factory-builder = []
 rest-api = ["futures", "splinter/rest-api"]

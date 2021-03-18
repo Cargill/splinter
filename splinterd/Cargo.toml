@@ -133,7 +133,7 @@ database-sqlite = ["splinter/sqlite"]
 health-service = ["health"]
 https-bind = ["splinter/https-bind"]
 node = [
-    "scabbard/client",
+    "scabbard/client-reqwest",
     "scabbard/factory-builder",
     "splinter/admin-service-client",
     "splinter/client-reqwest",
