@@ -1667,7 +1667,7 @@ impl AdminServiceShared {
                 })?;
         } else {
             return Err(AdminSharedError::ServiceProtocolError(format!(
-                "AdminService is not started, can't sent request to {}",
+                "AdminService is not started, can't send request to {}",
                 peer_id
             )));
         }
