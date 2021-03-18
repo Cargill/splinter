@@ -86,16 +86,11 @@ impl RunnableAdminSubsystem {
                 splinter::keys::insecure::AllowAllKeyPermissionManager,
             ))
             .with_coordinator_timeout(admin_timeout)
-            .with_routing_table_writer(routing_writer);
+            .with_routing_table_writer(routing_writer)
+            .with_admin_event_store(store_factory.get_admin_service_store());
 
         let circuit_resource_provider =
             CircuitResourceProvider::new(node_id, store_factory.get_admin_service_store());
-
-        #[cfg(feature = "admin-service-event-store")]
-        {
-            admin_service_builder = admin_service_builder
-                .with_admin_event_store(store_factory.get_admin_service_store());
-        }
 
         let admin_service = admin_service_builder
             .build()
