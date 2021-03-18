@@ -36,7 +36,7 @@ flexi_logger = "0.14"
 log = "0.4"
 sabre-sdk = "0.7"
 transact = { version = "0.3", features = ["contract-archive"] }
-scabbard = { path = "../libscabbard", features = ["client"] }
+scabbard = { path = "../libscabbard", features = ["client-reqwest"] }
 
 [dev-dependencies]
 serial_test = "0.3"
