@@ -17,6 +17,8 @@
 #[cfg(feature = "node")]
 mod circuit_commit;
 #[cfg(feature = "node")]
+mod circuit_disband;
+#[cfg(feature = "node")]
 mod circuit_lifecycle;
 #[cfg(feature = "node")]
 mod circuit_list;
