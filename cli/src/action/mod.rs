@@ -31,19 +31,16 @@ pub mod rbac;
 pub mod registry;
 
 use std::collections::HashMap;
-use std::env;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{Error as IoError, ErrorKind, Read};
 use std::path::Path;
 
 use clap::ArgMatches;
-use cylinder::{
-    current_user_key_name, current_user_search_path, jwt::JsonWebTokenBuilder, load_key,
-    load_key_from_path, secp256k1::Secp256k1Context, Context,
-};
+use cylinder::jwt::JsonWebTokenBuilder;
 
 use super::error::CliError;
+use crate::signing::load_signer;
 
 const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8080";
 const SPLINTER_REST_API_URL_ENV: &str = "SPLINTER_REST_API_URL";
@@ -142,62 +139,7 @@ fn msg_from_io_error(err: IoError) -> String {
 
 // build a signed json web token using the private key
 fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
-    let private_key = if let Some(key_name) = key_name {
-        if key_name.contains('/') {
-            load_key_from_path(Path::new(key_name))
-                .map_err(|err| CliError::ActionError(err.to_string()))?
-        } else {
-            let path = &current_user_search_path();
-            load_key(key_name, path)
-                .map_err(|err| CliError::ActionError(err.to_string()))?
-                .ok_or_else(|| {
-                    CliError::ActionError({
-                        format!(
-                            "No signing key found in {}. Either specify the --key argument or \
-                            generate the default key via splinter keygen",
-                            path.iter()
-                                .map(|path| path.as_path().display().to_string())
-                                .collect::<Vec<String>>()
-                                .join(":")
-                        )
-                    })
-                })?
-        }
-    } else {
-        // If the `CYLINDER_PATH` environment variable is not set, add `$HOME/.splinter/keys`
-        // to the vector of paths to search. This is for backwards compatibility.
-        let path = match env::var("CYLINDER_PATH") {
-            Ok(_) => current_user_search_path(),
-            Err(_) => {
-                let mut splinter_path = match dirs::home_dir() {
-                    Some(dir) => dir,
-                    None => Path::new(".").to_path_buf(),
-                };
-                splinter_path.push(".splinter");
-                splinter_path.push("keys");
-                let mut paths = current_user_search_path();
-                paths.push(splinter_path);
-                paths
-            }
-        };
-        load_key(&current_user_key_name(), &path)
-            .map_err(|err| CliError::ActionError(err.to_string()))?
-            .ok_or_else(|| {
-                CliError::ActionError({
-                    format!(
-                        "No signing key found in {}. Either specify the --key argument or \
-                        generate the default key via splinter keygen",
-                        path.iter()
-                            .map(|path| path.as_path().display().to_string())
-                            .collect::<Vec<String>>()
-                            .join(":")
-                    )
-                })
-            })?
-    };
-
-    let context = Secp256k1Context::new();
-    let signer = context.new_signer(private_key);
+    let signer = load_signer(key_name)?;
 
     let encoded_token = JsonWebTokenBuilder::new()
         .build(&*signer)
