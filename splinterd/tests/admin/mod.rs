@@ -18,3 +18,5 @@
 mod circuit_lifecycle;
 #[cfg(feature = "node")]
 mod circuit_list;
+#[cfg(feature = "node")]
+mod payload;
