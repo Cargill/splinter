@@ -32,15 +32,13 @@ pub mod registry;
 
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::fs::File;
-use std::io::{Error as IoError, ErrorKind, Read};
+use std::io::{Error as IoError, ErrorKind};
 use std::path::Path;
 
 use clap::ArgMatches;
-use cylinder::jwt::JsonWebTokenBuilder;
+use cylinder::{jwt::JsonWebTokenBuilder, Signer};
 
 use super::error::CliError;
-use crate::signing::load_signer;
 
 const DEFAULT_SPLINTER_REST_API_URL: &str = "http://127.0.0.1:8080";
 const SPLINTER_REST_API_URL_ENV: &str = "SPLINTER_REST_API_URL";
@@ -105,29 +103,6 @@ fn chown(path: &Path, uid: u32, gid: u32) -> Result<(), CliError> {
     }
 }
 
-/// Reads a private key from the given file name.
-fn read_private_key(file_name: &str) -> Result<String, CliError> {
-    let mut file = File::open(file_name).map_err(|err| {
-        CliError::EnvironmentError(format!(
-            "Unable to open key file '{}': {}",
-            file_name,
-            msg_from_io_error(err)
-        ))
-    })?;
-
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).map_err(|err| {
-        CliError::EnvironmentError(format!(
-            "Unable to read key file '{}': {}",
-            file_name,
-            msg_from_io_error(err)
-        ))
-    })?;
-    let key = buf.trim().to_string();
-
-    Ok(key)
-}
-
 fn msg_from_io_error(err: IoError) -> String {
     match err.kind() {
         ErrorKind::NotFound => "File not found".into(),
@@ -137,10 +112,7 @@ fn msg_from_io_error(err: IoError) -> String {
     }
 }
 
-// build a signed json web token using the private key
-fn create_cylinder_jwt_auth(key_name: Option<&str>) -> Result<String, CliError> {
-    let signer = load_signer(key_name)?;
-
+fn create_cylinder_jwt_auth(signer: Box<dyn Signer>) -> Result<String, CliError> {
     let encoded_token = JsonWebTokenBuilder::new()
         .build(&*signer)
         .map_err(|err| CliError::ActionError(format!("failed to build json web token: {}", err)))?;

@@ -20,18 +20,16 @@ use splinter::registry::{Node, YamlNode};
 #[cfg(feature = "registry")]
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use crate::error::CliError;
 #[cfg(feature = "registry")]
 use crate::registry::api::RegistryNode;
+use crate::signing::load_signer;
 
 use super::api::SplinterRestClientBuilder;
-use super::{
-    msg_from_io_error, read_private_key, Action, DEFAULT_SPLINTER_REST_API_URL,
-    SPLINTER_REST_API_URL_ENV,
-};
+use super::{msg_from_io_error, Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
 
 use super::create_cylinder_jwt_auth;
 
@@ -69,11 +67,11 @@ impl Action for RegistryGenerateAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+        let signer = load_signer(arg_matches.and_then(|args| args.value_of("private_key_file")))?;
 
         let client = SplinterRestClientBuilder::new()
             .with_url(url)
-            .with_auth(create_cylinder_jwt_auth(key)?)
+            .with_auth(create_cylinder_jwt_auth(signer)?)
             .build()?;
 
         let node_status = client.get_node_status()?;
@@ -196,11 +194,11 @@ impl Action for RegistryAddAction {
             .unwrap_or(&identity)
             .to_string();
 
-        let private_key = args.value_of("private_key_file");
+        let signer = load_signer(args.value_of("private_key_file"))?;
 
         let client = SplinterRestClientBuilder::new()
             .with_url(url)
-            .with_auth(create_cylinder_jwt_auth(private_key)?)
+            .with_auth(create_cylinder_jwt_auth(signer)?)
             .build()?;
 
         let mut node_metadata: HashMap<String, String> = HashMap::new();
@@ -289,4 +287,27 @@ fn parse_metadata(metadata: &str) -> Result<(String, String), CliError> {
         ))),
         _ => unreachable!(), // splitn always returns at least one item
     }
+}
+
+/// Reads a private key from the given file name.
+fn read_private_key(file_name: &str) -> Result<String, CliError> {
+    let mut file = File::open(file_name).map_err(|err| {
+        CliError::EnvironmentError(format!(
+            "Unable to open key file '{}': {}",
+            file_name,
+            msg_from_io_error(err)
+        ))
+    })?;
+
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).map_err(|err| {
+        CliError::EnvironmentError(format!(
+            "Unable to read key file '{}': {}",
+            file_name,
+            msg_from_io_error(err)
+        ))
+    })?;
+    let key = buf.trim().to_string();
+
+    Ok(key)
 }

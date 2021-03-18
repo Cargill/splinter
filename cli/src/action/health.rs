@@ -16,10 +16,11 @@ use clap::ArgMatches;
 use reqwest::{blocking::Client, StatusCode};
 use serde_json::Value;
 
+use crate::error::CliError;
+use crate::signing::load_signer;
+
 use super::create_cylinder_jwt_auth;
 use super::{Action, DEFAULT_SPLINTER_REST_API_URL, SPLINTER_REST_API_URL_ENV};
-
-use crate::error::CliError;
 
 pub struct StatusAction;
 
@@ -35,11 +36,11 @@ impl Action for StatusAction {
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+        let signer = load_signer(arg_matches.and_then(|args| args.value_of("private_key_file")))?;
 
         Client::new()
             .get(&format!("{}/health/status", url))
-            .header("Authorization", create_cylinder_jwt_auth(key)?)
+            .header("Authorization", create_cylinder_jwt_auth(signer)?)
             .send()
             .map_err(|err| match err.status() {
                 Some(StatusCode::NOT_FOUND) => {
