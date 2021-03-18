@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Integration tests for the lifecycle of a circuit between multiple nodes.
+//! Integration tests for the creation of a circuit between multiple nodes.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
