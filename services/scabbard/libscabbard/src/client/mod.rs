@@ -18,6 +18,7 @@ mod error;
 #[cfg(feature = "reqwest")]
 mod reqwest;
 
+use std::str::FromStr;
 use std::time::Duration;
 
 use transact::protocol::batch::Batch;
@@ -83,6 +84,14 @@ impl ServiceId {
     /// Get the service ID.
     pub fn service_id(&self) -> &str {
         &self.service_id
+    }
+}
+
+impl FromStr for ServiceId {
+    type Err = ScabbardClientError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_string(s)
     }
 }
 
@@ -161,4 +170,46 @@ pub trait ScabbardClient {
     /// * An internal error based on the underlying implementation
     fn get_current_state_root(&self, service_id: &ServiceId)
         -> Result<String, ScabbardClientError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that a `ServiceId` can be correctly parsed from a fully-qualified service ID string.
+    #[test]
+    fn service_id_from_string() {
+        assert!(ServiceId::from_string("").is_err());
+        assert!(ServiceId::from_string("01234-abcde").is_err());
+        assert!(ServiceId::from_string("::").is_err());
+        assert!(ServiceId::from_string("01234-abcde::").is_err());
+        assert!(ServiceId::from_string("::ABCD").is_err());
+
+        let service_id = ServiceId::from_string("01234-abcde::ABCD").expect("failed to parse");
+        assert_eq!(service_id.circuit(), "01234-abcde");
+        assert_eq!(service_id.service_id(), "ABCD");
+    }
+
+    /// This test covers parsing ServiceId values from strings. It is tested via str::parse, which
+    /// is provided by the FromStr implementation.
+    ///
+    /// 1. Parse a valid id
+    /// 2. Return err on missing service id
+    /// 3. Return err on only circuit id
+    /// 4. Return err on empty str
+    #[test]
+    fn test_parse_service_id() {
+        let service_id: ServiceId = "circuit::service".parse().expect("Unable to parse");
+        assert_eq!("circuit", service_id.circuit());
+        assert_eq!("service", service_id.service_id());
+
+        let parse_res: Result<ServiceId, _> = "circuit::".parse();
+        assert!(matches!(parse_res, Err(ScabbardClientError { .. })));
+
+        let parse_res: Result<ServiceId, _> = "circuit".parse();
+        assert!(matches!(parse_res, Err(ScabbardClientError { .. })));
+
+        let parse_res: Result<ServiceId, _> = "".parse();
+        assert!(matches!(parse_res, Err(ScabbardClientError { .. })));
+    }
 }

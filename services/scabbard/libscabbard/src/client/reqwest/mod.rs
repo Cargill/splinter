@@ -490,20 +490,6 @@ mod tests {
         permission_description: "Allows the client to submit batches to scabbard services",
     };
 
-    /// Verify that a `ServiceId` can be correctly parsed from a fully-qualified service ID string.
-    #[test]
-    fn service_id_from_string() {
-        assert!(ServiceId::from_string("").is_err());
-        assert!(ServiceId::from_string("01234-abcde").is_err());
-        assert!(ServiceId::from_string("::").is_err());
-        assert!(ServiceId::from_string("01234-abcde::").is_err());
-        assert!(ServiceId::from_string("::ABCD").is_err());
-
-        let service_id = ServiceId::from_string("01234-abcde::ABCD").expect("failed to parse");
-        assert_eq!(service_id.circuit(), "01234-abcde");
-        assert_eq!(service_id.service_id(), "ABCD");
-    }
-
     /// Verify the `ScabbardClient::submit` method works properly.
     #[test]
     fn submit() {
