@@ -37,6 +37,7 @@ use crate::registry::{
     error::InvalidNodeError, validate_nodes, MetadataPredicate, Node, NodeIter, RegistryError,
     RegistryReader,
 };
+use crate::threading::lifecycle::ShutdownHandle;
 
 use super::{LocalYamlRegistry, YamlNode};
 
@@ -75,7 +76,7 @@ use super::{LocalYamlRegistry, YamlNode};
 /// [`constructor`]: struct.RemoteYamlRegistry.html#method.new
 pub struct RemoteYamlRegistry {
     internal: Arc<Mutex<Internal>>,
-    shutdown_handle: ShutdownHandle,
+    shutdown_handle: Option<RemoteYamlShutdownHandle>,
 }
 
 impl RemoteYamlRegistry {
@@ -103,14 +104,14 @@ impl RemoteYamlRegistry {
             forced_refresh_period,
         )?));
 
-        let running = automatic_refresh_period
-            .map::<Result<_, RegistryError>, _>(|refresh_period| {
+        let (running, join_handle) = {
+            if let Some(refresh_period) = automatic_refresh_period {
                 let running = Arc::new(AtomicBool::new(true));
 
                 let thread_internal = internal.clone();
                 let thread_url = url.to_string();
                 let thread_running = running.clone();
-                thread::Builder::new()
+                let join_handle = thread::Builder::new()
                     .name(format!("Remote Registry Automatic Refresh: {}", url))
                     .spawn(move || {
                         automatic_refresh_loop(
@@ -129,20 +130,25 @@ impl RemoteYamlRegistry {
                             ),
                         ))
                     })?;
-                Ok(running)
-            })
-            .transpose()?;
-        let shutdown_handle = ShutdownHandle { running };
+                (Some(running), Some(join_handle))
+            } else {
+                (None, None)
+            }
+        };
+
+        let shutdown_handle = RemoteYamlShutdownHandle {
+            running,
+            join_handle,
+        };
 
         Ok(Self {
             internal,
-            shutdown_handle,
+            shutdown_handle: Some(shutdown_handle),
         })
     }
 
-    /// Get a copy of the registry's `ShutdownHandle`.
-    pub fn shutdown_handle(&self) -> ShutdownHandle {
-        self.shutdown_handle.clone()
+    pub fn take_shutdown_handle(&mut self) -> Option<RemoteYamlShutdownHandle> {
+        self.shutdown_handle.take()
     }
 
     /// Acquire the lock for the internal cache and get the nodes from it.
@@ -398,17 +404,28 @@ fn automatic_refresh_loop(
 }
 
 /// Handle for signaling the `RemoteYamlRegistry` to shutdown.
-#[derive(Clone)]
-pub struct ShutdownHandle {
+pub struct RemoteYamlShutdownHandle {
     running: Option<Arc<AtomicBool>>,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
-impl ShutdownHandle {
+impl ShutdownHandle for RemoteYamlShutdownHandle {
     /// Send shutdown signal to `RemoteYamlRegistry`.
-    pub fn shutdown(&self) {
+    fn signal_shutdown(&mut self) {
         if let Some(running) = &self.running {
             running.store(false, Ordering::SeqCst)
         }
+    }
+
+    fn wait_for_shutdown(self) -> Result<(), InternalError> {
+        if let Some(join_handle) = self.join_handle {
+            if join_handle.join().is_err() {
+                return Err(InternalError::with_message(
+                    "Unable to shutdown remote yaml registry".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -435,14 +452,20 @@ mod tests {
         registry[1].identity = "identity".into();
         let test_config = TestConfig::setup("duplicate_identity", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -455,14 +478,20 @@ mod tests {
         registry[1].endpoints = vec!["endpoint".into()];
         let test_config = TestConfig::setup("duplicate_endpoint", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -474,14 +503,20 @@ mod tests {
         registry[0].identity = "".into();
         let test_config = TestConfig::setup("empty_identity", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -493,14 +528,20 @@ mod tests {
         registry[0].endpoints = vec!["".into()];
         let test_config = TestConfig::setup("empty_endpoint", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -512,14 +553,20 @@ mod tests {
         registry[0].display_name = "".into();
         let test_config = TestConfig::setup("empty_display_name", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -531,14 +578,20 @@ mod tests {
         registry[0].keys = vec!["".into()];
         let test_config = TestConfig::setup("empty_key", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -549,14 +602,20 @@ mod tests {
         registry[0].endpoints = vec![];
         let test_config = TestConfig::setup("missing_endpoints", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -567,14 +626,20 @@ mod tests {
         registry[0].keys = vec![];
         let test_config = TestConfig::setup("missing_keys", Some(registry));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         // Verify that the registry is still empty
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -583,7 +648,7 @@ mod tests {
     fn fetch_node_ok() {
         let test_config = TestConfig::setup("fetch_node_ok", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -594,7 +659,13 @@ mod tests {
             .expect("Node not found");
         assert_eq!(node, expected_node);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -603,7 +674,7 @@ mod tests {
     fn fetch_node_not_found() {
         let test_config = TestConfig::setup("fetch_node_not_found", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -612,7 +683,13 @@ mod tests {
             .expect("Failed to fetch node")
             .is_none());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -623,7 +700,7 @@ mod tests {
     fn has_node() {
         let test_config = TestConfig::setup("has_node", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -635,7 +712,13 @@ mod tests {
             .has_node("NodeNotInRegistry")
             .expect("Failed to check for non-existent node"));
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -644,7 +727,7 @@ mod tests {
     fn list_nodes() {
         let test_config = TestConfig::setup("list_nodes", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -658,7 +741,13 @@ mod tests {
             assert!(nodes.contains(&node));
         }
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -667,7 +756,7 @@ mod tests {
     fn list_nodes_empty() {
         let test_config = TestConfig::setup("list_nodes_empty", Some(vec![]));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -678,7 +767,13 @@ mod tests {
 
         assert!(nodes.is_empty());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -687,7 +782,7 @@ mod tests {
     fn list_nodes_filter_metadata() {
         let test_config = TestConfig::setup("list_nodes_filter_metadata", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -708,7 +803,13 @@ mod tests {
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0], mock_registry()[0]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -718,7 +819,7 @@ mod tests {
     fn list_nodes_filter_multiple() {
         let test_config = TestConfig::setup("list_nodes_filter_multiple", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -749,7 +850,13 @@ mod tests {
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0], mock_registry()[2]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -758,7 +865,7 @@ mod tests {
     fn list_nodes_filter_empty() {
         let test_config = TestConfig::setup("list_nodes_filter_empty", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -774,7 +881,13 @@ mod tests {
 
         assert!(nodes.is_empty());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -784,13 +897,19 @@ mod tests {
     fn file_available_at_startup() {
         let test_config = TestConfig::setup("file_available_at_startup", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -802,7 +921,7 @@ mod tests {
         // Start without a remote file
         let test_config = TestConfig::setup("file_unavailable_at_startup", None);
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -815,7 +934,13 @@ mod tests {
         // Verify that the registry's contents were updated
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -824,14 +949,21 @@ mod tests {
     fn auto_refresh_disabled() {
         let test_config = TestConfig::setup("auto_refresh_disabled", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
-        // The `running` atomic bool is only set if the auto refresh thread was started.
-        assert!(remote_registry.shutdown_handle().running.is_none());
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
 
-        remote_registry.shutdown_handle().shutdown();
+        // The `running` atomic bool is only set if the auto refresh thread was started.
+        assert!(shutdown_handle.running.is_none());
+
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -842,7 +974,7 @@ mod tests {
         let test_config = TestConfig::setup("auto_refresh_enabled", Some(mock_registry()));
 
         let refresh_period = Duration::from_secs(1);
-        let remote_registry = RemoteYamlRegistry::new(
+        let mut remote_registry = RemoteYamlRegistry::new(
             test_config.url(),
             test_config.path(),
             Some(refresh_period),
@@ -852,8 +984,12 @@ mod tests {
 
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
 
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+
         // The `running` atomic bool is only set if the auto refresh thread was started.
-        assert!(remote_registry.shutdown_handle().running.is_some());
+        assert!(shutdown_handle.running.is_some());
 
         test_config.update_registry(Some(vec![]));
 
@@ -863,7 +999,10 @@ mod tests {
         // Verify that the registry's contents were updated
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -873,7 +1012,7 @@ mod tests {
     fn forced_refresh_disabled() {
         let test_config = TestConfig::setup("forced_refresh_disabled", Some(mock_registry()));
 
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
 
@@ -885,7 +1024,13 @@ mod tests {
         // was updated
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -896,7 +1041,7 @@ mod tests {
         let test_config = TestConfig::setup("forced_refresh_enabled", Some(mock_registry()));
 
         let refresh_period = Duration::from_millis(10);
-        let remote_registry = RemoteYamlRegistry::new(
+        let mut remote_registry = RemoteYamlRegistry::new(
             test_config.url(),
             test_config.path(),
             None,
@@ -914,7 +1059,13 @@ mod tests {
         // Verify that the registry's contents are updated on read
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -925,22 +1076,35 @@ mod tests {
         let test_config = TestConfig::setup("restart_file_available", Some(mock_registry()));
 
         // Start the registry the first time, verify its contents, and shut it down
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
-        remote_registry.shutdown_handle().shutdown();
+
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
 
         // Update the remote file
         test_config.update_registry(Some(vec![]));
 
         // Start the registry again and verify that it has the updated registry contents
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
         verify_internal_cache(&test_config, &remote_registry, vec![]);
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
@@ -951,22 +1115,34 @@ mod tests {
         let test_config = TestConfig::setup("restart_file_unavailable", Some(mock_registry()));
 
         // Start the registry the first time, verify its contents, and shut it down
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
 
         // Make the remote file unavailable
         test_config.update_registry(None);
 
         // Start the registry again and verify that the old contents are still available
-        let remote_registry =
+        let mut remote_registry =
             RemoteYamlRegistry::new(test_config.url(), test_config.path(), None, None)
                 .expect("Failed to create registry");
         verify_internal_cache(&test_config, &remote_registry, mock_registry());
 
-        remote_registry.shutdown_handle().shutdown();
+        let mut shutdown_handle = remote_registry
+            .take_shutdown_handle()
+            .expect("Unable to get shutdown handle");
+        shutdown_handle.signal_shutdown();
+        shutdown_handle
+            .wait_for_shutdown()
+            .expect("Unable to shutdown remote registry");
         test_config.shutdown();
     }
 
