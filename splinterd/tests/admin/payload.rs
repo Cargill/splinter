@@ -21,15 +21,18 @@ use cylinder::Signer;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 
+use sabre_sdk::protocol::payload::CreateContractRegistryActionBuilder;
 use splinter::admin::client::ProposalSlice;
 use splinter::admin::messages::{
     AuthorizationType, CircuitProposalVote, CreateCircuitBuilder, DurabilityType, PersistenceType,
     RouteType, SplinterNode, SplinterNodeBuilder, SplinterService, SplinterServiceBuilder, Vote,
 };
+use splinter::error::InternalError;
 use splinter::protos::admin::{
     CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header,
 };
+use transact::protocol::batch::Batch;
 
 /// Makes the `CircuitManagementPayload` to create a circuit and returns the bytes of this
 /// payload
@@ -235,4 +238,26 @@ fn setup_circuit(
     create_circuit_message
         .into_proto()
         .expect("Unable to get proto from `CreateCircuit`")
+}
+
+/// Create the bytes of a `CreateContractRegistryAction` batch
+pub(in crate::admin) fn make_create_contract_registry_batch(
+    name: &str,
+    signer: &dyn Signer,
+) -> Result<Batch, InternalError> {
+    let owners = vec![signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .as_hex()];
+    CreateContractRegistryActionBuilder::new()
+        .with_name(name.into())
+        .with_owners(owners)
+        .into_payload_builder()
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_transaction_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .into_batch_builder(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))?
+        .build(signer)
+        .map_err(|err| InternalError::from_source(Box::new(err)))
 }
