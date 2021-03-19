@@ -18,6 +18,7 @@ pub(crate) mod error;
 pub(crate) mod messages;
 pub(super) mod proposal_store;
 mod shared;
+mod subscriber;
 
 use std::any::Any;
 #[cfg(feature = "service-arg-validation")]
@@ -60,13 +61,7 @@ pub use self::error::AdminKeyVerifierError;
 pub use self::error::AdminServiceError;
 pub use self::error::AdminSubscriberError;
 pub use self::shared::AdminServiceStatus;
-
-pub trait AdminServiceEventSubscriber: Send {
-    fn handle_event(
-        &self,
-        admin_service_event: &store::AdminServiceEvent,
-    ) -> Result<(), AdminSubscriberError>;
-}
+pub use self::subscriber::AdminServiceEventSubscriber;
 
 pub trait AdminCommands: Send + Sync {
     fn submit_circuit_change(
