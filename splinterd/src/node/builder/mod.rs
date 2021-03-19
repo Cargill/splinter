@@ -149,6 +149,14 @@ impl NodeBuilder {
         self
     }
 
+    /// Specifies any external registry files to be used in the unified registry.
+    pub fn with_external_registries(mut self, registries: Option<Vec<String>>) -> Self {
+        self.admin_subsystem_builder = self
+            .admin_subsystem_builder
+            .with_external_registries(registries);
+        self
+    }
+
     /// Builds the `RunnableNode` and consumes the `NodeBuilder`.
     pub fn build(mut self) -> Result<RunnableNode, InternalError> {
         let url = format!("127.0.0.1:{}", self.rest_api_port.take().unwrap_or(0),);

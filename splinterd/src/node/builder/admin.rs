@@ -39,6 +39,7 @@ pub struct AdminSubsystemBuilder {
     service_transport: Option<InprocTransport>,
     signing_context: Option<Box<dyn Context>>,
     scabbard_config: Option<ScabbardConfig>,
+    registries: Option<Vec<String>>,
 }
 
 impl AdminSubsystemBuilder {
@@ -94,6 +95,12 @@ impl AdminSubsystemBuilder {
         self
     }
 
+    /// Specifies any external registry files to be used in the unified registry.
+    pub fn with_external_registries(mut self, registries: Option<Vec<String>>) -> Self {
+        self.registries = registries;
+        self
+    }
+
     pub fn build(mut self) -> Result<RunnableAdminSubsystem, InternalError> {
         let node_id = self.node_id.take().ok_or_else(|| {
             InternalError::with_message("Cannot build AdminSubsystem without a node id".to_string())
@@ -146,6 +153,8 @@ impl AdminSubsystemBuilder {
             })
             .transpose()?;
 
+        let registries = self.registries;
+
         Ok(RunnableAdminSubsystem {
             node_id,
             admin_timeout,
@@ -155,6 +164,7 @@ impl AdminSubsystemBuilder {
             service_transport,
             admin_service_verifier,
             scabbard_service_factory,
+            registries,
         })
     }
 }
