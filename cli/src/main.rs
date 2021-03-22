@@ -19,6 +19,7 @@ extern crate diesel;
 
 mod action;
 mod error;
+mod signing;
 #[cfg(test)]
 mod tests;
 

@@ -16,6 +16,7 @@
 use clap::ArgMatches;
 
 use crate::error::CliError;
+use crate::signing::load_signer;
 
 use super::{
     api::{SplinterRestClient, SplinterRestClientBuilder},
@@ -63,10 +64,10 @@ fn new_client(arg_matches: Option<&ArgMatches<'_>>) -> Result<SplinterRestClient
         .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
         .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-    let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+    let signer = load_signer(arg_matches.and_then(|args| args.value_of("private_key_file")))?;
 
     SplinterRestClientBuilder::new()
         .with_url(url)
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer)?)
         .build()
 }

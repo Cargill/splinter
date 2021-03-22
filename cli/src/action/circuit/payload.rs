@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cylinder::{secp256k1::Secp256k1Context, Context, PrivateKey};
+use cylinder::Signer;
 use openssl::hash::{hash, MessageDigest};
 use protobuf::Message;
 use splinter::admin::messages::CreateCircuit;
@@ -52,7 +52,7 @@ pub trait ApplyToEnvelope {
 /// Makes a signed, circuit management payload to be submitted to the Splinter REST API.
 pub fn make_signed_payload<M, A>(
     requester_node: &str,
-    private_key: &str,
+    signer: Box<dyn Signer>,
     action: A,
 ) -> Result<Vec<u8>, CliError>
 where
@@ -66,11 +66,6 @@ where
         .map_err(|err| CliError::ActionError(format!("Failed to serialize action: {}", err)))?;
 
     let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)?;
-
-    let private_key = PrivateKey::new_from_hex(private_key).map_err(|err| {
-        CliError::ActionError(format!("Invalid secp256k1 private key provided: {}", err))
-    })?;
-    let signer = Secp256k1Context::new().new_signer(private_key);
 
     let public_key = signer
         .public_key()

@@ -24,17 +24,19 @@ use std::convert::TryFrom;
 use std::fs::File;
 
 use clap::ArgMatches;
+use cylinder::Signer;
 use serde::Deserialize;
 use splinter::admin::messages::{CircuitStatus, CreateCircuit, SplinterService};
 use splinter::protocol::CIRCUIT_PROTOCOL_VERSION;
 
 use crate::error::CliError;
+use crate::signing::load_signer;
 #[cfg(feature = "circuit-template")]
 use crate::template::CircuitTemplate;
 
 use super::api::SplinterRestClientBuilder;
 use super::{
-    msg_from_io_error, print_table, read_private_key, Action, DEFAULT_SPLINTER_REST_API_URL,
+    msg_from_io_error, print_table, Action, DEFAULT_SPLINTER_REST_API_URL,
     SPLINTER_REST_API_URL_ENV,
 };
 
@@ -185,18 +187,16 @@ impl Action for CircuitProposeAction {
                 .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
                 .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
 
-            let key = args.value_of("key");
+            let signer = load_signer(args.value_of("key"))?;
 
             let client = SplinterRestClientBuilder::new()
                 .with_url(url)
-                .with_auth(create_cylinder_jwt_auth(key)?)
+                .with_auth(create_cylinder_jwt_auth(signer.clone())?)
                 .build()?;
 
             let requester_node = client.get_node_status()?.node_id;
-            let private_key_hex = read_private_key(&key.unwrap_or("./splinter.priv"))?;
 
-            let signed_payload =
-                make_signed_payload(&requester_node, &private_key_hex, create_circuit)?;
+            let signed_payload = make_signed_payload(&requester_node, signer, create_circuit)?;
             client.submit_admin_payload(signed_payload)?;
 
             info!("The circuit proposal was submitted successfully");
@@ -575,7 +575,8 @@ impl Action for CircuitVoteAction {
             .map(ToOwned::to_owned)
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let key = args.value_of("private_key_file");
+
+        let signer = load_signer(args.value_of("private_key_file"))?;
 
         let circuit_id = args
             .value_of("circuit_id")
@@ -590,22 +591,20 @@ impl Action for CircuitVoteAction {
             }
         };
 
-        vote_on_circuit_proposal(&url, key, circuit_id, vote)
+        vote_on_circuit_proposal(&url, signer, circuit_id, vote)
     }
 }
 
 fn vote_on_circuit_proposal(
     url: &str,
-    key: Option<&str>,
+    signer: Box<dyn Signer>,
     circuit_id: &str,
     vote: Vote,
 ) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer.clone())?)
         .build()?;
-
-    let private_key_hex = read_private_key(key.unwrap_or("splinter"))?;
 
     let requester_node = client.get_node_status()?.node_id;
     let proposal = client.fetch_proposal(circuit_id)?;
@@ -616,7 +615,7 @@ fn vote_on_circuit_proposal(
             circuit_hash: proposal.circuit_hash,
             vote,
         };
-        let signed_payload = make_signed_payload(&requester_node, &private_key_hex, circuit_vote)?;
+        let signed_payload = make_signed_payload(&requester_node, signer, circuit_vote)?;
         client.submit_admin_payload(signed_payload)
     } else {
         Err(CliError::ActionError(format!(
@@ -643,24 +642,27 @@ impl Action for CircuitDisbandAction {
             .map(ToOwned::to_owned)
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let key = args.value_of("private_key_file");
+
+        let signer = load_signer(args.value_of("private_key_file"))?;
 
         let circuit_id = args
             .value_of("circuit_id")
             .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
 
-        propose_circuit_disband(&url, key, circuit_id)
+        propose_circuit_disband(&url, signer, circuit_id)
     }
 }
 
 #[cfg(feature = "circuit-disband")]
-fn propose_circuit_disband(url: &str, key: Option<&str>, circuit_id: &str) -> Result<(), CliError> {
+fn propose_circuit_disband(
+    url: &str,
+    signer: Box<dyn Signer>,
+    circuit_id: &str,
+) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer.clone())?)
         .build()?;
-
-    let private_key_hex = read_private_key(key.unwrap_or("splinter"))?;
 
     let requester_node = client.get_node_status()?.node_id;
     let circuit = client.fetch_circuit(circuit_id)?;
@@ -669,8 +671,7 @@ fn propose_circuit_disband(url: &str, key: Option<&str>, circuit_id: &str) -> Re
         let circuit_disband_request = CircuitDisband {
             circuit_id: circuit_id.into(),
         };
-        let signed_payload =
-            make_signed_payload(&requester_node, &private_key_hex, circuit_disband_request)?;
+        let signed_payload = make_signed_payload(&requester_node, signer, circuit_disband_request)?;
         client.submit_admin_payload(signed_payload)
     } else {
         Err(CliError::ActionError(format!(
@@ -697,24 +698,27 @@ impl Action for CircuitPurgeAction {
             .map(ToOwned::to_owned)
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let key = args.value_of("private_key_file");
+
+        let signer = load_signer(args.value_of("private_key_file"))?;
 
         let circuit_id = args
             .value_of("circuit_id")
             .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
 
-        request_purge_circuit(&url, key, circuit_id)
+        request_purge_circuit(&url, signer, circuit_id)
     }
 }
 
 #[cfg(feature = "circuit-purge")]
-fn request_purge_circuit(url: &str, key: Option<&str>, circuit_id: &str) -> Result<(), CliError> {
+fn request_purge_circuit(
+    url: &str,
+    signer: Box<dyn Signer>,
+    circuit_id: &str,
+) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer.clone())?)
         .build()?;
-
-    let private_key_hex = read_private_key(key.unwrap_or("splinter"))?;
 
     let requester_node = client.get_node_status()?.node_id;
     let circuit = client.fetch_circuit(circuit_id)?;
@@ -732,8 +736,7 @@ fn request_purge_circuit(url: &str, key: Option<&str>, circuit_id: &str) -> Resu
         let circuit_purge_request = CircuitPurge {
             circuit_id: circuit_id.into(),
         };
-        let signed_payload =
-            make_signed_payload(&requester_node, &private_key_hex, circuit_purge_request)?;
+        let signed_payload = make_signed_payload(&requester_node, signer, circuit_purge_request)?;
         client.submit_admin_payload(signed_payload)
     } else {
         Err(CliError::ActionError(format!(
@@ -760,24 +763,27 @@ impl Action for CircuitAbandonAction {
             .map(ToOwned::to_owned)
             .or_else(|| std::env::var(SPLINTER_REST_API_URL_ENV).ok())
             .unwrap_or_else(|| DEFAULT_SPLINTER_REST_API_URL.to_string());
-        let key = args.value_of("private_key_file");
+
+        let signer = load_signer(args.value_of("private_key_file"))?;
 
         let circuit_id = args
             .value_of("circuit_id")
             .ok_or_else(|| CliError::ActionError("'circuit-id' argument is required".into()))?;
 
-        request_abandon_circuit(&url, key, circuit_id)
+        request_abandon_circuit(&url, signer, circuit_id)
     }
 }
 
 #[cfg(feature = "circuit-abandon")]
-fn request_abandon_circuit(url: &str, key: Option<&str>, circuit_id: &str) -> Result<(), CliError> {
+fn request_abandon_circuit(
+    url: &str,
+    signer: Box<dyn Signer>,
+    circuit_id: &str,
+) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer.clone())?)
         .build()?;
-
-    let private_key_hex = read_private_key(key.unwrap_or("splinter"))?;
 
     let requester_node = client.get_node_status()?.node_id;
     let circuit = client.fetch_circuit(circuit_id)?;
@@ -795,8 +801,7 @@ fn request_abandon_circuit(url: &str, key: Option<&str>, circuit_id: &str) -> Re
         let circuit_abandon = AbandonedCircuit {
             circuit_id: circuit_id.into(),
         };
-        let signed_payload =
-            make_signed_payload(&requester_node, &private_key_hex, circuit_abandon)?;
+        let signed_payload = make_signed_payload(&requester_node, signer, circuit_abandon)?;
         client.submit_admin_payload(signed_payload)
     } else {
         Err(CliError::ActionError(format!(
@@ -829,9 +834,9 @@ impl Action for CircuitListAction {
             })
             .unwrap_or("human");
 
-        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+        let signer = load_signer(arg_matches.and_then(|args| args.value_of("private_key_file")))?;
 
-        list_circuits(&url, member_filter, status_filter, format, key)
+        list_circuits(&url, member_filter, status_filter, format, signer)
     }
 }
 
@@ -840,11 +845,11 @@ fn list_circuits(
     member_filter: Option<&str>,
     status_filter: Option<&str>,
     format: &str,
-    key: Option<&str>,
+    signer: Box<dyn Signer>,
 ) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer)?)
         .build()?;
 
     let circuits = client.list_circuits(member_filter, status_filter)?;
@@ -906,9 +911,9 @@ impl Action for CircuitShowAction {
             args.value_of("format").unwrap_or("human")
         };
 
-        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+        let signer = load_signer(args.value_of("private_key_file"))?;
 
-        show_circuit(&url, circuit_id, format, key)
+        show_circuit(&url, circuit_id, format, signer)
     }
 }
 
@@ -916,11 +921,11 @@ fn show_circuit(
     url: &str,
     circuit_id: &str,
     format: &str,
-    key: Option<&str>,
+    signer: Box<dyn Signer>,
 ) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer)?)
         .build()?;
 
     let circuit = client.fetch_circuit(circuit_id)?;
@@ -1004,9 +1009,9 @@ impl Action for CircuitProposalsAction {
             })
             .unwrap_or("human");
 
-        let key = arg_matches.and_then(|args| args.value_of("private_key_file"));
+        let signer = load_signer(arg_matches.and_then(|args| args.value_of("private_key_file")))?;
 
-        list_proposals(&url, management_type_filter, member_filter, format, key)
+        list_proposals(&url, management_type_filter, member_filter, format, signer)
     }
 }
 
@@ -1015,11 +1020,11 @@ fn list_proposals(
     management_type_filter: Option<&str>,
     member_filter: Option<&str>,
     format: &str,
-    key: Option<&str>,
+    signer: Box<dyn Signer>,
 ) -> Result<(), CliError> {
     let client = SplinterRestClientBuilder::new()
         .with_url(url.to_string())
-        .with_auth(create_cylinder_jwt_auth(key)?)
+        .with_auth(create_cylinder_jwt_auth(signer)?)
         .build()?;
 
     let proposals = client.list_proposals(management_type_filter, member_filter)?;
