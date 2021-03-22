@@ -1861,10 +1861,6 @@ impl AdminServiceShared {
             }
             Ok(())
         } else {
-            println!(
-                "Going to initialize the services for node {:?}",
-                self.node_id()
-            );
             self.initialize_services_if_members_ready(&circuit_id)
         }
     }
