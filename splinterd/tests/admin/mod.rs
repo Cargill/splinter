@@ -14,13 +14,8 @@
 
 //! Admin service integration tests.
 
-#[cfg(feature = "node")]
 mod circuit_commit;
-#[cfg(feature = "node")]
 mod circuit_create;
-#[cfg(feature = "node")]
 mod circuit_disband;
-#[cfg(feature = "node")]
 mod circuit_list;
-#[cfg(feature = "node")]
 mod payload;
