@@ -95,7 +95,7 @@ RUN apt-get update \
  && apt-get -f -y install
 
 # Fetch the XO smart contract
-RUN curl -OLsS https://build.sawtooth.me/job/Sawtooth-Hyperledger/job/sawtooth-sdk-rust/job/master/lastSuccessfulBuild/artifact/build/scar/*zip*/scar.zip
+RUN curl -OLsS https://build.sawtooth.me/job/Sawtooth-Hyperledger/job/sawtooth-sdk-rust/job/main/lastSuccessfulBuild/artifact/build/scar/*zip*/scar.zip
 
 RUN unzip -oj scar.zip \
  && tar -xvf xo_*.scar \
