@@ -319,6 +319,10 @@ impl AdminServiceShared {
             peer_ref_vec.pop();
             if !peer_ref_vec.is_empty() {
                 self.peer_refs.insert(peer_id.to_string(), peer_ref_vec);
+            } else {
+                // If we have no other peer refs for this peer, the connection will be closed.
+                // On reconnection, the peer must go through protocol agreement again
+                self.service_protocols.remove(&admin_service_id(&peer_id));
             }
         }
     }
