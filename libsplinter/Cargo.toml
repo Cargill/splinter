@@ -112,7 +112,6 @@ experimental = [
     "biome-notifications",
     "biome-profile",
     "circuit-abandon",
-    "circuit-disband",
     "circuit-purge",
     "client-reqwest",
     "https-bind",
@@ -142,7 +141,6 @@ biome-notifications = ["biome"]
 biome-profile = ["biome"]
 oauth-profile = ["base64"]
 circuit-abandon = []
-circuit-disband = []
 circuit-purge = []
 circuit-template = ["admin-service", "glob"]
 client-reqwest = ["reqwest"]
