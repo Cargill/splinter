@@ -19,3 +19,4 @@ mod circuit_create;
 mod circuit_disband;
 mod circuit_list;
 mod payload;
+mod registry;
