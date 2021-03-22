@@ -718,7 +718,6 @@ impl Service for AdminService {
 
                 Ok(())
             }
-            #[cfg(feature = "circuit-abandon")]
             AdminMessage_Type::ABANDONED_CIRCUIT => {
                 let abandoned_circuit = admin_message.get_abandoned_circuit();
                 let circuit_id = abandoned_circuit.get_circuit_id();
@@ -732,10 +731,6 @@ impl Service for AdminService {
             }
             AdminMessage_Type::UNSET => Err(ServiceError::InvalidMessageFormat(Box::new(
                 AdminError::MessageTypeUnset,
-            ))),
-            #[cfg(not(feature = "circuit-abandon"))]
-            _ => Err(ServiceError::UnableToHandleMessage(Box::new(
-                AdminError::MessageTypeUnhandled,
             ))),
         }
     }

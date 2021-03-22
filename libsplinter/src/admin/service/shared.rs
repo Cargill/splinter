@@ -20,18 +20,14 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
-use protobuf::Message;
-#[cfg(feature = "circuit-abandon")]
-use protobuf::RepeatedField;
+use protobuf::{Message, RepeatedField};
 
-#[cfg(feature = "circuit-abandon")]
-use crate::admin::store::CircuitBuilder as StoreCircuitBuilder;
 #[cfg(feature = "circuit-purge")]
 use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
-    self, AdminServiceStore, Circuit as StoreCircuit, CircuitNode, CircuitPredicate,
-    CircuitProposal as StoreProposal, CircuitStatus as StoreCircuitStatus, ProposalType,
-    ProposedNode, Vote, VoteRecordBuilder,
+    self, AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
+    CircuitNode, CircuitPredicate, CircuitProposal as StoreProposal,
+    CircuitStatus as StoreCircuitStatus, ProposalType, ProposedNode, Vote, VoteRecordBuilder,
 };
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
@@ -42,17 +38,13 @@ use crate::peer::{PeerManagerConnector, PeerRef};
 use crate::protocol::{
     ADMIN_SERVICE_PROTOCOL_MIN, ADMIN_SERVICE_PROTOCOL_VERSION, CIRCUIT_PROTOCOL_VERSION,
 };
-#[cfg(feature = "circuit-abandon")]
-use crate::protos::admin::AbandonedCircuit;
-#[cfg(any(feature = "service-arg-validation", feature = "circuit-abandon"))]
-use crate::protos::admin::SplinterService;
 use crate::protos::admin::{
-    AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
+    AbandonedCircuit, AdminMessage, AdminMessage_Type, Circuit, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header, CircuitProposal,
     CircuitProposalVote, CircuitProposalVote_Vote, CircuitProposal_ProposalType,
     Circuit_AuthorizationType, Circuit_CircuitStatus, Circuit_DurabilityType,
     Circuit_PersistenceType, Circuit_RouteType, MemberReady, ServiceProtocolVersionRequest,
-    SplinterNode,
+    SplinterNode, SplinterService,
 };
 use crate::service::error::ServiceError;
 #[cfg(feature = "service-arg-validation")]
@@ -958,7 +950,6 @@ impl AdminServiceShared {
         }
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Locally abandon a circuit. The circuit to be abandoned is first fetched from the admin
     /// store, to validate this circuit is available to be abandoned. Then, an `ABANDONED_CIRCUIT`
     /// message is sent to the remote circuit members. Finally, the circuit is abandoned by
@@ -1322,7 +1313,6 @@ impl AdminServiceShared {
 
                 self.purge_circuit(circuit_id)
             }
-            #[cfg(feature = "circuit-abandon")]
             CircuitManagementPayload_Action::CIRCUIT_ABANDON => {
                 let signer_public_key = header.get_requester();
                 let requester_node_id = header.get_requester_node_id();
@@ -2476,7 +2466,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Validate a `CircuitAbandon` payload by the following:
     ///
     /// - Validate the protocol version used by the submitter node. Currently, abandoning is only
@@ -2742,7 +2731,6 @@ impl AdminServiceShared {
         Ok(circuit_proposal)
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Makes a `Circuit` and `StoreCircuit` with an `Abandoned` `circuit_status` to be used to
     /// update circuit state to reflect the abandoning change
     fn make_abandoned_circuit(
@@ -5928,7 +5916,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a circuit being abandoned is validated correctly
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5985,7 +5972,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the circuit does not exist.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -6029,7 +6015,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the circuit is not active.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -6083,7 +6068,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the circuit is active, but
     /// has a circuit version less than the `CIRCUIT_PROTOCOL_VERSION`.
     ///
@@ -6138,7 +6122,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the request does not come
     /// from the local node.
     ///
@@ -6194,7 +6177,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the admin service used has
     /// an invalid protocol version.
     ///
@@ -6244,7 +6226,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the requester is not
     /// permitted for the admin service.
     ///
@@ -6299,7 +6280,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-abandon")]
     /// Tests that a request to abandon a circuit returns an error if the requester is not
     /// permitted for the admin service.
     ///

@@ -294,8 +294,6 @@ impl std::fmt::Display for AdminConsensusManagerError {
 pub enum AdminError {
     ConsensusFailed(AdminConsensusManagerError),
     MessageTypeUnset,
-    #[cfg(not(feature = "circuit-abandon"))]
-    MessageTypeUnhandled,
 }
 
 impl Error for AdminError {
@@ -303,8 +301,6 @@ impl Error for AdminError {
         match self {
             AdminError::ConsensusFailed(err) => Some(err),
             AdminError::MessageTypeUnset => None,
-            #[cfg(not(feature = "circuit-abandon"))]
-            AdminError::MessageTypeUnhandled => None,
         }
     }
 }
@@ -314,8 +310,6 @@ impl std::fmt::Display for AdminError {
         match self {
             AdminError::ConsensusFailed(err) => write!(f, "admin consensus failed: {}", err),
             AdminError::MessageTypeUnset => write!(f, "received message with unset type"),
-            #[cfg(not(feature = "circuit-abandon"))]
-            AdminError::MessageTypeUnhandled => write!(f, "unable to handle the message"),
         }
     }
 }

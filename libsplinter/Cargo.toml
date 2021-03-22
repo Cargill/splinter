@@ -111,7 +111,6 @@ experimental = [
     "authorization-handler-rbac",
     "biome-notifications",
     "biome-profile",
-    "circuit-abandon",
     "circuit-purge",
     "client-reqwest",
     "https-bind",
@@ -140,7 +139,6 @@ biome-key-management = ["biome"]
 biome-notifications = ["biome"]
 biome-profile = ["biome"]
 oauth-profile = ["base64"]
-circuit-abandon = []
 circuit-purge = []
 circuit-template = ["admin-service", "glob"]
 client-reqwest = ["reqwest"]
