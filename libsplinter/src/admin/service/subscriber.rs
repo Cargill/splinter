@@ -41,6 +41,16 @@ impl SubscriberMap {
 
     pub fn broadcast_by_type(&self, event_type: &str, admin_service_event: &AdminServiceEvent) {
         let mut subscribers_by_type = self.subscribers_by_type.borrow_mut();
+        Self::broadcast(&mut subscribers_by_type, event_type, admin_service_event);
+        #[cfg(feature = "admin-service-event-subscriber-glob")]
+        Self::broadcast(&mut subscribers_by_type, "*", admin_service_event);
+    }
+
+    fn broadcast(
+        subscribers_by_type: &mut HashMap<String, Vec<Box<dyn AdminServiceEventSubscriber>>>,
+        event_type: &str,
+        admin_service_event: &AdminServiceEvent,
+    ) {
         if let Some(subscribers) = subscribers_by_type.get_mut(event_type) {
             subscribers.retain(
                 |subscriber| match subscriber.handle_event(admin_service_event) {
@@ -102,6 +112,35 @@ mod tests {
 
         assert_eq!(1, events.len());
         assert_eq!(&2, events[0].event_id());
+    }
+
+    #[cfg(feature = "admin-service-event-subscriber-glob")]
+    #[test]
+    fn test_glob_subscribe() {
+        let mut subscribers_map = SubscriberMap::new();
+
+        let (tx, std_rx) = channel();
+        subscribers_map.add_subscriber("some-type".into(), Box::new(ChannelSubscriber(tx)));
+
+        let (tx, glob_rx) = channel();
+        subscribers_map.add_subscriber("*".into(), Box::new(ChannelSubscriber(tx)));
+
+        subscribers_map.broadcast_by_type(
+            "another-type",
+            &create_circuit_ready_event(1, "another-type"),
+        );
+        subscribers_map.broadcast_by_type("some-type", &create_circuit_ready_event(2, "some-type"));
+
+        let events: Vec<_> = std_rx.try_iter().collect();
+
+        assert_eq!(1, events.len());
+        assert_eq!(&2, events[0].event_id());
+
+        let events: Vec<_> = glob_rx.try_iter().collect();
+
+        assert_eq!(2, events.len());
+        assert_eq!(&1, events[0].event_id());
+        assert_eq!(&2, events[1].event_id());
     }
 
     struct ChannelSubscriber(Sender<AdminServiceEvent>);
