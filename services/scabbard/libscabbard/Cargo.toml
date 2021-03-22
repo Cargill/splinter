@@ -70,7 +70,7 @@ experimental = [
 ]
 
 authorization = ["splinter/authorization"]
-circuit-purge = ["splinter/circuit-purge"]
+circuit-purge = []
 client = []
 client-reqwest = ["client", "reqwest"]
 events = ["splinter/events"]

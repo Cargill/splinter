@@ -85,7 +85,7 @@ authorization-handler-rbac = []
 circuit-auth-type = []
 circuit-abandon = []
 circuit-disband = []
-circuit-purge = ["splinter/circuit-purge"]
+circuit-purge = []
 circuit-template = ["splinter/circuit-template"]
 
 registry = []

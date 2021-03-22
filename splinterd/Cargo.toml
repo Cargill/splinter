@@ -126,7 +126,6 @@ circuit-disband = []
 circuit-purge = [
   "health/circuit-purge",
   "scabbard/circuit-purge",
-  "splinter/circuit-purge",
 ]
 database-postgres = ["splinter/postgres"]
 database-sqlite = ["splinter/sqlite"]

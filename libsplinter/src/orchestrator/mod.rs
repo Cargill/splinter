@@ -208,7 +208,6 @@ impl ServiceOrchestrator {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Purge the specified service state, based on its service implementation.
     pub fn purge_service(
         &self,

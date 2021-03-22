@@ -22,12 +22,11 @@ use std::sync::{Arc, Mutex};
 use cylinder::{PublicKey, Signature, Verifier as SignatureVerifier};
 use protobuf::{Message, RepeatedField};
 
-#[cfg(feature = "circuit-purge")]
-use crate::admin::store::Service as StoreService;
 use crate::admin::store::{
     self, AdminServiceStore, Circuit as StoreCircuit, CircuitBuilder as StoreCircuitBuilder,
     CircuitNode, CircuitPredicate, CircuitProposal as StoreProposal,
-    CircuitStatus as StoreCircuitStatus, ProposalType, ProposedNode, Vote, VoteRecordBuilder,
+    CircuitStatus as StoreCircuitStatus, ProposalType, ProposedNode, Service as StoreService, Vote,
+    VoteRecordBuilder,
 };
 use crate::circuit::routing::{self, RoutingTableWriter};
 use crate::consensus::{Proposal, ProposalId, ProposalUpdate};
@@ -910,7 +909,6 @@ impl AdminServiceShared {
         )
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Attempts to purge a circuit and the associated internal Splinter services
     fn purge_circuit(&mut self, circuit_id: &str) -> Result<(), ServiceError> {
         // Verifying the circuit is able to be purged
@@ -1296,7 +1294,6 @@ impl AdminServiceShared {
                     "local".to_string(),
                 )
             }
-            #[cfg(feature = "circuit-purge")]
             CircuitManagementPayload_Action::CIRCUIT_PURGE_REQUEST => {
                 let signer_public_key = header.get_requester();
                 let requester_node_id = header.get_requester_node_id();
@@ -1772,7 +1769,6 @@ impl AdminServiceShared {
         )?)
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Use the internal `admin_store`'s `remove_circuit` method
     pub fn remove_circuit(
         &mut self,
@@ -2371,7 +2367,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Validates a `CircuitPurgeRequest` using the following:
     ///
     /// - Validate the protocol version used by the requesting node. Currently, purging is only
@@ -2914,7 +2909,6 @@ impl AdminServiceShared {
         Ok(())
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Purges all services that this node was running on the disbanded circuit using the service
     /// orchestrator. Destroying a service will also remove the service's state LMDB files.
     pub fn purge_services(
@@ -5426,7 +5420,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit being purged is validated correctly
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5484,7 +5477,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit is unable to be purged when an invalid admin service protocol
     /// version is used. Currently, the purge functionality is not available for
     /// admin service protocol 1.
@@ -5542,7 +5534,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit purge request is invalid if the circuit to be purged has an
     /// invalid circuit version. `CircuitPurgeRequest` requires that the circuit being purged is
     /// not an invalid version and verifies the status of the circuit being purged. As v1 circuits
@@ -5608,7 +5599,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a purge request is invalid if the circuit to be purged does not exist in the
     /// admin store, indicating an invalid purge request.
     ///
@@ -5657,7 +5647,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a purge request is invalid if the requester is not permitted for the node.
     ///
     /// 1. Set up `AdminServiceShared`
@@ -5715,7 +5704,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a purge request is invalid if the request doesn't come from the admin service's
     /// own node. The `CircuitPurgeRequest` is a local operation, other nodes should not be able
     /// to submit a purge request.
@@ -5775,7 +5763,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit purge request is invalid if the circuit to be purged is still `Active`
     /// in the admin store. The `CircuitPurgeRequest` is only valid for circuits that have already
     /// been disbanded, a `circuit_status` of `Disbanded`.
@@ -5834,7 +5821,6 @@ mod tests {
         shutdown(mesh, cm, pm);
     }
 
-    #[cfg(feature = "circuit-purge")]
     /// Tests that a circuit is able to be purged using the `CircuitPurgeRequest`.
     ///
     /// 1. Set up `AdminServiceShared`
