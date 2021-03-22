@@ -24,6 +24,8 @@
 //! [`RegistryWriter`]: trait.RegistryWriter.html
 //! [`RwRegistry`]: trait.RwRegistry.html
 
+#[cfg(feature = "registry-client")]
+pub mod client;
 #[cfg(feature = "diesel")]
 mod diesel;
 mod error;
