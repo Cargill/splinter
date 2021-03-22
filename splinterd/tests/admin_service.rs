@@ -18,4 +18,5 @@
 #[macro_use]
 mod framework;
 
+#[cfg(feature = "node")]
 mod admin;
