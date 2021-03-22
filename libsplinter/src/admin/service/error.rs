@@ -18,7 +18,11 @@ use std::fmt;
 use crate::admin::store::error::AdminServiceStoreError;
 use crate::consensus::error::ProposalManagerError;
 use crate::orchestrator::InitializeServiceError;
-#[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
+#[cfg(any(
+    feature = "circuit-disband",
+    feature = "circuit-abandon",
+    feature = "circuit-purge"
+))]
 use crate::orchestrator::ShutdownServiceError;
 use crate::service::error::{ServiceError, ServiceSendError};
 
@@ -163,7 +167,11 @@ pub enum AdminSharedError {
         context: String,
         source: Option<InitializeServiceError>,
     },
-    #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
+    #[cfg(any(
+        feature = "circuit-disband",
+        feature = "circuit-abandon",
+        feature = "circuit-purge"
+    ))]
     ServiceShutdownFailed {
         context: String,
         source: Option<ShutdownServiceError>,
@@ -193,7 +201,11 @@ impl Error for AdminSharedError {
                     None
                 }
             }
-            #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
+            #[cfg(any(
+                feature = "circuit-disband",
+                feature = "circuit-abandon",
+                feature = "circuit-purge"
+            ))]
             AdminSharedError::ServiceShutdownFailed { source, .. } => {
                 if let Some(ref err) = source {
                     Some(err)
@@ -228,7 +240,11 @@ impl fmt::Display for AdminSharedError {
                     f.write_str(&context)
                 }
             }
-            #[cfg(any(feature = "circuit-disband", feature = "circuit-abandon"))]
+            #[cfg(any(
+                feature = "circuit-disband",
+                feature = "circuit-abandon",
+                feature = "circuit-purge"
+            ))]
             AdminSharedError::ServiceShutdownFailed { context, source } => {
                 if let Some(ref err) = source {
                     write!(f, "{}: {}", context, err)
