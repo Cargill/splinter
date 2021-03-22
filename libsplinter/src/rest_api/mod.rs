@@ -54,7 +54,7 @@
 //! #[cfg(not(feature = "https-bind"))]
 //! let bind = "localhost:8080";
 //! #[cfg(feature = "https-bind")]
-//! let bind = splinter::rest_api::RestApiBind::Insecure("localhost:8080".into());
+//! let bind = splinter::rest_api::BindConfig::Http("localhost:8080".into());
 //!
 //! RestApiBuilder::new()
 //!     .add_resources(index_resource.resources())
@@ -115,24 +115,24 @@ const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS
 
 /// Bind configuration for the REST API.
 #[derive(Clone)]
-pub enum RestApiBind {
+pub enum BindConfig {
     #[cfg(feature = "https-bind")]
-    /// A secure binding, including certificate and key paths.
-    Secure {
+    /// A secure HTTPS binding, including certificate and key paths.
+    Https {
         bind: String,
         cert_path: String,
         key_path: String,
     },
-    /// A insecure binding.
-    Insecure(String),
+    /// A insecure HTTP binding.
+    Http(String),
 }
 
-impl std::fmt::Display for RestApiBind {
+impl std::fmt::Display for BindConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             #[cfg(feature = "https-bind")]
-            RestApiBind::Secure { bind, .. } => write!(f, "https://{}", bind),
-            RestApiBind::Insecure(bind) => write!(f, "http://{}", bind),
+            BindConfig::Https { bind, .. } => write!(f, "https://{}", bind),
+            BindConfig::Http(bind) => write!(f, "http://{}", bind),
         }
     }
 }

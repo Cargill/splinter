@@ -383,7 +383,7 @@ mod tests {
         #[cfg(not(feature = "https-bind"))]
         let bind = "127.0.0.1:0";
         #[cfg(feature = "https-bind")]
-        let bind = crate::rest_api::RestApiBind::Insecure("127.0.0.1:0".into());
+        let bind = crate::rest_api::BindConfig::Http("127.0.0.1:0".into());
 
         rest_api_builder =
             rest_api_builder

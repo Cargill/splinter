@@ -28,7 +28,7 @@ use crate::rest_api::auth::identity::cylinder::CylinderKeyIdentityProvider;
 use crate::rest_api::{
     auth::identity::oauth::OAuthUserIdentityProvider, OAuthConfig, OAuthResourceProvider,
 };
-use crate::rest_api::{auth::identity::IdentityProvider, RestApiBind, RestApiServerError};
+use crate::rest_api::{auth::identity::IdentityProvider, BindConfig, RestApiServerError};
 
 use super::AuthConfig;
 #[cfg(any(feature = "biome-credentials", feature = "oauth"))]
@@ -38,7 +38,7 @@ use super::{Resource, RestApi};
 /// Builder `struct` for `RestApi`.
 pub struct RestApiBuilder {
     resources: Vec<Resource>,
-    bind: Option<RestApiBind>,
+    bind: Option<BindConfig>,
     #[cfg(feature = "rest-api-cors")]
     whitelist: Option<Vec<String>>,
     auth_configs: Vec<AuthConfig>,
@@ -67,12 +67,12 @@ impl RestApiBuilder {
 
     #[cfg(not(feature = "https-bind"))]
     pub fn with_bind(mut self, value: &str) -> Self {
-        self.bind = Some(RestApiBind::Insecure(value.to_string()));
+        self.bind = Some(BindConfig::Http(value.to_string()));
         self
     }
 
     #[cfg(feature = "https-bind")]
-    pub fn with_bind(mut self, value: RestApiBind) -> Self {
+    pub fn with_bind(mut self, value: BindConfig) -> Self {
         self.bind = Some(value);
         self
     }
@@ -270,8 +270,8 @@ impl RestApiBuilder {
 
         let bind = match bind {
             #[cfg(feature = "https-bind")]
-            RestApiBind::Secure { bind, .. } => RestApiBind::Insecure(bind),
-            insecure @ RestApiBind::Insecure(_) => insecure,
+            BindConfig::Https { bind, .. } => BindConfig::Http(bind),
+            insecure @ BindConfig::Http(_) => insecure,
         };
 
         Ok(RestApi {
@@ -305,7 +305,7 @@ mod test {
         }
         #[cfg(feature = "https-bind")]
         {
-            builder = builder.with_bind(RestApiBind::Insecure("test".into()));
+            builder = builder.with_bind(BindConfig::Http("test".into()));
         }
 
         let auth_config = AuthConfig::Custom {
@@ -323,7 +323,7 @@ mod test {
     fn rest_api_builder_no_auth() {
         #[cfg(feature = "https-bind")]
         let result = RestApiBuilder::new()
-            .with_bind(RestApiBind::Insecure("test".into()))
+            .with_bind(BindConfig::Http("test".into()))
             .build();
         #[cfg(not(feature = "https-bind"))]
         let result = RestApiBuilder::new().with_bind("test").build();
