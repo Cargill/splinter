@@ -20,7 +20,13 @@ use std::time::{Duration, Instant};
 use splinterd::node::RestApiVariant;
 
 use crate::admin::circuit_commit::{commit_2_party_circuit, commit_3_party_circuit};
-use crate::admin::payload::{make_circuit_proposal_vote_payload, make_create_circuit_payload};
+use crate::admin::{
+    get_node_service_id,
+    payload::{
+        make_circuit_proposal_vote_payload, make_create_circuit_payload,
+        make_create_contract_registry_batch,
+    },
+};
 use crate::framework::network::Network;
 
 /// Test that a 2-party circuit may be created on a 2-node network.
@@ -33,6 +39,10 @@ use crate::framework::network::Network;
 /// 6. Create and submit a `CircuitProposalVote` from the second node to accept the proposal
 /// 7. Wait until the circuit is available on the first node, using `list_circuits`
 /// 8. Verify the same circuit is available to each node
+/// 9. Create and submit a `Scabbard` transaction from the first node, to verify the active circuit
+///    is able to be used
+/// 10. Submit the same `Scabbard` transaction created in the last step from the other node,
+///    to verify the duplicate transaction fails to commit to the active circuit
 #[test]
 pub fn test_2_party_circuit_creation() {
     // Start a 2-node network
@@ -48,6 +58,40 @@ pub fn test_2_party_circuit_creation() {
     let circuit_id = "ABCDE-01234";
 
     commit_2_party_circuit(circuit_id, node_a, node_b);
+
+    // Create the `ServiceId` struct based on the first node's associated `service_id` and the
+    // committed `circuit_id`
+    let service_id_a = get_node_service_id(&circuit_id, node_a);
+    // Submit a `CreateContractRegistryAction` to validate the service transaction is
+    // valid on the active circuit
+    let scabbard_batch =
+        make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer());
+    assert!(node_a
+        .scabbard_client()
+        .expect("Unable to get first node's ScabbardClient")
+        .submit(
+            &service_id_a,
+            vec![scabbard_batch],
+            Some(Duration::from_secs(5)),
+        )
+        .is_ok());
+
+    // Create the `ServiceId` struct based on the second node's associated `service_id` and the
+    // committed `circuit_id`
+    let service_id_b = get_node_service_id(&circuit_id, node_b);
+    // Submit the same `CreateContractRegistryAction` payload submitted previously by the first
+    // node to validate this duplicate transaction is not committed to the circuit
+    let scabbard_batch =
+        make_create_contract_registry_batch("contract_registry_0", &*node_b.admin_signer());
+    assert!(node_b
+        .scabbard_client()
+        .expect("Unable to get second node's ScabbardClient")
+        .submit(
+            &service_id_b,
+            vec![scabbard_batch],
+            Some(Duration::from_secs(5)),
+        )
+        .is_err());
 
     shutdown!(network).expect("Unable to shutdown network");
 }
@@ -68,6 +112,10 @@ pub fn test_2_party_circuit_creation() {
 /// 9. Create and submit a `CircuitProposalVote` from the third node to accept the proposal
 /// 10. Wait until the circuit becomes available for one of the other nodes, using `list_circuits`
 /// 11. Validate the circuit is available to every node
+/// 12. Create and submit a `Scabbard` transaction from the first node, to verify the active
+///    circuit is able to be used
+/// 13. Submit the same `Scabbard` transaction created in the last step from the other node,
+///    to verify the duplicate transaction fails to commit to the active circuit
 #[test]
 pub fn test_3_party_circuit_creation() {
     // Start a 3-node network
@@ -84,6 +132,40 @@ pub fn test_3_party_circuit_creation() {
 
     let circuit_id = "ABCDE-01234";
     commit_3_party_circuit(circuit_id, node_a, node_b, node_c);
+
+    // Create the `ServiceId` struct based on the first node's associated `service_id` and the
+    // committed `circuit_id`
+    let service_id_a = get_node_service_id(&circuit_id, node_a);
+    // Submit a `CreateContractRegistryAction` to validate the service transaction is
+    // valid on the active circuit
+    let scabbard_batch =
+        make_create_contract_registry_batch("contract_registry_0", &*node_a.admin_signer());
+    assert!(node_a
+        .scabbard_client()
+        .expect("Unable to get first node's ScabbardClient")
+        .submit(
+            &service_id_a,
+            vec![scabbard_batch],
+            Some(Duration::from_secs(5)),
+        )
+        .is_ok());
+
+    // Create the `ServiceId` struct based on the second node's associated `service_id` and the
+    // committed `circuit_id`
+    let service_id_b = get_node_service_id(&circuit_id, node_b);
+    // Submit the same `CreateContractRegistryAction` payload submitted previously by the first
+    // node to validate this duplicate transaction is not committed to the circuit
+    let scabbard_batch =
+        make_create_contract_registry_batch("contract_registry_0", &*node_b.admin_signer());
+    assert!(node_b
+        .scabbard_client()
+        .expect("Unable to get second node's ScabbardClient")
+        .submit(
+            &service_id_b,
+            vec![scabbard_batch],
+            Some(Duration::from_secs(5)),
+        )
+        .is_err());
 
     shutdown!(network).expect("Unable to shutdown network");
 }
