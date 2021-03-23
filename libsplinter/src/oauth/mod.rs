@@ -77,6 +77,8 @@ impl OAuthClient {
     ///   identifiers
     /// * `inflight_request_store` - The store for information about in-flight request to a
     /// provider.
+    /// * `profile_provider` - The OAuth profile provider used to retrieve the profile
+    ///   information of the authenticated user from the OAuth provider.
     fn new(
         client: BasicClient,
         extra_auth_params: Vec<(String, String)>,
