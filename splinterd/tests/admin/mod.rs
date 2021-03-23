@@ -15,6 +15,7 @@
 //! Admin service integration tests.
 
 mod biome;
+mod circuit_abandon;
 mod circuit_commit;
 mod circuit_create;
 mod circuit_disband;
