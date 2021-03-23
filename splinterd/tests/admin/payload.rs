@@ -29,7 +29,7 @@ use splinter::admin::messages::{
 };
 use splinter::error::InternalError;
 use splinter::protos::admin::{
-    CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
+    CircuitAbandon, CircuitCreateRequest, CircuitDisbandRequest, CircuitManagementPayload,
     CircuitManagementPayload_Action, CircuitManagementPayload_Header,
 };
 use transact::protocol::batch::Batch;
@@ -166,6 +166,50 @@ pub(in crate::admin) fn make_circuit_disband_payload(
     payload
         .write_to_bytes()
         .expect("Unable to get bytes from `CircuitDisbandRequest` payload")
+}
+
+/// Makes the `CircuitManagementPayload` to abandon a circuit and returns the bytes of this
+/// payload
+pub(in crate::admin) fn make_circuit_abandon_payload(
+    circuit_id: &str,
+    requester_node_id: &str,
+    signer: &dyn Signer,
+) -> Vec<u8> {
+    // Get the public key to create the `CircuitAbandon` and to also set the `requester`
+    // field of the `CircuitManagementPayload` header
+    let public_key = signer
+        .public_key()
+        .expect("Unable to get signer's public key")
+        .into_bytes();
+    let mut circuit_abandon = CircuitAbandon::new();
+    circuit_abandon.set_circuit_id(circuit_id.to_string());
+
+    let serialized_action = circuit_abandon
+        .write_to_bytes()
+        .expect("Unable to serialize `CircuitAbandon`");
+    let hashed_bytes = hash(MessageDigest::sha512(), &serialized_action)
+        .expect("Unable to hash `CircuitAbandon` bytes");
+
+    let mut header = CircuitManagementPayload_Header::new();
+    header.set_action(CircuitManagementPayload_Action::CIRCUIT_ABANDON);
+    header.set_requester(public_key);
+    header.set_payload_sha512(hashed_bytes.to_vec());
+    header.set_requester_node_id(requester_node_id.to_string());
+
+    let mut payload = CircuitManagementPayload::new();
+    payload.set_signature(
+        signer
+            .sign(&payload.header)
+            .expect("Unable to sign `CircuitManagmentPayload` header")
+            .take_bytes(),
+    );
+    payload.set_circuit_abandon(circuit_abandon);
+    payload
+        .set_header(Message::write_to_bytes(&header).expect("Unable to serialize payload header"));
+    // Return the bytes of the payload
+    payload
+        .write_to_bytes()
+        .expect("Unable to get bytes from `CircuitAbandon` payload")
 }
 
 /// Creates the `CircuitCreateRequest` for the `CircuitManagementPayload` to propose a circuit
