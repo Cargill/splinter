@@ -21,7 +21,7 @@ use crate::error::{
     ConstraintViolationError, InternalError, InvalidArgumentError, InvalidStateError,
 };
 
-/// Errors that may occur during [UserProfileStoreError] operations.
+/// Errors that may occur during [UserProfileStore] operations.
 #[derive(Debug)]
 pub enum UserProfileStoreError {
     ConstraintViolation(ConstraintViolationError),
