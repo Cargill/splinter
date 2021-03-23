@@ -420,7 +420,6 @@ pub fn test_2_party_circuit_disband_proposal_rejected() {
 /// 15. Submit a `Scabbard` transaction from one of the nodes to validate the batch is unable to be
 ///    committed on the disbanded circuit as the services set-up for this circuit have been stopped
 #[test]
-#[ignore]
 pub fn test_3_party_circuit_lifecycle() {
     // Start a 3-node network
     let mut network = Network::new()
@@ -539,7 +538,7 @@ pub fn test_3_party_circuit_lifecycle() {
             .fetch_proposal(&circuit_id)
             .expect("Unable to fetch proposal from third node")
             .unwrap();
-        if proposal_a.votes.is_empty() && proposal_b.votes.is_empty() && proposal_c.votes.is_empty()
+        if proposal_a.votes.is_empty() || proposal_b.votes.is_empty() || proposal_c.votes.is_empty()
         {
             continue;
         } else {
