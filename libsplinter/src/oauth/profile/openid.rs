@@ -71,13 +71,20 @@ impl ProfileProvider for OpenIdProfileProvider {
                 .header("Authorization", format!("Bearer {}", access_token))
                 .send()
             {
-                Ok(image) => match image.bytes() {
-                    Ok(image_data) => Some(encode(image_data.to_vec())),
-                    Err(_) => {
-                        warn!("Failed to get bytes from microsoft graph HTTP response");
+                Ok(res) => {
+                    if res.status().is_success() {
+                        match res.bytes() {
+                            Ok(image_data) => Some(encode(image_data.to_vec())),
+                            Err(_) => {
+                                warn!("Failed to get bytes from microsoft graph HTTP response");
+                                Some("".into())
+                            }
+                        }
+                    } else {
+                        warn!("Microsoft graph API request failed");
                         Some("".into())
                     }
-                },
+                }
                 Err(_) => {
                     warn!("Failed to get user profile picture from microsoft graph API");
                     Some("".into())
